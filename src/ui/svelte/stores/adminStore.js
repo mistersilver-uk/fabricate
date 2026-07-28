@@ -5470,8 +5470,19 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * Create a crafting system, select it, and report it back so the caller can navigate.
+   *
+   * Returns the created system on success and `false` when the GM backed out of the
+   * dirty-environment confirm — `false` specifically, because the manager root routes
+   * this through the same "did it happen?" helper as `selectSystem`, and that helper
+   * treats only `false` as "no". Returning `null` here would read as success and
+   * navigate away from an edit the GM just chose to keep.
+   *
+   * @returns {Promise<object|false>}
+   */
   async function createSystem() {
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     const systemManager = services.getCraftingSystemManager();
     const name = _nextSystemName(systemManager);
@@ -5483,6 +5494,7 @@ export function createAdminStore(services) {
     activeTab.set('systems');
     await services.setSetting('lastManagedCraftingSystem', system.id);
     await refresh();
+    return system;
   }
 
   async function deleteSystem(systemId) {

@@ -423,6 +423,31 @@ describe('adminStore gathering environments tab state', () => {
     assert.equal(services._confirmCalls[0].no.label, 'Keep Editing');
   });
 
+  // `createSystem` reports its outcome so the manager root can open the new system's
+  // System Overview, and the root routes that through a helper which treats ONLY `false`
+  // as "did not happen". A declined confirm must therefore return `false` and not a merely
+  // falsy `null` — otherwise the root reads it as success and navigates away from the very
+  // environment edit the GM just chose to keep.
+  it('returns false from createSystem when a dirty environment draft is kept', async () => {
+    const services = createServices({
+      systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],
+      environments: [makeEnvironment({ id: 'environment-a', name: 'Forest' })],
+      confirmResult: false
+    });
+    const store = createAdminStore(services);
+
+    await store.selectSystem('system-a');
+    await store.setTab('environments');
+    store.updateEnvironmentDraft({ name: 'Unsaved Forest' });
+    const before = get(store.viewState).systems.length;
+
+    const created = await store.createSystem();
+
+    assert.equal(created, false, 'strictly false, not a falsy null');
+    assert.equal(get(store.viewState).systems.length, before, 'and nothing was created');
+    assert.equal(get(store.viewState).environmentDraft.name, 'Unsaved Forest', 'the edit survives');
+  });
+
   it('discards a dirty environment draft when tab navigation is confirmed', async () => {
     const services = createServices({
       systems: [makeSystem({ id: 'system-a', features: { gathering: true } })],

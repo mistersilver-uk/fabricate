@@ -1420,7 +1420,13 @@ function createStore(calls = [], options = {}) {
       applySelectedSystem(id);
       return true;
     },
-    createSystem: () => calls.push(['createSystem']),
+    // The real action returns the created system on success and `false` when the GM
+    // backed out of the dirty-environment confirm, because the root routes it through
+    // `afterTruthyResult` to decide whether to navigate.
+    createSystem: () => {
+      calls.push(['createSystem']);
+      return Object.hasOwn(options, 'createSystemResult') ? options.createSystemResult : {};
+    },
     importSystem: () => calls.push(['importSystem']),
     exportSystem: (id) => calls.push(['exportSystem', id]),
     deleteSystem: (id) => calls.push(['deleteSystem', id]),
@@ -14575,4 +14581,65 @@ describe('CraftingSystemManager mounted behavior', () => {
       'tool-lantern'
     );
   });
+  // Creating a crafting system already SELECTED it in the store, but left the GM on the
+  // systems library — one more click from the thing they had just asked for, and with no
+  // signal about which row in the list was the new one. The root now opens the new
+  // system's System Overview on its Settings tab, which is the page a brand-new system
+  // exists to be taken through.
+  it('creating a crafting system opens its System Overview', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls, {}), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'systems',
+      'pre-condition: the manager opens on the systems library'
+    );
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      calls.some((call) => call[0] === 'createSystem'),
+      'the store still performs the create'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    assert.ok(
+      target.querySelector('.manager-system-edit-form'),
+      'and lands on the Settings tab, not the Validation tab'
+    );
+  });
+
+  // …but only when a system was actually created. Backing out of the dirty-environment
+  // confirm returns `false`, and navigating anyway would abandon the very edit the GM
+  // just chose to keep.
+  it('a cancelled crafting-system create stays on the systems library', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { createSystemResult: false }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+  });
+
 });

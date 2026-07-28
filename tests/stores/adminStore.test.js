@@ -761,6 +761,21 @@ describe('createAdminStore', () => {
       assert.ok(vs.systems.some((s) => s.id === sysId));
     });
 
+    // The manager root routes this through the same "did it happen?" helper as
+    // `selectSystem`, and that helper treats ONLY `false` as no — so the return value is a
+    // contract, not an incidental. On success it hands back the system; on a declined
+    // dirty-environment confirm it must be `false`, because a `null` would read as success
+    // and navigate the GM away from the very edit they just chose to keep.
+    it('createSystem returns the created system so the caller can open it', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+
+      const created = await store.createSystem();
+
+      assert.ok(created, 'a successful create reports the system back');
+      assert.equal(created.id, get(store.selectedSystemId));
+    });
+
     it('createSystem generates unique name when default already exists', async () => {
       const services = createMockServices();
       // First creation will produce 'New Crafting System'

@@ -3057,8 +3057,16 @@
     selectSystem(systemId);
   }
 
+  // A newly created system is already SELECTED by the store, but the GM was left on the
+  // systems library looking at a list — one more click from the thing they just asked for,
+  // and with no signal about which row is the new one. Open its System Overview instead,
+  // on the Settings tab, exactly as `editSystem` does: a new system's first job is to be
+  // configured, and that is the page that configures it.
   function createSystem() {
-    store.createSystem?.();
+    afterTruthyResult(store.createSystem?.(), () => {
+      requestSystemTab('settings');
+      activeView = 'system-edit';
+    });
   }
 
   // The store resolves the post-import report content (or null when the import was
