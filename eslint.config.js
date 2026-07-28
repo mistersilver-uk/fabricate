@@ -287,6 +287,18 @@ export default [
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },
     },
+    rules: {
+      'no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
   },
 
   // 9. Prettier compatibility — disables formatting rules Prettier owns. LAST.
