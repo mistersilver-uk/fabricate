@@ -11791,7 +11791,7 @@ async function main() {
             const railStates = await page.evaluate(() =>
               Array.from(document.querySelectorAll('#fabricate-app [data-requirement-slot]'))
                 .map((node) => `${node.dataset.slotKind}:${node.dataset.slotState}`)
-                .sort()
+                .sort((a, b) => a.localeCompare(b))
             );
             const expectedRailStates = ['choice:partial', 'essence:short', 'fixed:met'];
             if (railStates.join('|') !== expectedRailStates.join('|')) {
@@ -11920,7 +11920,10 @@ async function main() {
             await setCarrierUnits('Smoke Duskcrystal', 1);
             await setCarrierUnits('Smoke Starmote', 0);
             const sharedMeters = await readMeters();
-            const sharedStates = sharedMeters.map((meter) => meter.state).sort().join('|');
+            const sharedStates = sharedMeters
+              .map((meter) => meter.state)
+              .sort((a, b) => a.localeCompare(b))
+              .join('|');
             if (sharedMeters.length !== 2 || sharedStates !== 'met|partial') {
               throw new Error(
                 `Shared pool was ${JSON.stringify(sharedMeters)}, expected one met and one part-delivered meter`
