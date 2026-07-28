@@ -6587,7 +6587,10 @@ export function createAdminStore(services) {
 
   // --- Essence management ---
 
-  async function addEssence(name, description, icon, sourceComponentId) {
+  // `colorToken` is the optional GM-authored per-essence colour (issue 917). It is a
+  // bare `--fab-tag-*` key or null; `CraftingSystemManager` owns the palette
+  // validation, so the store only has to carry the authored value through.
+  async function addEssence(name, description, icon, sourceComponentId, colorToken) {
     const normalizedName = String(name || '').trim();
     if (!normalizedName) return false;
     const systemManager = services.getCraftingSystemManager();
@@ -6613,6 +6616,7 @@ export function createAdminStore(services) {
         name: normalizedName,
         description: String(description || ''),
         icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
+        colorToken: colorToken || null,
         ...sourceFields,
       },
     ];
@@ -6656,6 +6660,12 @@ export function createAdminStore(services) {
     const nextIcon = Object.prototype.hasOwnProperty.call(updates, 'icon')
       ? normalizeEssenceIcon(updates.icon)
       : normalizeEssenceIcon(current.icon);
+    // The authored colour (issue 917) is nullable BY DESIGN, so absence and null are
+    // different instructions: an absent `colorToken` leaves the stored value alone (the
+    // spread below preserves it), while an explicit null is the editor's Clear control
+    // unsetting the colour. Palette validation belongs to `CraftingSystemManager`.
+    const hasColorTokenUpdate = Object.prototype.hasOwnProperty.call(updates, 'colorToken');
+    const nextColorToken = hasColorTokenUpdate ? updates.colorToken || null : null;
     const hasSourceUpdate =
       Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId') ||
       Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid');
@@ -6679,6 +6689,7 @@ export function createAdminStore(services) {
         description: nextDescription,
         icon: nextIcon,
       };
+      if (hasColorTokenUpdate) nextDefinition.colorToken = nextColorToken;
       if (!hasSourceUpdate) return nextDefinition;
       return {
         ...nextDefinition,
