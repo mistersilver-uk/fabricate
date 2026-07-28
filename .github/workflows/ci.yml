@@ -70,6 +70,9 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint
 
+      - name: Lint Svelte components (ESLint)
+        run: npm run lint:svelte
+
       - name: Lint styles (Stylelint)
         run: npm run lint:css
 

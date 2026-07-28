@@ -236,14 +236,28 @@ describe('Tool Studio editor (mounted)', () => {
     // Item…". Every existing assertion here matches MID-sentence and so cannot see the
     // join; this one straddles it. Found in a screenshot, not by a test (issue 881).
     for (const row of root.querySelectorAll('[data-tool-how-it-works] li')) {
+      const prose = row.querySelector('span');
+      // The row's ONE leading space is the other half of that fix and is just as fragile.
+      // The `{' '}` separator carries an `eslint-disable-next-line
+      // svelte/no-useless-mustaches` directive that MUST stay welded to the preceding
+      // markup comment's `-->`: moved onto its own line it splits the surrounding markup
+      // whitespace into two runs, Svelte collapses each to one space, and the row renders
+      // with a DOUBLE space between the glyph and the prose. The `<span>` text is byte-identical
+      // either way, so only an assertion over the whole ROW text can see it — and reflowing
+      // that one line is the likeliest way a human silently undoes the fix.
+      assert.equal(
+        row.textContent,
+        ` ${prose.textContent}`,
+        `explainer row must render exactly one space before its prose, got ${JSON.stringify(row.textContent.slice(0, 60))}`
+      );
+
       const lead = row.querySelector('strong')?.textContent;
       if (!lead) continue;
-      // Asserted on the JOIN, not the string start: the row's textContent carries leading
-      // whitespace from the glyph element, so anchoring at position 0 fails on markup that
-      // is actually correct.
+      // Asserted on the span rather than the row, so the leading whitespace above does not
+      // have to be restated here; `startsWith` pins the lead-in join at exactly one space.
       assert.ok(
-        row.textContent.includes(`${lead} `),
-        `explainer lead-in "${lead}" must be followed by a space, got "${row.textContent.slice(0, 60)}"`
+        prose.textContent.startsWith(`${lead} `) && !prose.textContent.startsWith(`${lead}  `),
+        `explainer lead-in "${lead}" must be followed by exactly one space, got ${JSON.stringify(prose.textContent.slice(0, 60))}`
       );
     }
     assert.match(

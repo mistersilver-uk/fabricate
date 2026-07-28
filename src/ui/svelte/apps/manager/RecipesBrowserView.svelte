@@ -57,7 +57,6 @@
     browserState = $bindable(null)
   } = $props();
 
-  // svelte-ignore state_referenced_locally
   let ownBrowserState = $state(createRecipeBrowserState());
   // The active view-state: the root's lifted object when bound, else the local
   // fallback. Both are `$state` proxies, so nested writes (`ui.statusFilter = …`)
@@ -223,6 +222,9 @@
   }
 
   function toggleGroup(category) {
+    // Copy-then-reassign: the reactive unit is `ui.collapsedCategories`, not the Set. In-place
+    // SvelteSet mutation would stop the bound state propagating back to the manager root.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(ui.collapsedCategories);
     if (next.has(category)) next.delete(category);
     else next.add(category);

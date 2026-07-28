@@ -121,6 +121,8 @@
 
   // Build one row per check, borrowing the owning issue when the check fails.
   const rows = $derived.by(() => {
+    // Function-local bookkeeping scratch, discarded when the $derived.by returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const usedIssueIds = new Set();
     const checkRows = readiness.checks.map((check) => {
       const owners = CHECK_TO_ISSUES[check.id] || [];

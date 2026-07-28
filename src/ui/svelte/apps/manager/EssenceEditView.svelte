@@ -170,18 +170,21 @@
       || (showSourceUi && (sourceTouched || sourceComponentId !== sourceIdentity(essence)));
   }
 
+  // A throw is a failure exactly as a `false` return is, so both mark the draft failed in
+  // their own branch. There is no `result` temporary to leave unassigned, and the save is
+  // still awaited exactly once — an extra async hop here would move the failure notice a
+  // microtask later than the mounted route tests observe it.
   async function handleSave(event) {
     event.preventDefault();
     if (!validName || saving) return;
     saveFailed = false;
     const updates = buildUpdates();
-    let result = false;
     try {
-      result = await onSave(draftId || null, updates);
-    } catch (err) {
-      result = false;
-    }
-    if (result === false) {
+      const result = await onSave(draftId || null, updates);
+      if (result === false) {
+        saveFailed = true;
+      }
+    } catch {
       saveFailed = true;
     }
   }

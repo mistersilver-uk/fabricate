@@ -32,7 +32,7 @@
       if (typeof nextPath === 'string' && nextPath.trim()) {
         onChange(nextPath);
       }
-    } catch (err) {
+    } catch {
       // A failed picker leaves the manual text entry untouched.
     } finally {
       picking = false;

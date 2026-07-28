@@ -1,11 +1,12 @@
 // Flat ESLint config for Fabricate.
 //
 // Goals: maintainability, testability, ease of change, and a predictable file
-// structure. Rules are introduced staged-by-path — `npm run lint` (the CI gate)
-// only targets the `.js` paths that are green today; `.svelte` files and any
-// not-yet-clean `.js` paths are linted by the non-gating `lint:all` /
-// `lint:svelte` scripts until follow-ups fold them into the gate. See
-// CONTRIBUTING.md.
+// structure. Rules are introduced staged-by-path. Two scripts gate in CI:
+// `npm run lint` targets the `.js` paths that are green today, and
+// `npm run lint:svelte` targets every `.svelte` file under `src/` — both run as
+// separate steps of the required `lint` job. The remaining not-yet-clean `.js`
+// paths are linted only by the non-gating `lint:all` script until follow-ups
+// fold them into the gate. See CONTRIBUTING.md.
 //
 // Block order matters in flat config: later blocks override earlier ones, and
 // `eslint-config-prettier` MUST stay last so it can switch off the stylistic
@@ -275,9 +276,30 @@ export default [
     },
   },
 
-  // 8. Svelte components (Svelte 5 runes). Wired up so `lint:svelte` works, but
-  //    intentionally NOT part of the gated `lint` script yet — folded into the
-  //    required check in a follow-up once findings are triaged.
+  // 8. Svelte components (Svelte 5 runes). This block IS gated: `npm run
+  //    lint:svelte` runs it over every `.svelte` file under `src/` as its own
+  //    step of the required `lint` CI job, so a new finding here fails the
+  //    build. It runs with `--max-warnings=0`, which matters because
+  //    `svelte.configs.recommended` ships two WARN-level rules
+  //    (`svelte/no-at-debug-tags`, `svelte/no-inspect`) — without the flag a
+  //    stray `{@debug}` tag or a leftover `$inspect()` would report and the job
+  //    would still exit 0.
+  //
+  //    `svelte/no-unused-svelte-ignore` (from the recommended set) makes the
+  //    gate bidirectional: a `svelte-ignore` comment that no longer suppresses
+  //    anything is itself a failure, so suppressions must be removed once they
+  //    stop being needed.
+  //
+  //    A finding has three legitimate dispositions — fix the code, tune the
+  //    config here, or suppress with a stated rationale. Suppressions use
+  //    `eslint-disable-next-line` only (never a file-level disable) and carry a
+  //    one-line rationale; markup sites need the HTML-comment form
+  //    `<!-- eslint-disable-next-line <rule> -->`, since a `//` in markup
+  //    renders as literal on-screen text.
+  //
+  //    Note this gate covers the script and markup of a component only.
+  //    Prettier, Stylelint (scoped `<style>` blocks), and failing the build on
+  //    Svelte compiler warnings all still exclude `.svelte`.
   ...svelte.configs.recommended.map((config) => ({
     ...config,
     files: ['**/*.svelte'],
@@ -286,6 +308,18 @@ export default [
     files: ['**/*.svelte'],
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },
+    },
+    rules: {
+      'no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
     },
   },
 

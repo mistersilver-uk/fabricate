@@ -218,6 +218,9 @@
     expandedTiers = new Set();
   });
   function toggleTier(groupId) {
+    // Copy-then-reassign: the reactive unit is `expandedTiers`, not the Set. The copy is
+    // mutated only before the assignment that publishes it.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(expandedTiers);
     if (next.has(groupId)) next.delete(groupId);
     else next.add(groupId);

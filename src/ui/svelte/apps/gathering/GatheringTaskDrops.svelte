@@ -42,6 +42,9 @@
 
   let expandedIds = $state(new Set());
   function toggle(id) {
+    // Copy-then-reassign: the reactive unit is `expandedIds`, not the Set. A plain Set
+    // that is never mutated after assignment is correct here; SvelteSet is not needed.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(expandedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     expandedIds = next;
@@ -81,7 +84,6 @@
       {#each drops as drop, index (drop.id ?? index)}
         {@const isOpen = expandedIds.has(drop.id ?? index)}
         <li class="gathering-task-drop" data-gathering-drop data-drop-id={drop.id ?? ''}>
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="gathering-task-drop-summary"
             role="button"

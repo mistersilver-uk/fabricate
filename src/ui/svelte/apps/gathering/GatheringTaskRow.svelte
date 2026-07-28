@@ -54,6 +54,9 @@
   // gate is an environment-level restriction, surfaced once above the task list
   // by GatheringDetail — never as a per-task callout here, so it is skipped.
   const callouts = $derived.by(() => {
+    // Function-local de-duplication scratch, discarded when the $derived.by returns.
+    // It is never held in state, so reactivity does not apply.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const seen = new Set();
     const out = [];
     for (const reason of blockedReasons) {
@@ -86,7 +89,6 @@
   data-blocked={blocked ? 'true' : 'false'}
   data-selected={selected ? 'true' : 'false'}
 >
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="gathering-task-summary is-toggle"
     role="button"

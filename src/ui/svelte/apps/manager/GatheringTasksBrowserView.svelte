@@ -9,7 +9,6 @@
 
   let {
     tasks = [],
-    environments = [],
     selectedTaskId = '',
     selectedSystemId = '',
     gatheringConfig = null,

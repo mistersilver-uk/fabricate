@@ -218,6 +218,9 @@
     }
   });
   function toggleSectionCollapsed(section) {
+    // Copy-then-reassign: the reactive unit is `collapsedSections`, not the Set. The copy is
+    // mutated only before the assignment that publishes it.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(collapsedSections);
     if (next.has(section)) next.delete(section);
     else next.add(section);
@@ -228,6 +231,8 @@
   }
   function expandSection(section) {
     if (!collapsedSections.has(section)) return;
+    // Copy-then-reassign, as in toggleSectionCollapsed above.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(collapsedSections);
     next.delete(section);
     collapsedSections = next;
@@ -421,6 +426,8 @@
   // transitively contains) reachable from the parent and from the child must be disjoint, or adding
   // the edge would give the parent two conversion paths to some node.
   function currencyReachableUnitIds(startUnitId) {
+    // Function-local graph-walk scratch, discarded when the function returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const reachable = new Set();
     const stack = [startUnitId];
     while (stack.length > 0) {
@@ -978,7 +985,6 @@
                         <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} title={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} onclick={(event) => { event.stopPropagation(); onClearCurrencyMacro(field.key); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
                       </div>
                     {:else}
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <div
                         class="manager-component-source-drop-zone manager-currency-macro-drop-zone"
                         data-system-currency-macro-dropzone={field.key}

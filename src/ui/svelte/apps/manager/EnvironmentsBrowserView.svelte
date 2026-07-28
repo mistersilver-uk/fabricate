@@ -67,11 +67,24 @@
     onDeleteGatheringVocabularyValue = () => {},
     gatheringRealmSettings = { enabled: false },
     onSetGatheringRealmsEnabled = () => {},
+    // The suppressed props below (the image-picker wire plus the Travel CRUD callbacks) have
+    // NO reader in this component, and the parent (CraftingSystemManagerRoot) wires a real
+    // store call into every one of them. The consumer that used to read them,
+    // GatheringTravelView.svelte, is imported by nothing under src/, so party
+    // create/enable/delete and all realm CRUD are currently unreachable from the manager's
+    // Travel tab. (Party RENAME is the exception and carries no suppression: `onRenameParty`
+    // is forwarded to the live parties tab below.) Deleting these destructures would leave
+    // the parent attributes wired to nothing and erase the evidence — Svelte silently ignores
+    // a prop the child does not destructure, so no test would fail. They are kept and
+    // suppressed until issue 920 reconnects the surface.
+    // eslint-disable-next-line no-unused-vars
     onPickImagePath = null,
     travelParties = [],
     travelSelectedPartyId = '',
     travelSaving = false,
+    // eslint-disable-next-line no-unused-vars
     travelError = null,
+    // eslint-disable-next-line no-unused-vars
     travelFieldErrors = {},
     travelActorOptions = [],
     travelSystemRealms = [],
@@ -80,9 +93,12 @@
     onAddEnvironmentToRealm = () => {},
     onRemoveEnvironmentFromRealm = () => {},
     onSelectParty = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onCreateParty = () => {},
     onRenameParty = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onSetPartyEnabled = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onDeleteParty = () => {},
     onAddPartyMember = () => {},
     onRemovePartyMember = () => {},
@@ -91,13 +107,21 @@
     onClearPartyTravelActor = () => {},
     onSetPartyRealmOverride = () => {},
     onClearPartyRealmOverride = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onRemoveStaleMember = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onClearStaleTravelActor = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onDropStaleOverrideRealm = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onCreateRealmQuick = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onRenameRealm = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onToggleRealmEnabled = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onUpdateRealm = () => {},
+    // eslint-disable-next-line no-unused-vars -- unreachable Travel CRUD; see issue 920 above
     onDeleteRealm = () => {},
     travelCurrentSceneRegions = [],
     travelCurrentSceneUuid = '',
@@ -124,6 +148,13 @@
   let biomeCustomColorInput = $state('');
   let openBiomeColorPickerId = $state('');
   let biomeColorTriggerButton = $state(null);
+  // Unfinished dismissal wiring, not a dead ref. The sibling ManagerColorPicker feeds its
+  // equivalent node to dismissOnOutsideClick via `additionalNodes`; this one is registered
+  // (see registerBiomeColorPopoverNode and the registerPopoverNode attribute on the biome
+  // ManagerColorPopover) and then never read, so the biome popover cannot be toggled shut
+  // from its own trigger. Keep BOTH this state and the registerPopoverNode attribute: that
+  // attribute is the seam the fix in issue 921 will use.
+  // eslint-disable-next-line no-unused-vars
   let biomeColorPopoverRoot = $state(null);
   let biomeColorPopoverStyle = $state('');
 
@@ -222,7 +253,6 @@
   const biomeVocabulary = $derived(selectedGatheringSystemConfig.vocabularies?.biomes || {
     values: gatheringConfig?.vocabularies?.biomes || []
   });
-  const biomeVocabularyOptions = $derived(Array.isArray(biomeVocabulary?.values) ? biomeVocabulary.values : []);
   const activeGatheringTabConfig = $derived(gatheringTabs.find(tab => tab.id === activeGatheringTab) || gatheringTabs[0]);
   const realmsEnabled = $derived(gatheringRealmSettings?.enabled === true);
   const biomeOptions = $derived(uniqueSorted(environmentList.flatMap(environment =>
@@ -823,7 +853,6 @@
   {:else if activeGatheringTab === 'tasks'}
     <GatheringTasksBrowserView
       tasks={selectedGatheringSystemConfig.tasks || []}
-      environments={environmentList}
       {selectedTaskId}
       {selectedSystemId}
       {gatheringConfig}
@@ -840,7 +869,6 @@
     <div class="manager-gathering-encounters-shell" data-gathering-encounters-shell>
       <GatheringEventsBrowserView
         events={selectedGatheringSystemConfig.events || []}
-        environments={environmentList}
         {selectedEventId}
         {selectedSystemId}
         {gatheringConfig}

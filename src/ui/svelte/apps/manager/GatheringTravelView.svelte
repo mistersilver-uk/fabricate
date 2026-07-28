@@ -181,6 +181,12 @@
     onClearRealmOverride(selectedParty.id, systemId);
   }
 
+  // No reader today. This component is imported by nothing under src/ (only mounted
+  // directly by tests), which is the unreachable-Travel-surface defect itself; these
+  // three travel EvidenceSource* lang keys have no other reader either, so deleting the
+  // helper would orphan them and fail the lang-keys-no-orphans ratchet. Kept until issue 920
+  // reconnects or removes the surface.
+  // eslint-disable-next-line no-unused-vars
   function evidenceSourceLabel(source) {
     if (source === 'manualOverride') return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceManualOverride', 'GM override');
     if (source === 'travelActor') return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceTravelActor', 'Travel actor');

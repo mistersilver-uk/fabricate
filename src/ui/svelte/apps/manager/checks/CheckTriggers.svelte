@@ -58,7 +58,10 @@
   const diceGroups = $derived(
     (() => {
       const parsed = parseDiceGroups(rollFormula);
+      // Function-local counters, discarded when the $derived IIFE returns.
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
       const seen = new Map();
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity
       const counts = new Map();
       for (const group of parsed) counts.set(group.raw, (counts.get(group.raw) || 0) + 1);
       return parsed.map((group, groupId) => {

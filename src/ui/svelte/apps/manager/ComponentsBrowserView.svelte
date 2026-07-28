@@ -36,6 +36,7 @@
     itemSearchTerm = '',
     selectedComponentId = '',
     selectedSystemId = '',
+    // eslint-disable-next-line no-unused-vars -- deliberately reader-less; see the note below
     selectedSystemResolutionMode = 'simple',
     // Whether the system is progressive on ANY axis that reads `component.difficulty` —
     // crafting resolution mode, salvage resolution mode, or the gathering economy's
@@ -65,7 +66,6 @@
     browserState = $bindable(null)
   } = $props();
 
-  // svelte-ignore state_referenced_locally
   let ownBrowserState = $state(createComponentBrowserState());
   // The active view-state: the root's lifted object when bound, else the local
   // fallback. Both are `$state` proxies, so nested writes (`ui.categoryFilter = …`)
@@ -312,6 +312,9 @@
   // Collapse is opt-IN: a category absent from the set is expanded. A new Set is
   // assigned rather than mutated so the bound state propagates back to the root.
   function toggleCategoryCollapsed(category) {
+    // Copy-then-reassign, per the contract above: in-place SvelteSet mutation would stop
+    // the bound state propagating back to the manager root.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(ui.collapsedCategories);
     if (next.has(category)) next.delete(category);
     else next.add(category);

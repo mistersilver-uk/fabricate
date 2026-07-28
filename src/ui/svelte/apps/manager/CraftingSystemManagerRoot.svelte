@@ -153,6 +153,9 @@
   // Crafting nav group (issue 511): mirrors the gathering group's expand state.
   // The group is always available as of issue 745 (v1.3 headline); only its
   // expand/collapse state lives here.
+  // Not a writable $derived: toggleCraftingMenu writes this from a non-crafting route and the
+  // value must STICK until the route category next changes, which a $derived would clobber.
+  // eslint-disable-next-line svelte/prefer-writable-derived
   let craftingMenuExpanded = $state(false);
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
@@ -166,6 +169,11 @@
   let recipeItemDraftBaseline = $state(null);
   let recipeItemLinkedSourceSnapshot = $state(null);
   let recipeItemEditSaving = $state(false);
+  // Written on every failed save and never read — the missing READER is the defect, so the
+  // write is kept as its evidence rather than deleted. A GM whose recipe-item save fails is
+  // shown nothing. Tracked in issue 919 (silent save failures), which adds the Draft-state
+  // `manager-inspector-card` section that renders it.
+  // eslint-disable-next-line no-unused-vars
   let recipeItemSaveFailed = $state(false);
   let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker. (The
@@ -197,10 +205,17 @@
   let gatheringTaskDraft = $state(null);
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
+  // Assigned user-facing failure text (including the localized
+  // FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed) that nothing renders. Kept as the
+  // evidence of the missing reader; see issue 919.
+  // eslint-disable-next-line no-unused-vars
   let gatheringTaskSaveError = $state('');
   let gatheringEventDraft = $state(null);
   let gatheringEventDraftBaseline = $state(null);
   let gatheringEventSaving = $state(false);
+  // Assigned user-facing failure text that nothing renders. Kept as the evidence of the
+  // missing reader; see issue 919.
+  // eslint-disable-next-line no-unused-vars
   let gatheringEventSaveError = $state('');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
@@ -260,13 +275,9 @@
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
-  // svelte-ignore state_referenced_locally
   let checkRoutedBaseline = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
-  // svelte-ignore state_referenced_locally
   let lastChecksSystemId = $viewState.selectedSystem?.id || '';
-  // svelte-ignore state_referenced_locally
   let lastChecksResolutionMode = $viewState.selectedSystem?.resolutionMode || 'simple';
   let checkRoutedSaving = $state(false);
   const checkRoutedDirty = $derived(
@@ -288,9 +299,7 @@
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkSimpleDraft = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
-  // svelte-ignore state_referenced_locally
   let checkSimpleBaseline = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
   let checkSimpleSaving = $state(false);
   const checkSimpleDirty = $derived(
@@ -310,11 +319,9 @@
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkProgressiveDraft = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
   );
-  // svelte-ignore state_referenced_locally
   let checkProgressiveBaseline = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
   );
@@ -327,17 +334,11 @@
   // (simple/routed/progressive), so the crafting clone helpers are reused. Same
   // staged pattern: one draft per mode, committed via the tab-aware header Save.
   const sysSalvage = $viewState.selectedSystem?.salvageCraftingCheck;
-  // svelte-ignore state_referenced_locally
   let salvageSimpleDraft = $state(cloneSimpleCheck(sysSalvage?.simple));
-  // svelte-ignore state_referenced_locally
   let salvageSimpleBaseline = $state(cloneSimpleCheck(sysSalvage?.simple));
-  // svelte-ignore state_referenced_locally
   let salvageRoutedDraft = $state(cloneRoutedCheck(sysSalvage?.routed));
-  // svelte-ignore state_referenced_locally
   let salvageRoutedBaseline = $state(cloneRoutedCheck(sysSalvage?.routed));
-  // svelte-ignore state_referenced_locally
   let salvageProgressiveDraft = $state(cloneProgressiveCheck(sysSalvage?.progressive));
-  // svelte-ignore state_referenced_locally
   let salvageProgressiveBaseline = $state(cloneProgressiveCheck(sysSalvage?.progressive));
   let salvageSimpleSaving = $state(false);
   let salvageRoutedSaving = $state(false);
@@ -356,13 +357,9 @@
   // crafting/salvage progressive + routed shapes (d100 has no editable config),
   // so the crafting clone helpers are reused. Same staged pattern as salvage.
   const sysGathering = $viewState.selectedSystem?.gatheringCraftingCheck;
-  // svelte-ignore state_referenced_locally
   let gatheringProgressiveDraft = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  // svelte-ignore state_referenced_locally
   let gatheringProgressiveBaseline = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  // svelte-ignore state_referenced_locally
   let gatheringRoutedDraft = $state(cloneRoutedCheck(sysGathering?.routed));
-  // svelte-ignore state_referenced_locally
   let gatheringRoutedBaseline = $state(cloneRoutedCheck(sysGathering?.routed));
   let gatheringProgressiveSaving = $state(false);
   let gatheringRoutedSaving = $state(false);
@@ -389,12 +386,6 @@
   // Complex recipes need a resolution mode that allows multiple ingredient/result
   // sets; simple/progressive systems craft exactly one set into one result.
   const recipeMultiSetAllowed = $derived(!['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple'));
-  // Both routed modes route a result group across multiple result groups (by the
-  // ingredient set in routedByIngredients, by the check outcome in routedByCheck);
-  // the routing basis is a property of the system mode, not a per-recipe choice.
-  const recipeRouted = $derived(
-    ['routedByIngredients', 'routedByCheck'].includes(selectedSystem?.resolutionMode || 'simple')
-  );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   // Experimental toggle (issue 745): the Crafting group is now unconditional; this
   // gate only decides whether the unimplemented Graph placeholder is advertised.
@@ -476,9 +467,12 @@
   // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
   // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
   // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
-  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. The separate
-  // `recipeRouted` derivation (multi-set / route enablement) still covers both routed
-  // modes.
+  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. Collapsing it
+  // here costs nothing elsewhere, because the multi-set and routing behaviours are derived
+  // separately from the RAW `resolutionMode` rather than from this value:
+  // `recipeMultiSetAllowed` gates more than one ingredient/result set, and
+  // `recipeRoutingProvider` picks the routing basis ('check' for routedByCheck,
+  // 'ingredientSet' for routedByIngredients). Both routed modes stay covered there.
   const craftingCheckMode = $derived(
     (function _craftingCheckMode(resolution) {
       if (resolution === 'routedByCheck') return 'routed';
@@ -800,10 +794,6 @@
     const name = String(item?.name || '').toLowerCase();
     return !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm);
   }));
-  const toolsPaginatedComponentCards = $derived(toolsFilteredComponentCards.slice(
-    toolsComponentPageIndex * toolsComponentPageSize,
-    (toolsComponentPageIndex + 1) * toolsComponentPageSize
-  ));
   const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
   const categoryRows = $derived(buildCategoryRows(
     selectedSystem?.categories || [],
@@ -1813,19 +1803,8 @@
   const focusedToolValidation = $derived(
     $viewState.toolDraftValidation || { valid: false, errors: ['missing'] }
   );
-  const dirtyToolIds = $derived(
-    $viewState.toolDraftDirty && focusedToolDraft?.id ? [focusedToolDraft.id] : []
-  );
   const selectedLibraryTool = $derived(
     libraryToolsList.find(tool => tool.id === focusedToolDraft?.id) || null
-  );
-  const selectedLibraryToolDirty = $derived(
-    selectedLibraryTool ? dirtyToolIds.includes(selectedLibraryTool.id) : false
-  );
-  const selectedToolDraftValidation = $derived(
-    currentView === 'tool-edit' && focusedToolDraft
-      ? focusedToolValidation
-      : { valid: true, errors: [] }
   );
 
   $effect(() => {
@@ -1922,41 +1901,6 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function toolsComponentCardImage(item) {
-    return item?.img || 'icons/svg/item-bag.svg';
-  }
-
-  function toolsComponentDescription(item) {
-    return String(item?.description || '').trim();
-  }
-
-  function onToolsComponentSearchInput(event) {
-    toolsComponentSearchTerm = event.currentTarget.value;
-    toolsComponentPageIndex = 0;
-  }
-
-  function onToolsComponentDragStart(item, event) {
-    const componentId = String(item?.id || '').trim();
-    if (!componentId) return;
-    event.dataTransfer?.setData?.('text/plain', JSON.stringify({ type: 'FabricateManagedComponent', componentId }));
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
-  }
-
-  function gatheringDropModeLabel(mode) {
-    const labels = {
-      highestRankedDrop: text('FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop'),
-      allDrops: text('FABRICATE.Admin.Manager.Environment.Rules.AllDrops', 'All successful drops'),
-      limitedDrops: text('FABRICATE.Admin.Manager.Environment.Rules.LimitedDrops', 'Limit successful drops')
-    };
-    return labels[mode] || labels.highestRankedDrop;
-  }
-
-  function gatheringEventPolicyLabel(policy) {
-    return policy === 'failureWithEvent'
-      ? text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')
-      : text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds');
   }
 
   function updateSelectedGatheringRules(updates) {
@@ -2266,10 +2210,6 @@
     return system?.features?.[view.feature] === true;
   }
 
-  function isSelectedRecipe(recipe) {
-    return selectedRecipe?.id === recipe.id;
-  }
-
   function isPromise(value) {
     return value && typeof value.then === 'function';
   }
@@ -2424,7 +2364,7 @@
     return true;
   }
 
-  function confirmGatheringEventRouteExit(nextView) {
+  function confirmGatheringEventRouteExit(_nextView) {
     if (activeView !== 'gathering-event-edit') return true;
     if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true);
     const confirmed = store.confirmDiscardDirtyGatheringEventDraft?.() ?? false;
@@ -2432,7 +2372,7 @@
     return finishGatheringEventRouteExit(confirmed);
   }
 
-  function confirmComponentRouteExit(nextView) {
+  function confirmComponentRouteExit(_nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditCombinedDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
@@ -2448,7 +2388,7 @@
     return finishEnvironmentRouteExit(confirmed);
   }
 
-  function confirmEssenceRouteExit(nextView) {
+  function confirmEssenceRouteExit(_nextView) {
     if (activeView !== 'essence-edit') return true;
     if (essenceEditDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
@@ -2501,7 +2441,7 @@
     return finishRecipeItemRouteExit(confirmed);
   }
 
-  function confirmGatheringTaskRouteExit(nextView) {
+  function confirmGatheringTaskRouteExit(_nextView) {
     if (activeView !== 'gathering-task-edit') return true;
     if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
     const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
@@ -2841,7 +2781,7 @@
       recipeDraftBaseline = cloneRecipeDraft(recipeDraft);
       activeView = 'recipes';
       return result;
-    } catch (err) {
+    } catch {
       recipeSaveFailed = true;
       return false;
     } finally {
@@ -2891,6 +2831,9 @@
     const rid = recipeDraft?.id;
     if (!rid || !recipeItemId) return false;
     const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    // Function-local scratch, spread into a store call on the next line but never held in
+    // state; the persisted value is the array, not the Set.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
     membership.delete(String(recipeItemId));
     await store.setRecipeBookMembership?.(rid, [...membership]);
@@ -3159,10 +3102,6 @@
     setView('checks');
   }
 
-  function cancelComponentEdit() {
-    backToComponentsBrowse();
-  }
-
   function handleComponentDraftChange(draft) {
     componentEditDraft = draft || null;
     componentEditDirty = draft?.dirty === true;
@@ -3184,7 +3123,7 @@
       componentEditDraft = null;
       activeView = 'components';
       return true;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       componentEditSaving = false;
@@ -3351,7 +3290,7 @@
       essenceEditDraft = null;
       activeView = canShowEssences ? 'essences' : 'systems';
       return result;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       essenceEditSaving = false;
@@ -3909,11 +3848,6 @@
     onUpdateEventCharacterModifier(ref.id, { expressionOverride });
   }
 
-  function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
-    if (!environmentId || !direction) return;
-    store.moveEnvironmentDraft?.(environmentId, direction);
-  }
-
   function selectGatheringTab(tabId) {
     activeGatheringTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
     gatheringMenuExpanded = true;
@@ -4113,7 +4047,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(recipeItemDraft);
       activeView = 'books-scrolls';
       return result;
-    } catch (err) {
+    } catch {
       recipeItemSaveFailed = true;
       return false;
     } finally {
@@ -4155,6 +4089,9 @@
   // Discard) rather than editing the recipe directly — no "Recipe updated" toast.
   function linkRecipeToItem(recipeId) {
     if (!recipeItemDraft?.id || !recipeId) return;
+    // Function-local scratch: the draft is patched with the spread array below, so the Set
+    // never reaches state.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set((recipeItemDraft.recipeIds || []).map((id) => String(id)));
     next.add(String(recipeId));
     patchRecipeItemDraft({ recipeIds: [...next] });
@@ -4187,19 +4124,6 @@
       return;
     }
     craftingMenuExpanded = !craftingMenuExpanded;
-  }
-
-  function environmentListIndex(environmentId) {
-    return environmentList.findIndex(environment => environment.id === environmentId);
-  }
-
-  function canMoveEnvironmentUp(environmentId) {
-    return environmentListIndex(environmentId) > 0;
-  }
-
-  function canMoveEnvironmentDown(environmentId) {
-    const index = environmentListIndex(environmentId);
-    return index >= 0 && index < environmentList.length - 1;
   }
 
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
@@ -4319,6 +4243,8 @@
   function environmentRequiredToolCount(environment) {
     const taskIds = new Set(environmentComposedIds(environment, 'task'));
     if (taskIds.size === 0) return 0;
+    // Function-local counting scratch, discarded when the function returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const toolIds = new Set();
     for (const task of gatheringTaskDefinitions) {
       if (!taskIds.has(task?.id)) continue;
@@ -4359,11 +4285,6 @@
 
   function gatheringDropImage(row) {
     return row?.img || gatheringManagedItemImage(row?.componentId) || 'icons/svg/item-bag.svg';
-  }
-
-  function gatheringTaskDropLabel(row) {
-    const name = gatheringDropName(row);
-    return `${name} x${row?.quantity || 1} (${row?.dropRate ?? 1}%)`;
   }
 
   function gatheringOptionLabel(kind, id) {
@@ -4586,19 +4507,19 @@
     return environment?.id && $viewState.environmentDraft?.id === environment.id && environmentValidationCount > 0;
   }
 
-  function environmentDisplay(environment) {
-    if (!environment) return null;
-    if (shouldUseEnvironmentDraftForDisplay && environmentDraftForDisplay?.id === environment.id) {
-      return environmentDraftForDisplay;
-    }
-    return environment;
-  }
-
   // `componentSourceState` lived here to tone the inline components inspector's source
   // chip. That inspector is now `ComponentBrowserInspector` (issue 676), which derives
   // its own linked badge, and the browser row derives its origin pill in
   // `ComponentsBrowserView` — so the helper had no callers left.
 
+  // No caller left. Deleting this and its two helpers (usageEvidenceItems,
+  // salvageSummaryLabel) would strip the only readers of the twelve component Salvage* and
+  // Usage* lang keys, orphaning them and failing the lang-keys-no-orphans ratchet, which may
+  // not be grown. lang/en.json is outside this change's owned paths, so the trio is
+  // suppressed rather than deleted; issue 926 removes the code and the keys together.
+  // (Do not spell those keys with their leading namespace here: the orphan scanner treats a
+  // dotted key literal in a COMMENT as a reference, and a partial one covers a whole subtree.)
+  // eslint-disable-next-line no-unused-vars
   function componentEvidenceItems(item) {
     const evidence = [];
     if (!item) return evidence;
@@ -4651,10 +4572,6 @@
     if (summary.hasTimeRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTime', 'time'));
     if (summary.hasCurrencyRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageCost', 'cost'));
     return parts.join(', ');
-  }
-
-  function stackedLabel(key, fallback) {
-    return `${text(key, fallback)}:`;
   }
 
   function normalizeVocabularyKey(value) {
@@ -6022,6 +5939,9 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}</h3>
               <div class="manager-fact-grid">
                 <div class="manager-fact" data-gathering-task-fact="biomes">
+                  <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
+                  <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
+                  <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-task-fact="drops">
@@ -6545,6 +6465,9 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}</h3>
               <div class="manager-fact-grid">
                 <div class="manager-fact" data-gathering-event-fact="biomes">
+                  <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
+                  <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
+                  <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0 ? selectedGatheringEvent.biomes.length : text('FABRICATE.Admin.Manager.Environment.Events.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-event-fact="drop-rate">
@@ -7365,6 +7288,10 @@
                   </span>
                 {:else}
                   <span class="manager-fact-line">
+                    <!-- `{' '}` is the separator between the leading span and the trailing label: -->
+                    <!-- a literal space is the first token inside the `{#if}` and Svelte trims -->
+                    <!-- block-leading whitespace, so the two would run together. -->
+                    <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
                     <span class="manager-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-fact-label">{labelParts.rest}</span>{/if}
                   </span>
                 {/if}

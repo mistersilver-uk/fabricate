@@ -35,26 +35,28 @@
   // Roving-tabindex keyboard model: Arrow keys move focus + selection within the
   // group, Home/End jump to the ends, Space/Enter commit the focused radio. Reads
   // the group's radios off the DOM so it works for both option and stack groups.
+  // Returns the index the key moves focus to, or -1 for a key this model ignores.
+  // Returning directly keeps `nextIndex` a const at the call site, so no code path
+  // can reach the commit with an unassigned index.
+  function rovingTargetIndex(key, currentIndex, length) {
+    if (key === 'ArrowRight' || key === 'ArrowDown') return (currentIndex + 1) % length;
+    if (key === 'ArrowLeft' || key === 'ArrowUp') return (currentIndex - 1 + length) % length;
+    if (key === 'Home') return 0;
+    if (key === 'End') return length - 1;
+    return -1;
+  }
+
   function onRadioKeydown(event, commit, values, currentValue) {
     const key = event.key;
     const radios = [...event.currentTarget.parentElement.querySelectorAll('[role="radio"]')];
     const currentIndex = values.indexOf(currentValue);
-    let nextIndex = currentIndex < 0 ? 0 : currentIndex;
-    if (key === 'ArrowRight' || key === 'ArrowDown') {
-      nextIndex = (currentIndex + 1) % values.length;
-    } else if (key === 'ArrowLeft' || key === 'ArrowUp') {
-      nextIndex = (currentIndex - 1 + values.length) % values.length;
-    } else if (key === 'Home') {
-      nextIndex = 0;
-    } else if (key === 'End') {
-      nextIndex = values.length - 1;
-    } else if (key === ' ' || key === 'Enter') {
+    if (key === ' ' || key === 'Enter') {
       event.preventDefault();
       commit(values[currentIndex < 0 ? 0 : currentIndex]);
       return;
-    } else {
-      return;
     }
+    const nextIndex = rovingTargetIndex(key, currentIndex, values.length);
+    if (nextIndex < 0) return;
     event.preventDefault();
     commit(values[nextIndex]);
     radios[nextIndex]?.focus();
