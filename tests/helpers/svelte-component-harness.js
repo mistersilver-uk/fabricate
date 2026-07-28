@@ -99,14 +99,20 @@ export function rewriteClientImports(code) {
 }
 
 /**
- * Guard against a VACUOUS reactivity pass.
+ * Guard the whole CLIENT/SERVER split every mounted suite depends on.
  *
- * `svelte/reactivity` is condition-mapped: the `browser` condition selects the real
- * client build, and every other condition (including Node's default) selects
- * `index-server.js`, whose `SvelteSet` is literally `globalThis.Set`. `npm test` passes
- * `--conditions=browser`; a bare `node --test <file>` does not. Under the server build an
- * assertion that a component uses `SvelteSet` rather than `Set` cannot fail, so a run
- * outside `npm test` would report PASS on unfixed code, indistinguishable from a real one.
+ * Svelte's exports are condition-mapped: the `browser` condition selects the real client
+ * build and every other condition (including Node's default) selects a server build.
+ * `npm test` passes `--conditions=browser`; a bare `node --test <file>` does not. The
+ * split is not confined to one subpath — `svelte` itself (`.`) and `svelte/legacy` are
+ * mapped the same way, so under the wrong condition set the `createClassComponent` this
+ * harness mounts with comes from `legacy-server.js` and the components under test are
+ * driven by a server runtime that never updates the DOM. Checking `svelte/reactivity` is
+ * therefore a canary for the whole set, not a check about one export: the subpath is the
+ * cheapest one to state a target for, and it happens to carry the sharpest vacuous pass
+ * (its server `SvelteSet` is literally `globalThis.Set`, so an assertion that a component
+ * uses `SvelteSet` rather than `Set` cannot fail — and no suite asserts that today, which
+ * is exactly why the guard must not be read as existing only for `SvelteSet`).
  *
  * The check compares what the specifier actually resolves to against the `browser` target
  * the installed Svelte declares for that subpath, so it states the condition rather than
