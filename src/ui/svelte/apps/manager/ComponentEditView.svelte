@@ -734,11 +734,17 @@
            ── WHY THIS IS A SIBLING SECTION AND NOT INSIDE SALVAGE ──────────────────
            The redesign prototype renders this card INSIDE the salvage panel, gated on
            the SALVAGE mode being progressive. Fabricate cannot: this value is
-           `component.difficulty`, and the manager root gates the section on the
-           system's CRAFTING `resolutionMode` (`componentDifficultyShown`), which is a
-           different axis. Nesting it under salvage would hide it for every
-           progressive-CRAFTING system whose salvage is simple or disabled — the exact
-           configuration the smoke harness drives when it fills this input.
+           `component.difficulty`, ONE component-level scalar that THREE engines read —
+           progressive recipes, progressive salvage and progressive gathering — so the
+           manager root gates the section on `componentDifficultyAxisProgressive`, which
+           is true when the system is progressive on ANY of those three axes
+           (`componentDifficultyShown` is that predicate plus the editor's own view and
+           selection terms). Nesting the card under salvage would hide it for every
+           progressive-CRAFTING or progressive-GATHERING system whose salvage is simple or
+           disabled — the exact configuration the smoke harness drives when it fills this
+           input. The browser row's read-only DC badge and the browser's bulk-edit
+           progressive-DC section read the same axis predicate, so all three appear
+           together (issue 772).
 
            STAGED, not written on change — the value rides the editor's draft and
            persists on Save, so it contributes to the dirty state and the exit guard.

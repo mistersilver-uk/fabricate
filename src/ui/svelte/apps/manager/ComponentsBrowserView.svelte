@@ -7,6 +7,13 @@
   import Pagination from '../../components/Pagination.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
+  import ComponentSelectionToolbar from './components/ComponentSelectionToolbar.svelte';
+  import {
+    describeComponentSelection,
+    pruneComponentSelection,
+    setComponentSelection,
+    toggleComponentSelection
+  } from '../../../../utils/componentBulkEditModel.js';
   import {
     COMPONENT_SORT_KEYS,
     componentCategoryOf,
@@ -30,6 +37,14 @@
     selectedComponentId = '',
     selectedSystemId = '',
     selectedSystemResolutionMode = 'simple',
+    // Whether the system is progressive on ANY axis that reads `component.difficulty` —
+    // crafting resolution mode, salvage resolution mode, or the gathering economy's
+    // (issue 772). The row's read-only DC badge used to gate on the CRAFTING mode alone,
+    // which made it invisible on a salvage-only-progressive system while the editor
+    // control and the bulk panel both showed it. All three read ONE predicate now, and it
+    // arrives as its own prop rather than being re-derived from
+    // `selectedSystemResolutionMode`, which is retained for its other uses.
+    difficultyAxisProgressive = false,
     categoryVocabulary = [],
     dropEnabled = false,
     onSearchChange = () => {},
@@ -68,6 +83,10 @@
     ui.essenceFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
+    // The bulk selection is scoped to the selected system — its ids name components the
+    // new system does not have — so a switch clears it, and the root discards the staged
+    // draft when the count reaches zero (issue 772).
+    ui.bulkSelectedComponentIds = new Set();
     ui.systemId = selectedSystemId;
   });
 
@@ -98,6 +117,56 @@
   // so a total can never ignore an active filter.
   const categoryTotals = $derived(countByCategory(filteredComponents, componentCategoryOf));
   const groups = $derived(ui.groupByCategory ? groupComponentsByCategory(page.components, categoryTotals) : []);
+
+  // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
+  // `pageIds` is the set of RENDERED row ids, NOT `page.components`: with grouping on
+  // (the default) a COLLAPSED group renders no rows at all, so a naive page list would let
+  // the toolbar's tri-state box select rows the GM cannot see and report a count exceeding
+  // the visible ones. `filteredIds` is the whole filtered set, which the results link
+  // reaches and the page box deliberately cannot.
+  const bulkSelectedIds = $derived(ui.bulkSelectedComponentIds ?? new Set());
+  const filteredIds = $derived(filteredComponents.map(item => item.id));
+  const pageIds = $derived(
+    ui.groupByCategory
+      ? groups
+        .filter(group => !isCategoryCollapsed(group.category))
+        .flatMap(group => group.components.map(item => item.id))
+      : page.components.map(item => item.id)
+  );
+  const selectionSummary = $derived(describeComponentSelection({
+    pageIds,
+    filteredIds,
+    selectedIds: bulkSelectedIds
+  }));
+
+  // A delete, an unlink or a store refresh must never leave a phantom id in the count or
+  // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
+  // subset, so equal sizes mean an identical set — so this cannot loop.
+  $effect(() => {
+    const current = ui.bulkSelectedComponentIds ?? new Set();
+    if (current.size === 0) return;
+    const pruned = pruneComponentSelection(current, (itemCards || []).map(item => item.id));
+    if (pruned.size !== current.size) ui.bulkSelectedComponentIds = pruned;
+  });
+
+  // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted
+  // state propagates back to the manager root — the rule `collapsedCategories` above
+  // already documents.
+  function toggleComponentBulkSelected(id) {
+    ui.bulkSelectedComponentIds = toggleComponentSelection(bulkSelectedIds, id);
+  }
+
+  function setPageSelected(on) {
+    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, pageIds, on);
+  }
+
+  function selectAllResults() {
+    ui.bulkSelectedComponentIds = setComponentSelection(bulkSelectedIds, filteredIds, true);
+  }
+
+  function clearBulkSelection() {
+    ui.bulkSelectedComponentIds = new Set();
+  }
 
   // The active-filter chips, derived by the pure model so the run and the "is anything
   // on?" question can never disagree.
@@ -279,10 +348,16 @@
     onSearchChange('');
   }
 
-  // Progressive-difficulty parity with the component editor (issue 651): shown ONLY for
-  // a progressive system, and only where a value is authored. It reads "None" when the
-  // system is progressive but the component has no difficulty, so a GM can see the gap.
-  const showProgressiveDifficulty = $derived(selectedSystemResolutionMode === 'progressive');
+  // Progressive-difficulty parity with the component editor (issue 651, re-gated for
+  // issue 772): shown whenever the system is progressive on ANY axis that reads
+  // `component.difficulty`, and only where a value is authored. It reads "None" when the
+  // axis is on but the component has no difficulty, so a GM can see the gap.
+  //
+  // This used to read `selectedSystemResolutionMode === 'progressive'` — the CRAFTING axis
+  // alone — which was already false against the editor control (three-axis since issue
+  // 676) and would have let the bulk panel write a DC that NO row could display on a
+  // salvage-only or gathering-only progressive system.
+  const showProgressiveDifficulty = $derived(difficultyAxisProgressive === true);
 
   function difficultyBadgeFor(item) {
     if (!showProgressiveDifficulty) return '';
@@ -309,8 +384,11 @@
       editLabel: format('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}', { name: item.name }),
       editTitle: text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component'),
       noDescriptionText: text('FABRICATE.Admin.Manager.NoDescription', 'No description'),
+      bulkSelected: bulkSelectedIds.has(item.id),
+      selectLabel: format('FABRICATE.Admin.Manager.Component.BulkEdit.SelectRow', 'Select {name} for bulk edit', { name: item.name }),
       onSelect: onSelectComponent,
-      onEdit: onEditComponent
+      onEdit: onEditComponent,
+      onToggleSelect: toggleComponentBulkSelected
     };
   }
 </script>
@@ -461,6 +539,24 @@
         })}
       </span>
     </div>
+
+    <!--
+      The multi-select row is the LAST row of the toolbar, immediately above the list —
+      the prototype's third-row-then-list order (issue 772). It is a row of THIS toolbar,
+      not a sticky bar of its own over the list, so it inherits the toolbar's own metrics
+      instead of declaring a second register. It does cost the list one row's height at
+      the default manager window size, which is why the PR carries a frame proving
+      `.manager-table-scroll` still shows several rows with it present.
+    -->
+    <ComponentSelectionToolbar
+      pageSelectionState={selectionSummary.pageSelectionState}
+      count={selectionSummary.count}
+      showSelectAllResults={selectionSummary.showSelectAllResults}
+      selectAllResultsCount={selectionSummary.selectAllResultsCount}
+      onTogglePage={(on) => setPageSelected(on)}
+      onSelectAllResults={selectAllResults}
+      onClear={clearBulkSelection}
+    />
   </section>
 
   <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}>

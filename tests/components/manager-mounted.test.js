@@ -90,6 +90,12 @@ function compileManagerRoot() {
   // so omitting it here HANGS every mounted manager test as `# cancelled` — this suite
   // hand-rolls its compile loop and has no closure validator to fail loudly instead.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte');
+  // The browser's multi-select toolbar and the bulk edit panel that REPLACES the
+  // single-component inspector in the rail (issue 772). `ComponentsBrowserView` imports the
+  // first statically and the root imports the second, so omitting either HANGS every
+  // mounted manager test as `# cancelled` for the same reason as the card above.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -409,6 +415,10 @@ function compileManagerRoot() {
     // the sibling of recipeBrowserModel below. Imported by ComponentsBrowserView AND by
     // the root (which lifts the browser state).
     'src/utils/componentBrowserModel.js',
+    // The pure bulk selection + staging model (issue 772). Imported by
+    // ComponentsBrowserView, by the bulk edit panel AND by the root (which owns the staged
+    // draft); omitting it HANGS every mounted manager test as `# cancelled`.
+    'src/utils/componentBulkEditModel.js',
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
@@ -1531,6 +1541,13 @@ function createStore(calls = [], options = {}) {
       calls.push(['updateComponent', id, updates]);
       if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
       return options.updateComponentResult ?? true;
+    },
+    // The set-apply bulk write (issue 772). It takes the selection `Set` directly and
+    // already refreshes internally, so the root neither converts nor re-refreshes; the
+    // recorded call is normalized to an array purely so a test can compare it.
+    applyComponentBulkEdit: (componentIds, edit) => {
+      calls.push(['applyComponentBulkEdit', [...(componentIds || [])], edit]);
+      return options.applyComponentBulkEditResult ?? true;
     },
     addEssence: (name, description, icon, sourceComponentId) => {
       calls.push(['addEssence', name, description, icon, sourceComponentId]);
@@ -5931,6 +5948,162 @@ describe('CraftingSystemManager mounted behavior', () => {
       false,
       'missing source warning should not print the raw UUID'
     );
+  });
+
+  // ── Issue 772: the rail swap ────────────────────────────────────────────────────
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only
+  // place the swap between `ComponentBrowserInspector` and `ComponentBulkEditPanel` — and
+  // the root-owned draft's lifecycle around it — can be proved at all.
+  async function openComponentsBrowser(calls = [], options = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, options),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {}, onCopySourceUuid: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Components').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  function tickComponentRow(id) {
+    target.querySelector(`[data-component-select="${id}"]`).click();
+    flushSync();
+  }
+
+  it('swaps the single-component inspector for the bulk panel at the FIRST selected row', async () => {
+    await openComponentsBrowser();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail opens on the single-component inspector'
+    );
+    assert.ok(!target.querySelector('[data-component-bulk-panel]'));
+
+    tickComponentRow('c1');
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-panel]')),
+      'ONE ticked row is already a bulk edit — the threshold is > 0, not > 1'
+    );
+    assert.ok(
+      !target.querySelector('[data-component-inspector]'),
+      'the panel REPLACES the inspector rather than stacking beside it'
+    );
+    assert.match(
+      target.querySelector('[data-component-bulk-count]').textContent,
+      /1 component selected/
+    );
+  });
+
+  it('restores the inspector and DISCARDS the staged draft when the selection clears', async () => {
+    await openComponentsBrowser();
+    tickComponentRow('c1');
+
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'add'
+    );
+    assert.equal(target.querySelector('[data-component-bulk-apply]').disabled, false);
+
+    // The panel's own escape — the documented way back to unlink / delete / copy-source.
+    target.querySelector('[data-component-bulk-clear]').click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail returns to the single-component inspector'
+    );
+
+    tickComponentRow('c1');
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'none',
+      'the staged draft was discarded on the count-to-zero transition, not carried forward'
+    );
+    assert.equal(
+      target.querySelector('[data-component-bulk-apply]').disabled,
+      true,
+      'so a re-opened panel cannot apply a stale edit'
+    );
+  });
+
+  it('applies every staged axis in ONE set-apply write, then resets the selection and the draft', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+
+    tickComponentRow('c1');
+    tickComponentRow('c2');
+    assert.match(
+      target.querySelector('[data-component-bulk-count]').textContent,
+      /2 components selected/
+    );
+
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    // Straight past `add` to `remove`, so the write carries BOTH tag axes.
+    target.querySelector('[data-bulk-tag="herb"]').click();
+    flushSync();
+    target.querySelector('[data-bulk-tag="herb"]').click();
+    flushSync();
+    const categorySelect = target.querySelector('[data-component-bulk-category]');
+    categorySelect.value = 'Reagent';
+    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
+    assert.equal(applyCalls.length, 1, 'ONE set-apply write for the whole selection');
+    assert.deepEqual(applyCalls[0][1].sort(), ['c1', 'c2']);
+    assert.deepEqual(applyCalls[0][2], {
+      category: 'Reagent',
+      addTags: ['ore'],
+      removeTags: ['herb'],
+    });
+    assert.ok(
+      !('essences' in applyCalls[0][2]) && !('difficulty' in applyCalls[0][2]),
+      'an unstaged axis is NEVER sent — a present key is an instruction to write'
+    );
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'applying clears the selection, so the rail returns to the inspector'
+    );
+    tickComponentRow('c1');
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'none',
+      'and the staged draft is gone with it'
+    );
+  });
+
+  it('sends a staged all-zero essence map, because that is an instruction to CLEAR', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    // The steppers cannot reach this state on a fresh draft — `Stepper` emits nothing at
+    // the zero boundary — so the staged-axis chip is the only path to it.
+    target.querySelector('[data-component-bulk-essences-staged]').click();
+    flushSync();
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCall = calls.find((call) => call[0] === 'applyComponentBulkEdit');
+    assert.ok(Boolean(applyCall), 'an all-zero staged map is a REAL edit, not a no-op');
+    assert.ok('essences' in applyCall[2], 'the key must be PRESENT for the write to clear');
   });
 
   it('opens the in-manager component-edit view, persists tag changes, and exposes source actions', async () => {
