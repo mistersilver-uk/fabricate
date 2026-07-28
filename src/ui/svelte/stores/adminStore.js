@@ -8651,6 +8651,42 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * Apply one staged bulk edit to a SET of components in the selected system (issue 772)
+   * through the manager's set-apply primitive: ONE persist and ONE refresh for the whole
+   * selection, rather than N `updateComponent` round trips.
+   *
+   * `edit` carries only the STAGED axes — `category`, `addTags`, `removeTags`, `essences`,
+   * `difficulty`. Presence is meaningful for the last two: an empty `essences` map and a
+   * zero `difficulty` are instructions to CLEAR, so this passes the caller's object through
+   * untouched rather than pruning "empty" keys.
+   *
+   * `refresh()` republishes `itemCards` and the `selectedSystem` projection, so the browser
+   * rows re-render with no bespoke invalidation.
+   *
+   * @param {Iterable<string>} componentIds
+   * @param {object} [edit]
+   * @returns {Promise<boolean>} whether the write completed.
+   */
+  async function applyComponentBulkEdit(componentIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    const ids = Array.from(componentIds || [], String).filter(Boolean);
+    if (ids.length === 0 || !sysId) return false;
+    if (!edit || typeof edit !== 'object') return false;
+    if (Object.keys(edit).length === 0) return true;
+
+    try {
+      await systemManager.applyBulkEditToComponents(sysId, ids, edit);
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('Fabricate | Failed to apply component bulk edit:', err);
+      services.notify?.error?.(err?.message || 'Failed to apply component bulk edit');
+      return false;
+    }
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
@@ -8889,6 +8925,7 @@ export function createAdminStore(services) {
     importSystem,
     deleteComponent,
     updateComponent,
+    applyComponentBulkEdit,
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,

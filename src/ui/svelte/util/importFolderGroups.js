@@ -134,7 +134,7 @@ export function hasRealFolderGroups(groups) {
  *
  * @param {{
  *   addItemFromUuid: (systemId: string, uuid: string) => Promise<{item?: {id?: string}, action: string, sourceFallbacks?: Array}>,
- *   applyCategoryAndTagsToComponents: (systemId: string, ids: string[], mapping: object) => Promise<object>
+ *   applyBulkEditToComponents: (systemId: string, ids: string[], edit: object) => Promise<object>
  * }} systemManager
  * @param {string} systemId
  * @param {Array<{itemUuids?: string[], category?: string, addTags?: string[]}>} decisions
@@ -163,7 +163,10 @@ export async function applyFolderImportDecisions(systemManager, systemId, decisi
       // Applied to EVERY imported id, INCLUDING a 'skipped' (re-dropped, already-existing)
       // component: re-dropping a folder deliberately re-categorizes its items, so the
       // overwrite-on-redrop here is intended, not a leak.
-      await systemManager.applyCategoryAndTagsToComponents(systemId, importedIds, {
+      // Import stages only the two axes it owns: it supplies NEITHER `essences` nor
+      // `difficulty`, so the primitive's presence-based guard is false for both and an
+      // import never clears a component's essences or DC (issue 772).
+      await systemManager.applyBulkEditToComponents(systemId, importedIds, {
         category: decision.category || '',
         addTags,
       });

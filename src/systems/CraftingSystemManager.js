@@ -4277,48 +4277,87 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Apply a category and/or a set of tags to a SET of components in one `save()`.
+   * Lowercase, trim and drop the empties from a caller-supplied tag list, matching the
+   * lowercase `itemTags` vocabulary. Order is preserved; de-duplication is the caller's
+   * job (the union path needs the incoming order, the removal path only needs the set).
+   *
+   * @param {unknown} tags
+   * @returns {string[]}
+   */
+  _normalizeBulkTagList(tags) {
+    if (!Array.isArray(tags)) return [];
+    return tags
+      .map((tag) =>
+        String(tag || '')
+          .trim()
+          .toLowerCase()
+      )
+      .filter(Boolean);
+  }
+
+  /**
+   * Apply a bulk edit — any of category, tag additions, tag removals, essences and
+   * progressive DC — to a SET of components in one `save()`.
    *
    * The shared set-apply primitive behind folder-aware import categorization (issue
-   * 771) and multi-select bulk edit (issue 772): both need "assign this category
-   * and/or these tags to these components" as a single persist rather than a
-   * per-component `updateItem` loop (N saves, N notifications).
+   * 771) and multi-select bulk edit (issue 772): both need "apply these changes to
+   * these components" as a single persist rather than a per-component `updateItem`
+   * loop (N saves, N notifications).
    *
-   * The two axes match `Component`'s own semantics (data-models spec):
+   * The axes match `Component`'s own semantics (data-models spec):
    *  - `category` is SINGLE-valued, so a provided category OVERWRITES each component's
    *    current one. Omitting it (or an empty/whitespace string) leaves the category
    *    untouched — a folder that maps to no category still applies its tags.
    *  - `tags` is many-valued and ADDITIVE, so `addTags` is unioned into each
    *    component's existing tags (case-insensitively de-duplicated, stored lowercase
    *    to match the `itemTags` vocabulary) rather than replacing them.
+   *  - `removeTags` is a lowercased set DIFFERENCE applied AFTER `addTags`, so a tag
+   *    supplied in both is removed. The bulk panel's tri-state chips make that
+   *    collision unreachable; the primitive defines it rather than leaving it undefined.
+   *  - `essences` REPLACES the whole `{essenceId: quantity}` map when the key is
+   *    PRESENT. `_normalizeEssenceQuantities` drops non-positive quantities and ids
+   *    outside the system's definitions, so an all-zero map clears essences and a
+   *    foreign id cannot be injected.
+   *  - `difficulty` is the progressive DC. `_normalizeComponent` keeps `>= 1` and
+   *    otherwise stores `undefined`, so `0`, `null`, `''` and `NaN` all CLEAR it.
    *
-   * A call that resolves to neither a category nor any tag is a no-op (no save).
+   * The guard tests a resolved non-empty `category`/`addTags`/`removeTags` and the
+   * PRESENCE — never the truthiness — of `essences` and `difficulty`: `{essences: {}}`
+   * and `{difficulty: 0}` are both real "clear this" edits, and a removal-only call is a
+   * real edit. #771's import caller supplies neither key, so a presence test is false
+   * for it and the guard behaves exactly as it did before issue 772.
+   *
+   * Every changed component is re-normalized under the owning system's essence AND
+   * salvage context, exactly as `updateItem` does. That is not inert for salvage: with a
+   * Simple-mode context `_normalizeSalvage` runs the success-first retain-one clamp
+   * (issue 764), which can re-order or drop result groups on a component whose salvage
+   * config predates it. That is correct, pre-existing behaviour shared with the
+   * single-component write — the bulk axes themselves never carry salvage.
    *
    * @param {string} systemId
    * @param {Iterable<string>} componentIds ids of the components to mutate.
-   * @param {{category?: string, addTags?: string[]}} [mapping]
+   * @param {{category?: string, addTags?: string[], removeTags?: string[],
+   *   essences?: Record<string, number>, difficulty?: number|null|string}} [edit]
    * @returns {Promise<{updated: number, componentIds: string[]}>} the ids actually changed.
    */
-  async applyCategoryAndTagsToComponents(systemId, componentIds, mapping = {}) {
-    this._assertGM('apply category and tags to components');
+  async applyBulkEditToComponents(systemId, componentIds, edit = {}) {
+    this._assertGM('apply a bulk edit to components');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
     const targetIds = new Set(Array.from(componentIds || [], String));
     if (targetIds.size === 0) return { updated: 0, componentIds: [] };
 
-    const rawCategory = typeof mapping.category === 'string' ? mapping.category.trim() : '';
+    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
+    const rawCategory = typeof bulkEdit.category === 'string' ? bulkEdit.category.trim() : '';
     const hasCategory = rawCategory !== '';
-    const addTags = Array.isArray(mapping.addTags)
-      ? mapping.addTags
-          .map((tag) =>
-            String(tag || '')
-              .trim()
-              .toLowerCase()
-          )
-          .filter(Boolean)
-      : [];
-    if (!hasCategory && addTags.length === 0) return { updated: 0, componentIds: [] };
+    const addTags = this._normalizeBulkTagList(bulkEdit.addTags);
+    const removeTags = new Set(this._normalizeBulkTagList(bulkEdit.removeTags));
+    const hasEssences = Object.hasOwn(bulkEdit, 'essences');
+    const hasDifficulty = Object.hasOwn(bulkEdit, 'difficulty');
+    const staged =
+      hasCategory || addTags.length > 0 || removeTags.size > 0 || hasEssences || hasDifficulty;
+    if (!staged) return { updated: 0, componentIds: [] };
 
     const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
     const salvageContext = this._salvageNormalizationContext(system);
@@ -4338,12 +4377,18 @@ export class CraftingSystemManager {
           nextTags.push(tag);
         }
       }
+      // AFTER the union, so a tag in both lists loses.
+      if (removeTags.size > 0) {
+        nextTags = nextTags.filter((tag) => !removeTags.has(String(tag).toLowerCase()));
+      }
 
       system.components[idx] = this._normalizeComponent(
         {
           ...component,
           category: hasCategory ? rawCategory : component.category,
           tags: nextTags,
+          essences: hasEssences ? bulkEdit.essences : component.essences,
+          difficulty: hasDifficulty ? bulkEdit.difficulty : component.difficulty,
           id: component.id,
         },
         { validEssenceIds, ...salvageContext }
