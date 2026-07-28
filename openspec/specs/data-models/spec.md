@@ -560,6 +560,7 @@ EssenceDefinition = {
   id: string,
   name: string,
   icon: string,
+  colorToken?: string | null, // a `--fab-tag-*` palette key, or null for the accent default
   description?: string,
   sourceComponentId?: string | null,
   sourceItemUuid?: string | null, // compatibility alias; may contain a legacy component id
@@ -573,6 +574,10 @@ EssenceDefinition = {
 2. `associatedSystemItemId` is a compatibility alias for `sourceComponentId`.
 3. Legacy `sourceItemUuid` values that match a managed component id are treated as source component ids during normalization and display.
 4. If an essence source component cannot be resolved, stored source evidence is retained so GM UI can show a stale-but-readable source state.
+5. `colorToken` is the GM-authored per-essence colour: a nullable key from the shared `--fab-tag-*` token palette (`sage`, `mist`, `lavender`, `rose`, `peach`, `butter`, `aqua`, `mauve`), stored as the bare token.
+   It has **no** `customColor` sibling — the palette is the whole vocabulary, because a free hex cannot be guaranteed legible against all seven themes.
+   Normalization emits it in **both** branches of essence-definition normalization (the object branch and the legacy id-string branch), so a definition never reaches a surface with the field absent.
+   A `null` or unrecognized token renders as the theme accent, which is what every essence renders as today, so no migration is required.
 
 ## RecipeItemDefinition
 
@@ -1200,6 +1205,8 @@ Ingredient = {
 8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
    It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
    An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
+   An essence option is resolved inside its ingredient set's single essence block rather than in its own author position (see §Essence-Alternative Consumption), so its funding is pooled with every other essence option in the set.
+   The player selects the held **items** that fund the block through the `essenceAllocation` channel, rather than picking one option per essence requirement as they would for a component/tag group.
 
 ### Currency-Alternative Spend (Craft-Time)
 
@@ -1222,13 +1229,36 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
 
 ### Essence-Alternative Consumption (Craft-Time)
 
-An essence option satisfies its ingredient group by consuming essence-carrying items until its `amount` is met, symmetric with component/tag alternatives:
+An essence option satisfies its ingredient group by consuming essence-carrying items until its `amount` is met — jointly with the set's other essence options rather than by an independent per-group draw (clause 5), and unit-granular like a component/tag alternative:
 
 1. The per-item essence contribution is read through an injected bound `resolveItemEssences(item) => essenceMap` collaborator, keeping the pure model Foundry-free.
    The default resolver is **flag-only** (`fabricate.essences` item flag), so the no-probe `canBeCraftedWith`/display path stays byte-for-byte the legacy behaviour; callers (`RecipeManager`, `CraftingEngine`, the per-slot selector) bind a **component-aware** resolver that also credits component-defined essences — an intentional capability increase over the old flag-only per-set gate.
 2. Consumption reads the shared `remaining` map and commits through `_commitItemPlan` (keyed by `uuid || id`), so an item already claimed by a component/tag group in the same set is not recounted toward the essence group (anti-double-consume).
 3. Consumption is **unit-granular**: an indivisible item may over-consume past `amount` (e.g. one item worth 3 essence to meet `amount: 2`), acceptable and symmetric with tag/component options.
 4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and `system.quantity`-summed in standard craft, mirroring the existing documented divergence between the two matchers.
+   The two paths **agree** that essence requirements share units with each other: alchemy pools the whole submission across every essence requirement, and standard craft resolves an ingredient set's essence options as one joint block (clause 5).
+   They still **differ** on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy credits it, standard craft does not, because clause 2's `remaining`/`_commitItemPlan` ledger has already spent that unit.
+5. Every `match.type === "essence"` option in one ingredient set forms a single **essence block**, resolved as one backtrackable node placed last — after every component/tag group has claimed from `remaining`.
+   Within the block a consumed unit credits every essence it carries to every essence requirement in the block, so one dual-essence carrier can fund two essence requirements at once.
+   The block's scope is exactly one ingredient set: it does not span ingredient sets, it does not span steps, and it does not reach across the component/tag boundary.
+   The governing principle, stated so the boundary is not arbitrary: an occurrence-based requirement (component or tag) claims a unit exclusively, while amount-based essence requirements share the units claimed for the block.
+   Joint resolution is a strict relaxation of per-group draw-down — the union of the per-group draws satisfies every group a fortiori — so no authored recipe becomes uncraftable.
+   Being a backtrackable node rather than a post-pass is load-bearing for that claim: a block that cannot fund must be able to force an earlier component/tag group to re-branch.
+6. The player MAY steer which held items fund the block through `resolveIngredientSelection`'s `essenceAllocation` override channel, a `{ itemKey: units }` map.
+   `itemKey` is an index into the already-resolved ledger and never a uuid the model resolves, so no allocation entry can trigger a document lookup; a key naming nothing in the ledger contributes zero units and is dropped.
+   Each entry is clamped against the units `remaining` still holds after the component/tag groups have claimed, and the allocation survives the resolver's re-branching.
+   The allocation is honoured whether or not it satisfies the block: a short allocation is reported short and is **never** topped up from unallocated carriers.
+   The resolved allocation is returned on `selection.essenceAllocation`, so a surface displaying it is displaying exactly what the craft consumes.
+7. The block contributes **at most one consumption-plan entry per item key**, whose `quantity` is the number of units the block draws from that item, committed once through `_commitItemPlan` after every component/tag group has claimed.
+   A component/tag group MAY still contribute its own entry for the same item key: those draws are disjoint and compose correctly under the engine's live `system.quantity` read.
+   Two entries for the same _shared_ unit do not compose, and on Foundry V13/V14 the second delete throws mid-consumption rather than silently overspending, so the block never emits a second entry for an item key it already claims.
+8. Every essence requirement's reported quantity comes from a **per essence id** partition of what the block delivers: for each essence id, the requirements naming that id settle in author order, each taking `min(need, remaining delivered of that id)`.
+   A requirement is missing exactly when its take is less than its `need`, and its reported quantity is that take — an essence amount in the same unit as `need`, never the ledger total of matching items held.
+   The partition is total (every essence requirement is either satisfied or in `missingGroups`), it runs whether or not the block is short, and it is independent across essence ids: a short Radiant requirement never marks a fully delivered Shadow requirement missing.
+   Because every take is capped at `need`, a satisfied essence requirement always reports delivered exactly equal to `need`; the unit-granular overshoot of clause 3 is visible in the per-carrier allocation, never in a requirement's ratio.
+9. Each essence-block plan entry carries `essenceGroupIds: string[]` naming every essence requirement it funds, alongside `ingredient` (the first funded option, retained for back-compat).
+   A reader resolving an essence requirement's consumed item MUST prefer `essenceGroupIds`, because one block entry names one `ingredient` and its sibling essence requirements would otherwise resolve to no consumed item.
+   Consumption-plan entries are not persisted, so no migration follows.
 
 ## Alchemy Signature Uniqueness (Validation Contract)
 
@@ -2276,6 +2306,7 @@ The following canonical field names must be used in all new writes:
 | ~~Recipe~~ `recipeItemId` | _(legacy)_                        | Removed by the 1.13.0 migration; membership inverted to `RecipeItemDefinition.recipeIds`                                                                                                                                           |
 | EssenceDefinition         | `sourceComponentId`               | Managed component source reference                                                                                                                                                                                                 |
 | EssenceDefinition         | `sourceItemUuid`                  | Resolved or legacy template item evidence for effect transfer                                                                                                                                                                      |
+| EssenceDefinition         | `colorToken`                      | Nullable `--fab-tag-*` palette key for the essence's authored colour; no `customColor` sibling                                                                                                                                     |
 | Component                 | `originItemUuid`                  | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560)                                                                                                                                  |
 | RecipeItemDefinition      | `originItemUuid`                  | Template item reference (registered-entry source ref; renamed from `sourceItemUuid` in issue 560)                                                                                                                                  |
 | RecipeItemDefinition      | `recipeIds`                       | Canonical recipe↔book membership (many-to-many); inverts the removed `Recipe.recipeItemId`                                                                                                                                         |
