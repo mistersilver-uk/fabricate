@@ -527,9 +527,12 @@ describe('craftingStore', () => {
       setId: 'r1-set',
       optionOverrides: { g1: { optionIndex: 1, heldItemId: null } },
       // Issue 917: the re-evaluate is now scoped and carries the essence funding.
-      // An empty allocation and a null step id are byte-for-byte today's behaviour
-      // (the facade treats both as absent).
-      essenceAllocation: {},
+      // A NULL allocation and a null step id are byte-for-byte today's behaviour (the
+      // facade treats both as absent). Null rather than `{}` is load-bearing: the
+      // model reads a supplied allocation as authoritative and never tops it up, so
+      // an empty one means "the player emptied this pool" — sending it for a
+      // choice-only override zeroed every essence bar and blocked the craft.
+      essenceAllocation: null,
       stepId: null,
       actorId: 'hero',
       componentSourceActorIds: ['a1'],

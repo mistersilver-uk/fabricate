@@ -73,6 +73,19 @@ export function createCraftingStore({ services } = {}) {
   // (`setId` plus the model's active step id) → `{ [itemKey]: units }`. The engine
   // consumes per set per step, so the pool is scoped the same way; a set-only key
   // would carry a step-1 allocation into a step-2 craft.
+  //
+  // KEY PRESENCE IS THE "the player has funded this scope themselves" MARKER —
+  // deliberately the same idiom `selectedIngredientOptions` uses to tell an untouched
+  // choice from an explicitly made one, rather than a second parallel flag map that
+  // could drift out of step with the allocation it describes. A scope with no key
+  // defers to the resolver's greedy suggestion; a scope whose key maps to `{}` is an
+  // explicitly EMPTIED pool and is sent as exactly that.
+  //
+  // Reading the VALUE cannot tell the two apart, because `setEssenceAllocation`
+  // deletes a carrier's entry at zero: a player who zeroes their last allocated
+  // carrier leaves `{}` behind, and a `length > 0` test reads that as "no allocation
+  // at all" and silently snaps the pool back to the suggestion they just cleared —
+  // a control that appears to work while its value goes nowhere.
   let selectedEssenceAllocation = $state({});
   // The chooser the player last opened, as `${scopeKey}:${slotId}`. Stored raw and
   // RE-VALIDATED on read (see `openSlotId`): a bare sticky key opens a stale — or
@@ -254,9 +267,13 @@ export function createCraftingStore({ services } = {}) {
     return stepId ? `${setId}::${stepId}` : setId;
   });
 
-  const currentEssenceAllocation = $derived(
-    essenceScopeKey ? (selectedEssenceAllocation[essenceScopeKey] ?? null) : null
-  );
+  // `null` while the player has not funded this scope at all (defer to the resolver's
+  // suggestion); an object — POSSIBLY EMPTY — once they have (send exactly that).
+  const currentEssenceAllocation = $derived.by(() => {
+    const scopeKey = essenceScopeKey;
+    if (!scopeKey || !Object.hasOwn(selectedEssenceAllocation, scopeKey)) return null;
+    return selectedEssenceAllocation[scopeKey] ?? {};
+  });
 
   // Craftability for the selected set. With no per-group override AND no essence
   // allocation this is the baked listing value (single evaluate at listing-build
@@ -276,13 +293,21 @@ export function createCraftingStore({ services } = {}) {
     const overrides = selectedIngredientOptions;
     const allocation = currentEssenceAllocation;
     const hasOverrides = Object.keys(overrides ?? {}).length > 0;
-    const hasAllocation = Object.keys(allocation ?? {}).length > 0;
+    // PRESENCE, not size: an explicitly emptied pool must re-evaluate too. Sizing it
+    // would send a cleared pool straight back to the baked suggestion, so the bars
+    // would refill themselves the moment the player zeroed their last carrier.
+    const hasAllocation = allocation !== null;
     if (!set?.id || (!hasOverrides && !hasAllocation)) return baked;
     const recomputed = services?.evaluateSelectedSet?.({
       recipeId: selectedRecipe?.id ?? null,
       setId: set.id,
       optionOverrides: overrides,
-      essenceAllocation: allocation ?? {},
+      // NULL, not `{}`, for an untouched pool. The model reads a supplied allocation
+      // as authoritative and never tops it up, and `{}` is a supplied allocation — so
+      // sending it for an untouched pool zeroed every essence bar and blocked the
+      // craft as soon as the player picked an ingredient OPTION, which allocates
+      // nothing. Only an explicitly emptied pool may send `{}`.
+      essenceAllocation: allocation,
       stepId: selectedRecipe?.activeStepId ?? null,
       actorId: currentActorId(),
       componentSourceActorIds: currentSourceIds(),
@@ -356,7 +381,14 @@ export function createCraftingStore({ services } = {}) {
     resetRequirementSelection();
   }
 
-  /** Drop the scoped essence funding, the open chooser and its announcement. */
+  /**
+   * Drop the scoped essence funding, the open chooser and its announcement.
+   *
+   * Dropping the whole map drops the per-scope "the player funded this" markers with
+   * it — they are the same keys — so a scope the player has left can never leave a
+   * stale marker pointing at it. A step change needs no reset for the same reason:
+   * the step id is part of the scope key, so the new step starts untouched.
+   */
   function resetRequirementSelection() {
     selectedEssenceAllocation = {};
     activeSlotKey = null;
@@ -522,6 +554,10 @@ export function createCraftingStore({ services } = {}) {
    * so `selectedCraftability` re-evaluates and the bars, the tiles and the
    * consumption plan all move together.
    *
+   * The SCOPE's own entry is written either way, including when clearing the last
+   * carrier leaves it `{}`: that entry is what records that the player has taken the
+   * pool over, so an emptied pool stays empty instead of reverting to the suggestion.
+   *
    * @param {string} itemKey
    * @param {number} units
    */
@@ -556,12 +592,17 @@ export function createCraftingStore({ services } = {}) {
     if (Object.keys(suggestedOptions).length > 0) {
       selectedIngredientOptions = { ...selectedIngredientOptions, ...suggestedOptions };
     }
-    const suggestedAllocation = craftability?.essencePool?.suggested ?? null;
+    // Adopting the suggestion is itself an EDIT — the player asked for it — so the
+    // write happens whenever the set has a pool at all, marking the scope funded even
+    // when the suggestion is empty. Sizing the suggestion instead would leave the
+    // scope reading as untouched, and a later manual zeroing would then revert to the
+    // suggestion rather than honouring the empty selection on screen.
+    const pool = craftability?.essencePool ?? null;
     const scopeKey = essenceScopeKey;
-    if (scopeKey && suggestedAllocation && Object.keys(suggestedAllocation).length > 0) {
+    if (scopeKey && pool) {
       selectedEssenceAllocation = {
         ...selectedEssenceAllocation,
-        [scopeKey]: { ...suggestedAllocation },
+        [scopeKey]: { ...(pool.suggested ?? {}) },
       };
     }
     slotAnnouncement = typeof announcement === 'string' ? announcement : '';
@@ -638,8 +679,14 @@ export function createCraftingStore({ services } = {}) {
    * @returns {Promise<object|null>} The craft result.
    */
   /**
-   * The scoped essence funding to send with a craft, or null when the player has
-   * allocated nothing (which keeps today's behaviour byte-for-byte).
+   * The scoped essence funding to send with a craft, or null when the player has not
+   * funded this scope at all (which keeps today's behaviour byte-for-byte: the engine
+   * allocates its own suggestion).
+   *
+   * An explicitly EMPTIED pool is `{}` and IS sent. The engine honours a short
+   * allocation and never tops it up, so an empty one blocks the craft with the
+   * missing-materials reason instead of silently drawing the full greedy allocation
+   * the player had just cleared.
    *
    * It names the step and set it was authored against rather than being a bare map:
    * the ENGINE re-resolves the step from the active run and drops a payload naming a
@@ -652,7 +699,7 @@ export function createCraftingStore({ services } = {}) {
    */
   function essenceAllocationPayload(recipe) {
     const allocation = currentEssenceAllocation;
-    if (!allocation || Object.keys(allocation).length === 0) return null;
+    if (allocation === null) return null;
     return {
       stepId: selectedRecipe?.activeStepId ?? null,
       ingredientSetId: selectedIngredientSetId ?? recipe?.defaultSetId ?? null,
