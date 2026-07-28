@@ -43,7 +43,11 @@
     // which made it invisible on a salvage-only-progressive system while the editor
     // control and the bulk panel both showed it. All three read ONE predicate now, and it
     // arrives as its own prop rather than being re-derived from
-    // `selectedSystemResolutionMode`, which is retained for its other uses.
+    // `selectedSystemResolutionMode`. That prop now has no reader in this component at
+    // all, and is kept ANYWAY as a NEGATIVE CONTROL: the re-gate test in
+    // `components-browser-view-mounted.test.js` passes a non-progressive crafting mode
+    // alongside a progressive salvage axis, and the badge must still render. Deleting it
+    // would leave that test unable to state the thing it is checking.
     difficultyAxisProgressive = false,
     categoryVocabulary = [],
     dropEnabled = false,

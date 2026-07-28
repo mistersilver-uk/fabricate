@@ -173,6 +173,10 @@ const FIXTURE = `
           <div class="manager-chip-row">
             <button type="button" class="manager-chip is-positive" data-m="bulk-tag-chip"><i class="fas fa-tag"></i>metal<i class="fas fa-plus"></i></button>
           </div>
+          <!-- The panel's SECOND hint scale: a standing sentence, not the inline aside
+               above. Both are pinned, because the whole point of splitting them is that
+               they are different sizes — one map entry could not state that. -->
+          <p class="manager-component-bulk-subhint" data-m="bulk-subhint">Applying essences overwrites the essence values on every selected component.</p>
           <div class="manager-component-bulk-essence-grid">
             <article class="manager-component-essence-card is-inactive" data-component-edit-essence="fire">
               <div class="manager-component-essence-identity">
@@ -398,13 +402,23 @@ const EXPECTED = {
   'bulk-hero-title': 14.72, // 0.92rem serif
   'bulk-hero-hint': 9.92, // 0.62rem
   'bulk-label': 9.28, // 0.58rem — identical to `inspector-label`
-  'bulk-hint': 9.28, // 0.58rem — the sub-hint sits WITH its label, not above the body scale
+  // The INLINE hint only ("click to add · again to remove"), which sits on a label row's
+  // baseline and must not out-weigh the label beside it.
+  'bulk-hint': 9.28, // 0.58rem — sits WITH its label, not above the body scale
+  // A STANDING SENTENCE addressed to the GM — the essence-overwrite warning, the DC's
+  // meaning, the no-tags empty state. It is read rather than glanced at, and one of them
+  // is the only prose explaining a destructive axis, so it is a step up from the inline
+  // hint and matches the hero's own hint. It used to share `bulk-hint`, which made that
+  // sentence the SMALLEST text in the panel.
+  'bulk-subhint': 9.92, // 0.62rem — identical to `bulk-hero-hint`
   'bulk-select': 11.52, // 0.72rem — the shared manager control-text scale
   'bulk-tag-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
   'bulk-essence-name': 12.16, // 0.76rem — the extracted card, shared with the editor grid
   'bulk-stepper-input': 11.84, // 0.74rem mono — the shared Stepper, shared with the editor
   'bulk-dc-copy': 9.92, // 0.62rem
-  'bulk-apply': 11.84, // 0.74rem
+  // 0.78rem, matching `.manager-component-browser-inspector-edit` — the button this one
+  // SWAPS PLACES with in the rail's bottom slot. The swap must not re-type the slot.
+  'bulk-apply': 12.48,
   // The cascade context. A bare control inherits Foundry's 14px app base; any role
   // above landing on 14 means its rule stopped applying and Foundry bled through.
   'bleed-baseline': 14,

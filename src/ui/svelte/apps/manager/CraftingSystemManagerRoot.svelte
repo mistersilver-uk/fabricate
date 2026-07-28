@@ -3253,9 +3253,14 @@
       // already re-rendering; clearing the selection returns the rail to the inspector and
       // the count-to-zero effect discards the draft.
       clearComponentBulkSelection();
+      // Singular, on the same terms as the panel's own heading and Apply label: the
+      // threshold is `> 0`, so ONE ticked row is the advertised case, and this toast is
+      // the ONLY feedback that survives the panel unmounting on a successful apply.
       notifyInfo(
-        text('FABRICATE.Admin.Manager.Component.BulkEdit.Applied', 'Applied bulk changes to {count} components.')
-          .replace('{count}', count)
+        count === 1
+          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne', 'Applied bulk changes to 1 component.')
+          : text('FABRICATE.Admin.Manager.Component.BulkEdit.Applied', 'Applied bulk changes to {count} components.')
+              .replace('{count}', count)
       );
       return true;
     } finally {

@@ -37,8 +37,10 @@
    - `tag="button"` and `type="button"` on that chip are load-bearing: `Chip` defaults to a
      `<span>` and defaults no `type`, which would make the only route to arming or
      unstaging a destructive axis non-focusable and non-keyboard-operable. Its accessible
-     name states the ACTION, because "Will overwrite" does not tell a screen-reader user
-     that activating it reverts the axis;
+     name OPENS with its visible label and then states the ACTION: the label alone ("Will
+     overwrite") does not tell a screen-reader user that activating it reverts the axis,
+     while an action-only name breaks WCAG 2.5.3 Label in Name — a speech-input user says
+     what they can read, and a name that omits the visible string is unactivatable by it;
    - `Apply` names the exact blast radius and is inert until something is staged.
 
   Props:
@@ -137,7 +139,13 @@
       ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ApplyOne', 'Apply to 1 component')
       : format('FABRICATE.Admin.Manager.Component.BulkEdit.Apply', 'Apply to {count} components', { count })
   );
-  const unchangedLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.Unchanged', 'Leave unchanged'));
+  // `Unchanged`, NOT "Leave unchanged". This label sits on a `<button>` whose activation
+  // ARMS the axis, so an imperative reading ("leave unchanged") names the opposite of what
+  // pressing it does — a GM who wants essences untouched would click it and stage the
+  // wipe. Its staged twin reads "Will overwrite" / "Will set", which is STATE phrasing, so
+  // a neutral state word is also the consistent choice. The `<select>` sentinel keeps
+  // `CategoryUnchanged` ("Leave unchanged"): there it genuinely is an option to choose.
+  const unchangedLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.Unchanged', 'Unchanged'));
 
   function tagState(tag) {
     if (stagedTagAdd.includes(tag)) return 'add';
@@ -242,7 +250,10 @@
     <span class="manager-component-bulk-hint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.TagsHint', 'click to add · again to remove')}</span>
   </div>
   {#if tags.length === 0}
-    <p class="manager-muted" data-component-bulk-tags-empty>{text('FABRICATE.Admin.Manager.Component.BulkEdit.NoTags', 'This system defines no item tags.')}</p>
+    <!-- The panel's OWN sub-hint scale, not the global `manager-muted` (0.78rem): that
+         class would make an empty-state aside the LARGEST text in a rail whose loudest
+         copy is 0.62rem. -->
+    <p class="manager-component-bulk-subhint" data-component-bulk-tags-empty>{text('FABRICATE.Admin.Manager.Component.BulkEdit.NoTags', 'This system defines no item tags.')}</p>
   {:else}
     <!--
       A FLAT run of tri-state chips rather than an Add/Remove segmented control plus a
@@ -284,8 +295,8 @@
         tone={essencesStaged ? 'warning' : 'neutral'}
         data-component-bulk-essences-staged={essencesStaged}
         aria-label={essencesStaged
-          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChipAction', 'Essences will be overwritten on every selected component. Activate to leave them unchanged.')
-          : text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesUnstagedChipAction', 'Essences are left unchanged. Activate to overwrite them on every selected component.')}
+          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChipAction', 'Will overwrite — essences will be overwritten on every selected component. Activate to leave them unchanged.')
+          : text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesUnstagedChipAction', 'Unchanged — essences are left unchanged. Activate to overwrite them on every selected component.')}
         disabled={applying}
         onclick={() => toggleEssences()}
       >{essencesStaged
@@ -294,8 +305,10 @@
       >
     </div>
     <!-- PERMANENT, and a sub-hint rather than a Callout: the one tinted strip in a 320px
-         rail is reserved for the conditional hazard below. -->
-    <p class="manager-component-bulk-hint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesOverwriteHint', 'Applying essences overwrites the essence values on every selected component.')}</p>
+         rail is reserved for the conditional hazard below. A STANDING SENTENCE, so it
+         wears `-subhint` rather than the inline `-hint` scale — the sentence that makes
+         the destructive axis legible must not be the smallest text in the panel. -->
+    <p class="manager-component-bulk-subhint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesOverwriteHint', 'Applying essences overwrites the essence values on every selected component.')}</p>
     {#if essencesStaged && essenceWarningCount > 0}
       <Callout
         tone="warning"
@@ -334,8 +347,8 @@
         tone={difficultyStaged ? 'warning' : 'neutral'}
         data-component-bulk-difficulty-staged={difficultyStaged}
         aria-label={difficultyStaged
-          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChipAction', 'The progressive DC will be set on every selected component. Activate to leave it unchanged.')
-          : text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcUnstagedChipAction', 'The progressive DC is left unchanged. Activate to set it on every selected component.')}
+          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChipAction', 'Will set — the progressive DC will be set on every selected component. Activate to leave it unchanged.')
+          : text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcUnstagedChipAction', 'Unchanged — the progressive DC is left unchanged. Activate to set it on every selected component.')}
         disabled={applying}
         onclick={() => toggleDifficulty()}
       >{difficultyStaged
@@ -343,7 +356,7 @@
           : unchangedLabel}</Chip
       >
     </div>
-    <p class="manager-component-bulk-hint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcHint', 'DC when used as a progressive result')}</p>
+    <p class="manager-component-bulk-subhint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcHint', 'DC when used as a progressive result')}</p>
     <div class="manager-component-bulk-dc-row">
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
       <span class="manager-component-bulk-dc-copy">{text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcSentence', 'Set every selected component to')}</span>
@@ -495,9 +508,16 @@
 
   /* Sections are uppercase micro-labels ON the panel background — the treatment the
      single-component inspector this panel replaces already uses, so the rail reads the
-     same either way. */
+     same either way.
+
+     The panel's SECTION RHYTHM lives on this margin and on the label row's below, because
+     the container's flex `gap` is uniform, and a uniform gap puts a section heading
+     exactly as far from the previous section's last control as from its own — so the
+     panel reads as one undifferentiated stack. The prototype separates sections by twice
+     what it puts between controls WITHIN one; the container gap already supplies the
+     inner spacing, and this extra `space-2` is what turns the flat run back into groups. */
   .manager-component-bulk-label {
-    margin: var(--fab-space-1) 0 0;
+    margin: var(--fab-space-2) 0 0;
     color: var(--fab-text-subtle);
     font-size: 0.58rem;
     font-weight: 700;
@@ -511,16 +531,32 @@
     align-items: baseline;
     justify-content: space-between;
     min-width: 0;
+    /* The row carries the section break for the label INSIDE it (which is zeroed just
+       below, since a flex item's own margin would push it off the shared baseline). */
+    margin-top: var(--fab-space-2);
   }
 
   .manager-component-bulk-label-row > .manager-component-bulk-label {
     margin-top: 0;
   }
 
+  /* Two hint scales, deliberately. `-hint` is the INLINE aside that sits on a label row's
+     baseline and must not out-weigh the label beside it. `-subhint` is a STANDING
+     SENTENCE addressed to the GM — the essence-overwrite warning and the DC's meaning —
+     which is read, not glanced at, so it is a step larger and looser. Collapsing the two
+     made the sentence explaining the panel's destructive axis the smallest text in it. */
   .manager-component-bulk-hint {
     margin: 0;
     color: var(--fab-text-subtle);
     font-size: 0.58rem;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  .manager-component-bulk-subhint {
+    margin: 0;
+    color: var(--fab-text-subtle);
+    font-size: 0.62rem;
     font-weight: 400;
     line-height: 1.4;
   }
@@ -575,7 +611,14 @@
   }
 
   /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an
-     axis is staged, so the GM cannot fire a no-op write and read success from it. */
+     axis is staged, so the GM cannot fire a no-op write and read success from it.
+     Geometry, weight and foreground are the browser inspector's primary button verbatim
+     (`.manager-button.manager-component-browser-inspector-edit`, styles/fabricate.css),
+     because this button LITERALLY SWAPS PLACES with it in the rail's bottom slot the
+     moment a box is ticked: 38px and 0.78rem, so the swap does not resize or re-type the
+     slot, and `--fab-on-accent` — the token that means "foreground ON an accent fill" —
+     rather than `--fab-bg-1`, which is a surface colour and differs from it in all seven
+     themes. */
   .manager-component-bulk-apply {
     display: flex;
     gap: var(--fab-space-chip);
@@ -583,17 +626,24 @@
     justify-content: center;
     width: 100%;
     height: auto;
-    min-height: 36px;
+    min-height: 38px;
     margin-top: var(--fab-space-1);
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;
-    color: var(--fab-bg-1);
+    color: var(--fab-on-accent);
     background: var(--fab-accent);
     font-family: inherit;
-    font-size: 0.74rem;
+    font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
+  }
+
+  /* The same accent-strong hover its twin carries. Without it the rail's primary action
+     is the only button on the panel with no pointer feedback. */
+  .manager-component-bulk-apply:not(:disabled):hover {
+    border-color: var(--fab-accent);
+    background: var(--fab-accent-strong);
   }
 
   .manager-component-bulk-apply:disabled {

@@ -261,6 +261,47 @@ test('an ABSENT essences/difficulty key leaves both values alone', async () => {
   assert.equal(c1.difficulty, 7, 'difficulty untouched when the key is absent');
 });
 
+// ── The SALVAGE half of the re-normalization context ────────────────────────────────
+// Each written component is re-normalized under `{ validEssenceIds, ...salvageContext }`.
+// Only the essence half was pinned, so deleting `...salvageContext` left every test in
+// this file green while silently changing salvage clamping on every bulk-written
+// component — the write would stop enforcing the Simple-mode invariant that the
+// single-component path enforces, and a bulk category edit would leave behind a config
+// the engine awards a FAILURE group from.
+//
+// The raw salvage is poked on AFTER seeding on purpose: `_normalizeSystem` runs the very
+// clamp under test, so a failure-first config declared in the fixture would already be
+// clamped before the bulk write and the assertion would pass on the seed's work.
+test('re-normalizes salvage under the owning system context, so a bulk write runs the Simple clamp', async () => {
+  const manager = makeLoadedManager([
+    {
+      id: 'sys1',
+      name: 'System One',
+      componentCategories: ['Reagent'],
+      salvageResolutionMode: 'simple',
+      // No authored Simple salvage roll formula, so the reserved failure group is not
+      // tolerated either — it is dropped rather than merely demoted to index 1.
+      items: [{ id: 'c1', name: 'Iron Ore', category: 'general' }],
+    },
+  ]);
+  const component = componentById(manager, 'c1');
+  component.salvage = {
+    enabled: true,
+    ingredientQuantity: 1,
+    resultGroups: [
+      { id: 'g-fail', name: 'Ruined', role: 'failure', results: [] },
+      { id: 'g-ok', name: 'Scrap', results: [] },
+    ],
+  };
+
+  await manager.applyBulkEditToComponents('sys1', ['c1'], { category: 'Reagent' });
+
+  const salvage = componentById(manager, 'c1').salvage;
+  assert.equal(salvage.resultGroups.length, 1, 'the untolerated failure group is dropped');
+  assert.equal(salvage.resultGroups[0].id, 'g-ok', 'and the success group lands at index 0');
+  assert.equal(salvage.enabled, true, 'a surviving success group keeps salvage enabled');
+});
+
 test('every staged axis lands on every targeted component in ONE save()', async () => {
   const manager = seededManager();
   const before = manager.saveCount;

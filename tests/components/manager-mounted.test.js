@@ -6106,6 +6106,90 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok('essences' in applyCall[2], 'the key must be PRESENT for the write to clear');
   });
 
+  // Capture `ui.notifications.info`. Nothing else in this suite needs the Foundry `ui`
+  // global, so it is installed per-test and removed again rather than left standing where
+  // an unrelated test could come to depend on it.
+  async function applyBulkEditOverRows(ids) {
+    const messages = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openComponentsBrowser();
+      for (const id of ids) tickComponentRow(id);
+      target.querySelector('[data-bulk-tag="ore"]').click();
+      flushSync();
+      target.querySelector('[data-component-bulk-apply]').click();
+      await tick();
+      flushSync();
+      return messages;
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  // The apply toast is the ONLY feedback that survives the panel unmounting on success —
+  // applying clears the selection, so the rail is back on the single-component inspector
+  // by the time the GM reads anything. Nothing asserted it before, which is how "Applied
+  // bulk changes to 1 components." shipped green past a panel that gets the same
+  // singular right twice.
+  it('says "1 component" in the applied toast at the panel\'s own > 0 threshold', async () => {
+    const messages = await applyBulkEditOverRows(['c1']);
+    assert.deepEqual(messages, ['Applied bulk changes to 1 component.']);
+  });
+
+  it('and keeps the plural for a real multi-row apply', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2']);
+    assert.deepEqual(messages, ['Applied bulk changes to 2 components.']);
+  });
+
+  // ── The root's own prop forwarding ──────────────────────────────────────────────
+  // Three props are computed HERE and handed down, and the view/panel suites all supply
+  // them directly — so every one of them could be mis-wired with those suites still
+  // green. This test mounts the root and reads the DOM the forwarding produces:
+  //  - `difficultyAxisProgressive` into the browser (the row badge), and
+  //  - `showProgressiveDifficulty` into the panel (the DC section), both of which regress
+  //    to the pre-issue-772 CRAFTING-only bug if re-derived from `resolutionMode`;
+  //  - `selectedCards` into the panel, which must be the SELECTION and not the library:
+  //    the overwrite warning counts authored essences over it, so the library would
+  //    overstate the hazard on rows the GM never ticked.
+  // The fixture is deliberately progressive for SALVAGE while `resolutionMode` is
+  // `routedByCheck`, because that is the only shape where the two predicates disagree.
+  it('forwards the three-axis DC predicate and the SELECTED cards, not the crafting mode and the library', async () => {
+    await openComponentsBrowser([], {
+      alchemyResolutionMode: 'routedByCheck',
+      salvageResolutionMode: 'progressive',
+    });
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-id="c1"] [data-component-difficulty]')),
+      'the row DC badge follows the salvage axis, not the crafting resolution mode'
+    );
+
+    // c2 has NO authored essences; c1 has earth 2.
+    tickComponentRow('c2');
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-difficulty]')),
+      'and so does the panel\'s progressive DC section'
+    );
+
+    target.querySelector('[data-component-bulk-essences-staged]').click();
+    flushSync();
+    assert.ok(
+      !target.querySelector('[data-component-bulk-essence-warning]'),
+      'no selected row has an authored essence value, so there is no hazard to warn about'
+    );
+
+    tickComponentRow('c1');
+    const warning = target.querySelector('[data-component-bulk-essence-warning]');
+    assert.ok(Boolean(warning), 'ticking the row that DOES have one raises the warning');
+    assert.equal(
+      warning.getAttribute('data-component-bulk-essence-warning'),
+      '1',
+      'and it counts the selection'
+    );
+  });
+
   it('opens the in-manager component-edit view, persists tag changes, and exposes source actions', async () => {
     const calls = [];
     const replaced = [];

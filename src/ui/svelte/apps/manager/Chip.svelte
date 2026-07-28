@@ -186,6 +186,30 @@
     cursor: pointer;
   }
 
+  /* Pointer feedback for a chip that is actually a control (issue 772). The component
+     editor's tag pill had this — `.manager-component-tag-toggle:hover:not(:disabled)` —
+     and lost it when that block retired into this primitive, and the bulk panel's
+     tri-state chips, whose whole interaction is repeated clicking, never had it at all.
+     Edge and foreground only, so it composes with every tone rather than fighting it:
+     a hover that repainted the fill would have to be restated per tone.
+
+     `button.`-prefixed, so it reaches ONLY the chips that are real buttons — six call
+     sites. A `<span>` chip can be neither hovered as a control nor `:disabled`, so the
+     wide call-site count is not a reason to leave a control without feedback. */
+  button.manager-chip:hover:not(:disabled) {
+    border-color: var(--fab-accent);
+    color: var(--fab-text);
+  }
+
+  /* A disabled chip-button goes inert. The component editor's tag run states this for
+     itself in the global sheet (three classes, so it still wins there); stating it HERE
+     is what covers a chip-button outside such a run — the bulk panel's chips, which had
+     no disabled treatment at all while an apply was in flight. */
+  button.manager-chip:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
   /* A chip rendered as a list item drops the marker; the pill IS the item. */
   li.manager-chip {
     list-style: none;
