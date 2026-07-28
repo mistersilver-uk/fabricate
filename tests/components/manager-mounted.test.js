@@ -1330,7 +1330,10 @@ function createStore(calls = [], options = {}) {
                   dropRows: [],
                 },
               ],
-          events: [],
+          // Opt-in only: the event library is empty by default so the many existing
+          // assertions about the encounters browser's empty state stay true. Tests that
+          // need to reach the gathering-EVENT editor pass `gatheringLibraryEvents`.
+          events: options.gatheringLibraryEvents || [],
           tools: options.gatheringLibraryTools || [],
         },
       },
@@ -1481,6 +1484,7 @@ function createStore(calls = [], options = {}) {
     },
     saveRecipeItem: (recipeItemId, patch) => {
       calls.push(['saveRecipeItem', recipeItemId, patch]);
+      if (options.saveRecipeItemReject) return Promise.reject(new Error('save recipe item failed'));
       return options.saveRecipeItemResult ?? true;
     },
     deleteRecipeItemDefinition: (recipeItemId) => {
@@ -1782,6 +1786,12 @@ function createStore(calls = [], options = {}) {
     },
     updateGatheringLibraryTask: (systemId, taskId, updates = {}) => {
       calls.push(['updateGatheringLibraryTask', systemId, taskId, updates]);
+      // The two failure branches the root's save path can take. Without these the fixture
+      // could only ever return `true`, so the failed-save alert was undrivable (issue 919).
+      if (options.updateGatheringLibraryTaskReject) {
+        return Promise.reject(new Error('update gathering task failed'));
+      }
+      if (options.updateGatheringLibraryTaskResult === false) return false;
       viewState.update((state) => {
         const systemConfig = state.gatheringConfig?.systems?.[systemId];
         if (!systemConfig) return state;
@@ -1808,6 +1818,37 @@ function createStore(calls = [], options = {}) {
       return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
     },
     deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
+    // The gathering-EVENT library had no handler here at all before issue 919, so the
+    // root's `store.updateGatheringLibraryEvent?.(…)` optional-chained to `undefined` — and
+    // because the root treats anything other than a literal `false` as success, every
+    // mounted event save passed unconditionally. Mirrors the task handler above.
+    updateGatheringLibraryEvent: (systemId, eventId, updates = {}) => {
+      calls.push(['updateGatheringLibraryEvent', systemId, eventId, updates]);
+      if (options.updateGatheringLibraryEventReject) {
+        return Promise.reject(new Error('update gathering event failed'));
+      }
+      if (options.updateGatheringLibraryEventResult === false) return false;
+      viewState.update((state) => {
+        const systemConfig = state.gatheringConfig?.systems?.[systemId];
+        if (!systemConfig) return state;
+        return {
+          ...state,
+          gatheringConfig: {
+            ...state.gatheringConfig,
+            systems: {
+              ...state.gatheringConfig.systems,
+              [systemId]: {
+                ...systemConfig,
+                events: (systemConfig.events || []).map((event) =>
+                  event.id === eventId ? { ...event, ...updates } : event
+                ),
+              },
+            },
+          },
+        };
+      });
+      return true;
+    },
     createToolDraft: (initialPatch = {}, systemId = 'alchemy') => {
       const created = {
         id: 'tool-new',
@@ -14655,4 +14696,273 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // --- Failed-save alerts in the editor toolbars (issue 919) -----------------------
+  //
+  // All three of these editors used to compute a failure and render NOTHING: a GM whose
+  // save failed saw no change at all. Each test drives one editor to a dirty draft, fails
+  // its save, and asserts the RENDERED text — element presence alone would pass against an
+  // implementation that renders an empty `<p>`. Each then flips the same live options
+  // object to success and re-saves, proving the alert clears rather than sticking.
+  //
+  // The `options` object is read at CALL time by the store fixture, so mutating it between
+  // two clicks on one mounted tree switches the outcome without a second mount.
+
+  const SAVE_FAILED_MESSAGE = 'Save failed. Try again.';
+
+  const gatheringEventLibraryFixtures = [
+    {
+      id: 'event-thorns',
+      name: 'Thorn Snare',
+      description: 'Tangled thorns snap shut around a careless gatherer.',
+      img: 'icons/svg/hazard.svg',
+      enabled: true,
+      dropRate: 10,
+      biomes: [],
+      weather: [],
+      timeOfDay: [],
+      dangerTags: [],
+    },
+  ];
+
+  // Two ticks: the save handlers await a store promise, so the state write that renders
+  // the alert lands a microtask after the click.
+  async function settle() {
+    await tick();
+    await tick();
+    flushSync();
+  }
+
+  function mountManager(calls, storeOptions) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, storeOptions),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+  }
+
+  function headerSaveButton() {
+    return target.querySelector('.manager-header-actions .manager-button.is-primary');
+  }
+
+  async function clickHeaderSave() {
+    headerSaveButton().click();
+    await settle();
+  }
+
+  function assertSaveErrorRendered(selector) {
+    const alert = target.querySelector(`.manager-header-actions ${selector}`);
+    assert.ok(alert, `expected the failed-save alert ${selector} in the header toolbar`);
+    assert.equal(alert.getAttribute('role'), 'alert', 'the failed-save alert is a live region');
+    assert.equal(
+      alert.textContent.trim(),
+      SAVE_FAILED_MESSAGE,
+      'the failed-save alert renders its localized message, not an empty element'
+    );
+  }
+
+  function assertSaveErrorAbsent(selector, why) {
+    assert.equal(target.querySelector(selector), null, why);
+    assert.equal(
+      target.textContent.includes(SAVE_FAILED_MESSAGE),
+      false,
+      `${why} (the message text is gone from the surface too)`
+    );
+  }
+
+  async function openDirtyGatheringTaskEditor(calls, storeOptions) {
+    mountManager(calls, storeOptions);
+    navButton('Gathering').click();
+    await settle();
+    gatheringSubitem('Tasks').click();
+    await settle();
+    target
+      .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+      .click();
+    await settle();
+    setInputValue(target.querySelector('[data-gathering-task-field="name"]'), 'Gather Sun Herbs');
+    await settle();
+  }
+
+  async function openDirtyGatheringEventEditor(calls, storeOptions) {
+    Object.assign(storeOptions, { gatheringLibraryEvents: gatheringEventLibraryFixtures });
+    mountManager(calls, storeOptions);
+    navButton('Gathering').click();
+    await settle();
+    gatheringSubitem('Events').click();
+    await settle();
+    target
+      .querySelector('[data-gathering-event-id="event-thorns"] [aria-label="Edit Thorn Snare"]')
+      .click();
+    await settle();
+    setInputValue(target.querySelector('[data-gathering-event-field="name"]'), 'Bramble Snare');
+    await settle();
+  }
+
+  async function openDirtyRecipeItemEditor(calls, storeOptions) {
+    Object.assign(storeOptions, {
+      experimentalFeaturesEnabled: true,
+      recipeItemDefinitions: booksScrollsFixtures,
+    });
+    mountManager(calls, storeOptions);
+    craftingParent().click();
+    await settle();
+    craftingSubitem('Books & Scrolls').click();
+    await settle();
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await settle();
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await settle();
+  }
+
+  // The two gathering rejection paths log through console.error before they surface the
+  // alert, so silence just that call rather than dumping an expected stack into the run.
+  async function withSilencedConsoleError(run) {
+    const original = console.error;
+    console.error = () => {};
+    try {
+      await run();
+    } finally {
+      console.error = original;
+    }
+  }
+
+  it('surfaces a gathering-task save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryTaskResult: false };
+    await openDirtyGatheringTaskEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickHeaderSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+
+    storeOptions.updateGatheringLibraryTaskResult = true;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a gathering-task save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryTaskReject: true };
+    await openDirtyGatheringTaskEditor(calls, storeOptions);
+
+    await withSilencedConsoleError(clickHeaderSave);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+
+    storeOptions.updateGatheringLibraryTaskReject = false;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a gathering-event save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryEventResult: false };
+    await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickHeaderSave();
+    assert.ok(
+      calls.some((call) => call[0] === 'updateGatheringLibraryEvent' && call[2] === 'event-thorns'),
+      'Save routes through updateGatheringLibraryEvent'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-event-edit'
+    );
+    assertSaveErrorRendered('[data-gathering-event-save-error]');
+
+    storeOptions.updateGatheringLibraryEventResult = true;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a gathering-event save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryEventReject: true };
+    await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    // Before issue 919 `saveGatheringEventDraft` had no `catch` at all, so this rejection
+    // escaped as an unhandled rejection and set nothing.
+    await withSilencedConsoleError(clickHeaderSave);
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-event-edit'
+    );
+    assertSaveErrorRendered('[data-gathering-event-save-error]');
+
+    storeOptions.updateGatheringLibraryEventReject = false;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a recipe-item save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { saveRecipeItemResult: false };
+    await openDirtyRecipeItemEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    target.querySelector('[data-recipe-item-save]').click();
+    await settle();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assertSaveErrorRendered('[data-recipe-item-save-error]');
+
+    storeOptions.saveRecipeItemResult = true;
+    target.querySelector('[data-recipe-item-save]').click();
+    await settle();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a recipe-item save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { saveRecipeItemReject: true };
+    await openDirtyRecipeItemEditor(calls, storeOptions);
+
+    target.querySelector('[data-recipe-item-save]').click();
+    await settle();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assertSaveErrorRendered('[data-recipe-item-save-error]');
+
+    storeOptions.saveRecipeItemReject = false;
+    target.querySelector('[data-recipe-item-save]').click();
+    await settle();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
 });
