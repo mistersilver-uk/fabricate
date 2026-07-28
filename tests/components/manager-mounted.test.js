@@ -14714,7 +14714,7 @@ describe('CraftingSystemManager mounted behavior', () => {
   // implementation that renders an empty `<p>`. Each then flips the same live options object
   // to success and re-saves, and asserts the alert is gone afterwards. For the two gathering
   // editors that is a real clearing assertion; the recipe-item pair leaves the route on
-  // success, so there absence follows from the whole toolbar branch unmounting instead.
+  // success, so their absence follows from the whole toolbar branch unmounting instead.
   //
   // The `options` object is read at CALL time by the store fixture, so mutating it between
   // two clicks on one mounted tree switches the outcome without a second mount.
@@ -14748,6 +14748,11 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   async function clickHeaderSave() {
     headerSaveButton(target).click();
+    await settleSaveAttempt();
+  }
+
+  async function clickRecipeItemSave() {
+    target.querySelector('[data-recipe-item-save]').click();
     await settleSaveAttempt();
   }
 
@@ -14828,16 +14833,17 @@ describe('CraftingSystemManager mounted behavior', () => {
   // SAME message. `role="alert"` announces on a DOM mutation, and writing a byte-identical
   // string is not one — $state sees no change, so nothing re-renders and a screen reader is
   // silent from the second failure onwards. Presence therefore proves nothing here; node
-  // IDENTITY does. This passes only because the save clears its error before the attempt.
-  async function assertRepeatFailureReAnnounces(selector) {
-    await clickHeaderSave();
+  // IDENTITY does. This passes only because the save clears its error before the awaited store
+  // call, so the alert leaves the DOM mid-flight and is re-inserted when the failure recurs.
+  async function assertRepeatFailureReAnnounces(selector, save = clickHeaderSave) {
+    await save();
     assertSaveErrorRendered(selector);
-    const firstAlert = target.querySelector(selector);
+    const firstAlert = saveErrorNode(selector);
 
-    await clickHeaderSave();
+    await save();
     assertSaveErrorRendered(selector);
     assert.notStrictEqual(
-      target.querySelector(selector),
+      saveErrorNode(selector),
       firstAlert,
       'a second identical failure re-inserts the alert rather than leaving the first node in place'
     );
@@ -15011,14 +15017,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no alert before a save has been attempted'
     );
 
-    target.querySelector('[data-recipe-item-save]').click();
-    await settleSaveAttempt();
+    await clickRecipeItemSave();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemResult = true;
-    target.querySelector('[data-recipe-item-save]').click();
-    await settleSaveAttempt();
+    await clickRecipeItemSave();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assertSaveErrorAbsent(
       '[data-recipe-item-save-error]',
@@ -15031,18 +15035,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     const storeOptions = { saveRecipeItemReject: true };
     await openDirtyRecipeItemEditor(calls, storeOptions);
 
-    target.querySelector('[data-recipe-item-save]').click();
-    await settleSaveAttempt();
+    await clickRecipeItemSave();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemReject = false;
-    target.querySelector('[data-recipe-item-save]').click();
-    await settleSaveAttempt();
+    await clickRecipeItemSave();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assertSaveErrorAbsent(
       '[data-recipe-item-save-error]',
       'a successful save clears the failed-save alert'
     );
+  });
+
+  // `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its awaited store call, and
+  // that line carries exactly the invariant the two gathering saves were changed to hold — but
+  // deleting it left the whole suite green, so nothing was actually holding it. This pins it on
+  // the third editor too, driven through its own Save control rather than the header one.
+  it('re-announces a recipe-item save that fails the same way twice', async () => {
+    await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
+    await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);
   });
 });
