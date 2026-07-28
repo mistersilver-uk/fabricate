@@ -1363,6 +1363,90 @@ async function captureStableManagerView(page, { width, height, layout, label, se
 }
 
 /**
+ * Issue 772 — capture ONE state of the components browser's BULK EDIT rail panel.
+ *
+ * THREE frames share this scaffold, because the panel has four sections and no single
+ * frame can hold them all. A STAGED axis chip and an UNSTAGED one are mutually exclusive
+ * states of the same control, so "leave unchanged" — the only route to *clear essences on
+ * every selected component*, since `Stepper` emits nothing at the zero boundary — can
+ * never appear in the same photograph as "will overwrite". And the Progressive DC section
+ * renders only where a system's crafting, salvage or gathering resolution is progressive,
+ * which in this world is never the same system as the essence-bearing one. Only the
+ * `stage` callback differs between the three, so the selection, the toolbar assertion, the
+ * capture and the teardown live here once; a fresh sibling copy per frame would also trip
+ * Sonar's new-code duplication gate, which counts `scripts/` and ignores `cpd.exclusions`.
+ *
+ * NET-ZERO by construction. `stage` drives the SHIPPED controls only — seeding the
+ * selection or the draft through `page.evaluate` would touch `game.` / settings / flags,
+ * the Foundry content-signal shape these frames deliberately avoid, and would photograph a
+ * state no GM can actually reach. Apply is NEVER pressed, so not one component is written,
+ * and the `finally` clears the selection so every following capture sees the
+ * single-component inspector it expects.
+ *
+ * A failed CLEAR is recorded as its own failed step rather than swallowed: it leaves the
+ * rail showing the bulk panel for every following components frame, which is silent
+ * evidence corruption. It is RECORDED, not thrown, because throwing from this `finally`
+ * would both mask an in-flight capture error and abort the rest of the section — and a
+ * recorded failure is already fatal to the run (`evaluateSmokeOutcome` treats step
+ * failures as non-waivable) while leaving the remaining frames to be captured.
+ *
+ * @param {import('playwright').Page} page
+ * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
+ * @param {{
+ *   stepName: string,
+ *   label: string,
+ *   stage: (bulkPanel: import('playwright').Locator) => Promise<void>
+ * }} options
+ */
+async function captureComponentBulkEditFrame(page, results, { stepName, label, stage }) {
+  try {
+    const componentRows = page.locator('.fabricate-manager .manager-component-row');
+    if (await componentRows.count() < 2) {
+      throw new Error('Components browser rendered fewer than two rows to bulk-select.');
+    }
+    // The selection control is an `<input type="checkbox">` whose real input is 1px and
+    // transparent behind a painted box, so the wrapping LABEL is the click target. It is
+    // deliberately NOT a `<button>` — which is why this walk's
+    // `.manager-component-row … button:has(i.fa-pen)` Edit selectors still resolve to
+    // exactly one control per row.
+    for (const index of [0, 1]) {
+      await componentRows.nth(index).locator('label:has(input[data-component-select])').first().click();
+    }
+    const bulkPanel = page.locator('.fabricate-manager [data-component-bulk-panel]').first();
+    await bulkPanel.waitFor({ state: 'visible', timeout: 5_000 });
+    const bulkSelectedRows = await page.locator('.fabricate-manager .manager-component-row.is-bulk-selected').count();
+    if (bulkSelectedRows !== 2) {
+      throw new Error(`Expected two bulk-selected component rows, found ${bulkSelectedRows}.`);
+    }
+    await page.locator('.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]')
+      .first().waitFor({ state: 'visible', timeout: 5_000 });
+
+    await stage(bulkPanel);
+
+    // The browser surface is unchanged by the selection, so this reuses the `components
+    // normal` pinned selectors: the list, the row and the row identity are all still on
+    // screen, and only the RAIL swapped the inspector for the panel.
+    await captureStableManagerView(page, { layout: 'components normal', label });
+    process.stdout.write(`  D0: ${stepName} screenshotted\n`);
+    results.steps.push({ step: stepName, passed: true });
+  } catch (err) {
+    results.steps.push({ step: stepName, passed: false, error: err.message });
+    process.stderr.write(`${stepName} capture failed: ${err.message}\n`);
+  } finally {
+    // Clear whether or not the capture succeeded: a live selection keeps the rail on the
+    // bulk panel, and the count-to-zero transition is what discards the staged draft.
+    await softClick(page.locator('.fabricate-manager [data-component-clear-selection]'));
+    try {
+      await page.locator('.fabricate-manager [data-component-bulk-panel]')
+        .first().waitFor({ state: 'detached', timeout: 5_000 });
+    } catch (err) {
+      results.steps.push({ step: `${stepName}-cleared`, passed: false, error: err.message });
+      process.stderr.write(`${stepName} left the bulk panel mounted: ${err.message}\n`);
+    }
+  }
+}
+
+/**
  * Issue 801 — capture a GM library's grouped-category CONTINUATION frame: seed one
  * category large enough to span a page boundary, shrink the pager to page size 10, advance
  * to the continuation page (the category's remaining slice, "N of M", at the head), and
@@ -8874,86 +8958,80 @@ async function main() {
         process.stdout.write('  D0: components normal screenshotted\n');
 
         // ---------------------------------------------------------------------
-        // Issue 772 — the components browser's BULK EDIT state: two rows ticked, the
-        // selection toolbar counting them, and the rail carrying the staged bulk panel
-        // (category, one tag staged for addition and one for removal, one essence).
+        // Issue 772 — the components browser's BULK EDIT rail panel, in TWO of its three
+        // frames (see `captureComponentBulkEditFrame` for why one frame cannot carry the
+        // panel's four sections). Both of these run on the fully-seeded Arcane Forge, the
+        // only essence-enabled system with a manager walk position — and the one with a
+        // six-definition vocabulary, so the essence grid is at real density. Its resolution
+        // is `routedByCheck` on crafting, `routed` on salvage and the default `d100` on
+        // gathering, so `componentDifficultyAxisProgressive` is false here and the panel's
+        // Progressive DC section does NOT render; that fourth section is captured later in
+        // this phase, on the progressive system that already has a walk position.
         //
-        // Driven entirely through the shipped controls. Seeding the selection or the
-        // draft through `page.evaluate` would touch `game.` / settings / flags, which is
-        // the Foundry content-signal shape this frame deliberately avoids — and it would
-        // photograph a state no GM can actually reach.
-        //
-        // NET-ZERO by construction: Apply is NEVER pressed, so not one component is
-        // written, and the `finally` clears the selection so every following capture in
-        // this section sees the single-component inspector it expects.
+        //  1. STAGED — a category, one tag cycled to `add`, one to `remove`, and the
+        //     essence axis armed. This is the frame the prototype parity table compares.
+        //  2. UNSTAGED — the pristine draft a GM sees the instant a selection is made:
+        //     every axis chip on its "leave unchanged" face and Apply inert. It is the
+        //     ONLY evidence of that face, and the face matters because it is the sole
+        //     route to "clear essences on every selected component" (`Stepper` emits
+        //     nothing at the zero boundary). Re-selecting from a cleared rail rather than
+        //     un-staging also proves the discard-on-empty-selection effect in real Foundry.
         // ---------------------------------------------------------------------
-        try {
-          const componentRows = page.locator('.fabricate-manager .manager-component-row');
-          if (await componentRows.count() < 2) {
-            throw new Error('Components browser rendered fewer than two rows to bulk-select.');
-          }
-          // The selection control is an `<input type="checkbox">` whose real input is 1px
-          // and transparent behind a painted box, so the wrapping LABEL is the click
-          // target. It is deliberately NOT a `<button>` — which is why this walk's
-          // `.manager-component-row … button:has(i.fa-pen)` Edit selectors still resolve
-          // to exactly one control per row.
-          for (const index of [0, 1]) {
-            await componentRows.nth(index).locator('label:has(input[data-component-select])').first().click();
-          }
-          const bulkPanel = page.locator('.fabricate-manager [data-component-bulk-panel]').first();
-          await bulkPanel.waitFor({ state: 'visible', timeout: 5_000 });
-          const bulkSelectedRows = await page.locator('.fabricate-manager .manager-component-row.is-bulk-selected').count();
-          if (bulkSelectedRows !== 2) {
-            throw new Error(`Expected two bulk-selected component rows, found ${bulkSelectedRows}.`);
-          }
-          await page.locator('.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]')
-            .first().waitFor({ state: 'visible', timeout: 5_000 });
+        await captureComponentBulkEditFrame(page, results, {
+          stepName: 'components-bulk-edit',
+          label: 'manager-components-bulk-edit',
+          stage: async (bulkPanel) => {
+            // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
+            // category is staged whatever vocabulary this world has authored.
+            await bulkPanel.locator('[data-component-bulk-category]').first().selectOption({ index: 1 });
 
-          // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
-          // category is staged whatever vocabulary this world has authored.
-          await bulkPanel.locator('[data-component-bulk-category]').first().selectOption({ index: 1 });
+            // The tag chips cycle none → add → remove → none, so one click stages an
+            // addition and two stage a removal. Both tri-states are in the frame because
+            // the tri-state IS the feature.
+            const tagChips = bulkPanel.locator('[data-bulk-tag]');
+            if (await tagChips.count() < 2) {
+              throw new Error('Bulk edit panel rendered fewer than two item-tag chips to cycle.');
+            }
+            await tagChips.nth(0).click();
+            await tagChips.nth(1).click();
+            await tagChips.nth(1).click();
+            for (const state of ['add', 'remove']) {
+              await bulkPanel.locator(`[data-bulk-tag][data-bulk-tag-state="${state}"]`)
+                .first().waitFor({ state: 'visible', timeout: 5_000 });
+            }
 
-          // The tag chips cycle none → add → remove → none, so one click stages an
-          // addition and two stage a removal. Both tri-states are in the frame because
-          // the tri-state IS the feature.
-          const tagChips = bulkPanel.locator('[data-bulk-tag]');
-          if (await tagChips.count() < 2) {
-            throw new Error('Bulk edit panel rendered fewer than two item-tag chips to cycle.');
-          }
-          await tagChips.nth(0).click();
-          await tagChips.nth(1).click();
-          await tagChips.nth(1).click();
-          for (const state of ['add', 'remove']) {
-            await bulkPanel.locator(`[data-bulk-tag][data-bulk-tag-state="${state}"]`)
+            // One essence increment, which also arms the essence axis (its staged chip
+            // flips to "Will overwrite" and the destructive-overwrite warning resolves).
+            await bulkPanel.locator('[data-component-bulk-essences] [data-component-edit-essence] [data-stepper-increment]')
+              .first().click();
+            await bulkPanel.locator('[data-component-bulk-essences] [data-component-essence-active="true"]')
               .first().waitFor({ state: 'visible', timeout: 5_000 });
-          }
 
-          // One essence increment, which also arms the essence axis (its staged chip flips
-          // to "Will overwrite" and the destructive-overwrite warning resolves).
-          await bulkPanel.locator('[data-component-bulk-essences] [data-component-edit-essence] [data-stepper-increment]')
-            .first().click();
-          await bulkPanel.locator('[data-component-bulk-essences] [data-component-essence-active="true"]')
-            .first().waitFor({ state: 'visible', timeout: 5_000 });
-
-          // Apply must be live with four axes staged — but it is never clicked: this
-          // capture writes nothing.
-          if (await bulkPanel.locator('[data-component-bulk-apply]').first().isDisabled()) {
-            throw new Error('Bulk edit Apply stayed inert after category, tags and essences were staged.');
-          }
-          await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-bulk-edit' });
-          process.stdout.write('  D0: components bulk edit screenshotted\n');
-          results.steps.push({ step: 'components-bulk-edit', passed: true });
-        } catch (err) {
-          results.steps.push({ step: 'components-bulk-edit', passed: false, error: err.message });
-          process.stderr.write(`Components bulk edit capture failed: ${err.message}\n`);
-        } finally {
-          // Clear whether or not the capture succeeded: a live selection keeps the rail on
-          // the bulk panel for every following components frame, and the count-to-zero
-          // transition is what discards the staged draft.
-          await softClick(page.locator('.fabricate-manager [data-component-clear-selection]'));
-          await page.locator('.fabricate-manager [data-component-bulk-panel]')
-            .first().waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
-        }
+            // Apply must be live with three axes staged — but it is never clicked: this
+            // capture writes nothing.
+            if (await bulkPanel.locator('[data-component-bulk-apply]').first().isDisabled()) {
+              throw new Error('Bulk edit Apply stayed inert after category, tags and essences were staged.');
+            }
+          },
+        });
+        await captureComponentBulkEditFrame(page, results, {
+          stepName: 'components-bulk-edit-unstaged',
+          label: 'manager-components-bulk-edit-unstaged',
+          stage: async (bulkPanel) => {
+            // Nothing is staged here, deliberately — the ASSERTIONS are the state. A
+            // pristine draft can write nothing, so Apply must be inert, and the essence
+            // chip must read its unstaged face on a control that ARMS the axis.
+            if (!await bulkPanel.locator('[data-component-bulk-apply]').first().isDisabled()) {
+              throw new Error('Bulk edit Apply was live on a pristine draft with nothing staged.');
+            }
+            await bulkPanel.locator('[data-component-bulk-essences-staged="false"]')
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
+            // The essence cards render in BOTH states, so this frame still carries the
+            // six-card grid — what differs is the chip above it and the inert Apply.
+            await bulkPanel.locator('[data-component-bulk-essences]').first()
+              .waitFor({ state: 'visible', timeout: 5_000 });
+          },
+        });
 
         // ---------------------------------------------------------------------
         // Issue 800 — write-time RESOLUTION of source descriptions, in three frames.
@@ -9892,6 +9970,34 @@ async function main() {
               .waitFor({ state: 'visible', timeout: 5_000 });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'manager-components-progressive');
+
+            // Issue 772 — the bulk panel's FOURTH section, Progressive DC, which the
+            // manager root gates on `componentDifficultyAxisProgressive` (crafting OR
+            // salvage OR gathering resolution being progressive). Broken Workshop is this
+            // world's progressive system and its components browser is already on screen,
+            // so this reuses an existing walk position rather than reconfiguring a system
+            // mid-walk. Two things ride along for free, both of which the panel's copy
+            // depends on and neither of which the Arcane Forge frames can show: this
+            // system authors NO item tags, so the empty-tags line is evidenced, and it has
+            // essences disabled, so the DC section sits above the fold instead of below a
+            // six-card essence grid.
+            await captureComponentBulkEditFrame(page, results, {
+              stepName: 'components-bulk-edit-progressive',
+              label: 'manager-components-bulk-edit-progressive',
+              stage: async (bulkPanel) => {
+                await bulkPanel.locator('[data-component-bulk-tags-empty]').first()
+                  .waitFor({ state: 'visible', timeout: 5_000 });
+                // `fill` on the shipped Stepper input, exactly as the single-component
+                // difficulty capture below drives its control: a finite parse commits and
+                // ARMS the axis, so the chip flips to its staged face and Apply goes live.
+                await bulkPanel.locator('[data-component-bulk-difficulty]').first().fill('12');
+                await bulkPanel.locator('[data-component-bulk-difficulty-staged="true"]')
+                  .first().waitFor({ state: 'visible', timeout: 5_000 });
+                if (await bulkPanel.locator('[data-component-bulk-apply]').first().isDisabled()) {
+                  throw new Error('Bulk edit Apply stayed inert after a progressive DC was staged.');
+                }
+              },
+            });
 
             // Open the second ("None") component and stage a difficulty so the card,
             // the Unsaved chip, and the editor Save flow are captured together. Save

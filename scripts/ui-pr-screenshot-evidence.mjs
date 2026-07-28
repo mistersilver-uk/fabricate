@@ -196,6 +196,32 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/utils\/componentBulkEditModel\.js$/,
     ],
   ),
+  // The bulk panel's other two states, each its OWN view for the same `candidates[0]`
+  // reason as the staged frame above — and each a separate FRAME because no one
+  // photograph can hold them. An axis chip cannot read "leave unchanged" and "will
+  // overwrite" at once, and the staged frame is the one the prototype parity table
+  // compares, so the unstaged face — the sole route to "clear essences on every selected
+  // component" — needs a frame of its own or it ships unevidenced.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit-unstaged',
+    'Manager components browser — bulk edit, pristine draft (every axis unstaged, Apply inert)',
+    [
+      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
+      /^src\/utils\/componentBulkEditModel\.js$/,
+    ],
+  ),
+  // The Progressive DC section is gated on `componentDifficultyAxisProgressive`, so it
+  // renders on the progressive smoke system and on no other — which is also the only
+  // system in this world that can evidence the panel's empty item-tag copy, since it
+  // authors no tags. Its extra trigger is the staging model alone, deliberately: the
+  // section is built from `Chip` and `Stepper`, but neither is named here because both are
+  // global primitives with no other `VIEW_RECIPES` entry, and conscripting this one frame
+  // as their evidence would mis-route every future change to them.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit-progressive',
+    'Manager components browser — bulk edit, progressive DC section + empty item-tag copy',
+    [/^src\/utils\/componentBulkEditModel\.js$/],
+  ),
   // Issue 801: the grouped-category CONTINUATION frame — a category split across a page
   // boundary, its continuation slice ("N of M") at the head of the next page. Its OWN view
   // id (one file per published frame; `collect` emits only `candidates[0]`) so the
