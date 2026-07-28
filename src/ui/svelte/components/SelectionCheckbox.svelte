@@ -8,7 +8,7 @@
   `.manager-checklist-card-check` box against the global sheet — and the component
   browser's new multi-select needs the same control one screen away. A shared CSS class
   that every site hand-rolls markup against does not satisfy the reuse rule
-  (`openspec/specs/ui-integration/spec.md` §Shared manager primitives), and a primitive
+  (`openspec/specs/ui-integration/spec.md` §Shared product UI primitives), and a primitive
   that coexists with an unconverted duplicate has ADDED a variant rather than removed one.
   So the check-box leaf was extracted here and `ChecklistCardRow` was converted onto it in
   the same change; its global rules are gone and its class names are ratcheted in
