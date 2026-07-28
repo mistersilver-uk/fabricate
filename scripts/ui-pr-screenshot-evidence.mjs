@@ -96,6 +96,36 @@ const componentsBrowserFrame = (id, label, extraMatches = []) => ({
   matches: [...COMPONENTS_BROWSER_MATCHES, ...extraMatches],
 });
 
+// The player Crafting tab's requirement surface (issue 917): the slot rail, the single
+// open chooser, the shared essence pool and the consumption-plan panel. Scoped to the
+// crafting DETAIL sources — the `player-crafting-roll-result` precedent — so a detail
+// change maps here as well as to the broad `player-crafting` glob, plus the rail's own
+// pure projection and the store that holds which chooser is open and what the player has
+// allocated. Neither of those two modules has any other view recipe, so naming them here
+// routes a change to them at real evidence instead of the generic global fallback.
+//
+// `components/Stepper.svelte` is deliberately NOT named, matching the argument recorded
+// on `manager-components-bulk-edit-progressive`: it is a global primitive rendered by
+// several unrelated surfaces, and conscripting these six frames as its evidence would
+// mis-route every future change to it.
+const REQUIREMENT_RAIL_MATCHES = [
+  /^src\/ui\/svelte\/apps\/crafting\/detail\//,
+  /^src\/ui\/svelte\/util\/requirementSlots\.js$/,
+  /^src\/ui\/svelte\/stores\/craftingStore\.svelte\.js$/,
+];
+
+// One rail frame: a single same-named smoke label over the shared rail trigger list.
+// Same argument as `recipeEditFrame` / `componentsBrowserFrame` above — six sibling
+// object literals differing only in two strings is exactly the span Sonar's Automatic
+// Analysis counts as new duplicated lines (`cpd.exclusions` is ignored for it), and
+// `scripts/**` is analysed.
+const requirementRailFrame = (id, label) => ({
+  id,
+  label,
+  smokeLabels: [id],
+  matches: REQUIREMENT_RAIL_MATCHES,
+});
+
 export const VIEW_RECIPES = Object.freeze([
   {
     id: 'manager-systems',
@@ -801,6 +831,35 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-multistep'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//],
   },
+  // The requirement-rail redesign (issue 917). SIX dedicated view ids, not extra labels
+  // on `player-crafting`: `collect` emits one file per view id and picks `candidates[0]`
+  // from a FILENAME sort, so appending them to the broad entry would publish one
+  // arbitrary frame forever and every state below — which is the whole change — would
+  // never reach the PR. Each names a distinct rendered state no other frame can hold.
+  requirementRailFrame(
+    'player-crafting-slot-rail',
+    'Player crafting — requirement rail: met fixed slot, unchosen choice slot (accent), short essence slot',
+  ),
+  requirementRailFrame(
+    'player-crafting-tag-unmatched',
+    'Player crafting — tag requirement with nothing matching: fallback glyph, never the item bag',
+  ),
+  requirementRailFrame(
+    'player-crafting-essence-pool',
+    'Player crafting — essence pool: one requirement, player-allocated partial funding, selection recap',
+  ),
+  requirementRailFrame(
+    'player-crafting-pick-for-me',
+    'Player crafting — after "Pick for me": the resolver’s suggested allocation applied',
+  ),
+  requirementRailFrame(
+    'player-crafting-essence-pool-shared',
+    'Player crafting — shared essence pool: two requirements funded jointly from one dual carrier',
+  ),
+  requirementRailFrame(
+    'player-crafting-consumption-plan',
+    'Player crafting — consumption plan: fixed row, essence-carrier row, and the still-to-choose line',
+  ),
   // The player Alchemy workbench (issue 543) publishes three distinct frames — the
   // discipline chooser, the three-column workbench, and the narrow stacked layout.
   // `collect` emits one file per view id (first matching smoke label wins), so each
