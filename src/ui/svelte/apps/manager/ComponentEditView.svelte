@@ -661,25 +661,21 @@
       : text('FABRICATE.Admin.Manager.Component.TagsEdit.ApplyTag', 'Apply {name}').replace('{name}', tag);
   }
 
-  // A throw is a failure exactly as a `false` return is. Returning the outcome directly
-  // keeps `result` a const in handleSave, so no path can reach the check unassigned. The
-  // save is passed as a thunk so the delegating call keeps its literal shape at the call
-  // site, matching the sibling essence editor.
-  async function saveOutcome(save) {
-    try {
-      return await save();
-    } catch {
-      return false;
-    }
-  }
-
+  // A throw is a failure exactly as a `false` return is, so both mark the draft failed in
+  // their own branch. There is no `result` temporary to leave unassigned, and the save is
+  // still awaited exactly once — an extra async hop here would move the failure notice a
+  // microtask later than the mounted route tests observe it.
   async function handleSave(event) {
     event?.preventDefault();
     if (!component?.id || saving) return;
     saveFailed = false;
     const updates = buildUpdates();
-    const result = await saveOutcome(() => onSave(component.id, updates));
-    if (result === false) saveFailed = true;
+    try {
+      const result = await onSave(component.id, updates);
+      if (result === false) saveFailed = true;
+    } catch {
+      saveFailed = true;
+    }
   }
 </script>
 
