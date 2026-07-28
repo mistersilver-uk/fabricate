@@ -3415,6 +3415,12 @@
 
   async function saveGatheringTaskDraft() {
     if (!gatheringTaskDraft || !selectedSystemId || !selectedGatheringTaskId) return false;
+    // Clear before the attempt, not only on success (mirrors saveRecipeItemDraft). A retry that
+    // fails the same way writes a byte-identical string, which $state treats as clean, so the
+    // role="alert" region is never re-inserted and a screen reader announces nothing. Dropping
+    // it first lets the alert leave the DOM while the save is in flight and be re-inserted when
+    // the same failure recurs.
+    gatheringTaskSaveError = '';
     const { valid, errors } = gatheringTaskValidation;
     if (!valid) {
       gatheringTaskSaveError = errors[0] || '';
@@ -3530,6 +3536,9 @@
 
   async function saveGatheringEventDraft() {
     if (!gatheringEventDraft || !selectedSystemId || !selectedGatheringEventId) return false;
+    // Cleared up front for the same reason as saveGatheringTaskDraft: an unchanged error string
+    // is not a DOM mutation, so a repeated identical failure would never re-announce.
+    gatheringEventSaveError = '';
     const { valid, errors } = gatheringEventValidation;
     if (!valid) {
       gatheringEventSaveError = errors[0] || '';

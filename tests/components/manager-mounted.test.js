@@ -14803,6 +14803,30 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleSaveAttempt();
   }
 
+  // The retry case: a GM whose save fails, changes nothing, and presses Save again gets the
+  // SAME message. `role="alert"` announces on a DOM mutation, and writing a byte-identical
+  // string is not one — $state sees no change, so nothing re-renders and a screen reader is
+  // silent from the second failure onwards. Presence therefore proves nothing here; node
+  // IDENTITY does. This passes only because the save clears its error before the attempt.
+  async function assertRepeatFailureReAnnounces(selector) {
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    const firstAlert = target.querySelector(selector);
+
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    assert.notStrictEqual(
+      target.querySelector(selector),
+      firstAlert,
+      'a second identical failure re-inserts the alert rather than leaving the first node in place'
+    );
+    assert.equal(
+      firstAlert.isConnected,
+      false,
+      'the first alert node left the DOM, so the re-insertion is a real announcement'
+    );
+  }
+
   // The two gathering rejection paths log through console.error before they surface the
   // alert, so silence just that call rather than dumping an expected stack into the run.
   async function withSilencedConsoleError(run) {
@@ -14854,6 +14878,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  it('re-announces a gathering-task save that fails the same way twice', async () => {
+    await openDirtyGatheringTaskEditor([], { updateGatheringLibraryTaskResult: false });
+    await assertRepeatFailureReAnnounces('[data-gathering-task-save-error]');
+  });
+
   it('surfaces a gathering-event save that returns false, and clears it on the next success', async () => {
     const calls = [];
     const storeOptions = { updateGatheringLibraryEventResult: false };
@@ -14903,6 +14932,11 @@ describe('CraftingSystemManager mounted behavior', () => {
       '[data-gathering-event-save-error]',
       'a successful save clears the failed-save alert'
     );
+  });
+
+  it('re-announces a gathering-event save that fails the same way twice', async () => {
+    await openDirtyGatheringEventEditor([], { updateGatheringLibraryEventResult: false });
+    await assertRepeatFailureReAnnounces('[data-gathering-event-save-error]');
   });
 
   it('surfaces a recipe-item save that returns false, and clears it on the next success', async () => {
