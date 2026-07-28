@@ -118,6 +118,11 @@ Tone carries meaning and is chosen deliberately.
 `info` states how the surface works and is permanent; `warning` marks a conditional hazard the GM can still avoid.
 A surface that paints its permanent hint in `warning` alongside a conditional `warning` has spent the colour that was supposed to make the hazard stand out, so a permanent hint takes `info` unless something is genuinely at risk.
 
+#### Selection controls
+
+Every multi-select affordance in the manager renders through one shared selection-control primitive: a square custom control with a checked, unchecked and indeterminate state, at the sizes its host row needs.
+A host-supplied `<input type="checkbox">` rendered with Foundry's default control chrome is a second selection design and is not an acceptable rendering.
+
 ## Responsive Product UI
 
 Foundry ApplicationV2 windows can be resized independently of the browser viewport.
@@ -572,9 +577,9 @@ Capabilities:
 - Edit managed item essences (if enabled).
 - Edit managed item difficulty: the component editor's body exposes an editable
   progressive-difficulty stepper, titled "This component's Progressive DC".
-  It is shown only when the system's crafting resolution mode is `progressive` (parity with the
-  read-only badge on the components-browser row).
-  It accepts an integer of 1 or greater; zero clears the value.
+  It is shown when the system is progressive on any axis that reads component difficulty — crafting resolution mode, salvage resolution mode, or the system's gathering economy resolution mode.
+  The read-only badge on the components-browser row and the browser's bulk-edit progressive-DC section obey the same condition, so all three appear together.
+  It accepts an integer from 0 to 35; zero clears the value.
   The stepper is staged into the component editor's draft and persisted with the rest of the edit on Save (not written on change), contributing to the editor's dirty state and unsaved-changes guard.
 - Replace associated source item by drag/drop.
 
@@ -1222,7 +1227,7 @@ The GM component surfaces: the component browser and the component editor.
 ### Requirements
 
 1. The GM component browser groups and filters by `Component.category`.
-   Tags are edited only in the component editor and must not be rendered as row chips; rows show a single-line description, mirroring the Recipe Studio.
+   Tags are edited in the component editor and, for a multi-row selection, in the browser's bulk edit panel; they must not be rendered as row chips, and rows show a single-line description, mirroring the Recipe Studio.
 2. The GM component editor is a single scrolling column with no right rail.
    Back sits beside Save in the header.
    Source actions (replace by drop, unlink, open item sheet, copy UUID) are reachable from the identity strip; the component's progressive difficulty is authored in the body.
@@ -1240,6 +1245,17 @@ The GM component surfaces: the component browser and the component editor.
 7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
 8. The component browser preserves the identical view-state across an editor round-trip specified under Recipe Studio, including its **essence** filter alongside category, page, sort, group-by-category, page size, and per-category collapse state; opening a component editor and returning restores exactly what the GM left.
    A genuine crafting-system switch resets category + essence + page + collapse, while keeping sort, group-by-category, and page size as cross-system preferences.
+9. The GM component browser supports multi-select bulk editing.
+   Each row carries a selection control at its TRAILING edge, after the essence chips and the Edit action, rendered through the shared selection-control primitive.
+   A selection toolbar sits directly above the list carrying a tri-state control over the CURRENTLY RENDERED rows, a selected-count readout, a "Select all {N} results" action over ALL filtered rows, and a Clear action.
+   The rendered-rows control and the results action are distinct operations and must not be conflated; a collapsed category's rows are not rendered and are never selected by the former.
+   The selection is scoped to the selected crafting system, survives an editor round-trip exactly as the browser's other view-state does, is cleared by a crafting-system switch, and never retains an id that no longer resolves to a component.
+10. While the selection is non-empty, the component browser's right inspector rail renders the bulk edit panel IN PLACE OF the single-component inspector, from the first selected row.
+    The panel stages changes without writing: category (single-valued, overwriting, with an explicit "leave unchanged" option), tags (a flat run of tri-state controls over the system's tag vocabulary cycling leave -> add -> remove -> leave), essences (one quantity control per system essence, shown only when the system enables essences, with OVERWRITE semantics), and the component progressive DC (shown under the same condition as the single-component control and the row badge).
+    An axis whose staged value cannot be distinguished from its unstaged value — an all-zero essence map, a zero DC — carries a visible staged indicator that also unstages it, so a destructive edit is never indistinguishable from no edit.
+    The panel states permanently that applying essences overwrites the values on every selected component, and additionally warns when the staged overwrite would in fact change or remove authored essence values on at least one selected component.
+    One action applies every staged axis to every selected component; it names the number of components it will affect and is inert until at least one axis is staged.
+    Applying persists through a single set-apply write, then clears the selection and the staged changes, returning the rail to the single-component inspector.
 
 ## Step Editor
 
