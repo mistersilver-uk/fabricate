@@ -410,6 +410,48 @@ test('a component-only target set runs ONLY components-checks; recipes is skippa
   assert.equal(isD0SectionNeededForTargets('gathering', targets), false);
 });
 
+test('the issue-772 bulk-edit frame is a components-checks capture that writes nothing', () => {
+  // The label belongs to the components section — a bulk-edit target must not resurrect
+  // the recipes, tools or gathering walks.
+  assert.equal(isCapturableLabel('manager-components-bulk-edit'), true);
+  assert.equal(phaseForCaptureLabel('manager-components-bulk-edit'), CAPTURE_PHASE_D0);
+  assert.equal(isD0SectionNeededForTargets('components-checks', ['manager-components-bulk-edit']), true);
+  for (const name of ['recipes', 'tags-essences', 'gathering', 'tools', 'knowledge', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, ['manager-components-bulk-edit']), false, name);
+  }
+  // It is captured immediately after the plain browser frame, so `manager-components`
+  // still wins its own `candidates[0]` with `manager-components-normal`.
+  assert.equal(
+    captureOrderIndex('manager-components-bulk-edit'),
+    captureOrderIndex('manager-components-normal') + 1,
+  );
+
+  // NET-ZERO: the routine stages through the shipped controls and never presses Apply, so
+  // no component is written and no later frame in the section sees a mutated fixture.
+  // It goes through `captureStableManagerView`, as the plain browser frame beside it does,
+  // so the overflow and overlay guards run on the bulk state too rather than only the
+  // bare `screenshot()`.
+  const capture = HARNESS.match(
+    /const componentRows = page\.locator\('\.fabricate-manager \.manager-component-row'\);[\s\S]*?captureStableManagerView\(page, \{ layout: 'components normal', label: 'manager-components-bulk-edit' \}\)[\s\S]*?data-component-clear-selection/,
+  )?.[0];
+  assert.ok(capture, 'the bulk-edit capture routine was not found in the harness');
+  assert.equal(
+    /data-component-bulk-apply'\]\)\.first\(\)\.click\(\)/.test(capture),
+    false,
+    'the capture must never press Apply — it would rewrite the shared component fixtures',
+  );
+  // Driven through the real controls, not seeded: `page.evaluate` here would touch
+  // `game.` / settings / flags and photograph a state no GM can reach.
+  assert.equal(/page\.evaluate\(/.test(capture), false, 'the bulk-edit state must be driven through the UI');
+  // The selection control is an input, so the walk's Edit-pen selectors still resolve.
+  assert.match(capture, /label:has\(input\[data-component-select\]\)/);
+  assert.match(capture, /data-bulk-tag-state="\$\{state\}"/);
+  assert.match(capture, /data-component-bulk-essences\] \[data-component-edit-essence\] \[data-stepper-increment\]/);
+  // And the selection is cleared in a `finally`, so a failed capture cannot leave the rail
+  // showing the bulk panel for every following components frame.
+  assert.match(capture, /\} finally \{[\s\S]*?data-component-clear-selection/);
+});
+
 test('a Tool Studio target runs only the dedicated persisted-net-zero tools section', () => {
   assert.equal(isD0SectionNeededForTargets('tools', TOOL_STUDIO_LABELS), true);
   for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {

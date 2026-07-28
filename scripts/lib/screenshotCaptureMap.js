@@ -116,6 +116,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-recipe-edit-results-alchemy',
   'manager-recipe-edit-access-rail',
   'manager-components-normal',
+  'manager-components-bulk-edit',
   'manager-components-description-before',
   'manager-components-description-repaired',
   'manager-components-description-ingested',

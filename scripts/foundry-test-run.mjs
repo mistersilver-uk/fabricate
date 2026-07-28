@@ -8874,6 +8874,88 @@ async function main() {
         process.stdout.write('  D0: components normal screenshotted\n');
 
         // ---------------------------------------------------------------------
+        // Issue 772 — the components browser's BULK EDIT state: two rows ticked, the
+        // selection toolbar counting them, and the rail carrying the staged bulk panel
+        // (category, one tag staged for addition and one for removal, one essence).
+        //
+        // Driven entirely through the shipped controls. Seeding the selection or the
+        // draft through `page.evaluate` would touch `game.` / settings / flags, which is
+        // the Foundry content-signal shape this frame deliberately avoids — and it would
+        // photograph a state no GM can actually reach.
+        //
+        // NET-ZERO by construction: Apply is NEVER pressed, so not one component is
+        // written, and the `finally` clears the selection so every following capture in
+        // this section sees the single-component inspector it expects.
+        // ---------------------------------------------------------------------
+        try {
+          const componentRows = page.locator('.fabricate-manager .manager-component-row');
+          if (await componentRows.count() < 2) {
+            throw new Error('Components browser rendered fewer than two rows to bulk-select.');
+          }
+          // The selection control is an `<input type="checkbox">` whose real input is 1px
+          // and transparent behind a painted box, so the wrapping LABEL is the click
+          // target. It is deliberately NOT a `<button>` — which is why this walk's
+          // `.manager-component-row … button:has(i.fa-pen)` Edit selectors still resolve
+          // to exactly one control per row.
+          for (const index of [0, 1]) {
+            await componentRows.nth(index).locator('label:has(input[data-component-select])').first().click();
+          }
+          const bulkPanel = page.locator('.fabricate-manager [data-component-bulk-panel]').first();
+          await bulkPanel.waitFor({ state: 'visible', timeout: 5_000 });
+          const bulkSelectedRows = await page.locator('.fabricate-manager .manager-component-row.is-bulk-selected').count();
+          if (bulkSelectedRows !== 2) {
+            throw new Error(`Expected two bulk-selected component rows, found ${bulkSelectedRows}.`);
+          }
+          await page.locator('.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]')
+            .first().waitFor({ state: 'visible', timeout: 5_000 });
+
+          // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
+          // category is staged whatever vocabulary this world has authored.
+          await bulkPanel.locator('[data-component-bulk-category]').first().selectOption({ index: 1 });
+
+          // The tag chips cycle none → add → remove → none, so one click stages an
+          // addition and two stage a removal. Both tri-states are in the frame because
+          // the tri-state IS the feature.
+          const tagChips = bulkPanel.locator('[data-bulk-tag]');
+          if (await tagChips.count() < 2) {
+            throw new Error('Bulk edit panel rendered fewer than two item-tag chips to cycle.');
+          }
+          await tagChips.nth(0).click();
+          await tagChips.nth(1).click();
+          await tagChips.nth(1).click();
+          for (const state of ['add', 'remove']) {
+            await bulkPanel.locator(`[data-bulk-tag][data-bulk-tag-state="${state}"]`)
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
+          }
+
+          // One essence increment, which also arms the essence axis (its staged chip flips
+          // to "Will overwrite" and the destructive-overwrite warning resolves).
+          await bulkPanel.locator('[data-component-bulk-essences] [data-component-edit-essence] [data-stepper-increment]')
+            .first().click();
+          await bulkPanel.locator('[data-component-bulk-essences] [data-component-essence-active="true"]')
+            .first().waitFor({ state: 'visible', timeout: 5_000 });
+
+          // Apply must be live with four axes staged — but it is never clicked: this
+          // capture writes nothing.
+          if (await bulkPanel.locator('[data-component-bulk-apply]').first().isDisabled()) {
+            throw new Error('Bulk edit Apply stayed inert after category, tags and essences were staged.');
+          }
+          await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-bulk-edit' });
+          process.stdout.write('  D0: components bulk edit screenshotted\n');
+          results.steps.push({ step: 'components-bulk-edit', passed: true });
+        } catch (err) {
+          results.steps.push({ step: 'components-bulk-edit', passed: false, error: err.message });
+          process.stderr.write(`Components bulk edit capture failed: ${err.message}\n`);
+        } finally {
+          // Clear whether or not the capture succeeded: a live selection keeps the rail on
+          // the bulk panel for every following components frame, and the count-to-zero
+          // transition is what discards the staged draft.
+          await softClick(page.locator('.fabricate-manager [data-component-clear-selection]'));
+          await page.locator('.fabricate-manager [data-component-bulk-panel]')
+            .first().waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+        }
+
+        // ---------------------------------------------------------------------
         // Issue 800 — write-time RESOLUTION of source descriptions, in three frames.
         //
         // Source items live in a world compendium that is then LOCKED, because the
