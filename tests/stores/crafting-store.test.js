@@ -76,6 +76,8 @@ describe('craftingStore', () => {
     compiler.copyPlain('src/utils/progressiveResultOrder.js');
     // And the threshold helper: the store recomputes thresholds after a reorder.
     compiler.copyPlain('src/utils/progressiveStageThresholds.js');
+    // The requirement rail's slot projection (issue 917) — same rule again.
+    compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
     ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
   });
 
@@ -524,6 +526,11 @@ describe('craftingStore', () => {
       recipeId: 'r1',
       setId: 'r1-set',
       optionOverrides: { g1: { optionIndex: 1, heldItemId: null } },
+      // Issue 917: the re-evaluate is now scoped and carries the essence funding.
+      // An empty allocation and a null step id are byte-for-byte today's behaviour
+      // (the facade treats both as absent).
+      essenceAllocation: {},
+      stepId: null,
       actorId: 'hero',
       componentSourceActorIds: ['a1'],
     });
