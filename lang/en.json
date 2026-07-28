@@ -2945,6 +2945,7 @@
             "BackToLibrary": "Back to event library",
             "Save": "Save event",
             "Dirty": "Unsaved",
+            "SaveFailed": "Save failed. Try again.",
             "DiscardChangesPrompt": "The current event has unsaved changes. Save them and continue, or discard them?",
             "CompositionLossWarning": {
               "Title": "This event will leave some environments",
@@ -4595,6 +4596,7 @@
             "UnlimitedUses": "Unlimited uses"
           },
           "Save": "Save recipe item",
+          "SaveFailed": "Save failed. Try again.",
           "SelectItem": "Select a recipe item",
           "Tabs": {
             "Label": "Recipe item editor sections",

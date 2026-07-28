@@ -169,11 +169,9 @@
   let recipeItemDraftBaseline = $state(null);
   let recipeItemLinkedSourceSnapshot = $state(null);
   let recipeItemEditSaving = $state(false);
-  // Written on every failed save and never read — the missing READER is the defect, so the
-  // write is kept as its evidence rather than deleted. A GM whose recipe-item save fails is
-  // shown nothing. Tracked in issue 919 (silent save failures), which adds the Draft-state
-  // `manager-inspector-card` section that renders it.
-  // eslint-disable-next-line no-unused-vars
+  // Set on every failed recipe-item save. Read by the header toolbar, which renders the
+  // localized failure alert beside Save (issue 919 — before that this had no reader at all
+  // and a GM whose save failed was shown nothing).
   let recipeItemSaveFailed = $state(false);
   let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker. (The
@@ -205,17 +203,14 @@
   let gatheringTaskDraft = $state(null);
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
-  // Assigned user-facing failure text (including the localized
-  // FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed) that nothing renders. Kept as the
-  // evidence of the missing reader; see issue 919.
-  // eslint-disable-next-line no-unused-vars
+  // User-facing failure text for the gathering-task editor, rendered by the header toolbar
+  // beside Save (issue 919).
   let gatheringTaskSaveError = $state('');
   let gatheringEventDraft = $state(null);
   let gatheringEventDraftBaseline = $state(null);
   let gatheringEventSaving = $state(false);
-  // Assigned user-facing failure text that nothing renders. Kept as the evidence of the
-  // missing reader; see issue 919.
-  // eslint-disable-next-line no-unused-vars
+  // User-facing failure text for the gathering-event editor, rendered by the header toolbar
+  // beside Save (issue 919).
   let gatheringEventSaveError = $state('');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
@@ -3550,6 +3545,13 @@
         gatheringEventSaveError = '';
         return true;
       }
+      gatheringEventSaveError = text('FABRICATE.Admin.Manager.Environment.Events.SaveFailed', 'Save failed. Try again.');
+      return false;
+    } catch (error) {
+      // Until issue 919 this `try` had no `catch` at all, so a rejected store call escaped
+      // as an unhandled rejection and the GM saw nothing. Mirrors saveGatheringTaskDraft.
+      console.error('Failed to save gathering event draft', error);
+      gatheringEventSaveError = text('FABRICATE.Admin.Manager.Environment.Events.SaveFailed', 'Save failed. Try again.');
       return false;
     } finally {
       gatheringEventSaving = false;
@@ -4916,6 +4918,14 @@
           <i class={recipeItemEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
         </button>
+        <!--
+          An attempted-and-failed save is announced beside the control the GM just clicked
+          (issue 919). It trails the Save button so the wrapping toolbar drops it onto its
+          own line instead of shoving the "Unsaved" chip out of the row.
+        -->
+        {#if recipeItemSaveFailed}
+          <p class="manager-header-save-error" role="alert" data-recipe-item-save-error>{text('FABRICATE.Admin.Manager.RecipeItem.SaveFailed', 'Save failed. Try again.')}</p>
+        {/if}
       {:else if currentView === 'components'}
         <!-- no header actions for the components list -->
       {:else if currentView === 'knowledge'}
@@ -5030,6 +5040,10 @@
           <i class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
         </button>
+        <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
+        {#if gatheringTaskSaveError}
+          <p class="manager-header-save-error" role="alert" data-gathering-task-save-error>{gatheringTaskSaveError}</p>
+        {/if}
       {:else if currentView === 'gathering-event-edit'}
         {#if gatheringEventDraftDirty}
           <Chip tone="warning">{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip>
@@ -5058,6 +5072,10 @@
           <i class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
         </button>
+        <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
+        {#if gatheringEventSaveError}
+          <p class="manager-header-save-error" role="alert" data-gathering-event-save-error>{gatheringEventSaveError}</p>
+        {/if}
       {:else if currentView === 'system-edit'}
         <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
           <i class="fas fa-arrow-left" aria-hidden="true"></i>
