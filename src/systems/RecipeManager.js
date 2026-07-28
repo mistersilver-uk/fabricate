@@ -989,79 +989,116 @@ export class RecipeManager {
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
     if (!ingredientSet) return [];
 
-    const groups =
-      Array.isArray(ingredientSet.ingredientGroups) && ingredientSet.ingredientGroups.length > 0
-        ? ingredientSet.ingredientGroups
-        : (ingredientSet.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
+    const context = {
+      availableItems,
+      selection,
+      missingByGroup: this._missingEntriesByGroupId(selection),
+      // The option the engine chose per group (issue 553), so the tile always mirrors
+      // the option/stack the craft consumes.
+      chosenByGroup: this._chosenOptionByGroup(ingredientSet, selection),
+      // Every essence requirement's attributed share of the block, keyed by group id
+      // (issue 917) — the SOLE source of an essence tile's reported quantity, on the
+      // satisfied path as well as the missing one.
+      essenceByGroup: this._essenceRequirementsByGroupId(selection),
+    };
 
-    // Build a set of missing group IDs for O(1) lookup.
-    const missingGroupIds = new Set(
-      (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
+    return this._displayGroups(ingredientSet).map((group) =>
+      this._buildIngredientState(recipe, group, context)
     );
+  }
 
-    // The option the engine chose per group (issue 553), so the tile always mirrors
-    // the option/stack the craft consumes.
-    const chosenByGroup = this._chosenOptionByGroup(ingredientSet, selection);
-    // Every essence requirement's attributed share of the block, keyed by group id
-    // (issue 917) — the SOLE source of an essence tile's reported quantity, on the
-    // satisfied path as well as the missing one.
-    const essenceByGroup = new Map(
+  /**
+   * The groups a display state is built for: the authored ingredient groups, or a
+   * synthetic one-option group per legacy flat ingredient.
+   * @private
+   */
+  _displayGroups(ingredientSet) {
+    const groups = ingredientSet.ingredientGroups;
+    if (Array.isArray(groups) && groups.length > 0) return groups;
+    return (ingredientSet.ingredients || []).map((ingredient) => ({ options: [ingredient] }));
+  }
+
+  /** Missing-group entries keyed by group id, for O(1) lookup. @private */
+  _missingEntriesByGroupId(selection) {
+    const byGroupId = new Map();
+    for (const entry of selection?.missingGroups || []) {
+      const groupId = entry?.group?.id;
+      if (groupId && !byGroupId.has(groupId)) byGroupId.set(groupId, entry);
+    }
+    return byGroupId;
+  }
+
+  /** Essence-block requirement states keyed by group id. @private */
+  _essenceRequirementsByGroupId(selection) {
+    return new Map(
       (selection?.essencePool?.requirements || []).map((requirement) => [
         requirement.groupId,
         requirement,
       ])
     );
+  }
 
-    return groups.map((group) => {
-      const options = group.options || [];
-      const chosenOption = chosenByGroup.get(group?.id) ?? options[0] ?? null;
-      // Show ONLY the chosen option's description (issue 552) instead of OR-joining
-      // every option's name against a single unlabelled have/need pip — the tile now
-      // names the specific option the craft will consume.
-      const description =
-        this._resolveIngredientDescription(recipe, chosenOption) ||
-        options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
-      const base = { groupId: group?.id ?? null, description };
+  /**
+   * The display state for ONE ingredient group, dispatched on the chosen option's
+   * kind: an essence requirement reports its attributed share of the block, a short
+   * group its missing entry, and a satisfied component/tag group its held quantity.
+   * @private
+   */
+  _buildIngredientState(recipe, group, context) {
+    const options = group.options || [];
+    const chosenOption = context.chosenByGroup.get(group?.id) ?? options[0] ?? null;
+    const base = {
+      groupId: group?.id ?? null,
+      description: this._resolveGroupDescription(recipe, chosenOption, options),
+    };
+    const missingEntry = context.missingByGroup.get(group?.id) ?? null;
 
-      const missingEntry = missingGroupIds.has(group.id)
-        ? ((selection?.missingGroups || []).find((mg) => mg?.group?.id === group.id) ?? null)
-        : null;
-
-      if (chosenOption?.match?.type === 'essence') {
-        return this._buildEssenceIngredientState(recipe, group, chosenOption, selection, {
-          ...base,
-          requirement: essenceByGroup.get(group?.id ?? null) ?? null,
-          isMissing: missingGroupIds.has(group.id),
-          missingEntry,
-          availableItems,
-        });
-      }
-
-      if (missingEntry) {
-        return {
-          ...this._resolveIngredientVisual(recipe, chosenOption, availableItems),
-          ...base,
-          need: Number(missingEntry?.need || chosenOption?.quantity || 1),
-          have: Number(missingEntry?.have || 0),
-          satisfied: false,
-        };
-      }
-
-      // The specific inventory item the engine will consume for this option, from the
-      // same consumption plan, so a shared tag/component tile shows the CONSUMED item
-      // rather than the first inventory item that merely matches (issue 553).
-      const consumedItem = this._consumedItemForGroup(selection, group, chosenOption);
-      const matchingItems = availableItems.filter((item) =>
-        this.ingredientMatchesItem(recipe, chosenOption, item)
-      );
-      return {
-        ...this._resolveIngredientVisual(recipe, chosenOption, availableItems, consumedItem),
+    if (chosenOption?.match?.type === 'essence') {
+      return this._buildEssenceIngredientState(recipe, group, chosenOption, context.selection, {
         ...base,
-        need: Number(chosenOption?.quantity || 1),
-        have: matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0),
-        satisfied: true,
+        requirement: context.essenceByGroup.get(group?.id ?? null) ?? null,
+        isMissing: Boolean(missingEntry),
+        missingEntry,
+        availableItems: context.availableItems,
+      });
+    }
+
+    if (missingEntry) {
+      return {
+        ...this._resolveIngredientVisual(recipe, chosenOption, context.availableItems),
+        ...base,
+        need: Number(missingEntry.need || chosenOption?.quantity || 1),
+        have: Number(missingEntry.have || 0),
+        satisfied: false,
       };
-    });
+    }
+
+    // The specific inventory item the engine will consume for this option, from the
+    // same consumption plan, so a shared tag/component tile shows the CONSUMED item
+    // rather than the first inventory item that merely matches (issue 553).
+    const consumedItem = this._consumedItemForGroup(context.selection, group, chosenOption);
+    const matching = context.availableItems.filter((item) =>
+      this.ingredientMatchesItem(recipe, chosenOption, item)
+    );
+    return {
+      ...this._resolveIngredientVisual(recipe, chosenOption, context.availableItems, consumedItem),
+      ...base,
+      need: Number(chosenOption?.quantity || 1),
+      have: matching.reduce((sum, item) => sum + (item.system?.quantity || 1), 0),
+      satisfied: true,
+    };
+  }
+
+  /**
+   * A group's tile caption: ONLY the chosen option's description (issue 552) instead
+   * of OR-joining every option's name against a single unlabelled have/need pip, with
+   * the OR-join retained as the fallback when the chosen option describes to nothing.
+   * @private
+   */
+  _resolveGroupDescription(recipe, chosenOption, options) {
+    const chosen = this._resolveIngredientDescription(recipe, chosenOption);
+    if (chosen) return chosen;
+    return options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
   }
 
   /**
