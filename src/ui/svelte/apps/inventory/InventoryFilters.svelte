@@ -17,21 +17,25 @@
     counts = {},
     onSearch = null,
     onFilter = null,
-    onSort = null
+    onSort = null,
   } = $props();
 
   const PILLS = [
     { id: 'all', labelKey: 'FABRICATE.App.Inventory.Filters.All', icon: 'fa-layer-group' },
     { id: 'components', labelKey: 'FABRICATE.App.Inventory.Filters.Components', icon: 'fa-cube' },
     { id: 'essences', labelKey: 'FABRICATE.App.Inventory.Filters.Essences', icon: 'fa-droplet' },
-    { id: 'tools', labelKey: 'FABRICATE.App.Inventory.Filters.Tools', icon: 'fa-screwdriver-wrench' },
-    { id: 'recipeItems', labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems', icon: 'fa-book' }
+    {
+      id: 'tools',
+      labelKey: 'FABRICATE.App.Inventory.Filters.Tools',
+      icon: 'fa-screwdriver-wrench',
+    },
+    { id: 'recipeItems', labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems', icon: 'fa-book' },
   ];
 
   const SORTS = [
     { id: 'name', labelKey: 'FABRICATE.App.Inventory.Filters.SortName' },
     { id: 'quantity', labelKey: 'FABRICATE.App.Inventory.Filters.SortQuantity' },
-    { id: 'type', labelKey: 'FABRICATE.App.Inventory.Filters.SortType' }
+    { id: 'type', labelKey: 'FABRICATE.App.Inventory.Filters.SortType' },
   ];
 
   function onInput(event) {
@@ -55,7 +59,11 @@
   </div>
 
   <div class="inventory-filters-row">
-    <div class="inventory-pills" role="group" aria-label={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}>
+    <div
+      class="inventory-pills"
+      role="group"
+      aria-label={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}
+    >
       {#each PILLS as pill (pill.id)}
         <button
           type="button"
@@ -67,14 +75,22 @@
         >
           <i class={`fas ${pill.icon}`} aria-hidden="true"></i>
           <span>{localize(pill.labelKey)}</span>
-          <span class="inventory-pill-count" data-inventory-pill-count>{Number(counts?.[pill.id] ?? 0)}</span>
+          <span class="inventory-pill-count" data-inventory-pill-count
+            >{Number(counts?.[pill.id] ?? 0)}</span
+          >
         </button>
       {/each}
     </div>
 
     <label class="inventory-sort">
-      <span class="inventory-sort-label">{localize('FABRICATE.App.Inventory.Filters.SortLabel')}</span>
-      <select value={sort} aria-label={localize('FABRICATE.App.Inventory.Filters.SortLabel')} onchange={onSortInput}>
+      <span class="inventory-sort-label"
+        >{localize('FABRICATE.App.Inventory.Filters.SortLabel')}</span
+      >
+      <select
+        value={sort}
+        aria-label={localize('FABRICATE.App.Inventory.Filters.SortLabel')}
+        onchange={onSortInput}
+      >
         {#each SORTS as option (option.id)}
           <option value={option.id}>{localize(option.labelKey)}</option>
         {/each}

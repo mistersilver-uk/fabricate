@@ -21,7 +21,7 @@
     hasComponents = false,
     onAdd = null,
     onSearch = null,
-    onDragStart = null
+    onDragStart = null,
   } = $props();
 </script>
 
@@ -45,14 +45,22 @@
   {#if components.length === 0 && !hasComponents}
     <div class="alchemy-inventory-empty" data-alchemy-empty-inventory>
       <i class="fas fa-box-open" aria-hidden="true"></i>
-      <p class="alchemy-inventory-empty-title">{localize('FABRICATE.App.Alchemy.EmptyInventoryTitle')}</p>
-      <p class="alchemy-inventory-empty-hint">{localize('FABRICATE.App.Alchemy.EmptyInventoryHint')}</p>
+      <p class="alchemy-inventory-empty-title">
+        {localize('FABRICATE.App.Alchemy.EmptyInventoryTitle')}
+      </p>
+      <p class="alchemy-inventory-empty-hint">
+        {localize('FABRICATE.App.Alchemy.EmptyInventoryHint')}
+      </p>
     </div>
   {:else if components.length === 0}
     <div class="alchemy-inventory-empty" data-alchemy-inventory-no-matches>
       <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <p class="alchemy-inventory-empty-title">{localize('FABRICATE.App.Alchemy.NoComponentMatchesTitle')}</p>
-      <p class="alchemy-inventory-empty-hint">{localize('FABRICATE.App.Alchemy.NoComponentMatchesHint')}</p>
+      <p class="alchemy-inventory-empty-title">
+        {localize('FABRICATE.App.Alchemy.NoComponentMatchesTitle')}
+      </p>
+      <p class="alchemy-inventory-empty-hint">
+        {localize('FABRICATE.App.Alchemy.NoComponentMatchesHint')}
+      </p>
     </div>
   {:else}
     <ul class="alchemy-inventory-list">
@@ -69,7 +77,9 @@
             onclick={() => !component.disabled && onAdd?.(component.componentId)}
             ondragstart={(event) => onDragStart?.(event, component.componentId)}
           >
-            <span class="alchemy-inventory-grip" aria-hidden="true"><i class="fas fa-grip-vertical"></i></span>
+            <span class="alchemy-inventory-grip" aria-hidden="true"
+              ><i class="fas fa-grip-vertical"></i></span
+            >
             <span class="alchemy-inventory-icon">
               {#if component.img}
                 <img src={component.img} alt="" />
@@ -82,14 +92,15 @@
               <span class="alchemy-inventory-avail"
                 >{localize('FABRICATE.App.Alchemy.Available', {
                   available: component.available,
-                  held: component.held
+                  held: component.held,
                 })}</span
               >
               {#if component.essences?.length}
                 <EssenceChips essences={component.essences} />
               {/if}
             </span>
-            <span class="alchemy-inventory-add" aria-hidden="true"><i class="fas fa-plus"></i></span>
+            <span class="alchemy-inventory-add" aria-hidden="true"><i class="fas fa-plus"></i></span
+            >
           </button>
         </li>
       {/each}

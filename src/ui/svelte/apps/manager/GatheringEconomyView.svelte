@@ -37,7 +37,16 @@
   let actorPageSize = $state(6);
 
   function defaultEconomy() {
-    return { resolutionMode: 'd100', stamina: { enabled: false, max: '', start: '', regen: { policy: 'none', unit: 'hours', amount: '' } }, nodes: { enabled: false } };
+    return {
+      resolutionMode: 'd100',
+      stamina: {
+        enabled: false,
+        max: '',
+        start: '',
+        regen: { policy: 'none', unit: 'hours', amount: '' },
+      },
+      nodes: { enabled: false },
+    };
   }
 
   // Gathering resolution mode is system config (default d100, the only currently
@@ -46,9 +55,34 @@
   const GATHERING_RESOLUTION_MODES = ['d100', 'progressive', 'routed'];
 
   const gatheringResolutionModeOptions = [
-    { value: 'd100', labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100', fallback: 'd100 roll', descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100Desc', descFallback: 'Each attempt rolls a d100 against the task’s drop tables to determine what is gathered.' },
-    { value: 'progressive', labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Progressive', fallback: 'Progressive', descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.ProgressiveDesc', descFallback: 'A numeric check awards every drop whose difficulty threshold is met.', disabled: true, badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon', badgeFallback: 'Coming soon' },
-    { value: 'routed', labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Routed', fallback: 'Routed by check', descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.RoutedDesc', descFallback: 'The gathering check outcome selects which drop group is returned.', disabled: true, badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon', badgeFallback: 'Coming soon' }
+    {
+      value: 'd100',
+      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100',
+      fallback: 'd100 roll',
+      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100Desc',
+      descFallback:
+        'Each attempt rolls a d100 against the task’s drop tables to determine what is gathered.',
+    },
+    {
+      value: 'progressive',
+      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Progressive',
+      fallback: 'Progressive',
+      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.ProgressiveDesc',
+      descFallback: 'A numeric check awards every drop whose difficulty threshold is met.',
+      disabled: true,
+      badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon',
+      badgeFallback: 'Coming soon',
+    },
+    {
+      value: 'routed',
+      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Routed',
+      fallback: 'Routed by check',
+      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.RoutedDesc',
+      descFallback: 'The gathering check outcome selects which drop group is returned.',
+      disabled: true,
+      badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon',
+      badgeFallback: 'Coming soon',
+    },
   ];
 
   function setResolutionMode(mode) {
@@ -72,9 +106,15 @@
   const filteredActors = $derived.by(() => {
     const term = actorSearch.trim().toLowerCase();
     if (!term) return staminaActors;
-    return staminaActors.filter(actor => String(actor.name || '').toLowerCase().includes(term));
+    return staminaActors.filter((actor) =>
+      String(actor.name || '')
+        .toLowerCase()
+        .includes(term)
+    );
   });
-  const pagedActors = $derived(filteredActors.slice(actorPageIndex * actorPageSize, (actorPageIndex + 1) * actorPageSize));
+  const pagedActors = $derived(
+    filteredActors.slice(actorPageIndex * actorPageSize, (actorPageIndex + 1) * actorPageSize)
+  );
 
   // Keep the page index in range as the search term or list size changes.
   $effect(() => {
@@ -90,33 +130,41 @@
     const base = defaultEconomy();
     if (!raw || typeof raw !== 'object') return base;
     const regen = raw.stamina?.regen || {};
-    const hasStaminaFlag = raw.stamina != null && Object.prototype.hasOwnProperty.call(raw.stamina, 'enabled');
-    const hasNodesFlag = raw.nodes != null && Object.prototype.hasOwnProperty.call(raw.nodes, 'enabled');
+    const hasStaminaFlag =
+      raw.stamina != null && Object.prototype.hasOwnProperty.call(raw.stamina, 'enabled');
+    const hasNodesFlag =
+      raw.nodes != null && Object.prototype.hasOwnProperty.call(raw.nodes, 'enabled');
     const legacyMode = ['none', 'stamina', 'nodes'].includes(raw.mode) ? raw.mode : 'none';
     return {
-      resolutionMode: GATHERING_RESOLUTION_MODES.includes(raw.resolutionMode) ? raw.resolutionMode : 'd100',
+      resolutionMode: GATHERING_RESOLUTION_MODES.includes(raw.resolutionMode)
+        ? raw.resolutionMode
+        : 'd100',
       stamina: {
         enabled: hasStaminaFlag ? raw.stamina.enabled === true : legacyMode === 'stamina',
         max: raw.stamina?.max == null ? '' : String(raw.stamina.max),
         start: raw.stamina?.start == null ? '' : String(raw.stamina.start),
         regen: {
-          policy: ['none', 'overTime'].includes(regen.policy) ? regen.policy : (regen.policy === 'elapsedTime' ? 'overTime' : 'none'),
+          policy: ['none', 'overTime'].includes(regen.policy)
+            ? regen.policy
+            : regen.policy === 'elapsedTime'
+              ? 'overTime'
+              : 'none',
           unit: UNITS.includes(regen.unit) ? regen.unit : 'hours',
-          amount: regen.amount == null ? '' : String(regen.amount)
-        }
+          amount: regen.amount == null ? '' : String(regen.amount),
+        },
       },
-      nodes: { enabled: hasNodesFlag ? raw.nodes.enabled === true : legacyMode === 'nodes' }
+      nodes: { enabled: hasNodesFlag ? raw.nodes.enabled === true : legacyMode === 'nodes' },
     };
   }
 
   function refreshStaminaActors(id = systemId) {
     const list = services?.getGatheringStaminaState?.({ systemId: id }) ?? [];
     staminaActors = Array.isArray(list)
-      ? list.map(actor => ({
+      ? list.map((actor) => ({
           ...actor,
           rolled: actor.rolledMax != null,
           draftCurrent: actor.current ?? '',
-          draftMaxOverride: actor.maxOverride ?? ''
+          draftMaxOverride: actor.maxOverride ?? '',
         }))
       : [];
   }
@@ -158,8 +206,11 @@
         systemId,
         actorId: actor.actorId,
         current: Number(actor.draftCurrent) || 0,
-        maxOverride: actor.draftMaxOverride === '' || actor.draftMaxOverride == null ? null : Number(actor.draftMaxOverride),
-        maxReadOnly: actor.maxReadOnly === true
+        maxOverride:
+          actor.draftMaxOverride === '' || actor.draftMaxOverride == null
+            ? null
+            : Number(actor.draftMaxOverride),
+        maxReadOnly: actor.maxReadOnly === true,
       });
     }
     refreshStaminaActors();
@@ -186,7 +237,7 @@
       labelKey: 'FABRICATE.Admin.Manager.Economy.Mode.Stamina',
       labelFallback: 'Stamina',
       enabled: () => economy.stamina.enabled === true,
-      toggle: () => setStamina(economy.stamina.enabled !== true)
+      toggle: () => setStamina(economy.stamina.enabled !== true),
     },
     {
       id: 'nodes',
@@ -194,11 +245,13 @@
       labelKey: 'FABRICATE.Admin.Manager.Economy.Mode.Nodes',
       labelFallback: 'Resource nodes',
       enabled: () => economy.nodes.enabled === true,
-      toggle: () => setNodes(economy.nodes.enabled !== true)
-    }
+      toggle: () => setNodes(economy.nodes.enabled !== true),
+    },
   ];
 
-  const anyLimitEnabled = $derived(economy.stamina.enabled === true || economy.nodes.enabled === true);
+  const anyLimitEnabled = $derived(
+    economy.stamina.enabled === true || economy.nodes.enabled === true
+  );
 </script>
 
 <div class="manager-gathering-economy" data-gathering-economy-view>
@@ -217,11 +270,24 @@
 
   <section class="manager-economy-card" data-economy-mode-card>
     <header class="manager-economy-card-head">
-      <h3 class="manager-economy-card-title"><i class="fas fa-scale-balanced" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}</span></h3>
-      <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ModeHint', 'How this system limits how often tasks can be attempted.')}</p>
+      <h3 class="manager-economy-card-title">
+        <i class="fas fa-scale-balanced" aria-hidden="true"></i><span
+          >{text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}</span
+        >
+      </h3>
+      <p class="manager-economy-card-hint">
+        {text(
+          'FABRICATE.Admin.Manager.Economy.ModeHint',
+          'How this system limits how often tasks can be attempted.'
+        )}
+      </p>
     </header>
 
-    <div class="manager-economy-mode-options" role="group" aria-label={text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}>
+    <div
+      class="manager-economy-mode-options"
+      role="group"
+      aria-label={text('FABRICATE.Admin.Manager.Economy.ModeTitle', 'Limitation mode')}
+    >
       {#each TOGGLE_OPTIONS as option (option.id)}
         <button
           type="button"
@@ -237,53 +303,99 @@
     </div>
 
     {#if !anyLimitEnabled}
-      <p class="manager-economy-card-hint manager-muted" data-economy-no-limit-hint>{text('FABRICATE.Admin.Manager.Economy.Mode.None', 'No limit — tasks can be attempted freely.')}</p>
+      <p class="manager-economy-card-hint manager-muted" data-economy-no-limit-hint>
+        {text(
+          'FABRICATE.Admin.Manager.Economy.Mode.None',
+          'No limit — tasks can be attempted freely.'
+        )}
+      </p>
     {/if}
 
     {#if economy.stamina.enabled}
       <div class="manager-economy-stamina-grid">
         <div class="manager-economy-subsection" data-economy-regen-card>
-          <h4 class="manager-economy-subtitle"><i class="fas fa-bolt" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span></h4>
-          <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenHint', 'How much stamina actors recover as world time passes.')}</p>
+          <h4 class="manager-economy-subtitle">
+            <i class="fas fa-bolt" aria-hidden="true"></i><span
+              >{text('FABRICATE.Admin.Manager.Economy.RegenTitle', 'Stamina regeneration')}</span
+            >
+          </h4>
+          <p class="manager-economy-card-hint">
+            {text(
+              'FABRICATE.Admin.Manager.Economy.RegenHint',
+              'How much stamina actors recover as world time passes.'
+            )}
+          </p>
 
           <div class="manager-economy-regen-grid">
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.MaxStamina', 'Maximum stamina')}</span>
               <input
                 type="text"
-                placeholder={text('FABRICATE.Admin.Manager.Economy.MaxStaminaPlaceholder', '40 or 4 * @abilities.con.mod')}
+                placeholder={text(
+                  'FABRICATE.Admin.Manager.Economy.MaxStaminaPlaceholder',
+                  '40 or 4 * @abilities.con.mod'
+                )}
                 value={economy.stamina.max}
                 oninput={(e) => updateStamina({ max: e.currentTarget.value })}
                 data-economy-stamina-max
               />
             </label>
             <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Economy.StartStamina', 'Starting stamina')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Economy.StartStamina', 'Starting stamina')}</span
+              >
               <input
                 type="text"
-                placeholder={text('FABRICATE.Admin.Manager.Economy.StartStaminaPlaceholder', 'blank = full')}
+                placeholder={text(
+                  'FABRICATE.Admin.Manager.Economy.StartStaminaPlaceholder',
+                  'blank = full'
+                )}
                 value={economy.stamina.start}
                 oninput={(e) => updateStamina({ start: e.currentTarget.value })}
                 data-economy-stamina-start
               />
             </label>
           </div>
-          <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.MaxStaminaHint', 'A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full.')}</p>
+          <p class="manager-economy-card-hint">
+            {text(
+              'FABRICATE.Admin.Manager.Economy.MaxStaminaHint',
+              'A number or formula, rolled once per character (e.g. 40 or 4 * @abilities.con.mod). Starting stamina is the value characters begin at — blank means full.'
+            )}
+          </p>
 
-          <div class="manager-economy-regen-grid" class:is-single={economy.stamina.regen.policy !== 'overTime'}>
+          <div
+            class="manager-economy-regen-grid"
+            class:is-single={economy.stamina.regen.policy !== 'overTime'}
+          >
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
-              <select value={economy.stamina.regen.policy} onchange={(e) => updateRegen({ policy: e.currentTarget.value })} data-economy-regen-policy>
-                <option value="none">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option>
-                <option value="overTime">{text('FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed', 'Over world time')}</option>
+              <select
+                value={economy.stamina.regen.policy}
+                onchange={(e) => updateRegen({ policy: e.currentTarget.value })}
+                data-economy-regen-policy
+              >
+                <option value="none"
+                  >{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option
+                >
+                <option value="overTime"
+                  >{text(
+                    'FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed',
+                    'Over world time'
+                  )}</option
+                >
               </select>
             </label>
             {#if economy.stamina.regen.policy === 'overTime'}
               <label class="manager-field">
                 <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
-                <select value={economy.stamina.regen.unit} onchange={(e) => updateRegen({ unit: e.currentTarget.value })} data-economy-regen-unit>
+                <select
+                  value={economy.stamina.regen.unit}
+                  onchange={(e) => updateRegen({ unit: e.currentTarget.value })}
+                  data-economy-regen-unit
+                >
                   {#each UNITS as unit (unit)}
-                    <option value={unit}>{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option>
+                    <option value={unit}
+                      >{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option
+                    >
                   {/each}
                 </select>
               </label>
@@ -292,22 +404,41 @@
 
           {#if economy.stamina.regen.policy === 'overTime'}
             <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Amount per interval')}</span>
+              <span
+                >{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Amount per interval')}</span
+              >
               <input
                 type="text"
-                placeholder={text('FABRICATE.Admin.Manager.Economy.RegenAmountPlaceholder', '1 or 1 + @abilities.con.mod')}
+                placeholder={text(
+                  'FABRICATE.Admin.Manager.Economy.RegenAmountPlaceholder',
+                  '1 or 1 + @abilities.con.mod'
+                )}
                 value={economy.stamina.regen.amount}
                 oninput={(e) => updateRegen({ amount: e.currentTarget.value })}
                 data-economy-regen-amount
               />
             </label>
-            <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.RegenAmountHint', 'A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod).')}</p>
+            <p class="manager-economy-card-hint">
+              {text(
+                'FABRICATE.Admin.Manager.Economy.RegenAmountHint',
+                'A number or formula, evaluated for each character (e.g. 1 or 1 + @abilities.con.mod).'
+              )}
+            </p>
           {/if}
         </div>
 
         <div class="manager-economy-subsection" data-economy-stamina-actors>
-          <h4 class="manager-economy-subtitle"><i class="fas fa-users" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.ActorsTitle', 'Actor stamina pools')}</span></h4>
-          <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.ActorsHint', 'Set each gatherer’s stamina pool.')}</p>
+          <h4 class="manager-economy-subtitle">
+            <i class="fas fa-users" aria-hidden="true"></i><span
+              >{text('FABRICATE.Admin.Manager.Economy.ActorsTitle', 'Actor stamina pools')}</span
+            >
+          </h4>
+          <p class="manager-economy-card-hint">
+            {text(
+              'FABRICATE.Admin.Manager.Economy.ActorsHint',
+              'Set each gatherer’s stamina pool.'
+            )}
+          </p>
 
           <input
             type="search"
@@ -319,27 +450,89 @@
           />
 
           {#if filteredActors.length === 0}
-            <p class="manager-muted" data-economy-no-actors>{text('FABRICATE.Admin.Manager.Economy.NoActors', 'No characters found.')}</p>
+            <p class="manager-muted" data-economy-no-actors>
+              {text('FABRICATE.Admin.Manager.Economy.NoActors', 'No characters found.')}
+            </p>
           {:else}
             <ul class="manager-economy-actor-list" data-economy-actor-list>
               <li class="manager-economy-actor-row is-head">
                 <span class="manager-economy-actor-identity"></span>
-                <span class="manager-economy-actor-col-label">{text('FABRICATE.Admin.Manager.Economy.Current', 'Current')}</span>
-                <span class="manager-economy-actor-col-label">{text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')}</span>
-                <button type="button" class="manager-button is-primary manager-economy-bulk-save" onclick={saveAll} data-economy-bulk-save>{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button>
+                <span class="manager-economy-actor-col-label"
+                  >{text('FABRICATE.Admin.Manager.Economy.Current', 'Current')}</span
+                >
+                <span class="manager-economy-actor-col-label"
+                  >{text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')}</span
+                >
+                <button
+                  type="button"
+                  class="manager-button is-primary manager-economy-bulk-save"
+                  onclick={saveAll}
+                  data-economy-bulk-save
+                  >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button
+                >
               </li>
               {#each pagedActors as actor (actor.actorId)}
-                <li class="manager-economy-actor-row" data-economy-actor-id={actor.actorId} data-economy-actor-rolled={actor.rolled ? 'true' : 'false'}>
+                <li
+                  class="manager-economy-actor-row"
+                  data-economy-actor-id={actor.actorId}
+                  data-economy-actor-rolled={actor.rolled ? 'true' : 'false'}
+                >
                   <span class="manager-economy-actor-identity">
-                    <img class="manager-economy-actor-thumb" src={actor.img || 'icons/svg/mystery-man.svg'} alt="" />
+                    <img
+                      class="manager-economy-actor-thumb"
+                      src={actor.img || 'icons/svg/mystery-man.svg'}
+                      alt=""
+                    />
                     <span class="manager-economy-actor-name" title={actor.name}>{actor.name}</span>
                   </span>
-                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder="—" bind:value={actor.draftCurrent} disabled={!actor.rolled} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`} data-economy-actor-current />
-                  <input class="manager-economy-actor-cell" type="number" min="0" step="1" placeholder={actor.rolledMax != null ? String(actor.rolledMax) : '—'} bind:value={actor.draftMaxOverride} disabled={!actor.rolled || actor.maxReadOnly === true} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`} data-economy-actor-max />
+                  <input
+                    class="manager-economy-actor-cell"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="—"
+                    bind:value={actor.draftCurrent}
+                    disabled={!actor.rolled}
+                    aria-label={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`}
+                    data-economy-actor-current
+                  />
+                  <input
+                    class="manager-economy-actor-cell"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder={actor.rolledMax != null ? String(actor.rolledMax) : '—'}
+                    bind:value={actor.draftMaxOverride}
+                    disabled={!actor.rolled || actor.maxReadOnly === true}
+                    aria-label={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`}
+                    data-economy-actor-max
+                  />
                   {#if actor.rolled}
-                    <button type="button" class="manager-icon-button manager-economy-actor-roll" title={text('FABRICATE.Admin.Manager.Economy.ResetHint', 'Re-roll this character’s pool from the max/start expressions')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`} onclick={() => rollActor(actor)} data-economy-actor-roll><i class="fas fa-arrows-rotate" aria-hidden="true"></i></button>
+                    <button
+                      type="button"
+                      class="manager-icon-button manager-economy-actor-roll"
+                      title={text(
+                        'FABRICATE.Admin.Manager.Economy.ResetHint',
+                        'Re-roll this character’s pool from the max/start expressions'
+                      )}
+                      aria-label={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`}
+                      onclick={() => rollActor(actor)}
+                      data-economy-actor-roll
+                      ><i class="fas fa-arrows-rotate" aria-hidden="true"></i></button
+                    >
                   {:else}
-                    <button type="button" class="manager-icon-button manager-economy-actor-roll is-roll-needed" title={text('FABRICATE.Admin.Manager.Economy.RollHint', 'Roll this character’s pool from the max/start expressions')} aria-label={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`} onclick={() => rollActor(actor)} data-economy-actor-roll><i class="fas fa-dice-d20" aria-hidden="true"></i></button>
+                    <button
+                      type="button"
+                      class="manager-icon-button manager-economy-actor-roll is-roll-needed"
+                      title={text(
+                        'FABRICATE.Admin.Manager.Economy.RollHint',
+                        'Roll this character’s pool from the max/start expressions'
+                      )}
+                      aria-label={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`}
+                      onclick={() => rollActor(actor)}
+                      data-economy-actor-roll
+                      ><i class="fas fa-dice-d20" aria-hidden="true"></i></button
+                    >
                   {/if}
                 </li>
               {/each}
@@ -349,8 +542,11 @@
               pageSize={actorPageSize}
               pageIndex={actorPageIndex}
               pageSizeOptions={[6, 12, 24]}
-              onPageChange={(index) => actorPageIndex = index}
-              onPageSizeChange={(size) => { actorPageSize = size; actorPageIndex = 0; }}
+              onPageChange={(index) => (actorPageIndex = index)}
+              onPageSizeChange={(size) => {
+                actorPageSize = size;
+                actorPageIndex = 0;
+              }}
             />
           {/if}
         </div>
@@ -359,8 +555,17 @@
 
     {#if economy.nodes.enabled}
       <div class="manager-economy-subsection" data-economy-nodes-note>
-        <h4 class="manager-economy-subtitle"><i class="fas fa-mountain" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Economy.Mode.Nodes', 'Resource nodes')}</span></h4>
-        <p class="manager-economy-card-hint">{text('FABRICATE.Admin.Manager.Economy.NodesNote', 'Set each task’s node count and respawn on the environment’s task inspector.')}</p>
+        <h4 class="manager-economy-subtitle">
+          <i class="fas fa-mountain" aria-hidden="true"></i><span
+            >{text('FABRICATE.Admin.Manager.Economy.Mode.Nodes', 'Resource nodes')}</span
+          >
+        </h4>
+        <p class="manager-economy-card-hint">
+          {text(
+            'FABRICATE.Admin.Manager.Economy.NodesNote',
+            'Set each task’s node count and respawn on the environment’s task inspector.'
+          )}
+        </p>
       </div>
     {/if}
   </section>

@@ -50,7 +50,7 @@
 >
   <img class="journal-history-thumb" src={img} alt="" />
   <div class="journal-history-copy">
-    <span class="journal-history-name" title={title}>{title}</span>
+    <span class="journal-history-name" {title}>{title}</span>
     <div class="journal-history-meta">
       <RunStatusPill {status} />
       {#if relativeTime !== ''}

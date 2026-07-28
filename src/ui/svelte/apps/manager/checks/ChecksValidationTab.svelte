@@ -33,21 +33,33 @@
   const SUBSYSTEM_LABELS = {
     crafting: ['SubsystemCrafting', 'Crafting check'],
     salvage: ['SubsystemSalvage', 'Salvage check'],
-    gathering: ['SubsystemGathering', 'Gathering check']
+    gathering: ['SubsystemGathering', 'Gathering check'],
   };
   const CHECK_LABELS = {
     hasRollFormula: ['CheckHasRollFormula', 'Has a roll formula'],
     outcomesNamed: ['CheckOutcomesNamed', 'Every outcome tier is named'],
     hasSuccessOutcome: ['CheckHasSuccessOutcome', 'At least one outcome is a Success'],
     rangesValid: ['CheckRangesValid', 'Every tier range is valid'],
-    rangesNoOverlap: ['CheckRangesNoOverlap', 'No tier ranges overlap']
+    rangesNoOverlap: ['CheckRangesNoOverlap', 'No tier ranges overlap'],
   };
   const ISSUE_LABELS = {
-    noRollFormula: ['IssueNoRollFormula', 'This check has no roll formula; it will not resolve until one is set.'],
-    unnamedOutcome: ['IssueUnnamedOutcome', 'Name every outcome tier — an unnamed tier cannot be routed to a result group.'],
-    noSuccessOutcome: ['IssueNoSuccessOutcome', "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success."],
+    noRollFormula: [
+      'IssueNoRollFormula',
+      'This check has no roll formula; it will not resolve until one is set.',
+    ],
+    unnamedOutcome: [
+      'IssueUnnamedOutcome',
+      'Name every outcome tier — an unnamed tier cannot be routed to a result group.',
+    ],
+    noSuccessOutcome: [
+      'IssueNoSuccessOutcome',
+      "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
+    ],
     rangeInvalid: ['IssueRangeInvalid', 'Some tiers have a start greater than their end.'],
-    rangeOverlap: ['IssueRangeOverlap', 'Some tier ranges overlap. Each value range must be unique.']
+    rangeOverlap: [
+      'IssueRangeOverlap',
+      'Some tier ranges overlap. Each value range must be unique.',
+    ],
   };
 
   function subsystemLabel(subsystem) {
@@ -66,7 +78,7 @@
   const evaluated = $derived(
     sections.map((section) => ({
       subsystem: section.subsystem,
-      readiness: evaluateCheckReadiness(section.check || {}, { mode: section.mode })
+      readiness: evaluateCheckReadiness(section.check || {}, { mode: section.mode }),
     }))
   );
 </script>
@@ -79,14 +91,17 @@
 >
   {#if evaluated.length === 0}
     <p class="manager-muted">
-      {text('FABRICATE.Admin.Manager.Checks.Validation.EmptyHint', 'Issues across the crafting, salvage, and gathering checks will be listed here.')}
+      {text(
+        'FABRICATE.Admin.Manager.Checks.Validation.EmptyHint',
+        'Issues across the crafting, salvage, and gathering checks will be listed here.'
+      )}
     </p>
   {:else}
     {#each evaluated as { subsystem, readiness } (subsystem)}
       {@const issuesBy = {
         critical: readiness.issues.filter((issue) => issue.severity === 'critical'),
         warning: readiness.issues.filter((issue) => issue.severity === 'warning'),
-        info: readiness.issues.filter((issue) => issue.severity === 'info')
+        info: readiness.issues.filter((issue) => issue.severity === 'info'),
       }}
       <section class="manager-task-core-card" data-checks-validation-section={subsystem}>
         <h3 class="manager-card-title">{subsystemLabel(subsystem)}</h3>
@@ -99,7 +114,10 @@
               data-check={check.id}
               data-satisfied={check.satisfied}
             >
-              <i class={check.satisfied ? 'fas fa-circle-check' : 'fas fa-circle-xmark'} aria-hidden="true"></i>
+              <i
+                class={check.satisfied ? 'fas fa-circle-check' : 'fas fa-circle-xmark'}
+                aria-hidden="true"
+              ></i>
               <span>{checkLabel(check.id)}</span>
             </li>
           {/each}
@@ -114,9 +132,16 @@
             {#if issuesBy[severity].length > 0}
               <ul class="manager-recipe-issue-list" data-issue-severity={severity}>
                 {#each issuesBy[severity] as issue, index (issue.id + index)}
-                  <li class={`manager-editor-issue is-${severity}`} data-subsystem={subsystem} data-issue={issue.id}>
+                  <li
+                    class={`manager-editor-issue is-${severity}`}
+                    data-subsystem={subsystem}
+                    data-issue={issue.id}
+                  >
                     <Chip tone={severityTone(severity)}>
-                      {text(`FABRICATE.Admin.Manager.Checks.Validation.Severity.${severity}`, severity)}
+                      {text(
+                        `FABRICATE.Admin.Manager.Checks.Validation.Severity.${severity}`,
+                        severity
+                      )}
                     </Chip>
                     <span class="manager-recipe-issue-title">{issueTitle(issue.id)}</span>
                   </li>

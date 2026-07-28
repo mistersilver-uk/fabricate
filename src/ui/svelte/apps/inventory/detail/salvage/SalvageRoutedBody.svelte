@@ -31,10 +31,16 @@
   const routedType = $derived(salvage?.routedType === 'fixed' ? 'fixed' : 'relative');
   const outcomes = $derived(Array.isArray(salvage?.routedOutcomes) ? salvage.routedOutcomes : []);
   const dc = $derived(Number.isFinite(salvage?.dc) ? salvage.dc : null);
-  const rolledOutcomeId = $derived(result?.state === 'success' ? (result?.outcomeId ?? null) : null);
+  const rolledOutcomeId = $derived(
+    result?.state === 'success' ? (result?.outcomeId ?? null) : null
+  );
 </script>
 
-<div class="salvage-body" data-inventory-salvage-body="routed" data-inventory-routed-type={routedType}>
+<div
+  class="salvage-body"
+  data-inventory-salvage-body="routed"
+  data-inventory-routed-type={routedType}
+>
   <p class="salvage-body-title">
     {localize('FABRICATE.App.Inventory.Salvage.OutcomesTitle')}
     <!-- Present for RELATIVE only: a fixed check has no DC — checkRoll never reads one
@@ -73,20 +79,31 @@
             {/if}
             {#if routedType === 'fixed'}
               {#if outcome.start !== null && outcome.end !== null}
-                <span class="salvage-outcome-threshold" data-inventory-outcome-range={`${outcome.start}-${outcome.end}`}>
+                <span
+                  class="salvage-outcome-threshold"
+                  data-inventory-outcome-range={`${outcome.start}-${outcome.end}`}
+                >
                   {outcome.start}–{outcome.end}
                 </span>
               {/if}
             {:else if outcome.threshold !== null}
-              <span class="salvage-outcome-threshold" data-inventory-outcome-threshold={String(outcome.threshold)}>
-                {localize('FABRICATE.App.Inventory.Salvage.ReachedAt', { threshold: outcome.threshold })}
+              <span
+                class="salvage-outcome-threshold"
+                data-inventory-outcome-threshold={String(outcome.threshold)}
+              >
+                {localize('FABRICATE.App.Inventory.Salvage.ReachedAt', {
+                  threshold: outcome.threshold,
+                })}
               </span>
             {/if}
           </div>
           {#if outcome.results.length > 0}
             <ul class="salvage-outcome-results">
               {#each outcome.results as entry, resultIndex (entry.id ?? entry.componentId ?? resultIndex)}
-                <li class="salvage-outcome-result" data-inventory-salvage-result={entry.componentId}>
+                <li
+                  class="salvage-outcome-result"
+                  data-inventory-salvage-result={entry.componentId}
+                >
                   <!-- CraftingThumb, not a raw <img>: missing art gets the house fallback
                        rather than a broken-image glyph. -->
                   <CraftingThumb src={entry.img ?? ''} alt="" size={14} />
@@ -96,7 +113,9 @@
               {/each}
             </ul>
           {:else}
-            <p class="salvage-empty">{localize('FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing')}</p>
+            <p class="salvage-empty">
+              {localize('FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing')}
+            </p>
           {/if}
         </li>
       {/each}

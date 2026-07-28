@@ -54,7 +54,7 @@
     // the player's order actually differs from it — resetting to the order you are
     // already in is a no-op the control should not offer.
     canResetOrder = false,
-    onResetOrder = () => {}
+    onResetOrder = () => {},
   } = $props();
 
   const resolved = $derived(result?.state === 'success');
@@ -90,28 +90,28 @@
     recovered: {
       key: 'FABRICATE.App.Inventory.Salvage.StateRecovered',
       tone: 'success',
-      icon: 'fas fa-circle-check'
+      icon: 'fas fa-circle-check',
     },
     short: {
       key: 'FABRICATE.App.Inventory.Salvage.StateRollFellShort',
       tone: 'danger',
-      icon: 'fas fa-circle-xmark'
+      icon: 'fas fa-circle-xmark',
     },
     unreachable: {
       key: 'FABRICATE.App.Inventory.Salvage.StateNotReached',
       tone: 'subtle',
-      icon: 'fas fa-lock'
+      icon: 'fas fa-lock',
     },
     awaiting: {
       key: 'FABRICATE.App.Inventory.Salvage.StateAwaitingRoll',
       tone: 'subtle',
-      icon: 'fas fa-circle'
+      icon: 'fas fa-circle',
     },
     resolved: {
       key: 'FABRICATE.App.Inventory.Salvage.StateResolved',
       tone: 'subtle',
-      icon: 'fas fa-circle'
-    }
+      icon: 'fas fa-circle',
+    },
   };
 </script>
 
@@ -157,7 +157,7 @@
       <span class="salvage-body-hint" data-inventory-salvage-recovered-count>
         {localize('FABRICATE.App.Inventory.Salvage.RecoveredCount', {
           recovered: recoveredCount,
-          total: stages.length
+          total: stages.length,
         })}
       </span>
     {/if}

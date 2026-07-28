@@ -72,7 +72,7 @@
   const quickstartLink = {
     href: `${DOCS_BASE}/quickstart`,
     label: text('FABRICATE.Admin.Manager.Checks.Quickstart', 'Quickstart'),
-    icon: 'fas fa-circle-question'
+    icon: 'fas fa-circle-question',
   };
 
   // The description stays ONE explainer row rather than being split into a row per rule:
@@ -87,17 +87,17 @@
           text: text(
             'FABRICATE.Admin.Manager.Checks.Crafting.HelpDesc',
             'The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.'
-          )
-        }
+          ),
+        },
       ],
       links: [
         {
           href: `${DOCS_BASE}/crafting-checks`,
           label: text('FABRICATE.Admin.Manager.Checks.Crafting.Docs', 'Crafting checks docs'),
-          icon: 'fas fa-book-open'
+          icon: 'fas fa-book-open',
         },
-        quickstartLink
-      ]
+        quickstartLink,
+      ],
     },
     salvage: {
       icon: 'fas fa-recycle',
@@ -107,17 +107,17 @@
           text: text(
             'FABRICATE.Admin.Manager.Checks.Salvage.HelpDesc',
             'The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.'
-          )
-        }
+          ),
+        },
       ],
       links: [
         {
           href: `${DOCS_BASE}/salvage`,
           label: text('FABRICATE.Admin.Manager.Checks.Salvage.Docs', 'Salvage docs'),
-          icon: 'fas fa-book-open'
+          icon: 'fas fa-book-open',
         },
-        quickstartLink
-      ]
+        quickstartLink,
+      ],
     },
     gathering: {
       icon: 'fas fa-seedling',
@@ -127,24 +127,27 @@
           text: text(
             'FABRICATE.Admin.Manager.Checks.Gathering.HelpDesc',
             'The gathering check is shaped by the task resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.'
-          )
-        }
+          ),
+        },
       ],
       links: [
         {
           href: `${DOCS_BASE}/gathering-environments`,
           label: text('FABRICATE.Admin.Manager.Checks.Gathering.Docs', 'Gathering docs'),
-          icon: 'fas fa-book-open'
+          icon: 'fas fa-book-open',
         },
-        quickstartLink
-      ]
-    }
+        quickstartLink,
+      ],
+    },
   };
 
   const menu = $derived(MENUS[activeTab] || MENUS.crafting);
 </script>
 
-<aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.Checks.Menu.Label', 'Checks context menu')}>
+<aside
+  class="manager-inspector manager-environment-inspector"
+  aria-label={text('FABRICATE.Admin.Manager.Checks.Menu.Label', 'Checks context menu')}
+>
   {#if activation}
     <section class="manager-inspector-card" data-checks-active={activeTab}>
       <h3 class="manager-card-title">{activeTitle}</h3>
@@ -156,7 +159,9 @@
           aria-pressed={activeOn}
           onclick={() => onToggleActive(!activeOn)}
         >
-          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+          <span class="manager-status-toggle-track" aria-hidden="true"
+            ><span class="manager-status-toggle-knob"></span></span
+          >
           <span class="manager-status-toggle-label">{activeOn ? onLabel : offLabel}</span>
         </button>
         <p class="manager-muted">{optionalHint}</p>

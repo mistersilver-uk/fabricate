@@ -65,7 +65,9 @@
 
 {#if groups.length > 0}
   <section class="crafting-alt" data-recipe-section="alternatives">
-    <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Io.AlternativesTitle')}</p>
+    <p class="crafting-detail-section-title">
+      {localize('FABRICATE.App.Crafting.Io.AlternativesTitle')}
+    </p>
     <p class="crafting-alt-hint">{localize('FABRICATE.App.Crafting.Io.AlternativesHint')}</p>
 
     {#each groups as choice (choice.kind + ':' + choice.groupId + ':' + (choice.optionIndex ?? ''))}
@@ -93,7 +95,12 @@
               data-option-satisfied={option.satisfied ? 'true' : 'false'}
               onclick={() => commitOption(choice, option.optionIndex)}
               onkeydown={(event) =>
-                onRadioKeydown(event, (value) => commitOption(choice, value), values, choice.selectedOptionIndex)}
+                onRadioKeydown(
+                  event,
+                  (value) => commitOption(choice, value),
+                  values,
+                  choice.selectedOptionIndex
+                )}
             >
               {#if option.isEssence}
                 <CraftingEssenceThumb icon={option.icon} size={40} />
@@ -126,7 +133,9 @@
         <div
           class="crafting-alt-group"
           role="radiogroup"
-          aria-label={localize('FABRICATE.App.Crafting.Io.ChooseStackTitle', { name: choice.groupName })}
+          aria-label={localize('FABRICATE.App.Crafting.Io.ChooseStackTitle', {
+            name: choice.groupName,
+          })}
           data-alt-group={choice.groupId}
           data-alt-kind="stack"
         >
@@ -143,7 +152,12 @@
               data-held-id={stack.itemId}
               onclick={() => commitStack(choice, stack.itemId)}
               onkeydown={(event) =>
-                onRadioKeydown(event, (value) => commitStack(choice, value), values, choice.selectedHeldItemId)}
+                onRadioKeydown(
+                  event,
+                  (value) => commitStack(choice, value),
+                  values,
+                  choice.selectedHeldItemId
+                )}
             >
               <CraftingThumb src={stack.img} alt="" size={40} />
               <span class="crafting-alt-name">{stack.name}</span>

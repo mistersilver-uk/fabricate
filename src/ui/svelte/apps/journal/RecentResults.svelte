@@ -32,15 +32,24 @@
       {#each runs as run (run.id)}
         <li class="journal-recent-item" data-recent-run-id={run.id}>
           <img class="journal-recent-thumb" src={run.img || DEFAULT_RUN_IMAGE} alt="" />
-          <span class="journal-recent-name" title={run.names?.title ?? ''}>{run.names?.title ?? ''}</span>
+          <span class="journal-recent-name" title={run.names?.title ?? ''}
+            >{run.names?.title ?? ''}</span
+          >
           {#if totalQuantity(run) > 1}
-            <span class="journal-recent-quantity">{localize('FABRICATE.App.Journal.Quantity', { n: totalQuantity(run) })}</span>
+            <span class="journal-recent-quantity"
+              >{localize('FABRICATE.App.Journal.Quantity', { n: totalQuantity(run) })}</span
+            >
           {/if}
           <RunStatusPill status={run.derivedStatus} />
         </li>
       {/each}
     </ul>
-    <button type="button" class="journal-recent-link" data-journal-view-history onclick={() => onViewFullHistory?.()}>
+    <button
+      type="button"
+      class="journal-recent-link"
+      data-journal-view-history
+      onclick={() => onViewFullHistory?.()}
+    >
       {localize('FABRICATE.App.Journal.RecentResults.ViewFullHistory')}
     </button>
   {/if}

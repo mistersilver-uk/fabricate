@@ -16,12 +16,15 @@
     onSelect = null,
     now = 0,
     sort = 'soonestReady',
-    onSortChange = null
+    onSortChange = null,
   } = $props();
 
   const sortOptions = $derived([
-    { value: 'soonestReady', label: localize('FABRICATE.App.Journal.ActiveRuns.Sort.SoonestReady') },
-    { value: 'newest', label: localize('FABRICATE.App.Journal.ActiveRuns.Sort.Newest') }
+    {
+      value: 'soonestReady',
+      label: localize('FABRICATE.App.Journal.ActiveRuns.Sort.SoonestReady'),
+    },
+    { value: 'newest', label: localize('FABRICATE.App.Journal.ActiveRuns.Sort.Newest') },
   ]);
 </script>
 

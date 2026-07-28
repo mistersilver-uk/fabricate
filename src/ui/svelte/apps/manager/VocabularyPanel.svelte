@@ -268,14 +268,20 @@
           </button>
         </div>
         {#if pendingRemovalId === row.id}
-          <div class="manager-vocabulary-confirm" data-vocabulary-confirm={row.id} role="alertdialog">
+          <div
+            class="manager-vocabulary-confirm"
+            data-vocabulary-confirm={row.id}
+            role="alertdialog"
+          >
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
             <span class="manager-vocabulary-confirm-copy">{confirmSentence(row)}</span>
             <button type="button" class="manager-button" onclick={cancelRemove}
               >{cancelRemoveLabel}</button
             >
-            <button type="button" class="manager-button is-danger" onclick={() => confirmRemove(row)}
-              >{confirmRemoveLabel}</button
+            <button
+              type="button"
+              class="manager-button is-danger"
+              onclick={() => confirmRemove(row)}>{confirmRemoveLabel}</button
             >
           </div>
         {/if}

@@ -19,7 +19,7 @@
     filtering = false,
     onSelect = null,
     onPageChange = null,
-    onPageSizeChange = null
+    onPageSizeChange = null,
   } = $props();
 
   const hasResults = $derived(Array.isArray(items) && items.length > 0);

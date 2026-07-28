@@ -20,7 +20,7 @@
     // neutral swatch and selects no preset; picking any preset ends the unset state
     // through the caller's own `onChange`.
     unset = false,
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   // Neutral, from the theme's own border token: visibly a swatch, unmistakably not one
@@ -35,7 +35,9 @@
 
   function normalizedToken(value) {
     const token = String(value || '').replace(/^--fab-tag-/, '');
-    return ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve'].includes(token) ? token : 'sage';
+    return ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve'].includes(token)
+      ? token
+      : 'sage';
   }
 
   function validCustomHex(value) {
@@ -71,7 +73,7 @@
 
     return {
       minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16
+      maxRight: mainPanelRect.right - hostRect.left - 16,
     };
   }
 
@@ -83,7 +85,7 @@
       left: 0,
       top: 0,
       width: window.innerWidth,
-      height: window.innerHeight
+      height: window.innerHeight,
     };
     const triggerRect = triggerButton.getBoundingClientRect();
     const horizontalBounds = getPopoverHorizontalBounds(hostRect);
@@ -95,7 +97,7 @@
         top: triggerRect.top - hostRect.top,
         bottom: triggerRect.bottom - hostRect.top,
         width: triggerRect.width,
-        height: triggerRect.height
+        height: triggerRect.height,
       },
       { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
       {
@@ -103,7 +105,7 @@
         minLeft: horizontalBounds.minLeft,
         maxRight: horizontalBounds.maxRight,
         minWidth: 220,
-        maxWidth: 220
+        maxWidth: 220,
       }
     );
 
@@ -112,16 +114,17 @@
       return;
     }
 
-    const verticalPosition = layout.placement === 'top'
-      ? `top: auto; bottom: ${layout.bottom}px;`
-      : `top: ${layout.top}px; bottom: auto;`;
+    const verticalPosition =
+      layout.placement === 'top'
+        ? `top: auto; bottom: ${layout.bottom}px;`
+        : `top: ${layout.top}px; bottom: auto;`;
 
     popoverStyle = [
       `left: ${layout.left}px;`,
       'right: auto;',
       `width: ${layout.width}px;`,
       `max-height: ${layout.maxHeight}px;`,
-      verticalPosition
+      verticalPosition,
     ].join(' ');
   }
 
@@ -154,7 +157,7 @@
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: closePicker,
-    additionalNodes: () => [popoverRoot]
+    additionalNodes: () => [popoverRoot],
   }}
 >
   <button
@@ -179,7 +182,7 @@
       {allowCustom}
       {unset}
       {onChange}
-      popoverStyle={popoverStyle}
+      {popoverStyle}
       portalTarget={() => getPopoverHost()}
       {registerPopoverNode}
       manageDismiss={false}

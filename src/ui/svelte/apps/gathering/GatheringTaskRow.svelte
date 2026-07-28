@@ -20,11 +20,7 @@
   import { calloutFor } from './gatheringBlockedReasons.js';
   import ChanceBar from './ChanceBar.svelte';
 
-  let {
-    task = null,
-    selected = false,
-    onSelect = null
-  } = $props();
+  let { task = null, selected = false, onSelect = null } = $props();
 
   const id = $derived(String(task?.id ?? ''));
   const name = $derived(String(task?.name ?? task?.label ?? ''));
@@ -45,8 +41,11 @@
   // only when the system runs that mode and (for blind tasks) the count is not
   // redacted — the runtime nulls those fields when they must stay hidden.
   const richNodes = $derived(task?.rich?.nodes ?? null);
-  const nodeCount = $derived(richNodes && richNodes.current != null && richNodes.max != null
-    ? `${richNodes.current}/${richNodes.max}` : null);
+  const nodeCount = $derived(
+    richNodes && richNodes.current != null && richNodes.max != null
+      ? `${richNodes.current}/${richNodes.max}`
+      : null
+  );
   const staminaCost = $derived(task?.rich?.stamina?.cost ?? null);
 
   // Each blocking issue becomes a header callout chip. Icon/tone/label come from
@@ -109,7 +108,12 @@
 
     <div class="gathering-task-main">
       <span class="gathering-task-thumb-wrap">
-        <img class="gathering-task-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_TASK_IMG} alt="" />
+        <img
+          class="gathering-task-thumb"
+          class:is-fallback={!img}
+          src={img || DEFAULT_GATHERING_TASK_IMG}
+          alt=""
+        />
         {#if blocked}
           <span class="gathering-task-lock-overlay" aria-hidden="true">
             <i class="fas fa-lock"></i>
@@ -122,13 +126,21 @@
         {#if nodeCount != null || staminaCost != null}
           <span class="gathering-task-economy" data-gathering-economy>
             {#if nodeCount != null}
-              <span class="gathering-economy-chip" data-gathering-node-count title={localize('FABRICATE.App.Gathering.Detail.NodesRemaining')}>
+              <span
+                class="gathering-economy-chip"
+                data-gathering-node-count
+                title={localize('FABRICATE.App.Gathering.Detail.NodesRemaining')}
+              >
                 <i class="fas fa-mountain" aria-hidden="true"></i>
                 <span>{nodeCount}</span>
               </span>
             {/if}
             {#if staminaCost != null}
-              <span class="gathering-economy-chip" data-gathering-stamina-cost title={localize('FABRICATE.App.Gathering.Detail.StaminaCost')}>
+              <span
+                class="gathering-economy-chip"
+                data-gathering-stamina-cost
+                title={localize('FABRICATE.App.Gathering.Detail.StaminaCost')}
+              >
                 <i class="fas fa-bolt" aria-hidden="true"></i>
                 <span>{staminaCost}</span>
               </span>
@@ -148,7 +160,9 @@
       class="gathering-task-description"
       class:is-fallback={!hasDescription}
       data-gathering-task-description
-    >{descriptionText}</p>
+    >
+      {descriptionText}
+    </p>
   </div>
 </div>
 

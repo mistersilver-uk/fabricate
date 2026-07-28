@@ -46,7 +46,7 @@
     rail = {},
     // The step the engine would execute for this actor's active run, so a multi-step
     // body can make only that step's rail interactive.
-    activeStepId = null
+    activeStepId = null,
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -69,7 +69,7 @@
     simple: SimpleRecipeBody,
     routedByIngredients: IngredientRoutedBody,
     routedByCheck: RoutedByCheckBody,
-    progressive: ProgressiveBody
+    progressive: ProgressiveBody,
   };
   const Body = $derived(BODIES[mode] ?? SimpleRecipeBody);
 </script>
@@ -102,13 +102,7 @@
         />
       </div>
       <div class="crafting-detail-footer">
-        <CraftButton
-          label={craftLabel}
-          disabled={!canCraft}
-          {disabledReason}
-          {busy}
-          {onCraft}
-        />
+        <CraftButton label={craftLabel} disabled={!canCraft} {disabledReason} {busy} {onCraft} />
       </div>
     {/if}
   </div>

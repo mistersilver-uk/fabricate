@@ -36,7 +36,10 @@
   }
 
   function metaFor(character) {
-    return text('FABRICATE.Admin.Manager.Knowledge.RosterMeta', '{items} item(s) · {learned} learned')
+    return text(
+      'FABRICATE.Admin.Manager.Knowledge.RosterMeta',
+      '{items} item(s) · {learned} learned'
+    )
       .replace('{items}', String(character?.itemCount ?? 0))
       .replace('{learned}', String(character?.learnedCount ?? 0));
   }
@@ -55,7 +58,10 @@
       type="search"
       value={searchTerm}
       oninput={(event) => onSearch(event.currentTarget.value)}
-      placeholder={text('FABRICATE.Admin.Manager.Knowledge.SearchPlaceholder', 'Search characters...')}
+      placeholder={text(
+        'FABRICATE.Admin.Manager.Knowledge.SearchPlaceholder',
+        'Search characters...'
+      )}
       aria-label={text('FABRICATE.Admin.Manager.Knowledge.SearchLabel', 'Search characters')}
       data-knowledge-search
     />
@@ -76,7 +82,10 @@
       <EmptyState
         compact
         icon="fas fa-search"
-        title={text('FABRICATE.Admin.Manager.Knowledge.RosterNoMatchTitle', 'No characters match this search')}
+        title={text(
+          'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchTitle',
+          'No characters match this search'
+        )}
         hint={text(
           'FABRICATE.Admin.Manager.Knowledge.RosterNoMatchHint',
           'Clear the search to show every player character.'
@@ -100,7 +109,9 @@
           >
             <Medallion src={character.img} icon="fas fa-user" size={34} alt="" />
             <span class="manager-knowledge-roster-copy">
-              <strong class="manager-knowledge-roster-name" title={character.name}>{character.name}</strong>
+              <strong class="manager-knowledge-roster-name" title={character.name}
+                >{character.name}</strong
+              >
               {#if character.tracked === true}
                 <small class="manager-knowledge-roster-meta">{metaFor(character)}</small>
               {:else}

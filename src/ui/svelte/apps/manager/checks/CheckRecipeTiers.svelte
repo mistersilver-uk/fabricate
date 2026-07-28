@@ -42,7 +42,9 @@
 </script>
 
 <div class="manager-checks-card-head">
-  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe tiers')}</h3>
+  <h3 class="manager-card-title">
+    {text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe tiers')}
+  </h3>
   <button type="button" class="manager-button" data-add-tier onclick={addTier}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddTier', 'Add tier')}</span>
@@ -50,13 +52,28 @@
 </div>
 
 {#if list.length === 0}
-  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NoTiers', 'No tiers yet. Add named tiers a recipe can select to override the DC.')}</p>
+  <p class="manager-muted">
+    {text(
+      'FABRICATE.Admin.Manager.Checks.Crafting.NoTiers',
+      'No tiers yet. Add named tiers a recipe can select to override the DC.'
+    )}
+  </p>
 {:else}
-  <div class="manager-checks-outcome-table is-tier" role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe tiers')}>
+  <div
+    class="manager-checks-outcome-table is-tier"
+    role="table"
+    aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle', 'Recipe tiers')}
+  >
     <div class="manager-checks-outcome-head" role="row">
-      <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.TierName', 'Name')}</span>
-      <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')}</span>
-      <span role="columnheader" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}></span>
+      <span role="columnheader"
+        >{text('FABRICATE.Admin.Manager.Checks.Crafting.TierName', 'Name')}</span
+      >
+      <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')}</span
+      >
+      <span
+        role="columnheader"
+        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}
+      ></span>
     </div>
     {#each list as tier (tier.id)}
       <div class="manager-checks-outcome-row" role="row" data-tier-row={tier.id}>

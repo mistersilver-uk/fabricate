@@ -32,7 +32,7 @@
     buildRecipeBrowserModel,
     createRecipeBrowserState,
     deriveRecipeIo,
-    deriveRecipeStatuses
+    deriveRecipeStatuses,
   } from '../../../../utils/recipeBrowserModel.js';
 
   let {
@@ -54,7 +54,7 @@
     // with the controls reset to defaults threw away the page, filters, sort and
     // grouping the GM left. When unbound — the isolated mounted tests — the local
     // fallback below keeps every control reactive in-component.
-    browserState = $bindable(null)
+    browserState = $bindable(null),
   } = $props();
 
   let ownBrowserState = $state(createRecipeBrowserState());
@@ -96,7 +96,9 @@
   function handleToggleEnabled(recipe) {
     flashMessage = '';
     onToggleEnabled(recipe.id, recipe.enabled === false, {
-      onBlocked: (message) => { flashMessage = message; }
+      onBlocked: (message) => {
+        flashMessage = message;
+      },
     });
   }
 
@@ -114,7 +116,7 @@
       sortDirection: ui.sortDirection,
       pageIndex: ui.pageIndex,
       pageSize: ui.pageSize,
-      groupByCategory: ui.groupByCategory && showRecipeCategories
+      groupByCategory: ui.groupByCategory && showRecipeCategories,
     })
   );
 
@@ -138,12 +140,16 @@
   const statusOptions = $derived([
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
     { value: 'on', labelKey: 'FABRICATE.Admin.Manager.StatusOn', fallback: 'On' },
-    { value: 'off', labelKey: 'FABRICATE.Admin.Manager.StatusOff', fallback: 'Off' }
+    { value: 'off', labelKey: 'FABRICATE.Admin.Manager.StatusOff', fallback: 'Off' },
   ]);
   const lockOptions = $derived([
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
-    { value: 'unlocked', labelKey: 'FABRICATE.Admin.Manager.Recipe.Unlocked', fallback: 'Unlocked' },
-    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.LockedLabel', fallback: 'Locked' }
+    {
+      value: 'unlocked',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.Unlocked',
+      fallback: 'Unlocked',
+    },
+    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.LockedLabel', fallback: 'Locked' },
   ]);
 
   const SORT_LABELS = {
@@ -151,14 +157,14 @@
     attention: ['FABRICATE.Admin.Manager.Recipe.SortAttention', 'Needs attention'],
     dc: ['FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC'],
     ingredients: ['FABRICATE.Admin.Manager.Recipe.SortIngredients', 'Ingredients'],
-    results: ['FABRICATE.Admin.Manager.Recipe.SortResults', 'Results']
+    results: ['FABRICATE.Admin.Manager.Recipe.SortResults', 'Results'],
   };
 
   const FILTER_CHIP_LABELS = {
     status: ['FABRICATE.Admin.Manager.Recipe.ChipStatus', 'Status: {value}'],
     lock: ['FABRICATE.Admin.Manager.Recipe.ChipLock', 'Lock: {value}'],
     category: ['FABRICATE.Admin.Manager.Recipe.ChipCategory', 'Category: {value}'],
-    search: ['FABRICATE.Admin.Manager.Recipe.ChipSearch', 'Search: {value}']
+    search: ['FABRICATE.Admin.Manager.Recipe.ChipSearch', 'Search: {value}'],
   };
 
   function sortLabel(key) {
@@ -168,7 +174,8 @@
 
   function chipLabel(chip) {
     const [labelKey, fallback] = FILTER_CHIP_LABELS[chip.id];
-    const value = chip.id === 'category' ? getRecipeCategoryLabel(chip.value, localize) : chip.value;
+    const value =
+      chip.id === 'category' ? getRecipeCategoryLabel(chip.value, localize) : chip.value;
     return format(labelKey, fallback, { value });
   }
 
@@ -210,7 +217,11 @@
     const count = (group?.recipes || []).length;
     const total = group?.total ?? count;
     if (total > count) {
-      return format('FABRICATE.Admin.Manager.Recipe.GroupCountOfTotal', '{count} of {total} recipes', { count, total });
+      return format(
+        'FABRICATE.Admin.Manager.Recipe.GroupCountOfTotal',
+        '{count} of {total} recipes',
+        { count, total }
+      );
     }
     return count === 1
       ? text('FABRICATE.Admin.Manager.Recipe.GroupCountOne', '1 recipe')
@@ -238,7 +249,7 @@
     disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
     locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
     blocked: ['FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable"],
-    incomplete: ['FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete']
+    incomplete: ['FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete'],
   };
 
   function statusPills(recipe) {
@@ -261,7 +272,9 @@
 
   function ioReadout(recipe) {
     const io = deriveRecipeIo(recipe, resolutionMode);
-    const inText = format('FABRICATE.Admin.Manager.Recipe.CountIn', '{count} in', { count: io.inCount });
+    const inText = format('FABRICATE.Admin.Manager.Recipe.CountIn', '{count} in', {
+      count: io.inCount,
+    });
     const outText =
       io.outKind === 'items'
         ? format('FABRICATE.Admin.Manager.Recipe.CountOut', '{count} out', { count: io.outCount })
@@ -284,20 +297,28 @@
   const CHECK_PILLS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
-    progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive', 'fas fa-list-ol'],
-    ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients', 'fas fa-code-branch'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation']
+    progressive: [
+      'FABRICATE.Admin.Manager.Recipe.CheckProgressive',
+      'Progressive',
+      'fas fa-list-ol',
+    ],
+    ingredients: [
+      'FABRICATE.Admin.Manager.Recipe.CheckByIngredients',
+      'By ingredients',
+      'fas fa-code-branch',
+    ],
+    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
   };
 
   const CHECK_TOOLTIPS = {
     ingredients: [
       'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
-      'This system routes results by the ingredient set used, with no crafting check.'
+      'This system routes results by the ingredient set used, with no crafting check.',
     ],
     none: [
       'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
-      'This system has no usable crafting check.'
-    ]
+      'This system has no usable crafting check.',
+    ],
   };
 
   // The check pill is projected by the store (`recipe.checkSummary`) — the row cannot
@@ -310,7 +331,7 @@
       kind: summary.kind,
       icon,
       label: format(labelKey, fallback, { dc: summary.dc ?? '' }),
-      title: tooltip ? text(tooltip[0], tooltip[1]) : ''
+      title: tooltip ? text(tooltip[0], tooltip[1]) : '',
     };
   }
 
@@ -326,7 +347,10 @@
   what the breadcrumb and the titlebar's gold system badge already said.
 -->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
-  <section class="manager-toolbar manager-recipe-toolbar" aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}>
+  <section
+    class="manager-toolbar manager-recipe-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
+  >
     <div class="manager-recipe-filter-row">
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
@@ -334,7 +358,10 @@
           type="search"
           value={recipeSearchTerm || ''}
           oninput={(event) => onSearchChange(event.currentTarget.value)}
-          placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Recipe.SearchPlaceholder',
+            'Search recipes...'
+          )}
           aria-label={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
         />
       </label>
@@ -342,19 +369,31 @@
         options={statusOptions}
         value={ui.statusFilter}
         groupName="manager-recipe-status-filter"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StatusFilterLabel', 'Filter recipes by status')}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.StatusFilterLabel',
+          'Filter recipes by status'
+        )}
         dataAttr="data-recipe-status-filter"
         optionDataAttr="data-recipe-status-option"
-        onChange={(value) => { ui.statusFilter = value; ui.pageIndex = 0; }}
+        onChange={(value) => {
+          ui.statusFilter = value;
+          ui.pageIndex = 0;
+        }}
       />
       <SegmentedControl
         options={lockOptions}
         value={ui.lockFilter}
         groupName="manager-recipe-lock-filter"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.LockFilterLabel', 'Filter recipes by lock state')}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.LockFilterLabel',
+          'Filter recipes by lock state'
+        )}
         dataAttr="data-recipe-lock-filter"
         optionDataAttr="data-recipe-lock-option"
-        onChange={(value) => { ui.lockFilter = value; ui.pageIndex = 0; }}
+        onChange={(value) => {
+          ui.lockFilter = value;
+          ui.pageIndex = 0;
+        }}
       />
     </div>
 
@@ -374,33 +413,52 @@
           class="manager-recipe-category-filter"
           data-recipe-category-filter
           value={ui.categoryFilter}
-          onchange={(event) => { ui.categoryFilter = event.currentTarget.value; ui.pageIndex = 0; }}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel', 'Filter recipes by category')}
+          onchange={(event) => {
+            ui.categoryFilter = event.currentTarget.value;
+            ui.pageIndex = 0;
+          }}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
+            'Filter recipes by category'
+          )}
         >
-          <option value="all">{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option>
+          <option value="all"
+            >{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option
+          >
           {#each recipeCategories || [] as category (category.name)}
             <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
           {/each}
         </select>
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
         <div class="manager-recipe-filter-field">
-          <span class="manager-recipe-filter-label" id="manager-recipe-group-label">{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span>
+          <span class="manager-recipe-filter-label" id="manager-recipe-group-label"
+            >{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span
+          >
           <button
             type="button"
             class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
             data-recipe-group-toggle
             aria-pressed={ui.groupByCategory}
             aria-labelledby="manager-recipe-group-label"
-            onclick={() => ui.groupByCategory = !ui.groupByCategory}
+            onclick={() => (ui.groupByCategory = !ui.groupByCategory)}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+            <span class="manager-status-toggle-track" aria-hidden="true"
+              ><span class="manager-status-toggle-knob"></span></span
+            >
           </button>
         </div>
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
       {/if}
       <div class="manager-recipe-filter-field">
-        <span class="manager-recipe-filter-label">{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span>
-        <select value={ui.sortKey} data-recipe-sort onchange={(event) => ui.sortKey = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}>
+        <span class="manager-recipe-filter-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span
+        >
+        <select
+          value={ui.sortKey}
+          data-recipe-sort
+          onchange={(event) => (ui.sortKey = event.currentTarget.value)}
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}
+        >
           {#each RECIPE_SORT_KEYS as key (key)}
             <option value={key}>{sortLabel(key)}</option>
           {/each}
@@ -409,13 +467,23 @@
           type="button"
           class="manager-button manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.ToggleSortDirection', 'Toggle sort direction')}
-          onclick={() => ui.sortDirection = ui.sortDirection === 'asc' ? 'desc' : 'asc'}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Recipe.ToggleSortDirection',
+            'Toggle sort direction'
+          )}
+          onclick={() => (ui.sortDirection = ui.sortDirection === 'asc' ? 'desc' : 'asc')}
         >
-          <i class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
-          <span>{ui.sortDirection === 'asc'
-            ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
-            : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span>
+          <i
+            class={ui.sortDirection === 'asc'
+              ? 'fas fa-arrow-down-short-wide'
+              : 'fas fa-arrow-down-wide-short'}
+            aria-hidden="true"
+          ></i>
+          <span
+            >{ui.sortDirection === 'asc'
+              ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
+              : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span
+          >
         </button>
       </div>
     </div>
@@ -427,7 +495,11 @@
           <button
             type="button"
             class="manager-recipe-chip-clear"
-            aria-label={format('FABRICATE.Admin.Manager.Recipe.ClearChip', 'Clear {filter} filter', { filter: chip.id })}
+            aria-label={format(
+              'FABRICATE.Admin.Manager.Recipe.ClearChip',
+              'Clear {filter} filter',
+              { filter: chip.id }
+            )}
             onclick={() => clearChip(chip.id)}
           >
             <i class="fas fa-times" aria-hidden="true"></i>
@@ -443,7 +515,7 @@
         {format('FABRICATE.Admin.Manager.Recipe.CountRange', '{start}–{end} of {total}', {
           start: model.rangeStart,
           end: model.rangeEnd,
-          total: model.totalCount
+          total: model.totalCount,
         })}
       </span>
     </div>
@@ -466,19 +538,25 @@
         class="manager-icon-button manager-recipe-flash-dismiss"
         data-recipe-flash-dismiss
         aria-label={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
-        onclick={() => flashMessage = ''}
+        onclick={() => (flashMessage = '')}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
       </button>
     </div>
   {/if}
 
-  <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Recipe.Table', 'Recipes table')}>
+  <section
+    class="manager-table-scroll"
+    aria-label={text('FABRICATE.Admin.Manager.Recipe.Table', 'Recipes table')}
+  >
     {#if (recipes || []).length === 0}
       <EmptyState
         icon="fas fa-scroll"
         title={text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}
-        hint={text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Recipe.EmptyHint',
+          'Create recipes for the selected crafting system.'
+        )}
       />
     {:else if model.filtered.length === 0}
       <!-- A filtered-to-nothing library is not an error state and does not want the
@@ -486,9 +564,18 @@
            button is the way out. -->
       <EmptyState
         filtered
-        hint={text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match your filters.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Recipe.EmptySearchTitle',
+          'No recipes match your filters.'
+        )}
       >
-        <button type="button" class="manager-button" data-clear-filters="recipes" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+        <button
+          type="button"
+          class="manager-button"
+          data-clear-filters="recipes"
+          onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        >
       </EmptyState>
     {:else}
       <div class="manager-recipes-table">
@@ -503,13 +590,21 @@
           stack of cards means nothing (see `.manager-recipe-table-head` in fabricate.css).
         -->
         <div class="manager-recipe-table-head" aria-hidden="true">
-          <span class="manager-recipe-head-identity">{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span>
+          <span class="manager-recipe-head-identity"
+            >{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span
+          >
           <div class="manager-recipe-head-cluster">
-            <span class="manager-recipe-head-cell is-io">{text('FABRICATE.Admin.Manager.Recipe.Column.Requirements', 'Requirements')}</span>
-            <span class="manager-recipe-head-cell is-check">{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span>
+            <span class="manager-recipe-head-cell is-io"
+              >{text('FABRICATE.Admin.Manager.Recipe.Column.Requirements', 'Requirements')}</span
+            >
+            <span class="manager-recipe-head-cell is-check"
+              >{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span
+            >
             <!-- STATUS spans both the lock and the enable-toggle columns: lock and
                  enable are both status controls, so the header sits over the pair. -->
-            <span class="manager-recipe-head-cell is-status">{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span>
+            <span class="manager-recipe-head-cell is-status"
+              >{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span
+            >
             <span class="manager-recipe-head-cell is-edit"></span>
           </div>
         </div>
@@ -537,7 +632,11 @@
                     data-recipe-incomplete={recipe.incomplete === true}
                     aria-current={isSelectedRecipe(recipe) ? 'true' : undefined}
                   >
-                    <button type="button" class="manager-recipe-identity" onclick={() => onSelectRecipe(recipe.id)}>
+                    <button
+                      type="button"
+                      class="manager-recipe-identity"
+                      onclick={() => onSelectRecipe(recipe.id)}
+                    >
                       <Medallion src={resolveRecipeImage(recipe)} icon="fas fa-scroll" size={40} />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
@@ -546,22 +645,35 @@
                             <StatusPill tone={pill.tone} icon={pill.icon} label={pill.label} />
                           {/each}
                         </span>
-                        <span class="manager-system-description manager-recipe-description" title={recipe.description}>
-                          {recipe.description || text('FABRICATE.Admin.Manager.NoDescription', 'No description')}
+                        <span
+                          class="manager-system-description manager-recipe-description"
+                          title={recipe.description}
+                        >
+                          {recipe.description ||
+                            text('FABRICATE.Admin.Manager.NoDescription', 'No description')}
                         </span>
                       </span>
                     </button>
 
                     <div class="manager-recipe-cluster">
-                      <span class={`manager-recipe-io ${io.empty ? 'is-empty' : ''}`} data-recipe-io>
+                      <span
+                        class={`manager-recipe-io ${io.empty ? 'is-empty' : ''}`}
+                        data-recipe-io
+                      >
                         <span class="manager-recipe-io-counts">
                           <span>{io.inText}</span>
                           <span aria-hidden="true">·</span>
-                          {#if io.routed}<i class="fas fa-code-branch manager-recipe-io-routed" aria-hidden="true"></i>{/if}
+                          {#if io.routed}<i
+                              class="fas fa-code-branch manager-recipe-io-routed"
+                              aria-hidden="true"
+                            ></i>{/if}
                           <span>{io.outText}</span>
                         </span>
                         <span class="manager-recipe-io-steps">
-                          <i class={(recipe.stepCount ?? 0) > 1 ? 'fas fa-list-ol' : 'fas fa-minus'} aria-hidden="true"></i>
+                          <i
+                            class={(recipe.stepCount ?? 0) > 1 ? 'fas fa-list-ol' : 'fas fa-minus'}
+                            aria-hidden="true"
+                          ></i>
                           <span>{stepText(recipe)}</span>
                         </span>
                       </span>
@@ -570,7 +682,13 @@
                            takes the mono face (`is-mono`, tabular figures) when it
                            carries a number. The word-only kinds (Dynamic DC,
                            Progressive, the em dash) stay in the UI face. -->
-                      <Chip class={`manager-recipe-check is-${check.kind}`} mono={check.kind === 'dc'} icon={check.icon} data-recipe-check={check.kind} title={check.title || undefined}>
+                      <Chip
+                        class={`manager-recipe-check is-${check.kind}`}
+                        mono={check.kind === 'dc'}
+                        icon={check.icon}
+                        data-recipe-check={check.kind}
+                        title={check.title || undefined}
+                      >
                         <span>{check.label}</span>
                       </Chip>
 
@@ -586,10 +704,16 @@
                           recipe.locked ? 'Unlock {name}' : 'Lock {name}',
                           { name: recipe.name }
                         )}
-                        title={text('FABRICATE.Admin.Manager.Recipe.LockHint', 'Locked recipes stay visible to players, but only a GM can craft them.')}
+                        title={text(
+                          'FABRICATE.Admin.Manager.Recipe.LockHint',
+                          'Locked recipes stay visible to players, but only a GM can craft them.'
+                        )}
                         onclick={() => onToggleLocked(recipe.id, recipe.locked !== true)}
                       >
-                        <i class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'} aria-hidden="true"></i>
+                        <i
+                          class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'}
+                          aria-hidden="true"
+                        ></i>
                       </button>
 
                       <!--
@@ -630,7 +754,11 @@
                         type="button"
                         class="manager-icon-button manager-recipe-edit"
                         data-recipe-edit={recipe.id}
-                        aria-label={format('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}', { name: recipe.name })}
+                        aria-label={format(
+                          'FABRICATE.Admin.Manager.Recipe.EditNamed',
+                          'Edit {name}',
+                          { name: recipe.name }
+                        )}
                         title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}
                         onclick={() => onEditRecipe(recipe.id)}
                       >
@@ -652,7 +780,10 @@
     pageSize={ui.pageSize}
     pageIndex={model.pageIndex}
     pageSizeOptions={[10, 25, 50]}
-    onPageChange={(next) => ui.pageIndex = next}
-    onPageSizeChange={(next) => { ui.pageSize = next; ui.pageIndex = 0; }}
+    onPageChange={(next) => (ui.pageIndex = next)}
+    onPageSizeChange={(next) => {
+      ui.pageSize = next;
+      ui.pageIndex = 0;
+    }}
   />
 </main>

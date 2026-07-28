@@ -37,7 +37,7 @@
     kind = 'simple',
     outcomeOptions = [],
     showBreakTools = false,
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -82,25 +82,61 @@
 
   const OPERATORS = ['==', '<=', '>=', '<', '>'];
   const AGGREGATES = [
-    { value: 'total', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateTotal', fallback: 'Group total' },
-    { value: 'anyDie', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateAnyDie', fallback: 'Any die' },
-    { value: 'allDice', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateAllDice', fallback: 'All dice' },
-    { value: 'lowestDie', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateLowestDie', fallback: 'Lowest die' },
-    { value: 'highestDie', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateHighestDie', fallback: 'Highest die' }
+    {
+      value: 'total',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateTotal',
+      fallback: 'Group total',
+    },
+    {
+      value: 'anyDie',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateAnyDie',
+      fallback: 'Any die',
+    },
+    {
+      value: 'allDice',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateAllDice',
+      fallback: 'All dice',
+    },
+    {
+      value: 'lowestDie',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateLowestDie',
+      fallback: 'Lowest die',
+    },
+    {
+      value: 'highestDie',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.AggregateHighestDie',
+      fallback: 'Highest die',
+    },
   ];
 
   // Condition types offered for this editor kind. progressiveValue is meaningful
   // only on progressive checks; outcomeTier only on routed checks.
   const conditionTypes = $derived(
     [
-      { value: 'rollTotal', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeRollTotal', fallback: 'Roll total' },
+      {
+        value: 'rollTotal',
+        labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeRollTotal',
+        fallback: 'Roll total',
+      },
       kind === 'progressive'
-        ? { value: 'progressiveValue', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeProgressiveValue', fallback: 'Awarded value' }
+        ? {
+            value: 'progressiveValue',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeProgressiveValue',
+            fallback: 'Awarded value',
+          }
         : null,
-      { value: 'diceGroup', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeDiceGroup', fallback: 'Dice group' },
+      {
+        value: 'diceGroup',
+        labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeDiceGroup',
+        fallback: 'Dice group',
+      },
       kind === 'routed'
-        ? { value: 'outcomeTier', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeOutcomeTier', fallback: 'Outcome tier' }
-        : null
+        ? {
+            value: 'outcomeTier',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TypeOutcomeTier',
+            fallback: 'Outcome tier',
+          }
+        : null,
     ].filter(Boolean)
   );
 
@@ -111,19 +147,53 @@
   const outcomeChoices = $derived(
     kind === 'progressive'
       ? [
-          { value: 'success', variant: 'is-success', labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardAll', fallback: 'Award all' },
-          { value: 'none', variant: 'is-neutral', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone', fallback: 'No effect' },
-          { value: 'failure', variant: 'is-danger', labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardNone', fallback: 'Award none' }
+          {
+            value: 'success',
+            variant: 'is-success',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardAll',
+            fallback: 'Award all',
+          },
+          {
+            value: 'none',
+            variant: 'is-neutral',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
+            fallback: 'No effect',
+          },
+          {
+            value: 'failure',
+            variant: 'is-danger',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardNone',
+            fallback: 'Award none',
+          },
         ]
       : [
-          { value: 'success', variant: 'is-success', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceSuccess', fallback: 'Automatic success' },
-          { value: 'none', variant: 'is-neutral', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone', fallback: 'No effect' },
-          { value: 'failure', variant: 'is-danger', labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceFailure', fallback: 'Automatic failure' }
+          {
+            value: 'success',
+            variant: 'is-success',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceSuccess',
+            fallback: 'Automatic success',
+          },
+          {
+            value: 'none',
+            variant: 'is-neutral',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
+            fallback: 'No effect',
+          },
+          {
+            value: 'failure',
+            variant: 'is-danger',
+            labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceFailure',
+            fallback: 'Automatic failure',
+          },
         ]
   );
 
-  const breakOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break'));
-  const breakOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break"));
+  const breakOnLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break')
+  );
+  const breakOffLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break")
+  );
 
   function emit(nextTriggers) {
     onChange({ triggers: Array.isArray(nextTriggers) ? nextTriggers : [] });
@@ -138,7 +208,7 @@
       groupId: firstD20GroupId ?? diceGroups[0]?.groupId ?? 0,
       aggregate: 'anyDie',
       operator: '==',
-      value: 1
+      value: 1,
     };
   }
 
@@ -151,8 +221,8 @@
         condition: defaultConditionFor(type),
         outcome: 'none',
         // Default a new trigger to breaking tools only where that effect is reachable.
-        breakTools: showBreakTools === true
-      }
+        breakTools: showBreakTools === true,
+      },
     ]);
   }
 
@@ -208,7 +278,9 @@
 
 <section class="manager-inspector-card" data-check-triggers>
   <div class="manager-checks-card-head">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Breakage.Title', 'Check triggers')}</h3>
+    <h3 class="manager-card-title">
+      {text('FABRICATE.Admin.Manager.Checks.Breakage.Title', 'Check triggers')}
+    </h3>
     <button type="button" class="manager-button" data-add-trigger onclick={addTrigger}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.AddTrigger', 'Add trigger')}</span>
@@ -229,7 +301,10 @@
 
   {#if triggers.length === 0}
     <p class="manager-muted" data-triggers-empty>
-      {text('FABRICATE.Admin.Manager.Checks.Breakage.Empty', 'No triggers yet. Add one to force an outcome or break tools on this check.')}
+      {text(
+        'FABRICATE.Admin.Manager.Checks.Breakage.Empty',
+        'No triggers yet. Add one to force an outcome or break tools on this check.'
+      )}
     </p>
   {:else}
     {#each triggers as trigger (trigger.id)}
@@ -239,94 +314,111 @@
       <div class="manager-checks-breakage-trigger" data-trigger={trigger.id}>
         <div class="manager-checks-trigger-top">
           <div class="manager-checks-breakage-condition">
-          <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.ConditionType', 'When')}</span>
-            <select
-              data-trigger-condition-type
-              value={condition.type || 'rollTotal'}
-              onchange={(event) => setConditionType(trigger.id, event.currentTarget.value)}
-            >
-              {#each conditionTypes as option (option.value)}
-                <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
-              {/each}
-            </select>
-          </label>
-
-          {#if condition.type === 'diceGroup'}
             <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Group', 'Group')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.ConditionType', 'When')}</span>
               <select
-                data-trigger-group
-                value={String(condition.groupId ?? '')}
-                onchange={(event) => updateCondition(trigger.id, { groupId: Number(event.currentTarget.value) })}
+                data-trigger-condition-type
+                value={condition.type || 'rollTotal'}
+                onchange={(event) => setConditionType(trigger.id, event.currentTarget.value)}
               >
-                {#each diceGroups as group (group.groupId)}
-                  <option value={String(group.groupId)}>{group.label}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Aggregate', 'Measure')}</span>
-              <select
-                data-trigger-aggregate
-                value={condition.aggregate || 'anyDie'}
-                onchange={(event) => updateCondition(trigger.id, { aggregate: event.currentTarget.value })}
-              >
-                {#each AGGREGATES as option (option.value)}
+                {#each conditionTypes as option (option.value)}
                   <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
                 {/each}
               </select>
             </label>
-          {/if}
 
-          {#if isOutcomeTier}
-            <div class="manager-checks-breakage-tiers" role="group" aria-label={text('FABRICATE.Admin.Manager.Checks.Breakage.Tiers', 'Outcome tiers')}>
-              {#if outcomeOptions.length === 0}
-                <p class="manager-muted" data-trigger-no-tiers>{text('FABRICATE.Admin.Manager.Checks.Breakage.NoTiers', 'Add named outcome tiers to target them.')}</p>
-              {:else}
-                {#each outcomeOptions as option (option.id)}
-                  <button
-                    type="button"
-                    class={`manager-checks-state-pill ${isOutcomeSelected(condition, option.id) ? 'is-positive' : 'is-negative'}`}
-                    data-trigger-tier={option.id}
-                    aria-pressed={isOutcomeSelected(condition, option.id)}
-                    onclick={() => toggleOutcomeTier(trigger.id, option.id)}
-                  >
-                    {option.name || text('FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier', 'Unnamed tier')}
-                  </button>
-                {/each}
-              {/if}
-            </div>
-          {:else}
-            <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Operator', 'Is')}</span>
-              <select
-                data-trigger-operator
-                value={condition.operator || '=='}
-                onchange={(event) => updateCondition(trigger.id, { operator: event.currentTarget.value })}
+            {#if condition.type === 'diceGroup'}
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Group', 'Group')}</span>
+                <select
+                  data-trigger-group
+                  value={String(condition.groupId ?? '')}
+                  onchange={(event) =>
+                    updateCondition(trigger.id, { groupId: Number(event.currentTarget.value) })}
+                >
+                  {#each diceGroups as group (group.groupId)}
+                    <option value={String(group.groupId)}>{group.label}</option>
+                  {/each}
+                </select>
+              </label>
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Aggregate', 'Measure')}</span>
+                <select
+                  data-trigger-aggregate
+                  value={condition.aggregate || 'anyDie'}
+                  onchange={(event) =>
+                    updateCondition(trigger.id, { aggregate: event.currentTarget.value })}
+                >
+                  {#each AGGREGATES as option (option.value)}
+                    <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
+
+            {#if isOutcomeTier}
+              <div
+                class="manager-checks-breakage-tiers"
+                role="group"
+                aria-label={text('FABRICATE.Admin.Manager.Checks.Breakage.Tiers', 'Outcome tiers')}
               >
-                {#each OPERATORS as operator (operator)}
-                  <option value={operator}>{operator}</option>
-                {/each}
-              </select>
-            </label>
-            <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Value', 'Value')}</span>
-              <input
-                type="number"
-                data-trigger-value
-                value={condition.value ?? 0}
-                oninput={(event) => updateCondition(trigger.id, { value: numeric(event.currentTarget.value) })}
-              />
-            </label>
-          {/if}
+                {#if outcomeOptions.length === 0}
+                  <p class="manager-muted" data-trigger-no-tiers>
+                    {text(
+                      'FABRICATE.Admin.Manager.Checks.Breakage.NoTiers',
+                      'Add named outcome tiers to target them.'
+                    )}
+                  </p>
+                {:else}
+                  {#each outcomeOptions as option (option.id)}
+                    <button
+                      type="button"
+                      class={`manager-checks-state-pill ${isOutcomeSelected(condition, option.id) ? 'is-positive' : 'is-negative'}`}
+                      data-trigger-tier={option.id}
+                      aria-pressed={isOutcomeSelected(condition, option.id)}
+                      onclick={() => toggleOutcomeTier(trigger.id, option.id)}
+                    >
+                      {option.name ||
+                        text('FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier', 'Unnamed tier')}
+                    </button>
+                  {/each}
+                {/if}
+              </div>
+            {:else}
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Operator', 'Is')}</span>
+                <select
+                  data-trigger-operator
+                  value={condition.operator || '=='}
+                  onchange={(event) =>
+                    updateCondition(trigger.id, { operator: event.currentTarget.value })}
+                >
+                  {#each OPERATORS as operator (operator)}
+                    <option value={operator}>{operator}</option>
+                  {/each}
+                </select>
+              </label>
+              <label class="manager-field">
+                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Value', 'Value')}</span>
+                <input
+                  type="number"
+                  data-trigger-value
+                  value={condition.value ?? 0}
+                  oninput={(event) =>
+                    updateCondition(trigger.id, { value: numeric(event.currentTarget.value) })}
+                />
+              </label>
+            {/if}
           </div>
 
           <button
             type="button"
             class="manager-icon-button is-danger manager-checks-trigger-remove"
             data-remove-trigger
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Breakage.RemoveTrigger', 'Remove trigger')}
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Checks.Breakage.RemoveTrigger',
+              'Remove trigger'
+            )}
             onclick={() => removeTrigger(trigger.id)}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
@@ -352,21 +444,28 @@
                   aria-pressed={selectedOutcome === option.value}
                   disabled={isOutcomeTier && option.value !== 'none'}
                   onclick={() => updateTrigger(trigger.id, { outcome: option.value })}
-                >{text(option.labelKey, option.fallback)}</button>
+                  >{text(option.labelKey, option.fallback)}</button
+                >
               {/each}
             </div>
           </div>
 
           {#if showBreakTools}
             <div class="manager-field manager-checks-trigger-break">
-              <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
+              <span
+                >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span
+              >
               <button
                 type="button"
                 class={`manager-checks-state-pill ${trigger.breakTools === true ? 'is-negative' : 'is-positive'}`}
                 data-trigger-break
                 aria-pressed={trigger.breakTools === true}
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
-                onclick={() => updateTrigger(trigger.id, { breakTools: !(trigger.breakTools === true) })}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
+                  'Break tools'
+                )}
+                onclick={() =>
+                  updateTrigger(trigger.id, { breakTools: !(trigger.breakTools === true) })}
               >
                 {trigger.breakTools === true ? breakOnLabel : breakOffLabel}
               </button>

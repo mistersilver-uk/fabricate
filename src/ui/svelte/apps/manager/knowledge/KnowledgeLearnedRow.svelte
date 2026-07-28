@@ -76,22 +76,13 @@
   // no learn limit at all. Keys are static literals so the lang gates see every leaf.
   function refundClause(row) {
     if (row.noRefundReason === NO_REFUND_NOT_OWNED) {
-      return text(
-        'FABRICATE.Admin.Manager.Knowledge.NoRefundNotOwned',
-        'no owned copy to refund'
-      );
+      return text('FABRICATE.Admin.Manager.Knowledge.NoRefundNotOwned', 'no owned copy to refund');
     }
     if (row.noRefundReason === NO_REFUND_UNCAPPED) {
-      return text(
-        'FABRICATE.Admin.Manager.Knowledge.NoRefundUncapped',
-        'no learn limit to refund'
-      );
+      return text('FABRICATE.Admin.Manager.Knowledge.NoRefundUncapped', 'no learn limit to refund');
     }
     if (row.noRefundReason === NO_REFUND_NO_SOURCE) {
-      return text(
-        'FABRICATE.Admin.Manager.Knowledge.NoRefundNoSource',
-        'no source copy to refund'
-      );
+      return text('FABRICATE.Admin.Manager.Knowledge.NoRefundNoSource', 'no source copy to refund');
     }
     return '';
   }
@@ -127,7 +118,10 @@
     <span
       class="manager-knowledge-row-actions"
       role="group"
-      aria-label={text('FABRICATE.Admin.Manager.Knowledge.LearnedRowActions', 'Learned recipe actions')}
+      aria-label={text(
+        'FABRICATE.Admin.Manager.Knowledge.LearnedRowActions',
+        'Learned recipe actions'
+      )}
     >
       <ArmedDangerButton
         token={eraseToken}

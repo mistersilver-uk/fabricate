@@ -16,7 +16,7 @@
     subscribeWorldTime,
     subscribeInventoryChange,
     subscribeCraftingDataChange,
-    subscribeActorRunFlagChange
+    subscribeActorRunFlagChange,
   } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
@@ -33,7 +33,7 @@
     activeCanvasTool = null,
     scopedEnvironmentId = null,
     scopedTaskId = null,
-    scopedActorId = null
+    scopedActorId = null,
   } = $props();
 
   // The scoped interacting actor most recently applied to the selection, so an
@@ -63,16 +63,16 @@
     { id: 'alchemy', icon: 'fa-flask', label: 'FABRICATE.App.Nav.Alchemy', requires: 'alchemy' },
     { id: 'gathering', icon: 'fa-leaf', label: 'FABRICATE.App.Nav.Gathering' },
     { id: 'journal', icon: 'fa-book-open', label: 'FABRICATE.App.Nav.Journal' },
-    { id: 'inventory', icon: 'fa-boxes-stacked', label: 'FABRICATE.App.Nav.Inventory' }
+    { id: 'inventory', icon: 'fa-boxes-stacked', label: 'FABRICATE.App.Nav.Inventory' },
   ];
 
   // The Journal nav entry carries a live active-run count badge fed by the shared
   // journal store's reactive `navCount` rune getter.
   const journalNavCount = $derived(Number(services?.journal?.navCount ?? 0));
   const tabs = $derived(
-    ALL_TABS
-      .filter(tab => tab.requires !== 'alchemy' || showAlchemy)
-      .map(tab => (tab.id === 'journal' ? { ...tab, count: journalNavCount } : tab))
+    ALL_TABS.filter((tab) => tab.requires !== 'alchemy' || showAlchemy).map((tab) =>
+      tab.id === 'journal' ? { ...tab, count: journalNavCount } : tab
+    )
   );
 
   // Shell-level Journal refresh: keep the store (and thus the nav badge) fresh
@@ -96,7 +96,7 @@
       isRelevantActor: (actorId) => {
         const selected = services?.getSelectedActorId?.() || null;
         return Boolean(selected) && String(selected) === String(actorId);
-      }
+      },
     })
   );
 

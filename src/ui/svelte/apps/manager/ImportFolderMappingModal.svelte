@@ -330,7 +330,10 @@
                 selectedIds={row.state.tags}
                 label={text('FABRICATE.Admin.Items.ImportMapping.Tags', 'Tags')}
                 addLabel={text('FABRICATE.Admin.Items.ImportMapping.AddTag', 'Add tag')}
-                placeholder={text('FABRICATE.Admin.Items.ImportMapping.SearchTags', 'Search tags...')}
+                placeholder={text(
+                  'FABRICATE.Admin.Items.ImportMapping.SearchTags',
+                  'Search tags...'
+                )}
                 emptyHint={text(
                   'FABRICATE.Admin.Items.ImportMapping.NoTags',
                   'No tags yet — create them in Tags & Categories.'
@@ -359,7 +362,10 @@
                   describeInput={categoryHint()}
                   normalize={(value) => String(value || '').trim()}
                   successFeedback={() =>
-                    text('FABRICATE.Admin.Manager.TagsCategories.CategoryAddedFeedback', 'Category added.')}
+                    text(
+                      'FABRICATE.Admin.Manager.TagsCategories.CategoryAddedFeedback',
+                      'Category added.'
+                    )}
                   addFailedFeedback={text(
                     'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryAddFailedFeedback',
                     'Component category could not be added.'
@@ -375,7 +381,12 @@
   {/snippet}
 
   {#snippet footer()}
-    <button type="button" class="manager-button" data-import-mapping-cancel onclick={() => onClose()}>
+    <button
+      type="button"
+      class="manager-button"
+      data-import-mapping-cancel
+      onclick={() => onClose()}
+    >
       {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
     </button>
     <button

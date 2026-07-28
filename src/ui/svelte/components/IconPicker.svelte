@@ -8,7 +8,7 @@
     getEssenceIconOptions,
     filterEssenceIconOptions,
     getEssenceIconOption,
-    normalizeEssenceIcon
+    normalizeEssenceIcon,
   } from '../util/essenceIcons.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
 
@@ -21,7 +21,7 @@
     triggerStyle = '',
     onTriggerContextMenu = null,
     onTriggerKeydown = null,
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   let pickerOpen = $state(false);
@@ -84,7 +84,7 @@
 
     return {
       minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16
+      maxRight: mainPanelRect.right - hostRect.left - 16,
     };
   }
 
@@ -96,7 +96,7 @@
       left: 0,
       top: 0,
       width: window.innerWidth,
-      height: window.innerHeight
+      height: window.innerHeight,
     };
     const triggerRect = triggerButton.getBoundingClientRect();
     const horizontalBounds = getPopoverHorizontalBounds(hostRect);
@@ -108,13 +108,13 @@
         top: triggerRect.top - hostRect.top,
         bottom: triggerRect.bottom - hostRect.top,
         width: triggerRect.width,
-        height: triggerRect.height
+        height: triggerRect.height,
       },
       { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
       {
         horizontalAlign: iconOnly ? 'left' : 'right',
         minLeft: horizontalBounds.minLeft,
-        maxRight: horizontalBounds.maxRight
+        maxRight: horizontalBounds.maxRight,
       }
     );
 
@@ -123,16 +123,17 @@
       return;
     }
 
-    const verticalPosition = layout.placement === 'top'
-      ? `top: auto; bottom: ${layout.bottom}px;`
-      : `top: ${layout.top}px; bottom: auto;`;
+    const verticalPosition =
+      layout.placement === 'top'
+        ? `top: auto; bottom: ${layout.bottom}px;`
+        : `top: ${layout.top}px; bottom: auto;`;
 
     popoverStyle = [
       `left: ${layout.left}px;`,
       'right: auto;',
       `width: ${layout.width}px;`,
       `max-height: ${layout.maxHeight}px;`,
-      verticalPosition
+      verticalPosition,
     ].join(' ');
   }
 
@@ -166,7 +167,7 @@
   use:dismissOnOutsideClick={{
     enabled: pickerOpen,
     onDismiss: closePicker,
-    additionalNodes: () => [popoverRoot]
+    additionalNodes: () => [popoverRoot],
   }}
 >
   <button
@@ -178,7 +179,7 @@
     onclick={togglePicker}
     oncontextmenu={handleTriggerContextMenu}
     onkeydown={handleTriggerKeydown}
-    disabled={disabled}
+    {disabled}
     aria-expanded={pickerOpen}
     aria-haspopup="dialog"
     aria-label={buttonTitle || localize('FABRICATE.Admin.Features.Essences.ChooseIcon')}

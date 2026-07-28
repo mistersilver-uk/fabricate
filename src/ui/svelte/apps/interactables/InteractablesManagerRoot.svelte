@@ -24,7 +24,7 @@
   import {
     buildSystemLabelMap,
     systemDisplayLabel,
-    pickDefaultSystemId
+    pickDefaultSystemId,
   } from '../../util/systemDisambiguation.js';
 
   let { services = null } = $props();
@@ -98,7 +98,7 @@
   const systems = $derived(
     (services?.listSystems?.() ?? []).map((system) => ({
       id: String(system?.id ?? ''),
-      name: String(system?.name ?? system?.id ?? '')
+      name: String(system?.name ?? system?.id ?? ''),
     }))
   );
 
@@ -114,9 +114,10 @@
   // duplicate (the "No sources in this system." footgun — issue 346).
   function systemHasSources(systemId) {
     if (!systemId) return false;
-    const list = sourceType === 'tool'
-      ? services?.listToolsForSystem?.(systemId) ?? []
-      : services?.listTasksForSystem?.(systemId) ?? [];
+    const list =
+      sourceType === 'tool'
+        ? (services?.listToolsForSystem?.(systemId) ?? [])
+        : (services?.listTasksForSystem?.(systemId) ?? []);
     return list.length > 0;
   }
 
@@ -140,8 +141,8 @@
 
   const sources = $derived(
     sourceType === 'tool'
-      ? services?.listToolsForSystem?.(selectedSystemId) ?? []
-      : services?.listTasksForSystem?.(selectedSystemId) ?? []
+      ? (services?.listToolsForSystem?.(selectedSystemId) ?? [])
+      : (services?.listTasksForSystem?.(selectedSystemId) ?? [])
   );
 
   // Reset the picked source when the system or the type changes so we never carry
@@ -166,11 +167,11 @@
       source: {
         interactableType: sourceType,
         systemId: selectedSystemId,
-        referenceId: selectedReferenceId
+        referenceId: selectedReferenceId,
       },
       name: promoteName,
       visualMode,
-      markerKind
+      markerKind,
     });
     if (ok) {
       // Reset + collapse the promote panel and refresh the list.
@@ -206,7 +207,10 @@
   </div>
 
   {#if showPromote}
-    <section class="fab-im-promote" aria-label={text('FABRICATE.Canvas.Manage.PromoteToggle', 'Promote region to interactable')}>
+    <section
+      class="fab-im-promote"
+      aria-label={text('FABRICATE.Canvas.Manage.PromoteToggle', 'Promote region to interactable')}
+    >
       <p class="fab-im-promote-hint">
         {text(
           'FABRICATE.Canvas.Manage.PromoteHint',
@@ -215,13 +219,22 @@
       </p>
 
       <label class="fab-im-field">
-        <span class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteRegion', 'Region')}</span>
+        <span class="fab-im-field-label"
+          >{text('FABRICATE.Canvas.Manage.PromoteRegion', 'Region')}</span
+        >
         <select bind:value={selectedRegionId}>
-          <option value="">{text('FABRICATE.Canvas.Manage.PromoteRegionPlaceholder', 'Choose a region…')}</option>
+          <option value=""
+            >{text('FABRICATE.Canvas.Manage.PromoteRegionPlaceholder', 'Choose a region…')}</option
+          >
           {#each regions as region (region.id)}
             <option value={region.id}>
               {region.name || region.id}{region.hasInteractable
-                ? ' (' + text('FABRICATE.Canvas.Manage.RegionAlreadyInteractable', 'already an interactable') + ')'
+                ? ' (' +
+                  text(
+                    'FABRICATE.Canvas.Manage.RegionAlreadyInteractable',
+                    'already an interactable'
+                  ) +
+                  ')'
                 : ''}
             </option>
           {/each}
@@ -229,7 +242,9 @@
       </label>
 
       <label class="fab-im-field">
-        <span class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteSystem', 'Crafting system')}</span>
+        <span class="fab-im-field-label"
+          >{text('FABRICATE.Canvas.Manage.PromoteSystem', 'Crafting system')}</span
+        >
         <select bind:value={selectedSystemId}>
           {#each systems as system (system.id)}
             <option value={system.id}>{systemDisplayLabel(system, systemLabels)}</option>
@@ -238,22 +253,36 @@
       </label>
 
       <fieldset class="fab-im-fieldset">
-        <legend class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteSourceType', 'Source type')}</legend>
+        <legend class="fab-im-field-label"
+          >{text('FABRICATE.Canvas.Manage.PromoteSourceType', 'Source type')}</legend
+        >
         <label class="fab-im-radio">
           <input type="radio" name="fab-im-source-type" value="tool" bind:group={sourceType} />
           <span>{text('FABRICATE.Canvas.Manage.TypeTool', 'Tool')}</span>
         </label>
         <label class="fab-im-radio">
-          <input type="radio" name="fab-im-source-type" value="gatheringTask" bind:group={sourceType} />
+          <input
+            type="radio"
+            name="fab-im-source-type"
+            value="gatheringTask"
+            bind:group={sourceType}
+          />
           <span>{text('FABRICATE.Canvas.Manage.TypeGatheringTask', 'Gathering task')}</span>
         </label>
       </fieldset>
 
       <label class="fab-im-field">
-        <span class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteSource', 'Source')}</span>
+        <span class="fab-im-field-label"
+          >{text('FABRICATE.Canvas.Manage.PromoteSource', 'Source')}</span
+        >
         <select bind:value={selectedReferenceId}>
           {#if sources.length === 0}
-            <option value="">{text('FABRICATE.Canvas.Manage.PromoteNoSources', 'No sources in this system.')}</option>
+            <option value=""
+              >{text(
+                'FABRICATE.Canvas.Manage.PromoteNoSources',
+                'No sources in this system.'
+              )}</option
+            >
           {/if}
           {#each sources as source (source.id)}
             <option value={source.id}>{source.name}</option>
@@ -262,29 +291,39 @@
       </label>
 
       <label class="fab-im-field">
-        <span class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteName', 'Name (optional)')}</span>
+        <span class="fab-im-field-label"
+          >{text('FABRICATE.Canvas.Manage.PromoteName', 'Name (optional)')}</span
+        >
         <input
           type="text"
           bind:value={promoteName}
-          placeholder={text('FABRICATE.Canvas.Manage.PromoteNamePlaceholder', 'Defaults to the source name')}
+          placeholder={text(
+            'FABRICATE.Canvas.Manage.PromoteNamePlaceholder',
+            'Defaults to the source name'
+          )}
         />
       </label>
 
       <fieldset class="fab-im-fieldset">
-        <legend class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteMarker', 'Marker')}</legend>
+        <legend class="fab-im-field-label"
+          >{text('FABRICATE.Canvas.Manage.PromoteMarker', 'Marker')}</legend
+        >
         <label class="fab-im-radio">
           <input type="radio" name="fab-im-visual-mode" value="marker" bind:group={visualMode} />
           <span>{text('FABRICATE.Canvas.Manage.PromoteMarkerVisible', 'Visible marker')}</span>
         </label>
         <label class="fab-im-radio">
           <input type="radio" name="fab-im-visual-mode" value="none" bind:group={visualMode} />
-          <span>{text('FABRICATE.Canvas.Manage.PromoteMarkerNone', 'Region only (no marker)')}</span>
+          <span>{text('FABRICATE.Canvas.Manage.PromoteMarkerNone', 'Region only (no marker)')}</span
+          >
         </label>
       </fieldset>
 
       {#if visualMode === 'marker'}
         <fieldset class="fab-im-fieldset">
-          <legend class="fab-im-field-label">{text('FABRICATE.Canvas.Manage.PromoteMarkerKind', 'Marker kind')}</legend>
+          <legend class="fab-im-field-label"
+            >{text('FABRICATE.Canvas.Manage.PromoteMarkerKind', 'Marker kind')}</legend
+          >
           <label class="fab-im-radio">
             <input type="radio" name="fab-im-marker-kind" value="Tile" bind:group={markerKind} />
             <span>{text('FABRICATE.Canvas.Manage.MarkerTile', 'Tile')}</span>
@@ -297,7 +336,12 @@
       {/if}
 
       <div class="fab-im-promote-actions">
-        <button type="button" class="fab-im-promote-confirm" disabled={!canPromote} onclick={confirmPromote}>
+        <button
+          type="button"
+          class="fab-im-promote-confirm"
+          disabled={!canPromote}
+          onclick={confirmPromote}
+        >
           {text('FABRICATE.Canvas.Manage.PromoteConfirm', 'Promote region')}
         </button>
         <button type="button" class="fab-im-promote-cancel" onclick={() => (showPromote = false)}>
@@ -307,7 +351,10 @@
     </section>
   {/if}
 
-  <section class="fab-im-list-section" aria-label={text('FABRICATE.Canvas.Manage.ListLabel', 'Interactables on this scene')}>
+  <section
+    class="fab-im-list-section"
+    aria-label={text('FABRICATE.Canvas.Manage.ListLabel', 'Interactables on this scene')}
+  >
     {#if rows.length === 0}
       <p class="fab-im-empty">
         {text(

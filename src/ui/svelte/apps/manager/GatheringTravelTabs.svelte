@@ -12,7 +12,7 @@
   const TABS = [
     { id: 'parties', icon: 'fas fa-people-group', key: 'Parties', fallback: 'Parties' },
     { id: 'realms', icon: 'fas fa-map-location-dot', key: 'Realms', fallback: 'Realms' },
-    { id: 'map', icon: 'fas fa-diagram-project', key: 'MapLinks', fallback: 'Map Region Links' }
+    { id: 'map', icon: 'fas fa-diagram-project', key: 'MapLinks', fallback: 'Map Region Links' },
   ];
 
   function onKeydown(event, index) {
@@ -26,7 +26,11 @@
   }
 </script>
 
-<div class="manager-environment-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.Travel.Tabs.Label', 'Travel sections')}>
+<div
+  class="manager-environment-tabs"
+  role="tablist"
+  aria-label={text('FABRICATE.Admin.Manager.Travel.Tabs.Label', 'Travel sections')}
+>
   {#each TABS as tab, index (tab.id)}
     <button
       type="button"

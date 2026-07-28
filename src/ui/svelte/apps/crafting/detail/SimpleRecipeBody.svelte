@@ -28,7 +28,7 @@
     rail = {},
     // The step the engine would execute for this actor's run, so a multi-step body
     // makes only THAT step's rail interactive.
-    activeStepId = null
+    activeStepId = null,
   } = $props();
 
   // An explicit multi-step recipe (more than one step) swaps the single IoTable for

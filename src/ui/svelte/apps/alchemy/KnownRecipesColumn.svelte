@@ -26,7 +26,7 @@
     canSwitch = false,
     onSearch = null,
     onSelect = null,
-    onSwitch = null
+    onSwitch = null,
   } = $props();
 
   /** A short, safe signature summary for a revealed recipe (the discipline has revealed it to the player). */
@@ -52,7 +52,7 @@
     if (!recipe?.result) return '';
     return localize('FABRICATE.App.Alchemy.Makes', {
       name: recipe.result.name,
-      qty: recipe.result.quantity
+      qty: recipe.result.quantity,
     });
   }
 </script>
@@ -94,8 +94,12 @@
   {#if recipes.length === 0 && knownCount > 0}
     <div class="alchemy-known-empty" data-alchemy-known-no-matches>
       <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <p class="alchemy-known-empty-title">{localize('FABRICATE.App.Alchemy.NoRecipeMatchesTitle')}</p>
-      <p class="alchemy-known-empty-hint">{localize('FABRICATE.App.Alchemy.NoRecipeMatchesHint')}</p>
+      <p class="alchemy-known-empty-title">
+        {localize('FABRICATE.App.Alchemy.NoRecipeMatchesTitle')}
+      </p>
+      <p class="alchemy-known-empty-hint">
+        {localize('FABRICATE.App.Alchemy.NoRecipeMatchesHint')}
+      </p>
     </div>
   {:else if recipes.length === 0}
     <div class="alchemy-known-empty" data-alchemy-zero-known>

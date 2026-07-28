@@ -76,10 +76,13 @@
   // Every key is a static literal at its call site so `ui-lang-keys-resolve` and
   // `lang-keys-no-orphans` can both see the leaf.
   function matchTierLabel(tier) {
-    if (tier === 'identity') return text('FABRICATE.Admin.Manager.Knowledge.MatchIdentity', 'Durable match');
+    if (tier === 'identity')
+      return text('FABRICATE.Admin.Manager.Knowledge.MatchIdentity', 'Durable match');
     if (tier === 'uuid') return text('FABRICATE.Admin.Manager.Knowledge.MatchUuid', 'Source match');
-    if (tier === 'compendium') return text('FABRICATE.Admin.Manager.Knowledge.MatchCompendium', 'Compendium match');
-    if (tier === 'duplicate') return text('FABRICATE.Admin.Manager.Knowledge.MatchDuplicate', 'Copy-source match');
+    if (tier === 'compendium')
+      return text('FABRICATE.Admin.Manager.Knowledge.MatchCompendium', 'Compendium match');
+    if (tier === 'duplicate')
+      return text('FABRICATE.Admin.Manager.Knowledge.MatchDuplicate', 'Copy-source match');
     return '';
   }
 
@@ -91,9 +94,12 @@
   function matchTierTitle(row) {
     const label = matchTierLabel(row.matchTier);
     if (!label) return '';
-    return fill(text('FABRICATE.Admin.Manager.Knowledge.MatchTierTitle', 'Definition link: {tier}'), {
-      tier: label,
-    });
+    return fill(
+      text('FABRICATE.Admin.Manager.Knowledge.MatchTierTitle', 'Definition link: {tier}'),
+      {
+        tier: label,
+      }
+    );
   }
 
   function duplicateMatchHint() {
@@ -166,7 +172,9 @@
           >
           {#if copy.quantity > 1}
             <Chip data-knowledge-quantity>
-              {fill(text('FABRICATE.Admin.Manager.Knowledge.Quantity', '×{quantity}'), { quantity: copy.quantity })}
+              {fill(text('FABRICATE.Admin.Manager.Knowledge.Quantity', '×{quantity}'), {
+                quantity: copy.quantity,
+              })}
             </Chip>
           {/if}
         </span>
@@ -224,7 +232,10 @@
         armedLabel={text('FABRICATE.Admin.Manager.Knowledge.DeleteConfirm', 'Confirm?')}
         idleIcon="fas fa-trash"
         idleAriaLabel={fill(
-          text('FABRICATE.Admin.Manager.Knowledge.DeleteLabel', 'Delete {name} from this character'),
+          text(
+            'FABRICATE.Admin.Manager.Knowledge.DeleteLabel',
+            'Delete {name} from this character'
+          ),
           { name: copy.name }
         )}
         armedAriaLabel={fill(

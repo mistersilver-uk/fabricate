@@ -36,7 +36,7 @@
     defaultName = '',
     onChange = () => {},
     onRemove = () => {},
-    onDuplicate = () => {}
+    onDuplicate = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -59,7 +59,7 @@
   const canAddCost = $derived(currencyEnabled && (currencyUnits || []).length > 0);
 
   const componentPickerOptions = $derived(
-    (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
+    (componentOptions || []).map((item) => ({ id: item.id, label: item.name, img: item.img }))
   );
 
   // The set-level "Add essence requirement" picker offers EVERY system essence: an
@@ -67,15 +67,24 @@
   // appends a single-option essence GROUP (an AND-required requirement, preserving the
   // old per-set semantics) and an essence may legitimately repeat across groups.
   const essencePickerOptions = $derived(
-    (essenceOptions || [])
-      .map((essence) => ({ id: essence.id, label: essence.name, icon: essence.icon || 'fas fa-flask-vial' }))
+    (essenceOptions || []).map((essence) => ({
+      id: essence.id,
+      label: essence.name,
+      icon: essence.icon || 'fas fa-flask-vial',
+    }))
   );
 
   function addEssenceGroup(id) {
     if (!id) return;
     onChange({
       ...set,
-      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'essence', essenceId: id, amount: 1 } }] }]
+      ingredientGroups: [
+        ...groups,
+        {
+          id: newId(),
+          options: [{ quantity: 1, match: { type: 'essence', essenceId: id, amount: 1 } }],
+        },
+      ],
     });
   }
 
@@ -84,7 +93,10 @@
   }
 
   function updateGroup(index, nextGroup) {
-    onChange({ ...set, ingredientGroups: groups.map((group, i) => (i === index ? nextGroup : group)) });
+    onChange({
+      ...set,
+      ingredientGroups: groups.map((group, i) => (i === index ? nextGroup : group)),
+    });
   }
 
   function removeGroup(index) {
@@ -105,25 +117,39 @@
     if (existingIndex !== -1) {
       const existing = groups[existingIndex];
       const option = existing.options[0];
-      const nextQuantity = Math.min(9999, (Number(option.quantity) > 0 ? Number(option.quantity) : 1) + 1);
+      const nextQuantity = Math.min(
+        9999,
+        (Number(option.quantity) > 0 ? Number(option.quantity) : 1) + 1
+      );
       onChange({
         ...set,
         ingredientGroups: groups.map((group, i) =>
-          i === existingIndex ? { ...existing, options: [{ ...option, quantity: nextQuantity }] } : group
-        )
+          i === existingIndex
+            ? { ...existing, options: [{ ...option, quantity: nextQuantity }] }
+            : group
+        ),
       });
       return;
     }
     onChange({
       ...set,
-      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'component', componentId: id } }] }]
+      ingredientGroups: [
+        ...groups,
+        { id: newId(), options: [{ quantity: 1, match: { type: 'component', componentId: id } }] },
+      ],
     });
   }
 
   function addTagRequirement() {
     onChange({
       ...set,
-      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] }]
+      ingredientGroups: [
+        ...groups,
+        {
+          id: newId(),
+          options: [{ quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+        },
+      ],
     });
   }
 
@@ -133,13 +159,22 @@
     const firstUnit = (currencyUnits || [])[0]?.id || '';
     onChange({
       ...set,
-      ingredientGroups: [...groups, { id: newId(), options: [{ quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }] }]
+      ingredientGroups: [
+        ...groups,
+        {
+          id: newId(),
+          options: [{ quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }],
+        },
+      ],
     });
   }
-
 </script>
 
-<div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`} data-recipe-set data-recipe-set-id={set?.id || ''}>
+<div
+  class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''}`}
+  data-recipe-set
+  data-recipe-set-id={set?.id || ''}
+>
   {#if !chromeless}
     <div class="manager-recipe-ingredient-set-head">
       {#if showSetName}
@@ -165,21 +200,26 @@
         data-recipe-duplicate="ingredient-set"
         aria-label={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
         title={text('FABRICATE.Admin.Manager.Recipe.DuplicateIngredientSet', 'Duplicate set')}
-        onclick={() => onDuplicate()}
-      ><i class="fas fa-clone" aria-hidden="true"></i></button>
+        onclick={() => onDuplicate()}><i class="fas fa-clone" aria-hidden="true"></i></button
+      >
       <button
         type="button"
         class="manager-icon-button is-danger"
         data-recipe-remove="ingredient-set"
         aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
         title={text('FABRICATE.Admin.Manager.Recipe.RemoveIngredientSet', 'Remove set')}
-        onclick={() => onRemove()}
-      ><i class="fas fa-trash" aria-hidden="true"></i></button>
+        onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></button
+      >
     </div>
   {/if}
 
   {#if groups.length === 0}
-    <p class="manager-muted manager-recipe-ingredient-set-empty">{text('FABRICATE.Admin.Manager.Recipe.SetEmptyHint', 'Add a component or a tag requirement this set must satisfy.')}</p>
+    <p class="manager-muted manager-recipe-ingredient-set-empty">
+      {text(
+        'FABRICATE.Admin.Manager.Recipe.SetEmptyHint',
+        'Add a component or a tag requirement this set must satisfy.'
+      )}
+    </p>
   {:else}
     <!-- §B7: requirements stack with no invented "AND" hairline dividers — every
          requirement in a set is AND'd, which the tab intro copy already states. -->
@@ -209,9 +249,18 @@
       triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddComponent', 'Add component')}
       triggerAddMarker="component"
       dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-      searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-      searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-      emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+      searchPlaceholder={text(
+        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+        'Search components...'
+      )}
+      searchAriaLabel={text(
+        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+        'Search components...'
+      )}
+      emptyHint={text(
+        'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
+        'No components defined'
+      )}
       showChevron={false}
       onChoose={(id) => addComponentRequirement(id)}
     />
@@ -234,12 +283,27 @@
         pickerClass="manager-recipe-essence-picker"
         triggerClass="manager-button is-dashed manager-recipe-essence-trigger"
         triggerIcon="fas fa-flask-vial"
-        triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}
-        triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}
+        triggerLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement',
+          'Add essence requirement'
+        )}
+        triggerAriaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement',
+          'Add essence requirement'
+        )}
         triggerAddMarker="essence-requirement"
-        dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement', 'Add essence requirement')}
-        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
-        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
+        dialogAriaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.AddEssenceRequirement',
+          'Add essence requirement'
+        )}
+        searchPlaceholder={text(
+          'FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder',
+          'Search essences...'
+        )}
+        searchAriaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder',
+          'Search essences...'
+        )}
         emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined')}
         showChevron={false}
         onChoose={(id) => addEssenceGroup(id)}

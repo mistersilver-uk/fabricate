@@ -26,7 +26,7 @@
   import {
     buildSystemLabelMap,
     systemDisplayLabel,
-    pickDefaultSystemId
+    pickDefaultSystemId,
   } from '../util/systemDisambiguation.js';
 
   let { services = null } = $props();
@@ -39,7 +39,7 @@
   const systems = $derived(
     (services?.listSystems?.() ?? []).map((system) => ({
       id: String(system?.id ?? ''),
-      name: String(system?.name ?? system?.id ?? '')
+      name: String(system?.name ?? system?.id ?? ''),
     }))
   );
 
@@ -77,7 +77,9 @@
   function matchesSearch(label) {
     const needle = search.trim().toLowerCase();
     if (!needle) return true;
-    return String(label ?? '').toLowerCase().includes(needle);
+    return String(label ?? '')
+      .toLowerCase()
+      .includes(needle);
   }
 
   const DEFAULT_TOOL_IMAGE = 'icons/svg/item-bag.svg';
@@ -108,7 +110,7 @@
         return {
           id: String(tool?.id ?? ''),
           label: toolDisplayName(tool, component),
-          img: toolImage(component)
+          img: toolImage(component),
         };
       })
       .filter((tool) => tool.id && matchesSearch(tool.label))
@@ -128,18 +130,29 @@
     (services?.listTasksForSystem?.(selectedSystemId) ?? [])
       .map((task) => ({
         id: String(task?.id ?? ''),
-        label: String(task?.name || '').trim() || text('FABRICATE.Canvas.Browser.UnnamedTask', 'Unnamed task'),
-        img: taskCustomImage(task?.img)
+        label:
+          String(task?.name || '').trim() ||
+          text('FABRICATE.Canvas.Browser.UnnamedTask', 'Unnamed task'),
+        img: taskCustomImage(task?.img),
       }))
       .filter((task) => task.id && matchesSearch(task.label))
   );
 
   function dragPayload(interactableType, referenceId) {
-    return buildInteractableDragPayload({ interactableType, systemId: selectedSystemId, referenceId });
+    return buildInteractableDragPayload({
+      interactableType,
+      systemId: selectedSystemId,
+      referenceId,
+    });
   }
 
   function place(interactableType, referenceId, visualMode = 'marker') {
-    services?.placeOnScene?.({ interactableType, systemId: selectedSystemId, referenceId, visualMode });
+    services?.placeOnScene?.({
+      interactableType,
+      systemId: selectedSystemId,
+      referenceId,
+      visualMode,
+    });
   }
 
   // Tab button refs so roving keyboard nav can move DOM focus to the newly
@@ -174,22 +187,44 @@
 <div class="fabricate-interactable-browser">
   <header class="fab-ib-header">
     <h2 class="fab-ib-title">{text('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}</h2>
-    <p class="fab-ib-hint">{text('FABRICATE.Canvas.Browser.Hint', 'Drag an entry onto the canvas, or use Place on current scene.')}</p>
-    <p class="fab-ib-hint fab-ib-hint-modifier">{text('FABRICATE.Canvas.Interactable.DropModifierHint', 'Hold Alt while dropping to always choose the environment manually.')}</p>
-    <p class="fab-ib-hint fab-ib-hint-region">{text('FABRICATE.Canvas.Browser.RegionOnlyHint', 'The cubes button places a region with a tile marker; the outlined-square button places a region only, with no visible marker.')}</p>
+    <p class="fab-ib-hint">
+      {text(
+        'FABRICATE.Canvas.Browser.Hint',
+        'Drag an entry onto the canvas, or use Place on current scene.'
+      )}
+    </p>
+    <p class="fab-ib-hint fab-ib-hint-modifier">
+      {text(
+        'FABRICATE.Canvas.Interactable.DropModifierHint',
+        'Hold Alt while dropping to always choose the environment manually.'
+      )}
+    </p>
+    <p class="fab-ib-hint fab-ib-hint-region">
+      {text(
+        'FABRICATE.Canvas.Browser.RegionOnlyHint',
+        'The cubes button places a region with a tile marker; the outlined-square button places a region only, with no visible marker.'
+      )}
+    </p>
   </header>
 
   <div class="fab-ib-controls">
     <label class="fab-ib-field">
-      <span class="fab-ib-field-label">{text('FABRICATE.Canvas.Browser.SystemLabel', 'Crafting system')}</span>
-      <select bind:value={selectedSystemId} aria-label={text('FABRICATE.Canvas.Browser.SystemLabel', 'Crafting system')}>
+      <span class="fab-ib-field-label"
+        >{text('FABRICATE.Canvas.Browser.SystemLabel', 'Crafting system')}</span
+      >
+      <select
+        bind:value={selectedSystemId}
+        aria-label={text('FABRICATE.Canvas.Browser.SystemLabel', 'Crafting system')}
+      >
         {#each systems as system (system.id)}
           <option value={system.id}>{systemDisplayLabel(system, systemLabels)}</option>
         {/each}
       </select>
     </label>
     <label class="fab-ib-field">
-      <span class="fab-ib-field-label">{text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}</span>
+      <span class="fab-ib-field-label"
+        >{text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}</span
+      >
       <input
         type="search"
         bind:value={search}
@@ -200,9 +235,15 @@
   </div>
 
   {#if systems.length === 0}
-    <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoSystems', 'No crafting systems available.')}</p>
+    <p class="fab-ib-empty">
+      {text('FABRICATE.Canvas.Browser.NoSystems', 'No crafting systems available.')}
+    </p>
   {:else}
-    <div class="fab-ib-tabs" role="tablist" aria-label={text('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}>
+    <div
+      class="fab-ib-tabs"
+      role="tablist"
+      aria-label={text('FABRICATE.Canvas.Browser.Title', 'Interactable browser')}
+    >
       <button
         type="button"
         role="tab"
@@ -213,7 +254,7 @@
         aria-controls="fab-ib-panel-tools"
         tabindex={activeTab === 'tools' ? 0 : -1}
         bind:this={toolsTabEl}
-        onclick={() => activeTab = 'tools'}
+        onclick={() => (activeTab = 'tools')}
         onkeydown={onTabKeydown}
       >
         {text('FABRICATE.Canvas.Browser.ToolsHeading', 'Tools')}
@@ -228,7 +269,7 @@
         aria-controls="fab-ib-panel-tasks"
         tabindex={activeTab === 'tasks' ? 0 : -1}
         bind:this={tasksTabEl}
-        onclick={() => activeTab = 'tasks'}
+        onclick={() => (activeTab = 'tasks')}
         onkeydown={onTabKeydown}
       >
         {text('FABRICATE.Canvas.Browser.TasksHeading', 'Gathering tasks')}
@@ -245,9 +286,13 @@
       >
         {#if tools.length === 0}
           {#if search.trim()}
-            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoMatchingTools', 'No matching tools.')}</p>
+            <p class="fab-ib-empty">
+              {text('FABRICATE.Canvas.Browser.NoMatchingTools', 'No matching tools.')}
+            </p>
           {:else}
-            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoTools', 'No tools in this system.')}</p>
+            <p class="fab-ib-empty">
+              {text('FABRICATE.Canvas.Browser.NoTools', 'No tools in this system.')}
+            </p>
           {/if}
         {:else}
           <ul class="fab-ib-list">
@@ -264,7 +309,10 @@
                     class="fab-ib-place"
                     onclick={() => place('tool', tool.id)}
                     title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
+                    aria-label={text(
+                      'FABRICATE.Canvas.Browser.PlaceOnScene',
+                      'Place region + Tile'
+                    )}
                   >
                     <i class="fas fa-cubes" aria-hidden="true"></i>
                   </button>
@@ -272,8 +320,14 @@
                     type="button"
                     class="fab-ib-place-region"
                     onclick={() => place('tool', tool.id, 'none')}
-                    title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
-                    aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                    title={text(
+                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
+                      'Place region only (no marker)'
+                    )}
+                    aria-label={text(
+                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
+                      'Place region only (no marker)'
+                    )}
                   >
                     <i class="fas fa-vector-square" aria-hidden="true"></i>
                   </button>
@@ -293,9 +347,13 @@
       >
         {#if tasks.length === 0}
           {#if search.trim()}
-            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoMatchingTasks', 'No matching gathering tasks.')}</p>
+            <p class="fab-ib-empty">
+              {text('FABRICATE.Canvas.Browser.NoMatchingTasks', 'No matching gathering tasks.')}
+            </p>
           {:else}
-            <p class="fab-ib-empty">{text('FABRICATE.Canvas.Browser.NoTasks', 'No gathering tasks in this system.')}</p>
+            <p class="fab-ib-empty">
+              {text('FABRICATE.Canvas.Browser.NoTasks', 'No gathering tasks in this system.')}
+            </p>
           {/if}
         {:else}
           <ul class="fab-ib-list">
@@ -316,7 +374,10 @@
                     class="fab-ib-place"
                     onclick={() => place('gatheringTask', task.id)}
                     title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    aria-label={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
+                    aria-label={text(
+                      'FABRICATE.Canvas.Browser.PlaceOnScene',
+                      'Place region + Tile'
+                    )}
                   >
                     <i class="fas fa-cubes" aria-hidden="true"></i>
                   </button>
@@ -324,8 +385,14 @@
                     type="button"
                     class="fab-ib-place-region"
                     onclick={() => place('gatheringTask', task.id, 'none')}
-                    title={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
-                    aria-label={text('FABRICATE.Canvas.Browser.PlaceRegionOnly', 'Place region only (no marker)')}
+                    title={text(
+                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
+                      'Place region only (no marker)'
+                    )}
+                    aria-label={text(
+                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
+                      'Place region only (no marker)'
+                    )}
                   >
                     <i class="fas fa-vector-square" aria-hidden="true"></i>
                   </button>

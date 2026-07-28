@@ -20,7 +20,7 @@
     regions = [],
     saving = false,
     onSelect = () => {},
-    onSetLink = () => {}
+    onSetLink = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -46,14 +46,20 @@
     <EmptyState
       compact
       icon="fas fa-map"
-      title={text('FABRICATE.Admin.Manager.Travel.MapLinks.NoScene', 'Activate a scene to link its regions.')}
+      title={text(
+        'FABRICATE.Admin.Manager.Travel.MapLinks.NoScene',
+        'Activate a scene to link its regions.'
+      )}
       dataAttr="data-travel-map-links-empty"
     />
   {:else if sceneRegions.length === 0}
     <EmptyState
       compact
       icon="fas fa-map-location-dot"
-      title={text('FABRICATE.Admin.Manager.Travel.MapLinks.NoRegions', 'The active scene has no regions.')}
+      title={text(
+        'FABRICATE.Admin.Manager.Travel.MapLinks.NoRegions',
+        'The active scene has no regions.'
+      )}
       dataAttr="data-travel-map-links-empty"
     />
   {:else}
@@ -79,7 +85,8 @@
               aria-hidden="true"
             ></span>
             <span class="manager-map-link-name">
-              {sceneRegion.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}
+              {sceneRegion.name ||
+                text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}
             </span>
           </div>
           <div class="manager-map-link-picker-cell">

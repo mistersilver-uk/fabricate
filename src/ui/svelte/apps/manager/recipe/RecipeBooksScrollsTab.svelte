@@ -30,7 +30,7 @@
     recipeItemDefinitions = [],
     onRemoveRecipeItem = () => {},
     onOpenItem = () => {},
-    onOpenBooksScrolls = () => {}
+    onOpenBooksScrolls = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -41,7 +41,9 @@
   const linkedDefinitionIds = $derived(
     Array.isArray(recipe?.recipeItemIds) && recipe.recipeItemIds.length > 0
       ? recipe.recipeItemIds.map((id) => String(id))
-      : (recipe?.recipeItemId ? [String(recipe.recipeItemId)] : [])
+      : recipe?.recipeItemId
+        ? [String(recipe.recipeItemId)]
+        : []
   );
 
   const linkedDefinitions = $derived(
@@ -73,7 +75,10 @@
         try {
           const doc = await Promise.resolve(globalThis.fromUuid(uuid));
           if (!doc) return [def.id, { name: '', img: '', missing: true }];
-          return [def.id, { name: String(doc.name || ''), img: String(doc.img || ''), missing: false }];
+          return [
+            def.id,
+            { name: String(doc.name || ''), img: String(doc.img || ''), missing: false },
+          ];
         } catch {
           return [def.id, { name: '', img: '', missing: true }];
         }
@@ -81,7 +86,9 @@
     ).then((entries) => {
       if (!cancelled) resolvedByDefId = Object.fromEntries(entries);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   });
 
   function definitionName(def) {
@@ -102,15 +109,30 @@
   }
 </script>
 
-<section class="manager-recipe-tab manager-recipe-books-tab" data-recipe-tab="books-scrolls" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.BooksScrolls', 'Books & Scrolls')}>
+<section
+  class="manager-recipe-tab manager-recipe-books-tab"
+  data-recipe-tab="books-scrolls"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.BooksScrolls', 'Books & Scrolls')}
+>
   <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.Title', 'Appears in')}</h2>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.Intro', 'The books and scrolls that teach this recipe. A recipe is added to a book from the book’s own editor.')}</p>
+    <h2 class="manager-recipe-tab-title">
+      {text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.Title', 'Appears in')}
+    </h2>
+    <p class="manager-muted">
+      {text(
+        'FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.Intro',
+        'The books and scrolls that teach this recipe. A recipe is added to a book from the book’s own editor.'
+      )}
+    </p>
   </div>
 
   <div class="manager-recipe-books-body" data-recipe-section="recipe-item">
     {#if linkedDefinitions.length > 0}
-      <ul class="manager-recipe-item-links" data-recipe-item-links aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLinks', 'Linked recipe items')}>
+      <ul
+        class="manager-recipe-item-links"
+        data-recipe-item-links
+        aria-label={text('FABRICATE.Admin.Manager.Recipe.RecipeItemLinks', 'Linked recipe items')}
+      >
         {#each linkedDefinitions as def (def.id)}
           <li
             class="manager-recipe-book-link"
@@ -118,11 +140,24 @@
             data-recipe-item-link={def.id}
           >
             {#if definitionMissing(def)}
-              <span class="manager-recipe-book-thumb is-placeholder" aria-hidden="true"><i class="fas fa-suitcase"></i></span>
-              <span class="manager-recipe-book-name manager-muted" data-recipe-item-missing>{text('FABRICATE.Admin.Manager.Recipe.RecipeItemMissing', 'Recipe item unresolved')}</span>
+              <span class="manager-recipe-book-thumb is-placeholder" aria-hidden="true"
+                ><i class="fas fa-suitcase"></i></span
+              >
+              <span class="manager-recipe-book-name manager-muted" data-recipe-item-missing
+                >{text(
+                  'FABRICATE.Admin.Manager.Recipe.RecipeItemMissing',
+                  'Recipe item unresolved'
+                )}</span
+              >
             {:else}
               <img class="manager-recipe-book-thumb" src={definitionImg(def)} alt="" />
-              <button type="button" class="manager-recipe-book-name is-link" onclick={() => openItem(def)} title={text('FABRICATE.Admin.Manager.Recipe.OpenItem', 'Open item')}>{definitionName(def)}</button>
+              <button
+                type="button"
+                class="manager-recipe-book-name is-link"
+                onclick={() => openItem(def)}
+                title={text('FABRICATE.Admin.Manager.Recipe.OpenItem', 'Open item')}
+                >{definitionName(def)}</button
+              >
             {/if}
             <button
               type="button"
@@ -130,7 +165,8 @@
               aria-label={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               onclick={() => unlinkDefinition(def)}
-            ><i class="fas fa-link-slash" aria-hidden="true"></i></button>
+              ><i class="fas fa-link-slash" aria-hidden="true"></i></button
+            >
           </li>
         {/each}
       </ul>
@@ -142,16 +178,32 @@
       <EmptyState
         compact
         icon="fas fa-book"
-        title={text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.EmptyTitle', 'Not in any book or scroll')}
-        hint={text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.AppearsInEmpty', 'Not in any book or scroll yet.')}
+        title={text(
+          'FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.EmptyTitle',
+          'Not in any book or scroll'
+        )}
+        hint={text(
+          'FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.AppearsInEmpty',
+          'Not in any book or scroll yet.'
+        )}
         contextClass="manager-recipe-tab-empty"
         dataAttr="data-recipe-item-empty"
       />
     {/if}
 
-    <button type="button" class="manager-button manager-recipe-tab-action" data-recipe-open-books onclick={() => onOpenBooksScrolls()}>
+    <button
+      type="button"
+      class="manager-button manager-recipe-tab-action"
+      data-recipe-open-books
+      onclick={() => onOpenBooksScrolls()}
+    >
       <i class="fas fa-book" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.OpenBooksScrolls', 'Open Books & Scrolls')}</span>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.Recipe.BooksScrollsTab.OpenBooksScrolls',
+          'Open Books & Scrolls'
+        )}</span
+      >
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
     </button>
   </div>

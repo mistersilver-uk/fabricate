@@ -28,16 +28,32 @@
 <JournalCard kind="about" title={localize('FABRICATE.App.Journal.About.Title')}>
   <div class="journal-fact-list">
     {#if startedLabel !== ''}
-      <JournalFactRow icon="fa-calendar-day" label={localize('FABRICATE.App.Journal.About.Started')} value={startedLabel} />
+      <JournalFactRow
+        icon="fa-calendar-day"
+        label={localize('FABRICATE.App.Journal.About.Started')}
+        value={startedLabel}
+      />
     {/if}
     {#if runId !== ''}
-      <JournalFactRow icon="fa-hashtag" label={localize('FABRICATE.App.Journal.About.RunId')} value={runId} />
+      <JournalFactRow
+        icon="fa-hashtag"
+        label={localize('FABRICATE.App.Journal.About.RunId')}
+        value={runId}
+      />
     {/if}
     {#if recipe !== ''}
-      <JournalFactRow icon="fa-scroll" label={localize('FABRICATE.App.Journal.About.Recipe')} value={recipe} />
+      <JournalFactRow
+        icon="fa-scroll"
+        label={localize('FABRICATE.App.Journal.About.Recipe')}
+        value={recipe}
+      />
     {/if}
     {#if mode !== ''}
-      <JournalFactRow icon="fa-sliders" label={localize('FABRICATE.App.Journal.About.Mode')} value={mode} />
+      <JournalFactRow
+        icon="fa-sliders"
+        label={localize('FABRICATE.App.Journal.About.Mode')}
+        value={mode}
+      />
     {/if}
   </div>
 </JournalCard>

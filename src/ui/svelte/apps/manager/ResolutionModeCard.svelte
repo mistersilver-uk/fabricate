@@ -43,7 +43,7 @@
     // renders its own section heading). Any other value keeps the default compact
     // single-column rows used by the gathering resolution surface.
     variant = '',
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   const isConfigCard = $derived(variant === 'config-card');

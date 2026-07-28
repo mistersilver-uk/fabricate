@@ -10,15 +10,37 @@
   }
 
   const OPTIONS = [
-    { value: 'automatic', icon: 'fas fa-wand-magic-sparkles', key: 'Automatic', fallback: 'Automatic', descKey: 'AutomaticHint', descFallback: 'All matching enabled tasks and events are available unless locally excluded.' },
-    { value: 'manual', icon: 'fas fa-hand-pointer', key: 'Manual', fallback: 'Manual', descKey: 'ManualHint', descFallback: 'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.' }
+    {
+      value: 'automatic',
+      icon: 'fas fa-wand-magic-sparkles',
+      key: 'Automatic',
+      fallback: 'Automatic',
+      descKey: 'AutomaticHint',
+      descFallback: 'All matching enabled tasks and events are available unless locally excluded.',
+    },
+    {
+      value: 'manual',
+      icon: 'fas fa-hand-pointer',
+      key: 'Manual',
+      fallback: 'Manual',
+      descKey: 'ManualHint',
+      descFallback:
+        'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.',
+    },
   ];
 
   const current = $derived(mode === 'manual' ? 'manual' : 'automatic');
-  const selected = $derived(OPTIONS.find(option => option.value === current) || OPTIONS[0]);
+  const selected = $derived(OPTIONS.find((option) => option.value === current) || OPTIONS[0]);
 </script>
 
-<div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ModeLabel', 'Composition mode')}>
+<div
+  class="manager-environment-mode-control"
+  role="radiogroup"
+  aria-label={text(
+    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ModeLabel',
+    'Composition mode'
+  )}
+>
   {#each OPTIONS as option (option.value)}
     <button
       type="button"
@@ -31,9 +53,19 @@
     >
       <span class="manager-environment-mode-head">
         <i class={option.icon} aria-hidden="true"></i>
-        <span>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${option.key}`, option.fallback)}</span>
+        <span
+          >{text(
+            `FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${option.key}`,
+            option.fallback
+          )}</span
+        >
       </span>
     </button>
   {/each}
 </div>
-<p class="manager-muted manager-environment-mode-hint">{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${selected.descKey}`, selected.descFallback)}</p>
+<p class="manager-muted manager-environment-mode-hint">
+  {text(
+    `FABRICATE.Admin.Manager.EnvironmentEditor.Composition.${selected.descKey}`,
+    selected.descFallback
+  )}
+</p>

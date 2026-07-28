@@ -54,7 +54,7 @@
     onUnlinkItem = () => {},
     onCopyItemUuid = () => {},
     onLinkRecipe = () => {},
-    onRemoveRecipe = () => {}
+    onRemoveRecipe = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -79,19 +79,24 @@
         : 'perInstance'
   );
   const learnsAllowed = $derived(
-    Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0 ? learnCaps.learnsAllowed : 1
+    Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0
+      ? learnCaps.learnsAllowed
+      : 1
   );
 
   const recipeCount = $derived(Array.isArray(linkedRecipes) ? linkedRecipes.length : 0);
   const hasItem = $derived(Boolean(linkedItem?.uuid || recipeItem?.originItemUuid));
 
-  const itemName = $derived(String(linkedItem?.name || '') || text('FABRICATE.Admin.Manager.RecipeItem.Overview.NamePlaceholder', 'Untitled recipe item'));
+  const itemName = $derived(
+    String(linkedItem?.name || '') ||
+      text('FABRICATE.Admin.Manager.RecipeItem.Overview.NamePlaceholder', 'Untitled recipe item')
+  );
 
   // ---- Validation (shared shape with the Validation tab) --------------------
   const computedChecks = $derived.by(() => {
     const checks = [
       { id: 'itemLinked', ok: hasItem },
-      { id: 'recipeLinked', ok: recipeCount > 0 }
+      { id: 'recipeLinked', ok: recipeCount > 0 },
     ];
     if (modeItem) {
       checks.push({ id: 'usesValid', ok: !limitUses || maxUses >= 1 });
@@ -101,24 +106,36 @@
     }
     return checks;
   });
-  const checks = $derived(Array.isArray(validation?.checks) && validation.checks.length > 0 ? validation.checks : computedChecks);
-  const criticalCount = $derived(checks.filter(check => !check.ok).length);
+  const checks = $derived(
+    Array.isArray(validation?.checks) && validation.checks.length > 0
+      ? validation.checks
+      : computedChecks
+  );
+  const criticalCount = $derived(checks.filter((check) => !check.ok).length);
   const effectiveValidation = $derived({ checks, criticalCount });
 
   const badges = $derived({
     contents: recipeCount > 0 ? recipeCount : '',
-    validation: criticalCount > 0
-      ? [{ label: String(criticalCount), tone: 'danger' }]
-      : [{ label: '✓', tone: 'success' }]
+    validation:
+      criticalCount > 0
+        ? [{ label: String(criticalCount), tone: 'danger' }]
+        : [{ label: '✓', tone: 'success' }],
   });
 
   // ---- Right rail: preview + effective rules --------------------------------
   function learnShort() {
-    if (!limitLearning) return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely');
+    if (!limitLearning)
+      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely');
     if (learnScope === 'total') {
-      return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToTotal', 'Learn up to {n} total').replace('{n}', String(learnsAllowed));
+      return text(
+        'FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToTotal',
+        'Learn up to {n} total'
+      ).replace('{n}', String(learnsAllowed));
     }
-    return text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToPerCopy', 'Learn up to {n} per copy').replace('{n}', String(learnsAllowed));
+    return text(
+      'FABRICATE.Admin.Manager.RecipeItem.Preview.LearnUpToPerCopy',
+      'Learn up to {n} per copy'
+    ).replace('{n}', String(learnsAllowed));
   }
 
   // Learning requirements (issue 544): read-only chips mirroring the two learning
@@ -147,7 +164,11 @@
       const match = byId.get(key);
       // The learning/knowledge glyph, kept in lockstep with the player builder's
       // knowledge requirement icon (InventoryListingBuilder._evaluateBookRequirements).
-      return { id: key, name: match ? String(match.name || key) : key, icon: 'fas fa-graduation-cap' };
+      return {
+        id: key,
+        name: match ? String(match.name || key) : key,
+        icon: 'fas fa-graduation-cap',
+      };
     });
   });
 
@@ -224,32 +245,112 @@
   const effectiveRules = $derived.by(() => {
     const rules = [];
     if (modeItem) {
-      rules.push(limitUses
-        ? { icon: 'fas fa-fire-flame-curved', tone: 'warning', title: maxUses === 1 ? text('FABRICATE.Admin.Manager.RecipeItem.Rules.SingleUse', 'Single use') : text('FABRICATE.Admin.Manager.RecipeItem.Rules.NUsesPerCopy', '{n} uses per copy').replace('{n}', String(maxUses)), sub: whenSpent === 'destroyed' ? text('FABRICATE.Admin.Manager.RecipeItem.Rules.DestroyedWhenSpent', 'Destroyed when spent') : text('FABRICATE.Admin.Manager.RecipeItem.Rules.InertWhenSpent', 'Becomes inert when spent') }
-        : { icon: 'fas fa-infinity', tone: 'info', title: text('FABRICATE.Admin.Manager.RecipeItem.Rules.UnlimitedUses', 'Unlimited uses'), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeverConsumed', 'The item is never consumed') });
+      rules.push(
+        limitUses
+          ? {
+              icon: 'fas fa-fire-flame-curved',
+              tone: 'warning',
+              title:
+                maxUses === 1
+                  ? text('FABRICATE.Admin.Manager.RecipeItem.Rules.SingleUse', 'Single use')
+                  : text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Rules.NUsesPerCopy',
+                      '{n} uses per copy'
+                    ).replace('{n}', String(maxUses)),
+              sub:
+                whenSpent === 'destroyed'
+                  ? text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Rules.DestroyedWhenSpent',
+                      'Destroyed when spent'
+                    )
+                  : text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Rules.InertWhenSpent',
+                      'Becomes inert when spent'
+                    ),
+            }
+          : {
+              icon: 'fas fa-infinity',
+              tone: 'info',
+              title: text(
+                'FABRICATE.Admin.Manager.RecipeItem.Rules.UnlimitedUses',
+                'Unlimited uses'
+              ),
+              sub: text(
+                'FABRICATE.Admin.Manager.RecipeItem.Rules.NeverConsumed',
+                'The item is never consumed'
+              ),
+            }
+      );
     }
     if (modeKnowledge) {
-      rules.push(limitLearning
-        ? { icon: 'fas fa-user-check', tone: 'accent', title: learnShort(), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.AppliesEveryRecipe', 'Applies to every recipe') }
-        : { icon: 'fas fa-book', tone: 'success', title: text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely'), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NoCapLearning', 'No cap on learning') });
+      rules.push(
+        limitLearning
+          ? {
+              icon: 'fas fa-user-check',
+              tone: 'accent',
+              title: learnShort(),
+              sub: text(
+                'FABRICATE.Admin.Manager.RecipeItem.Rules.AppliesEveryRecipe',
+                'Applies to every recipe'
+              ),
+            }
+          : {
+              icon: 'fas fa-book',
+              tone: 'success',
+              title: text('FABRICATE.Admin.Manager.RecipeItem.Preview.LearnFreely', 'Learn freely'),
+              sub: text(
+                'FABRICATE.Admin.Manager.RecipeItem.Rules.NoCapLearning',
+                'No cap on learning'
+              ),
+            }
+      );
       // Required Knowledge / Learning prerequisites become one "Needs: <name>" row each
       // (only when Limited learning is on — matching runtime toggle-gating).
       // Each "Needs: <name>" row carries the requirement `id`/`kind` so the markup can
       // render a GM-only "Satisfied?" toggle that drives the embedded preview. The
       // use/learn-cap rows above carry no `id` and get no toggle.
-      const needsTitle = (name) => text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledge', 'Needs: {name}').replace('{name}', name);
+      const needsTitle = (name) =>
+        text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledge', 'Needs: {name}').replace(
+          '{name}',
+          name
+        );
       for (const chip of requiredKnowledgeChips) {
-        rules.push({ id: chip.id, kind: 'knowledge', icon: chip.icon, tone: 'muted', title: needsTitle(chip.name), sub: text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledgeSub', 'Must already be known') });
+        rules.push({
+          id: chip.id,
+          kind: 'knowledge',
+          icon: chip.icon,
+          tone: 'muted',
+          title: needsTitle(chip.name),
+          sub: text(
+            'FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsKnowledgeSub',
+            'Must already be known'
+          ),
+        });
       }
       for (const chip of learningPrerequisiteChips) {
-        rules.push({ id: chip.id, kind: 'character', icon: chip.icon, tone: 'muted', title: needsTitle(chip.name), sub: chip.preview || text('FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsPrereqSub', 'Character requirement') });
+        rules.push({
+          id: chip.id,
+          kind: 'character',
+          icon: chip.icon,
+          tone: 'muted',
+          title: needsTitle(chip.name),
+          sub:
+            chip.preview ||
+            text(
+              'FABRICATE.Admin.Manager.RecipeItem.Rules.NeedsPrereqSub',
+              'Character requirement'
+            ),
+        });
       }
     }
     return rules;
   });
 </script>
 
-<main class="manager-main manager-recipe-item-editor-main" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item')}>
+<main
+  class="manager-main manager-recipe-item-editor-main"
+  aria-label={text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item')}
+>
   {#if recipeItem}
     <div class="manager-recipe-item-editor" data-recipe-item-editor>
       <div class="manager-recipe-item-editor-body">
@@ -297,9 +398,21 @@
         </div>
       </div>
 
-      <aside class="manager-recipe-item-editor-rail" data-recipe-item-rail aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Rail.Label', 'Preview and effective rules')}>
+      <aside
+        class="manager-recipe-item-editor-rail"
+        data-recipe-item-rail
+        aria-label={text(
+          'FABRICATE.Admin.Manager.RecipeItem.Rail.Label',
+          'Preview and effective rules'
+        )}
+      >
         <div class="manager-recipe-item-rail-section">
-          <span class="manager-recipe-item-rail-title">{text('FABRICATE.Admin.Manager.RecipeItem.Rail.HowPlayersSee', 'How players see it')}</span>
+          <span class="manager-recipe-item-rail-title"
+            >{text(
+              'FABRICATE.Admin.Manager.RecipeItem.Rail.HowPlayersSee',
+              'How players see it'
+            )}</span
+          >
           <!-- The REAL player book detail, fed a synthetic row — so it can never drift.
                No callbacks are passed, so it's a read-only preview. -->
           <div class="manager-recipe-item-live-preview" data-recipe-item-preview>
@@ -308,11 +421,23 @@
         </div>
 
         <div class="manager-recipe-item-rail-section">
-          <span class="manager-recipe-item-rail-title">{text('FABRICATE.Admin.Manager.RecipeItem.Rail.EffectiveRules', 'Effective rules')}</span>
+          <span class="manager-recipe-item-rail-title"
+            >{text(
+              'FABRICATE.Admin.Manager.RecipeItem.Rail.EffectiveRules',
+              'Effective rules'
+            )}</span
+          >
           <div class="manager-recipe-item-rules-list" data-recipe-item-rules>
             {#each effectiveRules as rule, index (`${rule.title}-${index}`)}
-              <div class="manager-recipe-item-rule-row" data-recipe-item-rule data-rule-tone={rule.tone}>
-                <i class={`${rule.icon} manager-recipe-item-rule-icon is-${rule.tone}`} aria-hidden="true"></i>
+              <div
+                class="manager-recipe-item-rule-row"
+                data-recipe-item-rule
+                data-rule-tone={rule.tone}
+              >
+                <i
+                  class={`${rule.icon} manager-recipe-item-rule-icon is-${rule.tone}`}
+                  aria-hidden="true"
+                ></i>
                 <div class="manager-recipe-item-rule-copy">
                   <span class="manager-recipe-item-rule-title">{rule.title}</span>
                   <span class="manager-recipe-item-rule-sub">{rule.sub}</span>
@@ -323,14 +448,21 @@
                     class={`manager-status-toggle manager-recipe-item-satisfied-toggle ${satisfied(rule.id) ? 'is-on' : 'is-off'}`}
                     data-recipe-item-satisfied-toggle={rule.id}
                     aria-pressed={satisfied(rule.id)}
-                    aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Rules.Satisfied', 'Satisfied?')}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Rules.Satisfied',
+                      'Satisfied?'
+                    )}
                     title={text('FABRICATE.Admin.Manager.RecipeItem.Rules.Satisfied', 'Satisfied?')}
                     onclick={() => toggleSatisfied(rule.id)}
                   >
-                    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                    <span class="manager-status-toggle-label">{satisfied(rule.id)
-                      ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                      : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+                    <span class="manager-status-toggle-track" aria-hidden="true"
+                      ><span class="manager-status-toggle-knob"></span></span
+                    >
+                    <span class="manager-status-toggle-label"
+                      >{satisfied(rule.id)
+                        ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                        : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+                    >
                   </button>
                 {/if}
               </div>
@@ -340,7 +472,12 @@
 
         <div class="manager-recipe-item-rail-note">
           <i class="fas fa-circle-check" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.RecipeItem.Rail.LiveHint', 'This preview updates live as you change the controls on the left.')}</span>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.RecipeItem.Rail.LiveHint',
+              'This preview updates live as you change the controls on the left.'
+            )}</span
+          >
         </div>
       </aside>
     </div>
@@ -348,7 +485,10 @@
     <EmptyState
       icon="fas fa-book"
       title={text('FABRICATE.Admin.Manager.RecipeItem.SelectItem', 'Select a recipe item')}
-      hint={text('FABRICATE.Admin.Manager.RecipeItem.EditMissingHint', 'Pick a recipe item from Books & Scrolls to open its editor.')}
+      hint={text(
+        'FABRICATE.Admin.Manager.RecipeItem.EditMissingHint',
+        'Pick a recipe item from Books & Scrolls to open its editor.'
+      )}
     />
   {/if}
 </main>

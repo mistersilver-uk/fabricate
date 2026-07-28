@@ -29,12 +29,7 @@
 
   const isEvent = $derived(scale === 'event');
   const pct = $derived(toPercent(value));
-  const tier = $derived(
-    pct >= 75 ? 'red'
-      : pct >= 50 ? 'amber'
-        : pct >= 25 ? 'yellow'
-          : 'green'
-  );
+  const tier = $derived(pct >= 75 ? 'red' : pct >= 50 ? 'amber' : pct >= 25 ? 'yellow' : 'green');
   // Only the event scale recolours the fill by tier; the success scale stays a
   // flat green (the base .chance-bar-fill rule).
   const rootClass = $derived(isEvent ? `chance-bar tier-${tier}` : 'chance-bar');

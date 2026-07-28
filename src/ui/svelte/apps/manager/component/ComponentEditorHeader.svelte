@@ -35,7 +35,7 @@
     dirtyLabel = '',
     backLabel = '',
     saveLabel = '',
-    onBack = () => {}
+    onBack = () => {},
   } = $props();
 </script>
 

@@ -14,7 +14,7 @@
     disabled = false,
     disabledReason = '',
     busy = false,
-    onCraft = null
+    onCraft = null,
   } = $props();
 
   const blocked = $derived(disabled || busy);

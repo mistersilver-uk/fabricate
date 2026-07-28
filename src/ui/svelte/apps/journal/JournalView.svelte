@@ -37,8 +37,12 @@
   const now = $derived(Number(journal?.worldTime ?? 0));
 
   const activeRuns = $derived(Array.isArray(journal?.activeRuns) ? journal.activeRuns : []);
-  const historyPageItems = $derived(Array.isArray(journal?.historyPageItems) ? journal.historyPageItems : []);
-  const recentTerminalRuns = $derived(Array.isArray(journal?.recentTerminalRuns) ? journal.recentTerminalRuns : []);
+  const historyPageItems = $derived(
+    Array.isArray(journal?.historyPageItems) ? journal.historyPageItems : []
+  );
+  const recentTerminalRuns = $derived(
+    Array.isArray(journal?.recentTerminalRuns) ? journal.recentTerminalRuns : []
+  );
   const selectedRun = $derived(journal?.selectedRun ?? null);
   const selectedRunId = $derived(String(journal?.selectedRunId ?? ''));
   const expectRunType = $derived(String(selectedRun?.runType ?? 'crafting'));

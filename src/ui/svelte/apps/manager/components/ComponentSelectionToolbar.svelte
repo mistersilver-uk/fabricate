@@ -44,7 +44,7 @@
     selectAllResultsCount = 0,
     onTogglePage = () => {},
     onSelectAllResults = () => {},
-    onClear = () => {}
+    onClear = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -60,14 +60,22 @@
     return result;
   }
 
-  const selectAllLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.SelectAll', 'Select all'));
+  const selectAllLabel = $derived(
+    text('FABRICATE.Admin.Manager.Component.BulkEdit.SelectAll', 'Select all')
+  );
   const countLabel = $derived(
-    format('FABRICATE.Admin.Manager.Component.BulkEdit.SelectedCount', '{count} selected', { count })
+    format('FABRICATE.Admin.Manager.Component.BulkEdit.SelectedCount', '{count} selected', {
+      count,
+    })
   );
   const resultsLabel = $derived(
-    format('FABRICATE.Admin.Manager.Component.BulkEdit.SelectAllResults', 'Select all {count} results', {
-      count: selectAllResultsCount
-    })
+    format(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.SelectAllResults',
+      'Select all {count} results',
+      {
+        count: selectAllResultsCount,
+      }
+    )
   );
   const clearLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.Clear', 'Clear'));
 </script>
@@ -104,8 +112,8 @@
         type="button"
         class="manager-component-selection-link"
         data-component-select-all-results
-        onclick={() => onSelectAllResults()}
-      >{resultsLabel}</button>
+        onclick={() => onSelectAllResults()}>{resultsLabel}</button
+      >
     {/if}
     <button
       type="button"

@@ -39,7 +39,9 @@
   const isEmpty = $derived(Boolean(store?.loadedOnce) && hasActor && recipes.length === 0);
 
   const selectedRecipe = $derived(store?.selectedRecipe ?? null);
-  const selectedSetId = $derived(store?.selectedIngredientSetId ?? selectedRecipe?.defaultSetId ?? null);
+  const selectedSetId = $derived(
+    store?.selectedIngredientSetId ?? selectedRecipe?.defaultSetId ?? null
+  );
   const craftability = $derived(store?.selectedCraftability ?? null);
   const craftInFlight = $derived(Boolean(store?.craftInFlight));
 
@@ -76,9 +78,7 @@
   const rollResult = $derived(
     selectedRecipe?.id ? (store?.lastRollResult?.[selectedRecipe.id] ?? null) : null
   );
-  const showRunSummary = $derived(
-    Boolean(rollResult) && dismissedRunFor !== selectedRecipe?.id
-  );
+  const showRunSummary = $derived(Boolean(rollResult) && dismissedRunFor !== selectedRecipe?.id);
 
   // Shopping-list entries enriched with display name/img from the listing.
   const shoppingEntries = $derived(
@@ -88,7 +88,7 @@
         recipeId: entry.recipeId,
         quantity: entry.quantity,
         name: recipe?.name ?? entry.recipeId,
-        img: recipe?.img ?? null
+        img: recipe?.img ?? null,
       };
     })
   );
@@ -169,10 +169,12 @@
 
   // The GM advancing the clock changes calendar-aware durations / regen windows;
   // bump the store's world-time tick and quietly re-fetch.
-  $effect(() => subscribeWorldTime(() => {
-    store?.tickWorldTime();
-    store?.load(true);
-  }));
+  $effect(() =>
+    subscribeWorldTime(() => {
+      store?.tickWorldTime();
+      store?.load(true);
+    })
+  );
 </script>
 
 {#if isLoading}

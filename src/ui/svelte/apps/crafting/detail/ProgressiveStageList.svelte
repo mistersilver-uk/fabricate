@@ -91,7 +91,7 @@
     // already been spent down the list. Defaulting to the GM string keeps the crafting
     // tab — where that is the only cause — byte-unchanged.
     fixedNoteKey = 'FABRICATE.App.Crafting.Detail.StageOrderFixed',
-    fixedNoteFallback = 'Order set by the GM'
+    fixedNoteFallback = 'Order set by the GM',
   } = $props();
 
   let dragIndex = $state(-1);
@@ -179,7 +179,10 @@
          maintainer's chosen mark for a component's progressive DC in the player app; crafting
          (inline) keeps the gauge. Keyed off the existing `stacked` layout flag, so no new
          prop exists solely to hold this cosmetic difference. -->
-    <span class="crafting-stage-difficulty" data-progressive-stage-difficulty={String(stage.difficulty)}>
+    <span
+      class="crafting-stage-difficulty"
+      data-progressive-stage-difficulty={String(stage.difficulty)}
+    >
       <i class="fas {stacked ? 'fa-medal' : 'fa-gauge-high'}" aria-hidden="true"></i>{format(
         'FABRICATE.App.Crafting.Detail.StageDifficultyDc',
         'DC {difficulty}',
@@ -190,7 +193,10 @@
   <!-- Omitted (not zeroed) when the threshold is undefined: a stage the award loop
        skips is reached at NO budget, so any number here would be a lie. -->
   {#if stage.threshold !== null && stage.threshold !== undefined}
-    <span class="crafting-stage-threshold" data-progressive-stage-threshold={String(stage.threshold)}>
+    <span
+      class="crafting-stage-threshold"
+      data-progressive-stage-threshold={String(stage.threshold)}
+    >
       {#if stacked}
         <!-- The SHORT form of the same phrase — stacked, this reads "DC N · Reach ≥N" (the
              DC chip above, then this). This is the COMPONENT's progressive DC (`component.difficulty`,
@@ -198,9 +204,13 @@
              check has no DC (`InventoryListingBuilder._salvageDc` returns null for progressive,
              and `dcOverride` is a check-DC knob progressive never reads). Those check-DC facts
              do not argue against showing the component's own DC, which is stable authored data. -->
-        {format('FABRICATE.App.Crafting.Detail.StageThresholdShort', 'Reach ≥{threshold}', { threshold: stage.threshold })}
+        {format('FABRICATE.App.Crafting.Detail.StageThresholdShort', 'Reach ≥{threshold}', {
+          threshold: stage.threshold,
+        })}
       {:else}
-        {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', { threshold: stage.threshold })}
+        {format('FABRICATE.App.Crafting.Detail.StageThreshold', 'Reached at ≥{threshold}', {
+          threshold: stage.threshold,
+        })}
       {/if}
     </span>
   {/if}
@@ -233,8 +243,8 @@
       aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')} — ${stageName(stage)}`}
       title={text('FABRICATE.App.Crafting.Detail.MoveStageUp', 'Move up')}
       disabled={index === 0}
-      onclick={() => move(index, -1)}
-    ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
+      onclick={() => move(index, -1)}><i class="fas fa-chevron-up" aria-hidden="true"></i></button
+    >
     <button
       type="button"
       class="crafting-stage-move-button"
@@ -242,8 +252,8 @@
       aria-label={`${text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')} — ${stageName(stage)}`}
       title={text('FABRICATE.App.Crafting.Detail.MoveStageDown', 'Move down')}
       disabled={index === stages.length - 1}
-      onclick={() => move(index, 1)}
-    ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+      onclick={() => move(index, 1)}><i class="fas fa-chevron-down" aria-hidden="true"></i></button
+    >
   </span>
 {/snippet}
 
@@ -257,10 +267,17 @@
         data-progressive-stage={stage.id}
         data-progressive-stage-reorderable
         draggable="true"
-        ondragstart={() => { dragIndex = index; }}
-        ondragend={() => { dragIndex = -1; }}
+        ondragstart={() => {
+          dragIndex = index;
+        }}
+        ondragend={() => {
+          dragIndex = -1;
+        }}
         ondragover={(event) => event.preventDefault()}
-        ondrop={(event) => { event.preventDefault(); handleDrop(index); }}
+        ondrop={(event) => {
+          event.preventDefault();
+          handleDrop(index);
+        }}
       >
         <!--
           Wholly decorative on BOTH surfaces, so `aria-hidden` sits on the cluster
@@ -275,17 +292,22 @@
           title={text('FABRICATE.App.Crafting.Detail.DragStage', 'Drag to reorder')}
         >
           <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-          <span
-            class="crafting-stage-ordinal"
-            data-progressive-stage-ordinal={String(index + 1)}
-          >{index + 1}</span>
+          <span class="crafting-stage-ordinal" data-progressive-stage-ordinal={String(index + 1)}
+            >{index + 1}</span
+          >
         </span>
         {#if stage.img}
           <!-- draggable="false" is REQUIRED, not decorative: an <img> is natively
                draggable, so a drag started on the artwork becomes an image drag with the
                wrong ghost, and dropping it outside the app can navigate away. This is the
                first drag row in the repo to contain an image — the GM's row has none. -->
-          <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" draggable="false" />
+          <img
+            class="crafting-stage-img"
+            src={stage.img}
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+          />
         {/if}
         <!-- The chevrons END the row on both surfaces (stacked, that is after the state
              chip): one arrow position everywhere, matching the GM's component salvage
@@ -297,12 +319,27 @@
       <!-- D13: no drag handlers attached at all, and no grip glyph. The ordinal and the
            difficulty stay — the order is still information, it is just not the player's
            to change. -->
-      <div class="crafting-stage-row is-fixed" class:is-stacked={stacked} data-progressive-stage={stage.id} data-progressive-stage-fixed>
-        <span class="crafting-stage-ordinal" aria-hidden="true" data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span>
+      <div
+        class="crafting-stage-row is-fixed"
+        class:is-stacked={stacked}
+        data-progressive-stage={stage.id}
+        data-progressive-stage-fixed
+      >
+        <span
+          class="crafting-stage-ordinal"
+          aria-hidden="true"
+          data-progressive-stage-ordinal={String(index + 1)}>{index + 1}</span
+        >
         {#if stage.img}
           <!-- Also non-draggable in the fixed state: the row is not a drag source, but a
                bare <img> still is, and dragging it out of the app can navigate away. -->
-          <img class="crafting-stage-img" src={stage.img} alt="" aria-hidden="true" draggable="false" />
+          <img
+            class="crafting-stage-img"
+            src={stage.img}
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+          />
         {/if}
         {@render identity(stage)}
       </div>

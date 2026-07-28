@@ -66,7 +66,7 @@
         data-recipe-step
         aria-label={localize('FABRICATE.App.Crafting.Detail.StepLabel', {
           index: index + 1,
-          name: step.label
+          name: step.label,
         })}
       >
         <p class="crafting-step-label" data-recipe-step-label>

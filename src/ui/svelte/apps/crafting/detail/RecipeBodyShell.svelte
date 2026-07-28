@@ -19,7 +19,7 @@
     rollResult = null,
     onChoose = null,
     results = null,
-    selectorIntro = null
+    selectorIntro = null,
   } = $props();
 
   const sets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);

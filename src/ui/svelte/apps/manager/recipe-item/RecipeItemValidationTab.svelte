@@ -34,7 +34,7 @@
     recipeItem = null,
     linkedItem = null,
     visibilityMode = 'item',
-    validation = null
+    validation = null,
   } = $props();
 
   function text(key, fallback) {
@@ -46,7 +46,7 @@
     itemLinked: ['ItemLinked', 'A game-world item is linked'],
     recipeLinked: ['RecipeLinked', 'At least one recipe is linked'],
     usesValid: ['UsesValid', 'Use count is valid'],
-    learnsValid: ['LearnsValid', 'Learning limit is valid']
+    learnsValid: ['LearnsValid', 'Learning limit is valid'],
   };
 
   function checkLabel(id) {
@@ -61,53 +61,74 @@
     const learn = recipeItem?.caps?.learn || {};
     const recipeCount = Array.isArray(recipeItem?.linkedRecipeIds)
       ? recipeItem.linkedRecipeIds.length
-      : (Number.isFinite(recipeItem?.recipeCount) ? recipeItem.recipeCount : 0);
+      : Number.isFinite(recipeItem?.recipeCount)
+        ? recipeItem.recipeCount
+        : 0;
     const hasItem = Boolean(linkedItem?.uuid || recipeItem?.originItemUuid);
     const checks = [
       { id: 'itemLinked', ok: hasItem },
-      { id: 'recipeLinked', ok: recipeCount > 0 }
+      { id: 'recipeLinked', ok: recipeCount > 0 },
     ];
     if (visibilityMode === 'item') {
-      checks.push({ id: 'usesValid', ok: item.limitUses !== true || (Number.isFinite(item.maxUses) && item.maxUses >= 1) });
+      checks.push({
+        id: 'usesValid',
+        ok: item.limitUses !== true || (Number.isFinite(item.maxUses) && item.maxUses >= 1),
+      });
     }
     if (visibilityMode === 'knowledge') {
       const limited = learn.limitLearning === true;
-      checks.push({ id: 'learnsValid', ok: !limited || (Number.isFinite(learn.learnsAllowed) && learn.learnsAllowed >= 1) });
+      checks.push({
+        id: 'learnsValid',
+        ok: !limited || (Number.isFinite(learn.learnsAllowed) && learn.learnsAllowed >= 1),
+      });
     }
     return checks;
   });
 
   // The provided `validation.checks` (if any) win; otherwise the local computation.
-  const checks = $derived(Array.isArray(validation?.checks) && validation.checks.length > 0
-    ? validation.checks
-    : computedChecks);
+  const checks = $derived(
+    Array.isArray(validation?.checks) && validation.checks.length > 0
+      ? validation.checks
+      : computedChecks
+  );
 
   // --- The aggregate summary (issue 797) -----------------------------------------
   // A two-state read of the SAME `checks` the rows below render — passing vs blocking,
   // no warning tier — so the aggregate can never disagree with the list.
-  const passingCount = $derived(checks.filter(check => check.ok).length);
-  const blockingCount = $derived(checks.filter(check => !check.ok).length);
+  const passingCount = $derived(checks.filter((check) => check.ok).length);
+  const blockingCount = $derived(checks.filter((check) => !check.ok).length);
   const summaryStatus = $derived(blockingCount > 0 ? 'blocked' : 'clear');
   const summaryMeta = $derived(
     summaryStatus === 'blocked'
       ? {
           icon: 'fas fa-circle-xmark',
-          title: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryBlocked', 'Cannot be used'),
-          sub: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryBlockedSub', 'Clear every blocking check before this recipe item works for players.')
+          title: text(
+            'FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryBlocked',
+            'Cannot be used'
+          ),
+          sub: text(
+            'FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryBlockedSub',
+            'Clear every blocking check before this recipe item works for players.'
+          ),
         }
       : {
           icon: 'fas fa-circle-check',
           title: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClear', 'All clear'),
-          sub: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClearSub', 'Every check passes. This recipe item is ready to use.')
+          sub: text(
+            'FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClearSub',
+            'Every check passes. This recipe item is ready to use.'
+          ),
         }
   );
 
-  const rows = $derived(checks.map(check => ({
-    id: check.id,
-    ok: check.ok,
-    status: check.ok ? 'pass' : 'block',
-    title: check.label || checkLabel(check.id)
-  })));
+  const rows = $derived(
+    checks.map((check) => ({
+      id: check.id,
+      ok: check.ok,
+      status: check.ok ? 'pass' : 'block',
+      title: check.label || checkLabel(check.id),
+    }))
+  );
 
   function statusPill(status) {
     return status === 'block'
@@ -119,17 +140,34 @@
   }
 </script>
 
-<section class="manager-recipe-item-tab manager-recipe-item-validation" data-recipe-item-tab="validation" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')}>
+<section
+  class="manager-recipe-item-tab manager-recipe-item-validation"
+  data-recipe-item-tab="validation"
+  aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')}
+>
   <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')}</h2>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.Intro', 'A recipe item saves while incomplete, but only works for players once every blocking check passes.')}</p>
+    <h2 class="manager-recipe-tab-title">
+      {text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')}
+    </h2>
+    <p class="manager-muted">
+      {text(
+        'FABRICATE.Admin.Manager.RecipeItem.Validation.Intro',
+        'A recipe item saves while incomplete, but only works for players once every blocking check passes.'
+      )}
+    </p>
   </div>
 
   <!-- The aggregate header: a status medallion + the Passing/Blocking counts, off the
        SAME checks the grouped rows below are built from. Reuses the recipe tab's global
        classes; the counts list is two-state (no Warnings tile — decision 1). -->
-  <section class="manager-recipe-validation-summary-row" data-recipe-item-section="validation-summary">
-    <div class={`manager-recipe-rail-summary is-${summaryStatus}`} data-recipe-item-validation-summary={summaryStatus}>
+  <section
+    class="manager-recipe-validation-summary-row"
+    data-recipe-item-section="validation-summary"
+  >
+    <div
+      class={`manager-recipe-rail-summary is-${summaryStatus}`}
+      data-recipe-item-validation-summary={summaryStatus}
+    >
       <span class="manager-recipe-rail-summary-medallion" aria-hidden="true">
         <i class={summaryMeta.icon}></i>
       </span>
@@ -141,13 +179,23 @@
     <ul class="manager-recipe-rail-counts" data-recipe-item-validation-counts>
       <li class="manager-recipe-rail-count is-passing">
         <i class="fas fa-circle-check" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountPassing', 'Passing')}</span>
-        <span class="manager-recipe-rail-count-value" data-recipe-item-count-passing>{passingCount}</span>
+        <span class="manager-recipe-rail-count-label"
+          >{text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountPassing', 'Passing')}</span
+        >
+        <span class="manager-recipe-rail-count-value" data-recipe-item-count-passing
+          >{passingCount}</span
+        >
       </li>
       <li class="manager-recipe-rail-count is-blocking">
         <i class="fas fa-circle-xmark" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountBlocking', 'Blocking')}</span>
-        <span class="manager-recipe-rail-count-value" data-recipe-item-count-blocking data-critical-count={blockingCount}>{blockingCount}</span>
+        <span class="manager-recipe-rail-count-label"
+          >{text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountBlocking', 'Blocking')}</span
+        >
+        <span
+          class="manager-recipe-rail-count-value"
+          data-recipe-item-count-blocking
+          data-critical-count={blockingCount}>{blockingCount}</span
+        >
       </li>
     </ul>
   </section>
@@ -155,11 +203,20 @@
   <div class="manager-recipe-val-group" data-recipe-item-validation-group="requirements">
     <p class="manager-recipe-val-group-label">
       <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.RecipeItem.Validation.GroupRequirements', 'Requirements')}</span>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.RecipeItem.Validation.GroupRequirements',
+          'Requirements'
+        )}</span
+      >
     </p>
     <ul class="manager-recipe-val-rows">
       {#each rows as row (row.id)}
-        <li class={`manager-recipe-val-row is-${row.status}`} data-recipe-item-check={row.id} data-ok={row.ok}>
+        <li
+          class={`manager-recipe-val-row is-${row.status}`}
+          data-recipe-item-check={row.id}
+          data-ok={row.ok}
+        >
           <i class={`manager-recipe-val-status ${statusIcon(row.status)}`} aria-hidden="true"></i>
           <div class="manager-recipe-val-copy">
             <span class="manager-recipe-val-title">{row.title}</span>

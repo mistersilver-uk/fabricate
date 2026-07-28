@@ -21,7 +21,7 @@
     // The requirement rail's interaction state (issue 917), spread straight onto
     // IoTable. One cohesive value rather than eight props threaded through four
     // bodies; `{}` renders a read-only rail with no chooser.
-    rail = {}
+    rail = {},
   } = $props();
 </script>
 

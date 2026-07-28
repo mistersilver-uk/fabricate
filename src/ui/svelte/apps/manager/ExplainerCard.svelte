@@ -48,14 +48,7 @@
 <script>
   const DEFAULT_LINK_ICON = 'fas fa-arrow-up-right-from-square';
 
-  let {
-    icon = '',
-    title = '',
-    items = [],
-    links = [],
-    dataAttr = '',
-    dataValue = '',
-  } = $props();
+  let { icon = '', title = '', items = [], links = [], dataAttr = '', dataValue = '' } = $props();
 
   // Spread so the hook is genuinely absent when unset, rather than an empty attribute a
   // selector would still match.
@@ -85,7 +78,9 @@
           lead-in ran straight into the prose ("Made from a game-world Item.Drag any Item…").
           Structural assertions cannot see it — it was caught in a screenshot (issue 881).
         --><!-- eslint-disable-next-line svelte/no-useless-mustaches -- the mustache IS the separator, per the note above; keep this directive glued to that close tag, because a markup comment on its own line here adds a second whitespace text node between glyph and prose -->
-        <span>{#if row.lead}<strong>{row.lead}</strong>{' '}{/if}{row.text}</span>
+        <span
+          >{#if row.lead}<strong>{row.lead}</strong>{' '}{/if}{row.text}</span
+        >
       </li>
     {/each}
   </ul>

@@ -29,7 +29,7 @@
     onAttempt = null,
     busy = false,
     services = null,
-    rememberedActorId = null
+    rememberedActorId = null,
   } = $props();
 
   const id = $derived(String(task?.id ?? ''));
@@ -54,8 +54,11 @@
   const staminaCost = $derived(task?.rich?.stamina?.cost ?? null);
   const staminaState = $derived(task?.rich?.stamina?.state ?? null);
   const richNodes = $derived(task?.rich?.nodes ?? null);
-  const nodeCount = $derived(richNodes && richNodes.current != null && richNodes.max != null
-    ? `${richNodes.current}/${richNodes.max}` : null);
+  const nodeCount = $derived(
+    richNodes && richNodes.current != null && richNodes.max != null
+      ? `${richNodes.current}/${richNodes.max}`
+      : null
+  );
   const nodeDepleted = $derived(richNodes != null && richNodes.available === false);
   // A `nonRegenerating` pool that has hit 0 is exhausted for good: the runtime
   // surfaces this as a derived `permanentlyExhausted` flag. Show the permanent
@@ -103,7 +106,9 @@
   // folds in weather/time/biome AND the actor's character-ability modifiers);
   // fall back to the listing's condition-adjusted value while it loads.
   const successChance = $derived(
-    breakdown && breakdown.successChance != null ? breakdown.successChance : (task?.successChance ?? null)
+    breakdown && breakdown.successChance != null
+      ? breakdown.successChance
+      : (task?.successChance ?? null)
   );
 
   function handleAttempt() {
@@ -123,8 +128,10 @@
     let cancelled = false;
     dropsLoading = true;
     breakdown = null;
-    Promise.resolve(services.getGatheringDropBreakdown({ environmentId: envId, taskId, rememberedActorId }))
-      .then(result => {
+    Promise.resolve(
+      services.getGatheringDropBreakdown({ environmentId: envId, taskId, rememberedActorId })
+    )
+      .then((result) => {
         if (cancelled) return;
         breakdown = result ?? null;
         dropsLoading = false;
@@ -134,17 +141,24 @@
         breakdown = null;
         dropsLoading = false;
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   });
 </script>
 
 {#if task == null}
-  <div class="gathering-task-detail-state" data-gathering-task-detail-state={hasTasks ? 'empty' : 'none'}>
+  <div
+    class="gathering-task-detail-state"
+    data-gathering-task-detail-state={hasTasks ? 'empty' : 'none'}
+  >
     <i class={`fas ${hasTasks ? 'fa-hand-pointer' : 'fa-list'}`} aria-hidden="true"></i>
     <p>
-      {localize(hasTasks
-        ? 'FABRICATE.App.Gathering.Detail.SelectTaskHint'
-        : 'FABRICATE.App.Gathering.Detail.NoAvailableTasks')}
+      {localize(
+        hasTasks
+          ? 'FABRICATE.App.Gathering.Detail.SelectTaskHint'
+          : 'FABRICATE.App.Gathering.Detail.NoAvailableTasks'
+      )}
     </p>
   </div>
 {:else}
@@ -157,14 +171,21 @@
   >
     <header class="gathering-task-detail-header">
       <span class="gathering-task-detail-thumb-wrap">
-        <img class="gathering-task-detail-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_TASK_IMG} alt="" />
+        <img
+          class="gathering-task-detail-thumb"
+          class:is-fallback={!img}
+          src={img || DEFAULT_GATHERING_TASK_IMG}
+          alt=""
+        />
       </span>
       <span class="gathering-task-detail-heading">
         <h2 id={titleId} class="gathering-task-detail-title" title={name}>{name}</h2>
       </span>
     </header>
 
-    <p class="gathering-task-detail-description" class:is-fallback={!hasDescription}>{descriptionText}</p>
+    <p class="gathering-task-detail-description" class:is-fallback={!hasDescription}>
+      {descriptionText}
+    </p>
 
     {#if staminaCost != null || nodeCount != null}
       <div class="gathering-task-detail-economy" data-gathering-economy-summary>
@@ -173,7 +194,11 @@
             <i class="fas fa-bolt" aria-hidden="true"></i>
             <span>
               {#if staminaState && staminaState.current != null && staminaState.max != null}
-                {localize('FABRICATE.App.Gathering.Detail.StaminaCostWithPool', { cost: staminaCost, current: staminaState.current, max: staminaState.max })}
+                {localize('FABRICATE.App.Gathering.Detail.StaminaCostWithPool', {
+                  cost: staminaCost,
+                  current: staminaState.current,
+                  max: staminaState.max,
+                })}
               {:else}
                 {localize('FABRICATE.App.Gathering.Detail.StaminaCostOnly', { cost: staminaCost })}
               {/if}
@@ -181,11 +206,21 @@
           </span>
         {/if}
         {#if nodeCount != null}
-          <span class="gathering-economy-line" class:is-depleted={nodeDepleted} data-gathering-node-count>
+          <span
+            class="gathering-economy-line"
+            class:is-depleted={nodeDepleted}
+            data-gathering-node-count
+          >
             <i class="fas fa-mountain" aria-hidden="true"></i>
-            <span>{localize('FABRICATE.App.Gathering.Detail.NodesAvailable', { count: nodeCount })}</span>
+            <span
+              >{localize('FABRICATE.App.Gathering.Detail.NodesAvailable', {
+                count: nodeCount,
+              })}</span
+            >
             {#if nodeDepleted}
-              <span class="gathering-economy-depleted">{localize('FABRICATE.App.Gathering.Detail.Callout.NodeDepleted')}</span>
+              <span class="gathering-economy-depleted"
+                >{localize('FABRICATE.App.Gathering.Detail.Callout.NodeDepleted')}</span
+              >
             {/if}
           </span>
         {/if}
@@ -198,7 +233,11 @@
         the `is-depleted` class (not color alone) so the depleted state is legible
         without relying on color, mirroring the row/economy depleted pattern.
       -->
-      <div class="gathering-node-depleted-callout is-depleted" role="status" data-gathering-node-depleted>
+      <div
+        class="gathering-node-depleted-callout is-depleted"
+        role="status"
+        data-gathering-node-depleted
+      >
         <i class="fas fa-mountain-sun" aria-hidden="true"></i>
         <span class="gathering-node-depleted-text">
           {#if nodeExhausted}
@@ -209,7 +248,9 @@
           {:else}
             {localize('FABRICATE.App.Gathering.Detail.NodeDepletedRespawns')}
             {#if respawnEtaText !== ''}
-              <span class="gathering-node-respawn-eta" data-gathering-node-respawn-eta>{respawnEtaText}</span>
+              <span class="gathering-node-respawn-eta" data-gathering-node-respawn-eta
+                >{respawnEtaText}</span
+              >
             {/if}
           {/if}
         </span>

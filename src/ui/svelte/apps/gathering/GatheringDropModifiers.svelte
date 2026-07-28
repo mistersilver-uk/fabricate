@@ -30,17 +30,40 @@
     const modifiers = target?.modifiers ?? {};
     const lines = [];
     if (Number(modifiers.weather?.value)) {
-      lines.push({ key: 'weather', icon: 'fas fa-cloud-sun', label: localize('FABRICATE.App.Gathering.Detail.ModifierWeather'), value: Number(modifiers.weather.value) });
+      lines.push({
+        key: 'weather',
+        icon: 'fas fa-cloud-sun',
+        label: localize('FABRICATE.App.Gathering.Detail.ModifierWeather'),
+        value: Number(modifiers.weather.value),
+      });
     }
     if (Number(modifiers.timeOfDay?.value)) {
-      lines.push({ key: 'timeOfDay', icon: 'fas fa-clock', label: localize('FABRICATE.App.Gathering.Detail.ModifierTimeOfDay'), value: Number(modifiers.timeOfDay.value) });
+      lines.push({
+        key: 'timeOfDay',
+        icon: 'fas fa-clock',
+        label: localize('FABRICATE.App.Gathering.Detail.ModifierTimeOfDay'),
+        value: Number(modifiers.timeOfDay.value),
+      });
     }
     if (Number(modifiers.biome?.value)) {
-      lines.push({ key: 'biome', icon: 'fas fa-mountain-sun', label: localize('FABRICATE.App.Gathering.Detail.ModifierBiome'), value: Number(modifiers.biome.value) });
+      lines.push({
+        key: 'biome',
+        icon: 'fas fa-mountain-sun',
+        label: localize('FABRICATE.App.Gathering.Detail.ModifierBiome'),
+        value: Number(modifiers.biome.value),
+      });
     }
-    for (const [index, entry] of (Array.isArray(modifiers.character) ? modifiers.character : []).entries()) {
+    for (const [index, entry] of (Array.isArray(modifiers.character)
+      ? modifiers.character
+      : []
+    ).entries()) {
       if (!Number(entry?.contribution)) continue;
-      lines.push({ key: `character-${index}`, icon: entry.icon || 'fas fa-user', label: entry.label || '', value: Number(entry.contribution) });
+      lines.push({
+        key: `character-${index}`,
+        icon: entry.icon || 'fas fa-user',
+        label: entry.label || '',
+        value: Number(entry.contribution),
+      });
     }
     return lines;
   }
@@ -49,10 +72,14 @@
 </script>
 
 <div class="gathering-task-drop-modifiers" data-gathering-drop-modifiers>
-  <p class="gathering-task-drop-modifiers-heading">{localize('FABRICATE.App.Gathering.Detail.Modifiers')}</p>
+  <p class="gathering-task-drop-modifiers-heading">
+    {localize('FABRICATE.App.Gathering.Detail.Modifiers')}
+  </p>
   <ul class="gathering-task-drop-modifier-list">
     <li class="gathering-task-drop-modifier is-base">
-      <span class="gathering-task-drop-modifier-label">{localize('FABRICATE.App.Gathering.Detail.DropBaseChance')}</span>
+      <span class="gathering-task-drop-modifier-label"
+        >{localize('FABRICATE.App.Gathering.Detail.DropBaseChance')}</span
+      >
       <span class="gathering-task-drop-modifier-value">{pct(drop.baseChance)}%</span>
     </li>
     {#each lines as line (line.key)}
@@ -60,7 +87,9 @@
         <span class="gathering-task-drop-modifier-label">
           <i class={line.icon} aria-hidden="true"></i>{line.label}
         </span>
-        <span class={`gathering-task-drop-modifier-value ${toneClass(line.value)}`}>{signedPercent(line.value)}</span>
+        <span class={`gathering-task-drop-modifier-value ${toneClass(line.value)}`}
+          >{signedPercent(line.value)}</span
+        >
       </li>
     {/each}
   </ul>

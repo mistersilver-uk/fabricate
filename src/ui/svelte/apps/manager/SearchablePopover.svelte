@@ -86,7 +86,7 @@
     pickerClass = '',
     minWidth = 240,
     maxWidth = 340,
-    onChoose = () => {}
+    onChoose = () => {},
   } = $props();
 
   let open = $state(false);
@@ -100,7 +100,11 @@
   const normalizedSearch = $derived(search.trim().toLowerCase());
   const filteredOptions = $derived(
     normalizedSearch
-      ? options.filter(option => String(option.label || '').toLowerCase().includes(normalizedSearch))
+      ? options.filter((option) =>
+          String(option.label || '')
+            .toLowerCase()
+            .includes(normalizedSearch)
+        )
       : options
   );
 
@@ -108,17 +112,17 @@
   // (or an unknown) group falls into a trailing, heading-less bucket so an option can
   // never be silently dropped by a mismatched group id.
   const groupedOptions = $derived.by(() => {
-    const groups = Array.isArray(optionGroups) ? optionGroups.filter(group => group?.id) : [];
+    const groups = Array.isArray(optionGroups) ? optionGroups.filter((group) => group?.id) : [];
     if (groups.length === 0) return [];
-    const known = new Set(groups.map(group => group.id));
-    const buckets = groups.map(group => ({
+    const known = new Set(groups.map((group) => group.id));
+    const buckets = groups.map((group) => ({
       id: group.id,
       label: group.label || '',
-      options: filteredOptions.filter(option => option.group === group.id)
+      options: filteredOptions.filter((option) => option.group === group.id),
     }));
-    const ungrouped = filteredOptions.filter(option => !known.has(option.group));
+    const ungrouped = filteredOptions.filter((option) => !known.has(option.group));
     if (ungrouped.length > 0) buckets.push({ id: '__ungrouped', label: '', options: ungrouped });
-    return buckets.filter(bucket => bucket.options.length > 0);
+    return buckets.filter((bucket) => bucket.options.length > 0);
   });
   const isGrouped = $derived(groupedOptions.length > 0);
 
@@ -182,7 +186,12 @@
   function updatePosition() {
     if (!open || !triggerButton || typeof window === 'undefined') return;
     const host = getPopoverHost();
-    const hostRect = host?.getBoundingClientRect?.() ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+    const hostRect = host?.getBoundingClientRect?.() ?? {
+      left: 0,
+      top: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
     const triggerRect = triggerButton.getBoundingClientRect();
     const bounds = getHorizontalBounds(hostRect);
     const layout = computeIconPickerPopoverLayout(
@@ -192,19 +201,32 @@
         top: triggerRect.top - hostRect.top,
         bottom: triggerRect.bottom - hostRect.top,
         width: triggerRect.width,
-        height: triggerRect.height
+        height: triggerRect.height,
       },
       { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
-      { horizontalAlign: 'left', minWidth, maxWidth, minLeft: bounds.minLeft, maxRight: bounds.maxRight }
+      {
+        horizontalAlign: 'left',
+        minWidth,
+        maxWidth,
+        minLeft: bounds.minLeft,
+        maxRight: bounds.maxRight,
+      }
     );
     if (!layout) {
       popoverStyle = '';
       return;
     }
-    const vertical = layout.placement === 'top'
-      ? `top: auto; bottom: ${layout.bottom}px;`
-      : `top: ${layout.top}px; bottom: auto;`;
-    popoverStyle = [`left: ${layout.left}px;`, 'right: auto;', `width: ${layout.width}px;`, `max-height: ${layout.maxHeight}px;`, vertical].join(' ');
+    const vertical =
+      layout.placement === 'top'
+        ? `top: auto; bottom: ${layout.bottom}px;`
+        : `top: ${layout.top}px; bottom: auto;`;
+    popoverStyle = [
+      `left: ${layout.left}px;`,
+      'right: auto;',
+      `width: ${layout.width}px;`,
+      `max-height: ${layout.maxHeight}px;`,
+      vertical,
+    ].join(' ');
   }
 
   // One attribute set for both trigger shapes. Writing it twice would be a copy the
@@ -218,7 +240,7 @@
     title: triggerTitle || undefined,
     'aria-label': triggerAriaLabel || undefined,
     onclick: toggle,
-    onkeydown: stop
+    onkeydown: stop,
   });
 
   $effect(() => {
@@ -246,12 +268,22 @@
 <div
   class={`manager-travel-picker ${pickerClass}`}
   bind:this={pickerRoot}
-  use:dismissOnOutsideClick={{ enabled: open, onDismiss: () => close(), additionalNodes: () => [popoverRoot] }}
+  use:dismissOnOutsideClick={{
+    enabled: open,
+    onDismiss: () => close(),
+    additionalNodes: () => [popoverRoot],
+  }}
 >
   {#snippet triggerBody()}
-    {#if triggerImg}<span class="manager-travel-portrait" aria-hidden="true"><img src={triggerImg} alt="" /></span>{:else if triggerIcon}<i class={triggerIcon} aria-hidden="true"></i>{/if}
-    {#if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span>{/if}
-    {#if showChevron}<i class={open ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>{/if}
+    {#if triggerImg}<span class="manager-travel-portrait" aria-hidden="true"
+        ><img src={triggerImg} alt="" /></span
+      >{:else if triggerIcon}<i class={triggerIcon} aria-hidden="true"></i>{/if}
+    {#if triggerLabel}<span class={`manager-travel-picker-value ${valueClass}`}>{triggerLabel}</span
+      >{/if}
+    {#if showChevron}<i
+        class={open ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+        aria-hidden="true"
+      ></i>{/if}
   {/snippet}
 
   {#if triggerChip}
@@ -274,7 +306,12 @@
       aria-label={dialogAriaLabel || undefined}
       use:portal={() => getPopoverHost()}
       onclick={stop}
-      onkeydown={(event) => { if (event.key === 'Escape') { stop(event); close(); } }}
+      onkeydown={(event) => {
+        if (event.key === 'Escape') {
+          stop(event);
+          close();
+        }
+      }}
     >
       {#if showSearch}
         <div class="manager-travel-popover-search">
@@ -298,7 +335,9 @@
           onclick={() => choose(option.id)}
         >
           {#if option.img}
-            <span class="manager-travel-portrait" aria-hidden="true"><img src={option.img} alt="" /></span>
+            <span class="manager-travel-portrait" aria-hidden="true"
+              ><img src={option.img} alt="" /></span
+            >
           {:else if option.icon}
             <i class={option.icon} aria-hidden="true"></i>
           {/if}
@@ -307,10 +346,19 @@
         </button>
       {/snippet}
 
-      <div class="manager-travel-popover-options" role="listbox" aria-label={dialogAriaLabel || undefined}>
+      <div
+        class="manager-travel-popover-options"
+        role="listbox"
+        aria-label={dialogAriaLabel || undefined}
+      >
         {#if isGrouped}
           {#each groupedOptions as bucket (bucket.id)}
-            <div class="manager-travel-popover-group" role="group" aria-label={bucket.label || undefined} data-popover-group={bucket.id}>
+            <div
+              class="manager-travel-popover-group"
+              role="group"
+              aria-label={bucket.label || undefined}
+              data-popover-group={bucket.id}
+            >
               {#if bucket.label}
                 <p class="manager-travel-popover-group-label" aria-hidden="true">{bucket.label}</p>
               {/if}

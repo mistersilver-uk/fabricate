@@ -23,7 +23,7 @@
     addLabel = '',
     onAddTool = () => {},
     onRemoveTool = () => {},
-    idPrefix = ''
+    idPrefix = '',
   } = $props();
 
   function text(key, fallback) {
@@ -31,8 +31,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const addToolLabel = $derived(addLabel || text('FABRICATE.Admin.Manager.Recipe.AddTool', 'Add tool'));
-  const emptyToolLabel = $derived(emptyLabel || text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyPanel', 'No tools required.'));
+  const addToolLabel = $derived(
+    addLabel || text('FABRICATE.Admin.Manager.Recipe.AddTool', 'Add tool')
+  );
+  const emptyToolLabel = $derived(
+    emptyLabel || text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyPanel', 'No tools required.')
+  );
 
   function toolDisplayLabel(tool) {
     return (
@@ -43,7 +47,7 @@
   }
 
   function toolLabel(toolId) {
-    const tool = (toolsLibrary || []).find(entry => entry.id === toolId);
+    const tool = (toolsLibrary || []).find((entry) => entry.id === toolId);
     return toolDisplayLabel(tool);
   }
 
@@ -52,14 +56,14 @@
   }
 
   function toolImageById(toolId) {
-    const tool = (toolsLibrary || []).find(entry => entry.id === toolId);
+    const tool = (toolsLibrary || []).find((entry) => entry.id === toolId);
     return toolImage(tool);
   }
 
   const availableToolOptions = $derived(
     (toolsLibrary || [])
-      .filter(tool => !(toolIds || []).includes(tool.id))
-      .map(tool => ({ id: tool.id, label: toolDisplayLabel(tool), img: toolImage(tool) }))
+      .filter((tool) => !(toolIds || []).includes(tool.id))
+      .map((tool) => ({ id: tool.id, label: toolDisplayLabel(tool), img: toolImage(tool) }))
   );
 
   const toolsEmptyHint = $derived(
@@ -81,7 +85,9 @@
     <ul class="manager-recipe-tool-rows">
       {#each toolIds as toolId (toolId)}
         <li class="manager-recipe-tool-row" data-recipe-tool-id={toolId}>
-          <span class="manager-recipe-tool-medallion" aria-hidden="true"><img src={toolImageById(toolId)} alt="" /></span>
+          <span class="manager-recipe-tool-medallion" aria-hidden="true"
+            ><img src={toolImageById(toolId)} alt="" /></span
+          >
           <span class="manager-recipe-tool-name">{toolLabel(toolId)}</span>
           <button
             type="button"
@@ -90,7 +96,8 @@
             aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTool', 'Remove tool')}
             title={text('FABRICATE.Admin.Manager.Recipe.RemoveTool', 'Remove tool')}
             onclick={() => onRemoveTool(toolId)}
-          ><i class="fas fa-times" aria-hidden="true"></i></button>
+            ><i class="fas fa-times" aria-hidden="true"></i></button
+          >
         </li>
       {/each}
     </ul>
@@ -104,8 +111,14 @@
     triggerAriaLabel={addToolLabel}
     triggerAddMarker="tool"
     dialogAriaLabel={addToolLabel}
-    searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder', 'Search tools...')}
-    searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder', 'Search tools...')}
+    searchPlaceholder={text(
+      'FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder',
+      'Search tools...'
+    )}
+    searchAriaLabel={text(
+      'FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder',
+      'Search tools...'
+    )}
     emptyHint={toolsEmptyHint}
     showChevron={false}
     onChoose={(id) => onAddTool(id)}

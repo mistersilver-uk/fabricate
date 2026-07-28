@@ -60,7 +60,7 @@
     selectLabel = '',
     onSelect = () => {},
     onEdit = () => {},
-    onToggleSelect = () => {}
+    onToggleSelect = () => {},
   } = $props();
 
   const essences = $derived(Array.isArray(component?.essences) ? component.essences : []);
@@ -74,11 +74,7 @@
   data-component-bulk-selected={bulkSelected}
   aria-current={selected ? 'true' : undefined}
 >
-  <button
-    type="button"
-    class="manager-component-identity"
-    onclick={() => onSelect(component?.id)}
-  >
+  <button type="button" class="manager-component-identity" onclick={() => onSelect(component?.id)}>
     <!-- The shared Medallion, as the recipe row uses: a flat fill on the surface ramp
          with a real glyph fallback, rather than a hand-rolled chip whose fallback was a
          private `icons/svg/item-bag.svg` path. Gradients stay forbidden. -->
@@ -95,10 +91,17 @@
     {#if categoryBadge}
       <!-- Suppressed for `general` by the caller: no redundant "General" chip, mirroring
            the Recipe Studio's badge-vs-filter asymmetry. `general` stays a FILTER option. -->
-      <Chip class="manager-component-category-badge" data-component-category={categoryBadge}>{categoryBadge}</Chip>
+      <Chip class="manager-component-category-badge" data-component-category={categoryBadge}
+        >{categoryBadge}</Chip
+      >
     {/if}
     {#if difficultyBadge}
-      <Chip tone="info" icon="fas fa-gauge-high" class="manager-component-difficulty-badge" data-component-difficulty>
+      <Chip
+        tone="info"
+        icon="fas fa-gauge-high"
+        class="manager-component-difficulty-badge"
+        data-component-difficulty
+      >
         <span>{difficultyBadge}</span>
       </Chip>
     {/if}
@@ -113,7 +116,8 @@
             icon={essence.icon || 'fas fa-mortar-pestle'}
             title={`${essence.name || essence.id} ${essence.quantity}`}
             aria-label={`${essence.name || essence.id} ${essence.quantity}`}
-          >{essence.quantity}</Chip>
+            >{essence.quantity}</Chip
+          >
         {/each}
       </span>
     {/if}

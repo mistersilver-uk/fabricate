@@ -46,7 +46,7 @@
     breakageAuthority = 'toolSpecific',
     resolutionMode = null,
     allowNatStepping = false,
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
@@ -100,10 +100,18 @@
   // place a GM reviews per-check issues.
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
-  const successOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success'));
-  const successOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure'));
-  const breakOnLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break'));
-  const breakOffLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break"));
+  const successOnLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success')
+  );
+  const successOffLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOff', 'Failure')
+  );
+  const breakOnLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break')
+  );
+  const breakOffLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOff', "Don't break")
+  );
 
   function emit(patch) {
     onChange({ ...value, ...patch });
@@ -152,8 +160,14 @@
 
 <div class="manager-checks-editor" data-crafting-check-editor>
   <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}</h3>
-    <div class="manager-checks-type-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}>
+    <h3 class="manager-card-title">
+      {text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}
+    </h3>
+    <div
+      class="manager-checks-type-options"
+      role="radiogroup"
+      aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}
+    >
       {#each TYPE_OPTIONS as option (option.value)}
         <label
           class={`manager-resolution-option ${type === option.value ? 'is-active' : ''}`}
@@ -167,8 +181,12 @@
             onchange={() => setType(option.value)}
           />
           <span class="manager-resolution-option-body">
-            <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
-            <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
+            <span class="manager-resolution-option-name"
+              >{text(option.labelKey, option.fallback)}</span
+            >
+            <span class="manager-resolution-option-desc"
+              >{text(option.descKey, option.descFallback)}</span
+            >
           </span>
         </label>
       {/each}
@@ -179,25 +197,44 @@
     <section class="manager-inspector-card" data-check-nat-stepping>
       <div class="manager-checks-card-head">
         <div>
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingTitle', 'Natural tier stepping')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingHint', 'A natural 20 steps the matched tier up once; a natural 1 steps it down once.')}</p>
+          <h3 class="manager-card-title">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingTitle',
+              'Natural tier stepping'
+            )}
+          </h3>
+          <p class="manager-muted">
+            {text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingHint',
+              'A natural 20 steps the matched tier up once; a natural 1 steps it down once.'
+            )}
+          </p>
         </div>
         <label class="manager-toggle-field">
           <input
             type="checkbox"
             role="switch"
             checked={value?.natStepping === true}
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingToggle', 'Enable natural tier stepping')}
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.NatSteppingToggle',
+              'Enable natural tier stepping'
+            )}
             onchange={(event) => emit({ natStepping: event.currentTarget.checked })}
           />
-          <span>{value?.natStepping === true ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+          <span
+            >{value?.natStepping === true
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+          >
         </label>
       </div>
     </section>
   {/if}
 
   <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}</h3>
+    <h3 class="manager-card-title">
+      {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+    </h3>
     <CheckFormulaFields
       rollFormula={value?.rollFormula || ''}
       dc={value?.dc ?? 15}
@@ -229,7 +266,9 @@
 
   <section class="manager-inspector-card">
     <div class="manager-checks-card-head">
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}</h3>
+      <h3 class="manager-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}
+      </h3>
       <button type="button" class="manager-button" data-add-outcome onclick={addOutcome}>
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddOutcome', 'Add outcome')}</span>
@@ -237,22 +276,46 @@
     </div>
 
     {#if outcomes.length === 0}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes', 'No outcome tiers yet. Add the tiers this check routes results into.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.NoOutcomes',
+          'No outcome tiers yet. Add the tiers this check routes results into.'
+        )}
+      </p>
     {:else}
-      <div class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'} ${checkDriven ? '' : 'is-no-break'}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}>
+      <div
+        class={`manager-checks-outcome-table ${type === 'fixed' ? 'is-fixed' : 'is-relative'} ${checkDriven ? '' : 'is-no-break'}`}
+        role="table"
+        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomesTitle', 'Outcome tiers')}
+      >
         <div class="manager-checks-outcome-head" role="row">
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span>
+          <span role="columnheader"
+            >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span
+          >
           {#if type === 'relative'}
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}</span>
+            <span role="columnheader"
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}</span
+            >
           {:else}
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}</span>
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span>
+            <span role="columnheader"
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}</span
+            >
+            <span role="columnheader"
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span
+            >
           {/if}
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeColumn', 'Outcome')}</span>
+          <span role="columnheader"
+            >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeColumn', 'Outcome')}</span
+          >
           {#if checkDriven}
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span>
+            <span role="columnheader"
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}</span
+            >
           {/if}
-          <span role="columnheader" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}></span>
+          <span
+            role="columnheader"
+            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}
+          ></span>
         </div>
 
         {#each outcomes as outcome, index (outcome.id)}
@@ -275,7 +338,8 @@
                 data-outcome-dc
                 aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}
                 value={outcome.dc ?? 0}
-                oninput={(event) => updateOutcome(outcome.id, { dc: numeric(event.currentTarget.value) })}
+                oninput={(event) =>
+                  updateOutcome(outcome.id, { dc: numeric(event.currentTarget.value) })}
               />
             {:else}
               <input
@@ -283,14 +347,16 @@
                 data-outcome-start
                 aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}
                 value={outcome.start ?? 0}
-                oninput={(event) => updateOutcome(outcome.id, { start: numeric(event.currentTarget.value) })}
+                oninput={(event) =>
+                  updateOutcome(outcome.id, { start: numeric(event.currentTarget.value) })}
               />
               <input
                 type="number"
                 data-outcome-end
                 aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}
                 value={outcome.end ?? 0}
-                oninput={(event) => updateOutcome(outcome.id, { end: numeric(event.currentTarget.value) })}
+                oninput={(event) =>
+                  updateOutcome(outcome.id, { end: numeric(event.currentTarget.value) })}
               />
             {/if}
 
@@ -311,8 +377,12 @@
                 class={`manager-checks-state-pill ${outcome.breakTools === true ? 'is-negative' : 'is-positive'}`}
                 data-outcome-break
                 aria-pressed={outcome.breakTools === true}
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak', 'Break tools')}
-                onclick={() => updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreak',
+                  'Break tools'
+                )}
+                onclick={() =>
+                  updateOutcome(outcome.id, { breakTools: !(outcome.breakTools === true) })}
               >
                 {outcome.breakTools === true ? breakOnLabel : breakOffLabel}
               </button>
@@ -322,7 +392,10 @@
               type="button"
               class="manager-icon-button is-danger"
               data-remove-outcome
-              aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveOutcome', 'Remove outcome')}
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.RemoveOutcome',
+                'Remove outcome'
+              )}
               onclick={() => removeOutcome(outcome.id)}
             >
               <i class="fas fa-trash" aria-hidden="true"></i>
@@ -331,6 +404,5 @@
         {/each}
       </div>
     {/if}
-
   </section>
 </div>

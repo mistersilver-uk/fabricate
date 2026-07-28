@@ -19,26 +19,26 @@
 
   const TABS = [
     { id: 'settings', icon: 'fas fa-sliders', key: 'Settings', fallback: 'Settings' },
-    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
+    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' },
   ];
 
   function badgeList(tab) {
     const value = badges?.[tab.id];
-    const values = Array.isArray(value) ? value : (value ? [value] : []);
+    const values = Array.isArray(value) ? value : value ? [value] : [];
     return values
-      .map(badge => {
+      .map((badge) => {
         if (badge && typeof badge === 'object') {
           return {
             label: badge.label ?? badge.value ?? '',
-            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral')
+            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral'),
           };
         }
         return {
           label: badge,
-          tone: tab.id === 'validation' ? 'danger' : 'neutral'
+          tone: tab.id === 'validation' ? 'danger' : 'neutral',
         };
       })
-      .filter(badge => badge.label !== '' && badge.label !== 0);
+      .filter((badge) => badge.label !== '' && badge.label !== 0);
   }
 
   function badgeTone(tone) {
@@ -58,7 +58,11 @@
   }
 </script>
 
-<div class="manager-environment-tabs manager-system-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Tabs.Label', 'System overview sections')}>
+<div
+  class="manager-environment-tabs manager-system-tabs"
+  role="tablist"
+  aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Tabs.Label', 'System overview sections')}
+>
   {#each TABS as tab, index (tab.id)}
     <button
       type="button"
@@ -75,7 +79,8 @@
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(`FABRICATE.Admin.Manager.SystemEdit.Tabs.${tab.key}`, tab.fallback)}</span>
       {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <Chip tone={badgeTone(badge.tone)} class="manager-environment-tab-badge">{badge.label}</Chip>
+        <Chip tone={badgeTone(badge.tone)} class="manager-environment-tab-badge">{badge.label}</Chip
+        >
       {/each}
     </button>
   {/each}
