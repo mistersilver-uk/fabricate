@@ -3010,6 +3010,13 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // Issue 765: unlock explicit multi-step authoring so the simple system can host
       // a stepped recipe (the player-crafting-multistep screenshot subject).
       features: { multiStepRecipes: true, essences: true },
+      // Issue 917: authored tag vocabulary for 'Smoke Sigil Etching' (acceptance
+      // criterion 5). `_validateTagPlaceholders` rejects a recipe whose tag match
+      // names anything outside `system.itemTags`, so the tag must be registered here
+      // for the recipe to persist at all. No component registered in this system is
+      // ever given this tag, so the requirement stays authored-but-unmatched — the
+      // whole point of the fixture.
+      itemTags: ['smoke-voidbound'],
       // Three authored essences (issue 917). `colorToken` is a BARE `--fab-tag-*` key —
       // never a hex and never the `--fab-tag-` prefix — because the normalizer strips the
       // prefix and every tinted surface composes `var(--fab-tag-<token>)` itself. Two
