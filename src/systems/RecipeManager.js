@@ -28,11 +28,14 @@ import { ingredientSetToolsAreActive, resolveToolPrerequisites } from './toolChe
 const DEFAULT_RECIPE_IMG = DEFAULT_RECIPE_IMAGE;
 const FALLBACK_RECIPE_IMG = 'icons/sundries/documents/document-bound-white-tan.webp';
 const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
-// Match-kind fallback icons for ingredient tiles whose match carries no managed
-// component id (issue 551). A tag match falls back to a generic item icon when
-// nothing in inventory currently satisfies it; a currency match — which never
-// resolves to an inventory item — always shows a coin icon.
-const FALLBACK_TAG_IMG = 'icons/svg/item-bag.svg';
+// Foundry's generic default Item image. On a MATERIAL tile it is a sentinel meaning
+// "no image", never an image to render (issue 917): a tag requirement with nothing
+// matching in inventory has no item to read an image from, and a matched item may
+// carry the literal as its own `img`. Both resolve to a null image so the tile draws
+// its glyph. `FALLBACK_COMPONENT_IMG` is deliberately NOT retired — it also backs the
+// tool-state image below, and blanking tool tiles is a different change.
+const GENERIC_ITEM_IMG = 'icons/svg/item-bag.svg';
+// A currency match never resolves to an inventory item, so it always shows a coin icon.
 const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
 
 /**
@@ -463,20 +466,31 @@ export class RecipeManager {
    *   `resolveIngredientSelection` so both this display path and the engine's
    *   consumption resolve the SAME chosen option/stack. Null (the default) keeps the
    *   first-satisfiable behaviour byte-for-byte unchanged.
+   * @param {object|null} [options.essenceAllocation] - The player's `{ itemKey: units }`
+   *   funding for the set's shared essence block (issue 917), threaded so the rail
+   *   displays exactly what the craft consumes. Null (the default) uses the allocator's
+   *   suggestion, which is today's behaviour.
    * @returns {{
    *   canCraft: boolean,
    *   satisfiableSet: IngredientSet|null,
    *   missing: { ingredients: Array, essences: Array, tools: Array },
-   *   ingredientStates: Array<{ groupId: string|null, description: string, need: number, have: number, satisfied: boolean, hasChoice: boolean, choiceCount: number, isEssence?: boolean, icon?: string|null }>,
+   *   ingredientStates: Array<{ groupId: string|null, description: string, need: number, have?: number, delivered?: number, owned?: number, satisfied: boolean, hasChoice: boolean, choiceCount: number, isEssence?: boolean, icon?: string|null }>,
    *   ingredientChoices: Array<object>,
    *   essenceStates: Array<{ type: string, need: number, have: number, satisfied: boolean, isEssence: boolean, icon: string|null }>,
+   *   essencePool: object|null,
    *   toolStates: Array<{ name: string, img: string|null, available: boolean, virtual?: boolean }>
    * }}
    */
   evaluateCraftability(
     componentSourceActors,
     recipe,
-    { presentTools = null, craftingActor = null, resolveComponent, optionOverrides = null } = {}
+    {
+      presentTools = null,
+      craftingActor = null,
+      resolveComponent,
+      optionOverrides = null,
+      essenceAllocation = null,
+    } = {}
   ) {
     const sourceActors = Array.isArray(componentSourceActors)
       ? componentSourceActors
@@ -490,6 +504,7 @@ export class RecipeManager {
       missing: { ingredients: [], essences: [], tools: [] },
       ingredientStates: [],
       essenceStates: [],
+      essencePool: null,
       toolStates: [],
     };
 
@@ -544,7 +559,12 @@ export class RecipeManager {
               availableItems,
               (ingredient, item) =>
                 this.ingredientMatchesItem(recipe, ingredient, item, resolveComponent),
-              { affordCurrency, optionOverrides, resolveItemEssences: resolveItemEssencesForSet }
+              {
+                affordCurrency,
+                optionOverrides,
+                essenceAllocation,
+                resolveItemEssences: resolveItemEssencesForSet,
+              }
             )
           : {
               success: true,
@@ -671,6 +691,16 @@ export class RecipeManager {
       features
     );
 
+    // The set's shared essence funding (issue 917) — the carriers a player allocates
+    // from and what each requirement is delivered. Null when the system has essences
+    // disabled or the set authors no essence requirement.
+    const essencePool = this._buildEssencePool(
+      recipe,
+      displayIngredientSet,
+      displaySelection,
+      features
+    );
+
     // Build the missing object (for backward compatibility with canCraft() callers).
     const missingIngredients = [];
     for (const groupMissing of displaySelection?.missingGroups || []) {
@@ -701,6 +731,7 @@ export class RecipeManager {
       ingredientStates,
       ingredientChoices,
       essenceStates,
+      essencePool,
       toolStates,
     };
   }
@@ -794,11 +825,14 @@ export class RecipeManager {
       }
     }
 
-    // Re-derive satisfaction against the merged max need.
-    const ingredientStates = [...ingredientByKey.values()].map((state) => ({
-      ...state,
-      satisfied: (state.have ?? 0) >= (state.need ?? 0),
-    }));
+    // Re-derive satisfaction against the merged max need. An essence requirement has
+    // no `have` — its plan-scoped `delivered` is capped at `need` and would always
+    // read satisfied — so the shopping projection restates its `owned` (the uncapped
+    // essence amount held) as the `have` the aggregator shops against.
+    const ingredientStates = [...ingredientByKey.values()].map((state) => {
+      const held = state.isEssence === true ? (state.owned ?? 0) : (state.have ?? 0);
+      return { ...state, have: held, satisfied: held >= (state.need ?? 0) };
+    });
     const essenceStates = [...essenceByType.values()].map((essence) => ({
       ...essence,
       satisfied: (essence.have ?? 0) >= (essence.need ?? 0),
@@ -949,7 +983,7 @@ export class RecipeManager {
    * @param {IngredientSet} ingredientSet
    * @param {Object} selection - result from resolveIngredientSelection
    * @param {Item[]} availableItems
-   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have: number, satisfied: boolean, isEssence?: boolean, icon?: string|null }>}
+   * @returns {Array<{ componentId: string|null, name: string, img: string|null, description: string, need: number, have?: number, delivered?: number, owned?: number, satisfied: boolean, isEssence?: boolean, icon?: string|null }>}
    * @private
    */
   _buildIngredientStates(recipe, ingredientSet, selection, availableItems) {
@@ -965,23 +999,21 @@ export class RecipeManager {
       (selection?.missingGroups || []).map((mg) => mg?.group?.id).filter(Boolean)
     );
 
-    // Lazily accumulate held essences once (only when a satisfied essence tile needs
-    // it), via the same component-aware `_accumulateEssences` path the resolver uses.
-    let accumulatedEssences = null;
-    const getAccumulatedEssences = () => {
-      if (accumulatedEssences === null) {
-        accumulatedEssences = this._accumulateEssences(availableItems, recipe);
-      }
-      return accumulatedEssences;
-    };
-
     // The option the engine chose per group (issue 553), so the tile always mirrors
     // the option/stack the craft consumes.
     const chosenByGroup = this._chosenOptionByGroup(ingredientSet, selection);
+    // Every essence requirement's attributed share of the block, keyed by group id
+    // (issue 917) — the SOLE source of an essence tile's reported quantity, on the
+    // satisfied path as well as the missing one.
+    const essenceByGroup = new Map(
+      (selection?.essencePool?.requirements || []).map((requirement) => [
+        requirement.groupId,
+        requirement,
+      ])
+    );
 
     return groups.map((group) => {
       const options = group.options || [];
-      const isMissing = missingGroupIds.has(group.id);
       const chosenOption = chosenByGroup.get(group?.id) ?? options[0] ?? null;
       // Show ONLY the chosen option's description (issue 552) instead of OR-joining
       // every option's name against a single unlabelled have/need pip — the tile now
@@ -989,16 +1021,26 @@ export class RecipeManager {
       const description =
         this._resolveIngredientDescription(recipe, chosenOption) ||
         options.map((o) => this._resolveIngredientDescription(recipe, o) || '').join(' OR ');
+      const base = { groupId: group?.id ?? null, description };
 
-      if (isMissing) {
-        const missingEntry = (selection?.missingGroups || []).find(
-          (mg) => mg?.group?.id === group.id
-        );
-        const visual = this._resolveIngredientVisual(recipe, chosenOption, availableItems);
+      const missingEntry = missingGroupIds.has(group.id)
+        ? ((selection?.missingGroups || []).find((mg) => mg?.group?.id === group.id) ?? null)
+        : null;
+
+      if (chosenOption?.match?.type === 'essence') {
+        return this._buildEssenceIngredientState(recipe, group, chosenOption, selection, {
+          ...base,
+          requirement: essenceByGroup.get(group?.id ?? null) ?? null,
+          isMissing: missingGroupIds.has(group.id),
+          missingEntry,
+          availableItems,
+        });
+      }
+
+      if (missingEntry) {
         return {
-          ...visual,
-          groupId: group?.id ?? null,
-          description,
+          ...this._resolveIngredientVisual(recipe, chosenOption, availableItems),
+          ...base,
           need: Number(missingEntry?.need || chosenOption?.quantity || 1),
           have: Number(missingEntry?.have || 0),
           satisfied: false,
@@ -1008,46 +1050,67 @@ export class RecipeManager {
       // The specific inventory item the engine will consume for this option, from the
       // same consumption plan, so a shared tag/component tile shows the CONSUMED item
       // rather than the first inventory item that merely matches (issue 553).
-      const consumedItem =
-        (selection?.plan || []).find((entry) => entry.ingredient === chosenOption)?.item || null;
-
-      const visual = this._resolveIngredientVisual(
-        recipe,
-        chosenOption,
-        availableItems,
-        consumedItem
-      );
-
-      // An essence option is amount-based, not occurrence-based: `ingredientMatchesItem`
-      // returns false for it, so use the essence amount as `need` and the accumulated
-      // essence for its id as `have` (the same component-aware `_accumulateEssences`
-      // path the resolver consumes) — else a satisfied essence tile reads have 0 / need 1.
-      if (chosenOption?.match?.type === 'essence') {
-        const essenceId = String(chosenOption.match.essenceId || '').trim();
-        const accumulated = getAccumulatedEssences();
-        return {
-          ...visual,
-          groupId: group?.id ?? null,
-          description,
-          need: Math.max(0, Number(chosenOption.match.amount) || 0),
-          have: accumulated[essenceId] || 0,
-          satisfied: true,
-        };
-      }
-
+      const consumedItem = this._consumedItemForGroup(selection, group, chosenOption);
       const matchingItems = availableItems.filter((item) =>
         this.ingredientMatchesItem(recipe, chosenOption, item)
       );
-      const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
       return {
-        ...visual,
-        groupId: group?.id ?? null,
-        description,
+        ...this._resolveIngredientVisual(recipe, chosenOption, availableItems, consumedItem),
+        ...base,
         need: Number(chosenOption?.quantity || 1),
-        have,
+        have: matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0),
         satisfied: true,
       };
     });
+  }
+
+  /**
+   * The display state for one ESSENCE requirement.
+   *
+   * An essence option is amount-based, not occurrence-based, so it reports `delivered`
+   * — the essence amount the resolved allocation supplies it under the block's
+   * per-essence-id partition — beside `owned`, the essence amount held across every
+   * matching carrier. The component/tag `have` is deliberately NOT reused: it is not
+   * net of plan, and reading two different questions off one key in a single array is
+   * exactly the ambiguity issue 917 removes. Because every take is capped at `need`, a
+   * satisfied requirement always reads `need / need`.
+   * @private
+   */
+  _buildEssenceIngredientState(recipe, group, option, selection, context) {
+    const { requirement, isMissing, missingEntry, availableItems, ...base } = context;
+    const consumedItem = this._consumedItemForGroup(selection, group, option);
+    const need = Math.max(0, Number(option?.match?.amount) || 0);
+    // A selection with no pool at all (a duck-typed set that never resolved one) falls
+    // back to the missing-group verdict rather than silently reading satisfied.
+    const delivered = requirement
+      ? requirement.delivered
+      : Number(missingEntry?.have) || (isMissing ? 0 : need);
+    return {
+      ...this._resolveIngredientVisual(recipe, option, availableItems, consumedItem),
+      ...base,
+      need,
+      delivered: Number(delivered) || 0,
+      owned: Number(requirement?.owned ?? delivered) || 0,
+      satisfied: requirement ? requirement.satisfied === true : !isMissing,
+    };
+  }
+
+  /**
+   * The inventory item the consumption plan spends for a group.
+   *
+   * An essence requirement resolves through `essenceGroupIds` FIRST: the block emits
+   * one entry per item key naming one `ingredient`, so a sibling essence tile reading
+   * only `entry.ingredient` would resolve to no consumed item at all.
+   * @private
+   */
+  _consumedItemForGroup(selection, group, chosenOption) {
+    const entries = selection?.plan || [];
+    const groupId = group?.id ?? null;
+    if (groupId) {
+      const byGroup = entries.find((entry) => entry?.essenceGroupIds?.includes(groupId));
+      if (byGroup) return byGroup.item ?? null;
+    }
+    return entries.find((entry) => entry.ingredient === chosenOption)?.item || null;
   }
 
   /**
@@ -1242,6 +1305,7 @@ export class RecipeManager {
     if (visual.isEssence === true) {
       choice.isEssence = true;
       choice.icon = visual.icon ?? null;
+      choice.colorToken = visual.colorToken ?? null;
     }
     return choice;
   }
@@ -1321,19 +1385,27 @@ export class RecipeManager {
       return {
         componentId: match.componentId,
         name: this.resolveComponentName(recipe, match.componentId),
-        img: this.resolveComponentImg(recipe, match.componentId),
+        img: this._materialImg(this.resolveComponentImg(recipe, match.componentId)),
       };
     }
 
     // An essence tile resolves its NAME + authored icon from the essence definition
     // (never the raw essenceId). It carries an explicit presentation discriminator so
-    // player surfaces render the authored glyph rather than an image fallback.
+    // player surfaces render the authored glyph rather than an image fallback, plus
+    // the GM-authored colour token that tints that glyph (issue 917).
     if (match?.type === 'essence') {
       const definition = this._resolveEssenceDefinition(recipe, match.essenceId);
       const essenceName = this._resolveIngredientDescription(recipe, ingredient);
       const icon =
         typeof definition?.icon === 'string' && definition.icon.trim() ? definition.icon : null;
-      return { componentId: null, name: essenceName, img: null, isEssence: true, icon };
+      return {
+        componentId: null,
+        name: essenceName,
+        img: null,
+        isEssence: true,
+        icon,
+        colorToken: this._essenceColorToken(definition),
+      };
     }
 
     const name = ingredient?.getDescription?.() || '';
@@ -1342,7 +1414,7 @@ export class RecipeManager {
       const matchingItem =
         consumedItem ||
         (availableItems || []).find((item) => this.ingredientMatchesItem(recipe, ingredient, item));
-      return { componentId: null, name, img: matchingItem?.img || FALLBACK_TAG_IMG };
+      return { componentId: null, name, img: this._materialImg(matchingItem?.img) };
     }
 
     if (match?.type === 'currency') {
@@ -1350,6 +1422,28 @@ export class RecipeManager {
     }
 
     return { componentId: null, name, img: null };
+  }
+
+  /**
+   * A MATERIAL tile's image, or null when there is nothing to show. Foundry's generic
+   * item-bag literal is the "no image" sentinel here rather than an image (issue 917),
+   * so the tile falls back to its glyph instead of rendering the bag. It never falls
+   * back to the recipe blueprint — that is the RECIPE's fallback, not a material's.
+   * @private
+   */
+  _materialImg(img) {
+    const resolved = typeof img === 'string' ? img.trim() : '';
+    return !resolved || resolved === GENERIC_ITEM_IMG ? null : resolved;
+  }
+
+  /**
+   * The GM-authored `--fab-tag-*` colour token for an essence definition, or null when
+   * unauthored (which every surface renders as the theme accent — today's appearance).
+   * @private
+   */
+  _essenceColorToken(definition) {
+    const token = typeof definition?.colorToken === 'string' ? definition.colorToken.trim() : '';
+    return token || null;
   }
 
   /**
@@ -1376,12 +1470,79 @@ export class RecipeManager {
         type,
         name: typeof name === 'string' && name.trim() ? name : String(type ?? ''),
         icon: typeof icon === 'string' && icon.trim() ? icon : null,
+        colorToken: this._essenceColorToken(definition),
         isEssence: true,
         need,
         have,
         satisfied: have >= need,
       };
     });
+  }
+
+  /**
+   * The shared essence-funding model for one ingredient set's craftability
+   * (issue 917): what each essence requirement needs and was delivered, which held
+   * stacks can fund it and how many units of each the plan draws, and the allocation
+   * tying the two together.
+   *
+   * `null` when the system has essences disabled (matching the per-set essence-state
+   * projection) or when the set authors no essence requirement, so a caller can gate
+   * the whole surface on its presence.
+   *
+   * Every quantity here comes from the RESOLVER's own ledger. In particular
+   * `carriers[].ownedUnits` is the units left AFTER the set's non-essence plan has
+   * claimed: no surface re-reads `item.system.quantity`, which is game-system-specific,
+   * can be absent or `NaN`, and would offer the player units the craft cannot spend.
+   *
+   * @param {Recipe} recipe
+   * @param {IngredientSet} ingredientSet
+   * @param {object|null} selection - the resolved selection carrying `essencePool`
+   * @param {{ enableEssences: boolean }} features
+   * @returns {object|null}
+   * @private
+   */
+  _buildEssencePool(recipe, ingredientSet, selection, features) {
+    const pool = selection?.essencePool ?? null;
+    if (!pool || !features?.enableEssences) return null;
+
+    const components = this._getSystemComponents(recipe);
+    const systemId = recipe?.craftingSystemId;
+
+    return {
+      scopeKey: ingredientSet?.id ?? null,
+      requirements: pool.requirements.map((requirement) => {
+        const definition = this._resolveEssenceDefinition(recipe, requirement.essenceId);
+        const name = definition?.name;
+        const icon = definition?.icon;
+        return {
+          groupId: requirement.groupId,
+          essenceId: requirement.essenceId,
+          name:
+            typeof name === 'string' && name.trim() ? name : String(requirement.essenceId ?? ''),
+          icon: typeof icon === 'string' && icon.trim() ? icon : null,
+          colorToken: this._essenceColorToken(definition),
+          need: requirement.need,
+          delivered: requirement.delivered,
+          owned: requirement.owned,
+          satisfied: requirement.satisfied,
+        };
+      }),
+      carriers: pool.carriers.map((carrier) => {
+        const component = findMatchingComponent(carrier.item, components, systemId);
+        return {
+          itemKey: carrier.itemKey,
+          componentId: component?.id ?? null,
+          name: carrier.item?.name ?? '',
+          img: this._materialImg(carrier.item?.img),
+          ownedUnits: carrier.ownedUnits,
+          allocatedUnits: carrier.allocatedUnits,
+          perUnit: { ...carrier.perUnit },
+        };
+      }),
+      allocation: { ...pool.allocation },
+      totals: { ...pool.totals },
+      suggested: { ...pool.suggested },
+    };
   }
 
   /**
