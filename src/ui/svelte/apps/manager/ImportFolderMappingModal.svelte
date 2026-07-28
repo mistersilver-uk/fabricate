@@ -26,6 +26,7 @@
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
   import ManagerModal from './ManagerModal.svelte';
   import RecipeRoutingAssignment from './recipe/RecipeRoutingAssignment.svelte';
+  import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
 
   let {
     open = false,
@@ -232,12 +233,21 @@
   {onClose}
 >
   {#snippet body()}
+    <!-- The manager's ONE selection control (issue 772). This was a raw checkbox wearing
+         Foundry's default control chrome, which is exactly the inconsistency the shared
+         primitive exists to remove — and it sat one dialog away from the component
+         browser's rows, which now render through the same component. -->
     <label class="manager-import-mapping-match" data-import-mapping-match>
-      <input
-        type="checkbox"
-        bind:this={matchToggle}
+      <SelectionCheckbox
+        size="sm"
+        wrapper="contents"
+        bind:input={matchToggle}
         checked={matchByName}
-        onchange={toggleMatchByName}
+        ariaLabel={text(
+          'FABRICATE.Admin.Items.ImportMapping.MatchByName',
+          'Match folder names to existing categories and tags'
+        )}
+        onChange={toggleMatchByName}
       />
       <span>
         {text(
@@ -378,12 +388,30 @@
 </ManagerModal>
 
 <style>
+  /*
+    One control scale for the whole dialog (issue 772).
+
+    Every control in here rendered at the manager's default body size while the surfaces
+    it sits between — the components toolbar it is launched from, and the bulk edit rail
+    beside it — read at `--fab-recipe-control-font`. The dialog is dense (a row per
+    detected folder, each with a select, a chip, and three buttons), so it was both the
+    largest type on screen and the one with the least room for it.
+  */
   .manager-import-mapping-match {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
-    font-size: 0.76rem;
+    font-size: var(--fab-recipe-control-font);
     color: var(--fab-text-secondary);
+  }
+
+  /* The row's inline actions — Skip / New / Add tag — are secondary to the dialog's own
+     Cancel and Import, which keep the default 34px so the commit action stays the
+     heaviest thing in the footer. */
+  .manager-import-mapping-row :global(.manager-button) {
+    min-height: 28px;
+    padding: 0 var(--fab-space-2);
+    font-size: var(--fab-recipe-control-font);
   }
 
   .manager-import-mapping-list {
@@ -422,6 +450,23 @@
     min-width: 0;
     flex: 1;
     color: var(--fab-text);
+    font-size: var(--fab-recipe-control-font);
+  }
+
+  /* The field labels read as the bulk rail's micro-labels rather than as body text: the
+     two surfaces sit side by side and were captioning the same vocabulary — a category
+     and a tag set — at two different scales. This also settles an inconsistency inside
+     the dialog itself, where "Category" was sentence case beside an uppercase "TAGS". */
+  .manager-import-mapping-controls :global(.manager-field > span) {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fab-text-muted);
+  }
+
+  .manager-import-mapping-category select {
+    font-size: var(--fab-recipe-control-font);
   }
 
   .manager-import-mapping-folder strong {

@@ -48,6 +48,10 @@
     wrapper = 'label',
     ariaLabel = '',
     onChange = () => {},
+    // The real input, exposed so a host can manage focus. The import mapping dialog moves
+    // focus here when it opens, and the input is visually hidden, so a host cannot reach it
+    // by query without reaching through this component's internals.
+    input = $bindable(null),
     ...rest
   } = $props();
 
@@ -60,8 +64,6 @@
   // not "none of these". A box that is BOTH checked and indeterminate reads as
   // indeterminate, which is what the DOM property does too.
   const glyph = $derived(indeterminate ? 'fas fa-minus' : 'fas fa-check');
-
-  let input = $state(null);
 
   // `indeterminate` has no HTML attribute — setting it in markup would do nothing at all,
   // silently. It is re-applied on every change so a re-render cannot drop it.
