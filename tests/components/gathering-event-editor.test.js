@@ -171,8 +171,8 @@ describe('GatheringEventEditView source contract', () => {
   it('supports Arrow Up/Down stepping on condition modifier values', () => {
     assert.ok(rootSource.includes('function onGatheringDropModifierKeydown'), 'root should expose a drop modifier keydown stepper');
     assert.ok(rootSource.includes('function onGatheringEventModifierKeydown'), 'root should expose an event modifier keydown stepper');
-    assert.ok(rootSource.includes('onkeydown={(event) => onGatheringDropModifierKeydown'), 'drop modifier input should wire the keydown stepper');
-    assert.ok(rootSource.includes('onkeydown={(event) => onGatheringEventModifierKeydown'), 'event modifier input should wire the keydown stepper');
+    assert.ok(/onkeydown=\{\(event\) =>\s*onGatheringDropModifierKeydown/.test(rootSource), 'drop modifier input should wire the keydown stepper');
+    assert.ok(/onkeydown=\{\(event\) =>\s*onGatheringEventModifierKeydown/.test(rootSource), 'event modifier input should wire the keydown stepper');
     assert.ok(/onGatheringDropModifierKeydown[\s\S]*ArrowUp[\s\S]*ArrowDown/.test(rootSource), 'stepper should handle ArrowUp and ArrowDown');
   });
 

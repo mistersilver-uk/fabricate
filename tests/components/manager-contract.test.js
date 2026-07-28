@@ -390,7 +390,10 @@ describe('CraftingSystemManager source contract', () => {
       'class="manager-titlebar-badge"',
       'data-manager-titlebar-system',
       'title={selectedSystem.name}',
-      '>{selectedSystem.name}</span>',
+      // Prettier breaks a whitespace-sensitive close tag as `</span\n>` (issue 923), so the
+      // trailing `>` is no longer adjacent. What matters is that the name stays welded to the
+      // open tag — a space there would render inside the titlebar badge.
+      '>{selectedSystem.name}</span',
       'data-manager-titlebar-status',
       '{titlebarStatusLabel()}',
     ]) {
@@ -539,8 +542,8 @@ describe('CraftingSystemManager source contract', () => {
       'character-modifier summary should not render a provider chip'
     );
     assert.ok(
-      systemEditSource.includes(
-        'onUpdateCharacterModifier(entry.id, { expression: event.currentTarget.value })'
+      /onUpdateCharacterModifier\(entry\.id, \{\s*expression: event\.currentTarget\.value,?\s*\}\)/.test(
+        systemEditSource
       ),
       'character-modifier editor should bind a plain expression input'
     );
@@ -557,17 +560,29 @@ describe('CraftingSystemManager source contract', () => {
       'manager-currency-subunit-builder',
       'manager-availability-pill is-currency',
       'manager-availability-pill-amount',
-      'onUpdateCurrencySubUnit(unit.id, contained.unitId, event.currentTarget.value)',
-      'onDeleteCurrencySubUnit(unit.id, contained.unitId)',
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
+    // Asserted as patterns rather than snippets in the list above: Prettier (issue 923) prints
+    // both calls one argument per line.
+    assert.ok(
+      /onUpdateCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId,\s*event\.currentTarget\.value\s*\)/.test(
+        systemEditSource
+      ),
+      'SystemEditView should bind the sub-unit amount input to onUpdateCurrencySubUnit'
+    );
+    assert.ok(
+      /onDeleteCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId\s*\)/.test(systemEditSource),
+      'SystemEditView should wire the sub-unit delete action'
+    );
     assert.ok(
       rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
       'root should pass selected currency units to SystemEditView'
     );
+    // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}` — prettier-plugin-svelte
+    // rewrites the long form to it (issue 923).
     assert.ok(
-      rootSource.includes('onAddCurrencySubUnit={onAddCurrencySubUnit}'),
+      rootSource.includes('{onAddCurrencySubUnit}'),
       'root should pass currency sub-unit actions to SystemEditView'
     );
     assert.ok(
@@ -717,10 +732,12 @@ describe('CraftingSystemManager source contract', () => {
       '{currencyProviderId}',
       '{currencyMacros}',
       '{currencyProviderOptions}',
-      'onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}',
-      'onSetCurrencyProvider={onSetCurrencyProvider}',
-      'onSetCurrencyMacro={onSetCurrencyMacro}',
-      'onClearCurrencyMacro={onClearCurrencyMacro}',
+      // Shorthand, like the three above: prettier-plugin-svelte rewrites `attr={attr}` to
+      // Svelte's `{attr}` form (issue 923). The two are the same binding.
+      '{onSetCurrencySpendStrategy}',
+      '{onSetCurrencyProvider}',
+      '{onSetCurrencyMacro}',
+      '{onClearCurrencyMacro}',
     ]) {
       assert.ok(rootSource.includes(prop), `root should thread ${prop} to SystemEditView`);
     }
@@ -1365,7 +1382,7 @@ describe('CraftingSystemManager source contract', () => {
       'the disabled Recipes placeholder should be removed now that Crafting is always available'
     );
     assert.ok(
-      rootSource.includes("{ id: 'graph', icon: 'fas fa-project-diagram'"),
+      /id: 'graph',\s*icon: 'fas fa-project-diagram'/.test(rootSource),
       'the Graph placeholder should remain in the planned placeholder list'
     );
     assert.ok(
@@ -1537,14 +1554,14 @@ describe('CraftingSystemManager source contract', () => {
       'expanded gathering rail should style as one submenu group'
     );
     assert.ok(
-      rootSource.includes(
-        'const gatheringEventDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : [])'
+      /const gatheringEventDefinitions = \$derived\(\s*Array\.isArray\(selectedGatheringSystemConfig\.events\)\s*\? selectedGatheringSystemConfig\.events\s*: \[\]\s*\)/.test(
+        rootSource
       ),
       'root should derive reusable gathering event counts from selected gathering config'
     );
     assert.ok(
-      rootSource.includes(
-        'total: environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length'
+      /total:\s*environmentList\.length \+ gatheringTaskDefinitions\.length \+ gatheringEventDefinitions\.length/.test(
+        rootSource
       ),
       'gathering parent count should summarize environments, tasks, and events'
     );
@@ -2222,8 +2239,8 @@ describe('CraftingSystemManager source contract', () => {
       'settings condition panels should expose editable display labels'
     );
     assert.ok(
-      environmentsBrowserSource.includes(
-        'onAddGatheringConditionValue?.(kind, { label: value, icon: conditionAddIcon(kind) }'
+      /onAddGatheringConditionValue\?\.\(\s*kind,\s*\{ label: value, icon: conditionAddIcon\(kind\) \}/.test(
+        environmentsBrowserSource
       ),
       'settings condition add should include the selected icon'
     );
@@ -2379,7 +2396,6 @@ describe('CraftingSystemManager source contract', () => {
       'onDropComponentMouseDown',
       'onComponentDragStart',
       'FabricateManagedComponent',
-      "onUpdateDrop(rowId, { componentId: data.componentId, itemUuid: '', systemItemId: '', name: '', enabled: true })",
       'dropRateTierClass',
       'dropRateTierColor',
       'onQuantityInput',
@@ -2396,6 +2412,15 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
     }
+    // Asserted as a pattern rather than a snippet in the list above: Prettier (issue 923) prints
+    // this object literal one property per line with a trailing comma, so no single-line
+    // substring covers the whole payload.
+    assert.ok(
+      /onUpdateDrop\(rowId, \{\s*componentId: data\.componentId,\s*itemUuid: '',\s*systemItemId: '',\s*name: '',\s*enabled: true,?\s*\}\)/.test(
+        gatheringTaskEditSource
+      ),
+      'a managed-component drop should reset the row identity and enable it'
+    );
     for (const snippet of [
       'manager-drop-rate-value',
       'manager-drop-rate-percent',
@@ -2685,7 +2710,7 @@ describe('CraftingSystemManager source contract', () => {
       'Tool requirements should reuse the roll-data expression input'
     );
     assert.ok(
-      /manager-tool-section-heading[\s\S]*?<h3><i class="fas fa-heart-crack"[\s\S]*?<\/h3>[\s\S]*?<p>/.test(
+      /manager-tool-section-heading[\s\S]*?<h3>\s*<i class="fas fa-heart-crack"[\s\S]*?<\/h3>[\s\S]*?<p>/.test(
         toolBreakageSource
       ),
       'Breakage should render its icon heading and immediate hint before the method cards'

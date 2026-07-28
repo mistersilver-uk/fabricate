@@ -56,7 +56,7 @@
 <div class="manager-tool-tab-stack" data-tool-requirements-tab>
   <section class="manager-tool-requirements-section">
     <div class="manager-tool-editor-card-heading">
-      <div>
+      <div data-tool-prerequisites-copy>
         <p class="manager-kicker">
           {text('FABRICATE.Admin.Manager.Tools.Editor.Prerequisites', 'Prerequisites')}
         </p>
@@ -135,7 +135,7 @@
 
   <section class="manager-tool-requirements-section">
     <div class="manager-tool-editor-card-heading">
-      <div>
+      <div data-tool-bonus-copy>
         <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.Bonus', 'Bonus')}</p>
         <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.BonusToCheck', 'Bonus to the check')}</h3>
         <p>

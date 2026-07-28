@@ -182,7 +182,7 @@
     <span class="manager-tool-authority-icon"
       ><i class="fas fa-sliders" aria-hidden="true"></i></span
     >
-    <div>
+    <div data-tool-authority-copy>
       <p class="manager-kicker">
         {text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'System breakage')}
       </p>
@@ -239,7 +239,7 @@
       <hr class="manager-tool-breakage-config-divider" data-tool-breakage-config-divider />
       {#if tool?.breakage?.mode === 'limitedUses'}
         <div class="manager-tool-breakage-config" data-tool-limited-uses-stepper>
-          <div>
+          <div data-tool-limited-uses-copy>
             <p class="manager-kicker">
               {text('FABRICATE.Admin.Manager.Tools.Editor.UsesPerCopy', 'Uses per copy')}
             </p>
@@ -342,7 +342,7 @@
   </section>
 
   <fieldset class="manager-tool-on-break" data-tool-on-break-controls disabled={immune}>
-    <legend
+    <legend data-tool-on-break-legend
       ><span>{text('FABRICATE.Admin.Manager.Tools.Editor.WhenItBreaks', 'When it breaks')}</span
       ><small
         >{immune

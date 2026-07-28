@@ -53,7 +53,12 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     // The hint now lives in the {:else} of the nodesEnabled guard, so it renders
     // whenever resource nodes are off — independent of the stamina toggle.
     const guardIdx = editorSource.indexOf('{#if nodesEnabled}');
-    const elseIdx = editorSource.indexOf('{:else}\n    <section class="manager-task-nodes-card manager-task-nodes-hint-card"', guardIdx);
+    // Prettier (issue 923) prints the section's attributes one per line, so match the {:else}
+    // and the hint card's class as a pattern rather than as a fixed two-line string.
+    const elseMatch = /\{:else\}\s*<section\s+class="manager-task-nodes-card manager-task-nodes-hint-card"/.exec(
+      editorSource.slice(guardIdx)
+    );
+    const elseIdx = elseMatch ? guardIdx + elseMatch.index : -1;
     const hintIdx = editorSource.indexOf('data-gathering-task-nodes-hint');
     assert.ok(elseIdx > guardIdx, 'the nodes guard has an else branch carrying the hint');
     assert.ok(hintIdx > elseIdx, 'the guidance hint renders inside the else (nodes-disabled) branch');
@@ -140,7 +145,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     // The swap-image control is wired to the FilePicker service (onPickImagePath),
     // not a free-text input.
     assert.match(editorSource, /async function chooseDepletedImage/, 'swap-image uses the FilePicker via onPickImagePath');
-    assert.match(editorSource, /onPickImagePath\(depletedSwapImage/, 'the depleted image picker calls onPickImagePath');
+    assert.match(editorSource, /onPickImagePath\(\s*depletedSwapImage/, 'the depleted image picker calls onPickImagePath');
   });
 
   it('puts the swap-image picker inline with the title/hint and the clear control below the image (plus right-click clears)', () => {

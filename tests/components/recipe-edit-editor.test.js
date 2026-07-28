@@ -623,7 +623,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.equal(rootSource.includes('RecipeContextRail'), false, 'the rail component is gone entirely');
     assert.equal(rootSource.includes('recipeInspectorVisible'), false, 'no conditional-hide gate remains');
     assert.ok(
-      rootSource.includes('recipeVisibilityEffect = $derived(craftingEffect('),
+      /recipeVisibilityEffect = \$derived\(\s*craftingEffect\(/.test(rootSource),
       'the conditional tabs are driven by the canonical craftingEffect matrix'
     );
     assert.ok(

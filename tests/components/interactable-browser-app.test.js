@@ -192,7 +192,7 @@ describe('InteractableBrowserRoot body', () => {
         'place button uses PlaceOnScene as the tooltip'
       );
       assert.ok(
-        button.includes('aria-label={text(\'FABRICATE.Canvas.Browser.PlaceOnScene'),
+        /aria-label=\{text\(\s*'FABRICATE\.Canvas\.Browser\.PlaceOnScene/.test(button),
         'place button uses PlaceOnScene as the accessible name'
       );
       assert.ok(button.includes('<i class="fas fa-cubes" aria-hidden="true">'), 'face is the cubes icon');

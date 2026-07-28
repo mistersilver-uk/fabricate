@@ -5516,7 +5516,12 @@ test('recipe tag list spans the full row width on its own line below the control
 // coverage existed for this route at all.
 test('the Books & Scrolls route names one grid track per section and grows the table', () => {
   const source = readFileSync(resolve(managerComponentDir, 'BooksScrollsView.svelte'), 'utf8');
-  const main = source.slice(source.indexOf('<main class="manager-main'));
+  // Matched as a pattern, not as `<main class="manager-main`: Prettier (issue 923) prints an
+  // element with several attributes one per line, so the class no longer sits on the open tag's
+  // own line. A missed match here silently sliced from -1 and counted ZERO children.
+  const mainIndex = source.search(/<main\b/);
+  assert.notEqual(mainIndex, -1, 'the route should render a <main> element');
+  const main = source.slice(mainIndex);
   const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
   assert.equal(children.length, 3, 'expected three unconditional top-level grid children');
   assert.equal(

@@ -150,7 +150,7 @@ describe('environment editor localization', () => {
       assert.ok(validationSource.includes(snippet), `${snippet} should match the English catalog`);
     }
     assert.ok(
-      modeControlSource.includes("descFallback: 'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events.'"),
+      /descFallback:\s*'Only explicitly included tasks and events are available; GMs can force add enabled non-matching tasks and events\.'/.test(modeControlSource),
       'ManualHint dynamic fallback should match the English catalog'
     );
   });
@@ -233,7 +233,7 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes('manager-environment-comp-row'), 'composition list renders table rows');
     assert.ok(listSource.includes('dismissOnOutsideClick'), 'row overflow menu dismisses on outside click');
     assert.ok(listSource.includes('manager-environment-comp-menu'), 'rows expose an overflow action menu');
-    assert.ok(listSource.includes("const showEventRankControls = $derived(kind === 'event' && eventSelectionMode === 'highestRankedDrop')"), 'event rank controls are gated by the highest-ranked system rule');
+    assert.ok(/const showEventRankControls = \$derived\(\s*kind === 'event' && eventSelectionMode === 'highestRankedDrop'\s*\)/.test(listSource), 'event rank controls are gated by the highest-ranked system rule');
     assert.ok(listSource.includes('draggable={showEventRankControls ? true : undefined}'), 'reorder drag is enabled only when event rank controls are active');
     assert.ok(!tasksTabSource.includes('data-composition-mode-select'), 'composition mode is set globally on the overview tab, not per-tab');
   });
@@ -284,10 +284,10 @@ describe('environment composition editor structure', () => {
 
   it('collapses task row actions into the overflow menu while preserving event row controls', () => {
     assert.ok(listSource.includes("{#if kind === 'task'}"), 'composition list branches task rows for compact action menus');
-    assert.ok(listSource.includes('data-action="include" onclick={() => { onInclude'), 'task include action is available from a menu item');
-    assert.ok(listSource.includes('data-action="force-include" onclick={() => { onForceInclude'), 'task force-add action is available from a menu item');
-    assert.ok(listSource.includes('data-action="restore" onclick={() => { onRestore'), 'task restore action is available from a menu item');
-    assert.ok(listSource.includes('data-action="exclude" onclick={() => { onExclude'), 'task remove/exclude action remains available from a menu item');
+    assert.ok(/data-action="include"\s+onclick=\{\(\) => \{\s*onInclude/.test(listSource), 'task include action is available from a menu item');
+    assert.ok(/data-action="force-include"\s+onclick=\{\(\) => \{\s*onForceInclude/.test(listSource), 'task force-add action is available from a menu item');
+    assert.ok(/data-action="restore"\s+onclick=\{\(\) => \{\s*onRestore/.test(listSource), 'task restore action is available from a menu item');
+    assert.ok(/data-action="exclude"\s+onclick=\{\(\) => \{\s*onExclude/.test(listSource), 'task remove/exclude action remains available from a menu item');
     assert.ok(listSource.includes('manager-environment-comp-quick-action'), 'manual task rows expose icon-only quick action buttons beside the menu');
     assert.ok(listSource.includes("data-quick-action=\"exclude\""), 'included manual task rows expose a quick remove action through the shared exclude handler');
     assert.ok(listSource.includes('Composition.QuickRemove'), 'manual included task quick action uses Remove copy');
@@ -400,7 +400,7 @@ describe('environment composition editor structure', () => {
     assert.ok(listSource.includes("availableToAddMatching"), 'manual mode has a matching available-to-add group');
     assert.ok(listSource.includes("availableToAddNonMatching"), 'manual mode has a non-matching available-to-add group');
     assert.ok(listSource.includes("availableToAddLibraryDisabled"), 'manual mode has a library-disabled available-to-add group');
-    assert.ok(listSource.includes('const availableToAdd = $derived([...availableToAddMatching, ...availableToAddNonMatching, ...availableToAddLibraryDisabled])'), 'available-to-add orders matching records before non-matching and library-disabled records');
+    assert.ok(/const availableToAdd = \$derived\(\[\s*\.\.\.availableToAddMatching,\s*\.\.\.availableToAddNonMatching,\s*\.\.\.availableToAddLibraryDisabled,?\s*\]\)/.test(listSource), 'available-to-add orders matching records before non-matching and library-disabled records');
     assert.ok(listSource.includes('data-section="available-to-add"'), 'manual mode renders an Available to add section');
     assert.ok(listSource.includes('Composition.AvailableToAdd'), 'Available to add section uses localized copy');
     assert.ok(listSource.includes('Composition.NoAvailableTasksToAdd'), 'Available to add empty state uses localized copy for the tasks tab');
@@ -413,7 +413,7 @@ describe('environment composition editor structure', () => {
     assert.ok(!listSource.includes("{#if kind !== 'task' && mode === 'manual'}"), 'event manual mode no longer keeps a separate Matching candidates section');
     assert.ok(listSource.includes("data-section=\"excluded\""), 'automatic task mode and events retain the Excluded section');
     assert.ok(listSource.includes("data-section=\"non-matching\""), 'automatic task mode and events retain the standalone Non-matching section');
-    assert.ok(/nonMatching = \$derived\(records\.filter\(entry =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\)\)/.test(listSource), 'non-matching list collects notMatching and libraryDisabled');
+    assert.ok(/nonMatching = \$derived\(\s*records\.filter\(\s*\(entry\) =>\s*entry\.compositionState === 'notMatching' \|\| entry\.compositionState === 'libraryDisabled'\s*\)\s*\)/.test(listSource), 'non-matching list collects notMatching and libraryDisabled');
     assert.ok(listSource.includes('<Pagination'), 'the standalone non-matching list is still paginated where it remains visible');
     assert.ok(!listSource.includes('DiagnosticsDisclosure'), 'the diagnostics disclosure is replaced by the non-matching list');
     assert.ok(listSource.includes('data-action="include"'), 'matching available-to-add rows expose an include action');
@@ -439,7 +439,7 @@ describe('environment composition editor structure', () => {
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-base'), 'task override rows should expose base chance as its own control-row item');
     assert.ok(inspectorSource.includes('data-drop-rate-adjustment-effective'), 'task override rows should expose effective chance as its own control-row item');
     assert.ok(inspectorSource.includes('manager-environment-drop-adjustment-clear'), 'task override clear action should be an icon-only button');
-    assert.ok(inspectorSource.includes('aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ClearAdjustment\', \'Clear\')}'), 'icon-only clear action should keep accessible copy');
+    assert.ok(/aria-label=\{text\(\s*'FABRICATE\.Admin\.Manager\.EnvironmentEditor\.Inspector\.ClearAdjustment',\s*'Clear'\s*\)\}/.test(inspectorSource), 'icon-only clear action should keep accessible copy');
     assert.ok(inspectorSource.includes('class={`manager-environment-drop-adjustment-row is-task-drop ${dropRateAdjustmentsEnabled ? \'\' : \'is-disabled\'} ${adjustmentValueClass(row.adjustment)}`}'), 'task override row card should carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('class="manager-condition-modifier-value" data-drop-rate-adjustment-percent'), 'task override input shell should remain neutral while keeping the percent suffix');
     assert.ok(!inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should not carry positive/negative/zero state classes');

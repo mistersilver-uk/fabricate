@@ -183,7 +183,7 @@ describe('GatheringEnvironmentList labeled region', () => {
 
   it('filters the ordered list by a case-insensitive name+description substring match', () => {
     assert.ok(
-      listSource.includes("`${environment?.name ?? ''} ${environment?.description ?? ''}`.toLowerCase().includes(normalizedSearchTerm)"),
+      /`\$\{environment\?\.name \?\? ''\} \$\{environment\?\.description \?\? ''\}`\s*\.toLowerCase\(\)\s*\.includes\(normalizedSearchTerm\)/.test(listSource),
       'filter matches name + description case-insensitively'
     );
   });
