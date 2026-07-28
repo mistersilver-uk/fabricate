@@ -29,6 +29,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
     'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
@@ -89,6 +90,45 @@ describe('EssencePoolPanel mounted behavior', () => {
       ),
       ['met', 'partial']
     );
+  });
+
+  // Zero delivered is an ERROR in the published slot-state matrix, not "a shorter bar":
+  // without a danger rule the only difference between untouched and part-funded was the
+  // fill width, which is a use-of-colour-alone failure at 6px tall.
+  it('carries a distinct state class for every meter state, danger tone included', async () => {
+    const target = await harness.mount({
+      pool: essencePool({
+        requirements: [
+          { groupId: 'g-a', essenceId: 'a', name: 'A', icon: 'fas fa-sun', need: 2, delivered: 2 },
+          { groupId: 'g-b', essenceId: 'b', name: 'B', icon: 'fas fa-moon', need: 2, delivered: 1 },
+          { groupId: 'g-c', essenceId: 'c', name: 'C', icon: 'fas fa-star', need: 2, delivered: 0 },
+        ],
+        carriers: [],
+        allocation: {},
+      }),
+    });
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-essence-meter]')].map((meter) => [
+        meter.getAttribute('data-essence-meter-state'),
+        meter.classList.contains('is-met'),
+        meter.classList.contains('is-partial'),
+        meter.classList.contains('is-short'),
+      ]),
+      [
+        ['met', true, false, false],
+        ['partial', false, true, false],
+        ['short', false, false, true],
+      ]
+    );
+
+    // happy-dom cannot compute a cascade, so the tone is asserted against the
+    // component's own scoped block: an emitted class with no rule is the defect.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte'),
+      'utf8'
+    );
+    assert.match(source, /\.essence-pool-meter\.is-short\s*\{[^}]*--fab-danger/);
+    assert.match(source, /\.essence-pool-meter\.is-partial \.essence-pool-bar-fill\s*\{/);
   });
 
   it('prints delivered/need as the readout, never the whole held amount', async () => {
@@ -153,16 +193,40 @@ describe('EssencePoolPanel mounted behavior', () => {
   it('multiplies a carrier contribution by the units allocated, and mutes an essence the set does not need', async () => {
     const target = await harness.mount({ pool: SHARED });
     const picked = target.querySelector('[data-essence-picked="Item.dusk"]');
-    const chips = [...picked.querySelectorAll('.essence-pool-contribution')];
+    const chips = [...picked.querySelectorAll('.essence-contribution')];
     assert.match(chips[0].textContent, /"amount":2/, 'one allocated unit yields 2 Radiant');
     assert.match(chips[1].textContent, /"amount":1/);
     assert.ok(chips.every((chip) => chip.classList.contains('is-required')));
 
     const prismChips = [
-      ...target.querySelectorAll('[data-essence-carrier="Item.prism"] .essence-pool-contribution'),
+      ...target.querySelectorAll('[data-essence-carrier="Item.prism"] .essence-contribution'),
     ];
     assert.ok(prismChips[0].classList.contains('is-required'), 'radiant is required here');
     assert.ok(!prismChips[1].classList.contains('is-required'), 'ember is spent but funds nothing');
+  });
+
+  // ONE component for one meaning: the identical chip is rendered from the carrier facts,
+  // the selection recap and the consumption plan, so it is `EssenceContribution` rather
+  // than three copies of the same markup + rules.
+  //
+  // And the authored tint is scoped to the GLYPH. The spec sentence this change added
+  // says label text keeps the standard body/muted colours, because a tag-palette colour
+  // behind 10px/600 text is where an authored colour can cut contrast.
+  it('renders every contribution through one component whose tint reaches the glyph only', async () => {
+    const target = await harness.mount({ pool: SHARED });
+    const chips = [...target.querySelectorAll('.essence-contribution')];
+    assert.ok(chips.length >= 3, 'the carrier facts and the recap both use it');
+    assert.match(chips[0].getAttribute('style'), /--fab-chip-color: var\(--fab-tag-butter\)/);
+
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte'),
+      'utf8'
+    );
+    assert.match(source, /\.essence-contribution\.is-required i\s*\{\s*color: var\(--fab-chip-color/);
+    assert.ok(
+      !/\.essence-contribution\.is-required\s*\{/.test(source),
+      'the tinted rule must target the glyph, never the span wrapping the label text'
+    );
   });
 
   it('shows the selection recap only once something is allocated', async () => {

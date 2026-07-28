@@ -260,6 +260,7 @@
               colorToken={colorToken || 'sage'}
               customColor=""
               allowCustom={false}
+              unset={!colorToken}
               buttonTitle={text('FABRICATE.Admin.Manager.Essence.Colour.Change', 'Change essence colour')}
               presetGridLabel={text('FABRICATE.Admin.Manager.Essence.Colour.Presets', 'Essence colour presets')}
               onChange={(next) => { colorToken = normalizeEssenceColorToken(next?.colorToken) || ''; }}

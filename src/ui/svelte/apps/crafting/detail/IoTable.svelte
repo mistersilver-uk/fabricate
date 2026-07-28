@@ -109,7 +109,11 @@
           onAllocate={(itemKey, units) => onAllocateEssence?.(itemKey, units)}
         />
       {:else if openChoices.length > 0}
-        <div id={panelId} aria-labelledby={openTileId ?? undefined}>
+        <!-- `role="region"` is load-bearing: `aria-labelledby` on a roleless `<div>` is
+             not exposed at all, so without it the panel the open tile points
+             `aria-controls` at would be an unnamed generic. The essence pool is a real
+             `<section>` and gets the same treatment for free. -->
+        <div id={panelId} role="region" aria-labelledby={openTileId ?? undefined}>
           <IngredientOptionSelector choices={openChoices} onChoose={onChooseOption} />
         </div>
       {/if}

@@ -13,6 +13,10 @@
     // this false: the palette is then the whole vocabulary, because a free hex cannot be
     // guaranteed legible across all seven themes.
     allowCustom = true,
+    // TRUE when the caller holds no authored colour. `normalizedToken` folds an absent
+    // value onto `sage`, so without this the palette would mark Sage selected for a
+    // model that has chosen nothing. See ManagerColorPicker for the full reasoning.
+    unset = false,
     onChange = () => {},
     onDismiss = () => {},
     manageDismiss = true,
@@ -76,7 +80,7 @@
     {#each presets as preset (preset.token)}
       <button
         type="button"
-        class={`manager-color-preset ${normalizedToken(colorToken) === preset.token ? 'is-selected' : ''}`}
+        class={`manager-color-preset ${!unset && normalizedToken(colorToken) === preset.token ? 'is-selected' : ''}`}
         aria-label={preset.label}
         title={preset.label}
         data-manager-color-token={preset.token}

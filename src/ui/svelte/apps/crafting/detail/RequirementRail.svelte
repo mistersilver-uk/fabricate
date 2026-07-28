@@ -96,12 +96,16 @@
         {localize('FABRICATE.App.Crafting.Slots.Title')}
       </p>
       {#if canPickForMe}
+        <!-- NO aria-label. The visible label is "Pick for me" and the hint is a whole
+             sentence, so labelling the button with the hint would leave an accessible
+             name that does not contain its visible text: speech activation by the
+             visible label then fails (WCAG 2.5.3 Label in Name). The `<span>` names the
+             button; `title` carries the hint for everyone. -->
         <button
           type="button"
           class="requirement-rail-wand"
           data-requirement-pick-for-me
           title={localize('FABRICATE.App.Crafting.Slots.PickForMeHint')}
-          aria-label={localize('FABRICATE.App.Crafting.Slots.PickForMeHint')}
           onclick={() => onPickForMe?.()}
         >
           <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>

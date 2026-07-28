@@ -495,7 +495,48 @@ test('a timed START refuses an allocation that does not fund the set and leaves 
 });
 
 // ---------------------------------------------------------------------------
-// 5. The step->recipe view is genuinely shared with the read side
+// 5. Two plan entries naming ONE document compose rather than double-spend
+// ---------------------------------------------------------------------------
+
+// The essence block contributes at most one plan entry per item key, but a set can
+// still name the same held stack twice — a non-essence requirement and an essence
+// carrier resolving to the same Item. `_consumeIngredients` re-reads
+// `item.system.quantity` LIVE on every entry precisely so the second entry sees what
+// the first left; a snapshot taken up front would compare both entries against the
+// original quantity and delete a document that is already gone (the update path is the
+// same defect wearing a smaller number). FakeItem's `delete()` throws on a second call,
+// so the hazard fails loudly here rather than silently over-spending.
+test('two plan entries naming one document consume the stack once, in composition', async () => {
+  const engine = engineFor();
+  const stack = new FakeItem('emberwood', 'Emberwood', 3);
+  const ingredient = { getDescription: () => '3x Emberwood' };
+
+  const consumed = await engine._consumeIngredients([
+    { item: stack, quantity: 1, ingredient },
+    { item: stack, quantity: 2, ingredient },
+  ]);
+
+  assert.equal(consumed.length, 2, 'both entries are reported for effect transfer');
+  assert.equal(stack.deleted, true, 'the second entry exhausts the stack and deletes it');
+  assert.equal(stack.system.quantity, 2, 'the first entry decremented the LIVE quantity');
+});
+
+test('two plan entries under the live stack leave the remainder behind', async () => {
+  const engine = engineFor();
+  const stack = new FakeItem('emberwood', 'Emberwood', 5);
+  const ingredient = { getDescription: () => '5x Emberwood' };
+
+  await engine._consumeIngredients([
+    { item: stack, quantity: 1, ingredient },
+    { item: stack, quantity: 2, ingredient },
+  ]);
+
+  assert.equal(stack.deleted, false, 'three of five is not the whole stack');
+  assert.equal(stack.system.quantity, 2, 'the two entries compose: 5 - 1 - 2');
+});
+
+// ---------------------------------------------------------------------------
+// 6. The step->recipe view is genuinely shared with the read side
 // ---------------------------------------------------------------------------
 
 test('the engine and the listing builder project the same step recipe view', () => {

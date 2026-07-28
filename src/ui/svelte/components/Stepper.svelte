@@ -210,13 +210,20 @@
   /* WCAG 2.2 §2.5.8 minimum target: 24x24 CSS px on EVERY target, the typeable input
      included. The compact default stays 22px because it sits inside dense manager
      editor rows where it is one field among many; this variant is for a control that
-     IS the interaction. */
-  .fab-stepper.is-comfortable .fab-stepper-adjunct {
+     IS the interaction.
+
+     `:not(.is-vertical)` is a GUARD, not decoration. The vertical rules above have the
+     same specificity as these, so a caller combining `orientation="vertical"` with
+     `density="comfortable"` would resolve on source order alone and SHRINK the spinner
+     to 24px — narrower than the full-width column it exists to fill, and shorter than
+     the 26/30px the vertical variant asks for. Excluding the combination here means
+     vertical keeps its own (already >= 24px) geometry instead. */
+  .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-adjunct {
     width: 24px;
     height: 24px;
   }
 
-  .fab-stepper.is-comfortable .fab-stepper-input {
+  .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-input {
     height: 24px;
     min-height: 24px;
   }

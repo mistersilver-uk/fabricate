@@ -279,6 +279,9 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
   'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
   'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
+  // The one "N Radiant" contribution chip both of the two panels above render. They
+  // are already listed, so omitting this HANGS every mounted crafting suite.
+  'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',

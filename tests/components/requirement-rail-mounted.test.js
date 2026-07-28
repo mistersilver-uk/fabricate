@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+    'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
   ],
@@ -153,6 +154,34 @@ describe('RequirementRail mounted behavior', () => {
     const tile = essence.querySelector('.requirement-slot-tile');
     assert.match(tile.getAttribute('style'), /--fab-chip-color: var\(--fab-tag-butter\)/);
     assert.ok(essence.querySelector('.requirement-slot-glyph i').classList.contains('fa-sun'));
+  });
+
+  // One essence, ONE component. The rail used to inline its own glyph box while
+  // CraftingEssenceThumb still rendered the same essence in the alternatives picker and
+  // the shopping list, so one screen drew the same thing two ways. The tint survives the
+  // component boundary because it is an inherited custom property on the ANCESTOR, which
+  // is exactly why a second component was never needed to carry it.
+  it('draws the essence glyph with the shared CraftingEssenceThumb', async () => {
+    const target = await harness.mount({ slots: slots() });
+    const glyph = tilesIn(target)[2].querySelector('.requirement-slot-glyph');
+    assert.ok(glyph.classList.contains('crafting-essence-thumb'), 'the shared thumb renders it');
+    // The smoke harness waits on `.requirement-slot-glyph`, so the hook must survive.
+    const style = glyph.getAttribute('style');
+    assert.match(style, /--crafting-essence-thumb-size:\s*44px/);
+    // 44 * 0.42 rounds to the 18px the rail hard-coded before it shared this component.
+    assert.match(style, /--crafting-essence-icon-size:\s*18px/);
+    assert.match(style, /--crafting-essence-thumb-radius:\s*8px/);
+  });
+
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, or
+  // speech activation by the visible label fails. Labelling the button with the hint
+  // sentence replaced "Pick for me" entirely.
+  it('names Pick for me by its visible label and keeps the hint on the title', async () => {
+    const target = await harness.mount({ slots: slots() });
+    const wand = target.querySelector('[data-requirement-pick-for-me]');
+    assert.ok(!wand.hasAttribute('aria-label'), 'the visible span is the accessible name');
+    assert.match(wand.textContent.trim(), /Slots\.PickForMe$/, 'and it is the short label');
+    assert.match(wand.getAttribute('title'), /Slots\.PickForMeHint/);
   });
 
   it('falls back to the theme accent for an essence with no authored colour', async () => {

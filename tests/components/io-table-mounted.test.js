@@ -176,6 +176,19 @@ describe('IoTable mounted behavior', () => {
     assert.equal(panel.getAttribute('aria-labelledby'), tile.getAttribute('id'));
   });
 
+  // `aria-labelledby` on a roleless `<div>` is not exposed, so the alternatives panel
+  // would be an unnamed generic while the tile's `aria-controls` pointed straight at it.
+  // The essence pool is a real `<section>`; this one has to say so.
+  it('exposes the alternatives panel as a named region, not a bare div', async () => {
+    const target = await harness.mount({
+      craftability: twoChoiceCraftability(),
+      openSlotId: 'g-herb',
+    });
+    const panel = target.querySelector('[role="radiogroup"]').closest('[aria-labelledby]');
+    assert.equal(panel.getAttribute('role'), 'region');
+    assert.equal(panel.getAttribute('aria-labelledby'), 'fabricate-slot-g-herb');
+  });
+
   it('opens no chooser at all on a read-only rail', async () => {
     const target = await harness.mount({
       craftability: sharedEssenceCraftability(),

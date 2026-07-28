@@ -29,6 +29,7 @@
 
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
 import {
+  CLOSED_SLOT_ID,
   buildRequirementSlots,
   composeSlotKey,
   resolveOpenSlotId,
@@ -259,7 +260,11 @@ export function createCraftingStore({ services } = {}) {
 
   // The pool's scope key. `craftability.essencePool.scopeKey` is the bare SET id;
   // only the store knows which step the model reports as active, so the step half is
-  // composed here. A single-step recipe reports no step id and keeps the bare key.
+  // composed here. A craftable recipe ALWAYS reports a step id — a single-step recipe
+  // reports the synthesized `implicit-step` from `Recipe.getExecutionSteps` — so the
+  // composed form is what ships; the bare-key branch covers a listing entry that
+  // carries no run position at all (a Discovery-Mode teaser, which has no
+  // craftability and so never reaches the pool).
   const essenceScopeKey = $derived.by(() => {
     const setId = selectedSet?.id ?? null;
     if (!setId) return null;
@@ -533,15 +538,27 @@ export function createCraftingStore({ services } = {}) {
   }
 
   /**
-   * Open ONE chooser in the requirement rail; a nullish slot id closes it.
+   * Toggle ONE chooser in the requirement rail.
    *
    * The key is stored scoped, so it stops matching (and the rail falls back to the
    * first unsatisfied slot) as soon as the set or step moves under it.
    *
+   * Clicking the slot that is ALREADY open COLLAPSES it, which is what a control
+   * reporting `aria-expanded="true"` promises. Clearing the remembered key cannot
+   * express that: with nothing remembered the resolver re-opens the first unsatisfied
+   * slot, which is usually the very slot just clicked, so the click read as a no-op.
+   * Only the scoped CLOSED sentinel survives that re-validation.
+   *
+   * A nullish slot id is the distinct FORGET operation: it drops the player's choice
+   * and lets the rail re-derive its own default, which is what a caller that is not
+   * the tile (a reset, a programmatic clear) means.
+   *
    * @param {string|null} slotId
    */
   function openSlot(slotId) {
-    activeSlotKey = slotId ? composeSlotKey(essenceScopeKey, slotId) : null;
+    activeSlotKey = slotId
+      ? composeSlotKey(essenceScopeKey, slotId === openSlotId ? CLOSED_SLOT_ID : slotId)
+      : null;
     slotAnnouncement = '';
   }
 

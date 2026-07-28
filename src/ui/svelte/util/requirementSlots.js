@@ -39,6 +39,19 @@ export const SLOT_STATE = Object.freeze({
  */
 export const ESSENCE_POOL_SLOT_ID = 'essence-pool';
 
+/**
+ * The scoped "the player closed the chooser" sentinel.
+ *
+ * A rail with any openable slot always resolves SOMETHING open, so without this a
+ * click on the open tile re-stored the same key and resolved back to the same slot
+ * — a no-op on a control reporting `aria-expanded="true"`. Storing this id instead
+ * makes the disclosure genuinely collapsible while keeping the memory SCOPED: it is
+ * composed and re-validated through exactly the same `${scopeKey}:${slotId}` path as
+ * a real slot, so changing set, step or recipe drops the closed state too and the
+ * new scope opens its first unsatisfied slot as before.
+ */
+export const CLOSED_SLOT_ID = '__closed__';
+
 function toCount(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
@@ -166,6 +179,10 @@ function firstUnsatisfiedSlotId(slots, ids) {
  * the current scope; otherwise focus falls to the first unsatisfied slot and then
  * to the first slot.
  *
+ * A remembered {@link CLOSED_SLOT_ID} in the current scope means the player closed
+ * the chooser, and closes it — the one case in which a rail with openable slots
+ * opens nothing.
+ *
  * @param {object} args
  * @param {object[]} args.slots
  * @param {string|null} args.scopeKey
@@ -179,6 +196,7 @@ export function resolveOpenSlotId({ slots = [], scopeKey = null, rememberedKey =
     const prefix = `${scopeKey}:`;
     if (rememberedKey.startsWith(prefix)) {
       const remembered = rememberedKey.slice(prefix.length);
+      if (remembered === CLOSED_SLOT_ID) return null;
       if (ids.includes(remembered)) return remembered;
     }
   }
@@ -257,6 +275,15 @@ function pendingEntries(slots) {
  * Essence rows come from the pool's per-carrier allocation, because the block
  * contributes at most one plan entry per item key regardless of how many
  * requirements that item funds.
+ *
+ * A RESOLVED-BUT-SHORT requirement (a fixed one the player cannot afford, or a
+ * choice they picked that does not cover the need) deliberately KEEPS its row,
+ * carrying `sufficient: false` and its `owned` count, which the panel paints in the
+ * danger tone beside the "You own N" line. The plan states what the craft spends,
+ * not what the player can afford, and there is nothing to choose for such a
+ * requirement — so dropping it would erase the only statement of the shortfall
+ * anywhere on the surface while leaving the requirement invisible. Only the
+ * UNDECIDED (`PARTIAL`) choice is withheld, because it moves to `pending`.
  *
  * @param {object|null} craftability
  * @param {object} [options]

@@ -28,6 +28,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+    'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
     'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
@@ -97,7 +98,7 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
     const rows = [...target.querySelectorAll('[data-consumption-row]')];
     assert.equal(rows.length, 1);
     assert.match(rows[0].querySelector('.consumption-plan-name').textContent, /Duskcrystal/);
-    const chips = [...rows[0].querySelectorAll('.consumption-plan-contribution')];
+    const chips = [...rows[0].querySelectorAll('.essence-contribution')];
     assert.equal(chips.length, 2, 'one contribution chip per essence the unit carries');
   });
 

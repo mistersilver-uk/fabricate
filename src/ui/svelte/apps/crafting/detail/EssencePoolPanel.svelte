@@ -22,6 +22,7 @@
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import CraftingThumb from '../CraftingThumb.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import EssenceContribution from './EssenceContribution.svelte';
 
   let {
     // `craftability.essencePool` — requirements, carriers, allocation, suggested.
@@ -64,8 +65,8 @@
   }
 
   // Per-unit essence yields of one carrier, multiplied by the units currently
-  // allocated. An essence this set does not require still shows (the unit is spent
-  // either way) but stays muted, because it funds nothing here.
+  // allocated. Presentation (icon normalization, tint, copy) belongs to
+  // EssenceContribution; this only says WHICH essence and HOW MUCH.
   function contributionsOf(carrier, units) {
     const perUnit = carrier?.perUnit && typeof carrier.perUnit === 'object' ? carrier.perUnit : {};
     return Object.keys(perUnit).map((essenceId) => {
@@ -73,8 +74,8 @@
       return {
         essenceId,
         name: requirement?.name || essenceId,
-        icon: normalizeEssenceIcon(requirement?.icon),
-        style: tintOf(requirement),
+        icon: requirement?.icon ?? null,
+        colorToken: requirement?.colorToken ?? null,
         amount: Number(perUnit[essenceId] ?? 0) * units,
         required: Boolean(requirement)
       };
@@ -139,17 +140,13 @@
               <span class="essence-pool-carrier-name">{carrier.name}</span>
               <span class="essence-pool-carrier-facts">
                 {#each contributionsOf(carrier, 1) as contribution (contribution.essenceId)}
-                  <span
-                    class="essence-pool-contribution"
-                    class:is-required={contribution.required}
-                    style={contribution.style}
-                  >
-                    <i class={contribution.icon} aria-hidden="true"></i>
-                    {localize('FABRICATE.App.Crafting.Pool.Contribution', {
-                      amount: contribution.amount,
-                      name: contribution.name
-                    })}
-                  </span>
+                  <EssenceContribution
+                    icon={contribution.icon}
+                    name={contribution.name}
+                    amount={contribution.amount}
+                    required={contribution.required}
+                    colorToken={contribution.colorToken}
+                  />
                 {/each}
                 <span class="essence-pool-owned"
                   >{localize('FABRICATE.App.Crafting.Pool.Owned', {
@@ -189,17 +186,13 @@
             <span class="essence-pool-picked-count">×{carrier.allocatedUnits}</span>
             <span class="essence-pool-picked-contributions">
               {#each contributionsOf(carrier, carrier.allocatedUnits) as contribution (contribution.essenceId)}
-                <span
-                  class="essence-pool-contribution"
-                  class:is-required={contribution.required}
-                  style={contribution.style}
-                >
-                  <i class={contribution.icon} aria-hidden="true"></i>
-                  {localize('FABRICATE.App.Crafting.Pool.Contribution', {
-                    amount: contribution.amount,
-                    name: contribution.name
-                  })}
-                </span>
+                <EssenceContribution
+                  icon={contribution.icon}
+                  name={contribution.name}
+                  amount={contribution.amount}
+                  required={contribution.required}
+                  colorToken={contribution.colorToken}
+                />
               {/each}
             </span>
           </li>
@@ -245,9 +238,18 @@
     );
   }
 
+  /* All three states of the published slot-state matrix are declared, so none of them
+     is an implicit default a later edit can silently retune. `partial` is the authored
+     tint of the base rule above; `met` and `short` replace it with the success and
+     danger families, so zero-delivered reads as an error rather than as a short bar. */
   .essence-pool-meter.is-met {
     border-color: var(--fab-success-border);
     background: var(--fab-success-soft);
+  }
+
+  .essence-pool-meter.is-short {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
   }
 
   .essence-pool-meter-head {
@@ -307,6 +309,16 @@
 
   .essence-pool-meter.is-met .essence-pool-bar-fill {
     background: var(--fab-success);
+  }
+
+  /* `partial` restates the tint the base rule already paints, so the three states of the
+     matrix are declared together rather than one of them being an implicit default. */
+  .essence-pool-meter.is-partial .essence-pool-bar-fill {
+    background: var(--fab-chip-color, var(--fab-accent));
+  }
+
+  .essence-pool-meter.is-short .essence-pool-bar-fill {
+    background: var(--fab-danger);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -372,23 +384,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-2);
-  }
-
-  .essence-pool-contribution {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--fab-text-subtle);
-  }
-
-  .essence-pool-contribution.is-required {
-    color: var(--fab-chip-color, var(--fab-accent));
-  }
-
-  .essence-pool-contribution i {
-    font-size: 8px;
   }
 
   .essence-pool-owned {

@@ -19,8 +19,8 @@
 -->
 <script>
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
-  import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import CraftingThumb from '../CraftingThumb.svelte';
+  import EssenceContribution from './EssenceContribution.svelte';
 
   let {
     // `{ rows, pending }` from buildConsumptionPlan.
@@ -71,19 +71,13 @@
             {#if row.contributions.length > 0}
               <span class="consumption-plan-contributions">
                 {#each row.contributions as contribution (contribution.essenceId)}
-                  <span
-                    class="consumption-plan-contribution"
-                    class:is-required={contribution.required}
-                    style={contribution.colorToken
-                      ? `--fab-chip-color: var(--fab-tag-${contribution.colorToken})`
-                      : ''}
-                  >
-                    <i class={normalizeEssenceIcon(contribution.icon)} aria-hidden="true"></i>
-                    {localize('FABRICATE.App.Crafting.Pool.Contribution', {
-                      amount: contribution.amount,
-                      name: contribution.name
-                    })}
-                  </span>
+                  <EssenceContribution
+                    icon={contribution.icon}
+                    name={contribution.name}
+                    amount={contribution.amount}
+                    required={contribution.required}
+                    colorToken={contribution.colorToken}
+                  />
                 {/each}
               </span>
             {/if}
@@ -176,23 +170,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--fab-space-2);
-  }
-
-  .consumption-plan-contribution {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--fab-text-subtle);
-  }
-
-  .consumption-plan-contribution.is-required {
-    color: var(--fab-chip-color, var(--fab-accent));
-  }
-
-  .consumption-plan-contribution i {
-    font-size: 8px;
   }
 
   .consumption-plan-owned {

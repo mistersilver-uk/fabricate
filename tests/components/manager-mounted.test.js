@@ -7976,14 +7976,38 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Air');
 
+    // A new draft has NO authored colour, and the control must say so. `colorToken`
+    // normalizes an absent value onto `sage`, so an unguarded picker painted a Sage
+    // swatch and marked Sage selected directly above copy reading "No colour — this
+    // essence renders in the theme accent".
+    const colourTrigger = target.querySelector(
+      '[data-manager-essence-colour] .manager-color-picker-trigger'
+    );
+    assert.ok(colourTrigger.classList.contains('is-unset'), 'an unauthored colour reads unset');
+    assert.ok(
+      !/--fab-tag-/.test(colourTrigger.getAttribute('style')),
+      'and the trigger paints a neutral swatch, not a palette colour'
+    );
+
     // The palette is the WHOLE vocabulary for an essence colour (there is no custom
     // hex), so picking a preset is the only authoring path there is.
-    target.querySelector('[data-manager-essence-colour] .manager-color-picker-trigger').click();
+    colourTrigger.click();
     await tick();
     flushSync();
+    assert.equal(
+      document.querySelectorAll('[data-manager-color-token].is-selected').length,
+      0,
+      'no preset claims to be the current choice while none is authored'
+    );
     document.querySelector('[data-manager-color-token="rose"]').click();
     await tick();
     flushSync();
+    assert.ok(
+      !target
+        .querySelector('[data-manager-essence-colour] .manager-color-picker-trigger')
+        .classList.contains('is-unset'),
+      'authoring a colour ends the unset state'
+    );
 
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();

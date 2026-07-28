@@ -6,10 +6,12 @@
   a selectable slot — the disclosure line that says what opening it offers.
 
   Props only: every string arrives already localized and every number already
-  derived, so the tile owns presentation and nothing else. Its one import is the
-  shared CraftingThumb (component/tag artwork + the item-bag sentinel rule); the
-  essence glyph is rendered here directly because it needs the authored colour
-  tint, which a shared thumb cannot carry.
+  derived, so the tile owns presentation and nothing else. Both artwork paths are
+  the SHARED thumbs — CraftingThumb for component/tag artwork (plus the item-bag
+  sentinel rule) and CraftingEssenceThumb for an essence glyph — so one screen can
+  never draw the same essence through two components. The authored tint travels to
+  the shared glyph as the inherited `--fab-chip-color` custom property set on the
+  tile below, which is why the thumb needs no colour prop.
 
   ARIA — disclosure, not tablist. A selectable slot is a real `<button>` spanning
   the WHOLE column with `aria-expanded`/`aria-controls`; a fixed slot is a
@@ -20,6 +22,7 @@
 -->
 <script>
   import CraftingThumb from '../CraftingThumb.svelte';
+  import CraftingEssenceThumb from '../CraftingEssenceThumb.svelte';
 
   let {
     // Slot projection from `util/requirementSlots.js`.
@@ -57,7 +60,9 @@
 {#snippet body()}
   <span class="requirement-slot-tile" style={tint}>
     {#if isEssence}
-      <span class="requirement-slot-glyph"><i class={iconClass} aria-hidden="true"></i></span>
+      <!-- `requirement-slot-glyph` is a selector hook, not a style hook: the Foundry
+           smoke harness waits on it to know a first-class essence slot has rendered. -->
+      <CraftingEssenceThumb icon={iconClass} size={44} radius={8} class="requirement-slot-glyph" />
     {:else}
       <CraftingThumb src={slot?.img} alt="" size={44} glyph={fallbackGlyph} />
     {/if}
@@ -111,6 +116,11 @@
     appearance: none;
     -webkit-appearance: none;
     box-sizing: border-box;
+    /* Tiles WRAP onto a further row rather than shrinking below their minimum size:
+       below it the artwork and the corner pip stop being legible. The rail's
+       `flex-wrap: wrap` already produces that, but only because nothing here shrinks
+       — so the promise is declared rather than left to depend on a sibling's default. */
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -143,7 +153,13 @@
     background: var(--fab-accent-soft);
   }
 
+  /* The tint vehicle. The inline `style` above overrides this declaration when the GM
+     authored a colour; without one the shared glyph inherits the theme accent here,
+     which is what the essence pool's own badge paints and what shipped before
+     per-essence colours existed. */
   .requirement-slot-tile {
+    --fab-chip-color: var(--fab-accent);
+
     position: relative;
     box-sizing: border-box;
     flex: 0 0 auto;
@@ -167,20 +183,6 @@
 
   .requirement-slot.is-short .requirement-slot-tile {
     border-color: var(--fab-danger-border);
-  }
-
-  /* Only the GLYPH takes the authored essence colour; it falls back to the theme
-     accent for an essence with no authored token, which is what ships today. */
-  .requirement-slot-glyph {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
-    background: var(--fab-surface-raised);
-    color: var(--fab-chip-color, var(--fab-accent));
-    font-size: 18px;
   }
 
   /* Corner pip, moved from IoTable's legacy grid. Solid fill for legibility over

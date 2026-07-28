@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CLOSED_SLOT_ID,
   ESSENCE_POOL_SLOT_ID,
   SLOT_KIND,
   SLOT_STATE,
@@ -201,6 +202,38 @@ describe('resolveOpenSlotId', () => {
     assert.equal(composeSlotKey(null, 'g-choice'), null);
     assert.equal(composeSlotKey('set-a', null), null);
   });
+
+  // The disclosure must be genuinely COLLAPSIBLE. Every openable rail otherwise
+  // resolves something open on every read, so clicking the open tile re-stored a key
+  // that resolved back to the same slot — a control reporting `aria-expanded="true"`
+  // that could not be closed.
+  it('closes the chooser for a remembered CLOSED sentinel in this scope', () => {
+    assert.equal(
+      resolveOpenSlotId({
+        slots,
+        scopeKey: 'set-a',
+        rememberedKey: composeSlotKey('set-a', CLOSED_SLOT_ID),
+      }),
+      null
+    );
+  });
+
+  // Closed is remembered exactly as scoped as open is: moving set or step re-opens the
+  // new scope's first unsatisfied slot rather than inheriting the old scope's collapse.
+  it('drops a CLOSED sentinel belonging to another scope', () => {
+    assert.equal(
+      resolveOpenSlotId({
+        slots,
+        scopeKey: 'set-b',
+        rememberedKey: composeSlotKey('set-a', CLOSED_SLOT_ID),
+      }),
+      ESSENCE_POOL_SLOT_ID
+    );
+  });
+
+  it('never mistakes the sentinel for a real slot id', () => {
+    assert.ok(slots.every((slot) => slot.slotId !== CLOSED_SLOT_ID));
+  });
 });
 
 describe('buildConsumptionPlan', () => {
@@ -269,6 +302,32 @@ describe('buildConsumptionPlan', () => {
       ],
       'a short FIXED requirement is not "still to choose" — there is nothing to choose'
     );
+  });
+
+  // A resolved-but-unaffordable requirement is NOT withheld. There is nothing to choose
+  // for it, so it cannot move to the pending line, and dropping the row would leave the
+  // requirement absent from the surface entirely while the craft still needs it. The row
+  // states the shortfall instead: `sufficient: false` plus the held count, which the
+  // panel renders as the danger-toned quantity beside "You own N".
+  it('keeps a row for a short requirement and marks it insufficient', () => {
+    const plan = buildConsumptionPlan(
+      {
+        ingredientStates: [
+          fixedState({ satisfied: false, have: 1 }),
+          choiceState({ satisfied: false, have: 0 }),
+        ],
+      },
+      { chosenGroupIds: ['g-choice'] }
+    );
+
+    assert.deepEqual(
+      plan.rows.map((row) => [row.name, row.quantity, row.owned, row.sufficient]),
+      [
+        ['Spring Water', 2, 1, false],
+        ['Red Herb', 1, 0, false],
+      ]
+    );
+    assert.deepEqual(plan.pending, [], 'neither is "still to choose"');
   });
 
   it('is empty for a null craftability', () => {
