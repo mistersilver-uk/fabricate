@@ -443,6 +443,64 @@ describe('craftingStore requirement rail and essence pool', () => {
     assert.equal(store.openSlotId, ESSENCE_POOL_SLOT_ID, 'and the rail re-derives its default');
   });
 
+  // The collapse behaviour a nullish slot id must NOT have (above): clicking the
+  // OPEN tile again is a distinct COLLAPSE, storing the closed sentinel rather than
+  // forgetting the choice, so a rail with an openable slot can genuinely show none
+  // open — the gap the previous lane's review found and this suite now pins at the
+  // store, not only in the pure resolver.
+  it('collapses the chooser when the already-open tile is clicked again', async () => {
+    const { store } = await loadedStore();
+    assert.equal(
+      store.openSlotId,
+      ESSENCE_POOL_SLOT_ID,
+      'the first unsatisfied slot is open by default'
+    );
+
+    store.openSlot(ESSENCE_POOL_SLOT_ID);
+    flushSync();
+    assert.equal(store.openSlotId, null, 'clicking the open tile collapses it');
+  });
+
+  it('reopens a collapsed tile when it is clicked again', async () => {
+    const { store } = await loadedStore();
+    store.openSlot(ESSENCE_POOL_SLOT_ID);
+    flushSync();
+    assert.equal(store.openSlotId, null, 'collapsed first');
+
+    store.openSlot(ESSENCE_POOL_SLOT_ID);
+    flushSync();
+    assert.equal(store.openSlotId, ESSENCE_POOL_SLOT_ID, 're-clicking the collapsed tile re-opens it');
+  });
+
+  // The closed sentinel is composed through the SAME `${scopeKey}:${slotId}` path as
+  // a real remembered slot (see `resolveOpenSlotId`), so it must be re-validated the
+  // same way: a step this closure was never recorded against opens normally, and
+  // only the step the player actually closed stays closed on return.
+  it('scopes the collapse: a different step is untouched, the closed step remembers it', async () => {
+    const recipes = [poolRecipe()];
+    const { store } = await loadedStore({ recipes });
+
+    store.openSlot(ESSENCE_POOL_SLOT_ID);
+    flushSync();
+    assert.equal(store.openSlotId, null, 'step 1 is now closed');
+
+    recipes[0] = poolRecipe({ activeStepId: 'step-2' });
+    await store.load(true);
+    flushSync();
+    assert.equal(store.essenceScopeKey, 'set-a::step-2');
+    assert.equal(
+      store.openSlotId,
+      ESSENCE_POOL_SLOT_ID,
+      "a scope the player never closed auto-derives its default, untouched by step 1's collapse"
+    );
+
+    recipes[0] = poolRecipe({ activeStepId: 'step-1' });
+    await store.load(true);
+    flushSync();
+    assert.equal(store.essenceScopeKey, 'set-a::step-1');
+    assert.equal(store.openSlotId, null, 'returning to the closed scope keeps it closed');
+  });
+
   it('pickForMe adopts the resolver suggestion and the most-held choice option', async () => {
     const { store } = await loadedStore();
     store.pickForMe('Picked for you.');
