@@ -510,20 +510,27 @@ function craftingSubitem(labelText) {
   );
 }
 
-// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
-// Assigns the module-level `mounted`/`target` (so afterEach can clean up) and
-// returns the mounted target for the caller to query.
-async function openRecipeEditor(calls, storeOptions = {}) {
+// Mount the manager against a fresh store on a fresh host element. Assigns the
+// module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
+// so the routing helpers below differ only in where they navigate afterwards.
+function mountManager(calls = [], storeOptions = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(Component, {
     target,
     props: {
-      store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+      store: createStore(calls, storeOptions),
       services: { openCurrentAdmin: () => {} },
     },
   });
   flushSync();
+  return target;
+}
+
+// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
+// Returns the mounted target for the caller to query.
+async function openRecipeEditor(calls, storeOptions = {}) {
+  mountManager(calls, { experimentalFeaturesEnabled: true, ...storeOptions });
   craftingParent().click();
   await tick();
   flushSync();
@@ -538,19 +545,9 @@ async function openRecipeEditor(calls, storeOptions = {}) {
   return target;
 }
 
-// Mount the manager and route to the Tags & Categories screen. Assigns the module-level
-// `mounted`/`target` (so afterEach can clean up) and returns the mounted target.
+// Mount the manager and route to the Tags & Categories screen. Returns the mounted target.
 async function openTagsScreen(calls = [], storeOptions = {}) {
-  target = document.createElement('div');
-  document.body.appendChild(target);
-  mounted = mount(Component, {
-    target,
-    props: {
-      store: createStore(calls, storeOptions),
-      services: { openCurrentAdmin: () => {} },
-    },
-  });
-  flushSync();
+  mountManager(calls, storeOptions);
   navButton('Tags & Categories').click();
   await tick();
   flushSync();
@@ -14701,8 +14698,10 @@ describe('CraftingSystemManager mounted behavior', () => {
   // All three of these editors used to compute a failure and render NOTHING: a GM whose
   // save failed saw no change at all. Each test drives one editor to a dirty draft, fails
   // its save, and asserts the RENDERED text — element presence alone would pass against an
-  // implementation that renders an empty `<p>`. Each then flips the same live options
-  // object to success and re-saves, proving the alert clears rather than sticking.
+  // implementation that renders an empty `<p>`. Each then flips the same live options object
+  // to success and re-saves, and asserts the alert is gone afterwards. For the two gathering
+  // editors that is a real clearing assertion; the recipe-item pair leaves the route on
+  // success, so there absence follows from the whole toolbar branch unmounting instead.
   //
   // The `options` object is read at CALL time by the store fixture, so mutating it between
   // two clicks on one mounted tree switches the outcome without a second mount.
@@ -14724,34 +14723,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     },
   ];
 
-  // Two ticks: the save handlers await a store promise, so the state write that renders
-  // the alert lands a microtask after the click.
-  async function settle() {
+  // Two ticks: the save handlers await a store promise, so the state write that renders the
+  // alert lands a microtask after the click. Named apart from the `settle` the system-details
+  // dirty tests use — function declarations are var-scoped, so a second `settle` in this one
+  // describe would silently take over all of their call sites too.
+  async function settleSaveAttempt() {
     await tick();
     await tick();
     flushSync();
-  }
-
-  function mountManager(calls, storeOptions) {
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, storeOptions),
-        services: { openCurrentAdmin: () => {} },
-      },
-    });
-    flushSync();
-  }
-
-  function headerSaveButton() {
-    return target.querySelector('.manager-header-actions .manager-button.is-primary');
   }
 
   async function clickHeaderSave() {
-    headerSaveButton().click();
-    await settle();
+    headerSaveButton(target).click();
+    await settleSaveAttempt();
   }
 
   function assertSaveErrorRendered(selector) {
@@ -14777,30 +14761,30 @@ describe('CraftingSystemManager mounted behavior', () => {
   async function openDirtyGatheringTaskEditor(calls, storeOptions) {
     mountManager(calls, storeOptions);
     navButton('Gathering').click();
-    await settle();
+    await settleSaveAttempt();
     gatheringSubitem('Tasks').click();
-    await settle();
+    await settleSaveAttempt();
     target
       .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
       .click();
-    await settle();
+    await settleSaveAttempt();
     setInputValue(target.querySelector('[data-gathering-task-field="name"]'), 'Gather Sun Herbs');
-    await settle();
+    await settleSaveAttempt();
   }
 
   async function openDirtyGatheringEventEditor(calls, storeOptions) {
     Object.assign(storeOptions, { gatheringLibraryEvents: gatheringEventLibraryFixtures });
     mountManager(calls, storeOptions);
     navButton('Gathering').click();
-    await settle();
+    await settleSaveAttempt();
     gatheringSubitem('Events').click();
-    await settle();
+    await settleSaveAttempt();
     target
       .querySelector('[data-gathering-event-id="event-thorns"] [aria-label="Edit Thorn Snare"]')
       .click();
-    await settle();
+    await settleSaveAttempt();
     setInputValue(target.querySelector('[data-gathering-event-field="name"]'), 'Bramble Snare');
-    await settle();
+    await settleSaveAttempt();
   }
 
   async function openDirtyRecipeItemEditor(calls, storeOptions) {
@@ -14810,13 +14794,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
     mountManager(calls, storeOptions);
     craftingParent().click();
-    await settle();
+    await settleSaveAttempt();
     craftingSubitem('Books & Scrolls').click();
-    await settle();
+    await settleSaveAttempt();
     target.querySelector('[data-books-scrolls-edit="ri1"]').click();
-    await settle();
+    await settleSaveAttempt();
     target.querySelector('[data-recipe-item-enabled]').click();
-    await settle();
+    await settleSaveAttempt();
   }
 
   // The two gathering rejection paths log through console.error before they surface the
@@ -14932,13 +14916,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
 
     target.querySelector('[data-recipe-item-save]').click();
-    await settle();
+    await settleSaveAttempt();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemResult = true;
     target.querySelector('[data-recipe-item-save]').click();
-    await settle();
+    await settleSaveAttempt();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assertSaveErrorAbsent(
       '[data-recipe-item-save-error]',
@@ -14952,13 +14936,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     await openDirtyRecipeItemEditor(calls, storeOptions);
 
     target.querySelector('[data-recipe-item-save]').click();
-    await settle();
+    await settleSaveAttempt();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
     assertSaveErrorRendered('[data-recipe-item-save-error]');
 
     storeOptions.saveRecipeItemReject = false;
     target.querySelector('[data-recipe-item-save]').click();
-    await settle();
+    await settleSaveAttempt();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assertSaveErrorAbsent(
       '[data-recipe-item-save-error]',
