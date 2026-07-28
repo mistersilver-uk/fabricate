@@ -1043,7 +1043,6 @@
           {#if salvageStages.length > 0}
             <ul class="manager-salvage-stage-list">
               {#each salvageStages as result, stageIndex (result.id)}
-                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                 <li
                   class={`manager-salvage-stage-row ${draggingStageIndex === stageIndex ? 'is-dragging' : ''}`}
                   data-salvage-result={result.id}

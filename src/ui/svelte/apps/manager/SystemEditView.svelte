@@ -985,7 +985,6 @@
                         <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} title={text('FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink', 'Unlink macro')} onclick={(event) => { event.stopPropagation(); onClearCurrencyMacro(field.key); }}><i class="fas fa-link-slash" aria-hidden="true"></i></button>
                       </div>
                     {:else}
-                      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                       <div
                         class="manager-component-source-drop-zone manager-currency-macro-drop-zone"
                         data-system-currency-macro-dropzone={field.key}

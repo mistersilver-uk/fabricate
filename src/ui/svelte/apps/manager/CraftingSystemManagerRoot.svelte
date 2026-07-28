@@ -275,13 +275,9 @@
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
-  // svelte-ignore state_referenced_locally
   let checkRoutedBaseline = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
-  // svelte-ignore state_referenced_locally
   let lastChecksSystemId = $viewState.selectedSystem?.id || '';
-  // svelte-ignore state_referenced_locally
   let lastChecksResolutionMode = $viewState.selectedSystem?.resolutionMode || 'simple';
   let checkRoutedSaving = $state(false);
   const checkRoutedDirty = $derived(
@@ -303,9 +299,7 @@
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkSimpleDraft = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
-  // svelte-ignore state_referenced_locally
   let checkSimpleBaseline = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
   let checkSimpleSaving = $state(false);
   const checkSimpleDirty = $derived(
@@ -325,11 +319,9 @@
       checkBreakage: cloneCheckBreakage(source.checkBreakage)
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkProgressiveDraft = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
   );
-  // svelte-ignore state_referenced_locally
   let checkProgressiveBaseline = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
   );
@@ -342,17 +334,11 @@
   // (simple/routed/progressive), so the crafting clone helpers are reused. Same
   // staged pattern: one draft per mode, committed via the tab-aware header Save.
   const sysSalvage = $viewState.selectedSystem?.salvageCraftingCheck;
-  // svelte-ignore state_referenced_locally
   let salvageSimpleDraft = $state(cloneSimpleCheck(sysSalvage?.simple));
-  // svelte-ignore state_referenced_locally
   let salvageSimpleBaseline = $state(cloneSimpleCheck(sysSalvage?.simple));
-  // svelte-ignore state_referenced_locally
   let salvageRoutedDraft = $state(cloneRoutedCheck(sysSalvage?.routed));
-  // svelte-ignore state_referenced_locally
   let salvageRoutedBaseline = $state(cloneRoutedCheck(sysSalvage?.routed));
-  // svelte-ignore state_referenced_locally
   let salvageProgressiveDraft = $state(cloneProgressiveCheck(sysSalvage?.progressive));
-  // svelte-ignore state_referenced_locally
   let salvageProgressiveBaseline = $state(cloneProgressiveCheck(sysSalvage?.progressive));
   let salvageSimpleSaving = $state(false);
   let salvageRoutedSaving = $state(false);
@@ -371,13 +357,9 @@
   // crafting/salvage progressive + routed shapes (d100 has no editable config),
   // so the crafting clone helpers are reused. Same staged pattern as salvage.
   const sysGathering = $viewState.selectedSystem?.gatheringCraftingCheck;
-  // svelte-ignore state_referenced_locally
   let gatheringProgressiveDraft = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  // svelte-ignore state_referenced_locally
   let gatheringProgressiveBaseline = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  // svelte-ignore state_referenced_locally
   let gatheringRoutedDraft = $state(cloneRoutedCheck(sysGathering?.routed));
-  // svelte-ignore state_referenced_locally
   let gatheringRoutedBaseline = $state(cloneRoutedCheck(sysGathering?.routed));
   let gatheringProgressiveSaving = $state(false);
   let gatheringRoutedSaving = $state(false);

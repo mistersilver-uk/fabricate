@@ -84,7 +84,6 @@
       {#each drops as drop, index (drop.id ?? index)}
         {@const isOpen = expandedIds.has(drop.id ?? index)}
         <li class="gathering-task-drop" data-gathering-drop data-drop-id={drop.id ?? ''}>
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="gathering-task-drop-summary"
             role="button"

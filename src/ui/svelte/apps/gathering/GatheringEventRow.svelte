@@ -56,7 +56,6 @@
   data-event-id={id}
   data-selected={selected ? 'true' : 'false'}
 >
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="gathering-event-summary is-toggle"
     role="button"

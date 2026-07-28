@@ -66,7 +66,6 @@
     browserState = $bindable(null)
   } = $props();
 
-  // svelte-ignore state_referenced_locally
   let ownBrowserState = $state(createComponentBrowserState());
   // The active view-state: the root's lifted object when bound, else the local
   // fallback. Both are `$state` proxies, so nested writes (`ui.categoryFilter = …`)
