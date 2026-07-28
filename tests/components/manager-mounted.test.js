@@ -1590,8 +1590,12 @@ function createStore(calls = [], options = {}) {
       }
       return { updated: ids.length, componentIds: ids };
     },
-    addEssence: (name, description, icon, sourceComponentId) => {
-      calls.push(['addEssence', name, description, icon, sourceComponentId]);
+    // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a
+    // four-parameter stub records a call that looks identical whether the argument is
+    // threaded or silently dropped — which is exactly how the value went missing once
+    // already. Recording it is what makes the assertion below able to fail.
+    addEssence: (name, description, icon, sourceComponentId, colorToken) => {
+      calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken]);
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
       return options.addEssenceResult ?? true;
     },
@@ -7971,10 +7975,25 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Air');
+
+    // The palette is the WHOLE vocabulary for an essence colour (there is no custom
+    // hex), so picking a preset is the only authoring path there is.
+    target.querySelector('[data-manager-essence-colour] .manager-color-picker-trigger').click();
+    await tick();
+    flushSync();
+    document.querySelector('[data-manager-color-token="rose"]').click();
+    await tick();
+    flushSync();
+
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
-    assert.ok(calls.some((call) => call[0] === 'addEssence' && call[1] === 'Air'));
+    const addCall = calls.find((call) => call[0] === 'addEssence' && call[1] === 'Air');
+    assert.ok(addCall, 'the create call reached the store');
+    // FIVE positional arguments, and the fifth is the authored colour. A four-argument
+    // assertion passes identically whether the colour is threaded or dropped.
+    assert.equal(addCall.length, 6, 'addEssence is called with all five arguments');
+    assert.equal(addCall[5], 'rose', 'the GM-authored colour survives the create call');
   });
 
   it('hides manager essence source UI when effect transfer is disabled', async () => {
