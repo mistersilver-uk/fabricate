@@ -48,6 +48,8 @@
     ...vocabularyIds(systemConfig.vocabularies?.biomes?.values)
   ]));
   const dangerOptions = $derived((() => {
+    // Function-local de-duplication scratch inside a $derived IIFE; never held in state.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const seen = new Set();
     const all = [
       ...DANGER_LEVEL_ORDER,

@@ -153,6 +153,9 @@
   // Crafting nav group (issue 511): mirrors the gathering group's expand state.
   // The group is always available as of issue 745 (v1.3 headline); only its
   // expand/collapse state lives here.
+  // Not a writable $derived: toggleCraftingMenu writes this from a non-crafting route and the
+  // value must STICK until the route category next changes, which a $derived would clobber.
+  // eslint-disable-next-line svelte/prefer-writable-derived
   let craftingMenuExpanded = $state(false);
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
@@ -2891,6 +2894,9 @@
     const rid = recipeDraft?.id;
     if (!rid || !recipeItemId) return false;
     const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    // Function-local scratch, spread into a store call on the next line but never held in
+    // state; the persisted value is the array, not the Set.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
     membership.delete(String(recipeItemId));
     await store.setRecipeBookMembership?.(rid, [...membership]);
@@ -4155,6 +4161,9 @@
   // Discard) rather than editing the recipe directly — no "Recipe updated" toast.
   function linkRecipeToItem(recipeId) {
     if (!recipeItemDraft?.id || !recipeId) return;
+    // Function-local scratch: the draft is patched with the spread array below, so the Set
+    // never reaches state.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set((recipeItemDraft.recipeIds || []).map((id) => String(id)));
     next.add(String(recipeId));
     patchRecipeItemDraft({ recipeIds: [...next] });
@@ -4319,6 +4328,8 @@
   function environmentRequiredToolCount(environment) {
     const taskIds = new Set(environmentComposedIds(environment, 'task'));
     if (taskIds.size === 0) return 0;
+    // Function-local counting scratch, discarded when the function returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const toolIds = new Set();
     for (const task of gatheringTaskDefinitions) {
       if (!taskIds.has(task?.id)) continue;
@@ -6022,6 +6033,9 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}</h3>
               <div class="manager-fact-grid">
                 <div class="manager-fact" data-gathering-task-fact="biomes">
+                  <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
+                  <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
+                  <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-task-fact="drops">
@@ -6545,6 +6559,9 @@
               <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}</h3>
               <div class="manager-fact-grid">
                 <div class="manager-fact" data-gathering-event-fact="biomes">
+                  <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
+                  <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
+                  <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
                   <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0 ? selectedGatheringEvent.biomes.length : text('FABRICATE.Admin.Manager.Environment.Events.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                 </div>
                 <div class="manager-fact" data-gathering-event-fact="drop-rate">
@@ -7365,6 +7382,10 @@
                   </span>
                 {:else}
                   <span class="manager-fact-line">
+                    <!-- `{' '}` is the separator between the leading span and the trailing label: -->
+                    <!-- a literal space is the first token inside the `{#if}` and Svelte trims -->
+                    <!-- block-leading whitespace, so the two would run together. -->
+                    <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
                     <span class="manager-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-fact-label">{labelParts.rest}</span>{/if}
                   </span>
                 {/if}

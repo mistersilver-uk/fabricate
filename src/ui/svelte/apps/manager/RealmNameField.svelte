@@ -12,6 +12,10 @@
   let { name = '', disabled = false, onRename = () => {} } = $props();
 
   // Seed without subscribing to `name` here; the $effect below keeps it synced.
+  // Not a writable $derived: this is a seed-then-resync draft that commits on blur/Enter and
+  // reverts on Escape. A writable $derived resyncs synchronously and would clobber the edit
+  // in progress.
+  // eslint-disable-next-line svelte/prefer-writable-derived
   let draft = $state(untrack(() => name));
 
   // Reseed the draft whenever the upstream name changes (selection change or

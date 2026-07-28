@@ -312,6 +312,9 @@
   // Collapse is opt-IN: a category absent from the set is expanded. A new Set is
   // assigned rather than mutated so the bound state propagates back to the root.
   function toggleCategoryCollapsed(category) {
+    // Copy-then-reassign, per the contract above: in-place SvelteSet mutation would stop
+    // the bound state propagating back to the manager root.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(ui.collapsedCategories);
     if (next.has(category)) next.delete(category);
     else next.add(category);

@@ -218,6 +218,9 @@
     }
   });
   function toggleSectionCollapsed(section) {
+    // Copy-then-reassign: the reactive unit is `collapsedSections`, not the Set. The copy is
+    // mutated only before the assignment that publishes it.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(collapsedSections);
     if (next.has(section)) next.delete(section);
     else next.add(section);
@@ -228,6 +231,8 @@
   }
   function expandSection(section) {
     if (!collapsedSections.has(section)) return;
+    // Copy-then-reassign, as in toggleSectionCollapsed above.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(collapsedSections);
     next.delete(section);
     collapsedSections = next;
@@ -421,6 +426,8 @@
   // transitively contains) reachable from the parent and from the child must be disjoint, or adding
   // the edge would give the parent two conversion paths to some node.
   function currencyReachableUnitIds(startUnitId) {
+    // Function-local graph-walk scratch, discarded when the function returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const reachable = new Set();
     const stack = [startUnitId];
     while (stack.length > 0) {

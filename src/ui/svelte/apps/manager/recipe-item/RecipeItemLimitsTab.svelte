@@ -87,6 +87,8 @@
   // Prerequisite options: prefer the recipes already linked to this item, then any
   // other available recipe, de-duplicated by id.
   const prerequisiteOptions = $derived.by(() => {
+    // Function-local de-duplication scratch, discarded when the $derived.by returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const seen = new Set();
     const options = [];
     for (const recipe of [...(linkedRecipes || []), ...(availableRecipes || [])]) {
