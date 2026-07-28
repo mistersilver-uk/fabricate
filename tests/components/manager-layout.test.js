@@ -5957,3 +5957,37 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
     await browser.close();
   }
 });
+
+/*
+  The OPEN state of a manager `<select>` (issue 772).
+
+  `.fabricate-manager select` themes the CLOSED field, so a manager dropdown looks correct
+  until it is opened — and then the option list fell back to the browser's black-on-white
+  default, in every native select the manager renders. The player app has carried
+  `.fabricate-app select option` for a long time; the manager root is `.fabricate-manager`
+  and never inherited it.
+
+  This is asserted from the STYLESHEET rather than from a rendered frame because it cannot
+  be photographed: a native select's popup is painted by the browser, not into the page DOM,
+  so Playwright never sees it and no smoke screenshot can contain the defect. It was found
+  by opening the control by hand. A source assertion is therefore the only gate available,
+  and its job is to stop the rule being deleted as "unused".
+*/
+test('the manager themes select options, not just the closed select', () => {
+  const optionRule = blockFor('.fabricate-manager select option');
+  assert.ok(optionRule, 'the manager must theme its option list, not only the closed field');
+  assert.match(
+    optionRule,
+    /background:\s*var\(--fab-mv2-[a-z0-9-]+\)/,
+    'an option list without a painted background falls back to the browser default white'
+  );
+  assert.match(optionRule, /color:\s*var\(--fab-mv2-[a-z0-9-]+\)/);
+
+  const checkedRule = blockFor('.fabricate-manager select option:checked');
+  assert.ok(checkedRule, 'the selected row needs its own treatment');
+  assert.match(
+    checkedRule,
+    /background:\s*var\(--fab-mv2-accent\)/,
+    "Foundry's default highlight renders the selected row unreadably against these surfaces"
+  );
+});

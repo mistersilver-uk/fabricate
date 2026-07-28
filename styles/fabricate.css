@@ -1359,6 +1359,34 @@
   line-height: 1.4;
 }
 
+/*
+  The OPEN state of every manager `<select>` (issue 772).
+
+  The same baseline reasoning as the block above, for the one part of a select that is
+  not the control itself. `.fabricate-manager select` themes the CLOSED field, so a
+  manager dropdown looks right until it is opened — at which point the option list fell
+  back to the browser's default white-on-light chrome, in all 75 native selects the
+  manager renders. The player app has had `.fabricate-app select option` since forever
+  (see the rule near the top of this file); the manager root is `.fabricate-manager` and
+  has simply never carried `.fabricate-app`, so it never inherited the fix.
+
+  Why no gate caught it: a native select's popup is painted by the browser, NOT into the
+  page DOM, so Playwright cannot screenshot it and no smoke frame can ever contain it.
+  This was found by opening the control by hand.
+
+  `:checked` is styled too — Foundry's default highlight is a light bar that renders the
+  selected row as black-on-grey against these surfaces.
+*/
+.fabricate-manager select option {
+  color: var(--fab-mv2-text);
+  background: var(--fab-mv2-surface-2);
+}
+
+.fabricate-manager select option:checked {
+  color: var(--fab-mv2-bg);
+  background: var(--fab-mv2-accent);
+}
+
 .fabricate-manager input[type="text"]:disabled,
 .fabricate-manager input[type="url"]:disabled,
 .fabricate-manager input[type="email"]:disabled,
