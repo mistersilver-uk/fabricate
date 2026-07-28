@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compile, compileModule } from 'svelte/compiler';
 import { createClassComponent } from 'svelte/legacy';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
@@ -99,10 +99,50 @@ export function rewriteClientImports(code) {
 }
 
 /**
+ * Guard against a VACUOUS reactivity pass.
+ *
+ * `svelte/reactivity` is condition-mapped: the `browser` condition selects the real
+ * client build, and every other condition (including Node's default) selects
+ * `index-server.js`, whose `SvelteSet` is literally `globalThis.Set`. `npm test` passes
+ * `--conditions=browser`; a bare `node --test <file>` does not. Under the server build an
+ * assertion that a component uses `SvelteSet` rather than `Set` cannot fail, so a run
+ * outside `npm test` would report PASS on unfixed code, indistinguishable from a real one.
+ *
+ * The check compares what the specifier actually resolves to against the `browser` target
+ * the installed Svelte declares for that subpath, so it states the condition rather than
+ * hard-coding a filename, and keeps working across Svelte releases that rename the build.
+ * `import.meta.resolve` is synchronous and does not evaluate the module, so this adds no
+ * second copy of the client runtime to a mounted suite.
+ *
+ * @throws {Error} when the process did not resolve `svelte/reactivity` under `browser`.
+ */
+export function assertClientSvelteReactivity() {
+  const packagePath = fileURLToPath(import.meta.resolve('svelte/package.json'));
+  const browserTarget = JSON.parse(readFileSync(packagePath, 'utf8')).exports?.['./reactivity']?.browser;
+  if (!browserTarget) {
+    throw new Error(
+      "The installed Svelte no longer declares a 'browser' condition for 'svelte/reactivity'; "
+        + 'the vacuous-pass guard in tests/helpers/svelte-component-harness.js needs updating.'
+    );
+  }
+  const expected = resolve(dirname(packagePath), browserTarget);
+  const actual = fileURLToPath(import.meta.resolve('svelte/reactivity'));
+  if (actual !== expected) {
+    throw new Error(
+      `'svelte/reactivity' resolved to ${actual}, not the client build ${expected}. `
+        + 'Without the browser export condition, SvelteSet IS globalThis.Set and every '
+        + 'reactivity assertion passes vacuously. Run the suite via `npm test` (which passes '
+        + '--conditions=browser), or add --conditions=browser to a bare `node --test` run.'
+    );
+  }
+}
+
+/**
  * Install the minimal Foundry/DOM globals that mounted component tests rely on.
  * Call after `setupDOM()` so `document` exists.
  */
 export function installComponentTestGlobals() {
+  assertClientSvelteReactivity();
   globalThis.Text = document.createTextNode('').constructor;
   globalThis.Comment = document.createComment('').constructor;
   const labels = {
