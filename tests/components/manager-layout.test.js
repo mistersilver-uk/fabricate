@@ -6016,3 +6016,85 @@ test('the manager themes select options, not just the closed select', () => {
   assert.ok(picker, 'the picker surface must be themed, not left as the platform default');
   assert.match(picker, /background:\s*var\(--fab-mv2-surface-2\)/);
 });
+
+/*
+  Every manager `<select>` must carry an OPAQUE background (issue 772).
+
+  A native select's option popup is painted by the browser, which derives its surface from
+  the control's own computed background. A translucent background looks correct on the
+  CLOSED control — it composites over whatever dark surface it sits on — but the popup has
+  nothing to composite against, so it opens LIGHT while every other manager dropdown opens
+  dark. `color-scheme: dark` does not rescue it: an author background wins over the UA
+  scheme.
+
+  This shipped once. The bulk edit panel's category select used `--fab-surface-soft`, a
+  5%-alpha light tint, and opened light beside a pagination select that opened dark in the
+  same window. It is invisible to every other gate: the closed control looks correct in any
+  screenshot, and the popup is browser chrome that Playwright cannot photograph at all.
+
+  The scan covers component SCOPED styles as well as the global sheet, because that is
+  where it shipped — a global-sheet-only guard would have missed it entirely.
+*/
+test('every manager select paints an opaque background, so its popup opens dark', () => {
+  // `rgb(… / 5%)`, `rgba(…, 0.05)` — any alpha below 1.
+  const TRANSLUCENT = /(?:rgba?|hsla?)\([^)]*(?:\/\s*(?:0?\.\d+|[0-9]{1,2})%|,\s*0?\.\d+)\s*\)/i;
+
+  // Resolve `var(--a)` chains against the sheet's own token declarations.
+  const tokens = new Map(
+    [...css.matchAll(/^\s*(--fab-[\w-]+):\s*([^;]+);/gm)].map(([, name, value]) => [
+      name,
+      value.trim(),
+    ])
+  );
+  function resolveToken(value, depth = 0) {
+    if (depth > 8) return value;
+    const ref = /var\(\s*(--fab-[\w-]+)/.exec(value);
+    if (!ref) return value;
+    const next = tokens.get(ref[1]);
+    return next ? resolveToken(next, depth + 1) : value;
+  }
+  const backgroundOf = (body) => /background(?:-color)?:\s*([^;]+)/.exec(body)?.[1]?.trim() || '';
+
+  const offenders = [];
+
+  // 1. The global sheet: rules whose selector ends at a bare `select` under the manager.
+  for (const [, selector, body] of css.matchAll(
+    /(\.fabricate-manager[^{},]*select)\s*\{([^}]*)\}/g
+  )) {
+    const declared = backgroundOf(body);
+    if (declared && TRANSLUCENT.test(resolveToken(declared))) {
+      offenders.push(`styles/fabricate.css ${selector.trim()} -> ${declared}`);
+    }
+  }
+
+  // 2. Component scoped styles: correlate `<select class="x">` with `.x { background }` in
+  //    the same file's `<style>` block. This is the shape the defect actually took, so a
+  //    global-sheet-only scan would have missed it.
+  const managerFiles = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
+
+  for (const entry of managerFiles) {
+    const full = resolve(entry.parentPath, entry.name);
+    const source = readFileSync(full, 'utf8');
+    const style = /<style>([\s\S]*)<\/style>/.exec(source)?.[1];
+    if (!style) continue;
+    const shortPath = relative(managerComponentDir, full).replaceAll('\\', '/');
+    for (const [, classAttr] of source.matchAll(/<select[^>]*class="([^"]+)"/g)) {
+      for (const className of classAttr.split(/\s+/).filter(Boolean)) {
+        if (className.includes('{')) continue;
+        const rule = new RegExp(`\\.${className}\\s*\\{([^}]*)\\}`).exec(style);
+        if (!rule) continue;
+        const declared = backgroundOf(rule[1]);
+        if (declared && TRANSLUCENT.test(resolveToken(declared))) {
+          offenders.push(`${shortPath} .${className} -> ${declared}`);
+        }
+      }
+    }
+  }
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `a translucent select background opens a LIGHT popup:\n- ${offenders.join('\n- ')}`
+  );
+});

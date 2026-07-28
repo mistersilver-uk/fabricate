@@ -561,8 +561,21 @@
     line-height: 1.4;
   }
 
-  /* Full width, and wearing the Fabricate select treatment rather than Foundry core's
-     default light chrome — the same treatment the toolbar's filter selects carry. */
+  /*
+    Full width, and wearing the Fabricate select treatment rather than Foundry core's
+    default light chrome — the same treatment the toolbar's filter selects carry.
+
+    The background MUST be opaque, and `--fab-mv2-bg` specifically (issue 772).
+
+    A native `<select>`'s option popup is painted by the browser, which derives its surface
+    from the control's own COMPUTED background. This rule originally used
+    `--fab-surface-soft`, which is a 5%-alpha LIGHT tint (`styles/fabricate.css:192`) — it
+    looks right on the closed control because it composites over the dark rail, but the
+    popup has nothing to composite against, so it opened light while every other manager
+    dropdown opened dark. `color-scheme: dark` does not rescue it: the author background
+    wins. The toolbar filters and the pagination size select both use `--fab-mv2-bg`
+    (`styles/fabricate.css:4255`, `:3436`) and open dark, which is the look to match.
+  */
   .manager-component-bulk-select {
     width: 100%;
     min-width: 0;
@@ -571,7 +584,7 @@
     border: 1px solid var(--fab-mv2-border-strong);
     border-radius: 8px;
     color: var(--fab-mv2-text);
-    background: var(--fab-surface-soft);
+    background: var(--fab-mv2-bg);
     font-family: inherit;
     font-size: 0.72rem;
     cursor: pointer;
