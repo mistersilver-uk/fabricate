@@ -54,6 +54,9 @@ const harness = createMountedComponentHarness({
     // The salvage result quantity + the progressive DC are the shared Stepper (issue
     // 676). Import-free leaf, so it needs no `rawModules` entry.
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared essence quantity card (issue 772). `ComponentEditView` renders it after
+    // the extraction, so it is in this tree's static import closure regardless of props.
+    'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],

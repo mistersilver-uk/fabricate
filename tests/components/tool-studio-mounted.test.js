@@ -43,6 +43,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
+    // the conversion, so it is in this tree's static graph; the harness's closure validator
+    // throws for a shared-harness suite that omits it.
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
@@ -750,6 +754,52 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('strong')));
     assert.ok(patches.some((patch) => patch.prerequisites?.gateMode === 'bonus'));
     assert.ok(patches.some((patch) => patch.bonus?.expression === '1d4'));
+  });
+
+  // Issue 772, acceptance 11 — the ONLY proof that extracting the check box out of
+  // `ChecklistCardRow` left this tab rendering what it rendered before. There is no Tool
+  // Studio screenshot recipe that `ChecklistCardRow.svelte` matches (it routes to the
+  // broad theme-or-global-ui recipe only), so no published frame can show it either.
+  //
+  // The three things a conversion of this shape can silently break: the box stops being a
+  // real `<input type="checkbox">` (killing the keyboard, the label association and every
+  // `input[value=…]` selector this suite already uses); the checked state stops rendering;
+  // or the change callback stops firing. Each is asserted below.
+  it('renders the prerequisite row through the shared selection control after the conversion', async () => {
+    const patches = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({ prerequisites: { enabled: true, ids: ['expert'], gateMode: 'block' } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+
+    const rows = [...root.querySelectorAll('[data-tool-prerequisite-row]')];
+    assert.equal(rows.length, 5);
+
+    // The real control survives the extraction, and the row still owns the `<label>` — the
+    // primitive is rendered in `contents` mode precisely so no second label is nested here.
+    for (const row of rows) {
+      assert.equal(row.tagName, 'LABEL');
+      assert.equal(row.querySelectorAll('label').length, 0);
+      const box = row.querySelector('input[type="checkbox"]');
+      assert.ok(box, 'every prerequisite row renders a real checkbox');
+      // A bare Foundry-chromed checkbox is a SECOND selection design; the custom box has
+      // to be there beside the hidden input.
+      assert.ok(row.querySelector('.fab-selection-check.is-sm'));
+    }
+
+    // Checked state reaches the visible box, not just the input.
+    const expertRow = rows[0];
+    assert.equal(expertRow.querySelector('input[value="expert"]').checked, true);
+    assert.equal(expertRow.querySelector('.fab-selection-check').classList.contains('is-checked'), true);
+    assert.equal(rows[1].querySelector('input[value="smith"]').checked, false);
+    assert.equal(rows[1].querySelector('.fab-selection-check').classList.contains('is-checked'), false);
+
+    // And the change callback still reaches the tab's patch handler through the primitive.
+    root.querySelector('.manager-tool-prerequisite-list input[value="smith"]').click();
+    assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('smith')));
   });
 
   it('renders the recipe-style grouped validation surface and Validation-only live preview note', async () => {

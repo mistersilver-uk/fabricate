@@ -4080,6 +4080,22 @@
   gap: var(--fab-space-1);
 }
 
+/* The multi-select row (issue 772) — the LAST row of the component toolbar, sitting
+   directly above the list. It JOINS `.manager-component-filter-row` for the toolbar's row
+   metrics rather than declaring a bespoke bar, and this block adds only the row CONTEXT
+   that makes it read as a different register from the filter rows above it: a hairline
+   rule and the row's own gap. Its content is a control, a count and two text actions, not
+   a run of filter fields, so the toolbar's `.is-secondary` spacing would be too loose.
+
+   It is its OWN block on purpose. The rows above are shared recipe/component joins pinned
+   by exact selector string, and adding a third variant selector to one of them would
+   couple this row to the recipe toolbar, which has no selection row at all. */
+.fabricate-manager .manager-component-filter-row.is-selection {
+  gap: var(--fab-space-2);
+  padding-top: var(--fab-space-2);
+  border-top: 1px solid var(--fab-mv2-border);
+}
+
 /* Both recipe-filter dropdowns (category + sort) wear the Fabricate select treatment —
    themed surface, border, radius, text colour and the native dark chevron under
    `color-scheme: dark` — rather than Foundry core's default light select chrome, which
@@ -5147,6 +5163,19 @@
 .fabricate-manager .manager-recipe-row.is-selected,
 .fabricate-manager .manager-component-row.is-selected {
   box-shadow: none;
+}
+
+/* A row ticked for BULK edit (issue 772). This is a different question from `.is-selected`
+   ("you are here", the row whose inspector is open) — it means "this row is in the set the
+   Apply will write to" — so it reads as the same accent ring over the ACTIVE surface,
+   which sits one step forward of the selected row's soft surface. A row can be both.
+
+   Its OWN block, never folded into the `.is-selected` joins above: those are pinned by
+   exact selector string in `tests/components/manager-layout.test.js`, and appending to
+   them would also give four other browser rows a state none of them has. */
+.fabricate-manager .manager-component-row.is-bulk-selected {
+  border-color: var(--fab-accent-border);
+  background: var(--fab-surface-active);
 }
 
 .fabricate-manager .manager-system-identity,
@@ -14302,36 +14331,12 @@
   opacity: 0.6;
 }
 
-.fabricate-manager .manager-checklist-card-row > input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  opacity: 0;
-}
-
-.fabricate-manager .manager-checklist-card-row > input::before,
-.fabricate-manager .manager-checklist-card-row > input::after {
-  display: none;
-}
-
-.fabricate-manager .manager-checklist-card-check {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--fab-mv2-border-strong);
-  border-radius: 5px;
-  color: transparent;
-}
-
-.fabricate-manager .manager-checklist-card-row.is-selected .manager-checklist-card-check {
-  border-color: var(--fab-mv2-accent);
-  background: var(--fab-mv2-accent);
-  color: var(--fab-mv2-bg);
-}
-
+/* The row's check box is the shared `SelectionCheckbox` (issue 772), so the hidden input,
+   its Foundry pseudo-element reset, the 18px box and its checked treatment all moved into
+   that component's scoped block and are gone from here. What stays is ROW context — the
+   grid, the selected/disabled treatment and the focus ring below — which the shared
+   primitives rule keeps global. The `sm` size renders the same 18px/radius-5 box against
+   the same resolved colours, so the Tool Studio is unchanged. */
 .fabricate-manager .manager-checklist-card-row:has(input:focus-visible) {
   outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 2px;
@@ -15089,69 +15094,39 @@
   font-size: 0.7rem;
 }
 
-/* ── Tag toggle pills (issue 676) ─────────────────────────────────────────────────
-   One pill per tag in the system's vocabulary; the pill IS the control. Purple comes
-   from the same `--fab-chip-color` + color-mix vehicle the selected availability pill
-   already uses (`.manager-availability-pill.is-tag`), so the tag tone is defined once.
-   `height: auto` + the font reset are Foundry's button reset: core gives every
-   `<button>` a fixed height and a control font, which crops the pill and re-types it. */
-.fabricate-manager .manager-component-tag-toggles {
+/* ── Tag pill run (issue 676, converted in issue 772) ─────────────────────────────
+   One pill per tag in the system's vocabulary; the pill IS the control. The pill itself
+   is now the shared `Chip` (`tone="tag"` carries the purple this block used to declare),
+   so every appearance rule it had — the pill geometry, the Foundry button reset, the
+   hover, the `is-on` purple and the label truncation — moved into `Chip.svelte` or was
+   retired with it. Only the RUN survives here, as host layout.
+
+   It is `manager-component-tag-run`, not the old `…-tag-toggles`: the retired-class
+   ratchet in `tests/components/manager-layout.test.js` is a bare substring test over this
+   stylesheet, and the plural container contains the singular name it retires — leaving it
+   named would have made the ratchet entry impossible to satisfy. */
+.fabricate-manager .manager-component-tag-run {
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-chip);
   min-width: 0;
 }
 
-.fabricate-manager .manager-component-tag-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-chip);
-  width: auto;
-  height: auto;
-  min-height: 28px;
-  max-width: 100%;
-  margin: 0;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: 1px solid var(--fab-border-strong);
-  border-radius: 999px;
-  background: var(--fab-surface-soft);
-  color: var(--fab-mv2-text-muted);
-  font-family: inherit;
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: normal;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-component-tag-toggle:hover:not(:disabled) {
-  border-color: var(--fab-mv2-accent);
-  color: var(--fab-mv2-text);
-}
-
-.fabricate-manager .manager-component-tag-toggle.is-on {
-  --fab-chip-color: var(--fab-purple);
-
-  border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
-  background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-mv2-surface-2));
-  color: var(--fab-mv2-text);
-}
-
-.fabricate-manager .manager-component-tag-toggle.is-on .fa-circle-check {
+/* The staged/checked glyph inside a tag chip. It is a CHILD of the shared primitive, which
+   cannot know what a caller renders in its slot, so its colour lives with the run that
+   renders it — three classes, so it beats `Chip`'s scoped block on specificity rather than
+   on source order. */
+.fabricate-manager .manager-component-tag-run .manager-chip.is-tag .fa-circle-check {
   color: var(--fab-purple);
 }
 
-.fabricate-manager .manager-component-tag-toggle .fa-circle {
+.fabricate-manager .manager-component-tag-run .manager-chip .fa-circle {
   color: var(--fab-text-disabled);
 }
 
-.fabricate-manager .manager-component-tag-toggle span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-component-tag-toggle:disabled {
+/* A saving editor disables the whole run; the pills go inert rather than merely stopping
+   responding. Host state, so it stays with the run. */
+.fabricate-manager .manager-component-tag-run .manager-chip:disabled {
   cursor: default;
   opacity: 0.6;
 }
@@ -15214,87 +15189,24 @@
 
 /* A fixed FOUR-up grid (brief §C5). `auto-fill, minmax(260px, 1fr)` gave 2–3 columns at
    the manager's width, so the same system rendered a different grid depending on the
-   window. */
+   window.
+
+   The grid is ALL that remains global here (issue 772). The card it lays out is the shared
+   `EssenceQuantityCard`, so the card's appearance — its two-row template, its
+   contributed/untouched tint, its icon tile and its truncating name — moved into that
+   component's scoped block, and its hand-rolled −/input/+ row died outright under the
+   shared `Stepper` (both of that row's class names are ratcheted in
+   `tests/components/manager-layout.test.js`; they are named there rather than here,
+   because this file is what the ratchet greps).
+
+   The split is host layout vs card identity: the editor renders this 4-up and the
+   browser's bulk-edit panel renders a 2-up of the same card, so WHICH grid a card sits in
+   is the host's business and what a card LOOKS like is the card's. */
 .fabricate-manager .manager-component-essence-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--fab-space-2);
   min-width: 0;
-}
-
-/* TWO rows — identity (chip + label) above, the stepper below — not a single 5-column
-   run rendering −, qty, +, icon, name, which put the stepper BEFORE the thing it
-   counts. The card is TINTED by whether the component contributes this essence at all:
-   an inactive card recedes to the soft surface, so a GM scanning the grid sees which
-   essences are set without reading every number. */
-.fabricate-manager .manager-component-essence-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-content: start;
-  min-width: 0;
-  padding: var(--fab-space-2) var(--fab-space-2);
-  border: 1px solid color-mix(in srgb, var(--fab-mv2-accent) 32%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--fab-mv2-accent) 8%, var(--fab-mv2-surface-2));
-}
-
-/* No essence contributed: this card is a control the GM has not used. It recedes rather
-   than disappearing — the stepper is still how they'd add one. */
-.fabricate-manager .manager-component-essence-card.is-inactive {
-  border-color: var(--fab-mv2-border);
-  background: var(--fab-surface-soft);
-  opacity: 0.6;
-}
-
-.fabricate-manager .manager-component-essence-identity {
-  display: flex;
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-essence-stepper {
-  display: flex;
-  gap: var(--fab-space-chip);
-  align-items: center;
-  justify-content: space-between;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-component-essence-quantity {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  height: 28px;
-  padding: 0 var(--fab-space-chip);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  color: var(--fab-mv2-text);
-  background: var(--fab-mv2-bg);
-  text-align: center;
-}
-
-.fabricate-manager .manager-component-essence-icon {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--fab-overlay-light-06);
-  color: var(--fab-mv2-accent);
-  font-size: 0.7rem;
-}
-
-.fabricate-manager .manager-component-essence-name {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fab-mv2-text);
-  font-size: 0.76rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ==========================================================================

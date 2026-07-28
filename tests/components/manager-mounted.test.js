@@ -34,6 +34,10 @@ const sharedComponentNames = [
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',
+  // The manager's ONE selection control (issue 772). `ChecklistCardRow` renders it after
+  // the conversion, which puts it in this root's static graph through the Tool Studio; the
+  // component browser's multi-select puts it there a second way.
+  'SelectionCheckbox',
   // The check-modifier catalogue's default set + a recipe's eligible-modifier override
   // both render the shared pill multi-select (issue 770). A `.svelte` the tree renders
   // but the allowlist omits HANGS the suite (# cancelled) rather than failing it.
@@ -81,6 +85,11 @@ function compileManagerRoot() {
   // map globs for the EDITOR.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte');
+  // The shared essence quantity card (issue 772), extracted out of the editor and rendered
+  // by the browser's bulk-edit panel too. `ComponentEditView` above imports it statically,
+  // so omitting it here HANGS every mounted manager test as `# cancelled` — this suite
+  // hand-rolls its compile loop and has no closure validator to fail loudly instead.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');

@@ -189,8 +189,8 @@ const FIXTURE = `
                 </li>
               </ul>
             </div>
-            <div class="manager-component-tag-toggles">
-              <button type="button" class="manager-component-tag-toggle is-on" data-m="tag-toggle"><span>Brass</span></button>
+            <div class="manager-component-tag-run">
+              <button type="button" class="manager-chip is-tag" data-m="tag-toggle"><i class="fas fa-tag"></i>Brass<i class="fas fa-circle-check"></i></button>
             </div>
           </section>
           <input type="text" data-m="bleed-baseline" value="bare">
@@ -284,7 +284,13 @@ const EXPECTED = {
   // that changes it read as one pair rather than a number with a speck beside it.
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc
   'stage-move': 10.88, // 0.68rem — the reorder chevron glyph; reorder IS the authoring act
-  'tag-toggle': 11.2, // 0.7rem — prototype tag toggle pill 11px sans. Near-exact.
+  // The editor's tag pill converged on the shared `Chip` (issue 772), so it MOVED from
+  // 11.2 (its own 0.7rem, near-exact against the prototype's 11px pill) to the one chip
+  // scale it now shares with every other chip on this screen. That is the declared cost of
+  // the conversion, not drift: the alternative was a second pill implementation sitting
+  // beside the bulk-edit panel's, which is what issue 772 exists to remove. The role is
+  // re-authored above as a real `.manager-chip` and re-measured here.
+  'tag-toggle': 9.92, // 0.62rem — the one chip scale (was 11.2)
   // The cascade context. A bare control inherits Foundry's 14px app base; any role
   // above landing on 14 means its rule stopped applying and Foundry bled through.
   'bleed-baseline': 14,

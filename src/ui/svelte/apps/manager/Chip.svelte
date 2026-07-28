@@ -26,7 +26,7 @@
      surrounding markup demands it — a chip inside a `role="list"` must be a list item,
      and a clickable chip must be a real button.
    - tone: the colour family, WITHOUT the `is-` prefix — one of `active`, `positive`,
-     `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, or '' for the
+     `disabled`, `warning`, `info`, `danger`, `neutral`, `negative`, `tag`, or '' for the
      default neutral fill. Tone is colour only and never changes the size; a tone that
      resized would reintroduce the drift this component removes.
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
@@ -70,6 +70,13 @@
     'danger',
     'neutral',
     'negative',
+    // An item TAG (issue 772). Tags are purple across the manager, and the component
+    // editor's tag pill carried that colour in the global sheet before it converted onto
+    // this component. Without the tone here, `TONES` would DROP `tag` silently at the
+    // filter below and the purple would simply disappear: `positive` would re-colour tag
+    // membership into the success family, `neutral` would erase the tag language, and a
+    // `class=` override would re-derive the tone back in the global sheet.
+    'tag',
   ]);
 
   const classes = $derived(
@@ -226,5 +233,18 @@
   .manager-chip.is-neutral {
     border-color: var(--fab-border);
     color: var(--fab-text-muted);
+  }
+
+  /* An item TAG (issue 772). Purple, through the same `--fab-chip-color` + `color-mix`
+     vehicle `.manager-availability-pill.is-tag` already uses, so the tag tone is defined
+     once for the whole manager. `--fab-bg-3` stands in for the manager alias the retired
+     `.manager-component-tag-toggle.is-on` rule mixed against (`--fab-mv2-surface-2` IS
+     `--fab-bg-3`), because this component is area-agnostic and must reach theme root. */
+  .manager-chip.is-tag {
+    --fab-chip-color: var(--fab-purple);
+
+    border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
+    color: var(--fab-text);
+    background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-bg-3));
   }
 </style>

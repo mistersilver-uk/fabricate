@@ -4959,7 +4959,7 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
   // shared `EmptyState` / `Callout` primitives replaced. Each was a per-screen re-derivation
   // of one meaning — a dashed panel, an icon tile, or a bare "nothing here" sentence — and
   // leaving any of them in the sheet is how the next copy gets written against it.
-  for (const dead of [
+  const retired = [
     'manager-knowledge-quantity-chip',
     'manager-knowledge-type-pill',
     'manager-knowledge-uses-chip',
@@ -4993,7 +4993,31 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
     // The reserved row's inline explanatory sentence: ellipsised to fit one line it
     // truncated to "Built…", so it became the row's tooltip instead (issue 878).
     'manager-vocabulary-locked-hint',
-  ]) {
+    // The third block (issue 772): classes retired by extracting three shared primitives
+    // and CONVERTING the duplicates that would otherwise have sat beside them. A primitive
+    // whose duplicate survives has added a variant rather than removed one, so each of
+    // these names is the proof that the conversion actually happened.
+    //
+    // The Tool Studio checklist row's hand-rolled check box, now `SelectionCheckbox`.
+    'manager-checklist-card-check',
+    // The component editor's hand-rolled tag pill, now `Chip tone="tag"`.
+    //
+    // The CONTAINER is retired with it, and that is not tidiness: this assertion is a bare
+    // `css.includes(dead)` substring test, and `manager-component-tag-toggles` (plural)
+    // CONTAINS `manager-component-tag-toggle`. Left in the sheet as layout context under
+    // the "layout stays global" rule, it would have kept the singular entry below true
+    // forever and made this ratchet impossible to satisfy. The surviving run is
+    // `manager-component-tag-run`.
+    'manager-component-tag-toggles',
+    'manager-component-tag-toggle',
+    // The component editor's hand-rolled −/input/+ essence row, now the shared `Stepper`
+    // inside `EssenceQuantityCard`. The card's own appearance classes are deliberately NOT
+    // here: they MOVED into that component's scoped block rather than dying, so they are
+    // absent from the sheet for a different reason and are still rendered.
+    'manager-component-essence-stepper',
+    'manager-component-essence-quantity',
+  ];
+  for (const dead of retired) {
     assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
   }
 
@@ -5011,9 +5035,22 @@ test('the Knowledge surface joins the rules it shares instead of restating them'
         entry.name !== 'EmptyState.svelte' &&
         entry.name !== 'Callout.svelte'
     )
-    .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
+    // COMMENTS ARE NOT MARKUP. This half asks whether a retired class is still RENDERED;
+    // a component that documents why it stopped rendering one is the opposite of the
+    // failure, and several already do. Stripping the two block-comment forms — Svelte's
+    // `<!-- -->` doc block and the `/* */` used inside `<script>` — is what lets the list
+    // below be the ratchet's own list rather than a hardcoded pair (issue 772).
+    .map((entry) =>
+      readFileSync(resolve(entry.parentPath, entry.name), 'utf8')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+    )
     .join('\n');
-  for (const dead of ['class="manager-empty', 'manager-recipe-section-empty"']) {
+  // The markup half used to walk a HARDCODED two-string list, which made it vacuous for
+  // every name added to the ratchet after it was written: a retired class could be deleted
+  // from the sheet and left rendering in a component, and both halves would still pass. It
+  // walks the SAME list now, so retiring a name is one edit and both halves bite.
+  for (const dead of [...retired, 'class="manager-empty', 'manager-recipe-section-empty"']) {
     assert.equal(
       managerComponents.includes(dead),
       false,
