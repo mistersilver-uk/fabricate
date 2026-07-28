@@ -30,6 +30,7 @@ import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, prim
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
+import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
 import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
 import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
@@ -1216,6 +1217,11 @@ class Fabricate {
       recipeVisibility: this.recipeVisibilityService,
       resolutionModeService: this.resolutionModeService,
       craftingSystemManager: this.craftingSystemManager,
+      // Read ONLY for `findActiveRunForRecipe`, so the projection can name the step a
+      // run is parked on (issue 917). Safe to capture in the cached builder:
+      // `this.craftingRunManager` is constructed once during init and never
+      // reassigned, so a cached builder can never hold a stale manager.
+      craftingRunManager: this.craftingRunManager,
       localize: (key, data) =>
         data !== undefined
           ? (game.i18n?.format?.(key, data) ?? key)
@@ -1431,6 +1437,13 @@ class Fabricate {
    * @param {string|null} [options.actorId] Crafting actor id.
    * @param {string} options.recipeId Recipe id.
    * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
+   * @param {{stepId: string|null, ingredientSetId: string|null,
+   *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation]
+   *   The player's funding for the set's shared essence block (issue 917), scoped to
+   *   the step and set the rail was computed against. Passed straight through: the
+   *   ENGINE drops it when either id disagrees with the step it resolves from the
+   *   active run, because a facade-side guard would check an index that can move
+   *   between the derived rail and the click. Omitted (null) is today's behaviour.
    * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
    * @param {boolean} [options.interactive] When true, prompt the player with the
    *   confirm-roll dialog (optional situational modifier) and post the roll to chat
@@ -1440,7 +1453,7 @@ class Fabricate {
    *   mutation (no ingredients, currency, or tools consumed, no run created).
    * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
    */
-  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, componentSourceActorIds = null, interactive = false } = {}) {
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -1457,6 +1470,8 @@ class Fabricate {
       ingredientSetId,
       // Per-group player option overrides (issue 552); null keeps default resolution.
       ingredientOptionOverrides,
+      // Scoped essence-block funding (issue 917); null keeps the allocator's suggestion.
+      ingredientEssenceAllocation,
       interactive,
     });
   }
@@ -1513,18 +1528,19 @@ class Fabricate {
    * @param {string|null} [options.recipeId]
    * @param {string|null} [options.setId] The ingredient set to re-evaluate.
    * @param {object|null} [options.optionOverrides] `{ [groupId]: {optionIndex, heldItemId?} }`.
+   * @param {object|null} [options.essenceAllocation] `{ [itemKey]: units }` — the
+   *   player's funding for the set's shared essence block (issue 917), so the rail
+   *   shows exactly what a craft would consume.
+   * @param {string|null} [options.stepId] Which execution step's set to resolve.
+   *   Omitted, the ACTIVE step decides (see below).
    * @param {string|null} [options.actorId] Crafting actor id (defaults to persisted).
    * @param {string[]|null} [options.componentSourceActorIds]
    * @returns {object|null} Fresh single-set craftability, or null when unresolvable.
    */
-  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, actorId = null, componentSourceActorIds = null } = {}) {
+  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, essenceAllocation = null, stepId = null, actorId = null, componentSourceActorIds = null } = {}) {
     this._requireReady();
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) return null;
-    const set = Array.isArray(recipe.ingredientSets)
-      ? recipe.ingredientSets.find((candidate) => String(candidate?.id) === String(setId))
-      : null;
-    if (!set) return null;
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
       componentSourceActorIds,
@@ -1533,13 +1549,31 @@ class Fabricate {
       ? componentSourceActors
       : (craftingActor ? [craftingActor] : []);
     if (sources.length === 0) return null;
-    // Narrow the evaluation to the one selected set (mirrors CraftingListingBuilder's
-    // per-set copy): keeps the recipe's data fields + the IngredientSet instance
-    // methods while scoping craftability to this set.
-    const singleSetRecipe = { ...recipe, ingredientSets: [set] };
+    // Resolve through the EXECUTION STEPS, not `recipe.ingredientSets`. That array is
+    // EMPTY for every explicit multi-step recipe (its sets live on `steps[]`), so the
+    // previous top-level scan returned null for all of them and the issue-552 per-group
+    // option overrides were silently dead on stepped recipes. `resolveStepIngredientSet`
+    // also enforces the two rules that make this safe: with no `stepId` the ACTIVE step
+    // decides (never step 0), and a set id is only matched WITHIN the resolved step —
+    // set ids are `randomID()`, so a cross-step scan could evaluate a different step.
+    const resolved = resolveStepIngredientSet({
+      steps: this.resolutionModeService?.getExecutionSteps?.(recipe) ?? [],
+      stepId,
+      activeStepIndex: activeRunStepState(this.craftingRunManager, craftingActor, recipe.id).index,
+      setId,
+    });
+    if (!resolved) return null;
+    // Narrow the evaluation to the one selected set through the SHARED step view the
+    // engine crafts against (so the step's tool union applies), keeping the recipe's
+    // data fields and the IngredientSet instance methods.
+    const singleSetRecipe = {
+      ...buildStepRecipeView(recipe, resolved.step),
+      ingredientSets: [resolved.set],
+    };
     return this.recipeManager.evaluateCraftability(sources, singleSetRecipe, {
       craftingActor,
       optionOverrides,
+      essenceAllocation,
     }) ?? null;
   }
 
