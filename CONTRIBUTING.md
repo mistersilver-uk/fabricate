@@ -450,12 +450,13 @@ Header lines must be 100 characters or fewer.
 
 ## Linting & formatting
 
-Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
+Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript and Svelte static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
 All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
 npm run lint           # ESLint over the gated JS scope (fails on any warning)
 npm run lint:fix       # …and auto-fix what can be fixed
+npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
 npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
 npm run format         # Prettier-format the gated scope
@@ -495,10 +496,23 @@ The gate (`npm run lint` / `npm run format:check`) now covers the **entire `src/
 
 - `src/models/`, `src/utils/`, `src/integrations/`, `src/config/`, `src/migration/`, `src/canvas/`, `src/systems/`, and `src/toolBreakageRuntime.js`
 
-Not yet gated (tracked for follow-up — run `npm run lint:all` / `npm run lint:svelte` to see them):
+A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
+It is separate because components need the Svelte parser and their own rule set, not because they are optional.
+Note what this does and does not mean for `src/ui/**`: that directory holds both halves, and only the `.svelte` half is gated — the plain `.js` under it still is not.
+
+`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
+A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
+Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
+The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
+
+ESLint is the only static analysis a `.svelte` file gets.
+Prettier and Stylelint still exclude components, Svelte compiler warnings still do not fail the build, and SonarCloud indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts.
+Each of those is tracked as its own follow-up.
+
+Not yet gated (tracked for follow-up — run `npm run lint:all` to see them):
 
 - the `tests/` suite — sort comparators, fixture duplication
-- `src/ui/**` and all `*.svelte` components (Svelte parsing is wired up; findings triaged later)
+- the plain `.js` under `src/ui/**` (the `.svelte` components in the same directory ARE gated, by `lint:svelte`)
 - `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by source-text assertions in `tests/gathering-bootstrap-api.test.js`, so they change with that test)
 - `scripts/**` build/release tooling
 
