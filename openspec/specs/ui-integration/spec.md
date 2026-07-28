@@ -1778,9 +1778,11 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - At most ONE chooser is open at a time; the open slot is the rail's single point of interaction.
 - Focus auto-advances to the first unsatisfied slot until the player opens a slot themselves, after which the player's choice sticks.
   The remembered slot is re-validated on every read against the live slot list, falling back to the first unsatisfied slot and then to the first slot, so changing set, step or recipe can never leave a stale or absent chooser open.
+  Clicking the open slot's tile again closes the chooser instead of reopening it, and the closed choice is remembered the same scoped way: it stays closed until the player opens a slot again (including re-clicking the same tile), while changing set, step or recipe re-derives the default open slot as before.
 - Auto-advance never steals focus, and it announces through its **own** live region rather than the progressive stage list's reorder region, because a progressive recipe renders both surfaces at once.
 - The rail is a **disclosure**, not a tablist: fixed slots are not selectable, so tab semantics would promise a selection the surface does not offer.
   A choice or essence slot is a `<button>` carrying `aria-expanded` and `aria-controls` over the whole tile column, and the panel it opens is labelled back at its tile.
+  That panel is itself an exposed named `role="region"`, because `aria-labelledby` on a roleless element exposes nothing to assistive technology.
   A fixed slot is `role="img"` with a label, because an `aria-label` on a non-focusable span exposes nothing.
 - Open state is drawn as an accent-soft fill plus a caption line, never as an accent ring: the app already paints an accent ring for `:focus-visible`, so a ring would make "focused" and "open" indistinguishable to a keyboard user.
   Open state and satisfaction are independent, so the open treatment sits on top of the status border rather than replacing it.
