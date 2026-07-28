@@ -350,6 +350,38 @@ test('selection: no-probe back-compat — authored currency is never chosen (ite
   assert.equal(blind.currencySpends.length, 0);
 });
 
+test('selection: an essence option still beats currency, and a block that cannot fund backtracks INTO it', () => {
+  // Issue 917 pulls the essence option out of its group's in-place branches into a
+  // last-placed block node, which puts "items strictly beat currency" squarely in
+  // play: the group must still try the block first, and a block that cannot fund
+  // must be able to re-branch onto the currency option rather than reporting the
+  // group missing.
+  setupGame(makeCurrencySystem());
+  const essenceOption = { quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 4 } };
+  const set = makeSet([[essenceOption, currencyOption('gp', 5)]]);
+  const matcher = () => false;
+
+  // Enough essence held: the block funds the group and currency is never spent.
+  const funded = set.resolveIngredientSelection(
+    [makeItem({ id: 'ember', quantity: 4 })],
+    matcher,
+    { affordCurrency: () => true, resolveItemEssences: () => ({ fire: 1 }) }
+  );
+  assert.equal(funded.success, true);
+  assert.equal(funded.currencySpends.length, 0, 'the essence block beats an affordable currency option');
+  assert.equal(funded.plan.length, 1);
+
+  // Not enough essence held: the failed block backtracks into the currency option.
+  const backtracked = set.resolveIngredientSelection(
+    [makeItem({ id: 'ember', quantity: 1 })],
+    matcher,
+    { affordCurrency: () => true, resolveItemEssences: () => ({ fire: 1 }) }
+  );
+  assert.equal(backtracked.success, true, 'the currency option rescues the group');
+  assert.deepEqual(backtracked.currencySpends.map((s) => `${s.amount} ${s.unit}`), ['5 gp']);
+  assert.equal(backtracked.plan.length, 0, 'no essence is consumed on the currency branch');
+});
+
 test('selection: first AFFORDABLE currency option wins among multiple currency options', () => {
   setupGame(makeCurrencySystem());
   const set = makeSet([[currencyOption('pp', 1), currencyOption('gp', 5)]]);
