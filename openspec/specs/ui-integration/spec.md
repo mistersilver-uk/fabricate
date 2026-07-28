@@ -74,9 +74,10 @@ Product UI padding, margin, and gap spacing must derive from a shared 4px-based 
 - Documented literal exemptions that must NOT be tokenized: `1px` hairlines (borders, dividers, and `-1px` overlap bleeds) and one-off fixed dimensions in the 34–42px range (search-input icon clearances and grid-alignment offsets) where the value reserves space for a fixed element rather than expressing spacing rhythm.
 - Positioning offsets (`left`/`right`/`top`/`bottom`), `width`/`height`, `border-*` widths, `border-radius`, `grid-template-columns` track sizes, `@container`/media breakpoints, and font sizes are not spacing-scale members and remain literal.
 
-### Shared manager primitives
+### Shared product UI primitives
 
-Wherever two or more manager surfaces perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component every site imports.
+Wherever two or more product UI surfaces perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component every site imports.
+The subject is every product surface — the GM manager and the player crafting, alchemy, gathering, inventory, and Journal surfaces alike — because two surfaces rendering the same meaning are duplicates whichever audience they face.
 A shared CSS class that each site hand-rolls markup against does not satisfy this, and neither does a copy.
 Adding flexibility to the primitive that already owns the meaning takes precedence over introducing a second component that owns half of it.
 A primitive that coexists with unconverted duplicates has added a variant rather than removed one.
@@ -85,6 +86,15 @@ A primitive's CSS MUST live in its own scoped `<style>` block rather than in `st
 Required-screenshot detection maps changed file paths to affected views, so global-sheet styling makes every tweak look like a global change and demands a wide core frame set, while co-located styling scopes the evidence to the views that actually render the component.
 Only two kinds of rule for a primitive stay in the global sheet: what must beat Foundry's host CSS (button geometry, focus rings) and LAYOUT-CONTEXT rules whose subject is reached through an ancestor the component does not render, such as how a specific container places, stretches, or spans the panel.
 A layout-context rule places the primitive and MUST NOT restyle it: no `font-size`, `font-family`, `font-weight`, `border`, `border-radius`, or `background`.
+The player crafting app's requirement rail, requirement tile, essence pool, consumption-plan panel, and essence-contribution chip are held to that CSS rule as player-side primitives, which is why they added no rules to `styles/fabricate.css`.
+
+Two live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+
+- The repo carries five hand-rolled horizontal fill bars: `src/ui/svelte/apps/gathering/ChanceBar.svelte`, `src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte`, `src/ui/svelte/apps/journal/RunCard.svelte`, `src/ui/svelte/components/ActorSelectTopBar.svelte`, and now `src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte`.
+  The primitive that should exist is a shared `FillBar` leaf that `ChanceBar` is itself rebuilt on: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would make it the second component owning half a meaning rather than the primitive that owns one.
+  Conversion is deferred because converting the other four would drag their screenshot-label sets into a single evidence run.
+- `tests/components/mounted-harness-primitive-allowlist.test.js` requires every `SHARED_PRIMITIVES` entry to be reachable from `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`, so the allowlist that encodes "this is a shared primitive" is structurally manager-scoped in exactly the way this rule is not.
+  Only its second test carries that assumption; the fix is to widen it to a declared root set rather than one root.
 
 #### No-state messages
 
@@ -1682,9 +1692,12 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
   `delivered` is the essence amount the resolved allocation supplies to that
   requirement — the tile's numerator — while `owned` is the essence amount held
   across every matching carrier.
-  Neither is reported as the component/tag `have`, which is not net of plan and
-  would read off a different denominator in a rail whose invariant is that the
-  tiles show what the craft consumes.
+  In this projection and the rail it feeds, neither is reported as the
+  component/tag `have`, which is not net of plan and would read off a different
+  denominator in a rail whose invariant is that the tiles show what the craft
+  consumes.
+  The session shopping aggregation is the one deliberate exception, for a reason
+  that does not apply here (see §Shopping List Panel).
   An essence requirement's own ingredient state carries `delivered` for the same
   reason and by the same rule.
   The key is renamed rather than aliased: leaving it named `have` while changing
@@ -1810,6 +1823,8 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - Essence shortages from first-class ingredient states and legacy set-level essence states retain the first nonblank GM-authored icon across aggregation.
   Later blank values do not erase it.
   Render-time canonical normalization uses `DEFAULT_ESSENCE_ICON` when the retained value is missing or unusable, without changing need/have totals.
+- The aggregation shops an essence requirement against the amount **held**, not the amount the plan delivers: `RecipeManager.evaluateShoppingRequirement` deliberately restates an essence state's `owned` as the `have` it aggregates on.
+  This is the one place `owned` is reported as `have` (see §Per-Set Craftability), because `delivered` is capped at `need` and a shortage shopped against it would always read satisfied.
 
 #### Right Rail (Run Summary or Shopping List)
 
