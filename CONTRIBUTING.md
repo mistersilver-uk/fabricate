@@ -504,6 +504,7 @@ Note what this does and does not mean for `src/ui/**`: that directory holds both
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
 Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
 The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
+That is the narrow case of a stronger property that covers every `eslint-disable` directive too: `eslint.config.js` declares no `linterOptions`, so ESLint 9's default `reportUnusedDisableDirectives: 'warn'` applies, and under `--max-warnings=0` a directive that suppresses nothing exits 1 — which is what stops a suppression from outliving the finding it was written for.
 
 ESLint is the only static analysis a `.svelte` file gets.
 Prettier and Stylelint still exclude components, Svelte compiler warnings still do not fail the build, and SonarCloud indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts.
