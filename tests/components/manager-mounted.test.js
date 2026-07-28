@@ -510,20 +510,27 @@ function craftingSubitem(labelText) {
   );
 }
 
-// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
-// Assigns the module-level `mounted`/`target` (so afterEach can clean up) and
-// returns the mounted target for the caller to query.
-async function openRecipeEditor(calls, storeOptions = {}) {
+// Mount the manager against a fresh store on a fresh host element. Assigns the
+// module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
+// so the routing helpers below differ only in where they navigate afterwards.
+function mountManager(calls = [], storeOptions = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(Component, {
     target,
     props: {
-      store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+      store: createStore(calls, storeOptions),
       services: { openCurrentAdmin: () => {} },
     },
   });
   flushSync();
+  return target;
+}
+
+// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
+// Returns the mounted target for the caller to query.
+async function openRecipeEditor(calls, storeOptions = {}) {
+  mountManager(calls, { experimentalFeaturesEnabled: true, ...storeOptions });
   craftingParent().click();
   await tick();
   flushSync();
@@ -538,19 +545,9 @@ async function openRecipeEditor(calls, storeOptions = {}) {
   return target;
 }
 
-// Mount the manager and route to the Tags & Categories screen. Assigns the module-level
-// `mounted`/`target` (so afterEach can clean up) and returns the mounted target.
+// Mount the manager and route to the Tags & Categories screen. Returns the mounted target.
 async function openTagsScreen(calls = [], storeOptions = {}) {
-  target = document.createElement('div');
-  document.body.appendChild(target);
-  mounted = mount(Component, {
-    target,
-    props: {
-      store: createStore(calls, storeOptions),
-      services: { openCurrentAdmin: () => {} },
-    },
-  });
-  flushSync();
+  mountManager(calls, storeOptions);
   navButton('Tags & Categories').click();
   await tick();
   flushSync();
@@ -1330,7 +1327,10 @@ function createStore(calls = [], options = {}) {
                   dropRows: [],
                 },
               ],
-          events: [],
+          // Opt-in only: the event library is empty by default so the many existing
+          // assertions about the encounters browser's empty state stay true. Tests that
+          // need to reach the gathering-EVENT editor pass `gatheringLibraryEvents`.
+          events: options.gatheringLibraryEvents || [],
           tools: options.gatheringLibraryTools || [],
         },
       },
@@ -1481,6 +1481,7 @@ function createStore(calls = [], options = {}) {
     },
     saveRecipeItem: (recipeItemId, patch) => {
       calls.push(['saveRecipeItem', recipeItemId, patch]);
+      if (options.saveRecipeItemReject) return Promise.reject(new Error('save recipe item failed'));
       return options.saveRecipeItemResult ?? true;
     },
     deleteRecipeItemDefinition: (recipeItemId) => {
@@ -1782,6 +1783,12 @@ function createStore(calls = [], options = {}) {
     },
     updateGatheringLibraryTask: (systemId, taskId, updates = {}) => {
       calls.push(['updateGatheringLibraryTask', systemId, taskId, updates]);
+      // The two failure branches the root's save path can take. Without these the fixture
+      // could only ever return `true`, so the failed-save alert was undrivable (issue 919).
+      if (options.updateGatheringLibraryTaskReject) {
+        return Promise.reject(new Error('update gathering task failed'));
+      }
+      if (options.updateGatheringLibraryTaskResult === false) return false;
       viewState.update((state) => {
         const systemConfig = state.gatheringConfig?.systems?.[systemId];
         if (!systemConfig) return state;
@@ -1803,11 +1810,55 @@ function createStore(calls = [], options = {}) {
       });
       return true;
     },
+    // Also absent until issue 919. The root optional-chains to `undefined` and reads that as
+    // "proceed", so the cancel branch of the save was undrivable and nothing pinned what a
+    // cancellation must leave on screen. Proceeding stays the default, which is exactly what
+    // the missing method already meant.
+    confirmGatheringLibraryTaskCompositionLoss: (systemId, taskId, draft) => {
+      calls.push(['confirmGatheringLibraryTaskCompositionLoss', systemId, taskId, draft]);
+      return options.confirmGatheringLibraryTaskCompositionLossResult !== false;
+    },
     duplicateGatheringLibraryTask: (...args) => {
       calls.push(['duplicateGatheringLibraryTask', ...args]);
       return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
     },
     deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
+    // The gathering-EVENT library had no handler here at all before issue 919, so the
+    // root's `store.updateGatheringLibraryEvent?.(…)` optional-chained to `undefined` — and
+    // because the root treats anything other than a literal `false` as success, every
+    // mounted event save passed unconditionally. Mirrors the task handler above.
+    updateGatheringLibraryEvent: (systemId, eventId, updates = {}) => {
+      calls.push(['updateGatheringLibraryEvent', systemId, eventId, updates]);
+      if (options.updateGatheringLibraryEventReject) {
+        return Promise.reject(new Error('update gathering event failed'));
+      }
+      if (options.updateGatheringLibraryEventResult === false) return false;
+      viewState.update((state) => {
+        const systemConfig = state.gatheringConfig?.systems?.[systemId];
+        if (!systemConfig) return state;
+        return {
+          ...state,
+          gatheringConfig: {
+            ...state.gatheringConfig,
+            systems: {
+              ...state.gatheringConfig.systems,
+              [systemId]: {
+                ...systemConfig,
+                events: (systemConfig.events || []).map((event) =>
+                  event.id === eventId ? { ...event, ...updates } : event
+                ),
+              },
+            },
+          },
+        };
+      });
+      return true;
+    },
+    // Mirrors confirmGatheringLibraryTaskCompositionLoss above.
+    confirmGatheringLibraryEventCompositionLoss: (systemId, eventId, draft) => {
+      calls.push(['confirmGatheringLibraryEventCompositionLoss', systemId, eventId, draft]);
+      return options.confirmGatheringLibraryEventCompositionLossResult !== false;
+    },
     createToolDraft: (initialPatch = {}, systemId = 'alchemy') => {
       const created = {
         id: 'tool-new',
@@ -14655,4 +14706,354 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // --- Failed-save alerts in the editor toolbars (issue 919) -----------------------
+  //
+  // All three of these editors used to compute a failure and render NOTHING: a GM whose
+  // save failed saw no change at all. Each test drives one editor to a dirty draft, fails
+  // its save, and asserts the RENDERED text — element presence alone would pass against an
+  // implementation that renders an empty `<p>`. Each then flips the same live options object
+  // to success and re-saves, and asserts the alert is gone afterwards. For the two gathering
+  // editors that is a real clearing assertion; the recipe-item pair leaves the route on
+  // success, so their absence follows from the whole toolbar branch unmounting instead.
+  //
+  // The `options` object is read at CALL time by the store fixture, so mutating it between
+  // two clicks on one mounted tree switches the outcome without a second mount.
+
+  const SAVE_FAILED_MESSAGE = 'Save failed. Try again.';
+
+  const gatheringEventLibraryFixtures = [
+    {
+      id: 'event-thorns',
+      name: 'Thorn Snare',
+      description: 'Tangled thorns snap shut around a careless gatherer.',
+      img: 'icons/svg/hazard.svg',
+      enabled: true,
+      dropRate: 10,
+      biomes: [],
+      weather: [],
+      timeOfDay: [],
+      dangerTags: [],
+    },
+  ];
+
+  // Two ticks: the save handlers await a store promise, so the state write that renders the
+  // alert lands a microtask after the click. Named apart from the `settle` the system-details
+  // dirty tests use — function declarations are var-scoped, so a second `settle` in this one
+  // describe would silently take over all of their call sites too.
+  async function settleSaveAttempt() {
+    await tick();
+    await tick();
+    flushSync();
+  }
+
+  async function clickHeaderSave() {
+    headerSaveButton(target).click();
+    await settleSaveAttempt();
+  }
+
+  async function clickRecipeItemSave() {
+    target.querySelector('[data-recipe-item-save]').click();
+    await settleSaveAttempt();
+  }
+
+  // Every one of these alerts is asserted THROUGH the toolbar, so the node an identity check
+  // compares is the same node the rendering check found. Querying one scoped and the other bare
+  // would still agree today, but would silently drift apart the moment anything carrying one of
+  // these data attributes rendered outside `.manager-header-actions`.
+  function saveErrorNode(selector) {
+    return target.querySelector(`.manager-header-actions ${selector}`);
+  }
+
+  function assertSaveErrorRendered(selector) {
+    const alert = saveErrorNode(selector);
+    assert.ok(alert, `expected the failed-save alert ${selector} in the header toolbar`);
+    assert.equal(alert.getAttribute('role'), 'alert', 'the failed-save alert is a live region');
+    assert.equal(
+      alert.textContent.trim(),
+      SAVE_FAILED_MESSAGE,
+      'the failed-save alert renders its localized message, not an empty element'
+    );
+  }
+
+  function assertSaveErrorAbsent(selector, why) {
+    assert.equal(target.querySelector(selector), null, why);
+    assert.equal(
+      target.textContent.includes(SAVE_FAILED_MESSAGE),
+      false,
+      `${why} (the message text is gone from the surface too)`
+    );
+  }
+
+  async function openDirtyGatheringTaskEditor(calls, storeOptions) {
+    mountManager(calls, storeOptions);
+    navButton('Gathering').click();
+    await settleSaveAttempt();
+    gatheringSubitem('Tasks').click();
+    await settleSaveAttempt();
+    target
+      .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+      .click();
+    await settleSaveAttempt();
+    setInputValue(target.querySelector('[data-gathering-task-field="name"]'), 'Gather Sun Herbs');
+    await settleSaveAttempt();
+  }
+
+  async function openDirtyGatheringEventEditor(calls, storeOptions) {
+    Object.assign(storeOptions, { gatheringLibraryEvents: gatheringEventLibraryFixtures });
+    mountManager(calls, storeOptions);
+    navButton('Gathering').click();
+    await settleSaveAttempt();
+    gatheringSubitem('Events').click();
+    await settleSaveAttempt();
+    target
+      .querySelector('[data-gathering-event-id="event-thorns"] [aria-label="Edit Thorn Snare"]')
+      .click();
+    await settleSaveAttempt();
+    setInputValue(target.querySelector('[data-gathering-event-field="name"]'), 'Bramble Snare');
+    await settleSaveAttempt();
+  }
+
+  async function openDirtyRecipeItemEditor(calls, storeOptions) {
+    Object.assign(storeOptions, {
+      experimentalFeaturesEnabled: true,
+      recipeItemDefinitions: booksScrollsFixtures,
+    });
+    mountManager(calls, storeOptions);
+    craftingParent().click();
+    await settleSaveAttempt();
+    craftingSubitem('Books & Scrolls').click();
+    await settleSaveAttempt();
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await settleSaveAttempt();
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await settleSaveAttempt();
+  }
+
+  // The retry case: a GM whose save fails, changes nothing, and presses Save again gets the
+  // SAME message. `role="alert"` announces on a DOM mutation, and writing a byte-identical
+  // string is not one — $state sees no change, so nothing re-renders and a screen reader is
+  // silent from the second failure onwards. Presence therefore proves nothing here; node
+  // IDENTITY does. This passes only because the save clears its error before the awaited store
+  // call, so the alert leaves the DOM mid-flight and is re-inserted when the failure recurs.
+  async function assertRepeatFailureReAnnounces(selector, save = clickHeaderSave) {
+    await save();
+    assertSaveErrorRendered(selector);
+    const firstAlert = saveErrorNode(selector);
+
+    await save();
+    assertSaveErrorRendered(selector);
+    assert.notStrictEqual(
+      saveErrorNode(selector),
+      firstAlert,
+      'a second identical failure re-inserts the alert rather than leaving the first node in place'
+    );
+    assert.equal(
+      firstAlert.isConnected,
+      false,
+      'the first alert node left the DOM, so the re-insertion is a real announcement'
+    );
+  }
+
+  // The counterpart constraint, and the reason the pre-attempt clear sits AFTER the
+  // composition-loss confirmation rather than at the top of the save: cancelling that
+  // confirmation makes no new attempt at all, so a failure the GM has not yet dealt with has to
+  // stay exactly where it is. Clearing first would delete the alert node with nothing put in its
+  // place — and a removal, unlike an insertion, is typically not announced at all, so the GM
+  // would be left with strictly less than they started with.
+  async function assertCancelledConfirmKeepsSaveError(selector, storeOptions, cancelKey) {
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    const standingAlert = saveErrorNode(selector);
+
+    storeOptions[cancelKey] = false;
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    assert.strictEqual(
+      saveErrorNode(selector),
+      standingAlert,
+      'a cancelled confirmation leaves the standing failure alert in place, untouched'
+    );
+  }
+
+  // The two gathering rejection paths log through console.error before they surface the
+  // alert, so silence just that call rather than dumping an expected stack into the run.
+  async function withSilencedConsoleError(run) {
+    const original = console.error;
+    console.error = () => {};
+    try {
+      await run();
+    } finally {
+      console.error = original;
+    }
+  }
+
+  it('surfaces a gathering-task save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryTaskResult: false };
+    await openDirtyGatheringTaskEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickHeaderSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+
+    storeOptions.updateGatheringLibraryTaskResult = true;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a gathering-task save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryTaskReject: true };
+    await openDirtyGatheringTaskEditor(calls, storeOptions);
+
+    await withSilencedConsoleError(clickHeaderSave);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+
+    storeOptions.updateGatheringLibraryTaskReject = false;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('re-announces a gathering-task save that fails the same way twice', async () => {
+    await openDirtyGatheringTaskEditor([], { updateGatheringLibraryTaskResult: false });
+    await assertRepeatFailureReAnnounces('[data-gathering-task-save-error]');
+  });
+
+  it('keeps a standing gathering-task save error when the composition-loss warning is cancelled', async () => {
+    const storeOptions = { updateGatheringLibraryTaskResult: false };
+    await openDirtyGatheringTaskEditor([], storeOptions);
+    await assertCancelledConfirmKeepsSaveError(
+      '[data-gathering-task-save-error]',
+      storeOptions,
+      'confirmGatheringLibraryTaskCompositionLossResult'
+    );
+  });
+
+  it('surfaces a gathering-event save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryEventResult: false };
+    await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickHeaderSave();
+    assert.ok(
+      calls.some((call) => call[0] === 'updateGatheringLibraryEvent' && call[2] === 'event-thorns'),
+      'Save routes through updateGatheringLibraryEvent'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-event-edit'
+    );
+    assertSaveErrorRendered('[data-gathering-event-save-error]');
+
+    storeOptions.updateGatheringLibraryEventResult = true;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a gathering-event save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryEventReject: true };
+    await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    // Before issue 919 `saveGatheringEventDraft` had no `catch` at all, so this rejection
+    // escaped as an unhandled rejection and set nothing.
+    await withSilencedConsoleError(clickHeaderSave);
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-event-edit'
+    );
+    assertSaveErrorRendered('[data-gathering-event-save-error]');
+
+    storeOptions.updateGatheringLibraryEventReject = false;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('re-announces a gathering-event save that fails the same way twice', async () => {
+    await openDirtyGatheringEventEditor([], { updateGatheringLibraryEventResult: false });
+    await assertRepeatFailureReAnnounces('[data-gathering-event-save-error]');
+  });
+
+  it('keeps a standing gathering-event save error when the composition-loss warning is cancelled', async () => {
+    const storeOptions = { updateGatheringLibraryEventResult: false };
+    await openDirtyGatheringEventEditor([], storeOptions);
+    await assertCancelledConfirmKeepsSaveError(
+      '[data-gathering-event-save-error]',
+      storeOptions,
+      'confirmGatheringLibraryEventCompositionLossResult'
+    );
+  });
+
+  it('surfaces a recipe-item save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { saveRecipeItemResult: false };
+    await openDirtyRecipeItemEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assertSaveErrorRendered('[data-recipe-item-save-error]');
+
+    storeOptions.saveRecipeItemResult = true;
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a recipe-item save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { saveRecipeItemReject: true };
+    await openDirtyRecipeItemEditor(calls, storeOptions);
+
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assertSaveErrorRendered('[data-recipe-item-save-error]');
+
+    storeOptions.saveRecipeItemReject = false;
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  // `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its awaited store call, and
+  // that line carries exactly the invariant the two gathering saves were changed to hold — but
+  // deleting it left the whole suite green, so nothing was actually holding it. This pins it on
+  // the third editor too, driven through its own Save control rather than the header one.
+  it('re-announces a recipe-item save that fails the same way twice', async () => {
+    await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
+    await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);
+  });
 });

@@ -1684,6 +1684,25 @@
   font-size: 0.72rem;
 }
 
+/* The attempted-and-failed save alert that the editor toolbars render beside Save
+   (issue 919). It borrows the danger TOKENS from `.manager-travel-error` rather than
+   reusing that class: the travel rule is a page-body callout sized at a fixed 13px,
+   and this toolbar deliberately scopes its own controls to 0.72rem (~11.5px) in the
+   two rules above, so the shared class would read visibly hot next to the chip and
+   buttons it sits with. Same ANCESTOR-CONTEXT reasoning as the warning chip: sized for
+   the container, not a new scale a screen can opt into. The 6px radius and the danger
+   palette are shared, so it still reads as one family with both. */
+.fabricate-manager .manager-header-actions .manager-header-save-error {
+  margin: 0;
+  padding: var(--fab-space-1) var(--fab-space-2);
+  border-radius: 6px;
+  border: 1px solid var(--fab-danger-border);
+  color: var(--fab-danger-text);
+  background: var(--fab-danger-soft);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .fabricate-manager .manager-subtitle {
   margin: var(--fab-space-2xs) 0 0;
   color: var(--fab-mv2-text-muted);
