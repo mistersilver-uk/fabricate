@@ -3246,9 +3246,16 @@
     if (Object.keys(edit).length === 0) return false;
     componentBulkApplying = true;
     try {
-      const applied = await store.applyComponentBulkEdit?.(ids, edit);
-      if (applied === false) return false;
-      const count = ids.size;
+      // The store returns the write RESULT, never a bare boolean, so a `null` covers every
+      // no-write case in one test — including the optional call resolving to `undefined`
+      // because the action is absent, which a `=== false` check would have read as success.
+      const result = await store.applyComponentBulkEdit?.(ids, edit);
+      if (!result) return false;
+      // The count the GM is told is the count that actually CHANGED, not the count they
+      // ticked: the write primitive compares each component before and after, so adding a
+      // tag three of five already carry updates two. Naming the selection size instead
+      // would report work that did not happen.
+      const count = result.updated;
       // One `save()` and one `refresh()` happened inside the store action, so the rows are
       // already re-rendering; clearing the selection returns the rail to the inspector and
       // the count-to-zero effect discards the draft.
@@ -3256,11 +3263,16 @@
       // Singular, on the same terms as the panel's own heading and Apply label: the
       // threshold is `> 0`, so ONE ticked row is the advertised case, and this toast is
       // the ONLY feedback that survives the panel unmounting on a successful apply.
+      // Zero is its own message rather than "applied to 0 components", which reads as a
+      // failure for what is a legitimate outcome — every selected component already
+      // matched the staged values.
       notifyInfo(
-        count === 1
-          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne', 'Applied bulk changes to 1 component.')
-          : text('FABRICATE.Admin.Manager.Component.BulkEdit.Applied', 'Applied bulk changes to {count} components.')
-              .replace('{count}', count)
+        count === 0
+          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.AppliedNone', 'No components needed changing.')
+          : count === 1
+            ? text('FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne', 'Applied bulk changes to 1 component.')
+            : text('FABRICATE.Admin.Manager.Component.BulkEdit.Applied', 'Applied bulk changes to {count} components.')
+                .replace('{count}', count)
       );
       return true;
     } finally {

@@ -1363,7 +1363,13 @@ function createStore(calls = [], options = {}) {
 
   function componentCardsFor(id) {
     if (options.emptyComponents) return [];
-    const cards = (componentItems[id] || []).map((item) =>
+    // Pad the managed list so the browser paginates. A selection is held on the lifted
+    // browser state, not on the page, so proving that Apply carries an id the current page
+    // does not even render needs more rows than one page holds.
+    const padded = options.extraComponentItems
+      ? [...(componentItems[id] || []), ...options.extraComponentItems]
+      : componentItems[id] || [];
+    const cards = padded.map((item) =>
       options.missingComponentSource && item.id === 'c1'
         ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
         : item
@@ -1546,8 +1552,16 @@ function createStore(calls = [], options = {}) {
     // already refreshes internally, so the root neither converts nor re-refreshes; the
     // recorded call is normalized to an array purely so a test can compare it.
     applyComponentBulkEdit: (componentIds, edit) => {
-      calls.push(['applyComponentBulkEdit', [...(componentIds || [])], edit]);
-      return options.applyComponentBulkEditResult ?? true;
+      const ids = [...(componentIds || [])];
+      calls.push(['applyComponentBulkEdit', ids, edit]);
+      // The real action returns the write RESULT, never a boolean: `null` for "nothing was
+      // written" and `{updated}` counting the components that actually CHANGED, which is
+      // what the toast names. Defaulting to `ids.length` keeps the common case honest while
+      // a test can hand back a smaller count, or `null`, to drive the other branches.
+      if (Object.hasOwn(options, 'applyComponentBulkEditResult')) {
+        return options.applyComponentBulkEditResult;
+      }
+      return { updated: ids.length, componentIds: ids };
     },
     addEssence: (name, description, icon, sourceComponentId) => {
       calls.push(['addEssence', name, description, icon, sourceComponentId]);
@@ -6109,12 +6123,12 @@ describe('CraftingSystemManager mounted behavior', () => {
   // Capture `ui.notifications.info`. Nothing else in this suite needs the Foundry `ui`
   // global, so it is installed per-test and removed again rather than left standing where
   // an unrelated test could come to depend on it.
-  async function applyBulkEditOverRows(ids) {
+  async function applyBulkEditOverRows(ids, options = {}) {
     const messages = [];
     const previousUi = globalThis.ui;
     globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
     try {
-      await openComponentsBrowser();
+      await openComponentsBrowser([], options);
       for (const id of ids) tickComponentRow(id);
       target.querySelector('[data-bulk-tag="ore"]').click();
       flushSync();
@@ -6141,6 +6155,85 @@ describe('CraftingSystemManager mounted behavior', () => {
   it('and keeps the plural for a real multi-row apply', async () => {
     const messages = await applyBulkEditOverRows(['c1', 'c2']);
     assert.deepEqual(messages, ['Applied bulk changes to 2 components.']);
+  });
+
+  // The count the GM is told is the count that actually CHANGED, not the count they ticked.
+  // The write primitive compares each component before and after, so ticking two and adding
+  // a tag one already carries updates ONE. Naming the selection size instead would report
+  // work that did not happen — and the toast is the only record of it.
+  it('names the components that actually changed, not the ones selected', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2'], {
+      applyComponentBulkEditResult: { updated: 1, componentIds: ['c1'] },
+    });
+    assert.deepEqual(messages, ['Applied bulk changes to 1 component.']);
+  });
+
+  // A write that legitimately changed nothing is not a failure and must not read as
+  // "Applied bulk changes to 0 components."
+  it('says nothing needed changing when the write updated none', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2'], {
+      applyComponentBulkEditResult: { updated: 0, componentIds: [] },
+    });
+    assert.deepEqual(messages, ['No components needed changing.']);
+  });
+
+  // `store.applyComponentBulkEdit?.(…)` resolves to `undefined` when the action is absent.
+  // The root used to test `applied === false`, so `undefined` fell through to the success
+  // path: selection cleared, toast fired, nothing written. Any falsy result must abort.
+  it('does not claim success when the store action is missing', async () => {
+    const messages = await applyBulkEditOverRows(['c1'], {
+      applyComponentBulkEditResult: null,
+    });
+    assert.deepEqual(messages, [], 'no toast for a write that never happened');
+  });
+
+  // A selection lives on the lifted browser state, not on the page, and the root builds the
+  // Apply payload from `itemCards` rather than from the rendered rows. Both halves were
+  // proved separately — the view suite pages away and asserts the COUNT survives, the model
+  // suite asserts the reducer is page-independent — but nothing drove the real Apply with a
+  // selection the current page cannot render. That is the composition a GM actually performs
+  // on the library size this feature exists for.
+  it('applies a selection that spans two pages, including the row page 2 cannot see', async () => {
+    const calls = [];
+    // Twelve rows over a ten-row page: `c1` sits on page 1, `pad-11` on page 2.
+    const extraComponentItems = Array.from({ length: 30 }, (_, index) => ({
+      id: `pad-${index + 2}`,
+      name: `Padding ${index + 2}`,
+      img: 'icons/commodities/metal/ore-chunk-grey.webp',
+      description: 'Bulk-selection padding.',
+      tags: [],
+      category: 'general',
+      essences: [],
+    }));
+    await openComponentsBrowser(calls, { extraComponentItems });
+
+    tickComponentRow('c1');
+    target.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.ok(
+      !target.querySelector('[data-component-select="c1"]'),
+      'pre-condition: page 2 does not render the first selection'
+    );
+    // Whichever row page 2 happens to open on — the point is that it is NOT `c1`, not
+    // which padding row the sort produces.
+    const offPageId = target
+      .querySelector('[data-component-select]')
+      .getAttribute('data-component-select');
+    tickComponentRow(offPageId);
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
+    assert.equal(applyCalls.length, 1, 'ONE write for the whole cross-page selection');
+    assert.deepEqual(
+      [...applyCalls[0][1]].sort(),
+      ['c1', offPageId].sort(),
+      'the off-page id reaches the write, not just the count'
+    );
   });
 
   // ── The root's own prop forwarding ──────────────────────────────────────────────

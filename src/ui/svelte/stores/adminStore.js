@@ -8664,26 +8664,41 @@ export function createAdminStore(services) {
    * `refresh()` republishes `itemCards` and the `selectedSystem` projection, so the browser
    * rows re-render with no bespoke invalidation.
    *
+   * Returns the write RESULT rather than a boolean, for two reasons. A boolean cannot
+   * distinguish "wrote nothing" from "wrote", so an empty edit had to report `true` — a
+   * success for a write that never happened. And the primitive already counts honestly:
+   * it compares each component before and after and only counts the ones that genuinely
+   * changed, so selecting five components and adding a tag three already carry is an
+   * `updated` of two. Discarding that left the caller able to name only the SELECTION
+   * size, which overstates what happened.
+   *
+   * `null` means nothing was written, for any reason — a bad or empty argument, no
+   * selected system, or a throw that has already been reported to the GM.
+   *
    * @param {Iterable<string>} componentIds
    * @param {object} [edit]
-   * @returns {Promise<boolean>} whether the write completed.
+   * @returns {Promise<{updated: number, componentIds: string[]}|null>} the write result, or
+   *   `null` when no write happened.
    */
   async function applyComponentBulkEdit(componentIds, edit = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     const ids = Array.from(componentIds || [], String).filter(Boolean);
-    if (ids.length === 0 || !sysId) return false;
-    if (!edit || typeof edit !== 'object') return false;
-    if (Object.keys(edit).length === 0) return true;
+    if (ids.length === 0 || !sysId) return null;
+    if (!edit || typeof edit !== 'object') return null;
+    if (Object.keys(edit).length === 0) return null;
 
     try {
-      await systemManager.applyBulkEditToComponents(sysId, ids, edit);
+      const result = await systemManager.applyBulkEditToComponents(sysId, ids, edit);
       await refresh();
-      return true;
+      return {
+        updated: Number(result?.updated) || 0,
+        componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
+      };
     } catch (err) {
       console.error('Fabricate | Failed to apply component bulk edit:', err);
       services.notify?.error?.(err?.message || 'Failed to apply component bulk edit');
-      return false;
+      return null;
     }
   }
 

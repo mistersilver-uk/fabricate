@@ -2388,7 +2388,8 @@
             "Apply": "Apply to {count} components",
             "ApplyOne": "Apply to 1 component",
             "Applied": "Applied bulk changes to {count} components.",
-            "AppliedOne": "Applied bulk changes to 1 component."
+            "AppliedOne": "Applied bulk changes to 1 component.",
+            "AppliedNone": "No components needed changing."
           },
           "Back": "Back",
           "SourceActions": "Source actions",

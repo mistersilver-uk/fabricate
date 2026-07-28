@@ -69,7 +69,7 @@ describe('adminStore.applyComponentBulkEdit (issue 772)', () => {
       removeTags: ['herb'],
     });
 
-    assert.equal(result, true);
+    assert.deepEqual(result, { updated: 2, componentIds: ['c1', 'c2'] });
     assert.equal(calls.length, 1, 'ONE set-apply write for the whole selection');
     assert.equal(calls[0].systemId, 'sys1');
     assert.deepEqual(calls[0].componentIds, ['c1', 'c2']);
@@ -86,7 +86,7 @@ describe('adminStore.applyComponentBulkEdit (issue 772)', () => {
 
     const result = await store.applyComponentBulkEdit(new Set(['c2']), { difficulty: 9 });
 
-    assert.equal(result, true);
+    assert.deepEqual(result, { updated: 1, componentIds: ['c2'] });
     assert.deepEqual(calls[0].componentIds, ['c2']);
   });
 
@@ -128,7 +128,7 @@ describe('adminStore.applyComponentBulkEdit (issue 772)', () => {
     );
   });
 
-  it('notifies and returns false when the primitive throws', async () => {
+  it('notifies and returns null when the primitive throws', async () => {
     const { store, errors } = buildStore({
       applyImpl: () => {
         throw new Error('boom');
@@ -138,7 +138,7 @@ describe('adminStore.applyComponentBulkEdit (issue 772)', () => {
 
     const result = await store.applyComponentBulkEdit(['c1'], { category: 'Reagent' });
 
-    assert.equal(result, false);
+    assert.equal(result, null);
     assert.deepEqual(errors, ['boom']);
   });
 
@@ -146,15 +146,15 @@ describe('adminStore.applyComponentBulkEdit (issue 772)', () => {
     const { store, calls } = buildStore();
     await store.selectSystem('sys1');
 
-    assert.equal(await store.applyComponentBulkEdit([], { category: 'Reagent' }), false);
-    assert.equal(await store.applyComponentBulkEdit(undefined, { category: 'Reagent' }), false);
+    assert.equal(await store.applyComponentBulkEdit([], { category: 'Reagent' }), null);
+    assert.equal(await store.applyComponentBulkEdit(undefined, { category: 'Reagent' }), null);
     assert.equal(calls.length, 0, 'the primitive is never reached without ids');
   });
 
   it('is a no-op when no system is selected', async () => {
     const { store, calls } = buildStore({ worldHasSystems: false });
 
-    assert.equal(await store.applyComponentBulkEdit(['c1'], { category: 'Reagent' }), false);
+    assert.equal(await store.applyComponentBulkEdit(['c1'], { category: 'Reagent' }), null);
     assert.equal(calls.length, 0);
   });
 });

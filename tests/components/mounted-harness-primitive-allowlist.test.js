@@ -26,6 +26,16 @@ const repoRoot = resolve(__dirname, '../..');
 const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
+  // The manager's ONE selection control and ONE essence quantity card (issue 772), and the
+  // shared editable-input stepper the card is built on. All three sit in two or more mounted
+  // trees already: `ChecklistCardRow` renders the checkbox for the Tool Studio while the
+  // component browser's multi-select renders it a second way, and the card is rendered by
+  // both the component editor and the browser's bulk-edit rail. They could not be listed here
+  // before the `named` detection below was narrowed — a bare substring match produced false
+  // positives that made every one of them unaddable.
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   // The manager's ONE modal-dialog chrome (issue 877). Both import-flow modals render
   // through it, so adding it to a third screen would silently pull it into every suite
   // that mounts a tree containing that screen.
@@ -44,6 +54,71 @@ const SHARED_PRIMITIVES = [
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
 const SVELTE_IMPORT = /import\s+\w+\s+from\s+'([^']+\.svelte)'/g;
+
+// The three forms a suite uses to DECLARE what its temp tree compiles.
+const WRITE_COMPILED = /writeCompiledSvelte\(\s*([^)]*?)\s*\)/g;
+const COMPILED_MODULES = /compiledModules\s*:\s*\[([\s\S]*?)\]/g;
+// A template-literal compile inside a loop: writeCompiledSvelte(`prefix/${part}.svelte`).
+const TEMPLATE_COMPILE = /^`([^`$]*)\$\{(\w+)\}([^`]*)`$/;
+// Deliberately path-SHAPED rather than `'([^']+)'`. These lists are heavily commented and the
+// comments contain apostrophes ("the manager's ONE chip"), which desynchronise naive quote
+// pairing and make it read prose as module paths. Requiring no whitespace inside the quotes
+// means a stray apostrophe pair can never match, because the text between two of them always
+// spans words.
+const QUOTED = /'([\w./@-]+)'/g;
+
+/**
+ * The set of component paths a suite actually COMPILES into its temp tree.
+ *
+ * This deliberately does NOT ask whether the suite merely mentions a path. A suite that
+ * reads a component's source to assert on its text — `component-identity-strip-mounted`
+ * does exactly this for `ComponentEditView.svelte` — mentions the path without compiling
+ * anything, and treating that as a compile made the guard demand primitives the suite can
+ * never render. The mirror image is just as wrong: `manager-mounted` registers the shared
+ * leaves by BARE NAME through `sharedComponentNames` and interpolates them into a template,
+ * so a path-only match saw those as uncompiled. Between them, those two false readings are
+ * why `Stepper` was excluded from the allowlist and why the issue 772 primitives could not
+ * be added at all.
+ */
+function compiledPathsOf(suite) {
+  // `const NAME = [ … ]` — the backing array for both `...NAME` spreads inside a
+  // `compiledModules` list and `for (const x of NAME)` compile loops.
+  const arrays = new Map(
+    [...suite.matchAll(/const\s+(\w+)\s*=\s*\[([^\]]*)\]/g)].map(([, name, body]) => [name, body])
+  );
+  const literalsIn = (body) => [...body.matchAll(QUOTED)].map(([, value]) => value);
+
+  const declared = [];
+  const regions = [
+    ...[...suite.matchAll(WRITE_COMPILED)].map(([, argument]) => argument),
+    ...[...suite.matchAll(COMPILED_MODULES)].map(([, body]) => body),
+  ];
+
+  for (const region of regions) {
+    const template = TEMPLATE_COMPILE.exec(region.trim());
+    if (template) {
+      // A compile loop. The iterated list is either inline — `for (const part of ['A','B'])`
+      // — or a named const, and both forms are in use in the same suite.
+      const [, prefix, variable, suffix] = template;
+      const binding = new RegExp(
+        `for\\s*\\(\\s*const\\s+${variable}\\s+of\\s+(\\[[^\\]]*\\]|\\w+)\\s*\\)`
+      ).exec(suite);
+      if (!binding) continue;
+      const source = binding[1].startsWith('[') ? binding[1] : (arrays.get(binding[1]) ?? '');
+      for (const member of literalsIn(source)) declared.push(`${prefix}${member}${suffix}`);
+      continue;
+    }
+
+    for (const value of literalsIn(region)) declared.push(value);
+    // `compiledModules: [...SHARED, 'one/more.svelte']` — hoisting a shared list into a const
+    // is the repo's own idiom for naming a primitive once across two harnesses in one file.
+    for (const [, spread] of region.matchAll(/\.\.\.(\w+)/g)) {
+      for (const value of literalsIn(arrays.get(spread) ?? '')) declared.push(value);
+    }
+  }
+
+  return declared;
+}
 
 function repoPathsUnder(directory, extension) {
   return readdirSync(resolve(repoRoot, directory), { recursive: true, withFileTypes: true })
@@ -88,7 +163,8 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
     // A suite that compiles nothing cannot hang on a missing component.
     if (!suite.includes('writeCompiledSvelte') && !suite.includes('compiledModules')) continue;
 
-    const named = componentPaths.filter((path) => suite.includes(`'${path}'`));
+    const compiled = new Set(compiledPathsOf(suite));
+    const named = componentPaths.filter((path) => compiled.has(path));
     const required = new Set(
       SHARED_PRIMITIVES.filter(
         (primitive) =>
