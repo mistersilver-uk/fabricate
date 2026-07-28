@@ -4961,7 +4961,27 @@ export function createAdminStore(services) {
   }
 
   // --- refresh ---
+  /**
+   * Refreshes overlap, and the later one is not necessarily the one that finishes last.
+   *
+   * `refresh` reads the selected system ONCE at the top and then does async work — item
+   * enrichment, environment state, the graph — before publishing. Two runs can therefore be
+   * in flight together, each holding the selection as it was when IT started, and whichever
+   * finishes last wins. `createSystem` produces exactly that overlap on its own: the manager
+   * fires `fabricate.craftingSystemsChanged` from inside the write, the store answers it by
+   * scheduling a refresh, and only then does `createSystem` select the new system and
+   * refresh again. The older run is holding the PREVIOUS selection, so when it published
+   * last the new system appeared briefly and then flicked back to the one the GM started on.
+   *
+   * Each run takes a ticket and publishes only while it is still the newest. A superseded
+   * run finishes its work and drops its result, which is correct: a newer run is already
+   * producing the state that replaces it.
+   */
+  let refreshTicket = 0;
+
   async function refresh() {
+    const ticket = ++refreshTicket;
+    const isCurrent = () => ticket === refreshTicket;
     const systemManager = services.getCraftingSystemManager();
     const recipeManager = services.getRecipeManager();
     if (!_fabricateReady(systemManager, recipeManager)) {
@@ -5068,6 +5088,7 @@ export function createAdminStore(services) {
     // Phase 1: publish all synchronous selected-system context immediately so
     // manager can paint its selected rail, menu, and inspector before slower
     // item/environment work finishes.
+    if (!isCurrent()) return;
     viewState.update((prev) => ({
       ...prev,
       systems: systemList,
@@ -5145,6 +5166,8 @@ export function createAdminStore(services) {
       graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
     }
 
+    // A newer refresh has already taken over; publishing here would put its work back.
+    if (!isCurrent()) return;
     viewState.update((prev) => ({
       ...prev,
       systems: systemList,

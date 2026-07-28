@@ -776,6 +776,113 @@ describe('createAdminStore', () => {
       assert.equal(created.id, get(store.selectedSystemId));
     });
 
+    // The reported case: a system is ALREADY selected when Create is pressed. The manager
+    // root opens the created system's overview off the back of this, so if the selection
+    // does not actually move, the GM is taken to the overview of the system they already
+    // had open — which is what a GM reported after the navigation landed.
+    it('createSystem selects the new system even when another one is already selected', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      assert.equal(get(store.viewState).selectedSystem?.id, 'sys1', 'pre-condition: sys1 is open');
+
+      const created = await store.createSystem();
+
+      assert.equal(get(store.selectedSystemId), created.id, 'the store selects the new system');
+      assert.equal(
+        get(store.viewState).selectedSystem?.id,
+        created.id,
+        'and the published projection the rail reads names it too'
+      );
+    });
+
+    // The real `CraftingSystemManager.createSystem` fires `fabricate.craftingSystemsChanged`
+    // BEFORE it returns, and the store answers that hook by scheduling its own refresh. That
+    // refresh is therefore already in flight, holding the PREVIOUS selection, when
+    // `createSystem` goes on to select the new system — and `refresh` had no way to tell a
+    // stale run from a current one, so the older one could publish last and put the rail back
+    // on the system the GM started from.
+    it('createSystem survives the systems-changed refresh its own write triggers', async () => {
+      let dataChangedCallback = null;
+      const services = createMockServices({
+        onFabricateDataChanged: (callback) => {
+          dataChangedCallback = callback;
+          return () => {};
+        },
+      });
+      const manager = services.getCraftingSystemManager();
+      const create = manager.createSystem;
+      manager.createSystem = async (data) => {
+        const created = await create(data);
+        // Stand in for `_notifySystemsChanged()`: fired while the OLD id is still selected.
+        dataChangedCallback?.('systems');
+        return created;
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const created = await store.createSystem();
+      // Let every scheduled refresh — including the stale one — finish publishing.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      assert.equal(get(store.selectedSystemId), created.id);
+      assert.equal(
+        get(store.viewState).selectedSystem?.id,
+        created.id,
+        'a refresh that started before the new system was selected must not publish over it'
+      );
+    });
+
+    // The mechanism behind that, isolated: a refresh reads the selection once at the top and
+    // publishes after async work, so an OLDER run can finish last and put the previous
+    // selection back. A GM sees the new system appear and then flick away.
+    //
+    // The interleave is FORCED here rather than hoped for. Every awaited call in the mock
+    // resolves in queue order, so two refreshes started back-to-back always finish in order
+    // and the race cannot appear by itself. Holding the first run's environment lookup open
+    // until the second has finished reproduces what varying `fromUuid`/`enrichHTML` latency
+    // does in a real world.
+    it('a superseded refresh does not publish over a newer one', async () => {
+      let releaseFirst = null;
+      let held = false;
+      const services = createMockServices({
+        getGatheringEnvironmentStore: () => ({
+          list: () => [],
+          listBySystem: async () => {
+            if (held) return [];
+            held = true;
+            await new Promise((resolve) => {
+              releaseFirst = resolve;
+            });
+            return [];
+          },
+        }),
+      });
+      services.getCraftingSystemManager().getSystem('sys1').features = { gathering: true };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // Run 1 stalls inside its environment lookup, still holding `sys1`.
+      const stale = store.refresh();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Run 2 selects and publishes the new system while run 1 is parked.
+      const created = await store.createSystem();
+      assert.equal(get(store.viewState).selectedSystem?.id, created.id, 'the new system is live');
+
+      // Now let the older run finish. It is holding `sys1` and must NOT publish it.
+      releaseFirst?.();
+      await stale;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      assert.equal(
+        get(store.viewState).selectedSystem?.id,
+        created.id,
+        'a superseded run must drop its work, not flick the selection back'
+      );
+    });
+
     it('createSystem generates unique name when default already exists', async () => {
       const services = createMockServices();
       // First creation will produce 'New Crafting System'

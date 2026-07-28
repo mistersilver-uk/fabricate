@@ -1425,7 +1425,23 @@ function createStore(calls = [], options = {}) {
     // `afterTruthyResult` to decide whether to navigate.
     createSystem: () => {
       calls.push(['createSystem']);
-      return Object.hasOwn(options, 'createSystemResult') ? options.createSystemResult : {};
+      if (Object.hasOwn(options, 'createSystemResult')) return options.createSystemResult;
+      // Model the real action: it registers the system, SELECTS it, and refreshes before
+      // resolving. A stub that only returns an object would let the root navigate to
+      // whichever system was already selected and still pass.
+      const created = {
+        id: 'created-system',
+        name: 'New Crafting System',
+        description: 'Configure categories, item tags, essences, and crafting behaviour.',
+        features: {},
+      };
+      systemDetails[created.id] = created;
+      viewState.update((state) => ({
+        ...state,
+        systems: [...state.systems, { id: created.id, name: created.name, selected: false }],
+      }));
+      applySelectedSystem(created.id);
+      return created;
     },
     importSystem: () => calls.push(['importSystem']),
     exportSystem: (id) => calls.push(['exportSystem', id]),
@@ -6240,6 +6256,63 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['c1', offPageId].sort(),
       'the off-page id reaches the write, not just the count'
     );
+  });
+
+  // Creating a crafting system already SELECTED it in the store, but the GM was left on
+  // the systems library — one more click from the thing they had just asked for, and with
+  // no signal about which row was the new one.
+  it('creating a crafting system opens the System Overview of the NEW system', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls, {}), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'systems',
+      'pre-condition: the manager opens on the systems library'
+    );
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    // The whole point: the NEW system, not whichever one happened to be selected before.
+    assert.equal(
+      target.querySelector('#manager-system-name')?.value,
+      'New Crafting System',
+      'the overview shows the system that was just created'
+    );
+  });
+
+  // …but only when a system was actually created. Backing out of the dirty-environment
+  // confirm returns `false`, and navigating anyway would abandon the very edit the GM just
+  // chose to keep.
+  it('a cancelled crafting-system create stays on the systems library', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { createSystemResult: false }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
   });
 
   // ── The root's own prop forwarding ──────────────────────────────────────────────
@@ -14580,66 +14653,6 @@ describe('CraftingSystemManager mounted behavior', () => {
       filteredCards[0].getAttribute('data-gathering-task-required-tools-card'),
       'tool-lantern'
     );
-  });
-  // Creating a crafting system already SELECTED it in the store, but left the GM on the
-  // systems library — one more click from the thing they had just asked for, and with no
-  // signal about which row in the list was the new one. The root now opens the new
-  // system's System Overview on its Settings tab, which is the page a brand-new system
-  // exists to be taken through.
-  it('creating a crafting system opens its System Overview', async () => {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: { store: createStore(calls, {}), services: { openCurrentAdmin: () => {} } },
-    });
-    flushSync();
-
-    assert.equal(
-      target.querySelector('.fabricate-manager').dataset.managerView,
-      'systems',
-      'pre-condition: the manager opens on the systems library'
-    );
-
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.ok(
-      calls.some((call) => call[0] === 'createSystem'),
-      'the store still performs the create'
-    );
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
-    assert.ok(
-      target.querySelector('.manager-system-edit-form'),
-      'and lands on the Settings tab, not the Validation tab'
-    );
-  });
-
-  // …but only when a system was actually created. Backing out of the dirty-environment
-  // confirm returns `false`, and navigating anyway would abandon the very edit the GM
-  // just chose to keep.
-  it('a cancelled crafting-system create stays on the systems library', async () => {
-    const calls = [];
-    target = document.createElement('div');
-    document.body.appendChild(target);
-    mounted = mount(Component, {
-      target,
-      props: {
-        store: createStore(calls, { createSystemResult: false }),
-        services: { openCurrentAdmin: () => {} },
-      },
-    });
-    flushSync();
-
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
-    await Promise.resolve();
-    await tick();
-    flushSync();
-
-    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
   });
 
 });

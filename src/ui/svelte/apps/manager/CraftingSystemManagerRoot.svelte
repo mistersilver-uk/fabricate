@@ -3062,6 +3062,12 @@
   // and with no signal about which row is the new one. Open its System Overview instead,
   // on the Settings tab, exactly as `editSystem` does: a new system's first job is to be
   // configured, and that is the page that configures it.
+  //
+  // This depends on the store's refresh staleness guard. The manager fires
+  // `fabricate.craftingSystemsChanged` from inside its own write, which schedules a refresh
+  // holding the PREVIOUS selection; before that guard existed the older run could publish
+  // last, so the new system appeared and then flicked back and this navigation landed on
+  // the system the GM started from.
   function createSystem() {
     afterTruthyResult(store.createSystem?.(), () => {
       requestSystemTab('settings');
