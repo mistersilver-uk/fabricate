@@ -130,7 +130,33 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
     assert.match(target.querySelector('[data-consumption-pending]').textContent, /JOINED/);
   });
 
-  it('falls back to the platform list formatter when none is injected', async () => {
+  // The DEFAULT join is the load-bearing one: `formatList` is an injectable prop, so
+  // a panel that quietly joined with a bare `Intl.ListFormat` bound to the SERVER's
+  // locale rendered identically to one bound to the world's language, and every
+  // spy-injecting test above still passed. Stubbing Foundry's own list-formatter read
+  // is what distinguishes them.
+  it('joins through the active language list formatter when no prop is injected', async () => {
+    const asked = [];
+    globalThis.game.i18n.getListFormatter = (options) => {
+      asked.push(options);
+      return { format: (names) => names.join(' ~AND~ ') };
+    };
+    try {
+      const target = await harness.mount({ plan: buildConsumptionPlan(mixedCraftability()) });
+      const pending = target.querySelector('[data-consumption-pending]').textContent;
+      assert.match(pending, / ~AND~ /, 'the default join must be the language formatter');
+      assert.deepEqual(asked, [{ style: 'long', type: 'conjunction' }]);
+      assert.match(pending, /Red Herb/);
+      assert.match(pending, /Shadow/);
+    } finally {
+      delete globalThis.game.i18n.getListFormatter;
+    }
+  });
+
+  // Node tests (and any client whose i18n predates the helper) have no list formatter
+  // to ask, so the join degrades to the platform default rather than throwing.
+  it('falls back to the platform list formatter when Foundry exposes none', async () => {
+    assert.ok(!globalThis.game.i18n.getListFormatter, 'no formatter installed for this case');
     const target = await harness.mount({ plan: buildConsumptionPlan(mixedCraftability()) });
     const pending = target.querySelector('[data-consumption-pending]').textContent;
     // Two entries, so a conjunction join must appear between them in any locale.

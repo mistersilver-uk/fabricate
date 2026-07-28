@@ -71,6 +71,35 @@ export function localize(key, data) {
   return i18n.localize(key);
 }
 
+// A comma-and-"and" join is a LANGUAGE rule, not an authored string: the separator,
+// the conjunction and whether an Oxford comma appears all vary by locale. These are
+// the options for the ordinary "x, y and z" reading of a list of things that are all
+// true at once.
+const LIST_FORMAT_OPTIONS = Object.freeze({ style: 'long', type: 'conjunction' });
+
+/**
+ * Join already-localized fragments using the ACTIVE language's list conventions.
+ *
+ * `Localization#getListFormatter` hands back an `Intl.ListFormat` bound to the
+ * language the world is actually running in, which is what makes this correct for a
+ * sentence assembled at render time — `items.join(', ')` and an authored separator
+ * key are both wrong outside English.
+ *
+ * Degrades to the platform default locale when Foundry's i18n is absent (Node tests)
+ * or does not expose the helper, so callers never branch on the runtime.
+ *
+ * @param {string[]} items
+ * @returns {string}
+ */
+export function formatList(items) {
+  const values = Array.isArray(items) ? items.map((item) => String(item ?? '')) : [];
+  const i18n = globalThis.game?.i18n;
+  if (typeof i18n?.getListFormatter !== 'function') {
+    return new Intl.ListFormat(undefined, LIST_FORMAT_OPTIONS).format(values);
+  }
+  return i18n.getListFormatter(LIST_FORMAT_OPTIONS).format(values);
+}
+
 export async function confirmDialog(options) {
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
   if (!DialogV2?.confirm) return false;

@@ -11,21 +11,26 @@
   item funds), and the non-essence rows are the rail's own resolved slots.
 
   The "still to choose" join uses a list formatter, never an authored separator key
-  — a comma-and-"and" join is locale-specific. Foundry V13's
-  `game.i18n.getListFormatter()` returns exactly an `Intl.ListFormat` bound to the
-  active language; the `formatList` prop is the seam for it (issue 917 L7 lifts that
-  read onto foundryBridge), and the platform default stands in until then.
+  — a comma-and-"and" join is locale-specific. `foundryBridge.formatList` owns that
+  read (it wraps Foundry's `game.i18n.getListFormatter()`, an `Intl.ListFormat` bound
+  to the active language) and is this panel's DEFAULT, so the locale-aware join is
+  what ships. The `formatList` prop stays as an injection seam for tests and for a
+  caller that needs a different join.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import CraftingThumb from '../CraftingThumb.svelte';
 
   let {
     // `{ rows, pending }` from buildConsumptionPlan.
     plan = null,
-    // Optional locale-aware list formatter: (string[]) => string.
-    formatList = null
+    // Locale-aware list formatter: (string[]) => string. Defaults to the bridge's
+    // own, so an omitted prop still joins through the active language. Deliberately
+    // NOT guarded with a `typeof … === 'function'` fallback at the call site: such a
+    // guard would swallow a parent that forwards a dead `null`, which is precisely
+    // the defect this default exists to close.
+    formatList = localeFormatList
   } = $props();
 
   const rows = $derived(Array.isArray(plan?.rows) ? plan.rows : []);
@@ -37,16 +42,11 @@
       : entry.name;
   }
 
-  function joinNames(names) {
-    if (typeof formatList === 'function') return formatList(names);
-    return new Intl.ListFormat(undefined, { style: 'long', type: 'conjunction' }).format(names);
-  }
-
   const pendingText = $derived(
     pending.length === 0
       ? ''
       : localize('FABRICATE.App.Crafting.ConsumptionPlan.StillToChoose', {
-          items: joinNames(pending.map(pendingLabel))
+          items: formatList(pending.map(pendingLabel))
         })
   );
 </script>

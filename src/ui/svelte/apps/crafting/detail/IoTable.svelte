@@ -19,7 +19,7 @@
   (which also preserves the pinned `[data-io-group="essences"]` smoke selector).
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
   import {
     ESSENCE_POOL_SLOT_ID,
@@ -49,8 +49,10 @@
     onOpenSlot = null,
     onPickForMe = null,
     onAllocateEssence = null,
-    // Locale-aware list join for the "still to choose" line.
-    formatList = null,
+    // Locale-aware list join for the "still to choose" line. Defaults to the bridge's
+    // own rather than to null: no ancestor supplies this, so a null default would
+    // leave the composition root forwarding a dead wire.
+    formatList = localeFormatList,
     // DOM id namespace, so several rails (a multi-step list) never collide.
     idPrefix = 'fabricate-req'
   } = $props();

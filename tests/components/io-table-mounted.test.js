@@ -89,6 +89,27 @@ describe('IoTable mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-section="consumption-plan"]'));
   });
 
+  // Composition-root wiring, not presentation: the plan panel ACCEPTS a `formatList`
+  // prop and no ancestor of IoTable supplies one, so unless the root itself defaults
+  // it to the bridge's locale-bound joiner the seam is dead — a rendered-but-inert
+  // prop that no rendering assertion can see. Stubbing Foundry's own list-formatter
+  // read proves the real helper is what reaches the panel.
+  it('supplies the active language list formatter to the consumption plan', async () => {
+    const asked = [];
+    globalThis.game.i18n.getListFormatter = (options) => {
+      asked.push(options);
+      return { format: (names) => names.join(' ~AND~ ') };
+    };
+    try {
+      const target = await harness.mount({ craftability: twoChoiceCraftability() });
+      const pending = target.querySelector('[data-consumption-pending]').textContent;
+      assert.match(pending, / ~AND~ /, 'IoTable must hand the plan the language formatter');
+      assert.deepEqual(asked, [{ style: 'long', type: 'conjunction' }]);
+    } finally {
+      delete globalThis.game.i18n.getListFormatter;
+    }
+  });
+
   // The old surface stacked EVERY group's alternatives below the grid at once; the
   // rail's contract is that the open slot is the single point of interaction.
   it('shows only the open group when a choice slot is open', async () => {
