@@ -37,6 +37,7 @@ import {
 } from './currencyAffordance.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
+import { buildStepRecipeView } from './stepRecipeView.js';
 import {
   appendToolBonusTerms,
   composeToolBonusTerms,
@@ -335,6 +336,14 @@ export class CraftingEngine {
    *   choice blocks with the missing-materials message). For a time-gated step the
    *   override is applied at START, so the consumed-item snapshot the FINISH resume
    *   replays already encodes the chosen option/stack.
+   * @param {{stepId: string|null, ingredientSetId: string|null,
+   *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation]
+   *   The player's funding for the set's shared essence block (issue 917), SCOPED to
+   *   the step and set it was computed against. Dropped wholesale — never clamped
+   *   into the wrong step — when either id disagrees with what this call resolved.
+   *   There is no timed snapshot for it: the source Items are deleted at START, so an
+   *   item-keyed map is stale by the time FINISH resumes, and FINISH never re-resolves
+   *   ingredients.
    * @param {boolean} [options.interactive] When true, the crafting check prompts the
    *   player with the confirm-roll dialog (optional situational modifier) and posts
    *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
@@ -365,6 +374,20 @@ export class CraftingEngine {
     const ingredientOptionOverrides =
       options?.ingredientOptionOverrides && typeof options.ingredientOptionOverrides === 'object'
         ? options.ingredientOptionOverrides
+        : null;
+    // The player's essence-block funding (issue 917). SCOPED, not a bare map: a
+    // `{ stepId, ingredientSetId, allocation }` payload the engine drops unless it
+    // names the step AND set this call actually resolved. Item uuids are not
+    // step-scoped, so a step-1 allocation arriving while the run has advanced to
+    // step 2 would actively steer that step's consumption. The check must happen
+    // HERE and not in the UI or the facade: the run's step index can move between
+    // the `$derived` that built the payload and the click that sends it — a time
+    // gate maturing on `updateWorldTime`, or another owner calling
+    // `advanceCraftingRun`. See {@link _scopedEssenceAllocation}.
+    const ingredientEssenceAllocation =
+      options?.ingredientEssenceAllocation &&
+      typeof options.ingredientEssenceAllocation === 'object'
+        ? options.ingredientEssenceAllocation
         : null;
     // Validate inputs
     if (!craftingActor) {
@@ -535,6 +558,7 @@ export class CraftingEngine {
             stepIndex,
             ingredientSetId,
             ingredientOptionOverrides,
+            ingredientEssenceAllocation,
             presentTools,
             options,
             runManager,
@@ -623,14 +647,28 @@ export class CraftingEngine {
       // consumption (its item `plan`) and the currency gate/spend (its `currencySpends`)
       // read THIS selection — never a recompute — so item mutation mid-craft can never
       // diverge the gated spend from the consumed plan.
+      const essenceAllocation = this._scopedEssenceAllocation(
+        ingredientEssenceAllocation,
+        step,
+        ingredientSet
+      );
       const craftSelection = this._resolveCraftSelection(
         componentSourceActors,
         ingredientSet,
         executionRecipe,
         craftingActor,
         resolveComponent,
-        ingredientOptionOverrides
+        ingredientOptionOverrides,
+        essenceAllocation
       );
+      const shortAllocation = this._allocationShortfallMessage(
+        essenceAllocation,
+        craftSelection,
+        executionRecipe
+      );
+      if (shortAllocation) {
+        return { success: false, results: null, message: shortAllocation };
+      }
       const currencySpends = craftSelection.currencySpends || [];
 
       // Validate tools: the recipe's resolved library Tools must be present
@@ -1042,6 +1080,11 @@ export class CraftingEngine {
       // set / cleared per-step overrides so each later step auto-resolves its own
       // satisfiable set rather than reusing the step-0 selection. The returned result
       // is the FINAL step's — the chain's effective outcome.
+      //
+      // `ingredientEssenceAllocation` MUST be nulled here for the same reason
+      // (issue 917), and the entry-time step scoping does NOT cover it: the chain
+      // enters at step 0, so a step-0-scoped allocation passes that check and would
+      // then be spread into every later step's call by `...options`.
       if (
         collapsedChain &&
         runManager &&
@@ -1052,6 +1095,7 @@ export class CraftingEngine {
           ...options,
           runId: run.id,
           ingredientOptionOverrides: null,
+          ingredientEssenceAllocation: null,
           resultGroupId: null,
         });
       }
@@ -1090,6 +1134,13 @@ export class CraftingEngine {
    * Tool BREAKAGE is intentionally NOT applied here — it is tied to the crafting
    * check outcome, which happens at FINISH.
    *
+   * `ingredientEssenceAllocation` is an explicit named parameter (like
+   * `ingredientOptionOverrides`), NOT an `options` passthrough, because it is applied
+   * exactly once — HERE, at START, where consumption happens. It is deliberately NOT
+   * snapshotted onto `preparedConsumption`: the source Items are deleted before the
+   * gate is armed, so an item-keyed map is stale by the time FINISH resumes, and
+   * FINISH never re-resolves ingredients anyway.
+   *
    * @private
    * @returns {Promise<{ resolved: boolean, result: object }>}
    */
@@ -1101,6 +1152,7 @@ export class CraftingEngine {
     stepIndex,
     ingredientSetId,
     ingredientOptionOverrides = null,
+    ingredientEssenceAllocation = null,
     presentTools,
     options,
     runManager,
@@ -1150,14 +1202,26 @@ export class CraftingEngine {
     // SINGLE SELECTION SOURCE (mirrors craft()): the item plan and currencySpends
     // both come from ONE _resolveCraftSelection call so consumption never diverges
     // from the gated/spent currency.
+    const essenceAllocation = this._scopedEssenceAllocation(
+      ingredientEssenceAllocation,
+      step,
+      ingredientSet
+    );
     const craftSelection = this._resolveCraftSelection(
       componentSourceActors,
       ingredientSet,
       executionRecipe,
       craftingActor,
       resolveComponent,
-      ingredientOptionOverrides
+      ingredientOptionOverrides,
+      essenceAllocation
     );
+    const shortAllocation = this._allocationShortfallMessage(
+      essenceAllocation,
+      craftSelection,
+      executionRecipe
+    );
+    if (shortAllocation) return abort(shortAllocation);
     const currencySpends = craftSelection.currencySpends || [];
 
     const toolsForSet =
@@ -1971,6 +2035,12 @@ export class CraftingEngine {
       ...options,
       isAlchemyAttempt: true,
       alchemySubmittedItems: submissionItems,
+      // An alchemy brew has no requirement rail and no player-chosen essence
+      // funding: the recipe and its ingredient set are DISCOVERED by matching the
+      // submission, so any allocation riding on `options` was scoped to something
+      // else entirely. Strip it rather than relying on the scope check downstream
+      // (issue 917).
+      ingredientEssenceAllocation: null,
     });
   }
 
@@ -2572,6 +2642,10 @@ export class CraftingEngine {
    *   standard-craft resolver via {@link RecipeManager#ingredientMatchesItem}.
    * @param {object|null} [optionOverrides] - Per-group player option overrides
    *   (issue 552) forwarded to the resolver so consumption matches the chosen option.
+   * @param {Record<string, number>|null} [essenceAllocation] - The player's
+   *   `{ itemKey: units }` funding for the set's shared essence block (issue 917),
+   *   ALREADY scoped to this step and set by {@link _scopedEssenceAllocation}.
+   *   Forwarded so the consumed plan is exactly what the requirement rail displayed.
    * @returns {{ success: boolean, plan: Array, currencySpends: Array, missingGroups: Array }}
    */
   _resolveCraftSelection(
@@ -2580,7 +2654,8 @@ export class CraftingEngine {
     recipe,
     craftingActor,
     resolveComponent,
-    optionOverrides = null
+    optionOverrides = null,
+    essenceAllocation = null
   ) {
     const availableItems = componentSourceActors.flatMap((actor) => [...actor.items]);
     const matcher = (ingredient, item) =>
@@ -2596,6 +2671,7 @@ export class CraftingEngine {
       return ingredientSet.resolveIngredientSelection(availableItems, matcher, {
         affordCurrency,
         optionOverrides,
+        essenceAllocation,
         resolveItemEssences,
       });
     }
@@ -2610,6 +2686,57 @@ export class CraftingEngine {
       };
     }
     return { success: true, plan: [], currencySpends: [], missingGroups: [] };
+  }
+
+  /**
+   * The player's essence allocation IF it was computed for the step and ingredient
+   * set this craft actually resolved, else null (issue 917).
+   *
+   * The payload is `{ stepId, ingredientSetId, allocation }` rather than a bare
+   * `{ itemKey: units }` map precisely so this check is possible. `step` here is the
+   * step resolved from `run.currentStepIndex`, not the one the UI believed was
+   * active: the index can move between the `$derived` that built the payload and the
+   * click that sent it, so a UI-side or facade-side guard is stale by construction.
+   *
+   * On a mismatch the allocation is DROPPED, never clamped into the resolved step —
+   * item uuids carry no step identity, so a step-1 map applied to step 2 would look
+   * plausible while steering the wrong consumption.
+   *
+   * @private
+   * @param {object|null} payload
+   * @param {object|null} step - The execution step this call resolved.
+   * @param {object|null} ingredientSet - The ingredient set this call resolved.
+   * @returns {Record<string, number>|null}
+   */
+  _scopedEssenceAllocation(payload, step, ingredientSet) {
+    const allocation = payload?.allocation;
+    if (!allocation || typeof allocation !== 'object') return null;
+    if (String(payload.stepId ?? '') !== String(step?.id ?? '')) return null;
+    if (String(payload.ingredientSetId ?? '') !== String(ingredientSet?.id ?? '')) return null;
+    return allocation;
+  }
+
+  /**
+   * The missing-materials message for a craft whose PLAYER-SUPPLIED essence
+   * allocation does not fund the set, else null (issue 917).
+   *
+   * A short allocation is honoured and never topped up, so the resolved selection
+   * comes back `success: false` with a partial plan. `RecipeManager.canCraft` ran
+   * BEFORE the allocation was applied (it gates on the allocator's own suggestion),
+   * so without this the engine would consume the partial plan and still award the
+   * result — a craft for less than the recipe costs. Scoped to the supplied-allocation
+   * case so the default path keeps its existing behaviour byte-for-byte.
+   *
+   * @private
+   */
+  _allocationShortfallMessage(essenceAllocation, craftSelection, executionRecipe) {
+    if (!essenceAllocation || craftSelection?.success !== false) return null;
+    const missing = {
+      ingredients: Array.isArray(craftSelection.missingGroups) ? craftSelection.missingGroups : [],
+      essences: [],
+      tools: [],
+    };
+    return `Missing required items:\n${this._formatMissingItems(missing, executionRecipe)}`;
   }
 
   /**
@@ -4412,23 +4539,23 @@ export class CraftingEngine {
     return lines.join('\n');
   }
 
+  /**
+   * The recipe narrowed to one execution step. The sets/result-groups narrowing and
+   * the recipe+step `toolIds` UNION come from the SHARED {@link buildStepRecipeView}
+   * that `CraftingListingBuilder` also uses (issue 917), so the read side evaluates
+   * craftability against exactly the view this engine crafts against.
+   *
+   * The engine layers two execution-only concerns on top: `toolBonusModes` is dropped
+   * (the step view must not carry the recipe-level bonus modes into a check), and
+   * routing/selection take step-else-recipe precedence.
+   * @private
+   */
   _buildStepRecipeView(recipe, step) {
-    const recipeWithoutToolBonusModes = { ...recipe };
-    delete recipeWithoutToolBonusModes.toolBonusModes;
-    return {
-      ...recipeWithoutToolBonusModes,
-      ingredientSets: step?.ingredientSets || recipe.ingredientSets || [],
-      resultGroups: step?.resultGroups || recipe.resultGroups || [],
-      outcomeRouting: step?.outcomeRouting || recipe.outcomeRouting || null,
-      resultSelection: step?.resultSelection || recipe.resultSelection || null,
-      // Merge step-level toolIds with recipe-level so the union flows to
-      // RecipeManager.getToolsForSet via recipe.toolIds. getToolsForSet dedupes
-      // by id, so recipe/step overlap resolves once.
-      toolIds: [
-        ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
-        ...(Array.isArray(step?.toolIds) ? step.toolIds : []),
-      ],
-    };
+    const view = buildStepRecipeView(recipe, step);
+    delete view.toolBonusModes;
+    view.outcomeRouting = step?.outcomeRouting || recipe.outcomeRouting || null;
+    view.resultSelection = step?.resultSelection || recipe.resultSelection || null;
+    return view;
   }
 
   _getSalvageRunManager() {
