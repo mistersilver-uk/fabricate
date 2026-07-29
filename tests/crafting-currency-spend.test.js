@@ -864,6 +864,41 @@ test('spend: a fully successful spend settles every group and records the whole 
   assert.equal(actor.system.currency.gem, 6);
 });
 
+test('engine: a THROWN currency lookup fails closed in both directions', async () => {
+  // The engine's own try/catch around the deduction and the refund is the last line of
+  // defence, and both branches are reachable: a corrupt or mid-migration crafting-system
+  // read throws out of `getCurrencyRequirementConfig` -> `resolveCurrencyContext`, so
+  // neither `spendCurrencySpends` nor `refundCurrencySpends` returns at all.
+  //
+  // The spend branch must report TOTAL NON-SETTLEMENT: returning the planned spends here
+  // would be issue 902's exact defect reached by another door — the run would record a
+  // plan that never settled and a later cancel would mint it. The refund branch must
+  // report TOTAL FAILURE: absent group detail is unknown-and-failed, never "all refunded".
+  const system = makeCurrencySystem({ units: SINGLE_TERMINAL_CURRENCY_UNITS });
+  setupGame(system);
+  globalThis.game.fabricate.getCraftingSystemManager = () => ({
+    getSystem() {
+      throw new Error('crafting system read failed');
+    },
+  });
+
+  const engine = new CraftingEngine(null, null, null, null, null, null, new ActorPropertyCoinSpender());
+  const recipe = { craftingSystemId: system.id };
+  const spends = [{ unit: 'gp', amount: 5 }];
+  const actor = new CurrencyCraftingActorFake('Spender', { currency: { gp: 47 } });
+
+  const spend = await engine._spendCraftCurrency(actor, recipe, spends);
+  assert.equal(spend.valid, false, 'a thrown deduction is never reported as valid');
+  assert.deepEqual(spend.settledSpends, [], 'a thrown deduction settles NOTHING, so it records nothing');
+  assert.deepEqual(spend.groups, []);
+
+  const refund = await engine._refundCraftCurrency(actor, recipe, spends);
+  assert.equal(refund.valid, false, 'a thrown refund is a total failure, never a success');
+  assert.deepEqual(refund.groups, [], 'missing group detail must read as unknown-and-failed');
+
+  assert.equal(actor.updates.length, 0, 'nothing was written to the actor in either direction');
+});
+
 test('engine: async-gate failure (macro) does not fall back to an unselected item plan', async () => {
   // A macro strategy whose canAfford macro reports failure must abort with zero mutation —
   // never silently item-craft. Here the group is currency-only so there is no item plan at all,
