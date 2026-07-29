@@ -1116,3 +1116,75 @@ describe('gathering economy — per-character max override', () => {
     assert.equal(service.getActorStamina(actor, SYSTEM).maxOverride, null);
   });
 });
+
+// Issue 904: the routed check's effective DC is "the task's dcOverride when
+// finite, else the routed check's own dc" (openspec spec.md, §System routed
+// check resolution requirement 1), implemented by
+// GatheringEngine#_resolveGatheringRoutedDc reading `task?.dcOverride` off the
+// COMPOSED runtime task. `_libraryTaskToRuntimeTask` previously dropped the
+// field entirely (via `normalizeLibraryTask`, which never carried it either),
+// so the requirement was dead on arrival. This coverage stays at the
+// composition seam — routed gathering is disabled ("Coming soon") behind
+// resolutionMode: 'd100' pending #683, so the fix is plumbing-only and stays
+// dormant until routed resolution ships.
+describe('gathering economy — library task dcOverride composition (issue 904)', () => {
+  const LIB_TASK = (overrides = {}) => ({ id: 'lib-dc', name: 'Mine', ...overrides });
+
+  function composedTask(overrides = {}) {
+    const { service } = makeRichState({ config: {} });
+    return service._libraryTaskToRuntimeTask(LIB_TASK(overrides), environment());
+  }
+
+  it('carries a finite dcOverride from the library task onto the composed runtime task', () => {
+    assert.equal(composedTask({ dcOverride: 18 }).dcOverride, 18);
+    // Non-integer input truncates, mirroring the admin normalizer.
+    assert.equal(composedTask({ dcOverride: '12.9' }).dcOverride, 12);
+  });
+
+  it('composes dcOverride: null to null, not 0 (the Number(null) === 0 trap)', () => {
+    const composed = composedTask({ dcOverride: null });
+    assert.equal(composed.dcOverride, null);
+    assert.notEqual(composed.dcOverride, 0, 'a naive Number(dcOverride) coercion would mint a spurious 0');
+  });
+
+  it('composes an absent dcOverride to null', () => {
+    assert.equal(composedTask({}).dcOverride, null);
+  });
+
+  it('is idempotent: re-composing an already-composed dcOverride round-trips (finite and null)', () => {
+    const withDc = composedTask({ dcOverride: 9 });
+    assert.equal(
+      makeRichState({ config: {} }).service._libraryTaskToRuntimeTask(withDc, environment()).dcOverride,
+      9
+    );
+    const withNull = composedTask({ dcOverride: null });
+    assert.equal(
+      makeRichState({ config: {} }).service._libraryTaskToRuntimeTask(withNull, environment()).dcOverride,
+      null
+    );
+  });
+
+  it('removes the unread resultSelection field but keeps resultGroups (routed-path consumer)', () => {
+    const composed = composedTask({ dcOverride: 5 });
+    assert.equal(composed.resultSelection, undefined, 'resultSelection is provably unread; removed');
+    assert.ok(Array.isArray(composed.resultGroups), 'resultGroups is read by the routed path; kept');
+  });
+
+  it('a composed dcOverride drives _resolveGatheringRoutedDc end to end (routed DC precedence)', async () => {
+    const { GatheringEngine } = await import('../src/systems/GatheringEngine.js');
+    const { service } = makeRichState({ config: {} });
+    const engine = new GatheringEngine({
+      environmentStore: { list: () => [environment()], get: () => environment() },
+      getSystems: () => [DEFAULT_TEST_SYSTEM],
+      richState: service,
+      localize: (key) => key
+    });
+    const routed = { dc: 15 };
+    // Override present and finite ⇒ wins over the routed check's own dc.
+    const overridden = engine._resolveGatheringRoutedDc(routed, composedTask({ dcOverride: 20 }));
+    assert.equal(overridden, 20);
+    // Override absent (null, per the composed shape) ⇒ falls back to routed.dc.
+    const fallback = engine._resolveGatheringRoutedDc(routed, composedTask({}));
+    assert.equal(fallback, 15);
+  });
+});
