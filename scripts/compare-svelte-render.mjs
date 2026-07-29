@@ -117,6 +117,12 @@ const EMISSION_ANCHORS = [
 
 const SIMPLE_ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
 
+/** Characters that open a run whose contents are opaque to the statement splitter. */
+const LITERAL_DELIMITERS = new Set(["'", '"', '`']);
+
+/** Characters that end a statement, at parenthesis depth 0. */
+const STATEMENT_BREAKS = new Set([';', '{', '}']);
+
 function parseArgs(argv) {
   const options = { base: 'origin/main', json: false, failOnDrift: false, filter: '' };
   for (let index = 0; index < argv.length; index++) {
@@ -230,35 +236,181 @@ function createGitCommands() {
   };
 }
 
-/** Decode a JS string literal (quotes included) to its value, so quote style stops mattering. */
+/**
+ * Decode the one escape sequence introduced by the `\` immediately before `index`.
+ *
+ * `index` addresses the character AFTER the backslash, and `next` is the index one past the whole
+ * sequence — variable-length, which is why this reports it rather than letting the caller guess.
+ *
+ * `String.fromCodePoint`, not `fromCharCode`: identical for every value these two forms can carry
+ * (`\uXXXX` caps at U+FFFF, `\xNN` at U+00FF, and a lone surrogate is a valid argument to both),
+ * and it is the one that stays correct if an astral escape ever reaches here.
+ */
+function decodeEscape(body, index) {
+  const escape = body[index];
+  if (escape === 'u' && body[index + 1] === '{') {
+    const end = body.indexOf('}', index);
+    return {
+      text: String.fromCodePoint(Number.parseInt(body.slice(index + 2, end), 16)),
+      next: end + 1,
+    };
+  }
+  if (escape === 'u') {
+    return {
+      text: String.fromCodePoint(Number.parseInt(body.slice(index + 1, index + 5), 16)),
+      next: index + 5,
+    };
+  }
+  if (escape === 'x') {
+    return {
+      text: String.fromCodePoint(Number.parseInt(body.slice(index + 1, index + 3), 16)),
+      next: index + 3,
+    };
+  }
+  // A backslash before a real newline is a line continuation and contributes nothing.
+  if (escape === '\n') return { text: '', next: index + 1 };
+  return { text: SIMPLE_ESCAPES[escape] ?? escape, next: index + 1 };
+}
+
+/**
+ * Decode a JS string literal (quotes included) to its value, so quote style stops mattering.
+ *
+ * A `while` over an explicit cursor rather than a `for` counter: the cursor advances by whatever
+ * the escape at hand consumed, and a `for` header that claims `index++` while the body overrides
+ * it lies about the step (SonarCloud's `javascript:S2310`).
+ */
 function decodeString(literal) {
   const body = literal.slice(1, -1);
   let value = '';
-  for (let index = 0; index < body.length; index++) {
+  let index = 0;
+  while (index < body.length) {
     if (body[index] !== '\\') {
       value += body[index];
+      index += 1;
       continue;
     }
-    const escape = body[++index];
-    if (escape === 'u') {
-      if (body[index + 1] === '{') {
-        const end = body.indexOf('}', index);
-        value += String.fromCodePoint(Number.parseInt(body.slice(index + 2, end), 16));
-        index = end;
-      } else {
-        value += String.fromCharCode(Number.parseInt(body.slice(index + 1, index + 5), 16));
-        index += 4;
-      }
-    } else if (escape === 'x') {
-      value += String.fromCharCode(Number.parseInt(body.slice(index + 1, index + 3), 16));
-      index += 2;
-    } else if (escape === '\n') {
-      // line continuation: contributes nothing
-    } else {
-      value += SIMPLE_ESCAPES[escape] ?? escape;
-    }
+    const { text, next } = decodeEscape(body, index + 1);
+    value += text;
+    index = next;
   }
   return value;
+}
+
+/** True when a comment — `//` or `/*` — opens at these two adjacent characters. */
+function opensComment(char, next) {
+  return char === '/' && (next === '/' || next === '*');
+}
+
+/**
+ * Index one past the comment opening at `index`.
+ *
+ * A line comment stops ON its newline rather than after it, so the whitespace rule below still
+ * gets to decide whether that newline joins two words.
+ */
+function endOfComment(code, index) {
+  if (code[index + 1] === '/') {
+    const end = code.indexOf('\n', index);
+    return end === -1 ? code.length : end;
+  }
+  const end = code.indexOf('*/', index + 2);
+  return end === -1 ? code.length : end + 2;
+}
+
+/** Index one past the run of whitespace starting at `index`. */
+function endOfWhitespace(code, index) {
+  let end = index;
+  while (end < code.length && /\s/.test(code[end])) end++;
+  return end;
+}
+
+/**
+ * Index one past the closing delimiter of the `'`, `"` or `` ` `` run starting at `index`.
+ *
+ * A backslash consumes the character after it, and an unterminated run reports one past the input
+ * so the caller's cursor still advances past the end.
+ */
+function endOfDelimited(code, index) {
+  const delimiter = code[index];
+  let end = index + 1;
+  while (end < code.length && code[end] !== delimiter) end += code[end] === '\\' ? 2 : 1;
+  return end + 1;
+}
+
+/**
+ * What a run of whitespace between these two characters contributes to the normalised output.
+ *
+ * A space only between two word characters, where it is lexically required (`return x`).
+ * Everywhere else the printer's line breaks are cosmetic, so they are dropped rather than
+ * collapsed to a space — collapsing would keep `( (` distinct from `((`.
+ */
+function joiningWhitespace(previous, following) {
+  const joinsWords = Boolean(previous) && /[\w$]/.test(previous) && /[\w$]/.test(following ?? '');
+  return joinsWords ? ' ' : '';
+}
+
+/**
+ * Index one past the `}` closing the `${…}` interpolation whose body starts at `start`.
+ *
+ * Brace depth is counted, and any nested quoted or template run is skipped wholesale so a brace
+ * inside a string cannot unbalance the scan. Skipped, not parsed: the caller normalises the whole
+ * interpolation body recursively, which is what handles the nested literal properly.
+ */
+function endOfInterpolation(code, start) {
+  let end = start;
+  let depth = 1;
+  while (end < code.length && depth > 0) {
+    const char = code[end];
+    if (LITERAL_DELIMITERS.has(char)) {
+      end = endOfDelimited(code, end);
+      continue;
+    }
+    if (char === '{') depth++;
+    else if (char === '}') depth--;
+    end++;
+  }
+  return end;
+}
+
+/**
+ * Read the template literal starting at `index`, normalising only the code inside its `${…}`
+ * interpolations.
+ *
+ * Collecting into `templates` happens here, and after the loop, so a literal nested inside an
+ * interpolation — pushed by the recursive `normalise` below — is collected before the literal
+ * containing it.
+ *
+ * @returns {{ literal: string, next: number }} the literal as it should be emitted, and the index
+ *   one past it
+ */
+function readTemplateLiteral(code, index, templates) {
+  let literal = '`';
+  let at = index + 1;
+  while (at < code.length) {
+    const char = code[at];
+    if (char === '\\') {
+      literal += char + code[at + 1];
+      at += 2;
+      continue;
+    }
+    if (char === '`') {
+      literal += '`';
+      at += 1;
+      break;
+    }
+    if (char === '$' && code[at + 1] === '{') {
+      const start = at + 2;
+      const end = endOfInterpolation(code, start);
+      // The interpolated expression is evaluated, never rendered, so normalise it as code.
+      literal += `\${${normalise(code.slice(start, end - 1), templates)}}`;
+      at = end;
+      continue;
+    }
+    // Template TEXT: byte for byte. This is the signal the whole script exists for.
+    literal += char;
+    at += 1;
+  }
+  if (templates) templates.push(literal);
+  return { literal, next: at };
 }
 
 /**
@@ -268,103 +420,53 @@ function decodeString(literal) {
  * simple ones, and this keeps the script free of a JS-parser dependency. It walks characters and
  * recurses into `${…}` interpolations, which is what lets template TEXT stay byte-exact while the
  * expressions inside it are normalised like any other code.
+ *
+ * The body is a dispatch over which lexical run starts here; each run's scanning rules live in
+ * its own helper above, so this stays a table of cases rather than one nested scanner.
  */
 function normalise(code, templates = null) {
   let out = '';
   let index = 0;
 
-  // Whitespace is only meaningful between two word characters (`return x`). Everywhere else the
-  // printer's line breaks are cosmetic, so they are dropped rather than collapsed to a space —
-  // collapsing would keep `( (` distinct from `((`.
-  const appendWhitespace = (following) => {
-    const previous = out.at(-1);
-    if (previous && /[\w$]/.test(previous) && /[\w$]/.test(following)) out += ' ';
-  };
-
   while (index < code.length) {
     const char = code[index];
-    const next = code[index + 1];
 
-    if (char === '/' && next === '/') {
-      const end = code.indexOf('\n', index);
-      index = end === -1 ? code.length : end;
-      continue;
-    }
-    if (char === '/' && next === '*') {
-      const end = code.indexOf('*/', index + 2);
-      index = end === -1 ? code.length : end + 2;
+    if (opensComment(char, code[index + 1])) {
+      index = endOfComment(code, index);
       continue;
     }
     if (/\s/.test(char)) {
-      let end = index;
-      while (end < code.length && /\s/.test(code[end])) end++;
-      appendWhitespace(code[end] ?? '');
+      const end = endOfWhitespace(code, index);
+      out += joiningWhitespace(out.at(-1), code[end]);
       index = end;
       continue;
     }
     if (char === "'" || char === '"') {
-      let end = index + 1;
-      while (end < code.length) {
-        if (code[end] === '\\') end += 2;
-        else if (code[end] === char) break;
-        else end++;
-      }
-      out += JSON.stringify(decodeString(code.slice(index, end + 1)));
-      index = end + 1;
+      const end = endOfDelimited(code, index);
+      out += JSON.stringify(decodeString(code.slice(index, end)));
+      index = end;
       continue;
     }
     if (char === '`') {
-      let literal = '`';
-      index++;
-      while (index < code.length) {
-        const current = code[index];
-        if (current === '\\') {
-          literal += current + code[index + 1];
-          index += 2;
-          continue;
-        }
-        if (current === '`') {
-          literal += '`';
-          index++;
-          break;
-        }
-        if (current === '$' && code[index + 1] === '{') {
-          const start = index + 2;
-          let end = start;
-          let depth = 1;
-          while (end < code.length && depth > 0) {
-            const inner = code[end];
-            if (inner === '{') depth++;
-            else if (inner === '}') depth--;
-            else if (inner === '`') {
-              // A nested template literal: skip it wholesale so its braces cannot unbalance the
-              // interpolation scan. The recursive call below normalises it properly.
-              end++;
-              while (end < code.length && code[end] !== '`') end += code[end] === '\\' ? 2 : 1;
-            } else if (inner === "'" || inner === '"') {
-              const quote = inner;
-              end++;
-              while (end < code.length && code[end] !== quote) end += code[end] === '\\' ? 2 : 1;
-            }
-            end++;
-          }
-          // The interpolated expression is evaluated, never rendered, so normalise it as code.
-          literal += `\${${normalise(code.slice(start, end - 1), templates)}}`;
-          index = end;
-          continue;
-        }
-        // Template TEXT: byte for byte. This is the signal the whole script exists for.
-        literal += current;
-        index++;
-      }
-      if (templates) templates.push(literal);
+      const { literal, next } = readTemplateLiteral(code, index, templates);
       out += literal;
+      index = next;
       continue;
     }
     out += char;
     index++;
   }
   return out;
+}
+
+/**
+ * Parenthesis/bracket depth after `char`, floored at 0 so an unbalanced closer cannot go negative
+ * and strand the splitter above depth 0 forever.
+ */
+function nextParenDepth(depth, char) {
+  if (char === '(' || char === '[') return depth + 1;
+  if (char === ')' || char === ']') return Math.max(0, depth - 1);
+  return depth;
 }
 
 /**
@@ -384,25 +486,20 @@ function statements(normalised) {
   let index = 0;
   while (index < normalised.length) {
     const char = normalised[index];
-    if (char === "'" || char === '"' || char === '`') {
+    if (LITERAL_DELIMITERS.has(char)) {
       // Literals are opaque here — they were normalised already and may contain any punctuation.
-      let end = index + 1;
-      while (end < normalised.length && normalised[end] !== char) {
-        end += normalised[end] === '\\' ? 2 : 1;
-      }
-      current += normalised.slice(index, end + 1);
-      index = end + 1;
+      const end = endOfDelimited(normalised, index);
+      current += normalised.slice(index, end);
+      index = end;
       continue;
     }
-    if (char === '(' || char === '[') parenDepth++;
-    else if (char === ')' || char === ']') parenDepth = Math.max(0, parenDepth - 1);
-    if (parenDepth === 0 && (char === ';' || char === '{' || char === '}')) {
+    parenDepth = nextParenDepth(parenDepth, char);
+    if (parenDepth === 0 && STATEMENT_BREAKS.has(char)) {
       chunks.push(current.trim());
       current = '';
-      index++;
-      continue;
+    } else {
+      current += char;
     }
-    current += char;
     index++;
   }
   if (current.trim()) chunks.push(current.trim());
@@ -445,50 +542,49 @@ function differences(left, right) {
   return found;
 }
 
-/** Show the window around the first differing character, not the first 200 identical ones. */
-function window_(base, head) {
-  const left = base ?? '';
-  const right = head ?? '';
+/**
+ * Show the window around the first differing character, not the first 200 identical ones.
+ *
+ * The empty-string defaults cover the one-sided case: `differences` reports an index present on
+ * only one side, so the other arrives as `undefined`.
+ */
+function window_(base = '', head = '') {
   let at = 0;
-  while (at < left.length && at < right.length && left[at] === right[at]) at++;
+  while (at < base.length && at < head.length && base[at] === head[at]) at++;
   const from = Math.max(0, at - 60);
   return {
     at,
-    base: JSON.stringify(left.slice(from, at + 90)),
-    head: JSON.stringify(right.slice(from, at + 90)),
+    base: JSON.stringify(base.slice(from, at + 90)),
+    head: JSON.stringify(head.slice(from, at + 90)),
   };
 }
 
-function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const git = createGitCommands();
+/** Why an unresolvable base ref is fatal, and what to do about it on CI. */
+function reportUnresolvableBase(base) {
+  console.error(`compare-svelte-render: base ref "${base}" does not resolve to a commit here.`);
+  console.error('  Nothing can be compared against it, so this run fails instead of reporting');
+  console.error('  a clean sweep over zero comparisons.');
+  console.error(
+    `  On CI, actions/checkout fetches a single commit by default: use fetch-depth: 0, or fetch` +
+      ` the ref explicitly (git fetch origin ${base}), before running this.`
+  );
+}
 
-  // Preflight, before any compilation: an unresolvable base is a failed run, not a clean one.
-  const baseCommit = git.resolveCommit(options.base);
-  if (!baseCommit) {
-    console.error(
-      `compare-svelte-render: base ref "${options.base}" does not resolve to a commit here.`
-    );
-    console.error('  Nothing can be compared against it, so this run fails instead of reporting');
-    console.error('  a clean sweep over zero comparisons.');
-    console.error(
-      `  On CI, actions/checkout fetches a single commit by default: use fetch-depth: 0, or fetch` +
-        ` the ref explicitly (git fetch origin ${options.base}), before running this.`
-    );
-    return 2;
-  }
+/** The components to compare: every one under `src/`, narrowed by `--filter`. */
+function collectComponents(filter) {
+  return toRepositoryPaths(repoRoot, listSvelteComponents(path.join(repoRoot, 'src'))).filter(
+    (relative) => !filter || relative.includes(filter)
+  );
+}
 
-  const components = toRepositoryPaths(
-    repoRoot,
-    listSvelteComponents(path.join(repoRoot, 'src'))
-  ).filter((relative) => !options.filter || relative.includes(options.filter));
-
-  const report = {
-    base: options.base,
+/** The empty record every comparison accumulates into. */
+function createReport(base, baseCommit, componentCount) {
+  return {
+    base,
     // The resolved SHA, because `--base origin/main` is a moving target: without it a recorded
     // report cannot say WHICH commit it found clean.
     baseCommit,
-    components: components.length,
+    components: componentCount,
     compared: 0,
     added: [],
     failed: [],
@@ -496,78 +592,94 @@ function main() {
     other: [],
     warnings: { total: 0, files: [] },
   };
+}
 
-  for (const relative of components) {
-    let head;
-    try {
-      head = fingerprint(readFileSync(path.join(repoRoot, relative), 'utf8'), relative);
-    } catch (error) {
-      report.failed.push({ file: relative, side: 'head', message: error.message });
-      continue;
-    }
-    if (head.warnings.length > 0) {
-      report.warnings.total += head.warnings.length;
-      report.warnings.files.push({ file: relative, codes: head.warnings });
-    }
+/**
+ * Every render-signal difference between the two sides of one component, in report order.
+ *
+ * `code` is deliberately absent: it is the fallback signal the caller consults only when this
+ * comes back empty.
+ */
+function renderCategories(base, head) {
+  const categories = [];
+  for (const delta of differences(base.templates, head.templates)) {
+    categories.push({ kind: 'templates', index: delta.index, ...window_(delta.base, delta.head) });
+  }
+  for (const delta of differences(base.emissions, head.emissions)) {
+    categories.push({ kind: 'emissions', index: delta.index, ...window_(delta.base, delta.head) });
+  }
+  if (base.css !== head.css) categories.push({ kind: 'css', ...window_(base.css, head.css) });
+  return categories;
+}
 
-    const baseSource = git.readAtRef(options.base, relative);
-    if (baseSource === null) {
-      report.added.push(relative);
-      continue;
-    }
-    let base;
-    try {
-      base = fingerprint(baseSource, relative);
-    } catch (error) {
-      report.failed.push({ file: relative, side: 'base', message: error.message });
-      continue;
-    }
-    report.compared++;
-
-    const categories = [];
-    for (const delta of differences(base.templates, head.templates)) {
-      categories.push({ kind: 'templates', index: delta.index, ...window_(delta.base, delta.head) });
-    }
-    for (const delta of differences(base.emissions, head.emissions)) {
-      categories.push({ kind: 'emissions', index: delta.index, ...window_(delta.base, delta.head) });
-    }
-    if (base.css !== head.css) categories.push({ kind: 'css', ...window_(base.css, head.css) });
-
-    if (categories.length > 0) report.drift.push({ file: relative, categories });
-    else if (base.code !== head.code) {
-      report.other.push({ file: relative, ...window_(base.code, head.code) });
-    }
+/** Compare one component against the base ref, recording the outcome in `report`. */
+function compareComponent(git, base, relative, report) {
+  let headFingerprint;
+  try {
+    headFingerprint = fingerprint(readFileSync(path.join(repoRoot, relative), 'utf8'), relative);
+  } catch (error) {
+    report.failed.push({ file: relative, side: 'head', message: error.message });
+    return;
+  }
+  if (headFingerprint.warnings.length > 0) {
+    report.warnings.total += headFingerprint.warnings.length;
+    report.warnings.files.push({ file: relative, codes: headFingerprint.warnings });
   }
 
-  if (options.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(
-      `base=${report.base} components=${report.components} compared=${report.compared}` +
-        ` drift=${report.drift.length} other=${report.other.length}`
-    );
-    console.log(`svelte_compiler_warnings=${report.warnings.total} over ${report.components} files`);
-    for (const entry of report.warnings.files) {
-      console.log(`  warn  ${entry.file}: ${entry.codes.join(', ')}`);
-    }
-    for (const file of report.added) console.log(`  new   ${file} (absent from ${report.base})`);
-    for (const entry of report.failed) {
-      console.log(`  FAIL  ${entry.side} ${entry.file}: ${entry.message}`);
-    }
-    for (const entry of report.drift) {
-      for (const category of entry.categories) {
-        console.log(`  drift ${entry.file} [${category.kind} #${category.index ?? 0}]`);
-        console.log(`    base: ${category.base}`);
-        console.log(`    head: ${category.head}`);
-      }
-    }
-    for (const entry of report.other) {
-      console.log(`  other ${entry.file}`);
-      console.log(`    base: ${entry.base}`);
-      console.log(`    head: ${entry.head}`);
-    }
+  const baseSource = git.readAtRef(base, relative);
+  if (baseSource === null) {
+    report.added.push(relative);
+    return;
   }
+  let baseFingerprint;
+  try {
+    baseFingerprint = fingerprint(baseSource, relative);
+  } catch (error) {
+    report.failed.push({ file: relative, side: 'base', message: error.message });
+    return;
+  }
+  report.compared++;
 
+  const categories = renderCategories(baseFingerprint, headFingerprint);
+  if (categories.length > 0) report.drift.push({ file: relative, categories });
+  else if (baseFingerprint.code !== headFingerprint.code) {
+    report.other.push({ file: relative, ...window_(baseFingerprint.code, headFingerprint.code) });
+  }
+}
+
+/** One drift entry: every category it drifted in, with the window around each first difference. */
+function printDriftEntry(entry) {
+  for (const category of entry.categories) {
+    console.log(`  drift ${entry.file} [${category.kind} #${category.index ?? 0}]`);
+    console.log(`    base: ${category.base}`);
+    console.log(`    head: ${category.head}`);
+  }
+}
+
+/** The human-readable form of the report: a summary line, then one block per finding. */
+function printReport(report) {
+  console.log(
+    `base=${report.base} components=${report.components} compared=${report.compared}` +
+      ` drift=${report.drift.length} other=${report.other.length}`
+  );
+  console.log(`svelte_compiler_warnings=${report.warnings.total} over ${report.components} files`);
+  for (const entry of report.warnings.files) {
+    console.log(`  warn  ${entry.file}: ${entry.codes.join(', ')}`);
+  }
+  for (const file of report.added) console.log(`  new   ${file} (absent from ${report.base})`);
+  for (const entry of report.failed) {
+    console.log(`  FAIL  ${entry.side} ${entry.file}: ${entry.message}`);
+  }
+  for (const entry of report.drift) printDriftEntry(entry);
+  for (const entry of report.other) {
+    console.log(`  other ${entry.file}`);
+    console.log(`    base: ${entry.base}`);
+    console.log(`    head: ${entry.head}`);
+  }
+}
+
+/** The process exit code this report earns. See the EXIT CODES note at the top of the file. */
+function exitCodeFor(report, options) {
   if (report.failed.length > 0) return 2;
   // Same rule as the base-ref preflight, applied to the outcome rather than the input: a run that
   // compared nothing proves nothing, so it must not read as a pass. The usual cause is a
@@ -582,6 +694,27 @@ function main() {
     return 2;
   }
   return options.failOnDrift && report.drift.length > 0 ? 1 : 0;
+}
+
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const git = createGitCommands();
+
+  // Preflight, before any compilation: an unresolvable base is a failed run, not a clean one.
+  const baseCommit = git.resolveCommit(options.base);
+  if (!baseCommit) {
+    reportUnresolvableBase(options.base);
+    return 2;
+  }
+
+  const components = collectComponents(options.filter);
+  const report = createReport(options.base, baseCommit, components.length);
+  for (const relative of components) compareComponent(git, options.base, relative, report);
+
+  if (options.json) console.log(JSON.stringify(report, null, 2));
+  else printReport(report);
+
+  return exitCodeFor(report, options);
 }
 
 try {
