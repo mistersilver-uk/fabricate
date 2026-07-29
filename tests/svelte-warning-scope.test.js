@@ -24,6 +24,15 @@
  *     through `scripts/lib/svelteCompilerWarnings.js`; that is asserted here, along with the one
  *     documented override (`compare-svelte-render.mjs`'s `css: 'external'`) being provably
  *     warning-neutral rather than merely claimed to be.
+ *
+ * A NOTE ON WHAT "PROVABLY" HAS TO MEAN HERE, because the first version of that last assertion
+ * got it wrong. It compiled a REAL component under both option sets and compared the codes —
+ * but every component under `src/` has zero warnings (the sibling assertion above is exactly
+ * that bar), so both sides were `[]` and it read `assert.deepEqual([], [])`. Not incidentally
+ * vacuous: structurally vacuous forever, guaranteed by the gate shipping beside it. Evidence
+ * about a warning set has to be taken over a source that WARNS, and it has to show the override
+ * was applied at all — otherwise a `compileComponent` that silently dropped its `overrides`
+ * argument, the exact regression the override needs guarding against, would keep it green.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,6 +59,7 @@ const sweepNpmScript = 'lint:svelte:warnings';
 const components = listSvelteComponents(path.join(repoRoot, 'src'));
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 const workflow = readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
+const viteConfigSource = readFileSync(path.join(repoRoot, 'vite.config.js'), 'utf8');
 
 /**
  * A component that warns, and one that does not.
@@ -59,6 +69,16 @@ const workflow = readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), '
  */
 const WARNING_COMPONENT = '<ul><li role="button" tabindex="0">warns</li></ul>\n';
 const CLEAN_COMPONENT = '<ul><li>clean</li></ul>\n';
+
+/**
+ * A component that does not COMPILE, which is a different failure from one that warns.
+ *
+ * `scanComponentWarnings` turns a compiler throw into a synthetic `compile_error` finding
+ * rather than skipping the file, so a sweep can never come back clean because it could not
+ * read something. Untested, that rescue is one `continue` away from being the silent skip it
+ * exists to prevent.
+ */
+const UNCOMPILABLE_COMPONENT = '<div>never closed\n';
 
 /** Run the real sweep over a throwaway source root. */
 function runSweep(root) {
@@ -144,12 +164,41 @@ describe('the sweep actually fails on a warning', () => {
     assert.equal(outcome.status, 2, 'an empty walk is a failed run, not a pass');
     assert.match(outcome.stdout, /found no \*\.svelte/);
   });
+
+  // A file the compiler REFUSES is the case where "skip it and carry on" is most tempting and
+  // most dangerous: the sweep would report clean over a component it never inspected.
+  it('attributes a component that fails to compile to that file rather than reporting clean', () => {
+    const outcome = withFixtureRoot(
+      { 'Broken.svelte': UNCOMPILABLE_COMPONENT, 'nested/Clean.svelte': CLEAN_COMPONENT },
+      (root) => runSweep(root)
+    );
+
+    assert.equal(outcome.status, 1, 'an uncompilable component is a finding, not a skipped file');
+    assert.match(outcome.stdout, /svelte_compiler_warnings=1 over 2 files/);
+    assert.match(
+      outcome.stdout,
+      /Broken\.svelte \[compile_error]/,
+      'the finding must name the file that could not be read, or it is not actionable'
+    );
+  });
 });
 
 describe('the gate is wired into CI and into npm', () => {
   it('runs the sweep as a step of the lint job', () => {
-    const lintJob = workflow.slice(workflow.indexOf('\n  lint:'), workflow.indexOf('\n  validate-bindings:'));
-    assert.ok(lintJob.length > 0, 'could not locate the lint job in ci.yml');
+    // BOTH anchors are checked before the slice. `indexOf` returns -1 for a job that was
+    // renamed or removed, and `slice(start, -1)` does not fail — it widens to the rest of the
+    // file, whereupon a step in ANY later job would satisfy the assertion below and this would
+    // stop being about the lint job at all.
+    const start = workflow.indexOf('\n  lint:');
+    const end = workflow.indexOf('\n  validate-bindings:');
+    assert.ok(start > -1, 'could not locate the lint job in ci.yml');
+    assert.ok(
+      end > start,
+      'could not locate the validate-bindings job that bounds the lint job in ci.yml — rename' +
+        ' the anchor here rather than leaving the slice to widen to the whole workflow'
+    );
+
+    const lintJob = workflow.slice(start, end);
     assert.ok(
       lintJob.includes(`npm run ${sweepNpmScript}`),
       `the CI lint job must run "npm run ${sweepNpmScript}" — without it the sweep is a script` +
@@ -188,6 +237,48 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
     assert.equal(BUILD_COMPILER_OPTIONS.dev, false);
   });
 
+  // `compilerOptions` is spread wholesale by BOTH halves, so anything added to it lands in the
+  // sweep, the build AND the whole-tree assertion above at once. `warningFilter` is the key
+  // that turns all three clean while they check nothing: one line, no gate objecting, and no
+  // pointer back to the code it silences. The config already states the no-allowlist rule in
+  // prose next to `onwarn`; this is that rule with an exit code.
+  it('carries no warningFilter — the no-allowlist rule is enforced, not just stated', () => {
+    assert.ok(
+      !Object.hasOwn(svelteConfig.compilerOptions, 'warningFilter'),
+      'a warningFilter here is an unreviewed, unexpiring exemption with no pointer back to the' +
+        ' code. Suppress at the site with `<!-- svelte-ignore <code> -->` and a reason, which' +
+        ' `svelte/no-unused-svelte-ignore` then polices in the other direction'
+    );
+  });
+
+  // The ONE way the "never config drift" claim can fail, and it is outside `compilerOptions`.
+  //
+  // `@sveltejs/vite-plugin-svelte` filters `css_unused_selector` out of the warning list
+  // BEFORE `onwarn` is called whenever `emitCss` is false (`ignoreCompilerWarning` in
+  // `src/utils/log.js`). `emitCss` is a PLUGIN option, not a compiler option, so the shared
+  // read of `compilerOptions` does not cover it — and it is the natural-looking companion to
+  // `css: 'injected'`, because the plugin derives that same value from it by default. Set it
+  // false and the build stops reporting the exact class that motivated issue 924 while the
+  // sweep, which never goes near the plugin, keeps reporting it.
+  //
+  // In this plugin version a root-level `emitCss` in `svelte.config.js` THROWS ("Move the
+  // following options into 'vitePlugin:{...}'"), so the two silent routes are the
+  // `vitePlugin` block here and an inline argument to `svelte()` in `vite.config.js`.
+  it('leaves emitCss at its default on both surfaces that can set it', () => {
+    assert.ok(
+      !Object.hasOwn(svelteConfig, 'emitCss') && !Object.hasOwn(svelteConfig.vitePlugin ?? {}, 'emitCss'),
+      'emitCss: false makes vite-plugin-svelte drop every css_unused_selector before onwarn' +
+        ' sees it — the build would go quiet on the class this gate was installed for while the' +
+        ' sweep kept reporting it, and the disagreement would look like graph reachability'
+    );
+    assert.match(
+      viteConfigSource,
+      /\bsvelte\(\s*\)/,
+      'vite.config.js must invoke svelte() with no inline options — the plugin accepts emitCss' +
+        ' there too, with the same effect and even less visibility'
+    );
+  });
+
   it('keeps onwarn present and throwing, so the build fails rather than logging', () => {
     assert.equal(typeof svelteConfig.onwarn, 'function', 'svelte.config.js must export onwarn');
     assert.throws(
@@ -204,32 +295,97 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
   });
 
   // The prose claim that `compare-svelte-render.mjs`'s `css: 'external'` override cannot move
-  // the warning set, converted into evidence. It is checked against a REAL component that
-  // exercises the CSS analysis, not a synthetic one.
-  it('proves the one permitted css override is warning-neutral', () => {
-    const file = 'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte';
-    const source = readFileSync(path.join(repoRoot, file), 'utf8');
-    const codes = (options) =>
-      compileComponent(source, file, options)
+  // the warning set, converted into evidence.
+  //
+  // Two things have to be shown, and the first is the one the original version of this test
+  // missed. (1) THE OVERRIDE IS ACTUALLY APPLIED: `external` returns the stylesheet in
+  // `result.css` and `injected` returns `null` there, so that field is a direct observation of
+  // which option took effect — and it is the very signal `compare-svelte-render.mjs` overrides
+  // for. Without it, a `compileComponent` that ignored its `overrides` argument would compile
+  // both sides identically and every comparison below would pass by construction. (2) GIVEN IT
+  // IS APPLIED, THE WARNING SETS AGREE — over sources that actually warn, one per analysis
+  // family, each pinned to its expected code so neither side can go quietly empty.
+  //
+  // The direction that matters most is `external` DROPPING a class: that would make
+  // `compare-svelte-render.mjs`'s `svelte_compiler_warnings=N over M files` line understate,
+  // silently, and issue 924's baseline figure came from exactly that line.
+  describe('the one permitted css override is warning-neutral', () => {
+    const codesOf = (source, options) =>
+      compileComponent(source, 'Probe.svelte', options)
         .warnings.map((warning) => warning.code)
         .sort();
+    const emitsStylesheet = (source, options) =>
+      compileComponent(source, 'Probe.svelte', options).css !== null;
 
-    assert.deepEqual(
-      codes({ css: 'external' }),
-      codes({}),
-      'the css option selects where the stylesheet is EMITTED, not whether it is ANALYSED —' +
-        ' if this ever fails, compare-svelte-render.mjs must stop overriding it'
-    );
-  });
+    // `.b` matches nothing, so the CSS analysis has something to report.
+    const CSS_PROBE = '<div class="a">x</div><style>.a{color:red}.b{color:blue}</style>';
+    // A style block the markup DOES use, so this probe reports the a11y class alone while
+    // still carrying a stylesheet for the "was the override applied" observation.
+    const A11Y_PROBE =
+      '<ul><li role="button" tabindex="0">warns</li></ul><style>li{color:red}</style>';
 
-  it('still reports a css_unused_selector under the build options', () => {
-    const source = '<div class="a">x</div><style>.a{color:red}.b{color:blue}</style>';
-    const codes = compileComponent(source, 'Probe.svelte').warnings.map((w) => w.code);
-    assert.deepEqual(
-      codes,
-      ['css_unused_selector'],
-      'a pruned selector must still be reported under css: injected — that class is what caught' +
-        " ComponentSelectionToolbar's dead focus ring"
-    );
+    it('applies the override at all, rather than compiling both sides the same way', () => {
+      assert.equal(
+        emitsStylesheet(CSS_PROBE, { css: 'external' }),
+        true,
+        'under external the stylesheet comes back in result.css — if this fails the override is' +
+          ' not reaching the compiler and every comparison in this block is vacuous'
+      );
+      assert.equal(
+        emitsStylesheet(CSS_PROBE, {}),
+        false,
+        "under the build's own css: injected the compiler folds the stylesheet into the JS and" +
+          ' returns result.css === null. That difference is the whole reason' +
+          ' compare-svelte-render.mjs overrides the option, and it is what makes the two sides' +
+          ' below genuinely different compiles rather than the same one twice'
+      );
+    });
+
+    it('reports the same codes either way for the CSS analysis', () => {
+      assert.deepEqual(
+        codesOf(CSS_PROBE, { css: 'external' }),
+        codesOf(CSS_PROBE, {}),
+        'the css option selects where the stylesheet is EMITTED, not whether it is ANALYSED —' +
+          ' if this ever fails, compare-svelte-render.mjs must stop overriding it'
+      );
+      assert.deepEqual(
+        codesOf(CSS_PROBE, {}),
+        ['css_unused_selector'],
+        'a pruned selector must still be reported under css: injected — that class is what' +
+          " caught ComponentSelectionToolbar's dead focus ring"
+      );
+      assert.deepEqual(
+        codesOf(CSS_PROBE, { css: 'external' }),
+        ['css_unused_selector'],
+        'and under external, so a comparison of two empty sets can never pass for agreement'
+      );
+    });
+
+    it('reports the same codes either way for the a11y analysis', () => {
+      assert.deepEqual(
+        codesOf(A11Y_PROBE, { css: 'external' }),
+        codesOf(A11Y_PROBE, {}),
+        'the other analysis family the sweep reports on, exercised for the same reason'
+      );
+      assert.deepEqual(codesOf(A11Y_PROBE, {}), [
+        'a11y_no_noninteractive_element_to_interactive_role',
+      ]);
+      assert.deepEqual(codesOf(A11Y_PROBE, { css: 'external' }), [
+        'a11y_no_noninteractive_element_to_interactive_role',
+      ]);
+    });
+
+    // Kept as a smoke over the shape the gate actually runs against. It is NOT the evidence:
+    // every component under `src/` is warning-free by the bar asserted above, so both sides
+    // are `[]` here by construction and this can only catch a compile that THROWS.
+    it('compiles a real component both ways without either side throwing', () => {
+      const file = 'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte';
+      const source = readFileSync(path.join(repoRoot, file), 'utf8');
+      const codes = (options) =>
+        compileComponent(source, file, options)
+          .warnings.map((warning) => warning.code)
+          .sort();
+      assert.deepEqual(codes({ css: 'external' }), codes({}));
+    });
   });
 });

@@ -166,7 +166,17 @@
 
      The adjacent-sibling form is what makes `:global()` sufficient: `<input>` and
      `<span class="fab-selection-check">` are siblings in both of the primitive's wrapper
-     modes, and `+` steps over any comment anchor Svelte interleaves between them. */
+     modes, and `+` steps over any comment anchor Svelte interleaves between them.
+
+     THE FIX ALSO CHANGED THE FAILURE MODE FROM LOUD TO SILENT, so the contract is pinned by
+     a test. Nothing inside `:global()` is analysed, and no other gate covers it: Stylelint
+     excludes `.svelte`, SonarCloud indexes none of it, and the sweep compiles each component
+     alone. Rename `.fab-selection-input` or `.fab-selection-check` in `SelectionCheckbox`, or
+     interpose an element between them, and this ring dies with nothing objecting. The
+     structural assertion lives in `tests/components/components-browser-view-mounted.test.js`
+     ("keeps the page box adjacent to its visible box"); a second, hand-copied copy of the
+     same markup sits in the Playwright fixture in
+     `tests/components/component-studio-font-size.test.js`. */
   .manager-component-selection-all
     :global(.fab-selection-input:focus-visible + .fab-selection-check) {
     outline: 2px solid var(--fab-mv2-accent);

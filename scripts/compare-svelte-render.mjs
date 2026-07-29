@@ -558,14 +558,20 @@ function compareWarningCodes(a, b) {
  * and three independent `compile()` calls with three private option sets is how a baseline goes
  * quietly wrong.
  *
- * `css: 'external'` is the one deliberate departure from the build's own `css: 'injected'`, and
- * it is confined to where the stylesheet is EMITTED, not whether it is ANALYSED — the warning
- * set is identical either way, which `tests/svelte-warning-scope.test.js` asserts against a real
- * component rather than leaving to this comment. Under `injected` the compiler returns
- * `result.css === null` and folds the stylesheet into a string literal inside the JS, which
- * would collapse the separate `css` signal below into the whole-module `code` fallback and turn
- * every rewrapped CSS declaration into a reported difference — the exact noise this script
- * normalises away everywhere else.
+ * `css: 'external'` is the one deliberate departure from the build's own `css: 'injected'`.
+ * Under `injected` the compiler returns `result.css === null` and folds the stylesheet into a
+ * string literal inside the JS, which would collapse the separate `css` signal below into the
+ * whole-module `code` fallback and turn every rewrapped CSS declaration into a reported
+ * difference — the exact noise this script normalises away everywhere else.
+ *
+ * It is not a new risk taken on. Svelte's `css` option DEFAULTS to `'external'`, and this
+ * function's pre-change call passed no `css` key — so `{ css: 'external' }` reproduces the
+ * behaviour this script has always had, byte for byte, and merely says so out loud now that
+ * the rest of the options come from `svelte.config.js`.
+ *
+ * The override is confined to where the stylesheet is EMITTED, not whether it is ANALYSED, so
+ * the `warnings` field above is unaffected — which `tests/svelte-warning-scope.test.js` asserts
+ * over sources that actually warn (one CSS, one a11y) rather than leaving to this comment.
  */
 function fingerprint(source, filename) {
   const result = compileComponent(source, filename, { css: 'external' });

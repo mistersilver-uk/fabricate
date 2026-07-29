@@ -17,7 +17,12 @@
  * "every component" means one thing across every gate — and compiles each one with the build's
  * own options, read out of `svelte.config.js` by `scripts/lib/svelteCompilerWarnings.js`. That
  * shared read is what makes a disagreement between this and `onwarn` diagnostic: it can only be
- * graph reachability, never config drift.
+ * graph reachability, never drift in `compilerOptions`.
+ *
+ * One seam sits outside that read and is closed by assertion instead: `emitCss` is a
+ * `vite-plugin-svelte` option, and `emitCss: false` makes the plugin drop every
+ * `css_unused_selector` before `onwarn` ever sees it — the build half would go quiet on a class
+ * this sweep still reports. `tests/svelte-warning-scope.test.js` pins it at its default.
  *
  * A DISAGREEMENT WITH `onwarn` IS A BUG HERE, NOT A REASON TO OVERRIDE IT. If this sweep is
  * clean while the build fails, the sweep has stopped seeing something; repair it rather than
@@ -97,8 +102,9 @@ function printReport(result) {
   console.error(
     `\ncheck-svelte-warnings: ${result.warnings.length} Svelte compiler warning(s) across` +
       ` ${result.files} component(s). The bar is zero. Fix the code rather than suppressing the` +
-      ' warning: three of these were real accessibility defects and one was a focus ring the' +
-      ' compiler had silently pruned out of every shipped build (issue 924).'
+      ' warning: five of the seven this gate was installed for were real accessibility defects' +
+      ' and one was a focus ring the compiler had silently pruned out of every shipped build' +
+      ' (issue 924).'
   );
 }
 

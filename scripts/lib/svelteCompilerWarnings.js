@@ -27,6 +27,12 @@
  * thing — and "exhaustive, therefore authoritative" becomes a sound conclusion rather than an
  * assumption.
  *
+ * The precise claim is "never drift in `compilerOptions`", and it stops there on purpose.
+ * `emitCss` is a `vite-plugin-svelte` option rather than a compiler one, so it is outside this
+ * read — and with `emitCss: false` the plugin filters `css_unused_selector` out before `onwarn`
+ * is called, which would make the BUILD half go quiet on a class the sweep still reports. That
+ * seam is closed by assertion instead, in `tests/svelte-warning-scope.test.js`.
+ *
  * THE ONE PERMITTED OVERRIDE, AND WHY IT IS SAFE
  * ----------------------------------------------
  * `compare-svelte-render.mjs` compiles with `css: 'external'` rather than the build's
@@ -35,12 +41,21 @@
  * script's separate `css` render-signal into its whole-module fallback and turn every
  * rewrapped CSS declaration into reported noise.
  *
- * That override is confined to a signal this file does not produce: `css` selects where the
- * stylesheet is EMITTED, not whether it is ANALYSED, so the warning set is identical either
- * way (`css_unused_selector` is reported under both). That is asserted rather than asserted-
- * in-prose — see `tests/svelte-warning-scope.test.js`, which compiles a real component both
- * ways and compares the warning codes. Adding a second override without that evidence would
- * put the ambiguity straight back.
+ * IT INTRODUCES NO NEW RISK; IT DECLINES TO INTRODUCE ONE. Svelte's `css` compiler option
+ * DEFAULTS to `'external'`, and that script's pre-change call — `compile(source, { filename,
+ * generate: 'client', dev: false })` — carried no `css` key at all. So `{ css: 'external' }`
+ * reproduces its prior behaviour EXACTLY. What changed here is that the option became
+ * explicit; what did not change is a single byte of what that script compiles.
+ *
+ * The override is also confined to a signal this file does not produce: `css` selects where
+ * the stylesheet is EMITTED, not whether it is ANALYSED, so the warning set is identical
+ * either way (`css_unused_selector` is reported under both). That is asserted rather than
+ * asserted-in-prose — see `tests/svelte-warning-scope.test.js`, which takes the comparison
+ * over sources that actually WARN, one per analysis family, and first observes `result.css`
+ * to prove the override reached the compiler at all. It does not compare a real component's
+ * warning set, because every component under `src/` is warning-free by the bar this gate
+ * enforces and both sides would be `[]` by construction. Adding a second override without
+ * evidence of that shape would put the ambiguity straight back.
  *
  * Pure and dependency-free beyond the compiler itself (no autorun, no I/O of its own — the
  * caller supplies the source text), so it is safe to import from `node --test`.

@@ -198,3 +198,48 @@ node scripts/compare-svelte-render.mjs --json --fail-on-drift
 Drift is a finding, not a verdict: it means a whitespace text node appeared or disappeared in the
 DOM, which no other gate in this repository can see.
 Read the reported window, decide whether it matters, and pin it with a test where it does.
+
+## Svelte Compiler Warning Sweep
+
+`check-svelte-warnings.mjs` fails on any Svelte compiler warning, across every component under
+`src/` — not just the reachable ones (issue 924).
+
+`svelte.config.js` carries an `onwarn` hook, so `npm run build` fails on a warning too, and that is
+the fast local signal.
+It is not sufficient on its own: a Vite build compiles the ENTRY GRAPH, and this repository has
+components nothing imports (`GatheringTravelView.svelte`, issue 927), whose warnings would never
+reach it.
+So this walks the tree directly with `lib/svelteComponentFiles.js` — the same walker
+`compare-svelte-render.mjs` uses — and compiles each component with the build's own options, read
+out of `svelte.config.js` by `lib/svelteCompilerWarnings.js`.
+That shared read is what makes a disagreement between the two halves diagnostic: it can only be
+graph reachability, never drift in `compilerOptions`.
+
+A disagreement in which the sweep is the clean one is a bug in the sweep, not grounds to override
+`onwarn`.
+
+```bash
+npm run lint:svelte:warnings    # what CI runs, as its own step of the lint job
+node scripts/check-svelte-warnings.mjs --json
+```
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Option | Description |
+|---|---|
+| `--root <dir>` | Source root to walk, resolved against the repository root. Defaults to `src`. Exists so `tests/svelte-warning-scope.test.js` can drive the real command against a fixture tree. |
+| `--json` | Emit the findings as JSON instead of the human report. |
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Every component compiled with no warning. |
+| `1` | At least one warning, or a component that failed to compile (reported as a synthetic `compile_error` finding rather than skipped). |
+| `2` | The run could not check — bad arguments, an unreadable root, or NO COMPONENTS FOUND. Finding nothing is a failure, not a clean sweep. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The first line of the report is byte-identical in shape to the `svelte_compiler_warnings=N over M
+files` line `compare-svelte-render.mjs` prints, so two runs can be diffed without reading past it.
+The bar is zero: fix the code rather than suppressing the warning, or suppress it at its site with a
+`<!-- svelte-ignore <code> -->` comment and a stated reason.
+There is deliberately no allowlist.

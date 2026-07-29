@@ -26,12 +26,26 @@ export default {
    * `npm run lint:svelte:warnings` sweeps every component under `src/` and is the gate CI runs;
    * this hook exists so an author trips the same bar locally, on the build they were already
    * running. The two share their compiler options through the export above, so if they ever
-   * disagree the cause is graph reachability — never config drift.
+   * disagree the cause is graph reachability — never drift in `compilerOptions`.
+   *
+   * THAT QUALIFIER IS EXACT, and the gap it leaves is real. `emitCss` is a PLUGIN option, not a
+   * compiler option, so it sits outside the shared read — and `vite-plugin-svelte` drops every
+   * `css_unused_selector` BEFORE calling this hook whenever `emitCss` is false
+   * (`ignoreCompilerWarning`, `src/utils/log.js`). It is also the natural-looking companion to
+   * `css: 'injected'`, since the plugin derives that same value from it by default. Set it and
+   * the build goes quiet on the exact class this gate was installed for while the sweep keeps
+   * reporting it, and the disagreement would read as graph reachability. So it is left at its
+   * default on both surfaces that can set it — the `vitePlugin` block here and an inline
+   * argument to `svelte()` in `vite.config.js` — and `tests/svelte-warning-scope.test.js`
+   * asserts that.
    *
    * There is deliberately no allowlist parameter. A warning worth keeping is a warning worth
    * suppressing AT ITS SITE with a `<!-- svelte-ignore ... -->` comment and a stated reason,
    * which `svelte/no-unused-svelte-ignore` then polices in the other direction; a list here
-   * would be an unreviewed, unexpiring exemption with no pointer back to the code.
+   * would be an unreviewed, unexpiring exemption with no pointer back to the code. That rule is
+   * enforced, not just stated: `compilerOptions` is spread wholesale by BOTH halves, so a
+   * `warningFilter` added to it would turn the sweep, the build and the whole-tree test clean
+   * while checking nothing — the same test asserts the key is absent.
    */
   onwarn(warning) {
     const where = warning.filename ?? '<unknown file>';
