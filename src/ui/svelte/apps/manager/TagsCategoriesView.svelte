@@ -221,7 +221,13 @@
        "Tags & Categories" title and its subtitle, so a second one restated the title
        inside the panel. Removed for the same reason as the components and recipes
        libraries (issue 676) and Books & Scrolls (issue 785). -->
-  <nav
+  <!-- A `<div>`, not a `<nav>`: `role="tablist"` on a `<nav>` overrides its implicit
+       `navigation` landmark, which the compiler reports. The ROLE is what matters and it
+       is unchanged — `handleTabKeydown` resolves the strip with
+       `.closest('[role="tablist"]')`, and the 37 other `<div role="tablist">` elements
+       across `src/` warn zero times, because a `<div>` has no implicit role to conflict
+       with. -->
+  <div
     class="manager-editor-tabs manager-vocabulary-tabs"
     role="tablist"
     aria-label={text('FABRICATE.Admin.Manager.TagsCategories.TabList', 'Vocabulary tabs')}
@@ -245,16 +251,18 @@
         <Chip tone="neutral" class="manager-editor-tab-badge">{tab.count}</Chip>
       </button>
     {/each}
-  </nav>
+  </div>
 
-  <section
+  <!-- Same rule for the panel: an `aria-label` promotes a `<section>` from generic to
+       the `region` landmark, which `role="tabpanel"` then overrides. A `<div>` has
+       nothing to override. The panel is named by ITS OWN TAB rather than by a standalone
+       label — matching `KnowledgeView`, `RecipeEditView` and `ChecksView` — so the
+       accessible name tracks the tab the reader just activated. -->
+  <div
     class="manager-tags-categories-workspace"
     role="tabpanel"
     id={`vocabulary-panel-${activeTab}`}
-    aria-label={text(
-      'FABRICATE.Admin.Manager.TagsCategories.Workspace',
-      'Tags and categories workspace'
-    )}
+    aria-labelledby={`vocabulary-tab-${activeTab}`}
   >
     {#if activeTab === 'recipe'}
       <VocabularyPanel
@@ -455,5 +463,5 @@
         onRemove={(row) => onRemoveTag(row.name)}
       />
     {/if}
-  </section>
+  </div>
 </main>

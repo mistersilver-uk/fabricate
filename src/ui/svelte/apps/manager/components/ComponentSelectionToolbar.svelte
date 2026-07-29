@@ -85,8 +85,10 @@
     `wrapper="contents"` because THIS element is the label: the box and its caption are one
     click target, and nesting the primitive's own `<label>` inside another would be invalid
     HTML with an ambiguous target. The focus ring therefore belongs to this host — the
-    primitive scopes its own ring to the wrapper IT renders — so the `:has()` rule below is
-    load-bearing, not decoration.
+    primitive scopes its own ring to the wrapper IT renders — so the focus-ring rule below
+    is load-bearing, not decoration. Read its comment before touching its shape: this rule
+    reaches into another component's markup, and the obvious authoring of it compiles to
+    nothing at all.
   -->
   <label class="manager-component-selection-all">
     <SelectionCheckbox
@@ -150,8 +152,23 @@
 
   /* The real control is 1px and transparent, so the ring has to be drawn on the visible
      box. `SelectionCheckbox` scopes its own ring to the `<label>` IT renders, which this
-     host opts out of with `wrapper="contents"` — so the host draws it. */
-  .manager-component-selection-all:has(input:focus-visible) :global(.fab-selection-check) {
+     host opts out of with `wrapper="contents"` — so the host draws it.
+
+     EVERY CROSS-BOUNDARY PART OF THE SELECTOR SITS INSIDE `:global()`, and that is the
+     fix, not a style choice. This rule used to read
+     `…-all:has(input:focus-visible) :global(.fab-selection-check)`, which left `input`
+     outside the `:global()` — and the `<input>` is rendered by `SelectionCheckbox`'s
+     `control()` snippet, not by this template. Svelte's unused-selector analysis cannot
+     see across a component boundary, so it decided the rule matched nothing, emitted the
+     whole block into the compiled stylesheet as an `(unused)` CSS comment, and the focus
+     ring was DEAD in every shipped build while this comment claimed it was load-bearing.
+     It was load-bearing; it just was not being applied.
+
+     The adjacent-sibling form is what makes `:global()` sufficient: `<input>` and
+     `<span class="fab-selection-check">` are siblings in both of the primitive's wrapper
+     modes, and `+` steps over any comment anchor Svelte interleaves between them. */
+  .manager-component-selection-all
+    :global(.fab-selection-input:focus-visible + .fab-selection-check) {
     outline: 2px solid var(--fab-mv2-accent);
     outline-offset: 2px;
   }

@@ -2460,7 +2460,6 @@
           "Filters": "Tags and categories filters",
           "SearchPlaceholder": "Search tags and categories...",
           "SearchLabel": "Search tags and categories",
-          "Workspace": "Tags and categories workspace",
           "Categories": "Recipe categories",
           "CategoriesHint": "General is always available. Add custom categories for recipes that need clearer grouping — categories are flat, and each recipe picks exactly one.",
           "CategoryName": "Category name",
