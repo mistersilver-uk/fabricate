@@ -18,6 +18,29 @@ import { readdirSync } from 'node:fs';
 import path from 'node:path';
 
 /**
+ * Order two paths by code point, ascending.
+ *
+ * Explicit rather than `sort()`'s default, which is not "sort strings" but "stringify, then order
+ * by code point" — the same result here, reached by an implicit conversion that hides the
+ * ordering rule from the reader (and that SonarCloud flags as a bug, `javascript:S2871`, because
+ * the default silently mis-sorts anything that is not already a string).
+ *
+ * `localeCompare` is deliberately NOT used: it is locale-dependent and case-insensitive-ish, so
+ * `ExplainerCard.svelte` and `explainerCard.svelte` could order differently between machines. The
+ * whole point of sorting here is a sequence two runs agree on, and code-point order is the one
+ * that never moves. This mirrors `src/utils/alchemySignatureKey.js`, which sorts the same way for
+ * the same reason.
+ *
+ * @param {string} left
+ * @param {string} right
+ * @returns {number} negative, zero or positive per the `Array#sort` contract
+ */
+function byCodePoint(left, right) {
+  if (left < right) return -1;
+  return left > right ? 1 : 0;
+}
+
+/**
  * Every `*.svelte` file beneath `sourceRoot`, as absolute paths in a stable sorted order.
  *
  * Sorted so that callers comparing two sides (or printing a report) get a deterministic
@@ -33,7 +56,7 @@ export function listSvelteComponents(sourceRoot) {
     if (entry.isDirectory()) found.push(...listSvelteComponents(fullPath));
     else if (entry.name.endsWith('.svelte')) found.push(fullPath);
   }
-  return found.sort();
+  return found.sort(byCodePoint);
 }
 
 /**
