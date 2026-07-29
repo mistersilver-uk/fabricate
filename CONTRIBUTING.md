@@ -527,9 +527,16 @@ Not yet gated (tracked for follow-up — run `npm run lint:all` to see them):
 - the `tests/` suite — sort comparators, fixture duplication
 - the plain `.js` under `src/ui/**` (the `.svelte` components in the same directory ARE gated, by `lint:svelte`)
 - `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by source-text assertions in `tests/gathering-bootstrap-api.test.js`, so they change with that test)
-- `scripts/**` build/release tooling
 
-When you bring a new path to green (ESLint **and** SonarCloud), add it to the `lint`/`format` globs in `package.json` so the gate keeps it green.
+`scripts/**` is NOT in that list, and is a different shape worth understanding before you add a script.
+It IS gated — but file by file, 18 files today, each named individually in the `lint`, `format` and `format:check` scripts rather than matched by a glob.
+The consequence is that adding a script does not lint it, which is exactly how a new BUG and a new VULNERABILITY reached SonarCloud in issue 933.
+`tests/scripts-lint-gate-coverage.test.js` now closes that at `npm test` speed: it parses the paths back out of the `lint` script, enumerates `scripts/**`, and fails on any ungated file that is not recorded as acknowledged debt in `tests/scripts-known-ungated.js`.
+That baseline only shrinks, and its length is pinned exactly, so recording a new script as debt instead of gating it means changing a number in review rather than appending a line — and paying debt down means lowering that number in the same commit.
+The remainder stays ungated for a measured reason: the Foundry smoke harness alone accounts for 844 of the 993 ESLint findings still reported across `scripts/**`, and it pins its Phase D0 selectors by class, index and button text with no unit coverage.
+
+When you bring a new path to green (ESLint **and** SonarCloud), add it to the `lint`, `format` **and** `format:check` lists in `package.json` so the gate keeps it green.
+All three, not two — `tests/scripts-lint-gate-coverage.test.js` asserts the three carry the same set of `scripts/` paths, so a file added to only some of them fails `npm test`.
 
 ## Foundry integration (smoke) tests
 

@@ -15,10 +15,7 @@ const INACTIVE_CONTAINER_STATUSES = new Set(['created', 'dead', 'exited']);
  * @param {() => void | Promise<void>} collaborators.replaceBoundData
  * @returns {Promise<string | null>} The reusable container's post-preparation status.
  */
-export async function prepareFoundryData({
-  cachedContainer,
-  replaceBoundData,
-}) {
+export async function prepareFoundryData({ cachedContainer, replaceBoundData }) {
   const initialStatus = cachedContainer.inspectStatus();
 
   if (initialStatus === null) {
