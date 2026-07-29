@@ -241,9 +241,13 @@ export default [
   //    ENFORCED rather than merely requested: `tests/scripts-lint-gate-coverage.test.js`
   //    parses the paths out of the `lint` script and fails `npm test` on any ungated
   //    `scripts/**` file that is not recorded as acknowledged debt in
-  //    `tests/scripts-known-ungated.js`, a baseline that may only shrink. Do NOT widen
-  //    the gate to `scripts/lib/**` or `scripts/**` on the strength of that guard; it
-  //    tracks the debt, it does not clear it.
+  //    `tests/scripts-known-ungated.js`, a baseline that may only shrink and whose
+  //    length is capped. Do NOT widen the gate to `scripts/lib/**` or `scripts/**` on
+  //    the strength of that guard; it tracks the debt, it does not clear it.
+  //
+  //    If you widen the `files` glob below to a new EXTENSION, widen that test's
+  //    `LINTED_EXTENSIONS` too — it must stay a superset of this glob, or the newly
+  //    configured files become invisible to the ratchet instead of gated by it.
   {
     files: ['scripts/**/*.{js,mjs}', '*.config.js', 'eslint.config.js'],
     languageOptions: {

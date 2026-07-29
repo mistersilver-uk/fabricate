@@ -9,8 +9,18 @@
  *
  * So the list is compared here, at `npm test` speed, against what is actually on disk. Anything
  * ungated must appear in the committed KNOWN_UNGATED_SCRIPTS baseline; anything in the baseline
- * that has since been gated or deleted must come out of it. The baseline therefore only shrinks,
- * and a new script fails immediately instead of quietly shipping unlinted.
+ * that has since been gated or deleted must come out of it.
+ *
+ * WHY THERE IS A CAP AS WELL AS A BASELINE
+ * ----------------------------------------
+ * "The baseline only shrinks" is a property, and a property nothing enforces is a wish. Without
+ * MAX_ACKNOWLEDGED_UNGATED, the cheapest way to make this test green after adding an unlinted
+ * script is to append one line to the baseline — a smaller edit than gating the file properly in
+ * three `package.json` entries, and therefore the one that would actually get made. The cap turns
+ * that into an edit to a NUMBER, which a reviewer sees and has to accept, instead of one more line
+ * in a fifteen-line array that reads as noise in a diff.
+ *
+ * It is a `<=`, not an `===`, so paying the debt down never breaks the gate.
  *
  * WHY THE GATE LIST IS PARSED RATHER THAN RESTATED
  * ------------------------------------------------
@@ -28,13 +38,16 @@
  * ---------------------------------
  * `readdirSync(…, { recursive: true })` yields `lib\zip.js` on a Windows dev machine and
  * `lib/zip.js` on the `ubuntu-latest` runner, while the list parsed out of `package.json` is
- * forward-slash on both. Without normalisation this test is red locally and green in CI, and
- * "fixing" it by writing backslash entries into the baseline merely inverts that.
+ * forward-slash on both. Enumerated paths are therefore normalised before any comparison, and the
+ * baseline stores POSIX paths only. Without that this test disagrees with itself across platforms.
  *
  * NON-VACUITY. A guard that stops looking at anything must not keep reporting success, so the
- * inputs are asserted alive: the enumeration is non-empty AND still reaches a two-level-deep file
- * (which a `readdirSync` that lost `{ recursive: true }` would not), and the parsed gate list is
- * non-empty. `parseGatedScriptPaths` is additionally exercised against hand-written `lint`-like
+ * inputs are asserted alive: the enumeration is non-empty AND still reaches at least one file in a
+ * SUBDIRECTORY (which a `readdirSync` that lost `{ recursive: true }` would not), and the parsed
+ * gate list is non-empty. The subdirectory check is structural rather than a named file on purpose
+ * — pinning one path would turn that file's deletion into a false report of broken recursion,
+ * whose obvious "fix" is to repoint the constant at a top-level script and silently disable the
+ * check. `parseGatedScriptPaths` is additionally exercised against hand-written `lint`-like
  * commands below, since the real command only ever exercises the happy path.
  */
 import assert from 'node:assert/strict';
@@ -47,16 +60,31 @@ import { KNOWN_UNGATED_SCRIPTS } from './scripts-known-ungated.js';
 
 const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPTS_DIRECTORY = 'scripts';
-const LINTED_EXTENSIONS = new Set(['.js', '.mjs']);
 
 /**
- * A file the enumeration must find, two levels deep. A `readdirSync` that lost its `recursive`
- * option still returns the top-level `.mjs` scripts, so an emptiness check alone would not notice.
+ * The extensions this enumeration considers lintable.
+ *
+ * MUST stay a SUPERSET of the `scripts/**` glob in `eslint.config.js` block 6. Anything ESLint is
+ * configured for but this does not enumerate is a hole the ratchet cannot see: the file would be
+ * ungated, unacknowledged, and invisible here all at once. `.cjs` is listed for that reason even
+ * though no such file exists yet — this repository is `"type": "module"`, so `.cjs` is the normal
+ * way to write CommonJS in it, and the hole would open the moment someone did.
  */
-const NESTED_CANARY = 'scripts/foundry/create-mythwright-dnd5e.js';
+const LINTED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs']);
+
+/**
+ * The largest acknowledged-ungated baseline this repository will accept.
+ *
+ * Lower it when debt is paid down. Raising it means deliberately shipping another unlinted script,
+ * which needs its own justification in review — see the header.
+ */
+const MAX_ACKNOWLEDGED_UNGATED = 15;
 
 /** Characters that make a `scripts/…` token something other than one literal path. */
 const NOT_A_LITERAL_PATH = /["'*?{]/;
+
+/** Shell composition: `&&`, `||`, `;` or a pipe. Any of them breaks the one-command assumption. */
+const SHELL_COMPOSITION = /&&|\|\||[;|]/;
 
 /** The three npm scripts that must agree on which `scripts/` files they cover. */
 const PARALLEL_SCRIPT_KEYS = ['lint', 'format', 'format:check'];
@@ -76,18 +104,26 @@ function existsInRepository(relativePath) {
  * Deliberately narrow, and it refuses rather than guesses, because over-counting is the silent
  * failure. The contract, in full:
  *
- *   1. Only whitespace-separated tokens beginning `scripts/` are candidates. A quoted token starts
+ *   1. The command must be ONE command. `&&`, `||`, `;` and `|` are refused outright, because the
+ *      positional rules below reason about a single tool invocation: in
+ *      `eslint … && node scripts/x.mjs`, the token before `scripts/x.mjs` is `node`, which starts
+ *      with no `-`, so clause 3 would not fire and a file nothing lints would be credited as
+ *      gated. That is precisely the silent direction, so it is refused rather than handled.
+ *   2. Only whitespace-separated tokens beginning `scripts/` are candidates. A quoted token starts
  *      with its quote, so it is not one — which reads as ungated, the safe direction.
- *   2. A candidate whose PRECEDING token starts with `-` is dropped: it is an option's value, not a
- *      target. `--ignore-pattern scripts/foundry-test-run.mjs` EXCLUDES that file, and counting it
- *      as covered would be exactly backwards.
- *   3. A candidate carrying `*`, `?`, `{` or a quote throws. Such a token is a glob, and treating
+ *   3. A candidate whose PRECEDING token is an option EXPECTING a value is dropped: it is that
+ *      value, not a target. `--ignore-pattern scripts/foundry-test-run.mjs` EXCLUDES that file, and
+ *      counting it as covered would be exactly backwards. "Expecting a value" means starting with
+ *      `-` and carrying no `=`: an `--opt=value` token is self-contained and consumes nothing after
+ *      it, so `--ignore-pattern=scripts/b.js scripts/a.js` gates `scripts/a.js` — while
+ *      `scripts/b.js` is skipped by clause 2 anyway, being mid-token rather than at its start.
+ *   4. A candidate carrying `*`, `?`, `{` or a quote throws. Such a token is a glob, and treating
  *      it as one literal path would credit a file that does not exist under that name — or, worse,
  *      silently credit nothing at all.
- *   4. A candidate naming a path absent from the checkout throws, so a rename that half-lands is
+ *   5. A candidate naming a path absent from the checkout throws, so a rename that half-lands is
  *      reported here rather than shrinking the remainder.
  *
- * `exists` is injected so the contract fixtures can drive clauses 3 and 4 with paths that are not
+ * `exists` is injected so the contract fixtures can drive clauses 4 and 5 with paths that are not
  * in this repository.
  *
  * @param {string} command the npm script's command text
@@ -95,12 +131,21 @@ function existsInRepository(relativePath) {
  * @returns {Set<string>} the POSIX paths the command covers
  */
 function parseGatedScriptPaths(command, exists = existsInRepository) {
+  if (SHELL_COMPOSITION.test(command)) {
+    throw new Error(
+      'the gate-coverage parser reads ONE command and this one is composed with &&, ||, ; or a' +
+        ` pipe: ${command}\nSplit it into its own npm script, or teach the parser this shape —` +
+        ' guessing here would silently credit a file that nothing lints.'
+    );
+  }
+
   const tokens = command.split(/\s+/).filter(Boolean);
   const covered = new Set();
 
   for (const [position, token] of tokens.entries()) {
     if (!token.startsWith(`${SCRIPTS_DIRECTORY}/`)) continue;
-    if ((tokens[position - 1] ?? '').startsWith('-')) continue;
+    const preceding = tokens[position - 1] ?? '';
+    if (preceding.startsWith('-') && !preceding.includes('=')) continue;
     if (NOT_A_LITERAL_PATH.test(token)) {
       throw new Error(
         `"${token}" is not one literal path. The gate-coverage parser refuses to guess at a glob` +
@@ -122,7 +167,7 @@ function byPath(a, b) {
   return a > b ? 1 : 0;
 }
 
-/** Every `.js`/`.mjs` file under `scripts/`, as repository-relative POSIX paths. */
+/** Every lintable file under `scripts/`, as repository-relative POSIX paths. */
 function enumerateScriptFiles() {
   const entries = readdirSync(path.join(REPO_ROOT, SCRIPTS_DIRECTORY), { recursive: true });
   return entries
@@ -139,9 +184,14 @@ function ungatedScriptFiles() {
 test('the scripts/ enumeration and the parsed gate list are both alive', () => {
   const enumerated = enumerateScriptFiles();
   assert.ok(enumerated.length > 0, 'enumerated no scripts/ files at all — the guard is vacuous');
+
+  const nested = enumerated.filter((file) =>
+    file.slice(`${SCRIPTS_DIRECTORY}/`.length).includes('/')
+  );
   assert.ok(
-    enumerated.includes(NESTED_CANARY),
-    `enumeration missed ${NESTED_CANARY}, so it is no longer descending into subdirectories`
+    nested.length > 0,
+    `enumerated ${enumerated.length} file(s) under ${SCRIPTS_DIRECTORY}/ but not one in a` +
+      ' subdirectory, so the walk is no longer recursive and every nested script is invisible here'
   );
 
   const gated = parseGatedScriptPaths(packageScripts().lint);
@@ -155,7 +205,8 @@ test('lint, format and format:check cover the same scripts/ files', () => {
   const scripts = packageScripts();
   // Scoped to `scripts/`-prefixed tokens on purpose: `format` and `format:check` also carry
   // `src/**/*.svelte` and `eslint.config.js`, which `lint` does not, so comparing whole token sets
-  // would false-fail on a correct configuration.
+  // would false-fail on a correct configuration. Compared as SETS, because none of the three tools
+  // cares in what order it is handed its files.
   const [reference, ...others] = PARALLEL_SCRIPT_KEYS.map((key) => ({
     key,
     paths: [...parseGatedScriptPaths(scripts[key])].sort(byPath),
@@ -166,7 +217,7 @@ test('lint, format and format:check cover the same scripts/ files', () => {
       other.paths,
       reference.paths,
       `the "${reference.key}" and "${other.key}" npm scripts disagree on which scripts/ files` +
-        ' they cover — add every newly gated path to all three, in the same order'
+        ' they cover — a newly gated path has to be added to all three'
     );
   }
 });
@@ -177,9 +228,11 @@ test('every ungated scripts/ file is acknowledged in KNOWN_UNGATED_SCRIPTS', () 
 
   assert.ok(
     unacknowledged.length === 0,
-    'these scripts/ files are linted by nothing and are not acknowledged debt — add them to the' +
-      ' lint, format and format:check scripts in package.json, or (deliberately) to' +
-      ` KNOWN_UNGATED_SCRIPTS in tests/scripts-known-ungated.js:\n${unacknowledged.join('\n')}`
+    'these scripts/ files are linted by nothing — add them to the lint, format and format:check' +
+      ' scripts in package.json:\n' +
+      `${unacknowledged.join('\n')}\n` +
+      'Recording one as debt in tests/scripts-known-ungated.js instead means raising the cap in' +
+      ' this file, which needs its own justification in review.'
   );
 });
 
@@ -195,6 +248,16 @@ test('KNOWN_UNGATED_SCRIPTS carries no stale entry', () => {
   );
 });
 
+test('KNOWN_UNGATED_SCRIPTS stays within its cap', () => {
+  assert.ok(
+    KNOWN_UNGATED_SCRIPTS.length <= MAX_ACKNOWLEDGED_UNGATED,
+    `KNOWN_UNGATED_SCRIPTS holds ${KNOWN_UNGATED_SCRIPTS.length} entries, over the cap of` +
+      ` ${MAX_ACKNOWLEDGED_UNGATED}. The baseline is debt and only shrinks: gate the new script in` +
+      ' package.json rather than acknowledging it. Raising MAX_ACKNOWLEDGED_UNGATED means' +
+      ' deliberately shipping another unlinted script and needs its own justification in review.'
+  );
+});
+
 test('KNOWN_UNGATED_SCRIPTS is a distinct, POSIX-separated list', () => {
   assert.equal(
     new Set(KNOWN_UNGATED_SCRIPTS).size,
@@ -202,6 +265,10 @@ test('KNOWN_UNGATED_SCRIPTS is a distinct, POSIX-separated list', () => {
     'KNOWN_UNGATED_SCRIPTS contains a duplicate entry'
   );
 
+  // The enumeration half is the load-bearing one: it is what would carry `lib\zip.js` on Windows
+  // if the normalisation above were dropped. The baseline half is close to unreachable by
+  // accident, since a lone `\` in a JS string literal is an escape and only a written `\\` trips
+  // it — it is asserted anyway so the two sides are held to one rule.
   const backslashed = [...KNOWN_UNGATED_SCRIPTS, ...enumerateScriptFiles()].filter((file) =>
     file.includes('\\')
   );
@@ -220,13 +287,25 @@ test('parseGatedScriptPaths reads targets and ignores option values', () => {
   assert.deepEqual([...covered].sort(byPath), ['scripts/a.js', 'scripts/c.mjs']);
 
   assert.deepEqual(
+    [...parseGatedScriptPaths('eslint --ignore-pattern=scripts/b.js scripts/a.js', () => true)],
+    ['scripts/a.js'],
+    'the --opt=value form must not credit its own value, and must not swallow the next token either'
+  );
+
+  assert.deepEqual(
     [...parseGatedScriptPaths('prettier --check "src/**/*.svelte" eslint.config.js', () => true)],
     [],
     'a command naming no scripts/ path must parse to nothing rather than to a guess'
   );
+
+  assert.deepEqual(
+    [...parseGatedScriptPaths('eslint "scripts/**/*.js"', () => true)],
+    [],
+    'a QUOTED glob starts with its quote, so it reads as ungated — the safe direction, no throw'
+  );
 });
 
-test('parseGatedScriptPaths refuses a glob and an absent path rather than guessing', () => {
+test('parseGatedScriptPaths refuses what it cannot read literally', () => {
   for (const command of [
     'eslint scripts/**/*.js',
     'eslint scripts/lib/*.js',
@@ -237,6 +316,21 @@ test('parseGatedScriptPaths refuses a glob and an absent path rather than guessi
       () => parseGatedScriptPaths(command, () => true),
       /is not one literal path/,
       `expected "${command}" to be refused rather than counted as one literal path`
+    );
+  }
+
+  // A composed command would credit `scripts/x.mjs` via the token `node`, which starts with no
+  // dash — the silent over-count the whole parser exists to avoid.
+  for (const command of [
+    'eslint scripts/a.js --max-warnings=0 && node scripts/x.mjs',
+    'eslint scripts/a.js || node scripts/x.mjs',
+    'eslint scripts/a.js; node scripts/x.mjs',
+    'eslint scripts/a.js | tee scripts/x.mjs',
+  ]) {
+    assert.throws(
+      () => parseGatedScriptPaths(command, () => true),
+      /parser reads ONE command/,
+      `expected "${command}" to be refused as a composed command`
     );
   }
 
