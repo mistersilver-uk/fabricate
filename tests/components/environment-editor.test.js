@@ -445,7 +445,28 @@ describe('environment composition editor structure', () => {
     assert.ok(!inspectorSource.includes('class={`manager-condition-modifier-value ${adjustmentValueClass(row.adjustment)}`}'), 'task override input shell should not carry positive/negative/zero state classes');
     assert.ok(inspectorSource.includes('onTaskAdjustmentInput'), 'task override text input should preserve transient signed editing states');
     assert.ok(inspectorSource.includes('DropRateAdjustmentRange'), 'task override text input should expose its bounded range in accessible copy');
-    assert.ok(!inspectorSource.includes('value={row.adjustment} aria-label={text(\'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment\', \'Drop-rate adjustment\')} onchange={(event) => setTaskDropAdjustment(row.id, event.currentTarget.value)}'), 'task override rows should no longer use the plain numeric adjustment input');
+    // The plain numeric input this replaced, as a whitespace-tolerant pattern. It used to be a
+    // ~200-character three-attribute needle on ONE line, which Prettier (issue 923) can no longer
+    // produce — it prints an element with several attributes one per line — so the guard could
+    // never match again and would have read green forever. The control below keeps it honest:
+    // the same markup, printed the way Prettier prints it, must still trip the pattern.
+    const plainNumericAdjustmentInput =
+      /value=\{row\.adjustment\}\s+aria-label=\{text\(\s*'FABRICATE\.Admin\.Manager\.EnvironmentEditor\.Inspector\.DropRateAdjustment',\s*'Drop-rate adjustment',?\s*\)\}\s+onchange=\{\(?event\)? =>\s*setTaskDropAdjustment\(\s*row\.id,\s*event\.currentTarget\.value,?\s*\)\}/;
+    assert.ok(
+      plainNumericAdjustmentInput.test(
+        [
+          '  value={row.adjustment}',
+          "  aria-label={text(",
+          "    'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.DropRateAdjustment',",
+          "    'Drop-rate adjustment'",
+          '  )}',
+          '  onchange={(event) =>',
+          '    setTaskDropAdjustment(row.id, event.currentTarget.value)}',
+        ].join('\n')
+      ),
+      'the plain-numeric-input guard must still match that input as Prettier would print it'
+    );
+    assert.ok(!plainNumericAdjustmentInput.test(inspectorSource), 'task override rows should no longer use the plain numeric adjustment input');
     assert.ok(inspectorSource.includes('Inspector.BaseChanceModifier'), 'event overrides should use the singular base-chance-modifier heading');
     assert.ok(inspectorSource.includes('setEventAdjustment'), 'event adjustment edits should update the environment draft');
     assert.ok(inspectorSource.includes('onEventAdjustmentInput'), 'event override text input should preserve transient signed editing states');

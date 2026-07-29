@@ -580,9 +580,11 @@ describe('CraftingSystemManager source contract', () => {
       'root should pass selected currency units to SystemEditView'
     );
     // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}` — prettier-plugin-svelte
-    // rewrites the long form to it (issue 923).
+    // rewrites the long form to it (issue 923). Anchored on the leading whitespace that starts
+    // an attribute, so the needle cannot also be satisfied by the tail of a longer identifier
+    // such as `{noOnAddCurrencySubUnit}`.
     assert.ok(
-      rootSource.includes('{onAddCurrencySubUnit}'),
+      rootSource.includes(' {onAddCurrencySubUnit}'),
       'root should pass currency sub-unit actions to SystemEditView'
     );
     assert.ok(
