@@ -71,7 +71,7 @@
     onChooseOption,
     onOpenSlot,
     onPickForMe,
-    onAllocateEssence
+    onAllocateEssence,
   });
 
   // Resolve the per-recipe last roll outcome for the current selection.

@@ -30,12 +30,14 @@
     readOnly = false,
     panelId = null,
     labelledBy = null,
-    onAllocate = null
+    onAllocate = null,
   } = $props();
 
   const requirements = $derived(Array.isArray(pool?.requirements) ? pool.requirements : []);
   const carriers = $derived(Array.isArray(pool?.carriers) ? pool.carriers : []);
-  const allocated = $derived(carriers.filter((carrier) => Number(carrier?.allocatedUnits ?? 0) > 0));
+  const allocated = $derived(
+    carriers.filter((carrier) => Number(carrier?.allocatedUnits ?? 0) > 0)
+  );
   const title = $derived(
     requirements.length === 1
       ? localize('FABRICATE.App.Crafting.Pool.Title')
@@ -47,7 +49,9 @@
   );
 
   function tintOf(requirement) {
-    return requirement?.colorToken ? `--fab-chip-color: var(--fab-tag-${requirement.colorToken})` : '';
+    return requirement?.colorToken
+      ? `--fab-chip-color: var(--fab-tag-${requirement.colorToken})`
+      : '';
   }
 
   function meterState(requirement) {
@@ -77,7 +81,7 @@
         icon: requirement?.icon ?? null,
         colorToken: requirement?.colorToken ?? null,
         amount: Number(perUnit[essenceId] ?? 0) * units,
-        required: Boolean(requirement)
+        required: Boolean(requirement),
       };
     });
   }
@@ -119,7 +123,7 @@
             aria-label={localize('FABRICATE.App.Crafting.Pool.Meter', {
               name: requirement.name,
               delivered: requirement.delivered ?? 0,
-              need: requirement.need ?? 0
+              need: requirement.need ?? 0,
             })}
           >
             <span class="essence-pool-bar-fill" style={`width:${meterWidth(requirement)}`}></span>
@@ -150,7 +154,7 @@
                 {/each}
                 <span class="essence-pool-owned"
                   >{localize('FABRICATE.App.Crafting.Pool.Owned', {
-                    count: carrier.ownedUnits ?? 0
+                    count: carrier.ownedUnits ?? 0,
                   })}</span
                 >
               </span>
@@ -163,10 +167,10 @@
               disabled={readOnly}
               ariaLabel={localize('FABRICATE.App.Crafting.Pool.Allocate', { name: carrier.name })}
               decrementLabel={localize('FABRICATE.App.Crafting.Pool.AllocateLess', {
-                name: carrier.name
+                name: carrier.name,
               })}
               incrementLabel={localize('FABRICATE.App.Crafting.Pool.AllocateMore', {
-                name: carrier.name
+                name: carrier.name,
               })}
               inputProps={{ 'data-essence-allocation': carrier.itemKey }}
               onChange={(units) => onAllocate?.(carrier.itemKey, units)}

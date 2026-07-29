@@ -34,7 +34,7 @@
     // projection's own baked craftability predates any in-session option override or
     // essence allocation, so the interactive step reads this instead — otherwise the
     // tiles would stop matching the plan the craft consumes.
-    activeCraftability = null
+    activeCraftability = null,
   } = $props();
 
   const items = $derived(Array.isArray(steps) ? steps : []);

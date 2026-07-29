@@ -41,7 +41,7 @@
     disclosure = '',
     tileId = null,
     controlsId = null,
-    onOpen = null
+    onOpen = null,
   } = $props();
 
   const kind = $derived(String(slot?.kind ?? 'fixed'));
