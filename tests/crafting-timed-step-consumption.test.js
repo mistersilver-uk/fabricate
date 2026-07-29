@@ -121,8 +121,9 @@ class FakeActor {
 }
 
 // A duck-typed ingredient set whose resolveIngredientSelection matches items by
-// componentId. Currency spends are empty here (component-only recipes).
-function buildIngredientSet(id, ingredientDefs) {
+// componentId. `currencySpends` defaults to empty (component-only recipes); the issue-902
+// settlement tests pass a real plan so the START path runs the currency deduction.
+function buildIngredientSet(id, ingredientDefs, currencySpends = []) {
   return {
     id,
     resolveIngredientSelection(availableItems, matcher) {
@@ -138,7 +139,12 @@ function buildIngredientSet(id, ingredientDefs) {
         const item = availableItems.find((i) => matcher(ingredient, i));
         if (item) plan.push({ item, quantity: def.quantity, ingredient });
       }
-      return { success: plan.length === ingredientDefs.length, plan, currencySpends: [], missingGroups: [] };
+      return {
+        success: plan.length === ingredientDefs.length,
+        plan,
+        currencySpends: currencySpends.map((spend) => ({ ...spend })),
+        missingGroups: [],
+      };
     },
   };
 }
@@ -1028,4 +1034,215 @@ test('multi-step feature ON is NOT collapsed: one craft call resolves a single s
   const active = runManager.getActiveRuns(craftingActor);
   assert.equal(active.length, 1, 'the run stays active for the next step (normal multi-step flow)');
   assert.equal(active[0].currentStepIndex, 1, 'the run advanced to the second step, awaiting a new trigger');
+});
+
+// ---------------------------------------------------------------------------
+// START-phase currency SETTLEMENT (issue 902)
+//
+// A timed step consumes currency at START and records the consumption on the run.
+// It must record what actually SETTLED, never the intended plan: the record is the
+// sole input to the cancel reversal's refund, so a spend that never settled would
+// be handed back as currency the actor never paid.
+//
+// Failure is injected at the `spender.spend` seam. Underfunding cannot reach here —
+// `checkCurrencySpends` runs over every group and aborts the whole craft before any
+// mutation, so `markStepPrepared` is never called and the test would read identically
+// before and after the fix.
+// ---------------------------------------------------------------------------
+
+const { ActorPropertyCoinSpender } = await import('../src/systems/CoinSpenders.js');
+const { aggregateCurrencySpends } = await import('../src/systems/currencyAffordance.js');
+const { validateCurrencyProfile } = await import('../src/systems/currencyProfile.js');
+const {
+  CurrencyCraftingActorFake,
+  SINGLE_TERMINAL_CURRENCY_UNITS,
+  TWO_TERMINAL_CURRENCY_UNITS,
+  makeDelegatingCoinSpender,
+} = await import('./helpers/currency-spend-fixtures.js');
+
+// Drive a timed craft's START phase with a real currency profile and a delegating
+// spender spy, and hand back everything the money assertions need.
+async function startTimedCurrencyCraft({
+  units,
+  currencySpends,
+  startingCurrency,
+  failSpendFor = [],
+  failRefundFor = [],
+}) {
+  const system = {
+    id: 'sys-currency-settlement',
+    resolutionMode: 'simple',
+    features: { craftingChecks: false, essences: false, refundOnPlayerCancel: true },
+    craftingCheck: { enabled: false, consumption: {} },
+    components: [{ id: 'wood', name: 'Wood' }],
+    requirements: {
+      currency: { enabled: true, spendStrategy: 'actorProperty', units, macros: {} },
+    },
+  };
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 5);
+  const sourceActor = new FakeActor('Source', [wood]);
+  globalThis.fromUuidSync = (uuid) => (uuid === sourceActor.uuid ? sourceActor : null);
+  const craftingActor = new CurrencyCraftingActorFake('Crafter', { currency: startingCurrency });
+
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }], currencySpends);
+  const recipe = buildRecipe({
+    craftingSystemId: system.id,
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+
+  const runManager = new CraftingRunManager();
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender(), {
+    failSpendFor,
+    failRefundFor,
+  });
+  const engine = new CraftingEngine(
+    buildRecipeManager({ ingredientSet: set }),
+    runManager,
+    null,
+    null,
+    null,
+    null,
+    spy
+  );
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  return {
+    engine,
+    runManager,
+    startResult,
+    craftingActor,
+    sourceActor,
+    spy,
+    profile: validateCurrencyProfile(units, { spendStrategy: 'actorProperty' }),
+    run: runManager.getActiveRuns(craftingActor)[0],
+  };
+}
+
+test('START records the FULL plan when every currency group settles (positive control)', async () => {
+  const currencySpends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  const context = await startTimedCurrencyCraft({
+    units: TWO_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47, gem: 9 },
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+  assert.equal(context.spy.spendCalls.length, 2, 'both groups were spent');
+  assert.deepEqual(
+    context.run.steps[0].preparedConsumption.currencySpends,
+    currencySpends,
+    'a fully settled spend is recorded in full — the record is never blanket-emptied'
+  );
+  assert.equal(context.craftingActor.system.currency.gp, 45);
+  assert.equal(context.craftingActor.system.currency.gem, 6);
+
+  // The same fixture's full-success cancel: the refund seam is demonstrably live and the
+  // balance actually INCREASES back to the starting values.
+  const cancel = await context.engine.cancelCraft(
+    context.craftingActor,
+    [context.sourceActor],
+    context.run.id,
+    { refund: true }
+  );
+  assert.equal(cancel.success, true);
+  assert.equal(cancel.refunded, true);
+  assert.equal(context.spy.refundCalls.length, 2, 'both recorded groups are refunded');
+  assert.equal(context.craftingActor.system.currency.gp, 47, 'gp refunded 45 -> 47');
+  assert.equal(context.craftingActor.system.currency.gem, 9, 'gem refunded 6 -> 9');
+  delete globalThis.fromUuidSync;
+});
+
+test('START records [] when the only currency group fails, and the cancel mints nothing', async () => {
+  const currencySpends = [{ unit: 'gp', amount: 5 }];
+  const context = await startTimedCurrencyCraft({
+    units: SINGLE_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47 },
+    failSpendFor: ['gp'],
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    1,
+    'a shipped-preset-shaped profile has ONE terminal base unit'
+  );
+  assert.equal(context.startResult.success, false, 'START arms the gate and waits');
+  assert.equal(context.spy.spendCalls.length, 1, 'the spy demonstrably ran during START');
+  assert.deepEqual(
+    context.run.steps[0].preparedConsumption.currencySpends,
+    [],
+    'nothing settled, so the run records nothing'
+  );
+  assert.equal(context.craftingActor.updates.length, 0, 'no currency left the actor at START');
+
+  const cancel = await context.engine.cancelCraft(
+    context.craftingActor,
+    [context.sourceActor],
+    context.run.id,
+    { refund: true }
+  );
+
+  // The reversal demonstrably EXECUTED: the consumed ingredient came back and the run
+  // was archived. An unchanged balance is therefore a result, not a skipped path.
+  assert.equal(cancel.success, true);
+  assert.equal(cancel.cancelled, true);
+  assert.equal(cancel.restoredCount, 1, 'the consumed ingredient was restored');
+  assert.equal(context.sourceActor._createdDocs.length, 1, 'restored onto the source actor');
+  assert.equal(context.runManager.getActiveRuns(context.craftingActor).length, 0);
+
+  // The money. `refunded: true` is NOT assertable here — an empty record skips the refund
+  // and reports the same value a FULL refund does. Assert that no currency was written.
+  assert.equal(context.spy.refundCalls.length, 0, 'no group is refunded, because none settled');
+  assert.equal(context.craftingActor.updates.length, 0, 'no currency write in either direction');
+  assert.equal(context.craftingActor.system.currency.gp, 47, 'the balance is exactly unchanged');
+  delete globalThis.fromUuidSync;
+});
+
+test('START records exactly the SETTLED group when the second of two groups fails', async () => {
+  const currencySpends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  const context = await startTimedCurrencyCraft({
+    units: TWO_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47, gem: 9 },
+    failSpendFor: ['gem'],
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+  assert.equal(context.spy.spendCalls.length, 2, 'the settled first group let the second run');
+  assert.deepEqual(
+    context.run.steps[0].preparedConsumption.currencySpends,
+    [{ unit: 'gp', amount: 2 }],
+    'exactly ONE entry, naming the settled unit — the plan (2) and nothing (0) are both wrong'
+  );
+  assert.equal(context.craftingActor.system.currency.gp, 45, 'the settled group was deducted');
+  assert.equal(context.craftingActor.system.currency.gem, 9, 'the failed group deducted nothing');
+
+  const cancel = await context.engine.cancelCraft(
+    context.craftingActor,
+    [context.sourceActor],
+    context.run.id,
+    { refund: true }
+  );
+  assert.equal(cancel.success, true);
+  assert.equal(context.spy.refundCalls.length, 1, 'only the settled group is refunded');
+  assert.equal(context.craftingActor.system.currency.gp, 47, 'the settled spend is returned');
+  assert.equal(context.craftingActor.system.currency.gem, 9, 'the unsettled spend mints nothing');
+  delete globalThis.fromUuidSync;
 });

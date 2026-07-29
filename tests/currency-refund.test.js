@@ -150,6 +150,116 @@ test('MacroCoinSpender.refund fails loudly when no increment macro is configured
   assert.equal(result.valid, false, 'a missing increment macro cannot silently drop a refund');
 });
 
+// ---------------------------------------------------------------------------
+// Refund ACCUMULATION across aggregated groups (issue 902).
+//
+// §RunModel requires the reversal to be "best-effort" and to report the actual
+// outcome. Aborting at the first failing group is neither: it strands every later
+// group unrefunded and reports one opaque boolean.
+// ---------------------------------------------------------------------------
+
+const { aggregateCurrencySpends } = await import('../src/systems/currencyAffordance.js');
+const { validateCurrencyProfile: validateProfile } = await import(
+  '../src/systems/currencyProfile.js'
+);
+const { CurrencyCraftingActorFake, TWO_TERMINAL_CURRENCY_UNITS, makeDelegatingCoinSpender } =
+  await import('./helpers/currency-spend-fixtures.js');
+
+const TWO_TERMINAL_SPENDS = [
+  { unit: 'gp', amount: 2 },
+  { unit: 'gem', amount: 3 },
+];
+
+// Wire `game` for the two-terminal profile and assert the precondition that makes every
+// downstream money assertion meaningful: a typo'd unit id or a shared terminal collapses
+// the fixture to ONE group silently.
+function setupTwoTerminalRefund() {
+  const system = {
+    id: 'sys-two-terminal',
+    requirements: {
+      currency: {
+        enabled: true,
+        spendStrategy: 'actorProperty',
+        units: TWO_TERMINAL_CURRENCY_UNITS,
+      },
+    },
+  };
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: (id) => (id === system.id ? system : null) }),
+    },
+  };
+  const profile = validateProfile(TWO_TERMINAL_CURRENCY_UNITS, {
+    spendStrategy: 'actorProperty',
+  });
+  assert.equal(
+    aggregateCurrencySpends(TWO_TERMINAL_SPENDS, profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+  return { recipe: { craftingSystemId: system.id } };
+}
+
+test('refundCurrencySpends refunds every group even when the FIRST one fails', async () => {
+  const { recipe } = setupTwoTerminalRefund();
+  const actor = new CurrencyCraftingActorFake('Refundee', { currency: { gp: 11, gem: 4 } });
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender(), { failRefundFor: ['gp'] });
+
+  const result = await refundCurrencySpends(actor, recipe, TWO_TERMINAL_SPENDS, {
+    actorPropertyCoinSpender: spy,
+  });
+
+  assert.equal(spy.refundCalls.length, 2, 'a failing first group must not abort the second');
+  assert.equal(actor.system.currency.gem, 7, 'the second group is still refunded (4 -> 7)');
+  assert.equal(actor.system.currency.gp, 11, 'the failed group refunded nothing');
+  assert.equal(result.valid, false, 'one failed group makes the whole refund invalid');
+  assert.equal(result.groups.length, 2, 'per-group detail is reported for every group');
+  assert.equal(result.groups[0].refunded, false);
+  assert.equal(result.groups[1].refunded, true);
+});
+
+test('refundCurrencySpends still reports overall FAILURE when only the LAST group fails', async () => {
+  const { recipe } = setupTwoTerminalRefund();
+  const actor = new CurrencyCraftingActorFake('Refundee', { currency: { gp: 11, gem: 4 } });
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender(), { failRefundFor: ['gem'] });
+
+  const result = await refundCurrencySpends(actor, recipe, TWO_TERMINAL_SPENDS, {
+    actorPropertyCoinSpender: spy,
+  });
+
+  assert.equal(spy.refundCalls.length, 2);
+  assert.equal(actor.system.currency.gp, 13, 'the first group is refunded (11 -> 13)');
+  assert.equal(actor.system.currency.gem, 4, 'the failed last group refunded nothing');
+  assert.equal(result.valid, false, 'an accumulator must not report success because SOMETHING did');
+  assert.equal(result.groups[0].refunded, true);
+  assert.equal(result.groups[1].refunded, false);
+});
+
+test('refundCurrencySpends reports EVERY group unrefunded when the spender has no refund', async () => {
+  const { recipe } = setupTwoTerminalRefund();
+  const actor = new CurrencyCraftingActorFake('Refundee', { currency: { gp: 11, gem: 4 } });
+  const base = new ActorPropertyCoinSpender();
+  // The spend-only spy precedent: no `refund` method at all.
+  const spendOnly = {
+    readCoins: (a, ctx) => base.readCoins(a, ctx),
+    check: (a, req, ctx) => base.check(a, req, ctx),
+    spend: (a, req, ctx) => base.spend(a, req, ctx),
+  };
+
+  const result = await refundCurrencySpends(actor, recipe, TWO_TERMINAL_SPENDS, {
+    actorPropertyCoinSpender: spendOnly,
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.message, /not available/i);
+  assert.equal(result.groups.length, 2, 'missing detail must never read as "all refunded"');
+  assert.ok(
+    result.groups.every((group) => group.refunded === false && group.attempted === false),
+    'no group was refunded and none was even attempted'
+  );
+  assert.equal(actor.updates.length, 0);
+});
+
 test('refundCurrencySpends is a no-op when currency is disabled or nothing was spent', async () => {
   globalThis.game = {
     fabricate: {

@@ -734,6 +734,136 @@ test('RecipeManager.evaluateCraftability: currency option costLabel prefers an a
   assert.equal(currencyOption_.costLabel, '100 PP');
 });
 
+// ===========================================================================
+// 4. Per-group spend SETTLEMENT (issue 902)
+//
+// `spendCurrencySpends` must report which aggregated groups actually settled, so a
+// timed craft can record the settlement rather than the plan. Failure is injected at
+// the `spender.spend` seam: `checkCurrencySpends` runs over every group and aborts
+// before any mutation, so an underfunded actor never reaches the deduction at all.
+// ===========================================================================
+
+const { aggregateCurrencySpends, spendCurrencySpends } = globalThis.__currencyAffordance;
+const { validateCurrencyProfile } = await import('../src/systems/currencyProfile.js');
+const {
+  CurrencyCraftingActorFake,
+  SINGLE_TERMINAL_CURRENCY_UNITS,
+  TWO_TERMINAL_CURRENCY_UNITS,
+  makeDelegatingCoinSpender,
+} = await import('./helpers/currency-spend-fixtures.js');
+
+// Wire `game` for a currency profile and return the recipe view + validated profile the
+// aggregation precondition is asserted against.
+function currencyContextFor(units) {
+  const system = makeCurrencySystem({ units });
+  setupGame(system);
+  return {
+    recipe: { craftingSystemId: system.id },
+    profile: validateCurrencyProfile(units, { spendStrategy: 'actorProperty' }),
+  };
+}
+
+test('spend: aborts on the FIRST failing group and settles nothing', async () => {
+  const { recipe, profile } = currencyContextFor(TWO_TERMINAL_CURRENCY_UNITS);
+  const spends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  assert.equal(
+    aggregateCurrencySpends(spends, profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+  const actor = new CurrencyCraftingActorFake('Spender', { currency: { gp: 47, gem: 9 } });
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender(), { failSpendFor: ['gp'] });
+
+  const result = await spendCurrencySpends(actor, recipe, spends, {
+    actorPropertyCoinSpender: spy,
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(spy.spendCalls.length, 1, 'the second group is never attempted (abort-on-first)');
+  assert.deepEqual(result.settledSpends, [], 'nothing settled, so nothing may be recorded');
+  assert.equal(result.groups.length, 2, 'every aggregated group is reported');
+  assert.equal(result.groups[0].settled, false);
+  assert.equal(result.groups[0].attempted, true);
+  assert.equal(result.groups[1].settled, false);
+  assert.equal(result.groups[1].attempted, false);
+  assert.equal(actor.updates.length, 0, 'no currency left the actor');
+});
+
+test('spend: a failing SECOND group leaves the first settled and recorded alone', async () => {
+  const { recipe, profile } = currencyContextFor(TWO_TERMINAL_CURRENCY_UNITS);
+  const spends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  assert.equal(aggregateCurrencySpends(spends, profile).length, 2, 'two terminal base units');
+  const actor = new CurrencyCraftingActorFake('Spender', { currency: { gp: 47, gem: 9 } });
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender(), { failSpendFor: ['gem'] });
+
+  const result = await spendCurrencySpends(actor, recipe, spends, {
+    actorPropertyCoinSpender: spy,
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(spy.spendCalls.length, 2, 'the first group settled, so the second is attempted');
+  assert.deepEqual(
+    result.settledSpends,
+    [{ unit: 'gp', amount: 2 }],
+    'only the settled group is recorded — a non-empty PROPER subset'
+  );
+  assert.equal(actor.system.currency.gp, 45, 'gp 47 - 2 = 45');
+  assert.equal(actor.system.currency.gem, 9, 'the failed group deducted nothing');
+});
+
+test('spend: the only group failing (single terminal base unit) settles nothing at all', async () => {
+  const { recipe, profile } = currencyContextFor(SINGLE_TERMINAL_CURRENCY_UNITS);
+  const spends = [{ unit: 'gp', amount: 5 }];
+  assert.equal(
+    aggregateCurrencySpends(spends, profile).length,
+    1,
+    'a single-terminal profile can only ever produce ONE group'
+  );
+  const actor = new CurrencyCraftingActorFake('Spender', { currency: { gp: 47 } });
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender(), { failSpendFor: ['gp'] });
+
+  const result = await spendCurrencySpends(actor, recipe, spends, {
+    actorPropertyCoinSpender: spy,
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(spy.spendCalls.length, 1, 'the spy is demonstrably live');
+  assert.deepEqual(result.settledSpends, []);
+  assert.equal(actor.system.currency.gp, 47, 'the balance is untouched');
+  assert.equal(actor.updates.length, 0, 'no currency write in either direction');
+});
+
+test('spend: a fully successful spend settles every group and records the whole plan', async () => {
+  const { recipe, profile } = currencyContextFor(TWO_TERMINAL_CURRENCY_UNITS);
+  const spends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  assert.equal(aggregateCurrencySpends(spends, profile).length, 2, 'two terminal base units');
+  const actor = new CurrencyCraftingActorFake('Spender', { currency: { gp: 47, gem: 9 } });
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender());
+
+  const result = await spendCurrencySpends(actor, recipe, spends, {
+    actorPropertyCoinSpender: spy,
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(spy.spendCalls.length, 2);
+  assert.deepEqual(result.settledSpends, spends, 'the settlement equals the plan on success');
+  assert.ok(
+    result.groups.every((group) => group.settled === true),
+    'every group is reported settled'
+  );
+  assert.equal(actor.system.currency.gp, 45);
+  assert.equal(actor.system.currency.gem, 6);
+});
+
 test('engine: async-gate failure (macro) does not fall back to an unselected item plan', async () => {
   // A macro strategy whose canAfford macro reports failure must abort with zero mutation —
   // never silently item-craft. Here the group is currency-only so there is no item plan at all,

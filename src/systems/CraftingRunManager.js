@@ -80,6 +80,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       // by markStepPrepared; read by the engine at FINISH so the resume can
       // transfer essences and build results/chat/history without re-reading the
       // (now-deleted) source items. Undefined for non-timed / instant steps.
+      // Its `currencySpends` holds the SETTLED deductions only (issue 902), because the
+      // cancel reversal refunds exactly what it finds there.
       preparedConsumption: undefined,
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,
@@ -166,10 +168,17 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * the resume can transfer essences and build the result / chat / history entry
    * without re-reading the source items (which are already deleted).
    *
+   * `currencySpends` records what the deduction ACTUALLY SETTLED, never what was intended
+   * (issue 902). It is the sole input to the cancel reversal's refund, so a spend that did
+   * not settle must not appear here — otherwise cancelling hands back currency the actor
+   * never paid. An empty array is the correct record for a step whose currency deduction
+   * settled nothing, and the reversal's own `length > 0` guard then skips the refund.
+   *
    * @param {Actor} actor
    * @param {object} run
    * @param {number} stepIndex
-   * @param {{ selectedIngredientSetId?: string|null, currencySpends?: Array,
+   * @param {{ selectedIngredientSetId?: string|null,
+   *   currencySpends?: Array<{unit: string, amount: number}>,
    *   resolvedEssences?: object, consumedSummary?: Array }} prepared
    * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
    */
@@ -178,6 +187,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     if (!step) return null;
     step.preparedConsumption = {
       selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
+      // SETTLED spends only — see the note above.
       currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
       resolvedEssences:
         prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'

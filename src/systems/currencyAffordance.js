@@ -127,6 +127,29 @@ export function buildCurrencyAffordProbe(craftingActor, recipe, seams = {}) {
 }
 
 /**
+ * Resolve one raw spend against the profile: its unit, its TERMINAL base unit, that unit's integer
+ * base value, and the clamped amount. Returns `null` for a spend that is not spendable at all — an
+ * unresolvable unit, a unit that reaches no base unit, or a non-positive amount.
+ *
+ * Shared by {@link aggregateCurrencySpends} (which groups by `baseUnitId`) and
+ * {@link settledCurrencySpends} (which filters raw spends back down to the groups that settled).
+ * The two MUST agree on what is droppable, so the rule lives here once.
+ *
+ * @param {{ unit?: string, amount?: number }} spend
+ * @param {object} profile - a validated currency profile.
+ * @returns {{ unit: object, baseUnitId: string, baseValue: number, amount: number }|null}
+ */
+function resolveSpendBaseUnit(spend, profile) {
+  const unit = findCurrencyUnit(profile?.units || [], spend?.unit);
+  if (!unit) return null;
+  const meta = profile?.metadata?.get(unit.id);
+  const baseValue = Number(meta?.baseValue) || 0;
+  const amount = Math.max(0, Number(spend?.amount) || 0);
+  if (!meta?.baseUnitId || baseValue <= 0 || amount <= 0) return null;
+  return { unit, baseUnitId: meta.baseUnitId, baseValue, amount };
+}
+
+/**
  * Aggregate the chosen `currencySpends` by their COMMON base unit value, so units on the same
  * ladder share coins (e.g. 1 gp + 50 sp checked as one combined copper requirement). Spends whose
  * unit is unknown or non-positive are dropped. The returned groups are keyed by `baseUnitId`, each
@@ -140,21 +163,13 @@ export function buildCurrencyAffordProbe(craftingActor, recipe, seams = {}) {
 export function aggregateCurrencySpends(currencySpends, profile) {
   const byBase = new Map();
   for (const spend of currencySpends || []) {
-    const unit = findCurrencyUnit(profile?.units || [], spend?.unit);
-    if (!unit) continue;
-    const meta = profile?.metadata?.get(unit.id);
-    const baseValue = Number(meta?.baseValue) || 0;
-    const amount = Math.max(0, Number(spend?.amount) || 0);
-    if (!meta?.baseUnitId || baseValue <= 0 || amount <= 0) continue;
+    const resolved = resolveSpendBaseUnit(spend, profile);
+    if (!resolved) continue;
+    const { unit, baseUnitId, baseValue, amount } = resolved;
     const base = amount * baseValue;
-    const existing = byBase.get(meta.baseUnitId);
+    const existing = byBase.get(baseUnitId);
     if (!existing) {
-      byBase.set(meta.baseUnitId, {
-        baseUnitId: meta.baseUnitId,
-        requiredBase: base,
-        unit,
-        baseValue,
-      });
+      byBase.set(baseUnitId, { baseUnitId, requiredBase: base, unit, baseValue });
       continue;
     }
     existing.requiredBase += base;
@@ -249,106 +264,241 @@ export async function checkCurrencySpends(craftingActor, recipe, currencySpends,
 }
 
 /**
- * Async deduction over the chosen `currencySpends`, aggregated cross-unit. Runs AFTER item
- * consumption on success (or on a failure path only when the failure policy consumes ingredients).
- * A mid-loop spend failure is logged (never refunded); the first hard failure surfaces its message.
+ * Filter the raw `currencySpends` down to the ones whose aggregated group actually settled.
  *
- * @returns {Promise<{ valid: boolean, message?: string }>}
+ * `aggregateCurrencySpends` discards which raw spends fed each group, so each spend's terminal
+ * `baseUnitId` is re-derived here through the same {@link resolveSpendBaseUnit} rule. A group
+ * settles or fails as one transaction (it is spent once, in its representative denomination), so
+ * every raw spend feeding a settled group settled. Spends that aggregation drops entirely were
+ * never spendable and are dropped from the record too.
+ *
+ * @param {Array<{unit: string, amount: number}>} currencySpends
+ * @param {object} profile - a validated currency profile.
+ * @param {Set<string>} settledBaseUnitIds
+ * @returns {Array<{unit: string, amount: number}>}
  */
-export async function spendCurrencySpends(craftingActor, recipe, currencySpends, seams = {}) {
-  if (!currencySpends?.length) return { valid: true };
-  const context = resolveCurrencyContext(recipe, seams);
-  if (!context.enabled) return { valid: true };
-  if (context.error) return { valid: false, message: context.error };
-  const { profile, config, spender } = context;
-  if (!spender?.spend) {
-    return { valid: false, message: 'Currency spending is not available on this actor.' };
+function settledCurrencySpends(currencySpends, profile, settledBaseUnitIds) {
+  const settled = [];
+  for (const spend of currencySpends || []) {
+    const resolved = resolveSpendBaseUnit(spend, profile);
+    if (!resolved || !settledBaseUnitIds.has(resolved.baseUnitId)) continue;
+    settled.push(spend);
   }
+  return settled;
+}
 
-  for (const group of aggregateCurrencySpends(currencySpends, profile)) {
-    const ctx = buildSpendContext({
+/**
+ * Build one aggregated group's outcome record. `outcomeKey` is `settled` for a deduction and
+ * `refunded` for a refund; `attempted` distinguishes "tried and failed" from "never tried",
+ * which a deduction's abort-on-first-group makes a real distinction and not bookkeeping.
+ */
+function groupOutcomeRecord(group, outcomeKey, { attempted, ok, message } = {}) {
+  const record = {
+    baseUnitId: group.baseUnitId,
+    unitId: group.unit.id,
+    amount: group.amount,
+    requiredBase: group.requiredBase,
+    attempted: attempted === true,
+    [outcomeKey]: ok === true,
+  };
+  if (message) record.message = message;
+  return record;
+}
+
+/**
+ * Invoke one spender method against one aggregated group, normalising a falsy result and a thrown
+ * error into the same `{ ok: false, message }` shape. Shared by the deduction and the refund so
+ * their per-group mechanics cannot drift; only their LOOPS differ (see below).
+ */
+async function applySpenderToGroup({
+  spender,
+  method,
+  verb,
+  logVerb,
+  craftingActor,
+  group,
+  profile,
+  recipe,
+  config,
+}) {
+  const ctx = buildSpendContext({
+    profile,
+    unit: group.unit,
+    amount: group.amount,
+    recipe,
+    config,
+  });
+  ctx.macroContext.actor = craftingActor;
+  const fallbackMessage = `Could not ${verb} currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`;
+  try {
+    const result = await spender[method](
+      craftingActor,
+      { unit: group.unit, amount: group.amount },
+      ctx
+    );
+    if (result?.valid) return { ok: true };
+    return { ok: false, message: result?.message || fallbackMessage };
+  } catch (error) {
+    console.error(`Fabricate | Failed to ${logVerb} currency`, error);
+    return { ok: false, message: fallbackMessage };
+  }
+}
+
+/**
+ * Drive the deduction across the aggregated groups, ABORTING at the first failure: no further
+ * currency is taken for a craft already in an anomalous state. The remaining groups are still
+ * reported, as `attempted: false`, so a caller can tell "tried and failed" from "never tried".
+ */
+async function runSpendGroups({ spender, craftingActor, groups, profile, recipe, config }) {
+  const records = [];
+  let failure = null;
+  for (const group of groups) {
+    if (failure !== null) {
+      records.push(groupOutcomeRecord(group, 'settled', { attempted: false, ok: false }));
+      continue;
+    }
+    const outcome = await applySpenderToGroup({
+      spender,
+      method: 'spend',
+      verb: 'spend',
+      logVerb: 'decrement',
+      craftingActor,
+      group,
       profile,
-      unit: group.unit,
-      amount: group.amount,
       recipe,
       config,
     });
-    ctx.macroContext.actor = craftingActor;
-    try {
-      const result = await spender.spend(
-        craftingActor,
-        { unit: group.unit, amount: group.amount },
-        ctx
-      );
-      if (!result?.valid) {
-        return {
-          valid: false,
-          message:
-            result?.message ||
-            `Could not spend currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`,
-        };
-      }
-    } catch (error) {
-      console.error('Fabricate | Failed to decrement currency', error);
-      return {
-        valid: false,
-        message: `Could not spend currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`,
-      };
-    }
+    records.push(
+      groupOutcomeRecord(group, 'settled', {
+        attempted: true,
+        ok: outcome.ok,
+        message: outcome.message,
+      })
+    );
+    if (!outcome.ok) failure = outcome.message;
   }
-  return { valid: true };
+  return { records, failure };
+}
+
+/**
+ * Async deduction over the chosen `currencySpends`, aggregated cross-unit. Runs AFTER item
+ * consumption on success (or on a failure path only when the failure policy consumes ingredients).
+ * A spend failure is logged and never refunded — the settled deductions are NOT rolled back and
+ * the craft still proceeds — so the deduction ABORTS at the first failing group and reports which
+ * groups settled.
+ *
+ * That report is load-bearing, not diagnostic (issue 902). Because a failure neither aborts the
+ * craft nor rolls back, the only way a time-gated step's run can stay honest is to record what
+ * SETTLED rather than what was planned; `settledSpends` is exactly that record, already filtered.
+ *
+ * @returns {Promise<{ valid: boolean, message?: string,
+ *   groups: Array<{ baseUnitId: string, unitId: string, amount: number, requiredBase: number,
+ *     attempted: boolean, settled: boolean, message?: string }>,
+ *   settledSpends: Array<{unit: string, amount: number}> }>}
+ */
+export async function spendCurrencySpends(craftingActor, recipe, currencySpends, seams = {}) {
+  // Nothing to spend, or currency is off: nothing settled, so the record is empty — which is
+  // the correct record, not a missing one.
+  if (!currencySpends?.length) return { valid: true, groups: [], settledSpends: [] };
+  const context = resolveCurrencyContext(recipe, seams);
+  if (!context.enabled) return { valid: true, groups: [], settledSpends: [] };
+  if (context.error) {
+    return { valid: false, message: context.error, groups: [], settledSpends: [] };
+  }
+  const { profile, config, spender } = context;
+  const groups = aggregateCurrencySpends(currencySpends, profile);
+  if (!spender?.spend) {
+    const message = 'Currency spending is not available on this actor.';
+    return {
+      valid: false,
+      message,
+      groups: groups.map((group) =>
+        groupOutcomeRecord(group, 'settled', { attempted: false, ok: false, message })
+      ),
+      settledSpends: [],
+    };
+  }
+
+  const { records, failure } = await runSpendGroups({
+    spender,
+    craftingActor,
+    groups,
+    profile,
+    recipe,
+    config,
+  });
+  const settledBaseUnitIds = new Set(
+    records.filter((record) => record.settled).map((record) => record.baseUnitId)
+  );
+  const result = {
+    valid: failure === null,
+    groups: records,
+    settledSpends: settledCurrencySpends(currencySpends, profile, settledBaseUnitIds),
+  };
+  if (failure) result.message = failure;
+  return result;
 }
 
 /**
  * Async REFUND over previously spent `currencySpends`, aggregated cross-unit — the inverse of
  * {@link spendCurrencySpends}. Used by the player-cancel reversal (issue 848) and shared with the
  * GM cancel/reverse (issue 847) so the un-spend logic is defined once. Each aggregated group is
- * handed back in its representative denomination, so the actor's total base value is restored. A
- * mid-loop refund failure is logged; the first hard failure surfaces its message. Returns
- * `{ valid: true }` when currency is disabled or there is nothing to refund.
+ * handed back in its representative denomination, so the actor's total base value is restored.
  *
- * @returns {Promise<{ valid: boolean, message?: string }>}
+ * Unlike the deduction, the refund ACCUMULATES rather than aborting (issue 902): every group is
+ * attempted even when an earlier one fails, because §RunModel requires the reversal to be
+ * best-effort, and a group left unrefunded because an unrelated group failed is currency stranded
+ * for no reason. The asymmetry is deliberate — the deduction bounds the loss by stopping, the
+ * refund bounds the stranding by continuing.
+ *
+ * Returns `{ valid: true, groups: [] }` when currency is disabled or there is nothing to refund.
+ *
+ * @returns {Promise<{ valid: boolean, message?: string,
+ *   groups: Array<{ baseUnitId: string, unitId: string, amount: number, requiredBase: number,
+ *     attempted: boolean, refunded: boolean, message?: string }> }>}
  */
 export async function refundCurrencySpends(craftingActor, recipe, currencySpends, seams = {}) {
-  if (!currencySpends?.length) return { valid: true };
+  if (!currencySpends?.length) return { valid: true, groups: [] };
   const context = resolveCurrencyContext(recipe, seams);
-  if (!context.enabled) return { valid: true };
-  if (context.error) return { valid: false, message: context.error };
+  if (!context.enabled) return { valid: true, groups: [] };
+  if (context.error) return { valid: false, message: context.error, groups: [] };
   const { profile, config, spender } = context;
+  const groups = aggregateCurrencySpends(currencySpends, profile);
   if (!spender?.refund) {
-    return { valid: false, message: 'Currency refund is not available on this actor.' };
+    const message = 'Currency refund is not available on this actor.';
+    return {
+      valid: false,
+      message,
+      groups: groups.map((group) =>
+        groupOutcomeRecord(group, 'refunded', { attempted: false, ok: false, message })
+      ),
+    };
   }
 
-  for (const group of aggregateCurrencySpends(currencySpends, profile)) {
-    const ctx = buildSpendContext({
+  const records = [];
+  let firstFailure = null;
+  for (const group of groups) {
+    const outcome = await applySpenderToGroup({
+      spender,
+      method: 'refund',
+      verb: 'refund',
+      logVerb: 'refund',
+      craftingActor,
+      group,
       profile,
-      unit: group.unit,
-      amount: group.amount,
       recipe,
       config,
     });
-    ctx.macroContext.actor = craftingActor;
-    try {
-      const result = await spender.refund(
-        craftingActor,
-        { unit: group.unit, amount: group.amount },
-        ctx
-      );
-      if (!result?.valid) {
-        return {
-          valid: false,
-          message:
-            result?.message ||
-            `Could not refund currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`,
-        };
-      }
-    } catch (error) {
-      console.error('Fabricate | Failed to refund currency', error);
-      return {
-        valid: false,
-        message: `Could not refund currency (${formatCurrencyRequirement({ unit: group.unit.id, amount: group.amount }, profile.units)}).`,
-      };
-    }
+    records.push(
+      groupOutcomeRecord(group, 'refunded', {
+        attempted: true,
+        ok: outcome.ok,
+        message: outcome.message,
+      })
+    );
+    if (!outcome.ok && firstFailure === null) firstFailure = outcome.message;
   }
-  return { valid: true };
+  const result = { valid: firstFailure === null, groups: records };
+  if (firstFailure) result.message = firstFailure;
+  return result;
 }
