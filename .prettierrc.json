@@ -9,5 +9,8 @@
   "trailingComma": "es5",
   "bracketSpacing": true,
   "arrowParens": "always",
-  "endOfLine": "lf"
+  "endOfLine": "lf",
+  "svelteAllowShorthand": true,
+  "svelteSortOrder": "options-scripts-markup-styles",
+  "svelteIndentScriptAndStyle": true
 }
