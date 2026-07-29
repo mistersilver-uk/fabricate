@@ -50,6 +50,10 @@ The driver timeboxes delegated lanes: after about 60 seconds without observable 
 
 Every spawned role works in its own Git worktree by default so independent workstreams do not share a mutable checkout.
 The workflow driver owns the clean coordinator checkout and integration branch, GitHub and remote mutations, lane lifecycle, integration, authoritative gates, and guarded cleanup.
+That coordinator checkout is itself a worktree created for the task — never the maintainer's primary clone — so integration, authoritative gates, and delivery all run from it and it is disposed under the same guarded cleanup as any lane.
+A maintainer's own checkout is never checked out to a task branch and is left as they left it.
+The one exception is an explicit maintainer instruction to work in their checkout, usually so they can watch the change in a running app or drive manual testing themselves; no agent may assume or grant itself that instruction.
+It authorizes only the task it was given for, does not become the default afterwards, and still requires confirming and reporting that checkout's current branch and dirty state before touching it.
 Mutable lanes use unique `agent/<issue>-<stage>-<role>-r<revision>` branches and exclusive path ownership; read-only lanes use fresh detached worktrees pinned to the exact commit under review.
 Spawned agents verify their assigned path, branch or detached SHA, base, and clean state before acting, then return local commits, base-relative diffs, or verdicts without pushing or mutating issue or PR state.
 Parallel mutable lanes require disjoint owned paths and no dependency on unintegrated output.

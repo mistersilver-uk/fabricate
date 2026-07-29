@@ -182,7 +182,7 @@ For a Foundry module, report the module path or link target visible to Foundry a
 For an already-running process, restart it when necessary and prove the new process uses the candidate rather than assuming hot reload crossed worktrees.
 
 Record coordinator branch, `HEAD`, and `git status --short` before and after preparing the candidate.
-Prefer a separate clean coordinator or serving worktree.
+Serve the candidate from the clean coordinator worktree or another dedicated serving worktree.
 When the coordinator contains unrelated user-owned tracked, untracked, or ignored state, preserve it in place and use another clean worktree; do not stash, delete, overwrite, or absorb that state merely to make a candidate visible.
 If a requested checkout cannot safely expose the candidate without disturbing unrelated state, say so and provide the exact alternate root and launch command instead of claiming the requested checkout is ready.
 
