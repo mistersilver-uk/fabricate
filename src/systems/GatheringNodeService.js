@@ -8,7 +8,7 @@ import {
   normalizeList,
   numberOrNullStrict,
 } from './gatheringRichStateInternals.js';
-import { respawnNodeOnce } from './nodeRespawnMath.js';
+import { resolveAccrualAnchor, respawnNodeOnce } from './nodeRespawnMath.js';
 
 /**
  * Owns the finite resource-node subsystem extracted from
@@ -323,18 +323,22 @@ export class GatheringNodeService {
     // implementation removes the prior `_respawnNode`/`respawnNodeOnce` drift.
 
     // Pre-roll expression amounts asynchronously (the math is sync). The needed
-    // count is bounded by the elapsed whole intervals capped by the restock room,
-    // mirroring the math's stochastic-loop bound; the math may consume fewer (the
-    // max-clamp early break) — surplus pre-rolls are simply unused.
+    // count is bounded by the elapsed whole intervals capped by the restock room.
+    // The anchor MUST be resolved through the math's own shared predicate
+    // (`resolveAccrualAnchor`, issues 403/896) rather than a local finiteness
+    // test: `Number(null) === 0` is finite, so the lax form read the `null` anchor
+    // of an unevaluated pool as world time 0 and pre-rolled a whole restock of
+    // real, awaited, `Roll`-backed evaluations that the math's seed branch then
+    // consumed NONE of. With the predicates shared, the bound again mirrors the
+    // math's stochastic-loop bound; the math may still consume fewer (the
+    // max-clamp early break) — those surplus pre-rolls are simply unused.
     let expressionRolls = null;
     let expressionCursor = 0;
     if ((respawn.gainMode || 'guaranteed') === 'expression') {
       const interval = respawn.intervalUnit
         ? durationToSeconds(this.secondsPerUnit, respawn.intervalAmount, respawn.intervalUnit)
         : Number(respawn.intervalSeconds || 0);
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-        ? Number(respawn.lastEvaluatedWorldTime)
-        : now;
+      const last = resolveAccrualAnchor(respawn.lastEvaluatedWorldTime, now);
       if (interval > 0 && now > last) {
         const elapsedIntervals = Math.floor((now - last) / interval);
         const room = Math.max(0, Number(nodes.max || 0) - Number(nodes.current || 0));
@@ -404,16 +408,17 @@ export class GatheringNodeService {
     if (!Number.isFinite(now)) return { changed: false, node };
 
     // Pre-roll expression amounts asynchronously (the math is sync), mirroring the
-    // env path's bound: elapsed whole intervals capped by the restock room.
+    // env path's bound: elapsed whole intervals capped by the restock room, with
+    // the anchor resolved through the math's shared absent-anchor predicate
+    // (issues 403/896) so a never-evaluated pool pre-rolls nothing on its seeding
+    // tick. See `_respawnNode` for why the lax finiteness test was wrong.
     let expressionRolls = null;
     let expressionCursor = 0;
     if ((respawn.gainMode || 'guaranteed') === 'expression') {
       const interval = respawn.intervalUnit
         ? durationToSeconds(this.secondsPerUnit, respawn.intervalAmount, respawn.intervalUnit)
         : Number(respawn.intervalSeconds || 0);
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-        ? Number(respawn.lastEvaluatedWorldTime)
-        : now;
+      const last = resolveAccrualAnchor(respawn.lastEvaluatedWorldTime, now);
       if (interval > 0 && now > last) {
         const elapsedIntervals = Math.floor((now - last) / interval);
         const room = Math.max(0, Number(node.max || 0) - Number(node.current || 0));

@@ -169,6 +169,32 @@ test('nextRespawnEta: legacy intervalSeconds node → next anchor strictly after
   assert.equal(eta.secondsUntil, 30 * 60);
 });
 
+// issue 896: `Number(null) === 0` is finite, so the ETA used to count down
+// against an epoch-zero grid for a pool that has never been evaluated. A literal
+// `null` is required to exercise this — `Number(undefined)` is `NaN`, so a
+// missing key already took the correct branch before the fix.
+test('nextRespawnEta: a null-anchored pool reports one whole interval (the pending seed), not an epoch-zero remainder', () => {
+  const node = { current: 0, max: 5, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: null } };
+  const eta = nextRespawnEta(node, secondsPerHour, 5.5 * HOUR);
+  assert.ok(eta);
+  assert.equal(eta.secondsUntil, HOUR, 'issue 896: the pool seeds on the next tick and gains one whole interval after that');
+  assert.equal(eta.nextWorldTime, 6.5 * HOUR, 'issue 896: the countdown runs from the pending seed at now, not from world time 0');
+});
+
+// REGRESSION PIN, not fix evidence: #403's accrual policy lets the anchor sit
+// AHEAD of `now` (a world-time rewind FREEZES the pool rather than re-anchoring),
+// and `nextRespawnEta`'s `Math.max(0, nowTime - last)` clamp already reports that
+// correctly. Both the old and the new predicate resolve a present finite anchor
+// identically, so this cannot fail before the fix — it pins behaviour #896 must
+// not disturb.
+test('nextRespawnEta: an anchor ahead of now still reports the anchor-relative countdown', () => {
+  const node = { current: 0, max: 5, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 10 * HOUR } };
+  const eta = nextRespawnEta(node, secondsPerHour, 2 * HOUR);
+  assert.ok(eta);
+  assert.equal(eta.nextWorldTime, 11 * HOUR, 'one interval past the frozen anchor');
+  assert.equal(eta.secondsUntil, 9 * HOUR, 'measured from now, matching what the frozen pool actually does');
+});
+
 test('nextRespawnEta: manual policy / at-max → null (never auto-respawns)', () => {
   assert.equal(nextRespawnEta({ current: 0, max: 5, respawn: { policy: 'manual' } }, secondsPerHour, 0), null);
   assert.equal(nextRespawnEta({ current: 5, max: 5, respawn: { policy: 'overTime', intervalSeconds: HOUR } }, secondsPerHour, 0), null);
