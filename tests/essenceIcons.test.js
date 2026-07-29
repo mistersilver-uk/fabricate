@@ -4,11 +4,13 @@ import assert from 'node:assert/strict';
 import {
   buildEssenceIconOptions,
   DEFAULT_ESSENCE_ICON,
+  ESSENCE_COLOR_TOKENS,
   filterEssenceIconOptions,
   getEssenceAllIconOptions,
   getEssenceIconOption,
   getEssenceIconOptions,
   getEssenceIconPrefix,
+  normalizeEssenceColorToken,
   normalizeEssenceIcon
 } from '../src/ui/svelte/util/essenceIcons.js';
 import {
@@ -16,6 +18,32 @@ import {
   FONT_AWESOME_FREE_CLASSIC_ICON_DEFINITIONS,
   isFantasySafeFontAwesomeClassicFreeIcon
 } from '../src/ui/svelte/util/fontAwesomeFreeClassicIcons.js';
+
+describe('essence colour tokens (issue 917)', () => {
+  it('offers exactly the shared --fab-tag-* palette', () => {
+    assert.deepEqual(
+      [...ESSENCE_COLOR_TOKENS],
+      ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve']
+    );
+  });
+
+  it('stores a palette token bare, stripping a --fab-tag- prefix', () => {
+    assert.equal(normalizeEssenceColorToken('aqua'), 'aqua');
+    assert.equal(normalizeEssenceColorToken('--fab-tag-aqua'), 'aqua');
+    assert.equal(normalizeEssenceColorToken('  rose  '), 'rose');
+  });
+
+  it('treats unset and unrecognized colours as null, the accent default', () => {
+    // Null is a FIRST-CLASS state: it renders the essence in the theme accent, which
+    // is what every essence renders as today, so no migration is required. Coercing an
+    // unknown token to a preset would invent a colour the GM never chose.
+    assert.equal(normalizeEssenceColorToken(''), null);
+    assert.equal(normalizeEssenceColorToken(null), null);
+    assert.equal(normalizeEssenceColorToken(undefined), null);
+    assert.equal(normalizeEssenceColorToken('#ff0000'), null);
+    assert.equal(normalizeEssenceColorToken('chartreuse'), null);
+  });
+});
 
 describe('essenceIcons utility', () => {
   it('normalizes empty icon values to the default essence icon', () => {

@@ -8,9 +8,17 @@
  * so the UI, screenshots, and mounted tests all look correct — nothing fails.
  *
  * Covered reference patterns (all with a literal first-string key):
- *   - inline `text('FABRICATE…')` / `format('FABRICATE…')`;
+ *   - inline `text('FABRICATE…')` / `format('FABRICATE…')` / `localize('FABRICATE…')`
+ *     (`localize` is `util/foundryBridge.js`'s wrapper, which the player-facing
+ *     crafting components call directly instead of through a fallback-carrying
+ *     `text` helper — so leaving it out silently exempted a whole app from this
+ *     guard);
  *   - `labelKey: 'FABRICATE…'` / `descKey: 'FABRICATE…'` object properties
  *     (option/nav tables rendered later via `text(option.labelKey, …)`);
+ *   - `[COMPUTED]: 'FABRICATE…'` object entries — the state/kind → key lookup
+ *     tables a component then reads dynamically (RequirementRail's per-slot-state
+ *     labels). The key is literal even though the property name is not, so it is
+ *     checkable; only the *value* has to be a quoted literal here;
  *   - `['FABRICATE…', fallback]` array-first-element tables (STATUS/SORT labels).
  *
  * Coverage limit (stated, not total): DYNAMIC references are out of scope — a call
@@ -31,10 +39,15 @@ const UI_ROOT = join(ROOT, 'src', 'ui');
 // (e.g. `text(varKey)`, `labelKey: someVar`) does not start with a quote and is
 // therefore never matched — exactly the intended skip.
 const KEY_PATTERNS = [
-  // text('FABRICATE…') / format("FABRICATE…")
-  /\b(?:text|format)\(\s*(['"])(FABRICATE[^'"]*)\1/g,
+  // text('FABRICATE…') / format("FABRICATE…") / localize('FABRICATE…')
+  /\b(?:text|format|localize)\(\s*(['"])(FABRICATE[^'"]*)\1/g,
   // labelKey: 'FABRICATE…' / descKey: "FABRICATE…"
   /\b(?:labelKey|descKey)\s*:\s*(['"])(FABRICATE[^'"]*)\1/g,
+  // [COMPUTED]: 'FABRICATE…' lookup-table entries. Deliberately narrower than a
+  // bare `: 'FABRICATE…'`, which also matches namespace BASES that are legitimately
+  // objects (adminStore's `${base}.Title` composition-loss prefix) and would report
+  // them as unresolved.
+  /\[[^\]\n]*\]\s*:\s*(['"])(FABRICATE[^'"]*)\1/g,
   // ['FABRICATE…', fallback] array-first-element label tables
   /\[\s*(['"])(FABRICATE[^'"]*)\1\s*,/g,
 ];

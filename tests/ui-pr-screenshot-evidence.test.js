@@ -593,6 +593,173 @@ describe('UI PR screenshot evidence', () => {
     assert.match(harness, /type: 'essence', essenceId: 'smoke-star-essence'/);
   });
 
+  // Issue 917. Six frames, each a distinct rendered state of the requirement-rail
+  // redesign, each its OWN view id: `collect` emits one file per view id and picks
+  // `candidates[0]` from a FILENAME sort, so appending these to the broad
+  // `player-crafting` entry would publish one arbitrary frame forever.
+  const REQUIREMENT_RAIL_VIEW_IDS = [
+    'player-crafting-slot-rail',
+    'player-crafting-tag-unmatched',
+    'player-crafting-essence-pool',
+    'player-crafting-pick-for-me',
+    'player-crafting-essence-pool-shared',
+    'player-crafting-consumption-plan',
+  ];
+
+  it('maps the requirement-rail surfaces to six dedicated single-label evidence views', () => {
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view]));
+
+    for (const id of REQUIREMENT_RAIL_VIEW_IDS) {
+      const view = byId[id];
+      assert.ok(view, `${id} is missing from VIEW_RECIPES`);
+      // Exactly its own label — a second label here would hand `candidates[0]` to a
+      // filename sort and silently publish the other state.
+      assert.deepEqual(view.smokeLabels, [id]);
+      assert.match(harness, new RegExp(`screenshot\\(page, '${id}'\\)`));
+    }
+
+    // Every rail component, the pure slot projection and the store that holds which
+    // chooser is open all route to the whole set.
+    for (const file of [
+      'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
+      'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+      'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
+      'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
+      'src/ui/svelte/util/requirementSlots.js',
+      'src/ui/svelte/stores/craftingStore.svelte.js',
+    ]) {
+      const ids = mapChangedFilesToViews([file]).map(view => view.id);
+      for (const id of REQUIREMENT_RAIL_VIEW_IDS) {
+        assert.ok(ids.includes(id), `${file} must map to ${id}`);
+      }
+    }
+
+    // The rail's own projection and its store have no other view recipe, so they must
+    // resolve to real rail evidence rather than falling through to the generic
+    // global-UI set (which would publish six frames that show none of this).
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/ui/svelte/util/requirementSlots.js']).map(view => view.id),
+      REQUIREMENT_RAIL_VIEW_IDS
+    );
+    assert.deepEqual(
+      smokeLabelsForChangedFiles(['src/ui/svelte/stores/craftingStore.svelte.js']),
+      REQUIREMENT_RAIL_VIEW_IDS
+    );
+  });
+
+  it('pins the smoke-world seeding each requirement-rail frame depends on', () => {
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+
+    // A SECOND authored essence with its own colour token — without it the shared-pool
+    // frame has one tint and cannot show which carrier unit funded which requirement.
+    assert.match(harness, /id: 'smoke-tide-essence'/);
+    assert.match(harness, /colorToken: 'butter'/);
+    assert.match(harness, /colorToken: 'lavender'/);
+    // Bare `--fab-tag-*` keys only: the normalizer strips the prefix and every tinted
+    // surface composes `var(--fab-tag-<token>)` itself, so a prefixed or hex value would
+    // render as the untinted accent fallback.
+    assert.equal(/colorToken: '(?:--fab-tag-|#)/.test(harness), false);
+
+    // Two DUAL-essence carriers plus a single-essence contrast carrier, registered
+    // through `updateItem({ essences })` — the field the resolver reads.
+    assert.match(harness, /'Smoke Duskcrystal': \{ 'smoke-star-essence': 2, 'smoke-tide-essence': 2 \}/);
+    assert.match(harness, /'Smoke Tidebloom': \{ 'smoke-star-essence': 1, 'smoke-tide-essence': 1 \}/);
+    assert.match(harness, /'Smoke Starmote': \{ 'smoke-star-essence': 1 \}/);
+    assert.match(harness, /await csm\.updateItem\(simpleSystemId, simpleMap\[name\], \{ essences \}\)/);
+
+    // The contended pool: TWO essence requirements as sibling groups in ONE set, whose
+    // only Tide sources are the two dual carriers.
+    assert.match(harness, /name: 'Smoke Tidecore Tempering'/);
+    assert.match(harness, /essenceId: 'smoke-star-essence', amount: 2/);
+    assert.match(harness, /essenceId: 'smoke-tide-essence', amount: 3/);
+
+    // The unmatched-tag fixture (acceptance criterion 5) and the zero-carrier essence
+    // that makes a genuinely short (rather than part-delivered) rail tile reachable.
+    assert.match(harness, /name: 'Smoke Sigil Etching'/);
+    assert.match(harness, /tags: \['smoke-voidbound'\]/);
+    assert.match(harness, /id: 'smoke-ember-essence'/);
+
+    // The carriers must actually be in the crafter's bag, or every meter reads 0.
+    for (const name of ['Smoke Duskcrystal', 'Smoke Tidebloom', 'Smoke Starmote', 'Smoke Runeplate']) {
+      assert.match(harness, new RegExp(`invCopies\\('${name}', \\d+\\)`));
+    }
+  });
+
+  it('keeps the new rail fixtures off page one of the player recipe browser', () => {
+    // The browser sorts A→Z and pages at 12, and `selectCraftingRecipeByMode` only
+    // iterates the rows in the DOM — page one. A fixture that displaces the last page-one
+    // row silently re-points `player-crafting-ingredient-routed`, `-routed-by-check` and
+    // the craft behind `-run-summary`/`-roll-result` at an UNCRAFTABLE display fixture,
+    // and every one of those frames still passes while showing the wrong recipe. This is
+    // the guard that fails instead.
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+    const recipeNames = [
+      ...harness.matchAll(/createRecipe\(\{[^}]*?\bname: '([^']+)'/g),
+    ].map(match => match[1]);
+    assert.ok(recipeNames.length > 12, 'no seeded recipe names were found to order');
+    const sorted = [...new Set(recipeNames)].sort((left, right) => left.localeCompare(right));
+    const PAGE_SIZE = 12;
+    for (const name of ['Smoke Runestaff Binding', 'Smoke Sigil Etching', 'Smoke Tidecore Tempering']) {
+      const position = sorted.indexOf(name);
+      assert.ok(position >= 0, `${name} is not a seeded recipe`);
+      assert.ok(
+        position >= PAGE_SIZE,
+        `${name} sorts at position ${position + 1}, inside the browser's first page of ${PAGE_SIZE}`
+      );
+    }
+  });
+
+  it('re-points the pinned crafting selectors the requirement rail moved', () => {
+    const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
+
+    // DEAD: a first-class essence requirement is no longer a CraftingEssenceThumb in the
+    // ingredient image grid, so this selector matches nothing and would time out.
+    assert.equal(
+      harness.includes(`[data-io-group="ingredients"] .crafting-essence-thumb`),
+      false,
+      'the ingredient-grid essence-thumb selector must be re-pointed at the rail'
+    );
+    assert.ok(
+      harness.includes(
+        `[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] .requirement-slot-glyph`
+      ),
+      'the first-class essence wait must target the rail slot glyph'
+    );
+
+    // SURVIVES: legacy set-level essences keep their row presentation, and the Shopping
+    // List still renders the shared essence thumb.
+    assert.ok(harness.includes(`[data-io-group="essences"] .crafting-io-essence-icon`));
+    assert.ok(harness.includes(`[data-shopping-acquire-components] .crafting-essence-thumb`));
+
+    // The alternatives picker is now the chooser ONE slot opens, so the walk must open
+    // that slot before waiting on the section.
+    assert.match(
+      harness,
+      /\[data-requirement-slot\]\[data-slot-kind="choice"\][^]*?\[data-recipe-section="alternatives"\]/,
+      'the alternatives capture must open its slot before waiting on the chooser'
+    );
+
+    // Container-level waits, not deep leaf content: an over-specific wait that times out
+    // fails the whole phase and surfaces as an unrelated later breakage.
+    assert.ok(
+      harness.includes(`[data-recipe-section="requirement-rail"] [data-requirement-rail-slots]`)
+    );
+
+    // Pointer hit-tests on the three controls the redesign newly stacks (issue 917).
+    for (const [selector, label] of [
+      ['\\[data-requirement-slot\\]', 'Requirement rail slot tile'],
+      ['\\[data-stepper-increment\\]', 'Essence pool carrier increment'],
+      ['\\[data-requirement-pick-for-me\\]', 'Requirement rail Pick for me'],
+    ]) {
+      assert.match(
+        harness,
+        new RegExp(`assertPointerTarget\\([^]*?'${selector}',\\s*\\n?\\s*'${label}'`),
+        `${label} needs a real-browser pointer hit-test`
+      );
+    }
+  });
+
   it('maps player alchemy app files to the player-alchemy recipes (incl. chooser + stacked frames)', () => {
     const views = mapChangedFilesToViews([
       'src/ui/svelte/apps/alchemy/AlchemyView.svelte',

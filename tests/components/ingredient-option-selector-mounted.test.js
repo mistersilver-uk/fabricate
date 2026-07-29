@@ -102,6 +102,27 @@ describe('IngredientOptionSelector mounted behavior', () => {
     assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'commits the clicked option');
   });
 
+  // Issue 917 moved this component behind the requirement rail, where it renders ONE
+  // focused group instead of a stack of every group. The roving-tabindex keyboard
+  // model is preserved byte-for-byte, and it had no test of its own before — so a
+  // regression in it would have surfaced only as a silently unusable keyboard path.
+  it('keeps the roving-tabindex keyboard model when rendering a single focused group', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      choices: [optionChoice()],
+      onChoose: (groupId, choice) => calls.push([groupId, choice]),
+    });
+    const radios = [...target.querySelectorAll('[role="radio"]')];
+    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'ArrowRight moves the selection');
+
+    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'End jumps to the last option');
+
+    radios[0].dispatchEvent(new globalThis.window.KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 0 }], 'Space commits the focused radio');
+  });
+
   it('renders a stack radiogroup keyed to held item ids', async () => {
     const stackChoice = {
       kind: 'stack',

@@ -103,6 +103,11 @@ class Tier4Item {
     return this._flags[key];
   }
   async delete() {
+    // Model Foundry's STRICT embedded delete (issue 917): `#preDeleteDocumentArray`
+    // resolves the id with `{ strict: true }` and THROWS on a missing embedded id, so
+    // a duplicate consumption-plan entry aborts mid-consumption rather than silently
+    // spending twice. A permissive fake would let that contract ship unverified.
+    if (this._deleted) throw new Error(`Item ${this.id} was already deleted`);
     this._deleted = true;
     if (this.parent) this.parent.items = this.parent.items.filter((i) => i !== this);
   }
@@ -208,10 +213,15 @@ const FAILURE_GROUP = {
 // A single-ingredient-set alchemy recipe requiring component X (quantity 1) AND
 // declaring essences { fire: 2 }, built on a REAL IngredientSet so
 // resolveIngredientSelection / canCraft run genuinely.
-function makeRecipe({ resultGroups, timeRequirement = null, essences = { fire: 2 } }) {
+function makeRecipe({
+  resultGroups,
+  timeRequirement = null,
+  essences = { fire: 2 },
+  ingredientGroups = null,
+}) {
   const set = new IngredientSet({
     id: 'brew-set',
-    ingredientGroups: [
+    ingredientGroups: ingredientGroups ?? [
       {
         id: 'g1',
         options: [{ match: { type: 'component', componentId: 'cX' }, quantity: 1 }],
@@ -269,11 +279,18 @@ function makeSystem({ checkMode }) {
   };
 }
 
-function setup({ checkMode, resultGroups, timeRequirement = null, runManager = null }) {
+function setup({
+  checkMode,
+  resultGroups,
+  timeRequirement = null,
+  runManager = null,
+  ingredientGroups = null,
+  essences = { fire: 2 },
+}) {
   const system = makeSystem({ checkMode });
   system.components = components();
   const comps = system.components;
-  const recipe = makeRecipe({ resultGroups, timeRequirement });
+  const recipe = makeRecipe({ resultGroups, timeRequirement, ingredientGroups, essences });
 
   const resolutionService = new ResolutionModeService({
     getSystem: (id) => (id === SYS ? system : null),
@@ -497,7 +514,95 @@ test('own-flag short-circuit: an item carrying its own essences brews even again
 });
 
 // ===========================================================================
-// 6. Non-alchemy shared resolvers still have no tier 4 (unmutated)
+// 6. Alchemy CONSUMPTION under the shared essence block (issue 917)
+//
+// Alchemy MATCHING is a separate code path, but alchemy CONSUMPTION shares
+// `_resolveCraftSelection` -> `resolveIngredientSelection` -> `_consumeIngredients`
+// with standard crafting, and `_consumeAlchemyExtraItems` mops up whatever the plan
+// did not claim. Resolving every essence option in one shared block moves items
+// between `plan` and `extras` — so the invariant worth pinning is that the NET
+// consumption is unchanged: alchemy consumes the whole submission either way, which
+// is exactly why no otherwise-planned assertion would catch a regression here.
+// ===========================================================================
+
+// A brew whose set authors BOTH a component group and an essence group, so the
+// submission splits across the plan (component claim + block draw) and the extras
+// sweep. `Tier4Item.delete` throws on a second delete, so a duplicated plan entry
+// fails loudly rather than silently over-spending.
+const BLOCK_GROUPS = [
+  { id: 'g-comp', options: [{ match: { type: 'component', componentId: 'cX' }, quantity: 1 }] },
+  { id: 'g-ess', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
+];
+
+test('alchemy consumes the whole submission unchanged when an essence block splits the plan', async () => {
+  const { engine, validator, comps } = setup({
+    checkMode: 'simple',
+    resultGroups: [SUCCESS_GROUP],
+    ingredientGroups: BLOCK_GROUPS,
+    // Groups, not the retired per-set map: the block is what must fund the essence.
+    essences: {},
+  });
+  engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: 18, data: {} });
+
+  // Three single-unit stacks of component X (each carrying fire 2): one funds the
+  // component group, one funds the essence block, one is surplus.
+  const submitted = [
+    new Tier4Item('owned-x1', 'Item.X', { uuid: 'Item.ownedX1' }),
+    new Tier4Item('owned-x2', 'Item.X', { uuid: 'Item.ownedX2' }),
+    new Tier4Item('owned-x3', 'Item.X', { uuid: 'Item.ownedX3' }),
+  ];
+  const source = new FakeActor('src', submitted);
+  const crafter = new FakeActor('pc');
+  const records = resolveAlchemySubmissions([source], comps, ['cX', 'cX', 'cX'], SYS);
+  assert.equal(records.length, 3, 'non-vacuity: three submissions were collected');
+
+  const result = await engine.craftAlchemy(crafter, [source], records, {
+    craftingSystemId: SYS,
+    signatureValidator: validator,
+  });
+
+  assert.equal(result.success, true, 'the brew completes');
+  assert.equal(result.results[0].name, 'Elixir');
+  assert.deepEqual(
+    submitted.map((item) => item._deleted),
+    [true, true, true],
+    'every submitted unit is consumed exactly once — net consumption is unchanged'
+  );
+  assert.equal(source.items.length, 0, 'nothing is left behind on the source actor');
+});
+
+test('an essence allocation riding on the options never reaches an alchemy brew', async () => {
+  const { engine, validator, comps } = setup({
+    checkMode: 'simple',
+    resultGroups: [SUCCESS_GROUP],
+    ingredientGroups: BLOCK_GROUPS,
+    essences: {},
+  });
+  engine._runCraftingCheck = async () => ({ success: true, outcome: 'pass', value: 18, data: {} });
+
+  const submitted = [
+    new Tier4Item('alloc-x1', 'Item.X', { uuid: 'Item.allocX1' }),
+    new Tier4Item('alloc-x2', 'Item.X', { uuid: 'Item.allocX2' }),
+  ];
+  const source = new FakeActor('src', submitted);
+  const records = resolveAlchemySubmissions([source], comps, ['cX', 'cX'], SYS);
+
+  // An empty allocation means "fund the block with nothing" — it is honoured, never
+  // topped up — so if it survived the alchemy hop the brew would be refused. The
+  // recipe and set here are DISCOVERED by matching, so any allocation on `options`
+  // was scoped to something else entirely and must be stripped.
+  const result = await engine.craftAlchemy(new FakeActor('pc'), [source], records, {
+    craftingSystemId: SYS,
+    signatureValidator: validator,
+    ingredientEssenceAllocation: { stepId: 'implicit-step', ingredientSetId: 'brew-set', allocation: {} },
+  });
+
+  assert.equal(result.success, true, 'the brew is unaffected by a foreign allocation');
+  assert.equal(result.results[0].name, 'Elixir');
+});
+
+// ===========================================================================
+// 7. Non-alchemy shared resolvers still have no tier 4 (unmutated)
 // ===========================================================================
 
 test('the UNMUTATED shared essence/ingredient resolvers still have no tier 4 for the item', () => {

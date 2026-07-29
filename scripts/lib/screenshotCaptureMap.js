@@ -54,6 +54,16 @@ export const CLASS_B_LABELS = Object.freeze(
     'player-crafting-run-summary',
     'player-crafting-roll-result',
     'player-crafting-alternatives-switched',
+    // The requirement-rail states that live in the STORE rather than the world DB
+    // (issue 917): which chooser is open, and how many units of each carrier the
+    // player has allocated. `player-crafting-tag-unmatched` is deliberately absent —
+    // it is the all-fixed rail with every chooser closed, so it renders purely from
+    // seeded world state and needs no interaction to reach.
+    'player-crafting-slot-rail',
+    'player-crafting-essence-pool',
+    'player-crafting-pick-for-me',
+    'player-crafting-essence-pool-shared',
+    'player-crafting-consumption-plan',
     'player-crafting-progressive-reordered',
     'manager-import-report',
     'manager-import-folder-mapping',
@@ -207,6 +217,16 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'player-crafting-essence-legacy',
   'player-crafting-essence-ingredient',
   'player-crafting-essence-shopping',
+  // The requirement-rail redesign (issue 917), in walk order. Each is its OWN
+  // `VIEW_RECIPES` entry rather than an extra label on `player-crafting`, because
+  // `collect` publishes only `candidates[0]` per view id — appending them there would
+  // publish one arbitrary frame forever and none of these states would reach a PR.
+  'player-crafting-slot-rail',
+  'player-crafting-tag-unmatched',
+  'player-crafting-essence-pool',
+  'player-crafting-pick-for-me',
+  'player-crafting-essence-pool-shared',
+  'player-crafting-consumption-plan',
   'player-crafting-multistep',
   'player-crafting-progressive',
   'player-crafting-progressive-reordered',

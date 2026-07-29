@@ -29,6 +29,9 @@ const RAW_MODULES = [
   'src/models/Recipe.js',
   'src/models/Ingredient.js',
   'src/models/IngredientSet.js',
+  // IngredientSet imports the shared essence allocator (issue 917); the harness's
+  // dependency validator throws a named "add it to rawModules" error without it.
+  'src/utils/essenceAllocation.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
   'src/systems/toolCheckBonus.js',

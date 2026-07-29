@@ -35,6 +35,13 @@
     // duration unit columns — the increment sits on TOP so the visual stacks the
     // way a spinner reads.
     orientation = 'horizontal',
+    // 'default': the compact 22px control the manager's dense editors use.
+    // 'comfortable': every target — the typeable input INCLUDED, not just the −/+
+    // adjuncts — raised to at least 24x24 for WCAG 2.2 §2.5.8. The input is the
+    // primary control, so raising only the adjuncts would leave the real target
+    // undersized. Used by the crafting essence pool, whose steppers are the main
+    // interaction of that panel rather than an inline field tweak.
+    density = 'default',
     // Extra attributes spread onto the underlying `<input>` (e.g. a test/marker
     // `data-*` hook a caller relies on). Import-free: a plain object, so this leaf
     // still carries no module dependency into the mount harnesses.
@@ -43,6 +50,7 @@
   } = $props();
 
   const isVertical = $derived(orientation === 'vertical');
+  const isComfortable = $derived(density === 'comfortable');
 
   function clamp(candidate) {
     let next = candidate;
@@ -80,7 +88,12 @@
   }
 </script>
 
-<div class="fab-stepper" class:is-disabled={disabled} class:is-vertical={isVertical}>
+<div
+  class="fab-stepper"
+  class:is-disabled={disabled}
+  class:is-vertical={isVertical}
+  class:is-comfortable={isComfortable}
+>
   {#if isVertical}
     <button
       type="button"
@@ -192,6 +205,27 @@
     height: 30px;
     font-size: 1.05rem;
     font-weight: 600;
+  }
+
+  /* WCAG 2.2 §2.5.8 minimum target: 24x24 CSS px on EVERY target, the typeable input
+     included. The compact default stays 22px because it sits inside dense manager
+     editor rows where it is one field among many; this variant is for a control that
+     IS the interaction.
+
+     `:not(.is-vertical)` is a GUARD, not decoration. The vertical rules above have the
+     same specificity as these, so a caller combining `orientation="vertical"` with
+     `density="comfortable"` would resolve on source order alone and SHRINK the spinner
+     to 24px — narrower than the full-width column it exists to fill, and shorter than
+     the 26/30px the vertical variant asks for. Excluding the combination here means
+     vertical keeps its own (already >= 24px) geometry instead. */
+  .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-adjunct {
+    width: 24px;
+    height: 24px;
+  }
+
+  .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-input {
+    height: 24px;
+    min-height: 24px;
   }
 
   .fab-stepper-adjunct {

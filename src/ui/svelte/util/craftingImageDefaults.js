@@ -18,6 +18,16 @@ export const DEFAULT_CRAFTING_IMAGE = 'icons/sundries/documents/blueprint-recipe
 export const GENERIC_ITEM_IMAGE = 'icons/svg/item-bag.svg';
 
 /**
+ * The glyph a MATERIAL tile (a component or tag requirement) draws when it has no
+ * image (issue 917) — including when its only candidate image is the
+ * {@link GENERIC_ITEM_IMAGE} sentinel above.
+ *
+ * It is deliberately NOT {@link DEFAULT_CRAFTING_IMAGE}: the blueprint is the RECIPE's
+ * fallback, and using it for a material would say "this requirement is a recipe".
+ */
+export const DEFAULT_MATERIAL_GLYPH = 'fas fa-cube';
+
+/**
  * Resolve a recipe's thumbnail image, mirroring `InventoryListingBuilder._resolveRecipeImg`
  * EXACTLY so the GM recipe-item UI and the player Inventory app never drift: an empty
  * image OR Foundry's generic item-bag both fall back to the alchemical blueprint; any

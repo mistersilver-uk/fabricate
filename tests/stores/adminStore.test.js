@@ -1453,6 +1453,31 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('essence management', () => {
+    // The authored-colour cases (issue 917) all need the same rig: optionally seeded
+    // essence definitions, plus a capture of the definitions that actually reach
+    // updateSystem. Asserting the persisted payload — not that the store method was
+    // called — is the point: the GM control renders a colour that is worthless if the
+    // save path drops it.
+    function createEssenceColourRig(seeded = null) {
+      const captured = { essenceDefinitions: null };
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys && seeded) sys.essenceDefinitions = seeded;
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) captured.essenceDefinitions = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      return { services, manager: origManager, captured };
+    }
+
+    function storedEssence(manager, essenceId) {
+      return (manager.getSystem('sys1').essenceDefinitions || []).find((e) => e.id === essenceId);
+    }
+
     it('addEssence appends to essenceDefinitions', async () => {
       let savedEssences = null;
       const services = createMockServices();
@@ -1568,6 +1593,33 @@ describe('createAdminStore', () => {
       // The essence's OWN output key stays `sourceItemUuid` (kept).
       assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
       assert.ok(!('originItemUuid' in newEssence));
+    });
+
+    it('addEssence persists the authored colour token (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null, 'rose');
+
+      const saved = captured.essenceDefinitions?.find((e) => e.name === 'Fire');
+      assert.ok(saved, 'new essence should be persisted');
+      assert.equal(saved.colorToken, 'rose');
+      assert.equal(
+        (manager.getSystem('sys1').essenceDefinitions || []).find((e) => e.name === 'Fire')
+          ?.colorToken,
+        'rose'
+      );
+    });
+
+    it('addEssence stores a null colour token when none is authored (issue 917)', async () => {
+      const { services, captured } = createEssenceColourRig();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null);
+
+      const saved = captured.essenceDefinitions?.find((e) => e.name === 'Fire');
+      assert.ok(saved, 'new essence should be persisted');
+      assert.equal(saved.colorToken, null);
     });
 
     it('addEssence rejects duplicate name', async () => {
@@ -1840,6 +1892,81 @@ describe('createAdminStore', () => {
       assert.equal(savedEssences?.[0].sourceComponentId, null);
       assert.equal(savedEssences?.[0].sourceItemUuid, null);
       assert.equal(savedEssences?.[0].associatedSystemItemId, null);
+    });
+
+    it('updateEssence persists a newly authored colour token (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig([
+        {
+          id: 'ess1',
+          name: 'Fire',
+          description: 'Burning essence',
+          icon: 'fas fa-fire',
+          colorToken: null,
+          sourceComponentId: null,
+          sourceItemUuid: null,
+          associatedSystemItemId: null,
+        },
+      ]);
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', {
+        name: 'Fire',
+        description: 'Burning essence',
+        icon: 'fas fa-fire',
+        colorToken: 'sage',
+      });
+
+      // The value that reaches updateSystem, not merely that updateSystem was called.
+      assert.equal(captured.essenceDefinitions?.[0].colorToken, 'sage');
+      assert.equal(storedEssence(manager, 'ess1')?.colorToken, 'sage');
+    });
+
+    it('updateEssence clears an authored colour token when the editor sends null (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig([
+        {
+          id: 'ess1',
+          name: 'Fire',
+          description: 'Burning essence',
+          icon: 'fas fa-fire',
+          colorToken: 'rose',
+          sourceComponentId: null,
+          sourceItemUuid: null,
+          associatedSystemItemId: null,
+        },
+      ]);
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', { name: 'Fire', colorToken: null });
+
+      // An explicit null is the Clear control unsetting the colour, so the previous
+      // value must NOT survive the spread that preserves an untouched field.
+      assert.equal(captured.essenceDefinitions?.[0].colorToken, null);
+      assert.equal(storedEssence(manager, 'ess1')?.colorToken, null);
+    });
+
+    it('updateEssence leaves an authored colour token alone when the field is absent (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig([
+        {
+          id: 'ess1',
+          name: 'Fire',
+          description: 'Burning essence',
+          icon: 'fas fa-fire',
+          colorToken: 'aqua',
+          sourceComponentId: null,
+          sourceItemUuid: null,
+          associatedSystemItemId: null,
+        },
+      ]);
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', { name: 'Ember' });
+
+      assert.equal(captured.essenceDefinitions?.[0].name, 'Ember');
+      assert.equal(captured.essenceDefinitions?.[0].colorToken, 'aqua');
+      assert.equal(storedEssence(manager, 'ess1')?.colorToken, 'aqua');
     });
 
     it('updateEssence rejects duplicate names from another essence', async () => {

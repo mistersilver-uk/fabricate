@@ -49,6 +49,29 @@
   const canReorderStages = $derived(selectedRecipe?.allowPlayerResultReorder !== false);
   const stageAnnouncement = $derived(store?.orderAnnouncement ?? '');
 
+  // The requirement rail is INTERACTIVE only for the step the engine would execute
+  // next, and only while that step's time gate is unarmed (issue 917). A later step's
+  // rail would drive a craft it does not describe — and the engine drops any
+  // allocation naming the wrong step — while an armed gate means the inputs were
+  // already consumed and the finish path never re-resolves ingredients. Both fields
+  // are absent on a pre-917 listing, in which case they compare equal and the rail
+  // stays interactive, exactly as today.
+  const railReadOnly = $derived(
+    selectedRecipe?.activeStepTimeGateArmed === true ||
+      (selectedRecipe?.activeStepId ?? null) !== (selectedRecipe?.displayedStepId ?? null)
+  );
+
+  const rail = $derived({
+    chosenGroupIds: Object.keys(store?.selectedIngredientOptions ?? {}),
+    openSlotId: railReadOnly ? null : (store?.openSlotId ?? null),
+    readOnly: railReadOnly,
+    announcement: store?.slotAnnouncement ?? '',
+    onChooseOption,
+    onOpenSlot,
+    onPickForMe,
+    onAllocateEssence
+  });
+
   // Resolve the per-recipe last roll outcome for the current selection.
   const rollResult = $derived(
     selectedRecipe?.id ? (store?.lastRollResult?.[selectedRecipe.id] ?? null) : null
@@ -99,6 +122,17 @@
   }
   function onChooseOption(groupId, choice) {
     store?.chooseIngredientOption(groupId, choice);
+  }
+  function onOpenSlot(slotId) {
+    store?.openSlot(slotId);
+  }
+  function onAllocateEssence(itemKey, units) {
+    store?.setEssenceAllocation(itemKey, units);
+  }
+  function onPickForMe() {
+    // The component owns the i18n and the store owns the state, mirroring the
+    // progressive reorder path: the localized sentence is passed IN.
+    store?.pickForMe(localize('FABRICATE.App.Crafting.Slots.PickedForYou'));
   }
   function onReorderStage(index, target, announcement) {
     store?.reorderProgressiveStage(index, target, announcement);
@@ -208,6 +242,8 @@
           {onReorderStage}
           {onReorderStageSettled}
           steps={selectedRecipe?.steps ?? []}
+          {rail}
+          activeStepId={selectedRecipe?.activeStepId ?? null}
         />
       </section>
 

@@ -221,12 +221,21 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
+  // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
+  // is already in the compiled graph and imports it, so omitting this HANGS every
+  // mounted crafting suite (# cancelled). Deliberately import-free, so one entry
+  // suffices — see the module header.
+  'src/ui/svelte/util/requirementSlots.js',
   // RecipeDetailHeader surfaces the recipe's authored craft duration pre-craft (issue
   // 846) via this formatter. RecipeDetailHeader is already in the compiled graph, so
   // omitting this raw dep HANGS every mounted crafting test (# cancelled). It imports
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
+  // Same rule, issue 917: the builder now shares its step->recipe view projection and
+  // its active-run step read with CraftingEngine through this import-free leaf, so it
+  // must be copied alongside the builder.
+  'src/systems/stepRecipeView.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
@@ -247,6 +256,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // can be mounted from one shared list.
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
+  // The shared numeric stepper the essence pool's per-carrier rows are built on
+  // (issue 917). IoTable renders EssencePoolPanel, which renders this, so omitting it
+  // HANGS every mounted crafting suite rather than failing it.
+  'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
   'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
   'src/ui/svelte/apps/crafting/QuantityTag.svelte',
@@ -259,6 +272,16 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+  // IoTable is the requirement surface's composition root (issue 917) and renders all
+  // four of these. IoTable is already listed, so omitting any of them HANGS every
+  // mounted crafting suite (# cancelled), not just the rail's own one.
+  'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
+  'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+  'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
+  'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
+  // The one "N Radiant" contribution chip both of the two panels above render. They
+  // are already listed, so omitting this HANGS every mounted crafting suite.
+  'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',

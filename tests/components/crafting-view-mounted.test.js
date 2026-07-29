@@ -7,7 +7,13 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES
 } from '../helpers/svelte-component-harness.js';
-import { fakeCraftingStore, listing, recipe, craftability } from '../helpers/crafting-fixtures.js';
+import {
+  craftability,
+  essenceCraftability,
+  fakeCraftingStore,
+  listing,
+  recipe
+} from '../helpers/crafting-fixtures.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -124,5 +130,70 @@ describe('CraftingView mounted behavior', () => {
       'false',
       'the time-gated progressive advance stays enabled'
     );
+  });
+
+  // ── Issue 917: requirement rail wiring ────────────────────────────────────
+  //
+  // These prove the view's OWN decisions — which step's rail is interactive, and
+  // that the store's callbacks are actually reached. Both are invisible to the rail's
+  // own suite, which is handed its props directly.
+
+  function railRecipe(overrides = {}) {
+    return recipe({
+      ingredientSets: [
+        { id: 'set-a', label: 'Option A', craftability: essenceCraftability(), products: [] }
+      ],
+      activeStepId: 'step-1',
+      displayedStepId: 'step-1',
+      ...overrides
+    });
+  }
+
+  it('renders an interactive rail while the displayed step IS the step the engine would run', async () => {
+    const store = fakeCraftingStore({ recipes: [railRecipe()] });
+    const target = await harness.mount({ services: services(store) });
+    assert.ok(target.querySelector('[data-recipe-section="requirement-rail"]'), 'rail rendered');
+    assert.ok(
+      !target.querySelector('[data-requirement-rail-readonly]'),
+      'and it is not read-only'
+    );
+    assert.ok(target.querySelector('[data-recipe-section="essence-pool"]'), 'the pool auto-opened');
+  });
+
+  // A later step's rail describes a craft the button will not fire, and the engine
+  // drops any allocation naming the wrong step, so the rail must not imply otherwise.
+  it('renders the rail read-only when the displayed step is not the active step', async () => {
+    const store = fakeCraftingStore({ recipes: [railRecipe({ activeStepId: 'step-2' })] });
+    const target = await harness.mount({ services: services(store) });
+    assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
+    assert.ok(!target.querySelector('[data-recipe-section="essence-pool"]'), 'no chooser opens');
+  });
+
+  // An armed time gate means the inputs were consumed when it was ARMED; a craft
+  // click hits the engine's "still in progress" return and the finish path never
+  // re-resolves ingredients, so the allocation controls would be a lie.
+  it('renders the rail read-only while the active step time gate is armed', async () => {
+    const store = fakeCraftingStore({
+      recipes: [railRecipe({ activeStepTimeGateArmed: true })]
+    });
+    const target = await harness.mount({ services: services(store) });
+    assert.ok(target.querySelector('[data-requirement-rail-readonly]'));
+  });
+
+  it('routes the rail callbacks back to the store', async () => {
+    const calls = { openSlot: [], allocate: [], pickForMe: [] };
+    const store = fakeCraftingStore({
+      recipes: [railRecipe()],
+      openSlot: (slotId) => calls.openSlot.push(slotId),
+      setEssenceAllocation: (itemKey, units) => calls.allocate.push([itemKey, units]),
+      pickForMe: (announcement) => calls.pickForMe.push(announcement)
+    });
+    const target = await harness.mount({ services: services(store) });
+
+    target.querySelector('[data-requirement-pick-for-me]').click();
+    target.querySelector('[data-essence-carrier="Item.dusk-1"] [data-stepper-increment]').click();
+
+    assert.match(calls.pickForMe.at(-1), /Slots\.PickedForYou/, 'the view owns the i18n');
+    assert.deepEqual(calls.allocate.at(-1), ['Item.dusk-1', 2]);
   });
 });

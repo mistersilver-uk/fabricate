@@ -5,6 +5,40 @@ import {
 
 export const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
+/**
+ * The shared `--fab-tag-*` palette an essence's optional colour is chosen from
+ * (issue 917). The palette is the whole vocabulary — there is no custom-hex entry for
+ * an essence — because a free hex cannot be guaranteed legible against all seven
+ * themes. It mirrors the preset list the manager's colour picker renders.
+ */
+export const ESSENCE_COLOR_TOKENS = Object.freeze([
+  'sage',
+  'mist',
+  'lavender',
+  'rose',
+  'peach',
+  'butter',
+  'aqua',
+  'mauve'
+]);
+
+/**
+ * Normalize a stored essence colour to a bare palette token, or null.
+ *
+ * Null is a FIRST-CLASS state, not a failure: an essence with no authored colour
+ * renders in the theme accent, which is what every essence renders as today. An
+ * unrecognized token normalizes to null for the same reason — falling back to the
+ * accent is honest, whereas coercing it to an arbitrary preset would invent a colour
+ * the GM never chose.
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function normalizeEssenceColorToken(value) {
+  const token = String(value ?? '').trim().replace(/^--fab-tag-/, '');
+  return ESSENCE_COLOR_TOKENS.includes(token) ? token : null;
+}
+
 const DEFAULT_ICON_PREFIX = 'fas';
 
 const STYLE_PREFIXES = Object.freeze(new Set([

@@ -1916,6 +1916,24 @@ async function assertPointerTarget(page, locator, targetSelector, label) {
   }
 }
 
+/**
+ * Open a requirement-rail slot's chooser only if it is not already open (issue
+ * 917). `RequirementTile` is a real disclosure — its button reports its own
+ * state via `aria-expanded` — and clicking a tile that is ALREADY open now
+ * COLLAPSES it rather than being a no-op, because the rail's `openSlotId` is a
+ * single toggled key (`craftingStore.svelte.js`). Focus auto-advance already
+ * opens the first unsatisfied openable slot the moment a recipe is selected, so
+ * a blind click right after selection frequently lands on an already-open tile
+ * and closes the very chooser the walk is about to assert against. Read the
+ * tile's own reported state and click only when it says closed.
+ * @param {import('playwright').Locator} slotLocator
+ */
+async function ensureSlotOpen(slotLocator) {
+  await slotLocator.waitFor({ state: 'visible', timeout: 8_000 });
+  if (await slotLocator.getAttribute('aria-expanded') === 'true') return;
+  await slotLocator.click({ timeout: 5_000 });
+}
+
 function assertSingleToolMutation(report, expectedMethod, label) {
   const matchingCalls = report?.calls?.filter((call) => call.method === expectedMethod) ?? [];
   const unexpectedCalls = report?.calls?.filter((call) => call.method !== expectedMethod) ?? [];
@@ -2885,6 +2903,24 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Copper Coil', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
       { name: 'Smoke Bronze Coil', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
       { name: 'Smoke Filigree', img: 'icons/commodities/metal/ingot-gold.webp' },
+      // simple system — the requirement-rail / shared essence pool fixtures (issue 917).
+      // Before this the world seeded ZERO essence-carrying components, so every essence
+      // frame photographed `have: 0` and a shared pool could not be shot at all.
+      //
+      // Two DUAL-essence carriers plus one single-essence contrast carrier fund the pool.
+      // Their per-unit yields (set below, after the essence library exists) are chosen so
+      // the two-requirement recipe is CONTENDED: `Smoke Tide Essence` can only be met by
+      // spending BOTH duals, which under the old per-group disjoint draw would leave the
+      // Star requirement short — so the frame proves D-ESS joint crediting rather than
+      // showing two trivially-met bars.
+      { name: 'Smoke Duskcrystal', img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp' },
+      { name: 'Smoke Tidebloom', img: 'icons/commodities/flowers/lotus-white.webp' },
+      { name: 'Smoke Starmote', img: 'icons/commodities/materials/bowl-powder-teal.webp' },
+      // The FIXED (non-selectable) requirement every new rail recipe opens with, so each
+      // rail frame shows a met fixed tile beside the states actually under test. It is a
+      // dedicated component rather than a reused plank so the plank budget the execution
+      // asserts spend down (5 planks, exactly consumed) is not disturbed.
+      { name: 'Smoke Runeplate', img: 'icons/commodities/metal/ingot-stack-steel.webp' },
       // routedByIngredients system
       { name: 'Smoke Ingot A', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
       { name: 'Smoke Ingot B', img: 'icons/commodities/metal/ingot-gold.webp' },
@@ -2960,6 +2996,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       'Smoke Toolchest',
       // Multi-option ingredient recipe (issue #552) components.
       'Smoke Copper Coil', 'Smoke Bronze Coil', 'Smoke Filigree',
+      // Issue 917: the shared essence pool's carriers + the fixed rail requirement.
+      'Smoke Duskcrystal', 'Smoke Tidebloom', 'Smoke Starmote', 'Smoke Runeplate',
       // Issue 766: also registered in the progressive forge below — one physical stack,
       // two systems, one collapsed card.
       'Smoke Air Shard'
@@ -2990,12 +3028,45 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // Issue 765: unlock explicit multi-step authoring so the simple system can host
       // a stepped recipe (the player-crafting-multistep screenshot subject).
       features: { multiStepRecipes: true, essences: true },
+      // Issue 917: authored tag vocabulary for 'Smoke Sigil Etching' (acceptance
+      // criterion 5). `_validateTagPlaceholders` rejects a recipe whose tag match
+      // names anything outside `system.itemTags`, so the tag must be registered here
+      // for the recipe to persist at all. No component registered in this system is
+      // ever given this tag, so the requirement stays authored-but-unmatched — the
+      // whole point of the fixture.
+      itemTags: ['smoke-voidbound'],
+      // Three authored essences (issue 917). `colorToken` is a BARE `--fab-tag-*` key —
+      // never a hex and never the `--fab-tag-` prefix — because the normalizer strips the
+      // prefix and every tinted surface composes `var(--fab-tag-<token>)` itself. Two
+      // distinct tokens are what make the shared-pool frame legible: each meter, glyph and
+      // contribution chip carries its own tint, so a reader can tell which carrier unit
+      // funded which requirement.
       essenceDefinitions: [
         {
           id: 'smoke-star-essence',
           name: 'Smoke Star Essence',
           description: 'Distinctive authored essence icon fixture for player Crafting evidence.',
-          icon: 'fas fa-star-of-life'
+          icon: 'fas fa-star-of-life',
+          colorToken: 'butter'
+        },
+        {
+          id: 'smoke-tide-essence',
+          name: 'Smoke Tide Essence',
+          description: 'Second authored essence: the shared-pool frame needs two tints to read.',
+          icon: 'fas fa-water',
+          colorToken: 'lavender'
+        },
+        {
+          // Deliberately carried by NOTHING in the world. It is the only way to shoot a
+          // zero-delivered (danger) essence tile at rest: a carried essence always ends up
+          // partly delivered, because the resolver's suggestion allocates every carrier it
+          // can, and clearing the whole allocation makes the store fall back to that same
+          // suggestion (an empty map re-reads the baked craftability).
+          id: 'smoke-ember-essence',
+          name: 'Smoke Ember Essence',
+          description: 'Authored essence with no carrier in the world — the short-tile fixture.',
+          icon: 'fas fa-fire',
+          colorToken: 'rose'
         }
       ],
       tools: [
@@ -3033,6 +3104,32 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         }
       ]
     });
+    // Issue 917: per-unit essence yields on the pool's carriers. This MUST run after the
+    // `essenceDefinitions` write above — `_normalizeComponent` filters the map against the
+    // system's `validEssenceIds`, so an id authored before its definition exists is
+    // silently dropped. `essences` on the managed COMPONENT is the field the resolver
+    // reads (`resolveItemEssences` falls back to it for every inventory copy matched by
+    // `flags.core.sourceId`), so no per-item essence flag is seeded: the flag path is read
+    // through `getFabricateFlag(item, 'essences')`, which resolves the DOUBLE-nested
+    // `flags.fabricate.fabricate.essences`, and a single-nested seed would be a silent
+    // no-op.
+    //
+    // The numbers are the fixture's whole point. Against `Smoke Tidecore Tempering`
+    // (Star 2 + Tide 3 in ONE set) the only Tide sources are the two duals, totalling
+    // exactly 3 — so a disjoint per-group draw spends both on Tide and leaves Star with
+    // just the Starmote's 1 of the 2 it needs (infeasible), while the block's joint
+    // crediting funds both from the same two units (feasible). The contended pool is what
+    // the `-essence-pool-shared` frame photographs.
+    const simpleCarrierEssences = {
+      'Smoke Duskcrystal': { 'smoke-star-essence': 2, 'smoke-tide-essence': 2 },
+      'Smoke Tidebloom': { 'smoke-star-essence': 1, 'smoke-tide-essence': 1 },
+      // The single-essence contrast row: one tinted contribution chip beside the duals' two.
+      'Smoke Starmote': { 'smoke-star-essence': 1 }
+    };
+    for (const [name, essences] of Object.entries(simpleCarrierEssences)) {
+      await csm.updateItem(simpleSystemId, simpleMap[name], { essences });
+    }
+
     // Salvage config on Smoke Relic: simple mode (deterministic success, no
     // timeRequirement, no tools) → exactly one result group per validateSalvage.
     await csm.updateItem(simpleSystemId, simpleMap['Smoke Relic'], {
@@ -3170,10 +3267,152 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         ingredientGroups: [{
           id: 'smoke-star-essence-group',
           name: 'Star Essence',
-          options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 3 } }]
+          // 6, not the pre-917 3: the world now HOLDS 4 Star (2 + 1 + 1 across the three
+          // carriers), and a need of 3 would clear the shopping-list shortage this recipe
+          // is also the fixture for — `player-crafting-essence-shopping` waits on an
+          // acquire row that would then never render. 6 keeps the shortage AND makes this
+          // the single-requirement pool frame: a partly-funded meter with real numbers
+          // instead of the 0/3 every essence frame photographed before.
+          options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 6 } }]
         }]
       }],
       resultGroups: [{ name: 'Draught', results: [{ componentId: simpleMap['Smoke Toy'], quantity: 1 }] }]
+    });
+
+    // ── Issue 917 requirement-rail fixtures ─────────────────────────────────
+    // Three recipes, each authored for ONE rendered state the redesign has to prove and
+    // that no existing fixture can reach. All are display-only: no execution assert
+    // crafts them, and none is craftable, so they add no consumption anywhere.
+    //
+    // THE NAMES ARE LOAD-BEARING. The player recipe browser sorts A→Z and pages at 12,
+    // and the walk's mode-based selection (`selectCraftingRecipeByMode`) only iterates the
+    // rows currently in the DOM — i.e. page one. Page one presently ends at 'Smoke Carve
+    // Toy', so a fixture named 'Smoke Bind…' or 'Smoke Etch…' would displace it and
+    // silently re-point `player-crafting-ingredient-routed`, `-routed-by-check` and the
+    // craft that produces `-run-summary`/`-roll-result` at an UNCRAFTABLE display fixture.
+    // These three names sort at positions ~20-22, so page one is unchanged. Every capture
+    // below reaches its recipe through the browser SEARCH, which collapses the list to one
+    // row, so their own page position never matters.
+
+    // (1) The rail's three states in one frame. Author order is load-bearing — the rail
+    // auto-advances to the FIRST unsatisfied openable slot, so the choice group must
+    // precede the essence group for the alternatives chooser (rather than the pool) to be
+    // the one open chooser in the shot.
+    await rm.createRecipe({
+      name: 'Smoke Runestaff Binding',
+      description: 'Requirement rail: a met fixed slot, an unchosen choice slot, and a short essence slot.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/sundries/scrolls/scroll-runed-brown.webp',
+      ingredientSets: [{
+        id: 'smoke-rail-set',
+        ingredientGroups: [
+          {
+            id: 'smoke-rail-plate',
+            name: 'Runeplate',
+            options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Runeplate'] } }]
+          },
+          {
+            // Two alternatives the crafter holds NEITHER of. An untouched choice whose
+            // group already resolves satisfied renders MET, so an unaffordable pair is the
+            // only way to shoot the "unchosen → accent, never danger" state.
+            id: 'smoke-rail-binding',
+            name: 'Binding',
+            options: [
+              { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Anvil'] } },
+              { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Bracket'] } }
+            ]
+          },
+          {
+            id: 'smoke-rail-ember',
+            name: 'Ember Essence',
+            options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-ember-essence', amount: 4 } }]
+          }
+        ]
+      }],
+      resultGroups: [{ name: 'Runestaff', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
+    });
+
+    // (2) The shared pool. TWO essence requirements in ONE set (sibling groups, each a
+    // single essence option) beside a fixed group, so the same selection also supplies the
+    // consumption-plan frame: a fixed row, an essence-carrier row and a "still to choose"
+    // line, all at once.
+    //
+    // Issue 917 review: `player-crafting-consumption-plan` and `player-crafting-essence-
+    // pool-shared` were captured on this SAME recipe at the SAME store state, differing
+    // only by `scrollIntoViewIfNeeded` — a no-op frame if the plan panel is already in
+    // view at the capture size. `smoke-shared-fitting` is an unaffordable pair (neither
+    // option held, same pattern as `smoke-rail-binding` above), so it stays PARTIAL —
+    // "unchosen" — for the life of both captures. It never contributes a plan row (an
+    // untouched choice contributes only to `pending`), so it does not disturb the
+    // existing `rows`/`carrierRows` assertions below, but it DOES put a non-essence
+    // requirement on the consumption plan's "still to choose" line — evidence the
+    // essence-pool panel (which shows only essence carriers) never renders at all. (The
+    // tile reports its CHOSEN OPTION's name there, not the authored group label, so the
+    // pending line names 'Smoke Anvil' rather than 'Fitting' — verified against a live
+    // run.) That is what makes the two frames prove different things instead of the same
+    // state twice.
+    await rm.createRecipe({
+      name: 'Smoke Tidecore Tempering',
+      description: 'Shared essence pool: two requirements in one set funded jointly from dual carriers.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp',
+      ingredientSets: [{
+        id: 'smoke-shared-pool-set',
+        ingredientGroups: [
+          {
+            id: 'smoke-shared-plate',
+            name: 'Runeplate',
+            options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Runeplate'] } }]
+          },
+          {
+            id: 'smoke-shared-star',
+            name: 'Star Essence',
+            options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 2 } }]
+          },
+          {
+            id: 'smoke-shared-tide',
+            name: 'Tide Essence',
+            options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-tide-essence', amount: 3 } }]
+          },
+          {
+            id: 'smoke-shared-fitting',
+            name: 'Fitting',
+            options: [
+              { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Anvil'] } },
+              { quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Bracket'] } }
+            ]
+          }
+        ]
+      }],
+      resultGroups: [{ name: 'Tidecore', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
+    });
+
+    // (3) The item-bag defect (acceptance criterion 5). The tag names nothing any seeded
+    // component carries, so the tile has no inventory item to borrow an image from and
+    // must render its glyph. Both of this set's groups are single-option and
+    // non-essence, so the rail offers NO openable slot at all — which is also the only
+    // fixture in the world that photographs the rail with every chooser closed.
+    await rm.createRecipe({
+      name: 'Smoke Sigil Etching',
+      description: 'Tag requirement with nothing matching in inventory: the tile must render a glyph, not the item bag.',
+      craftingSystemId: simpleSystemId,
+      img: 'icons/sundries/books/book-embossed-jewel-gold-green.webp',
+      ingredientSets: [{
+        id: 'smoke-tag-unmatched-set',
+        ingredientGroups: [
+          {
+            id: 'smoke-tag-plate',
+            name: 'Runeplate',
+            options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Runeplate'] } }]
+          },
+          {
+            id: 'smoke-tag-voidbound',
+            name: 'Voidbound Reagent',
+            options: [{ quantity: 1, match: { type: 'tags', tags: ['smoke-voidbound'], tagMatch: 'any' } }]
+          }
+        ]
+      }],
+      resultGroups: [{ name: 'Sigil', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
     });
 
     // Explicit multi-step simple recipe (issue 765): the reported defect. Its sets
@@ -3489,6 +3728,18 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ...invCopies('Smoke Toolchest', 1),             // issue 777: required-tools salvage subject
       ...invCopies('Smoke Copper Coil', 1),           // multi-option recipe alternative A (#552)
       ...invCopies('Smoke Bronze Coil', 1),           // multi-option recipe alternative B (#552)
+      // Issue 917 — the shared essence pool's ledger, in DELIBERATE quantities. One unit
+      // of each carrier: `_initialRemaining` keys the ledger by item and reads
+      // `system.quantity`, so N copies would render N identically-named carrier rows
+      // rather than one row of N. With Star 2/Tide 2 + Star 1/Tide 1 + Star 1 the world
+      // holds Star 4 and Tide 3 — exactly the Tide the two-requirement recipe needs, which
+      // is what makes its pool contended rather than comfortably over-funded.
+      ...invCopies('Smoke Duskcrystal', 1),           // dual carrier (Star 2, Tide 2)
+      ...invCopies('Smoke Tidebloom', 1),             // dual carrier (Star 1, Tide 1)
+      ...invCopies('Smoke Starmote', 1),              // single-essence contrast carrier (Star 1)
+      // TWO, so the fixed rail tile reads "owned 2, spends 1" in the consumption plan
+      // rather than a degenerate 1-of-1.
+      ...invCopies('Smoke Runeplate', 2),             // the fixed requirement of every rail fixture
       ...invCopies('Smoke Ingot A', 1),               // routedByIngredients set A
       ...invCopies('Smoke Ingot B', 1),               // routedByIngredients set B (asserted NOT produced)
       ...invCopies('Smoke Bar', 1),                   // routedByCheck stock
@@ -11378,8 +11629,37 @@ async function main() {
               .first();
             await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
             await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
+            // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer
+            // always present. The alternatives picker is now the chooser ONE rail slot
+            // opens, so it renders only while that slot is the open one. The rail
+            // auto-advances to the first unsatisfied openable slot and this recipe's only
+            // openable slot IS the coil choice, so it opens by itself — the slot tile is a
+            // real disclosure now (a later accessibility fix), and clicking one that is
+            // ALREADY open collapses it rather than being a no-op, so a blind click here
+            // would race the auto-advance and could close the very chooser this step
+            // asserts on. `ensureSlotOpen` reads the tile's own `aria-expanded` state and
+            // clicks only when it is still closed, making the precondition explicit
+            // without fighting the auto-advance. Wait on the rail container first: a
+            // container-level marker fails fast and locally, whereas waiting straight on
+            // deep chooser content turns any upstream slip into an unrelated-looking later
+            // failure.
+            await appShell.locator('[data-recipe-section="requirement-rail"]').first()
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            const altSlotTile = appShell
+              .locator('[data-requirement-slot][data-slot-kind="choice"]').first();
+            await ensureSlotOpen(altSlotTile).catch(() => {});
             const altSection = appShell.locator('[data-recipe-section="alternatives"]').first();
             await altSection.waitFor({ state: 'visible', timeout: 10_000 });
+            // Pointer hit-test (issue 917): the slot tile is a new card-shaped `<button>`
+            // whose whole 80px column is the control, layered under the rail's wrapping
+            // flex row. happy-dom computes no cascade, so only a real frame can prove
+            // Foundry's global button chrome is not swallowing the click.
+            await assertPointerTarget(
+              page,
+              altSlotTile,
+              '[data-requirement-slot]',
+              'Requirement rail slot tile'
+            );
             await appShell.locator('.crafting-alt-option').first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             await assertNoScreenshotOverlays(page);
@@ -11419,7 +11699,18 @@ async function main() {
             const firstClass = await selectCraftingRecipeByName(
               'Smoke First-Class Essence Draught'
             );
-            await appShell.locator('[data-io-group="ingredients"] .crafting-essence-thumb').first()
+            // Issue 917 re-point: a first-class essence requirement is no longer a
+            // CraftingEssenceThumb inside the ingredient image grid — it is a rail slot
+            // whose glyph carries the authored icon and colour token. The predecessor
+            // selector paired the ingredients group with that thumb class; it now matches
+            // nothing here (the thumb survives only on the alternatives option cards and
+            // in the Shopping List), so waiting on it would time out and fail the whole
+            // step. The `data-io-group="ingredients"` wrapper itself survives as the rail's
+            // container, which is why the wait below re-anchors on the rail section rather
+            // than on that wrapper.
+            await appShell
+              .locator('[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] .requirement-slot-glyph')
+              .first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-essence-ingredient');
@@ -11437,6 +11728,286 @@ async function main() {
               passed: false,
               error: String(essenceIconError?.message ?? essenceIconError)
             });
+          }
+
+          // ── Requirement rail, shared essence pool + consumption plan (issue 917) ──
+          // The redesign's own surfaces. Six frames, each a NAMED rendered state that no
+          // pre-existing fixture could reach — the world seeded no essence-carrying
+          // component at all before this change, so every essence frame photographed
+          // `have: 0` and a shared pool was unphotographable.
+          //
+          // Each frame is its own `VIEW_RECIPES` entry (`collect` publishes only
+          // `candidates[0]` per view id), so all six reach the PR rather than one
+          // arbitrary member of a shared list. Guarded like its neighbours: a missing
+          // recipe or control records a failed step instead of aborting the phase.
+          try {
+            // Set one carrier's allocation through its real stepper input rather than the
+            // store, so what the frame shows is what a player's keystroke produces. The
+            // input is the Stepper's PRIMARY control (the −/+ buttons are adjuncts), and
+            // `fill` + blur drives both its `oninput` commit and its clamp-on-blur.
+            const setCarrierUnits = async (carrierName, units) => {
+              const input = appShell
+                .locator(`[data-essence-carrier]:has-text("${carrierName}") [data-stepper-input]`)
+                .first();
+              await input.waitFor({ state: 'visible', timeout: 8_000 });
+              await input.fill(String(units));
+              await input.blur().catch(() => {});
+              await page.waitForTimeout(300);
+            };
+            // `ensureSlotOpen` (issue 917): the essence slot's tile is a real disclosure,
+            // and focus auto-advance already opens the rail's first unsatisfied openable
+            // slot — which is this very essence slot in both recipes this helper is used
+            // against — the moment the recipe is selected. A blind click here would
+            // therefore collapse the pool that auto-advance already opened instead of
+            // opening it, which is exactly the defect that turned this step's fresh
+            // `[data-recipe-section="essence-pool"]` wait into a 10s timeout.
+            const openEssencePool = async () => {
+              await ensureSlotOpen(
+                appShell.locator('[data-requirement-slot][data-slot-kind="essence"]').first()
+              );
+              await appShell.locator('[data-recipe-section="essence-pool"]').first()
+                .waitFor({ state: 'visible', timeout: 10_000 });
+            };
+            const readMeters = () => page.evaluate(() =>
+              Array.from(document.querySelectorAll('#fabricate-app [data-essence-meter]')).map((node) => ({
+                essenceId: node.dataset.essenceMeter,
+                state: node.dataset.essenceMeterState,
+                ratio: String(node.querySelector('.essence-pool-meter-ratio')?.textContent ?? '').trim()
+              }))
+            );
+            // Container-level wait: the rail's slot row, not a particular tile. An
+            // over-specific wait that times out fails the whole phase and reads as an
+            // unrelated later breakage.
+            const railSlots = appShell
+              .locator('[data-recipe-section="requirement-rail"] [data-requirement-rail-slots]')
+              .first();
+
+            // (1) The rail's three states in ONE frame: a met fixed slot, an UNCHOSEN
+            // choice slot in accent (a to-do, never danger — the state the two-state
+            // predecessor could not express), and a zero-delivered essence slot in danger,
+            // with exactly one chooser open beneath it.
+            const railRecipe = await selectCraftingRecipeByName('Smoke Runestaff Binding');
+            await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
+            const railStates = await page.evaluate(() =>
+              Array.from(document.querySelectorAll('#fabricate-app [data-requirement-slot]'))
+                .map((node) => `${node.dataset.slotKind}:${node.dataset.slotState}`)
+                .sort((a, b) => a.localeCompare(b))
+            );
+            const expectedRailStates = ['choice:partial', 'essence:short', 'fixed:met'];
+            if (railStates.join('|') !== expectedRailStates.join('|')) {
+              throw new Error(
+                `Requirement rail states were ${JSON.stringify(railStates)}, expected ${JSON.stringify(expectedRailStates)}`
+              );
+            }
+            const openChoosers = await appShell
+              .locator('[data-recipe-section="alternatives"], [data-recipe-section="essence-pool"]')
+              .count();
+            if (openChoosers !== 1) {
+              throw new Error(`Requirement rail had ${openChoosers} choosers open, expected exactly one`);
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-slot-rail');
+            await railRecipe.recipeSearch.fill('');
+
+            // (2) Acceptance criterion 5. Nothing in inventory carries the authored tag, so
+            // the tile has no item image to borrow and MUST render its glyph — never
+            // Foundry's `icons/svg/item-bag.svg`. Both of this set's groups are fixed, so
+            // it is also the world's only rail with every chooser closed.
+            const tagRecipe = await selectCraftingRecipeByName('Smoke Sigil Etching');
+            await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
+            const tagReport = await page.evaluate(() => {
+              const rail = document.querySelector('#fabricate-app [data-recipe-section="requirement-rail"]');
+              if (!rail) return null;
+              return {
+                slots: rail.querySelectorAll('[data-requirement-slot]').length,
+                bagImages: Array.from(rail.querySelectorAll('img'))
+                  .filter((img) => String(img.getAttribute('src') ?? '').includes('item-bag')).length,
+                glyphTiles: rail.querySelectorAll('.crafting-thumb.is-glyph').length,
+                openChoosers: document.querySelectorAll(
+                  '#fabricate-app [data-recipe-section="alternatives"], #fabricate-app [data-recipe-section="essence-pool"]'
+                ).length
+              };
+            });
+            if (!tagReport) throw new Error('Tag-requirement rail did not render');
+            if (tagReport.bagImages > 0) {
+              throw new Error(`Unmatched tag tile still renders the item-bag SVG: ${JSON.stringify(tagReport)}`);
+            }
+            if (tagReport.glyphTiles < 1) {
+              throw new Error(`Unmatched tag tile rendered no fallback glyph: ${JSON.stringify(tagReport)}`);
+            }
+            if (tagReport.openChoosers !== 0) {
+              throw new Error(`An all-fixed rail opened a chooser: ${JSON.stringify(tagReport)}`);
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-tag-unmatched');
+            await tagRecipe.recipeSearch.fill('');
+
+            // (3) The pool at its simplest: ONE requirement, a partial allocation, exactly
+            // one stepper left non-zero, and the "your selection" recap beneath it.
+            //
+            // THE WAND CLICK IS A PRECONDITION, not decoration. The store holds NO
+            // allocation until the player makes one, and an allocation map that becomes
+            // empty again re-reads the baked craftability — so with every carrier already
+            // at its maximum, zeroing the first one would simply snap back to the
+            // resolver's suggestion. "Pick for me" writes that suggestion into the store,
+            // which is what makes the subsequent per-carrier trims stick.
+            const poolRecipe = await selectCraftingRecipeByName('Smoke First-Class Essence Draught');
+            await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
+            await openEssencePool();
+            const poolWand = appShell.locator('[data-requirement-pick-for-me]').first();
+            // Pointer hit-test (issue 917): a new card-shaped pill button in the rail's own
+            // header row, which no mounted test can evaluate for stacking.
+            await assertPointerTarget(page, poolWand, '[data-requirement-pick-for-me]', 'Requirement rail Pick for me');
+            await poolWand.click({ timeout: 5_000 });
+            await page.waitForTimeout(400);
+            await setCarrierUnits('Smoke Tidebloom', 0);
+            await setCarrierUnits('Smoke Starmote', 0);
+            // Pointer hit-test (issue 917): the `+` adjunct is a 24px icon-only control
+            // nested in a list row inside a panel that only exists while its slot is open —
+            // a new stacking arrangement no mounted test can evaluate. Run it on a carrier
+            // that has just been zeroed, so the button under the point is ENABLED and the
+            // check cannot pass merely because a disabled control still hit-tests.
+            await assertPointerTarget(
+              page,
+              appShell
+                .locator('[data-essence-carrier]:has-text("Smoke Tidebloom") [data-stepper-increment]')
+                .first(),
+              '[data-stepper-increment]',
+              'Essence pool carrier increment'
+            );
+            const singleMeters = await readMeters();
+            if (singleMeters.length !== 1 || singleMeters[0].state !== 'partial') {
+              throw new Error(`Single-requirement pool was ${JSON.stringify(singleMeters)}, expected one partial meter`);
+            }
+            const trimmedRows = await appShell.locator('[data-essence-picked]').count();
+            if (trimmedRows !== 1) {
+              throw new Error(`Pool recap listed ${trimmedRows} carriers, expected exactly the one still allocated`);
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-pool');
+
+            // (4) "Pick for me", captured on the SAME recipe immediately after (3) so the
+            // pair reads as a genuine before/after: one carrier funding 2 of 6, then the
+            // wand restoring the resolver's full suggestion. The wand stays on screen in
+            // both frames because this requirement can never be fully funded, which is the
+            // only arrangement in which the control itself is photographable at all.
+            await poolWand.click({ timeout: 5_000 });
+            await page.waitForTimeout(400);
+            const pickedRows = await appShell.locator('[data-essence-picked]').count();
+            if (pickedRows <= trimmedRows) {
+              throw new Error(
+                `Pick for me left ${pickedRows} allocated carriers, no more than the ${trimmedRows} before it`
+              );
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-pick-for-me');
+            await poolRecipe.recipeSearch.fill('');
+
+            // (5) The D-ESS proof. TWO requirements in one set funded from ONE dual
+            // carrier: allocating only the Duskcrystal leaves Star fully delivered and
+            // Tide short from the SAME units — which a per-group disjoint draw could not
+            // produce at all (Tide alone would claim both duals and starve Star).
+            //
+            // Every slot is met at rest here, so there is no wand to seed the store with.
+            // The allocation is therefore built the way a player builds one: raise a
+            // carrier that the suggestion left at zero (which both seeds the map and, since
+            // a short allocation is never topped up, drops the rest), add the dual, then
+            // clear the seed.
+            const sharedRecipe = await selectCraftingRecipeByName('Smoke Tidecore Tempering');
+            await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
+            await openEssencePool();
+            await setCarrierUnits('Smoke Starmote', 1);
+            await setCarrierUnits('Smoke Duskcrystal', 1);
+            await setCarrierUnits('Smoke Starmote', 0);
+            const sharedMeters = await readMeters();
+            const sharedStates = sharedMeters
+              .map((meter) => meter.state)
+              .sort((a, b) => a.localeCompare(b))
+              .join('|');
+            if (sharedMeters.length !== 2 || sharedStates !== 'met|partial') {
+              throw new Error(
+                `Shared pool was ${JSON.stringify(sharedMeters)}, expected one met and one part-delivered meter`
+              );
+            }
+            // Issue 917 re-point: the chip's class is `.essence-contribution`
+            // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never
+            // existed and always counted zero. Masked until now because the walk
+            // never actually reached this state: the essence pool auto-opened by
+            // focus advance and the (now-fixed) blind click above immediately closed
+            // it again, so the panel this selector reads was never rendered live.
+            const duskContributions = await appShell
+              .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-contribution')
+              .count();
+            if (duskContributions < 2) {
+              throw new Error(
+                `Dual carrier showed ${duskContributions} contribution chips, expected one per essence it funds`
+              );
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-essence-pool-shared');
+
+            // (6) The same recipe and the same essence allocation, framed on the
+            // consumption plan: a FIXED row (the runeplate the craft spends) and an
+            // ESSENCE-CARRIER row (one entry per item key however many requirements that
+            // item funds), plus the "still to choose" line. `smoke-shared-fitting` (an
+            // unaffordable pair, permanently unchosen — see the recipe fixture above) is
+            // what keeps this frame from being a duplicate of (5): the essence-pool panel
+            // never shows a non-essence choice at all, so the plan naming its unresolved
+            // option ('Smoke Anvil' — the tile reports the CHOSEN OPTION's name, not the
+            // authored group label) here is evidence unique to this capture, not the same
+            // store state re-photographed.
+            const planPanel = appShell.locator('[data-recipe-section="consumption-plan"]').first();
+            await planPanel.waitFor({ state: 'visible', timeout: 10_000 });
+            await planPanel.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            const planReport = await page.evaluate(() => {
+              const panel = document.querySelector('#fabricate-app [data-recipe-section="consumption-plan"]');
+              if (!panel) return null;
+              return {
+                rows: panel.querySelectorAll('[data-consumption-row]').length,
+                carrierRows: panel.querySelectorAll('[data-consumption-row^="carrier:"]').length,
+                pending: String(panel.querySelector('[data-consumption-pending]')?.textContent ?? '')
+                  .replace(/\s+/g, ' ').trim()
+              };
+            });
+            if (!planReport) throw new Error('Consumption plan panel did not render');
+            if (planReport.rows < 2 || planReport.carrierRows < 1) {
+              throw new Error(`Consumption plan showed ${JSON.stringify(planReport)}, expected a fixed row and a carrier row`);
+            }
+            if (planReport.pending.length === 0) {
+              throw new Error('Consumption plan showed no "still to choose" line for the unsettled requirement');
+            }
+            // The tile's own name is the CHOSEN option's name, not the authored group
+            // name — `_resolveGroupDescription`/`_resolveIngredientVisual` in
+            // `RecipeManager.js` report the option (here 'Smoke Anvil', the default pick
+            // among the unaffordable pair), never the group label ('Fitting'). Live-run
+            // verified (issue 917): asserting the group name here fails against the real
+            // render.
+            if (!planReport.pending.includes('Smoke Anvil')) {
+              throw new Error(`Consumption plan pending line did not name the unchosen Fitting requirement's option: ${JSON.stringify(planReport)}`);
+            }
+            await assertNoScreenshotOverlays(page);
+            await screenshot(page, 'player-crafting-consumption-plan');
+
+            await sharedRecipe.recipeSearch.fill('');
+            await page.waitForTimeout(200);
+            results.steps.push({
+              step: 'player-crafting-requirement-rail',
+              passed: true,
+              railStates,
+              tagReport,
+              singleMeters,
+              trimmedRows,
+              pickedRows,
+              sharedMeters,
+              planReport
+            });
+          } catch (railError) {
+            results.steps.push({
+              step: 'player-crafting-requirement-rail',
+              passed: false,
+              error: String(railError?.message ?? railError)
+            });
+            process.stdout.write(`  Player Crafting requirement-rail capture failed: ${railError?.message ?? railError}\n`);
           }
 
           // ── Explicit multi-step simple recipe (issue 765) ─────────────────
