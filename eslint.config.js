@@ -225,14 +225,25 @@ export default [
   //    CLI entry points, so process control and console output are expected.
   //
   //    This block CONFIGURES every `scripts/` file, but the gated `lint` (and
-  //    `format:check`) script only passes it the release publish path — the
-  //    semver/release-tag/publish-guard libs, `release-s3.js`, and the tag-validator
-  //    CLI — named one by one. That is deliberate: `scripts/lib/zip.js` has lint
-  //    errors and fails Prettier, and its autofixes would land on the Windows
-  //    `Compress-Archive` path that builds the published artefact — with no test
-  //    coverage to catch a regression. Add new script files to the gate as they land;
-  //    do NOT widen the gate to `scripts/lib/**` until zip.js is cleaned up and
-  //    covered.
+  //    `format`/`format:check`) scripts only pass it a subset — the release publish
+  //    path, the smoke-harness libs, and a few others — named one by one.
+  //
+  //    That narrowness is measured, not habitual. ESLint over `scripts/**/*.{js,mjs}`
+  //    reports 993 findings across 15 of 33 files, and 844 of them are in
+  //    `scripts/foundry-test-run.mjs` alone — the Foundry smoke harness, whose Phase D0
+  //    pins selectors by class, `.nth(N)` index and visible button text with no unit
+  //    coverage over any of them. THAT is the blocker for a `scripts/**` glob, by two
+  //    orders of magnitude; `scripts/lib/zip.js` (6 findings, fails Prettier, autofixes
+  //    landing on the Windows `Compress-Archive` path that builds the published
+  //    artefact, also untested) is a real but secondary one.
+  //
+  //    Add new script files to the gate as they land — and note that this is now
+  //    ENFORCED rather than merely requested: `tests/scripts-lint-gate-coverage.test.js`
+  //    parses the paths out of the `lint` script and fails `npm test` on any ungated
+  //    `scripts/**` file that is not recorded as acknowledged debt in
+  //    `tests/scripts-known-ungated.js`, a baseline that may only shrink. Do NOT widen
+  //    the gate to `scripts/lib/**` or `scripts/**` on the strength of that guard; it
+  //    tracks the debt, it does not clear it.
   {
     files: ['scripts/**/*.{js,mjs}', '*.config.js', 'eslint.config.js'],
     languageOptions: {

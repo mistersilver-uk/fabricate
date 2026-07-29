@@ -90,7 +90,9 @@ import { execFileSync } from 'node:child_process';
 import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { compile } from 'svelte/compiler';
+
 import { listSvelteComponents, toRepositoryPaths } from './lib/svelteComponentFiles.js';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -115,7 +117,7 @@ const EMISSION_ANCHORS = [
   '.innerHTML',
 ];
 
-const SIMPLE_ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
+const SIMPLE_ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', 0: '\0' };
 
 /** Characters that open a run whose contents are opaque to the statement splitter. */
 const LITERAL_DELIMITERS = new Set(["'", '"', '`']);
@@ -127,11 +129,27 @@ function parseArgs(argv) {
   const options = { base: 'origin/main', json: false, failOnDrift: false, filter: '' };
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
-    if (arg === '--base') options.base = argv[++index];
-    else if (arg === '--filter') options.filter = argv[++index];
-    else if (arg === '--json') options.json = true;
-    else if (arg === '--fail-on-drift') options.failOnDrift = true;
-    else throw new Error(`unknown argument: ${arg}`);
+    switch (arg) {
+      case '--base': {
+        options.base = argv[++index];
+        break;
+      }
+      case '--filter': {
+        options.filter = argv[++index];
+        break;
+      }
+      case '--json': {
+        options.json = true;
+        break;
+      }
+      case '--fail-on-drift': {
+        options.failOnDrift = true;
+        break;
+      }
+      default: {
+        throw new Error(`unknown argument: ${arg}`);
+      }
+    }
   }
   if (!options.base) throw new Error('--base needs a ref');
   return options;
@@ -223,6 +241,11 @@ function createGitCommands() {
      * turns the failure into a plain exit code so the caller can word its own message.
      */
     resolveCommit: (ref) =>
+      // `^{commit}` is git's own peel-to-a-commit revision syntax, written literally into the
+      // argument. It is not a `${…}` placeholder that lost its dollar sign, which is what
+      // no-incorrect-template-string-interpolation reads it as — a false positive, and "fixing"
+      // it to `${commit}` would interpolate an undefined binding and break the preflight.
+      // eslint-disable-next-line unicorn/no-incorrect-template-string-interpolation
       read(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])?.trim() ?? null,
 
     /**
@@ -506,6 +529,27 @@ function statements(normalised) {
   return chunks.filter(Boolean);
 }
 
+/**
+ * Order two Svelte compiler warning codes by codepoint, independently of the host locale.
+ *
+ * This inventory is not a cross-commit signal — `renderCategories` compares only `templates`,
+ * `emissions` and `css`, and `compareComponent` reads the head side's `warnings` alone. It is the
+ * head-side warning inventory `printReport` prints and `--json` serializes, so the order must be
+ * locale-INDEPENDENT for two runs on different machines to stay diffable. `localeCompare` would
+ * make it depend on the host's collation, so it is deliberately not used here.
+ *
+ * `String(…)` first, because the bare `.sort()` this replaces coerces with `ToString` before
+ * comparing: a relational comparator over the raw values diverges from it on non-strings
+ * (`[10, 9].sort()` is `[10, 9]`, while comparing the numbers gives `[9, 10]`). `warning.code` is
+ * a string today and nothing pins that, so the coercion is made explicit rather than assumed.
+ */
+function compareWarningCodes(a, b) {
+  const left = String(a);
+  const right = String(b);
+  if (left < right) return -1;
+  return left > right ? 1 : 0;
+}
+
 /** The compiled-render fingerprint of one component. */
 function fingerprint(source, filename) {
   const result = compile(source, { filename, generate: 'client', dev: false });
@@ -521,7 +565,7 @@ function fingerprint(source, filename) {
       .replaceAll(/\s+/g, ' ')
       .trim(),
     code,
-    warnings: result.warnings.map((warning) => warning.code).sort(),
+    warnings: result.warnings.map((warning) => warning.code).sort(compareWarningCodes),
   };
 }
 
@@ -601,10 +645,11 @@ function createReport(base, baseCommit, componentCount) {
  * comes back empty.
  */
 function renderCategories(base, head) {
-  const categories = [];
-  for (const delta of differences(base.templates, head.templates)) {
-    categories.push({ kind: 'templates', index: delta.index, ...window_(delta.base, delta.head) });
-  }
+  const categories = Array.from(differences(base.templates, head.templates), (delta) => ({
+    kind: 'templates',
+    index: delta.index,
+    ...window_(delta.base, delta.head),
+  }));
   for (const delta of differences(base.emissions, head.emissions)) {
     categories.push({ kind: 'emissions', index: delta.index, ...window_(delta.base, delta.head) });
   }
