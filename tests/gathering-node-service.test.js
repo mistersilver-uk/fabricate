@@ -233,12 +233,23 @@ function countingEvaluatorService() {
   return { service, evaluations: () => evaluations };
 }
 
-// Both cases assert the COUNT of expression evaluations, not the resulting pool
+// These cases assert the COUNT of expression evaluations, not the resulting pool
 // state: the state was already correct before the fix (the math's seed branch
 // consumed none of the pre-rolls), so the wasted work is the only defect signal.
-// The pair is symmetric because the two pre-roll blocks are structurally
-// identical but live 79 lines apart — `respawnInteractableNode` had no
-// expression-mode coverage at all, so a partial fix would otherwise ship green.
+//
+// `_respawnNode` and `respawnInteractableNode` carry structurally identical
+// pre-roll blocks, so each has to be pinned in BOTH directions or an edit to one
+// of them ships green:
+//  - "pre-rolls too many" — a null-anchored seeding tick must roll NOTHING. That
+//    is the issue 896 defect, and it is the pair of cases immediately below.
+//  - "pre-rolls none" — an anchored pool must still roll once per elapsed
+//    interval. `_respawnNode` gets that from `_respawnNode (expression) pre-rolls
+//    per interval via the evaluator` above; `respawnInteractableNode` had NO
+//    expression-mode coverage in either direction, so its positive case is added
+//    here. Without it, replacing that site's anchor line with `const last = now`
+//    or zeroing its pre-roll loop survives green — the site would then never
+//    pre-roll anything and every interactable-scoped `expression` pool would stop
+//    regrowing.
 
 test('_respawnNode: a null-anchored expression pool pre-rolls nothing on its seeding tick', async () => {
   const { service, evaluations } = countingEvaluatorService();
@@ -260,6 +271,39 @@ test('respawnInteractableNode: a null-anchored expression pool pre-rolls nothing
   });
   assert.equal(evaluations(), 0, 'issue 896: respawnInteractableNode must roll no expression amounts on the seeding tick');
   assert.equal(next.respawn.lastEvaluatedWorldTime, 500 * HOUR, 'the tick seeds the anchor at now');
+});
+
+// The positive counterpart for the scoped site: the pre-roll bound must still
+// produce one evaluation per elapsed interval for an ANCHORED pool. This is what
+// keeps the "pre-rolls none" direction honest at `respawnInteractableNode`.
+test('respawnInteractableNode (expression): pre-rolls per interval via the evaluator', async () => {
+  const { service, evaluations } = countingEvaluatorService();
+  const pool = nullAnchoredExpressionPool();
+  const node = { ...pool, max: 10, respawn: { ...pool.respawn, lastEvaluatedWorldTime: 0 } };
+  const { node: next } = await service.respawnInteractableNode({ node, worldTime: 2 * HOUR });
+  assert.equal(evaluations(), 2, '2 elapsed intervals → 2 evaluations');
+  assert.equal(next.current, 4, '2 intervals × rolled 2');
+});
+
+// The `interval > 0` half of both pre-roll guards, pinned at both sites: a legacy
+// zero-interval pool must skip the block entirely. Without this, dropping that
+// half divides by zero, yields an `Infinity` elapsed-interval count and pre-rolls
+// a full restock the math never consumes (it short-circuits on the interval).
+test('a legacy zero-interval expression pool pre-rolls nothing at either site', async () => {
+  const zeroInterval = () => {
+    const pool = nullAnchoredExpressionPool();
+    return {
+      ...pool,
+      respawn: { ...pool.respawn, intervalUnit: null, intervalSeconds: 0, lastEvaluatedWorldTime: 0 }
+    };
+  };
+  const env = countingEvaluatorService();
+  await env.service._respawnNode(zeroInterval(), { now: 5 * HOUR, environment: null, environmentId: 'e', taskId: 't' });
+  assert.equal(env.evaluations(), 0, '_respawnNode: no resolvable interval → the pre-roll block is skipped');
+
+  const scoped = countingEvaluatorService();
+  await scoped.service.respawnInteractableNode({ node: zeroInterval(), worldTime: 5 * HOUR });
+  assert.equal(scoped.evaluations(), 0, 'respawnInteractableNode: no resolvable interval → the pre-roll block is skipped');
 });
 
 // --- _resolveNodeSource (interactable scope) -------------------------------

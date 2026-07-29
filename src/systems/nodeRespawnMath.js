@@ -34,7 +34,20 @@ export function isNodeDepleted(node) {
  * i.e. the pool has never been evaluated, so it must be seeded at `now` rather
  * than read as anchored at some past instant.
  *
- * ONE shared definition for every site that resolves the anchor (issues 403, 896).
+ * ONE shared definition for every site that does anchor ARITHMETIC (issues 403,
+ * 896): the respawn step below, {@link nextRespawnEta}, and the two expression
+ * pre-roll bounds in `GatheringNodeService` (`_respawnNode` and
+ * `respawnInteractableNode`).
+ *
+ * It deliberately does NOT cover `commitAcceptedAttempt`
+ * (`src/systems/GatheringRichStateService.js`), which tests `== null` alone. That
+ * site is a seed WRITER, not an arithmetic read: it stamps the anchor at
+ * depletion time so the first world-time advance gains instead of only
+ * re-anchoring, and a non-finite anchor there is simply seeded one tick later by
+ * this predicate's own seed branch. Benign, so it is recorded rather than
+ * changed. (Note that file carries a raw NUL byte in a string literal, so plain
+ * `grep` reports it as binary and prints no matches — use `grep -a`.)
+ *
  * The predicate is nullish OR non-finite, and both halves are load-bearing:
  *  - the nullish half, because `normalizeRespawn` emits `null` for an unevaluated
  *    pool and `Number(null) === 0` is FINITE, so a laxer `Number.isFinite(...)`
