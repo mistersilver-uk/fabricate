@@ -121,8 +121,9 @@ class FakeActor {
 }
 
 // A duck-typed ingredient set whose resolveIngredientSelection matches items by
-// componentId. Currency spends are empty here (component-only recipes).
-function buildIngredientSet(id, ingredientDefs) {
+// componentId. `currencySpends` defaults to empty (component-only recipes); the issue-902
+// settlement tests pass a real plan so the START path runs the currency deduction.
+function buildIngredientSet(id, ingredientDefs, currencySpends = []) {
   return {
     id,
     resolveIngredientSelection(availableItems, matcher) {
@@ -138,7 +139,12 @@ function buildIngredientSet(id, ingredientDefs) {
         const item = availableItems.find((i) => matcher(ingredient, i));
         if (item) plan.push({ item, quantity: def.quantity, ingredient });
       }
-      return { success: plan.length === ingredientDefs.length, plan, currencySpends: [], missingGroups: [] };
+      return {
+        success: plan.length === ingredientDefs.length,
+        plan,
+        currencySpends: currencySpends.map((spend) => ({ ...spend })),
+        missingGroups: [],
+      };
     },
   };
 }
@@ -1028,4 +1034,305 @@ test('multi-step feature ON is NOT collapsed: one craft call resolves a single s
   const active = runManager.getActiveRuns(craftingActor);
   assert.equal(active.length, 1, 'the run stays active for the next step (normal multi-step flow)');
   assert.equal(active[0].currentStepIndex, 1, 'the run advanced to the second step, awaiting a new trigger');
+});
+
+// ---------------------------------------------------------------------------
+// START-phase currency SETTLEMENT (issue 902)
+//
+// A timed step consumes currency at START and records the consumption on the run.
+// It must record what actually SETTLED, never the intended plan: the record is the
+// sole input to the cancel reversal's refund, so a spend that never settled would
+// be handed back as currency the actor never paid.
+//
+// Failure is injected at the `spender.spend` seam. Underfunding cannot reach here —
+// `checkCurrencySpends` runs over every group and aborts the whole craft before any
+// mutation, so `markStepPrepared` is never called and the test would read identically
+// before and after the fix.
+// ---------------------------------------------------------------------------
+
+const { ActorPropertyCoinSpender } = await import('../src/systems/CoinSpenders.js');
+const { aggregateCurrencySpends } = await import('../src/systems/currencyAffordance.js');
+const { validateCurrencyProfile } = await import('../src/systems/currencyProfile.js');
+const {
+  CurrencyCraftingActorFake,
+  SINGLE_TERMINAL_CURRENCY_UNITS,
+  TWO_TERMINAL_CURRENCY_UNITS,
+  makeCurrencyCraftingSystem,
+  makeDelegatingCoinSpender,
+} = await import('./helpers/currency-spend-fixtures.js');
+
+// Drive a timed craft's START phase with a real currency profile and a delegating
+// spender spy, and hand back everything the money assertions need.
+//
+// `t` is the node:test context, used ONLY to register the `fromUuidSync` teardown
+// through `t.after` — which runs even when an assertion throws mid-test, unlike a bare
+// `delete` at the end of a test body, which leaks the global on the first failure.
+async function startTimedCurrencyCraft({
+  t,
+  units,
+  currencySpends,
+  startingCurrency,
+  failSpendFor = [],
+  failRefundFor = [],
+}) {
+  const system = makeCurrencyCraftingSystem({
+    id: 'sys-currency-settlement',
+    units,
+    components: [{ id: 'wood', name: 'Wood' }],
+  });
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 5);
+  const sourceActor = new FakeActor('Source', [wood]);
+  globalThis.fromUuidSync = (uuid) => (uuid === sourceActor.uuid ? sourceActor : null);
+  t.after(() => {
+    delete globalThis.fromUuidSync;
+  });
+  const craftingActor = new CurrencyCraftingActorFake('Crafter', { currency: startingCurrency });
+
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }], currencySpends);
+  const recipe = buildRecipe({
+    craftingSystemId: system.id,
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+
+  const runManager = new CraftingRunManager();
+  const spy = makeDelegatingCoinSpender(new ActorPropertyCoinSpender(), {
+    failSpendFor,
+    failRefundFor,
+  });
+  const engine = new CraftingEngine(
+    buildRecipeManager({ ingredientSet: set }),
+    runManager,
+    null,
+    null,
+    null,
+    null,
+    spy
+  );
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+  return {
+    engine,
+    runManager,
+    startResult,
+    craftingActor,
+    sourceActor,
+    spy,
+    profile: validateCurrencyProfile(units, { spendStrategy: 'actorProperty' }),
+    run: runManager.getActiveRuns(craftingActor)[0],
+  };
+}
+
+test('START records the FULL plan when every currency group settles (positive control)', async (t) => {
+  const currencySpends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  const context = await startTimedCurrencyCraft({
+    t,
+    units: TWO_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47, gem: 9 },
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+  assert.equal(context.spy.spendCalls.length, 2, 'both groups were spent');
+  assert.deepEqual(
+    context.run.steps[0].preparedConsumption.currencySpends,
+    currencySpends,
+    'a fully settled spend is recorded in full — the record is never blanket-emptied'
+  );
+  assert.equal(context.craftingActor.system.currency.gp, 45);
+  assert.equal(context.craftingActor.system.currency.gem, 6);
+
+  // The same fixture's full-success cancel: the refund seam is demonstrably live and the
+  // balance actually INCREASES back to the starting values.
+  const cancel = await context.engine.cancelCraft(
+    context.craftingActor,
+    [context.sourceActor],
+    context.run.id,
+    { refund: true }
+  );
+  assert.equal(cancel.success, true);
+  assert.equal(cancel.refunded, true);
+  assert.equal(context.spy.refundCalls.length, 2, 'both recorded groups are refunded');
+  assert.equal(context.craftingActor.system.currency.gp, 47, 'gp refunded 45 -> 47');
+  assert.equal(context.craftingActor.system.currency.gem, 9, 'gem refunded 6 -> 9');
+});
+
+test('START records [] when the only currency group fails, and the cancel mints nothing', async (t) => {
+  const currencySpends = [{ unit: 'gp', amount: 5 }];
+  const context = await startTimedCurrencyCraft({
+    t,
+    units: SINGLE_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47 },
+    failSpendFor: ['gp'],
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    1,
+    'a shipped-preset-shaped profile has ONE terminal base unit'
+  );
+  assert.equal(context.startResult.success, false, 'START arms the gate and waits');
+  assert.equal(context.spy.spendCalls.length, 1, 'the spy demonstrably ran during START');
+  assert.deepEqual(
+    context.run.steps[0].preparedConsumption.currencySpends,
+    [],
+    'nothing settled, so the run records nothing'
+  );
+  assert.equal(context.craftingActor.updates.length, 0, 'no currency left the actor at START');
+
+  const cancel = await context.engine.cancelCraft(
+    context.craftingActor,
+    [context.sourceActor],
+    context.run.id,
+    { refund: true }
+  );
+
+  // The reversal demonstrably EXECUTED: the consumed ingredient came back and the run
+  // was archived. An unchanged balance is therefore a result, not a skipped path.
+  assert.equal(cancel.success, true);
+  assert.equal(cancel.cancelled, true);
+  assert.equal(cancel.restoredCount, 1, 'the consumed ingredient was restored');
+  assert.equal(context.sourceActor._createdDocs.length, 1, 'restored onto the source actor');
+  assert.equal(context.runManager.getActiveRuns(context.craftingActor).length, 0);
+
+  // The money. `refunded: true` is NOT assertable here — an empty record skips the refund
+  // and reports the same value a FULL refund does. Assert that no currency was written.
+  assert.equal(context.spy.refundCalls.length, 0, 'no group is refunded, because none settled');
+  assert.equal(context.craftingActor.updates.length, 0, 'no currency write in either direction');
+  assert.equal(context.craftingActor.system.currency.gp, 47, 'the balance is exactly unchanged');
+});
+
+test('START records exactly the SETTLED group when the second of two groups fails', async (t) => {
+  const currencySpends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  const context = await startTimedCurrencyCraft({
+    t,
+    units: TWO_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47, gem: 9 },
+    failSpendFor: ['gem'],
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+  assert.equal(context.spy.spendCalls.length, 2, 'the settled first group let the second run');
+  assert.deepEqual(
+    context.run.steps[0].preparedConsumption.currencySpends,
+    [{ unit: 'gp', amount: 2 }],
+    'exactly ONE entry, naming the settled unit — the plan (2) and nothing (0) are both wrong'
+  );
+  assert.equal(context.craftingActor.system.currency.gp, 45, 'the settled group was deducted');
+  assert.equal(context.craftingActor.system.currency.gem, 9, 'the failed group deducted nothing');
+
+  const cancel = await context.engine.cancelCraft(
+    context.craftingActor,
+    [context.sourceActor],
+    context.run.id,
+    { refund: true }
+  );
+  assert.equal(cancel.success, true);
+  assert.equal(context.spy.refundCalls.length, 1, 'only the settled group is refunded');
+  assert.equal(context.craftingActor.system.currency.gp, 47, 'the settled spend is returned');
+  assert.equal(context.craftingActor.system.currency.gem, 9, 'the unsettled spend mints nothing');
+});
+
+// The PARTIAL refund — one terminal base unit returned, another stranded. It is the
+// middle value the object-valued `currencyRefund` return exists to express, and it is
+// production-reachable: `validateCurrencyProfile` accepts a two-terminal profile.
+// Both spends SETTLE here (so both are recorded); the failure is injected on the REFUND.
+
+test('reverseRunConsumption reports a PARTIAL refund when one group returns and another fails', async (t) => {
+  const currencySpends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  const context = await startTimedCurrencyCraft({
+    t,
+    units: TWO_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47, gem: 9 },
+    failRefundFor: ['gem'],
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+  assert.deepEqual(
+    context.run.steps[0].preparedConsumption.currencySpends,
+    currencySpends,
+    'both groups settled, so both are recorded and both are attempted on reversal'
+  );
+
+  const reversal = await context.engine.reverseRunConsumption(
+    context.craftingActor,
+    context.run
+  );
+
+  assert.equal(context.spy.refundCalls.length, 2, 'the failing group did not abort the other');
+  assert.equal(reversal.currencyRefund.status, 'partial', 'neither a full refund nor a total loss');
+  assert.equal(reversal.currencyRefund.refundedGroups, 1);
+  assert.equal(reversal.currencyRefund.attempted, true);
+  assert.equal(reversal.restoreFailures, 0, 'the ingredient half succeeded, isolating the currency');
+  assert.equal(
+    reversal.ok,
+    false,
+    'a partial refund is NOT a complete reversal — reporting it complete strands money silently'
+  );
+  assert.equal(context.craftingActor.system.currency.gp, 47, 'gp came back (45 -> 47)');
+  assert.equal(context.craftingActor.system.currency.gem, 6, 'gem is stranded at the spent balance');
+});
+
+test('cancel reports refunded:false + partialRefund:true when one currency group fails to refund', async (t) => {
+  const currencySpends = [
+    { unit: 'gp', amount: 2 },
+    { unit: 'gem', amount: 3 },
+  ];
+  const context = await startTimedCurrencyCraft({
+    t,
+    units: TWO_TERMINAL_CURRENCY_UNITS,
+    currencySpends,
+    startingCurrency: { gp: 47, gem: 9 },
+    failRefundFor: ['gem'],
+  });
+  assert.equal(
+    aggregateCurrencySpends(currencySpends, context.profile).length,
+    2,
+    'the fixture must aggregate to TWO terminal base units, not collapse to one'
+  );
+
+  const cancel = await context.engine.cancelCraft(
+    context.craftingActor,
+    [context.sourceActor],
+    context.run.id,
+    { refund: true }
+  );
+
+  assert.equal(cancel.success, true, 'the cancel still completes');
+  assert.equal(
+    cancel.refunded,
+    false,
+    'a stranded terminal base unit must never be reported as a full refund'
+  );
+  assert.equal(cancel.partialRefund, true, 'some inputs came back, some did not');
+  assert.equal(cancel.restoredCount, 1, 'the ingredient half succeeded');
+  assert.equal(context.spy.refundCalls.length, 2);
+  assert.equal(context.craftingActor.system.currency.gp, 47);
+  assert.equal(context.craftingActor.system.currency.gem, 6, 'the player is NOT told this returned');
+  assert.equal(context.runManager.getActiveRuns(context.craftingActor).length, 0, 'run archived');
 });

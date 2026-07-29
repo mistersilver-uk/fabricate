@@ -142,7 +142,12 @@ function setupGame(system, { sourceActor } = {}) {
 
 // Build an active timed run whose current step is CONSUMED (has a START snapshot)
 // but not yet resolved — the exact state a mid-run cancel targets.
-async function seedConsumedRun(runManager, craftingActor, sourceActor) {
+async function seedConsumedRun(
+  runManager,
+  craftingActor,
+  sourceActor,
+  { currencySpends = [{ unit: 'gp', amount: 5 }] } = {}
+) {
   const recipe = {
     id: 'recipe-cancel',
     craftingSystemId: 'sys-cancel',
@@ -151,7 +156,7 @@ async function seedConsumedRun(runManager, craftingActor, sourceActor) {
   const run = await runManager.createRun(craftingActor, recipe, [sourceActor], 'user-1');
   await runManager.markStepPrepared(craftingActor, run, 0, {
     selectedIngredientSetId: 'set-1',
-    currencySpends: [{ unit: 'gp', amount: 5 }],
+    currencySpends,
     resolvedEssences: {},
     consumedSummary: [
       {
@@ -369,6 +374,95 @@ test('a mid-reversal RESTORE failure cannot double-restore: run is archived, not
   assert.equal(runManager.getActiveRuns(craftingActor).length, 0, 'the run is archived, not left active');
   const second = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
   assert.equal(second.success, false, 'the archived run cannot be re-cancelled');
+});
+
+// ---------------------------------------------------------------------------
+// Truthful reversal reporting (issue 902).
+//
+// `partialRefund` means "some inputs came back, some did not". A reversal that
+// recovered NOTHING is a total failure and §RunModel forbids reporting it as partial.
+// ---------------------------------------------------------------------------
+
+test('a reversal that recovers NOTHING (no currency recorded) reports partialRefund:false', async () => {
+  const system = makeSystem();
+  const craftingActor = new FakeActor('Crafter', { gp: 41 });
+  // The source actor rejects item creation, so nothing is restored either.
+  const sourceActor = new FakeActor('Source', { gp: 0, failCreate: true });
+  setupGame(system, { sourceActor });
+
+  const runManager = new CraftingRunManager();
+  const engine = makeEngine(runManager);
+  // An empty record is what a step whose currency deduction settled NOTHING now writes.
+  const run = await seedConsumedRun(runManager, craftingActor, sourceActor, {
+    currencySpends: [],
+  });
+
+  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+
+  assert.equal(result.success, true, 'the cancel still completes');
+  assert.equal(result.refunded, false, 'nothing was recovered');
+  assert.equal(result.restoredCount, 0, 'the restore failed');
+  assert.equal(
+    result.partialRefund,
+    false,
+    'a total failure must never be reported as a partial refund'
+  );
+  assert.equal(craftingActor._updates.length, 0, 'no currency was recorded, so none is written');
+  assert.equal(craftingActor.system.currency.gp, 41, 'the balance is exactly unchanged');
+});
+
+test('a reversal whose restore AND currency refund both fail reports partialRefund:false', async () => {
+  const system = makeSystem();
+  // `update` throws, so the currency refund cannot apply.
+  const craftingActor = new FakeActor('Crafter', { gp: 41, failUpdate: true });
+  const sourceActor = new FakeActor('Source', { gp: 0, failCreate: true });
+  setupGame(system, { sourceActor });
+
+  const runManager = new CraftingRunManager();
+  const engine = makeEngine(runManager);
+  const run = await seedConsumedRun(runManager, craftingActor, sourceActor);
+
+  const result = await engine.cancelCraft(craftingActor, [sourceActor], run.id, { refund: true });
+
+  assert.equal(result.success, true);
+  assert.equal(result.refunded, false);
+  assert.equal(result.restoredCount, 0);
+  assert.equal(
+    result.partialRefund,
+    false,
+    'both halves failed, so nothing came back — an object-valued refund result read in ' +
+      'boolean context would silently collapse this to true'
+  );
+  assert.equal(craftingActor.system.currency.gp, 41, 'the balance is exactly unchanged');
+});
+
+test('reverseRunConsumption reports the currency refund outcome, not a single boolean', async () => {
+  const system = makeSystem();
+  const craftingActor = new FakeActor('Crafter', { gp: 41 });
+  const sourceActor = new FakeActor('Source', { gp: 0 });
+  setupGame(system, { sourceActor });
+
+  const runManager = new CraftingRunManager();
+  const engine = makeEngine(runManager);
+
+  // Nothing recorded: the refund was never ATTEMPTED, which is not a success.
+  const emptyRun = await seedConsumedRun(runManager, craftingActor, sourceActor, {
+    currencySpends: [],
+  });
+  const noCurrency = await engine.reverseRunConsumption(craftingActor, emptyRun);
+  assert.equal(noCurrency.currencyRefund.status, 'none');
+  assert.equal(noCurrency.currencyRefund.attempted, false);
+  assert.equal(noCurrency.currencyRefund.refundedGroups, 0);
+  assert.equal(noCurrency.ok, true, 'an unattempted refund does not make the reversal incomplete');
+
+  // A recorded group whose refund fails: total failure, with a live group count of zero.
+  const failing = new FakeActor('Failer', { gp: 41, failUpdate: true });
+  const failingRun = await seedConsumedRun(runManager, failing, sourceActor);
+  const refundFailed = await engine.reverseRunConsumption(failing, failingRun);
+  assert.equal(refundFailed.currencyRefund.status, 'failed');
+  assert.equal(refundFailed.currencyRefund.attempted, true);
+  assert.equal(refundFailed.currencyRefund.refundedGroups, 0);
+  assert.equal(refundFailed.ok, false);
 });
 
 test('multi-step cancel reverses ONLY the consumed-but-unresolved step, never a succeeded step', async () => {

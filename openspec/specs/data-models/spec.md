@@ -1218,10 +1218,13 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
 2. Affordability is evaluated against the crafting actor through the same currency profile/spend strategy the system configures (`actorProperty` / `actorInventory` / `macro`).
    The craftability display and the engine execution resolve currency against the **same** actor, so what a player sees agrees with what the craft spends.
    With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
-3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated across units that share a base ladder — **before** any item or currency mutation.
+3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated per terminal base unit — **before** any item or currency mutation.
    On a shortfall the craft aborts with an `Insufficient currency` message and zero mutation, and never falls back to an unselected item plan.
 4. Currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
-   Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded.
+   Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded — the settled deductions are NOT rolled back, and the craft still proceeds.
+   Deduction is aggregated per terminal base unit and stops at the first group that fails, so no further currency is taken for a craft already in an anomalous state; the deduction reports which groups settled.
+   A time-gated step that consumes at START records on its run ONLY the spends that actually settled, never the intended plan.
+   A group that did not settle is not recorded, so no later reversal can return currency the actor never paid.
 5. When `requirements.currency.enabled === false`, a currency option can never satisfy its group (it is shown missing), regardless of the actor's balance.
 6. A currency requirement or cost is displayed by resolving the unit `id` to a human label through the chain `abbreviation` (when authored) → `label`, so a well-formed requirement never surfaces the raw unit `id`.
    The sole exception is a degenerate orphaned reference — a `requirement.unit` id no longer present in the system's resolved currency config — which `formatCurrencyRequirement` renders verbatim as a last-resort fallback (a stale id being preferable to a blank cost).
@@ -1564,6 +1567,19 @@ CraftingRunStepState = {
 
   selectedIngredientSetId?: string,
 
+  // START-phase consumption snapshot for a time-gated step, written when the gate is ARMED
+  // and read at FINISH (source items are already deleted) and by the cancel reversal.
+  // Absent for instant / non-timed steps and on pre-snapshot historical records.
+  preparedConsumption?: {
+    selectedIngredientSetId: string | null,
+    currencySpends: Array<{ unit: string, amount: number }>, // SETTLED spends only
+    resolvedEssences: object,
+    consumedSummary: Array<{
+      itemUuid: string | null, actorUuid: string | null, quantity: number,
+      name: string | null, img: string | null, componentId: string | null,
+    }>,
+  },
+
   // Authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
   // Component-backed ingredients of the step's primary (first) ingredient set only; tag /
   // essence requirements carry no component id and are omitted. Persisting the stable ids
@@ -1631,6 +1647,8 @@ CraftingRunStepState = {
 4. `completedAt` is required when `status` is `succeeded`, or `failed`.
 5. `lastCheckResult.outcome` is only valid in `routedByCheck` mode (and in alchemy when `checkMode` is `tiered`); `lastCheckResult.value` is only valid in progressive mode.
 6. `failureReason` is required when `status` is `failed`.
+7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
+   It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
 
 ## Actor Flags
 
@@ -1811,6 +1829,7 @@ A **player self-cancel** removes an in-progress crafting run (archived to histor
 It is owner-scoped with no GM relay (the engine writes items directly), so the cancel edge blocks a non-owner exactly as the advance edge does.
 When the system's `features.refundOnPlayerCancel` policy is on (default), the reversal restores each consumed ingredient onto its recorded source actor and refunds the spent currency (the shared "un-consume" primitive, reused by the GM cancel/reverse); when off, the inputs are forfeit.
 The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
+The currency refund is attempted for EVERY recorded group even when one fails, and its result distinguishes a full refund, a partial refund, and a total failure, because "one terminal base unit returned, another failed" and "nothing returned" require different operator responses.
 
 ### StepModel
 

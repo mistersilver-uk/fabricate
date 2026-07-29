@@ -1257,7 +1257,14 @@ export class CraftingEngine {
 
     // Consume NOW (at START): items first, then currency (both gates passed).
     const consumedItems = await this._consumeIngredients(craftSelection.plan);
-    await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+    // The deduction deliberately does not abort the craft on failure (clause 4 forbids
+    // both aborting and rolling back), so the run must record what SETTLED rather than
+    // what was planned — otherwise a cancel refunds currency the actor never paid.
+    const currencySettlement = await this._spendCraftCurrency(
+      craftingActor,
+      executionRecipe,
+      currencySpends
+    );
     await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
     // Snapshot for the FINISH resume: essence quantities are precomputed here
@@ -1284,7 +1291,7 @@ export class CraftingEngine {
 
     await runManager.markStepPrepared(craftingActor, run, stepIndex, {
       selectedIngredientSetId: ingredientSet.id,
-      currencySpends,
+      currencySpends: currencySettlement.settledSpends,
       resolvedEssences,
       consumedSummary,
     });
@@ -2336,10 +2343,22 @@ export class CraftingEngine {
    * already confirmed affordability, so this runs after item consumption. A spend
    * failure here is logged (mirroring the Item-Piles deduct-error handling) and never
    * refunded — it does not abort the craft, matching the no-refund policy.
+   *
+   * It RETURNS the settlement (issue 902). The four terminal-craft call sites keep
+   * ignoring it and keep their non-aborting behaviour: they hold no run record, so a
+   * spend that fails there loses money but can never mint it. Only the time-gated
+   * START path ({@link _startTimedStep}) consumes the return, because only it persists
+   * a record that a later cancel reversal would otherwise hand back.
+   *
+   * Never throws: a thrown deduction reports total non-settlement, so nothing is
+   * recorded and nothing can be refunded.
+   *
    * @private
+   * @returns {Promise<{ valid: boolean, message?: string, groups: object[],
+   *   settledSpends: Array<{unit: string, amount: number}> }>}
    */
   async _spendCraftCurrency(craftingActor, recipe, currencySpends) {
-    if (!currencySpends?.length) return;
+    if (!currencySpends?.length) return { valid: true, groups: [], settledSpends: [] };
     try {
       const result = await spendCurrencySpends(
         craftingActor,
@@ -2350,8 +2369,15 @@ export class CraftingEngine {
       if (!result?.valid) {
         console.error('Fabricate | Currency deduction reported failure', result?.message);
       }
+      return {
+        valid: result?.valid === true,
+        message: result?.message,
+        groups: Array.isArray(result?.groups) ? result.groups : [],
+        settledSpends: Array.isArray(result?.settledSpends) ? result.settledSpends : [],
+      };
     } catch (error) {
       console.error('Fabricate | Currency deduction error', error);
+      return { valid: false, groups: [], settledSpends: [] };
     }
   }
 
@@ -2360,10 +2386,17 @@ export class CraftingEngine {
    * {@link _spendCraftCurrency}. A failure is logged (never thrown) so a cancel that
    * cannot refund currency still removes the run. Shared by the player-cancel path
    * (issue 848) and reusable by the GM cancel/reverse (issue 847).
+   *
+   * FAILS CLOSED (issue 902): a refund that throws reports total failure with NO group
+   * detail, and absent detail must be read as unknown-and-failed. Inferring "no failed
+   * groups listed, therefore everything refunded" would reproduce this issue's own
+   * defect class one level up.
+   *
    * @private
+   * @returns {Promise<{ valid: boolean, message?: string, groups: object[] }>}
    */
   async _refundCraftCurrency(craftingActor, recipe, currencySpends) {
-    if (!currencySpends?.length) return { valid: true };
+    if (!currencySpends?.length) return { valid: true, groups: [] };
     try {
       const result = await refundCurrencySpends(
         craftingActor,
@@ -2374,10 +2407,14 @@ export class CraftingEngine {
       if (!result?.valid) {
         console.error('Fabricate | Currency refund reported failure', result?.message);
       }
-      return result;
+      return {
+        valid: result?.valid === true,
+        message: result?.message,
+        groups: Array.isArray(result?.groups) ? result.groups : [],
+      };
     } catch (error) {
       console.error('Fabricate | Currency refund error', error);
-      return { valid: false };
+      return { valid: false, groups: [] };
     }
   }
 
@@ -2507,16 +2544,25 @@ export class CraftingEngine {
    * ingredient restored AND every attempted currency refund succeeded — so the caller can
    * report the truthful outcome rather than the refund policy's intent.
    *
+   * The currency half reports a `currencyRefund` VALUE rather than a boolean (issue 902),
+   * because "one terminal base unit returned, another failed" and "nothing returned"
+   * require different operator responses. Read `currencyRefund.status` or its counts —
+   * never the value itself in boolean context, since an object is always truthy.
+   *
    * @param {Actor} craftingActor
    * @param {object} run The active run whose consumption should be reversed.
    * @returns {Promise<{ restored: object[], restoreFailures: number,
-   *   currencyAttempted: boolean, currencyRefunded: boolean, ok: boolean }>}
+   *   currencyAttempted: boolean,
+   *   currencyRefund: { attempted: boolean, refundedGroups: number,
+   *     status: 'none'|'full'|'partial'|'failed' },
+   *   ok: boolean }>}
    */
   async reverseRunConsumption(craftingActor, run) {
     const restored = [];
     let restoreFailures = 0;
     let currencyAttempted = false;
-    let currencyRefunded = true;
+    let currencyFailed = false;
+    let refundedGroups = 0;
     const recipe = this.recipeManager?.getRecipe?.(run?.recipeId) ?? {
       craftingSystemId: run?.craftingSystemId ?? null,
     };
@@ -2533,6 +2579,8 @@ export class CraftingEngine {
       );
       restored.push(...outcome.restored);
       restoreFailures += outcome.failures;
+      // The record holds only the spends that SETTLED, so an empty array correctly skips
+      // the refund: there is nothing the actor paid and nothing to hand back.
       if (Array.isArray(prepared.currencySpends) && prepared.currencySpends.length > 0) {
         currencyAttempted = true;
         const refund = await this._refundCraftCurrency(
@@ -2540,14 +2588,37 @@ export class CraftingEngine {
           recipe,
           prepared.currencySpends
         );
+        // Count the groups that DEMONSTRABLY came back. Absent group detail (a refund that
+        // threw) therefore counts zero — unknown-and-failed, never "all refunded".
+        refundedGroups += (refund?.groups || []).filter((group) => group.refunded === true).length;
         // Any failed refund makes the whole reversal incomplete (fail-closed on truth).
-        if (refund?.valid !== true) currencyRefunded = false;
+        if (refund?.valid !== true) currencyFailed = true;
       }
     }
+    const currencyRefund = this._currencyRefundOutcome({
+      attempted: currencyAttempted,
+      failed: currencyFailed,
+      refundedGroups,
+    });
     // A refund that was never attempted is not a failure; the reversal is complete only
     // when nothing failed to restore and no attempted currency refund reported failure.
-    const ok = restoreFailures === 0 && (!currencyAttempted || currencyRefunded);
-    return { restored, restoreFailures, currencyAttempted, currencyRefunded, ok };
+    const ok =
+      restoreFailures === 0 &&
+      (currencyRefund.status === 'none' || currencyRefund.status === 'full');
+    return { restored, restoreFailures, currencyAttempted, currencyRefund, ok };
+  }
+
+  /**
+   * Classify a reversal's currency refund (issue 902). `none` means it was never
+   * attempted (nothing settled, so nothing was recorded), which is NOT a success and
+   * NOT a failure; `partial` requires at least one group demonstrably back.
+   * @private
+   */
+  _currencyRefundOutcome({ attempted, failed, refundedGroups }) {
+    let status = 'full';
+    if (!attempted) status = 'none';
+    else if (failed) status = refundedGroups > 0 ? 'partial' : 'failed';
+    return { attempted, refundedGroups, status };
   }
 
   /**
@@ -2595,8 +2666,12 @@ export class CraftingEngine {
         restoredCount = reversal.restored.length;
         reversalOk = reversal.ok;
         // A partial reversal (some inputs back, some lost) is worth flagging distinctly
-        // from a total failure so callers can message honestly.
-        partialRefund = !reversal.ok && (reversal.restored.length > 0 || reversal.currencyRefunded);
+        // from a total failure so callers can message honestly. Both operands must be
+        // re-derived rather than read from `currencyRefund` directly: it is an OBJECT and
+        // would collapse this whole expression to `!reversal.ok` in boolean context. A
+        // refund that was never attempted recovered nothing, so it is not partial either.
+        const currencyRecovered = reversal.currencyRefund.refundedGroups > 0;
+        partialRefund = !reversal.ok && (reversal.restored.length > 0 || currencyRecovered);
       }
     } finally {
       // Always archive the run, even if the reversal threw or partially failed, so the
