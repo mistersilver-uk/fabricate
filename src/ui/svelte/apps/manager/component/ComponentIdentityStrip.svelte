@@ -55,7 +55,7 @@
     onReplaceSource = () => {},
     onUnlinkSource = () => {},
     onOpenSource = () => {},
-    onCopySourceUuid = () => {}
+    onCopySourceUuid = () => {},
   } = $props();
 
   // Source linkage is projected onto the component row by the admin store, so this
@@ -70,8 +70,8 @@
   // projected fields and the same lang keys as `componentEditSourceSegment()` in the
   // manager root — one vocabulary, so the badge and the header can never disagree.
   const sourceOriginLabel = $derived(
-    component?.sourceOriginLabel
-      || (component?.sourceOrigin === 'compendium'
+    component?.sourceOriginLabel ||
+      (component?.sourceOrigin === 'compendium'
         ? text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium')
         : component?.sourceOrigin === 'world'
           ? text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory')
@@ -111,13 +111,13 @@
     {
       id: 'copy-source',
       label: text('FABRICATE.Admin.Manager.Component.CopySource', 'Copy source UUID'),
-      icon: 'fas fa-copy'
+      icon: 'fas fa-copy',
     },
     {
       id: 'unlink-source',
       label: text('FABRICATE.Admin.Manager.Component.SourceCard.Unlink', 'Unlink Source Item'),
-      icon: 'fas fa-link-slash'
-    }
+      icon: 'fas fa-link-slash',
+    },
   ]);
 
   // Commits immediately — the admin store validates the drop payload, mirroring the
@@ -177,7 +177,9 @@
   use:dragDrop={{
     onDrop: handleSourceDrop,
     activeClass: 'is-drop-active',
-    onActiveChange: (active) => { dropActive = active; }
+    onActiveChange: (active) => {
+      dropActive = active;
+    },
   }}
 >
   <span class="manager-component-identity-chip" aria-hidden="true">
@@ -202,20 +204,37 @@
           class="manager-component-identity-name"
           data-component-edit-action="open-source"
           data-component-edit-field="name"
-          onclick={(event) => { event.stopPropagation(); openSource(); }}
+          onclick={(event) => {
+            event.stopPropagation();
+            openSource();
+          }}
           title={text('FABRICATE.Admin.Manager.Component.SourceCard.Open', 'Open Source Item')}
-        >{sourceName}</button>
+          >{sourceName}</button
+        >
       {:else}
-        <span class="manager-component-identity-name" data-component-edit-field="name">{component?.name || '—'}</span>
+        <span class="manager-component-identity-name" data-component-edit-field="name"
+          >{component?.name || '—'}</span
+        >
       {/if}
 
       {#if hasRegisteredItemUuid && !sourceMissing}
-        <Chip icon="fas fa-lock" class="manager-component-identity-lock" data-component-identity-lock>
-          <span>{`${text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')} ${sourceOriginLabel}`}</span>
+        <Chip
+          icon="fas fa-lock"
+          class="manager-component-identity-lock"
+          data-component-identity-lock
+        >
+          <span
+            >{`${text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')} ${sourceOriginLabel}`}</span
+          >
         </Chip>
       {:else if sourceMissing}
         <Chip tone="warning" icon="fas fa-link-slash" data-component-source-unresolved>
-          <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.MissingLabel', 'Source item unresolved')}</span>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Component.SourceCard.MissingLabel',
+              'Source item unresolved'
+            )}</span
+          >
         </Chip>
       {/if}
 
@@ -232,7 +251,10 @@
           triggerClass="manager-icon-button manager-component-overflow-trigger"
           triggerIcon="fas fa-ellipsis-vertical"
           triggerTitle={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
-          triggerAriaLabel={text('FABRICATE.Admin.Manager.Component.SourceActions', 'Source actions')}
+          triggerAriaLabel={text(
+            'FABRICATE.Admin.Manager.Component.SourceActions',
+            'Source actions'
+          )}
           popoverClass="manager-component-overflow-popover"
           onChoose={chooseOverflow}
         />
@@ -240,22 +262,39 @@
     </div>
 
     <!-- Flowing prose, not a boxed control. Read from the LIVE prop. -->
-    <p class="manager-component-identity-description" data-component-edit-field="description">{component?.description || '—'}</p>
+    <p class="manager-component-identity-description" data-component-edit-field="description">
+      {component?.description || '—'}
+    </p>
 
     {#if showPremiseNote}
       <p class="manager-component-identity-note" data-component-identity-premise>
         <i class="fas fa-circle-info" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Component.Identity.SourceBackedHint', 'Name, image & description follow the linked item and can’t be edited here.')}</span>
+        <span
+          >{text(
+            'FABRICATE.Admin.Manager.Component.Identity.SourceBackedHint',
+            'Name, image & description follow the linked item and can’t be edited here.'
+          )}</span
+        >
       </p>
     {:else if unlinked}
       <p class="manager-component-identity-note" data-component-identity-unlinked-hint>
         <i class="fas fa-circle-info" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Component.Identity.UnlinkedHint', 'This component has no linked Foundry item, so it has no name, image or description to follow. Drop one here to link it.')}</span>
+        <span
+          >{text(
+            'FABRICATE.Admin.Manager.Component.Identity.UnlinkedHint',
+            'This component has no linked Foundry item, so it has no name, image or description to follow. Drop one here to link it.'
+          )}</span
+        >
       </p>
     {:else if sourceMissing}
       <p class="manager-component-identity-note" data-component-source-missing-hint>
         <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</span>
+        <span
+          >{text(
+            'FABRICATE.Admin.Manager.Component.SourceMissingHint',
+            'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.'
+          )}</span
+        >
       </p>
     {/if}
   </div>
@@ -274,19 +313,41 @@
     role="group"
     aria-label={text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item')}
     title={hasRegisteredItemUuid
-      ? text('FABRICATE.Admin.Manager.Component.SourceCard.ReplaceHint', 'Drop a Foundry item to replace it, or right-click to unlink.')
-      : text('FABRICATE.Admin.Manager.Component.SourceCard.NoSourceTitle', 'Drop a Foundry item to link this component to a source.')}
-    oncontextmenu={(event) => { event.preventDefault(); unlinkSource(); }}
+      ? text(
+          'FABRICATE.Admin.Manager.Component.SourceCard.ReplaceHint',
+          'Drop a Foundry item to replace it, or right-click to unlink.'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.Component.SourceCard.NoSourceTitle',
+          'Drop a Foundry item to link this component to a source.'
+        )}
+    oncontextmenu={(event) => {
+      event.preventDefault();
+      unlinkSource();
+    }}
     onmousedown={onLinkedSourceMouseDown}
   >
-    <i class={dropActive ? 'fas fa-arrow-down-to-bracket' : 'fas fa-arrow-right-arrow-left'} aria-hidden="true"></i>
+    <i
+      class={dropActive ? 'fas fa-arrow-down-to-bracket' : 'fas fa-arrow-right-arrow-left'}
+      aria-hidden="true"
+    ></i>
     {#if dropActive}
       <!-- Under a drag the strip stops describing the CURRENT link and describes what
            releasing will do — the swap is destructive-ish (it restamps the roles map and
            commits immediately), so it says so before the drop, not after. -->
-      <span data-component-source-release>{text('FABRICATE.Admin.Manager.Component.SourceCard.ReleaseToSwap', 'Release to swap the linked item')}</span>
+      <span data-component-source-release
+        >{text(
+          'FABRICATE.Admin.Manager.Component.SourceCard.ReleaseToSwap',
+          'Release to swap the linked item'
+        )}</span
+      >
     {:else}
-      <span>{text('FABRICATE.Admin.Manager.Component.SourceCard.ReplaceLabel', 'Drop a world or compendium item to replace')}</span>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.Component.SourceCard.ReplaceLabel',
+          'Drop a world or compendium item to replace'
+        )}</span
+      >
     {/if}
   </div>
 </section>

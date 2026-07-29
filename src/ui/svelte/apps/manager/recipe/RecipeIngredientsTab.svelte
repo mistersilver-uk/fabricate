@@ -43,7 +43,7 @@
     // as "Ingredient sets", everything else as "Ingredients".
     routingProvider = null,
     onUpdateIngredientSets = () => {},
-    onDeleteStep = () => {}
+    onDeleteStep = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -51,24 +51,38 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
+  const ingredientSets = $derived(
+    Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
+  );
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
   // Per-mode heading + intro OUTSIDE any card (§B5), mirroring the Results tab.
   const heading = $derived(
     isMultiStep
       ? {
-          title: text('FABRICATE.Admin.Manager.Recipe.IngredientsHeadingMultiStep', 'Steps & ingredients'),
-          intro: text('FABRICATE.Admin.Manager.Recipe.IngredientsIntroMultiStep', 'Ordered steps craft in sequence, each with its own ingredients and essences. Durations are set on the Overview tab.')
+          title: text(
+            'FABRICATE.Admin.Manager.Recipe.IngredientsHeadingMultiStep',
+            'Steps & ingredients'
+          ),
+          intro: text(
+            'FABRICATE.Admin.Manager.Recipe.IngredientsIntroMultiStep',
+            'Ordered steps craft in sequence, each with its own ingredients and essences. Durations are set on the Overview tab.'
+          ),
         }
       : routingProvider === 'ingredientSet'
         ? {
             title: text('FABRICATE.Admin.Manager.Recipe.IngredientsHeadingSets', 'Ingredient sets'),
-            intro: text('FABRICATE.Admin.Manager.Recipe.IngredientsIntroSets', 'Each set is a full list of components (AND). The crafter satisfies any one set (OR); the set used selects the result on the Results tab.')
+            intro: text(
+              'FABRICATE.Admin.Manager.Recipe.IngredientsIntroSets',
+              'Each set is a full list of components (AND). The crafter satisfies any one set (OR); the set used selects the result on the Results tab.'
+            ),
           }
         : {
             title: text('FABRICATE.Admin.Manager.Recipe.IngredientsHeadingFlat', 'Ingredients'),
-            intro: text('FABRICATE.Admin.Manager.Recipe.IngredientsIntroFlat', 'Everything the crafter must provide. A set is satisfied when every requirement in it is met (AND).')
+            intro: text(
+              'FABRICATE.Admin.Manager.Recipe.IngredientsIntroFlat',
+              'Everything the crafter must provide. A set is satisfied when every requirement in it is met (AND).'
+            ),
           }
   );
 
@@ -77,17 +91,31 @@
   }
 </script>
 
-<section class="manager-recipe-tab manager-recipe-ingredients-tab" data-recipe-tab="ingredients" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients', 'Ingredients')}>
+<section
+  class="manager-recipe-tab manager-recipe-ingredients-tab"
+  data-recipe-tab="ingredients"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients', 'Ingredients')}
+>
   <div class="manager-recipe-tab-intro">
     <h2 class="manager-recipe-tab-title">{heading.title}</h2>
     <p class="manager-muted">{heading.intro}</p>
   </div>
 
   {#if collapsed}
-    <p class="manager-muted" data-recipe-collapsed-note>{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote', 'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.')}</p>
+    <p class="manager-muted" data-recipe-collapsed-note>
+      {text(
+        'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
+        'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
+      )}
+    </p>
   {:else if isMultiStep}
     {#if steps.length === 0}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its ingredients.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Recipe.NoStepsHint',
+          'Add a step in Overview to configure its ingredients.'
+        )}
+      </p>
     {:else}
       <RecipeStepAccordion {steps} {onDeleteStep}>
         {#snippet body(step)}

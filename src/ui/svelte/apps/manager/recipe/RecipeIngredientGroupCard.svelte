@@ -42,7 +42,7 @@
     // the system has no essences, so the choice is not offered at all.
     essenceOptions = [],
     onChange = () => {},
-    onRemove = () => {}
+    onRemove = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -71,13 +71,19 @@
       id: 'component',
       addMarker: 'alternative-component',
       icon: 'fas fa-cube',
-      label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent', 'Add alternative component')
+      label: text(
+        'FABRICATE.Admin.Manager.Recipe.AddAlternativeComponent',
+        'Add alternative component'
+      ),
     },
     {
       id: 'tags',
       addMarker: 'alternative-tag',
       icon: 'fas fa-tags',
-      label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement', 'Add alternative tag requirement')
+      label: text(
+        'FABRICATE.Admin.Manager.Recipe.AddAlternativeTagRequirement',
+        'Add alternative tag requirement'
+      ),
     },
     ...(canAddCost
       ? [
@@ -85,8 +91,11 @@
             id: 'currency',
             addMarker: 'alternative-currency',
             icon: 'fa-solid fa-coins',
-            label: text('FABRICATE.Admin.Manager.Recipe.AddAlternativeCost', 'Add alternative cost')
-          }
+            label: text(
+              'FABRICATE.Admin.Manager.Recipe.AddAlternativeCost',
+              'Add alternative cost'
+            ),
+          },
         ]
       : []),
     ...(hasEssences
@@ -95,14 +104,17 @@
             id: 'essence',
             addMarker: 'alternative-essence',
             icon: 'fas fa-flask-vial',
-            label: text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence')
-          }
+            label: text('FABRICATE.Admin.Manager.Recipe.AddEssence', 'Add essence'),
+          },
         ]
-      : [])
+      : []),
   ]);
 
   function updateOption(index, nextOption) {
-    onChange({ ...group, options: options.map((option, i) => (i === index ? nextOption : option)) });
+    onChange({
+      ...group,
+      options: options.map((option, i) => (i === index ? nextOption : option)),
+    });
   }
 
   // Removing an alternative removes that option; removing the LAST alternative
@@ -123,25 +135,34 @@
       const firstEssence = (essenceOptions || [])[0]?.id || '';
       onChange({
         ...group,
-        options: [...options, { quantity: 1, match: { type: 'essence', essenceId: firstEssence, amount: 1 } }]
+        options: [
+          ...options,
+          { quantity: 1, match: { type: 'essence', essenceId: firstEssence, amount: 1 } },
+        ],
       });
       return;
     }
     if (type === 'tags') {
-      onChange({ ...group, options: [...options, { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }] });
+      onChange({
+        ...group,
+        options: [...options, { quantity: 1, match: { type: 'tags', tags: [], tagMatch: 'any' } }],
+      });
       return;
     }
     if (type === 'currency') {
       const firstUnit = (currencyUnits || [])[0]?.id || '';
       onChange({
         ...group,
-        options: [...options, { quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } }]
+        options: [
+          ...options,
+          { quantity: 1, match: { type: 'currency', unit: firstUnit, amount: 1 } },
+        ],
       });
       return;
     }
     onChange({
       ...group,
-      options: [...options, { quantity: 1, match: { type: 'component', componentId: null } }]
+      options: [...options, { quantity: 1, match: { type: 'component', componentId: null } }],
     });
   }
 </script>
@@ -156,9 +177,15 @@
     triggerIcon="fas fa-code-branch"
     triggerLabel={text('FABRICATE.Admin.Manager.Recipe.OrTrigger', 'or…')}
     triggerAriaLabel={orMenuLabel}
-    triggerTitle={text('FABRICATE.Admin.Manager.Recipe.OrTriggerHint', 'Accept another kind of ingredient in place of this one.')}
+    triggerTitle={text(
+      'FABRICATE.Admin.Manager.Recipe.OrTriggerHint',
+      'Accept another kind of ingredient in place of this one.'
+    )}
     dialogAriaLabel={orMenuLabel}
-    searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder', 'Search options...')}
+    searchPlaceholder={text(
+      'FABRICATE.Admin.Manager.Recipe.OrSearchPlaceholder',
+      'Search options...'
+    )}
     searchAriaLabel={orMenuLabel}
     emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
     showChevron={false}
@@ -184,7 +211,12 @@
         <i class="fas fa-code-branch" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AnyOneOf', 'Any one of')}</span>
       </span>
-      <span class="manager-recipe-any-one-of-hint manager-muted">{text('FABRICATE.Admin.Manager.Recipe.AnyOneOfHint', 'crafter picks a component or a tagged item')}</span>
+      <span class="manager-recipe-any-one-of-hint manager-muted"
+        >{text(
+          'FABRICATE.Admin.Manager.Recipe.AnyOneOfHint',
+          'crafter picks a component or a tagged item'
+        )}</span
+      >
     </div>
     <div class="manager-recipe-ingredient-requirement-options">
       {#each options as option, index (index)}
@@ -230,7 +262,9 @@
         onclick={() => appendAlternative('tags')}
       >
         <i class="fas fa-tags" aria-hidden="true"></i>
-        <span>{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span>
+        <span
+          >{text('FABRICATE.Admin.Manager.Recipe.AddTagRequirement', 'Add tag requirement')}</span
+        >
       </button>
       {#if canAddCost}
         <button

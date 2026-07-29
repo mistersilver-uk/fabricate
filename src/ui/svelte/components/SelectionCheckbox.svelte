@@ -83,7 +83,12 @@
     onchange={(event) => onChange(event.currentTarget.checked)}
     {...rest}
   />
-  <span class="fab-selection-check {sizeClass}" class:is-checked={checked} class:is-indeterminate={indeterminate} aria-hidden="true"><i class={glyph}></i></span>
+  <span
+    class="fab-selection-check {sizeClass}"
+    class:is-checked={checked}
+    class:is-indeterminate={indeterminate}
+    aria-hidden="true"><i class={glyph}></i></span
+  >
 {/snippet}
 
 {#if wrapper === 'contents'}

@@ -37,7 +37,9 @@
   const quantity = $derived(Number(item?.totalQuantity ?? 0));
   const isEssence = $derived(item?.isEssenceSource === true);
   const img = $derived(typeof item?.img === 'string' && item.img.trim() !== '' ? item.img : '');
-  const icon = $derived(typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle');
+  const icon = $derived(
+    typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
+  );
   const quantityLabel = $derived(`×${quantity}`);
   // At-a-glance badges (component rows only): salvageable, tool. Essence rows carry
   // neither. `broken` is a read-only verdict decided builder-side — it does NOT gate

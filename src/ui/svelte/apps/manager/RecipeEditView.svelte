@@ -126,12 +126,14 @@
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
-    onDeleteStep = () => {}
+    onDeleteStep = () => {},
   } = $props();
 
   // Current single-step requirement scopes default to empty arrays so an
   // unconfigured recipe still renders the empty-state sections.
-  const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
+  const ingredientSets = $derived(
+    Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
+  );
   const toolIds = $derived(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []);
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
@@ -177,7 +179,7 @@
   const showSetName = $derived(routingProvider !== 'check');
 
   function stepById(stepId) {
-    return steps.find(step => step.id === stepId) || null;
+    return steps.find((step) => step.id === stepId) || null;
   }
 
   // Ingredient-mode result routing: assigning an ingredient set to a result group
@@ -248,7 +250,7 @@
     onUpdateRecipe({ toolIds: [...toolIds, toolId] });
   }
   function removeTool(toolId) {
-    onUpdateRecipe({ toolIds: toolIds.filter(id => id !== toolId) });
+    onUpdateRecipe({ toolIds: toolIds.filter((id) => id !== toolId) });
   }
   function addStepTool(stepId, toolId) {
     const step = stepById(stepId);
@@ -258,7 +260,7 @@
   function removeStepTool(stepId, toolId) {
     const step = stepById(stepId);
     if (!step) return;
-    onUpdateStep(stepId, { toolIds: stepToolIds(step).filter(id => id !== toolId) });
+    onUpdateStep(stepId, { toolIds: stepToolIds(step).filter((id) => id !== toolId) });
   }
 
   function updateIngredientSetTools(stepId, setId, update) {
@@ -276,7 +278,9 @@
 
   function addIngredientSetTool(stepId, setId, toolId) {
     if (!toolId) return;
-    updateIngredientSetTools(stepId, setId, (ids) => ids.includes(toolId) ? ids : [...ids, toolId]);
+    updateIngredientSetTools(stepId, setId, (ids) =>
+      ids.includes(toolId) ? ids : [...ids, toolId]
+    );
   }
 
   function removeIngredientSetTool(stepId, setId, toolId) {
@@ -294,15 +298,24 @@
 
   // Validation badges: critical/warning issue counts. The draft is the single
   // source of truth, so the readiness evaluator reads it directly.
-  const readiness = $derived(evaluateRecipeReadiness({ ...(recipe || {}) }, {
-    systemComponents: componentTagOptions,
-    routingProvider,
-    routedOutcomeTierOptions,
-    alchemy,
-    signatureConflicts
-  }));
-  const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
-  const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
+  const readiness = $derived(
+    evaluateRecipeReadiness(
+      { ...(recipe || {}) },
+      {
+        systemComponents: componentTagOptions,
+        routingProvider,
+        routedOutcomeTierOptions,
+        alchemy,
+        signatureConflicts,
+      }
+    )
+  );
+  const errorCount = $derived(
+    readiness.issues.filter((issue) => issue.severity === 'critical').length
+  );
+  const warningCount = $derived(
+    readiness.issues.filter((issue) => issue.severity === 'warning').length
+  );
 
   // Tab count badges (issue 643 §F1): Ingredients / Results / Tools carry a mono
   // count so the strip reads like the prototype. Multi-step recipes sum each tab's
@@ -311,13 +324,17 @@
     const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
     return sets.reduce((total, set) => {
       const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups.length : 0;
-      const essences = set?.essences && typeof set.essences === 'object' ? Object.keys(set.essences).length : 0;
+      const essences =
+        set?.essences && typeof set.essences === 'object' ? Object.keys(set.essences).length : 0;
       return total + groups + essences;
     }, 0);
   }
   function countResults(scope) {
     const groups = Array.isArray(scope?.resultGroups) ? scope.resultGroups : [];
-    return groups.reduce((total, group) => total + (Array.isArray(group?.results) ? group.results.length : 0), 0);
+    return groups.reduce(
+      (total, group) => total + (Array.isArray(group?.results) ? group.results.length : 0),
+      0
+    );
   }
   function countTools(scope) {
     return Array.isArray(scope?.toolIds) ? scope.toolIds.length : 0;
@@ -329,7 +346,9 @@
   const ingredientsCount = $derived(sumOverScopes(countIngredients));
   const resultsCount = $derived(sumOverScopes(countResults));
   // Tools also carries the recipe-level (global) tools in multi-step mode.
-  const toolsCount = $derived(sumOverScopes(countTools) + (isMultiStep ? countTools(recipe || {}) : 0));
+  const toolsCount = $derived(
+    sumOverScopes(countTools) + (isMultiStep ? countTools(recipe || {}) : 0)
+  );
   // While the recipe is OFF, an enable-blocking issue disables the enable toggle so
   // the GM cannot trigger the hard activation failure (issue 549); disabling stays
   // free. Predicted from the same readiness the Validation tab renders.
@@ -340,8 +359,8 @@
     tools: toolsCount > 0 ? [{ label: String(toolsCount), tone: 'neutral' }] : [],
     validation: [
       ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
-      ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : [])
-    ]
+      ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : []),
+    ],
   });
 
   // Reset the active tab to Overview whenever a different recipe is loaded.
@@ -375,7 +394,7 @@
     'tools',
     ...(visibilityEffect?.showAccess ? ['access'] : []),
     ...(visibilityEffect?.showBooksScrolls ? ['books-scrolls'] : []),
-    'validation'
+    'validation',
   ]);
 
   // A mode change can retire the tab the GM is standing on (turning a restricted system
@@ -393,12 +412,22 @@
   }
 </script>
 
-<main class="manager-main manager-recipe-edit-main" aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}>
+<main
+  class="manager-main manager-recipe-edit-main"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}
+>
   {#if recipe}
     <div class="manager-recipe-edit-view" data-recipe-editor>
       <!-- Header → tabs → banner → content (§4.2): the banner sits BELOW the tab strip
            so the tabs stay attached to the header above them. -->
-      <RecipeEditorTabs {activeTab} {badges} {visibilityEffect} onSelect={(tab) => { activeTab = tab; }} />
+      <RecipeEditorTabs
+        {activeTab}
+        {badges}
+        {visibilityEffect}
+        onSelect={(tab) => {
+          activeTab = tab;
+        }}
+      />
 
       <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
 
@@ -520,7 +549,10 @@
     <EmptyState
       icon="fas fa-scroll"
       title={text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}
-      hint={text('FABRICATE.Admin.Manager.Recipe.EditMissingHint', 'Pick a recipe from the browser to open its editor.')}
+      hint={text(
+        'FABRICATE.Admin.Manager.Recipe.EditMissingHint',
+        'Pick a recipe from the browser to open its editor.'
+      )}
     />
   {/if}
 </main>

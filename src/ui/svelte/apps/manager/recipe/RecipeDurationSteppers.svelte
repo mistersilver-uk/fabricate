@@ -21,7 +21,7 @@
   import {
     TIME_UNITS,
     durationUnitLabelSingular,
-    formatTimeRequirementCompact
+    formatTimeRequirementCompact,
   } from '../../../util/recipeDuration.js';
   import Stepper from '../../../components/Stepper.svelte';
 
@@ -29,7 +29,7 @@
     timeRequirement = null,
     disabled = false,
     showLabel = true,
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -53,7 +53,7 @@
       days: unitValue('days'),
       months: unitValue('months'),
       years: unitValue('years'),
-      [unit]: value
+      [unit]: value,
     };
     const total = next.minutes + next.hours + next.days + next.months + next.years;
     onChange(total > 0 ? next : null);

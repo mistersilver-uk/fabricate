@@ -27,7 +27,7 @@
     visibilityMode = 'knowledge',
     onOpenRecipeItem = () => {},
     onToggleEnabled = () => {},
-    onToggleQuickLimit = () => {}
+    onToggleQuickLimit = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -108,11 +108,20 @@
   const quickSub = $derived.by(() => {
     if (isItemMode) {
       return useLimited
-        ? text('FABRICATE.Admin.Manager.BooksScrolls.UseSubLimited', '{n} use(s) per copy').replace('{n}', maxUses)
-        : text('FABRICATE.Admin.Manager.BooksScrolls.UseSubFree', 'Can be read any number of times');
+        ? text('FABRICATE.Admin.Manager.BooksScrolls.UseSubLimited', '{n} use(s) per copy').replace(
+            '{n}',
+            maxUses
+          )
+        : text(
+            'FABRICATE.Admin.Manager.BooksScrolls.UseSubFree',
+            'Can be read any number of times'
+          );
     }
     if (!learnLimited) {
-      return text('FABRICATE.Admin.Manager.BooksScrolls.LearnSubFree', 'Recipes can be learned freely');
+      return text(
+        'FABRICATE.Admin.Manager.BooksScrolls.LearnSubFree',
+        'Recipes can be learned freely'
+      );
     }
     return learnScope === 'total'
       ? text('FABRICATE.Admin.Manager.BooksScrolls.LearnSubTotal', 'Shared cap across all copies')
@@ -124,62 +133,108 @@
   {#if !item}
     <div class="manager-inspector-empty" data-item-page-empty>
       <i class="fas fa-book-sparkles" aria-hidden="true"></i>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.BooksScrolls.SelectHint', 'Select a recipe item to see its page.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.BooksScrolls.SelectHint',
+          'Select a recipe item to see its page.'
+        )}
+      </p>
     </div>
   {:else}
-    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.BooksScrolls.ItemPage', 'Item page')}</p>
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.BooksScrolls.ItemPage', 'Item page')}
+    </p>
 
     <div class="manager-inspector-title-row is-hero-large">
-      <span class="manager-inspector-icon is-hero-large" aria-hidden="true"><i class={typeIcon()}></i></span>
+      <span class="manager-inspector-icon is-hero-large" aria-hidden="true"
+        ><i class={typeIcon()}></i></span
+      >
       <div class="manager-inspector-copy">
         <h3 class="manager-inspector-name" data-item-page-name>{item.resolvedName}</h3>
         <span class="manager-books-scrolls-inspector-meta">
-          <Chip tone={recipeCount === 0 ? 'danger' : 'neutral'} data-item-page-type>{typePillLabel()}</Chip>
+          <Chip tone={recipeCount === 0 ? 'danger' : 'neutral'} data-item-page-type
+            >{typePillLabel()}</Chip
+          >
           <button
             type="button"
             class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
             aria-pressed={enabled}
             data-item-page-toggle
             aria-label={enabled
-              ? text('FABRICATE.Admin.Manager.BooksScrolls.DisableNamed', 'Disable {name}').replace('{name}', item.resolvedName)
-              : text('FABRICATE.Admin.Manager.BooksScrolls.EnableNamed', 'Enable {name}').replace('{name}', item.resolvedName)}
+              ? text('FABRICATE.Admin.Manager.BooksScrolls.DisableNamed', 'Disable {name}').replace(
+                  '{name}',
+                  item.resolvedName
+                )
+              : text('FABRICATE.Admin.Manager.BooksScrolls.EnableNamed', 'Enable {name}').replace(
+                  '{name}',
+                  item.resolvedName
+                )}
             onclick={() => onToggleEnabled(item.id, !enabled)}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-            <span class="manager-status-toggle-label">{enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+            <span class="manager-status-toggle-track" aria-hidden="true"
+              ><span class="manager-status-toggle-knob"></span></span
+            >
+            <span class="manager-status-toggle-label"
+              >{enabled
+                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+            >
           </button>
         </span>
       </div>
     </div>
 
     <p class="manager-muted manager-books-scrolls-inspector-desc" data-item-page-desc>
-      {item.description || text('FABRICATE.Admin.Manager.BooksScrolls.NoDescription', 'No description for this recipe item yet.')}
+      {item.description ||
+        text(
+          'FABRICATE.Admin.Manager.BooksScrolls.NoDescription',
+          'No description for this recipe item yet.'
+        )}
     </p>
 
     <div class="manager-books-scrolls-stat-grid" data-item-page-stats>
       <div class="manager-books-scrolls-stat" data-item-page-stat="recipes">
-        <div class="manager-books-scrolls-stat-value" data-item-page-recipe-count>{recipeCount}</div>
-        <div class="manager-books-scrolls-stat-label">{text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}</div>
+        <div class="manager-books-scrolls-stat-value" data-item-page-recipe-count>
+          {recipeCount}
+        </div>
+        <div class="manager-books-scrolls-stat-label">
+          {text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}
+        </div>
       </div>
-      <div class="manager-books-scrolls-stat" data-item-page-stat={isItemMode ? 'uses' : 'learning'}>
-        <div class="manager-books-scrolls-stat-value is-accent" data-item-page-mid-value>{midValue}</div>
+      <div
+        class="manager-books-scrolls-stat"
+        data-item-page-stat={isItemMode ? 'uses' : 'learning'}
+      >
+        <div class="manager-books-scrolls-stat-value is-accent" data-item-page-mid-value>
+          {midValue}
+        </div>
         <div class="manager-books-scrolls-stat-label" data-item-page-mid-label>{midLabel}</div>
       </div>
       <div class="manager-books-scrolls-stat" data-item-page-stat="learned-by">
-        <div class="manager-books-scrolls-stat-value" data-item-page-learned-by>{item.learnedByCount || 0}</div>
-        <div class="manager-books-scrolls-stat-label">{text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}</div>
+        <div class="manager-books-scrolls-stat-value" data-item-page-learned-by>
+          {item.learnedByCount || 0}
+        </div>
+        <div class="manager-books-scrolls-stat-label">
+          {text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}
+        </div>
       </div>
     </div>
 
     <div class="manager-books-scrolls-recipes-inside" data-item-page-recipes-inside>
-      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.BooksScrolls.RecipesInside', 'Recipes inside')}</p>
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.BooksScrolls.RecipesInside', 'Recipes inside')}
+      </p>
       {#if recipeCount === 0}
-        <p class="manager-muted" data-item-page-no-recipes>{text('FABRICATE.Admin.Manager.BooksScrolls.NoRecipesLinked', 'No recipes linked yet.')}</p>
+        <p class="manager-muted" data-item-page-no-recipes>
+          {text('FABRICATE.Admin.Manager.BooksScrolls.NoRecipesLinked', 'No recipes linked yet.')}
+        </p>
       {:else}
         <div class="manager-books-scrolls-recipe-preview">
           {#each previewRecipes as recipe (recipe.id)}
             <div class="manager-books-scrolls-recipe-preview-row" data-item-page-recipe={recipe.id}>
-              <span class="manager-books-scrolls-recipe-preview-icon" aria-hidden="true"><i class="fas fa-scroll"></i></span>
+              <span class="manager-books-scrolls-recipe-preview-icon" aria-hidden="true"
+                ><i class="fas fa-scroll"></i></span
+              >
               <span class="manager-books-scrolls-recipe-preview-name">{recipe.name}</span>
               {#if recipe.category}
                 <Chip tone="neutral">{recipe.category}</Chip>
@@ -188,25 +243,41 @@
           {/each}
         </div>
         {#if moreCount > 0}
-          <p class="manager-muted manager-books-scrolls-more" data-item-page-more>{text('FABRICATE.Admin.Manager.BooksScrolls.MoreRecipes', '+{n} more recipes').replace('{n}', moreCount)}</p>
+          <p class="manager-muted manager-books-scrolls-more" data-item-page-more>
+            {text('FABRICATE.Admin.Manager.BooksScrolls.MoreRecipes', '+{n} more recipes').replace(
+              '{n}',
+              moreCount
+            )}
+          </p>
         {/if}
       {/if}
     </div>
 
-    <section class="manager-inspector-card manager-books-scrolls-quick-limits" data-item-page-quick-limits>
+    <section
+      class="manager-inspector-card manager-books-scrolls-quick-limits"
+      data-item-page-quick-limits
+    >
       <div class="manager-inspector-title-row">
-        <span class="manager-inspector-icon" aria-hidden="true"><i class="fas fa-sliders"></i></span>
+        <span class="manager-inspector-icon" aria-hidden="true"><i class="fas fa-sliders"></i></span
+        >
         <div class="manager-inspector-copy">
-          <h4 class="manager-inspector-name">{isItemMode
-            ? text('FABRICATE.Admin.Manager.BooksScrolls.UseLimits', 'Use limits')
-            : text('FABRICATE.Admin.Manager.BooksScrolls.LearningLimits', 'Learning limits')}</h4>
+          <h4 class="manager-inspector-name">
+            {isItemMode
+              ? text('FABRICATE.Admin.Manager.BooksScrolls.UseLimits', 'Use limits')
+              : text('FABRICATE.Admin.Manager.BooksScrolls.LearningLimits', 'Learning limits')}
+          </h4>
         </div>
       </div>
       <div class="manager-rule-row" data-item-page-quick-limit-row>
         <span class="manager-rule-copy">
-          <strong>{isItemMode
-            ? text('FABRICATE.Admin.Manager.BooksScrolls.LimitedUse', 'Limited use')
-            : text('FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning', 'Limited learning')}</strong>
+          <strong
+            >{isItemMode
+              ? text('FABRICATE.Admin.Manager.BooksScrolls.LimitedUse', 'Limited use')
+              : text(
+                  'FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning',
+                  'Limited learning'
+                )}</strong
+          >
           <span>{quickSub}</span>
         </span>
         <span class="manager-rule-field">
@@ -220,8 +291,14 @@
               : text('FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning', 'Limited learning')}
             onclick={() => onToggleQuickLimit(item.id, !quickLimited)}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-            <span class="manager-status-toggle-label">{quickLimited ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+            <span class="manager-status-toggle-track" aria-hidden="true"
+              ><span class="manager-status-toggle-knob"></span></span
+            >
+            <span class="manager-status-toggle-label"
+              >{quickLimited
+                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+            >
           </button>
         </span>
       </div>

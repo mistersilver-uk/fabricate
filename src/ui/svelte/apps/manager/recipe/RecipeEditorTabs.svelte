@@ -31,7 +31,7 @@
     // NOT named `effect`: a variable of that name makes the compiler read `$effect(...)`
     // as a store subscription (`$` + `effect`).
     visibilityEffect = { showAccess: false, showBooksScrolls: true },
-    onSelect = () => {}
+    onSelect = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -48,28 +48,35 @@
       ? [{ id: 'access', icon: 'fas fa-user-shield', key: 'Access', fallback: 'Access' }]
       : []),
     ...(visibilityEffect?.showBooksScrolls
-      ? [{ id: 'books-scrolls', icon: 'fas fa-book', key: 'BooksScrolls', fallback: 'Books & Scrolls' }]
+      ? [
+          {
+            id: 'books-scrolls',
+            icon: 'fas fa-book',
+            key: 'BooksScrolls',
+            fallback: 'Books & Scrolls',
+          },
+        ]
       : []),
-    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
+    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' },
   ]);
 
   function badgeList(tab) {
     const value = badges?.[tab.id];
-    const values = Array.isArray(value) ? value : (value ? [value] : []);
+    const values = Array.isArray(value) ? value : value ? [value] : [];
     return values
-      .map(badge => {
+      .map((badge) => {
         if (badge && typeof badge === 'object') {
           return {
             label: badge.label ?? badge.value ?? '',
-            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral')
+            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral'),
           };
         }
         return {
           label: badge,
-          tone: tab.id === 'validation' ? 'danger' : 'neutral'
+          tone: tab.id === 'validation' ? 'danger' : 'neutral',
         };
       })
-      .filter(badge => badge.label !== '' && badge.label !== 0);
+      .filter((badge) => badge.label !== '' && badge.label !== 0);
   }
 
   // A badge tone name is this component's own vocabulary; translate it to a `Chip`
@@ -91,7 +98,11 @@
   }
 </script>
 
-<div class="manager-editor-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Label', 'Recipe editor sections')}>
+<div
+  class="manager-editor-tabs"
+  role="tablist"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Label', 'Recipe editor sections')}
+>
   {#each TABS as tab, index (tab.id)}
     <button
       type="button"

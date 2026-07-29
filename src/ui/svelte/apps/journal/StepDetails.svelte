@@ -28,7 +28,9 @@
   const detail = $derived(step?.detail ?? null);
   const requiredSeconds = $derived(Number(detail?.requiredSeconds));
   const requiredTime = $derived(
-    Number.isFinite(requiredSeconds) && requiredSeconds > 0 ? formatDurationHMS(requiredSeconds) : ''
+    Number.isFinite(requiredSeconds) && requiredSeconds > 0
+      ? formatDurationHMS(requiredSeconds)
+      : ''
   );
   const primaryTool = $derived(String(detail?.primaryToolName ?? ''));
   const checkLabel = $derived(String(detail?.checkLabel ?? ''));

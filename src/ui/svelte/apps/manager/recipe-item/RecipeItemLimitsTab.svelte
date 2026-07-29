@@ -42,7 +42,7 @@
     // System-owned character prerequisite library (issue 544) — the options for
     // the "Character prerequisites to learn" multi-select.
     characterPrerequisites = [],
-    onPatch = () => {}
+    onPatch = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -72,16 +72,36 @@
         : 'perInstance'
   );
   const learnsAllowed = $derived(
-    Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0 ? learnCaps.learnsAllowed : 1
+    Number.isFinite(learnCaps.learnsAllowed) && learnCaps.learnsAllowed > 0
+      ? learnCaps.learnsAllowed
+      : 1
   );
 
   const WHEN_SPENT_OPTIONS = [
-    { value: 'destroyed', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Destroyed', fallback: 'Destroyed' },
-    { value: 'inert', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Inert', fallback: 'Becomes inert' }
+    {
+      value: 'destroyed',
+      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Destroyed',
+      fallback: 'Destroyed',
+    },
+    {
+      value: 'inert',
+      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.Inert',
+      fallback: 'Becomes inert',
+    },
   ];
   const LEARN_SCOPE_OPTIONS = [
-    { value: 'perInstance', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopePerCopy', fallback: 'Per copy', icon: 'fas fa-book' },
-    { value: 'total', labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopeTotal', fallback: 'Across all copies', icon: 'fas fa-layer-group' }
+    {
+      value: 'perInstance',
+      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopePerCopy',
+      fallback: 'Per copy',
+      icon: 'fas fa-book',
+    },
+    {
+      value: 'total',
+      labelKey: 'FABRICATE.Admin.Manager.RecipeItem.Limits.ScopeTotal',
+      fallback: 'Across all copies',
+      icon: 'fas fa-layer-group',
+    },
   ];
 
   // Prerequisite options: prefer the recipes already linked to this item, then any
@@ -102,13 +122,21 @@
 
   const learnExplain = $derived.by(() => {
     const n = learnsAllowed;
-    const recipes = `${n} ${n === 1
-      ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.Recipe', 'recipe')
-      : text('FABRICATE.Admin.Manager.RecipeItem.Limits.Recipes', 'recipes')}`;
+    const recipes = `${n} ${
+      n === 1
+        ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.Recipe', 'recipe')
+        : text('FABRICATE.Admin.Manager.RecipeItem.Limits.Recipes', 'recipes')
+    }`;
     if (learnScope === 'total') {
-      return text('FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainTotal', 'Up to {recipes} can be learned in total across every copy of this item, no matter who reads them.').replace('{recipes}', recipes);
+      return text(
+        'FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainTotal',
+        'Up to {recipes} can be learned in total across every copy of this item, no matter who reads them.'
+      ).replace('{recipes}', recipes);
     }
-    return text('FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainPerCopy', 'Each copy of this item teaches up to {recipes}; the reader picks which.').replace('{recipes}', recipes);
+    return text(
+      'FABRICATE.Admin.Manager.RecipeItem.Limits.ExplainPerCopy',
+      'Each copy of this item teaches up to {recipes}; the reader picks which.'
+    ).replace('{recipes}', recipes);
   });
 
   function patchItem(patch) {
@@ -212,7 +240,9 @@
   const characterPrereqSuggestions = $derived(
     normalizedCharacterPrereqSearch
       ? availableCharacterPrerequisites.filter((p) =>
-          String(p.name || '').toLowerCase().includes(normalizedCharacterPrereqSearch)
+          String(p.name || '')
+            .toLowerCase()
+            .includes(normalizedCharacterPrereqSearch)
         )
       : []
   );
@@ -223,26 +253,50 @@
     characterPrereqSearch = '';
   }
   function removeCharacterPrerequisite(id) {
-    patchLearn({ characterPrerequisiteIds: characterPrerequisiteIds.filter((value) => value !== id) });
+    patchLearn({
+      characterPrerequisiteIds: characterPrerequisiteIds.filter((value) => value !== id),
+    });
   }
 </script>
 
-<section class="manager-recipe-item-tab manager-recipe-item-limits" data-recipe-item-tab="limits" data-visibility-mode={visibilityMode} aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Title', 'Limits')}>
+<section
+  class="manager-recipe-item-tab manager-recipe-item-limits"
+  data-recipe-item-tab="limits"
+  data-visibility-mode={visibilityMode}
+  aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Title', 'Limits')}
+>
   {#if modeItem}
     <div class="manager-recipe-item-limits-section" data-recipe-item-limits-card="item">
       <div class="manager-recipe-item-limits-heading">
         <i class="fas fa-rotate" aria-hidden="true"></i>
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.UsesTitle', 'Uses')}</h3>
+        <h3 class="manager-card-title">
+          {text('FABRICATE.Admin.Manager.RecipeItem.Limits.UsesTitle', 'Uses')}
+        </h3>
       </div>
-      <p class="manager-muted manager-recipe-item-limits-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.UsesHint', 'How many times a single copy of this item can be read before it’s spent.')}</p>
+      <p class="manager-muted manager-recipe-item-limits-hint">
+        {text(
+          'FABRICATE.Admin.Manager.RecipeItem.Limits.UsesHint',
+          'How many times a single copy of this item can be read before it’s spent.'
+        )}
+      </p>
 
       <div class="manager-recipe-item-limits-panel">
         <div class="manager-recipe-item-limits-toggle-row">
           <div class="manager-recipe-item-limits-toggle-copy">
-            <span class="manager-recipe-item-limits-toggle-title">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUse', 'Limited use')}</span>
-            <span class="manager-recipe-item-limits-toggle-sub">{limitUses
-              ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUseOn', 'On — a copy is spent as it’s read.')
-              : text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUseOff', 'Off — this item can be read any number of times.')}</span>
+            <span class="manager-recipe-item-limits-toggle-title"
+              >{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUse', 'Limited use')}</span
+            >
+            <span class="manager-recipe-item-limits-toggle-sub"
+              >{limitUses
+                ? text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUseOn',
+                    'On — a copy is spent as it’s read.'
+                  )
+                : text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUseOff',
+                    'Off — this item can be read any number of times.'
+                  )}</span
+            >
           </div>
           <button
             type="button"
@@ -252,30 +306,70 @@
             aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUse', 'Limited use')}
             onclick={toggleLimitUses}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-            <span class="manager-status-toggle-label">{limitUses ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+            <span class="manager-status-toggle-track" aria-hidden="true"
+              ><span class="manager-status-toggle-knob"></span></span
+            >
+            <span class="manager-status-toggle-label"
+              >{limitUses
+                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+            >
           </button>
         </div>
 
         {#if limitUses}
           <div class="manager-recipe-item-limits-detail">
             <div class="manager-recipe-item-stepper-group">
-              <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.UsesPerCopy', 'Uses per copy')}</span>
+              <span class="manager-recipe-item-stepper-label"
+                >{text(
+                  'FABRICATE.Admin.Manager.RecipeItem.Limits.UsesPerCopy',
+                  'Uses per copy'
+                )}</span
+              >
               <div class="manager-recipe-item-stepper" data-recipe-item-uses-stepper>
-                <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-uses-dec aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Decrement', 'Decrease')} onclick={() => stepUses(-1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                <span class="manager-recipe-item-stepper-value" data-recipe-item-uses-value>{maxUses}</span>
-                <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-uses-inc aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Increment', 'Increase')} onclick={() => stepUses(1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
+                <button
+                  type="button"
+                  class="manager-recipe-item-stepper-button"
+                  data-recipe-item-uses-dec
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.Decrement',
+                    'Decrease'
+                  )}
+                  onclick={() => stepUses(-1)}
+                  ><i class="fas fa-minus" aria-hidden="true"></i></button
+                >
+                <span class="manager-recipe-item-stepper-value" data-recipe-item-uses-value
+                  >{maxUses}</span
+                >
+                <button
+                  type="button"
+                  class="manager-recipe-item-stepper-button"
+                  data-recipe-item-uses-inc
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.Increment',
+                    'Increase'
+                  )}
+                  onclick={() => stepUses(1)}><i class="fas fa-plus" aria-hidden="true"></i></button
+                >
               </div>
             </div>
             <div class="manager-recipe-item-limits-divider" aria-hidden="true"></div>
             <div class="manager-recipe-item-when-spent">
-              <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.WhenSpent', 'When the last use is spent')}</span>
+              <span class="manager-recipe-item-stepper-label"
+                >{text(
+                  'FABRICATE.Admin.Manager.RecipeItem.Limits.WhenSpent',
+                  'When the last use is spent'
+                )}</span
+              >
               <SegmentedControl
                 options={WHEN_SPENT_OPTIONS}
                 value={whenSpent}
                 onChange={selectWhenSpent}
                 groupName="recipe-item-when-spent"
-                ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.WhenSpent', 'When the last use is spent')}
+                ariaLabel={text(
+                  'FABRICATE.Admin.Manager.RecipeItem.Limits.WhenSpent',
+                  'When the last use is spent'
+                )}
                 dataAttr="data-recipe-item-when-spent"
                 optionDataAttr="data-recipe-item-when-spent-option"
               />
@@ -290,28 +384,57 @@
     <div class="manager-recipe-item-limits-section" data-recipe-item-limits-card="knowledge">
       <div class="manager-recipe-item-limits-heading">
         <i class="fas fa-graduation-cap" aria-hidden="true"></i>
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningTitle', 'Learning')}</h3>
+        <h3 class="manager-card-title">
+          {text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningTitle', 'Learning')}
+        </h3>
       </div>
-      <p class="manager-muted manager-recipe-item-limits-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningHint', 'How many recipes may be learned from this item — independent of how many times the item can be opened.')}</p>
+      <p class="manager-muted manager-recipe-item-limits-hint">
+        {text(
+          'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningHint',
+          'How many recipes may be learned from this item — independent of how many times the item can be opened.'
+        )}
+      </p>
 
       <div class="manager-recipe-item-limits-panel">
         <div class="manager-recipe-item-limits-toggle-row">
           <div class="manager-recipe-item-limits-toggle-copy">
-            <span class="manager-recipe-item-limits-toggle-title">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearning', 'Limited learning')}</span>
-            <span class="manager-recipe-item-limits-toggle-sub">{limitLearning
-              ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOn', 'On — a limited number of recipes can be learned from this item.')
-              : text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOff', 'Off — readers can learn every recipe in this item freely.')}</span>
+            <span class="manager-recipe-item-limits-toggle-title"
+              >{text(
+                'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearning',
+                'Limited learning'
+              )}</span
+            >
+            <span class="manager-recipe-item-limits-toggle-sub"
+              >{limitLearning
+                ? text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOn',
+                    'On — a limited number of recipes can be learned from this item.'
+                  )
+                : text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearningOff',
+                    'Off — readers can learn every recipe in this item freely.'
+                  )}</span
+            >
           </div>
           <button
             type="button"
             class={`manager-status-toggle ${limitLearning ? 'is-on' : 'is-off'}`}
             data-recipe-item-limit-learning
             aria-pressed={limitLearning}
-            aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearning', 'Limited learning')}
+            aria-label={text(
+              'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearning',
+              'Limited learning'
+            )}
             onclick={toggleLimitLearning}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-            <span class="manager-status-toggle-label">{limitLearning ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+            <span class="manager-status-toggle-track" aria-hidden="true"
+              ><span class="manager-status-toggle-knob"></span></span
+            >
+            <span class="manager-status-toggle-label"
+              >{limitLearning
+                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+            >
           </button>
         </div>
 
@@ -320,27 +443,70 @@
             <!-- Line 1: Limit applies · divider · Recipes allowed. -->
             <div class="manager-recipe-item-learning-row">
               <div class="manager-recipe-item-learning-limit">
-                <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}</span>
+                <span class="manager-recipe-item-stepper-label"
+                  >{text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo',
+                    'Limit applies'
+                  )}</span
+                >
                 <SegmentedControl
                   options={LEARN_SCOPE_OPTIONS}
                   value={learnScope}
                   onChange={selectLearnScope}
                   groupName="recipe-item-learn-scope"
-                  ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo', 'Limit applies')}
+                  ariaLabel={text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.AppliesTo',
+                    'Limit applies'
+                  )}
                   dataAttr="data-recipe-item-learn-scope"
                   optionDataAttr="data-recipe-item-learn-scope-option"
                 />
               </div>
               <div class="manager-recipe-item-limits-divider is-vertical" aria-hidden="true"></div>
               <div class="manager-recipe-item-stepper-group">
-                <span class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RecipesAllowed', 'Recipes allowed')}</span>
+                <span class="manager-recipe-item-stepper-label"
+                  >{text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.RecipesAllowed',
+                    'Recipes allowed'
+                  )}</span
+                >
                 <div class="manager-recipe-item-stepper" data-recipe-item-learns-stepper>
-                  <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-learns-dec aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Decrement', 'Decrease')} onclick={() => stepLearns(-1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                  <span class="manager-recipe-item-stepper-value" data-recipe-item-learns-value>{learnsAllowed}</span>
-                  <button type="button" class="manager-recipe-item-stepper-button" data-recipe-item-learns-inc aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.Increment', 'Increase')} onclick={() => stepLearns(1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
-                  <span class="manager-recipe-item-stepper-unit">{learnScope === 'total'
-                    ? text('FABRICATE.Admin.Manager.RecipeItem.Limits.UnitTotal', 'total · shared')
-                    : text('FABRICATE.Admin.Manager.RecipeItem.Limits.UnitPerCopy', 'per copy')}</span>
+                  <button
+                    type="button"
+                    class="manager-recipe-item-stepper-button"
+                    data-recipe-item-learns-dec
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.Decrement',
+                      'Decrease'
+                    )}
+                    onclick={() => stepLearns(-1)}
+                    ><i class="fas fa-minus" aria-hidden="true"></i></button
+                  >
+                  <span class="manager-recipe-item-stepper-value" data-recipe-item-learns-value
+                    >{learnsAllowed}</span
+                  >
+                  <button
+                    type="button"
+                    class="manager-recipe-item-stepper-button"
+                    data-recipe-item-learns-inc
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.Increment',
+                      'Increase'
+                    )}
+                    onclick={() => stepLearns(1)}
+                    ><i class="fas fa-plus" aria-hidden="true"></i></button
+                  >
+                  <span class="manager-recipe-item-stepper-unit"
+                    >{learnScope === 'total'
+                      ? text(
+                          'FABRICATE.Admin.Manager.RecipeItem.Limits.UnitTotal',
+                          'total · shared'
+                        )
+                      : text(
+                          'FABRICATE.Admin.Manager.RecipeItem.Limits.UnitPerCopy',
+                          'per copy'
+                        )}</span
+                  >
                 </div>
               </div>
             </div>
@@ -348,14 +514,32 @@
             <!-- Line 2: two equal columns — Required Knowledge · Learning prerequisites. -->
             <div class="manager-recipe-item-prereq-columns">
               <!-- Required Knowledge (recipes the reader must already have learned). -->
-              <div class="manager-recipe-item-prereq-column" data-recipe-item-required-knowledge-column>
-                <span id="recipe-item-required-knowledge-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge', 'Required Knowledge')}</span>
-                <p class="manager-muted manager-recipe-item-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeHint', 'The character must already know these recipes to learn from this book or scroll.')}</p>
+              <div
+                class="manager-recipe-item-prereq-column"
+                data-recipe-item-required-knowledge-column
+              >
+                <span
+                  id="recipe-item-required-knowledge-label"
+                  class="manager-recipe-item-stepper-label"
+                  >{text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge',
+                    'Required Knowledge'
+                  )}</span
+                >
+                <p class="manager-muted manager-recipe-item-prereq-hint">
+                  {text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeHint',
+                    'The character must already know these recipes to learn from this book or scroll.'
+                  )}
+                </p>
                 {#if prerequisiteOptions.length === 0}
                   <EmptyState
                     compact
                     icon="fas fa-graduation-cap"
-                    title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeEmpty', 'No recipes to require yet')}
+                    title={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeEmpty',
+                      'No recipes to require yet'
+                    )}
                     dataAttr="data-recipe-item-required-knowledge-empty"
                   />
                 {:else}
@@ -368,14 +552,32 @@
                       aria-expanded={requiredKnowledgeSuggestions.length > 0}
                       aria-controls="recipe-item-required-knowledge-suggestions"
                       value={requiredKnowledgeSearch}
-                      placeholder={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeSearch', 'Search recipes…')}
+                      placeholder={text(
+                        'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeSearch',
+                        'Search recipes…'
+                      )}
                       aria-labelledby="recipe-item-required-knowledge-label"
                       oninput={(event) => (requiredKnowledgeSearch = event.currentTarget.value)}
                     />
                     {#if requiredKnowledgeSuggestions.length > 0}
-                      <div id="recipe-item-required-knowledge-suggestions" class="manager-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge', 'Required Knowledge')}>
+                      <div
+                        id="recipe-item-required-knowledge-suggestions"
+                        class="manager-tag-suggestions"
+                        role="listbox"
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledge',
+                          'Required Knowledge'
+                        )}
+                      >
                         {#each requiredKnowledgeSuggestions as option (option.id)}
-                          <button type="button" role="option" aria-selected="false" class="manager-tag-suggestion" data-recipe-item-required-knowledge-option={option.id} onclick={() => addRequiredKnowledge(option.id)}>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected="false"
+                            class="manager-tag-suggestion"
+                            data-recipe-item-required-knowledge-option={option.id}
+                            onclick={() => addRequiredKnowledge(option.id)}
+                          >
                             <i class="fas fa-scroll" aria-hidden="true"></i>
                             <span>{option.name}</span>
                           </button>
@@ -387,15 +589,27 @@
                 {#if selectedRequiredKnowledge.length > 0}
                   <div class="manager-selected-tag-row" role="list">
                     {#each selectedRequiredKnowledge as option (option.id)}
-                      <Chip class="manager-selected-tag-pill" icon="fas fa-scroll" role="listitem" data-recipe-item-required-knowledge={option.id}>
+                      <Chip
+                        class="manager-selected-tag-pill"
+                        icon="fas fa-scroll"
+                        role="listitem"
+                        data-recipe-item-required-knowledge={option.id}
+                      >
                         <span>{option.name}</span>
                         <button
                           type="button"
                           data-recipe-item-required-knowledge-remove={option.id}
-                          aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeRemove', 'Remove')}
-                          title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeRemove', 'Remove')}
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeRemove',
+                            'Remove'
+                          )}
+                          title={text(
+                            'FABRICATE.Admin.Manager.RecipeItem.Limits.RequiredKnowledgeRemove',
+                            'Remove'
+                          )}
                           onclick={() => removeRequiredKnowledge(option.id)}
-                        ><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                          ><i class="fas fa-xmark" aria-hidden="true"></i></button
+                        >
                       </Chip>
                     {/each}
                   </div>
@@ -404,13 +618,28 @@
 
               <!-- Learning prerequisites (character prerequisites the reader must pass). -->
               <div class="manager-recipe-item-prereq-column" data-recipe-item-character-prereqs>
-                <span id="recipe-item-character-prereqs-label" class="manager-recipe-item-stepper-label">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites', 'Learning prerequisites')}</span>
-                <p class="manager-muted manager-recipe-item-prereq-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesHint', 'The character must have these attributes to learn.')}</p>
+                <span
+                  id="recipe-item-character-prereqs-label"
+                  class="manager-recipe-item-stepper-label"
+                  >{text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites',
+                    'Learning prerequisites'
+                  )}</span
+                >
+                <p class="manager-muted manager-recipe-item-prereq-hint">
+                  {text(
+                    'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesHint',
+                    'The character must have these attributes to learn.'
+                  )}
+                </p>
                 {#if characterPrerequisites.length === 0}
                   <EmptyState
                     compact
                     icon="fas fa-user-shield"
-                    title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone', 'No prerequisites yet — add them in System Settings.')}
+                    title={text(
+                      'FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone',
+                      'No prerequisites yet — add them in System Settings.'
+                    )}
                     dataAttr="data-recipe-item-character-prereq-empty"
                   />
                 {:else}
@@ -423,14 +652,32 @@
                       aria-expanded={characterPrereqSuggestions.length > 0}
                       aria-controls="recipe-item-character-prereq-suggestions"
                       value={characterPrereqSearch}
-                      placeholder={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesSearch', 'Search prerequisites…')}
+                      placeholder={text(
+                        'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisitesSearch',
+                        'Search prerequisites…'
+                      )}
                       aria-labelledby="recipe-item-character-prereqs-label"
                       oninput={(event) => (characterPrereqSearch = event.currentTarget.value)}
                     />
                     {#if characterPrereqSuggestions.length > 0}
-                      <div id="recipe-item-character-prereq-suggestions" class="manager-tag-suggestions" role="listbox" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites', 'Learning prerequisites')}>
+                      <div
+                        id="recipe-item-character-prereq-suggestions"
+                        class="manager-tag-suggestions"
+                        role="listbox"
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.RecipeItem.Limits.LearningPrerequisites',
+                          'Learning prerequisites'
+                        )}
+                      >
                         {#each characterPrereqSuggestions as prereq (prereq.id)}
-                          <button type="button" role="option" aria-selected="false" class="manager-tag-suggestion" data-recipe-item-character-prereq-option={prereq.id} onclick={() => addCharacterPrerequisite(prereq.id)}>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected="false"
+                            class="manager-tag-suggestion"
+                            data-recipe-item-character-prereq-option={prereq.id}
+                            onclick={() => addCharacterPrerequisite(prereq.id)}
+                          >
                             <i class={prereq.icon || 'fas fa-user-check'} aria-hidden="true"></i>
                             <span>{prereq.name}</span>
                           </button>
@@ -440,17 +687,34 @@
                   </div>
                 {/if}
                 {#if selectedCharacterPrerequisites.length > 0}
-                  <div class="manager-selected-tag-row" data-recipe-item-character-prereq-chips role="list">
+                  <div
+                    class="manager-selected-tag-row"
+                    data-recipe-item-character-prereq-chips
+                    role="list"
+                  >
                     {#each selectedCharacterPrerequisites as prereq (prereq.id)}
-                      <Chip class="manager-selected-tag-pill" icon={prereq.icon || 'fas fa-user-check'} role="listitem" data-recipe-item-character-prereq={prereq.id} title={prerequisitePreview(prereq)}>
+                      <Chip
+                        class="manager-selected-tag-pill"
+                        icon={prereq.icon || 'fas fa-user-check'}
+                        role="listitem"
+                        data-recipe-item-character-prereq={prereq.id}
+                        title={prerequisitePreview(prereq)}
+                      >
                         <span>{prereq.name}</span>
                         <button
                           type="button"
                           data-recipe-item-character-prereq-remove={prereq.id}
-                          aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove', 'Remove')}
-                          title={text('FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove', 'Remove')}
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove',
+                            'Remove'
+                          )}
+                          title={text(
+                            'FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesRemove',
+                            'Remove'
+                          )}
                           onclick={() => removeCharacterPrerequisite(prereq.id)}
-                        ><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                          ><i class="fas fa-xmark" aria-hidden="true"></i></button
+                        >
                       </Chip>
                     {/each}
                   </div>

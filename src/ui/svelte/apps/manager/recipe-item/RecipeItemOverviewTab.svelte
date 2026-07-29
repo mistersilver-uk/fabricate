@@ -28,7 +28,7 @@
     onPatch = () => {},
     onLinkItem = () => {},
     onUnlinkItem = () => {},
-    onCopyItemUuid = () => {}
+    onCopyItemUuid = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -54,15 +54,30 @@
   }
 </script>
 
-<section class="manager-recipe-item-tab" data-recipe-item-tab="overview" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Title', 'Overview')}>
+<section
+  class="manager-recipe-item-tab"
+  data-recipe-item-tab="overview"
+  aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Title', 'Overview')}
+>
   <div class="manager-recipe-item-field">
-    <span class="manager-recipe-item-label">{text('FABRICATE.Admin.Manager.RecipeItem.Overview.LinkLabel', 'Recipe item')}</span>
+    <span class="manager-recipe-item-label"
+      >{text('FABRICATE.Admin.Manager.RecipeItem.Overview.LinkLabel', 'Recipe item')}</span
+    >
     <ItemDropZone
       item={hasLink ? { name: itemName || uuid, img: itemImg } : null}
-      title={text('FABRICATE.Admin.Manager.RecipeItem.Overview.DropHint', 'Drop a game-world Item here')}
+      title={text(
+        'FABRICATE.Admin.Manager.RecipeItem.Overview.DropHint',
+        'Drop a game-world Item here'
+      )}
       hint={hasLink
-        ? text('FABRICATE.Admin.Manager.RecipeItem.Overview.ReplaceHint', 'Drop another Item to replace the linked source.')
-        : text('FABRICATE.Admin.Manager.RecipeItem.Overview.DropSub', 'The Item sets this recipe item’s name and description.')}
+        ? text(
+            'FABRICATE.Admin.Manager.RecipeItem.Overview.ReplaceHint',
+            'Drop another Item to replace the linked source.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.RecipeItem.Overview.DropSub',
+            'The Item sets this recipe item’s name and description.'
+          )}
       kind="recipe-item"
       copyLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.CopyUuid', 'Copy UUID')}
       unlinkLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Unlink', 'Unlink item')}
@@ -75,42 +90,77 @@
   <div class="manager-recipe-item-field">
     <span class="manager-recipe-item-label">
       {text('FABRICATE.Admin.Manager.RecipeItem.Overview.Name', 'Name')}
-      <span class="manager-recipe-item-label-note">{text('FABRICATE.Admin.Manager.RecipeItem.Overview.FromLinkedItem', '· from linked item')}</span>
+      <span class="manager-recipe-item-label-note"
+        >{text(
+          'FABRICATE.Admin.Manager.RecipeItem.Overview.FromLinkedItem',
+          '· from linked item'
+        )}</span
+      >
     </span>
-    <div class={`manager-recipe-item-readonly is-name ${itemName ? '' : 'is-placeholder'}`} data-recipe-item-name>
-      {itemName || text('FABRICATE.Admin.Manager.RecipeItem.Overview.NamePlaceholder', 'Untitled recipe item')}
+    <div
+      class={`manager-recipe-item-readonly is-name ${itemName ? '' : 'is-placeholder'}`}
+      data-recipe-item-name
+    >
+      {itemName ||
+        text('FABRICATE.Admin.Manager.RecipeItem.Overview.NamePlaceholder', 'Untitled recipe item')}
     </div>
   </div>
 
   <div class="manager-recipe-item-field">
     <span class="manager-recipe-item-label">
       {text('FABRICATE.Admin.Manager.RecipeItem.Overview.Description', 'Description')}
-      <span class="manager-recipe-item-label-note">{text('FABRICATE.Admin.Manager.RecipeItem.Overview.FromLinkedItem', '· from linked item')}</span>
+      <span class="manager-recipe-item-label-note"
+        >{text(
+          'FABRICATE.Admin.Manager.RecipeItem.Overview.FromLinkedItem',
+          '· from linked item'
+        )}</span
+      >
     </span>
     <div class="manager-recipe-item-readonly is-description" data-recipe-item-description>
-      {description || text('FABRICATE.Admin.Manager.RecipeItem.Overview.DescriptionEmpty', 'No description on the linked item.')}
+      {description ||
+        text(
+          'FABRICATE.Admin.Manager.RecipeItem.Overview.DescriptionEmpty',
+          'No description on the linked item.'
+        )}
     </div>
   </div>
 
   <div class="manager-recipe-item-enabled-row">
     <div class="manager-recipe-item-enabled-copy">
-      <span class="manager-recipe-item-enabled-title">{text('FABRICATE.Admin.Manager.RecipeItem.Overview.Enabled', 'Enabled')}</span>
-      <span class="manager-recipe-item-enabled-sub">{enabled
-        ? text('FABRICATE.Admin.Manager.RecipeItem.Overview.EnabledOn', 'Players can find and use this item.')
-        : text('FABRICATE.Admin.Manager.RecipeItem.Overview.EnabledOff', 'Hidden from players until re-enabled.')}</span>
+      <span class="manager-recipe-item-enabled-title"
+        >{text('FABRICATE.Admin.Manager.RecipeItem.Overview.Enabled', 'Enabled')}</span
+      >
+      <span class="manager-recipe-item-enabled-sub"
+        >{enabled
+          ? text(
+              'FABRICATE.Admin.Manager.RecipeItem.Overview.EnabledOn',
+              'Players can find and use this item.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.RecipeItem.Overview.EnabledOff',
+              'Hidden from players until re-enabled.'
+            )}</span
+      >
     </div>
     <button
       type="button"
       class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
       data-recipe-item-enabled
       aria-pressed={enabled}
-      aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Overview.ToggleEnabled', 'Toggle enabled')}
+      aria-label={text(
+        'FABRICATE.Admin.Manager.RecipeItem.Overview.ToggleEnabled',
+        'Toggle enabled'
+      )}
       onclick={toggleEnabled}
     >
-      <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-      <span class="manager-status-toggle-label">{enabled
-        ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-        : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span>
+      <span class="manager-status-toggle-track" aria-hidden="true"
+        ><span class="manager-status-toggle-knob"></span></span
+      >
+      <span class="manager-status-toggle-label"
+        >{enabled
+          ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+          : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
+      >
     </button>
   </div>
 </section>

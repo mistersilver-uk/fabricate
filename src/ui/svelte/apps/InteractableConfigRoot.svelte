@@ -28,10 +28,7 @@
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
-  import {
-    describeVisualStatus,
-    describeActivationGate
-  } from '../../interactableConfigView.js';
+  import { describeVisualStatus, describeActivationGate } from '../../interactableConfigView.js';
   import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
 
   let { services = null } = $props();
@@ -53,8 +50,14 @@
   const view = $derived(snapshot?.view ?? null);
   const worldTime = $derived(snapshot?.now ?? null);
 
-  const sourceLabel = $derived.by(() => { void tick; return services?.resolveSourceLabel?.() ?? null; });
-  const environmentLabel = $derived.by(() => { void tick; return services?.resolveEnvironmentLabel?.() ?? null; });
+  const sourceLabel = $derived.by(() => {
+    void tick;
+    return services?.resolveSourceLabel?.() ?? null;
+  });
+  const environmentLabel = $derived.by(() => {
+    void tick;
+    return services?.resolveEnvironmentLabel?.() ?? null;
+  });
 
   // --- Identity / source configuration (issue 342) ----------------------------
   // An unconfigured interactable (born via the native "+ Add Behavior" path) is
@@ -65,7 +68,9 @@
   let identityOpen = $state(false);
   // Open the section automatically while unconfigured (the prominent "Needs
   // configuration" state); a configured interactable keeps it collapsed until asked.
-  $effect(() => { if (unconfigured) identityOpen = true; });
+  $effect(() => {
+    if (unconfigured) identityOpen = true;
+  });
   const showIdentityBody = $derived(unconfigured || identityOpen);
 
   // Selection drafts. Seed the type from the current view so a re-target starts sensibly.
@@ -79,7 +84,10 @@
     if (!selSystemId && view?.interactableType) selType = view.interactableType;
   });
 
-  const systemOptions = $derived.by(() => { void tick; return services?.listSystems?.() ?? []; });
+  const systemOptions = $derived.by(() => {
+    void tick;
+    return services?.listSystems?.() ?? [];
+  });
   // Same-named systems are indistinguishable in the picker; disambiguate colliding
   // display names with a short id suffix (issue 346).
   const systemLabels = $derived(buildSystemLabelMap(systemOptions));
@@ -90,11 +98,12 @@
       ? (services?.listTools?.(selSystemId) ?? [])
       : (services?.listTasks?.(selSystemId) ?? []);
   });
-  const environmentOptions = $derived.by(() => { void tick; return services?.listEnvironments?.() ?? []; });
+  const environmentOptions = $derived.by(() => {
+    void tick;
+    return services?.listEnvironments?.() ?? [];
+  });
 
-  const canApplyIdentity = $derived(
-    Boolean(selSystemId) && Boolean(selReferenceId)
-  );
+  const canApplyIdentity = $derived(Boolean(selSystemId) && Boolean(selReferenceId));
 
   function onSelectType(next) {
     selType = next;
@@ -115,7 +124,7 @@
       systemId: selSystemId,
       ...(selType === 'tool'
         ? { toolId: selReferenceId }
-        : { taskId: selReferenceId, environmentId: selEnvironmentId || undefined })
+        : { taskId: selReferenceId, environmentId: selEnvironmentId || undefined }),
     };
     await services?.configureSource?.(selection);
     // Reset drafts after a successful re-target; the panel refreshes via the service.
@@ -209,17 +218,28 @@
 
   async function restockFull() {
     if (!scopedNode) return;
-    await services?.restockScopedNode?.({ current: Number(scopedNode.max || 0), max: Number(scopedNode.max || 0) });
+    await services?.restockScopedNode?.({
+      current: Number(scopedNode.max || 0),
+      max: Number(scopedNode.max || 0),
+    });
     refresh();
   }
 </script>
 
 <div class="fabricate-interactable-config">
   {#if !view}
-    <p class="fab-ic-empty">{text('FABRICATE.Canvas.Interactable.Config.Unavailable', 'This interactable could not be loaded.')}</p>
+    <p class="fab-ic-empty">
+      {text(
+        'FABRICATE.Canvas.Interactable.Config.Unavailable',
+        'This interactable could not be loaded.'
+      )}
+    </p>
   {:else}
     <header class="fab-ic-header">
-      <h2 class="fab-ic-title">{view.name || text('FABRICATE.Canvas.Interactable.Config.Untitled', 'Untitled interactable')}</h2>
+      <h2 class="fab-ic-title">
+        {view.name ||
+          text('FABRICATE.Canvas.Interactable.Config.Untitled', 'Untitled interactable')}
+      </h2>
       <span class="fab-ic-type-chip">
         {view.interactableType === 'tool'
           ? text('FABRICATE.Canvas.Interactable.Config.TypeTool', 'Tool station')
@@ -229,20 +249,34 @@
 
     <!-- Identity / source (issue 342). Prominent "Needs configuration" state while
          unconfigured; collapsed re-target affordance once configured. -->
-    <section class="fab-ic-section fab-ic-identity" class:is-unconfigured={unconfigured} data-interactable-identity-section>
+    <section
+      class="fab-ic-section fab-ic-identity"
+      class:is-unconfigured={unconfigured}
+      data-interactable-identity-section
+    >
       {#if unconfigured}
         <div class="fab-ic-identity-banner" data-interactable-needs-config>
           <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
           <div>
-            <strong>{text('FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle', 'Needs configuration')}</strong>
+            <strong
+              >{text(
+                'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigTitle',
+                'Needs configuration'
+              )}</strong
+            >
             <p class="fab-ic-fact-muted fab-ic-identity-hint">
-              {text('FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigHint', 'This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.')}
+              {text(
+                'FABRICATE.Canvas.Interactable.Config.Identity.NeedsConfigHint',
+                'This interactable has no source yet. It stays hidden and inert to players until you choose its type and source below.'
+              )}
             </p>
           </div>
         </div>
       {:else}
         <div class="fab-ic-identity-head">
-          <h3 class="fab-ic-section-title">{text('FABRICATE.Canvas.Interactable.Config.Identity.Heading', 'Source')}</h3>
+          <h3 class="fab-ic-section-title">
+            {text('FABRICATE.Canvas.Interactable.Config.Identity.Heading', 'Source')}
+          </h3>
           <button
             type="button"
             class="fab-ic-btn fab-ic-identity-toggle"
@@ -260,17 +294,41 @@
       {#if showIdentityBody}
         <div class="fab-ic-identity-body" data-interactable-identity-body>
           <label class="fab-ic-field">
-            <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Identity.TypeLabel', 'Type')}</span>
-            <select value={selType} onchange={(e) => onSelectType(e.currentTarget.value)} data-interactable-identity-type>
-              <option value="tool">{text('FABRICATE.Canvas.Interactable.Config.TypeTool', 'Tool station')}</option>
-              <option value="gatheringTask">{text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task')}</option>
+            <span class="fab-ic-field-label"
+              >{text('FABRICATE.Canvas.Interactable.Config.Identity.TypeLabel', 'Type')}</span
+            >
+            <select
+              value={selType}
+              onchange={(e) => onSelectType(e.currentTarget.value)}
+              data-interactable-identity-type
+            >
+              <option value="tool"
+                >{text('FABRICATE.Canvas.Interactable.Config.TypeTool', 'Tool station')}</option
+              >
+              <option value="gatheringTask"
+                >{text('FABRICATE.Canvas.Interactable.Config.TypeTask', 'Gathering task')}</option
+              >
             </select>
           </label>
 
           <label class="fab-ic-field">
-            <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Identity.SystemLabel', 'Crafting system')}</span>
-            <select value={selSystemId} onchange={(e) => onSelectSystem(e.currentTarget.value)} data-interactable-identity-system>
-              <option value="">{text('FABRICATE.Canvas.Interactable.Config.Identity.SelectSystem', 'Select a crafting system…')}</option>
+            <span class="fab-ic-field-label"
+              >{text(
+                'FABRICATE.Canvas.Interactable.Config.Identity.SystemLabel',
+                'Crafting system'
+              )}</span
+            >
+            <select
+              value={selSystemId}
+              onchange={(e) => onSelectSystem(e.currentTarget.value)}
+              data-interactable-identity-system
+            >
+              <option value=""
+                >{text(
+                  'FABRICATE.Canvas.Interactable.Config.Identity.SelectSystem',
+                  'Select a crafting system…'
+                )}</option
+              >
               {#each systemOptions as option (option.id)}
                 <option value={option.id}>{systemDisplayLabel(option, systemLabels)}</option>
               {/each}
@@ -283,10 +341,23 @@
                 ? text('FABRICATE.Canvas.Interactable.Config.Identity.ToolLabel', 'Tool')
                 : text('FABRICATE.Canvas.Interactable.Config.Identity.TaskLabel', 'Gathering task')}
             </span>
-            <select value={selReferenceId} onchange={(e) => (selReferenceId = e.currentTarget.value)} disabled={!selSystemId} data-interactable-identity-source>
-              <option value="">{selType === 'tool'
-                ? text('FABRICATE.Canvas.Interactable.Config.Identity.SelectTool', 'Select a tool…')
-                : text('FABRICATE.Canvas.Interactable.Config.Identity.SelectTask', 'Select a gathering task…')}</option>
+            <select
+              value={selReferenceId}
+              onchange={(e) => (selReferenceId = e.currentTarget.value)}
+              disabled={!selSystemId}
+              data-interactable-identity-source
+            >
+              <option value=""
+                >{selType === 'tool'
+                  ? text(
+                      'FABRICATE.Canvas.Interactable.Config.Identity.SelectTool',
+                      'Select a tool…'
+                    )
+                  : text(
+                      'FABRICATE.Canvas.Interactable.Config.Identity.SelectTask',
+                      'Select a gathering task…'
+                    )}</option
+              >
               {#each sourceOptions as option (option.id)}
                 <option value={option.id}>{option.name}</option>
               {/each}
@@ -295,9 +366,23 @@
 
           {#if selType === 'gatheringTask'}
             <label class="fab-ic-field">
-              <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Identity.EnvironmentLabel', 'Environment (optional)')}</span>
-              <select value={selEnvironmentId} onchange={(e) => (selEnvironmentId = e.currentTarget.value)} data-interactable-identity-environment>
-                <option value="">{text('FABRICATE.Canvas.Interactable.Config.Identity.SelectEnvironment', 'No environment')}</option>
+              <span class="fab-ic-field-label"
+                >{text(
+                  'FABRICATE.Canvas.Interactable.Config.Identity.EnvironmentLabel',
+                  'Environment (optional)'
+                )}</span
+              >
+              <select
+                value={selEnvironmentId}
+                onchange={(e) => (selEnvironmentId = e.currentTarget.value)}
+                data-interactable-identity-environment
+              >
+                <option value=""
+                  >{text(
+                    'FABRICATE.Canvas.Interactable.Config.Identity.SelectEnvironment',
+                    'No environment'
+                  )}</option
+                >
                 {#each environmentOptions as option (option.id)}
                   <option value={option.id}>{option.name}</option>
                 {/each}
@@ -314,7 +399,9 @@
               data-interactable-identity-apply
             >
               <i class="fas fa-check" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Canvas.Interactable.Config.Identity.Apply', 'Apply source')}</span>
+              <span
+                >{text('FABRICATE.Canvas.Interactable.Config.Identity.Apply', 'Apply source')}</span
+              >
             </button>
           </div>
         </div>
@@ -324,7 +411,9 @@
     <!-- Editable identity -->
     <section class="fab-ic-section">
       <label class="fab-ic-field">
-        <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.NameLabel', 'Name')}</span>
+        <span class="fab-ic-field-label"
+          >{text('FABRICATE.Canvas.Interactable.Config.NameLabel', 'Name')}</span
+        >
         <input
           type="text"
           bind:value={nameDraft}
@@ -334,13 +423,18 @@
         />
       </label>
       <label class="fab-ic-field">
-        <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.PromptLabel', 'Prompt text')}</span>
+        <span class="fab-ic-field-label"
+          >{text('FABRICATE.Canvas.Interactable.Config.PromptLabel', 'Prompt text')}</span
+        >
         <input
           type="text"
           bind:value={promptDraft}
           onchange={commitPrompt}
           onblur={commitPrompt}
-          placeholder={text('FABRICATE.Canvas.Interactable.Config.PromptPlaceholder', 'Shown to players in the interaction prompt')}
+          placeholder={text(
+            'FABRICATE.Canvas.Interactable.Config.PromptPlaceholder',
+            'Shown to players in the interaction prompt'
+          )}
           aria-label={text('FABRICATE.Canvas.Interactable.Config.PromptLabel', 'Prompt text')}
         />
       </label>
@@ -350,13 +444,21 @@
          Environment fact is omitted for a tool interactable, so the grid lays out
          as 3 columns when it is present and 2 columns when it is absent. -->
     <section class="fab-ic-section fab-ic-facts">
-      <dl class="fab-ic-fact-list" class:has-environment={view.interactableType === 'gatheringTask'}>
+      <dl
+        class="fab-ic-fact-list"
+        class:has-environment={view.interactableType === 'gatheringTask'}
+      >
         <div class="fab-ic-fact">
-          <dt>{view.interactableType === 'tool'
-            ? text('FABRICATE.Canvas.Interactable.Config.ToolLabel', 'Linked tool')
-            : text('FABRICATE.Canvas.Interactable.Config.TaskLabel', 'Linked gathering task')}</dt>
+          <dt>
+            {view.interactableType === 'tool'
+              ? text('FABRICATE.Canvas.Interactable.Config.ToolLabel', 'Linked tool')
+              : text('FABRICATE.Canvas.Interactable.Config.TaskLabel', 'Linked gathering task')}
+          </dt>
           <dd>
-            <span class="fab-ic-fact-name">{sourceLabel ?? text('FABRICATE.Canvas.Interactable.Config.UnresolvedSource', 'Unresolved')}</span>
+            <span class="fab-ic-fact-name"
+              >{sourceLabel ??
+                text('FABRICATE.Canvas.Interactable.Config.UnresolvedSource', 'Unresolved')}</span
+            >
             {#if view.referenceId}<code class="fab-ic-fact-id">{view.referenceId}</code>{/if}
           </dd>
         </div>
@@ -367,14 +469,20 @@
               {#if view.environmentId}
                 <span class="fab-ic-fact-name">{environmentLabel ?? view.environmentId}</span>
               {:else}
-                <span class="fab-ic-fact-muted">{text('FABRICATE.Canvas.Interactable.Config.NoEnvironment', 'None')}</span>
+                <span class="fab-ic-fact-muted"
+                  >{text('FABRICATE.Canvas.Interactable.Config.NoEnvironment', 'None')}</span
+                >
               {/if}
             </dd>
           </div>
         {/if}
         <div class="fab-ic-fact">
           <dt>{text('FABRICATE.Canvas.Interactable.Config.StatusLabel', 'Status')}</dt>
-          <dd><span class="fab-ic-fact-muted">{text(activationGate.key, activationGate.fallback)}</span></dd>
+          <dd>
+            <span class="fab-ic-fact-muted"
+              >{text(activationGate.key, activationGate.fallback)}</span
+            >
+          </dd>
         </div>
       </dl>
     </section>
@@ -384,9 +492,13 @@
          interactable owns its own pool (FVTT token↔actor link framing). -->
     {#if isGatheringTask}
       <section class="fab-ic-section" data-interactable-node-section>
-        <h3 class="fab-ic-section-title">{text('FABRICATE.Canvas.Interactable.Config.Node.Heading', 'Resource node')}</h3>
+        <h3 class="fab-ic-section-title">
+          {text('FABRICATE.Canvas.Interactable.Config.Node.Heading', 'Resource node')}
+        </h3>
         <div class="fab-ic-field">
-          <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.Node.LinkLabel', 'Task node link')}</span>
+          <span class="fab-ic-field-label"
+            >{text('FABRICATE.Canvas.Interactable.Config.Node.LinkLabel', 'Task node link')}</span
+          >
           <button
             type="button"
             class="fab-ic-btn fab-ic-btn-toggle"
@@ -396,31 +508,62 @@
             data-interactable-node-link
           >
             <i class="fas {isUnlinked ? 'fa-link-slash' : 'fa-link'}" aria-hidden="true"></i>
-            <span>{isUnlinked
-              ? text('FABRICATE.Canvas.Interactable.Config.Node.LinkUnlinked', 'Independent (this interactable only)')
-              : text('FABRICATE.Canvas.Interactable.Config.Node.LinkLinked', 'Linked to gathering task')}</span>
+            <span
+              >{isUnlinked
+                ? text(
+                    'FABRICATE.Canvas.Interactable.Config.Node.LinkUnlinked',
+                    'Independent (this interactable only)'
+                  )
+                : text(
+                    'FABRICATE.Canvas.Interactable.Config.Node.LinkLinked',
+                    'Linked to gathering task'
+                  )}</span
+            >
           </button>
         </div>
 
         {#if !isUnlinked}
-          <p class="fab-ic-fact-muted fab-ic-node-hint">{text('FABRICATE.Canvas.Interactable.Config.Node.LinkedHint', 'Depletion and respawn follow the gathering task\'s shared node.')}</p>
+          <p class="fab-ic-fact-muted fab-ic-node-hint">
+            {text(
+              'FABRICATE.Canvas.Interactable.Config.Node.LinkedHint',
+              "Depletion and respawn follow the gathering task's shared node."
+            )}
+          </p>
         {:else if scopedNode}
-          <p class="fab-ic-fact-muted fab-ic-node-hint">{text('FABRICATE.Canvas.Interactable.Config.Node.UnlinkedHint', 'Independent count, regeneration, and max — separate from the task.')}</p>
+          <p class="fab-ic-fact-muted fab-ic-node-hint">
+            {text(
+              'FABRICATE.Canvas.Interactable.Config.Node.UnlinkedHint',
+              'Independent count, regeneration, and max — separate from the task.'
+            )}
+          </p>
           <p class="fab-ic-node-state" data-interactable-node-state>
             {#if scopedNode.current <= 0 && nodeIsNonRegenerating}
-              <span class="fab-ic-node-exhausted">{text('FABRICATE.Canvas.Interactable.Config.Node.Exhausted', 'Permanently exhausted')}</span>
+              <span class="fab-ic-node-exhausted"
+                >{text(
+                  'FABRICATE.Canvas.Interactable.Config.Node.Exhausted',
+                  'Permanently exhausted'
+                )}</span
+              >
             {:else if scopedNode.current <= 0}
-              <span class="fab-ic-node-depleted">{text('FABRICATE.Canvas.Interactable.Config.Node.Depleted', 'Depleted')}</span>
+              <span class="fab-ic-node-depleted"
+                >{text('FABRICATE.Canvas.Interactable.Config.Node.Depleted', 'Depleted')}</span
+              >
             {:else}
-              <span>{text('FABRICATE.Canvas.Interactable.Config.Node.Available', 'Available')}</span>
+              <span>{text('FABRICATE.Canvas.Interactable.Config.Node.Available', 'Available')}</span
+              >
             {/if}
             <span class="fab-ic-fact-muted">{scopedNode.current} / {scopedNode.max}</span>
           </p>
 
           <label class="fab-ic-field">
-            <span class="fab-ic-field-label">{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
+            <span class="fab-ic-field-label"
+              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span
+            >
             <input
-              type="number" min="0" step="1" placeholder="—"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="—"
               value={scopedNode.max > 0 ? scopedNode.max : ''}
               onchange={(e) => setNodeCount(e.currentTarget.value)}
               data-interactable-node-count
@@ -428,19 +571,47 @@
           </label>
 
           <label class="fab-ic-field">
-            <span class="fab-ic-field-label">{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
-            <select value={scopedNode.depletionTiming} onchange={(e) => setNodeDeplete(e.currentTarget.value)} data-interactable-node-deplete>
-              <option value="onStart">{text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start')}</option>
-              <option value="onSuccess">{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option>
+            <span class="fab-ic-field-label"
+              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span
+            >
+            <select
+              value={scopedNode.depletionTiming}
+              onchange={(e) => setNodeDeplete(e.currentTarget.value)}
+              data-interactable-node-deplete
+            >
+              <option value="onStart"
+                >{text('FABRICATE.Admin.Manager.Economy.DepleteOnStart', 'On start')}</option
+              >
+              <option value="onSuccess"
+                >{text('FABRICATE.Admin.Manager.Economy.DepleteOnSuccess', 'On success')}</option
+              >
             </select>
           </label>
 
           <label class="fab-ic-field">
-            <span class="fab-ic-field-label">{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span>
-            <select value={respawnPolicy} onchange={(e) => setNodeRespawnPolicy(e.currentTarget.value)} data-interactable-node-respawn>
-              <option value="manual">{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option>
-              <option value="overTime">{text('FABRICATE.Admin.Manager.Economy.RespawnOverTime', 'Over world time')}</option>
-              <option value="nonRegenerating">{text('FABRICATE.Admin.Manager.Economy.RespawnNone', 'Does not regenerate')}</option>
+            <span class="fab-ic-field-label"
+              >{text('FABRICATE.Admin.Manager.Economy.TaskNodeRespawn', 'Respawn')}</span
+            >
+            <select
+              value={respawnPolicy}
+              onchange={(e) => setNodeRespawnPolicy(e.currentTarget.value)}
+              data-interactable-node-respawn
+            >
+              <option value="manual"
+                >{text('FABRICATE.Admin.Manager.Economy.RespawnManual', 'Manual')}</option
+              >
+              <option value="overTime"
+                >{text(
+                  'FABRICATE.Admin.Manager.Economy.RespawnOverTime',
+                  'Over world time'
+                )}</option
+              >
+              <option value="nonRegenerating"
+                >{text(
+                  'FABRICATE.Admin.Manager.Economy.RespawnNone',
+                  'Does not regenerate'
+                )}</option
+              >
             </select>
           </label>
 
@@ -449,7 +620,10 @@
                  only a read-only permanence hint. The node-count input above still
                  authors the reserve size. -->
             <p class="fab-ic-fact-muted fab-ic-node-hint" data-interactable-node-no-restock-hint>
-              {text('FABRICATE.Canvas.Interactable.Config.Node.NoRestock', 'Cannot restock — this node does not regenerate.')}
+              {text(
+                'FABRICATE.Canvas.Interactable.Config.Node.NoRestock',
+                'Cannot restock — this node does not regenerate.'
+              )}
             </p>
           {:else}
             <div class="fab-ic-actions fab-ic-actions-inline">
@@ -470,12 +644,17 @@
 
     <!-- Linked visual -->
     <section class="fab-ic-section">
-      <h3 class="fab-ic-section-title">{text('FABRICATE.Canvas.Interactable.Config.VisualHeading', 'Linked marker')}</h3>
+      <h3 class="fab-ic-section-title">
+        {text('FABRICATE.Canvas.Interactable.Config.VisualHeading', 'Linked marker')}
+      </h3>
       <p class="fab-ic-visual-status" class:is-missing={visualStatus.severity === 'missing'}>
         <i class="fas {visualStatus.icon}" aria-hidden="true"></i>
         {#if visualStatus.kind}
           <!-- Resolved marker: read sensibly per kind ("Linked marker: Token"). -->
-          <span>{text('FABRICATE.Canvas.Interactable.Config.VisualOkPrefix', 'Linked marker:')} {text(visualStatus.kind.key, visualStatus.kind.fallback)}</span>
+          <span
+            >{text('FABRICATE.Canvas.Interactable.Config.VisualOkPrefix', 'Linked marker:')}
+            {text(visualStatus.kind.key, visualStatus.kind.fallback)}</span
+          >
         {:else}
           <span>{text(visualStatus.key, visualStatus.fallback)}</span>
         {/if}
@@ -483,31 +662,68 @@
 
       {#if visualStatus.severity === 'missing'}
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createReplacementTile?.())}>
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.createReplacementTile?.())}
+          >
             {text('FABRICATE.Canvas.Interactable.Config.RecreateTile', 'Recreate tile')}
           </button>
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createDrawingMarker?.())}>
-            {text('FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker', 'Create drawing marker')}
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.createDrawingMarker?.())}
+          >
+            {text(
+              'FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker',
+              'Create drawing marker'
+            )}
           </button>
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.relinkSelected?.())}>
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.relinkSelected?.())}
+          >
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
           </button>
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.removeVisualMarker?.())}>
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.removeVisualMarker?.())}
+          >
             {text('FABRICATE.Canvas.Interactable.Config.ClearVisualLink', 'Clear visual link')}
           </button>
         </div>
       {:else if visualStatus.severity === 'none'}
         <!-- Region-only (no marker): offer an upgrade to a linked Tile or Drawing. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createMarker?.())}>
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.createMarker?.())}
+          >
             <i class="fas fa-map-pin" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Canvas.Interactable.Config.CreateMarker', 'Create marker')}</span>
+            <span>{text('FABRICATE.Canvas.Interactable.Config.CreateMarker', 'Create marker')}</span
+            >
           </button>
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.createDrawingMarker?.())}>
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.createDrawingMarker?.())}
+          >
             <i class="fas fa-draw-polygon" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker', 'Create drawing marker')}</span>
+            <span
+              >{text(
+                'FABRICATE.Canvas.Interactable.Config.CreateDrawingMarker',
+                'Create drawing marker'
+              )}</span
+            >
           </button>
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.relinkSelected?.())}>
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.relinkSelected?.())}
+          >
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
           </button>
         </div>
@@ -515,25 +731,50 @@
         <!-- Resolved (healthy) marker: still offer relink-to-a-different-doc and
              remove-from-panel, mirroring the missing-state affordances. -->
         <div class="fab-ic-actions fab-ic-actions-inline">
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.relinkSelected?.())}>
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.relinkSelected?.())}
+          >
             {text('FABRICATE.Canvas.Interactable.Config.RelinkSelected', 'Relink selected')}
           </button>
-          <button type="button" class="fab-ic-btn" onclick={() => run(() => services?.removeVisualMarker?.())}>
-            {text('FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker', 'Remove visual marker')}
+          <button
+            type="button"
+            class="fab-ic-btn"
+            onclick={() => run(() => services?.removeVisualMarker?.())}
+          >
+            {text(
+              'FABRICATE.Canvas.Interactable.Config.RemoveVisualMarker',
+              'Remove visual marker'
+            )}
           </button>
         </div>
       {/if}
 
       <label class="fab-ic-field">
-        <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.MissingPolicyLabel', 'If the marker is missing')}</span>
+        <span class="fab-ic-field-label"
+          >{text(
+            'FABRICATE.Canvas.Interactable.Config.MissingPolicyLabel',
+            'If the marker is missing'
+          )}</span
+        >
         <select
           value={view.linkedVisual.missingPolicy}
           onchange={(e) => setMissingPolicy(e.currentTarget.value)}
-          aria-label={text('FABRICATE.Canvas.Interactable.Config.MissingPolicyLabel', 'If the marker is missing')}
+          aria-label={text(
+            'FABRICATE.Canvas.Interactable.Config.MissingPolicyLabel',
+            'If the marker is missing'
+          )}
         >
-          <option value="ignore">{text('FABRICATE.Canvas.Interactable.Config.MissingIgnore', 'Ignore')}</option>
-          <option value="warn">{text('FABRICATE.Canvas.Interactable.Config.MissingWarn', 'Warn')}</option>
-          <option value="recreate">{text('FABRICATE.Canvas.Interactable.Config.MissingRecreate', 'Recreate')}</option>
+          <option value="ignore"
+            >{text('FABRICATE.Canvas.Interactable.Config.MissingIgnore', 'Ignore')}</option
+          >
+          <option value="warn"
+            >{text('FABRICATE.Canvas.Interactable.Config.MissingWarn', 'Warn')}</option
+          >
+          <option value="recreate"
+            >{text('FABRICATE.Canvas.Interactable.Config.MissingRecreate', 'Recreate')}</option
+          >
         </select>
       </label>
     </section>
@@ -546,24 +787,39 @@
           checked={view.presentation.hidden}
           onchange={(e) => setHidden(e.currentTarget.checked)}
         />
-        <span>{text('FABRICATE.Canvas.Interactable.Config.HiddenLabel', 'Hidden from players')}</span>
+        <span
+          >{text('FABRICATE.Canvas.Interactable.Config.HiddenLabel', 'Hidden from players')}</span
+        >
       </label>
       <label class="fab-ic-field">
-        <span class="fab-ic-field-label">{text('FABRICATE.Canvas.Interactable.Config.AudienceLabel', 'Who can activate')}</span>
+        <span class="fab-ic-field-label"
+          >{text('FABRICATE.Canvas.Interactable.Config.AudienceLabel', 'Who can activate')}</span
+        >
         <select
           value={view.activation.audience}
           onchange={(e) => setAudience(e.currentTarget.value)}
-          aria-label={text('FABRICATE.Canvas.Interactable.Config.AudienceLabel', 'Who can activate')}
+          aria-label={text(
+            'FABRICATE.Canvas.Interactable.Config.AudienceLabel',
+            'Who can activate'
+          )}
         >
-          <option value="players">{text('FABRICATE.Canvas.Interactable.Config.AudiencePlayers', 'Players')}</option>
-          <option value="all">{text('FABRICATE.Canvas.Interactable.Config.AudienceAll', 'Everyone')}</option>
+          <option value="players"
+            >{text('FABRICATE.Canvas.Interactable.Config.AudiencePlayers', 'Players')}</option
+          >
+          <option value="all"
+            >{text('FABRICATE.Canvas.Interactable.Config.AudienceAll', 'Everyone')}</option
+          >
         </select>
       </label>
     </section>
 
     <!-- Primary action row -->
     <section class="fab-ic-section fab-ic-actions">
-      <button type="button" class="fab-ic-btn fab-ic-btn-primary" onclick={() => run(() => services?.testAsPlayer?.())}>
+      <button
+        type="button"
+        class="fab-ic-btn fab-ic-btn-primary"
+        onclick={() => run(() => services?.testAsPlayer?.())}
+      >
         <i class="fas fa-play" aria-hidden="true"></i>
         <span>{text('FABRICATE.Canvas.Interactable.Config.TestAsPlayer', 'Test as player')}</span>
       </button>
@@ -601,7 +857,11 @@
           ? text('FABRICATE.Canvas.Interactable.Config.Unlock', 'Unlock')
           : text('FABRICATE.Canvas.Interactable.Config.Lock', 'Lock')}
       </button>
-      <button type="button" class="fab-ic-btn fab-ic-btn-danger" onclick={() => run(() => services?.deleteInteractable?.())}>
+      <button
+        type="button"
+        class="fab-ic-btn fab-ic-btn-danger"
+        onclick={() => run(() => services?.deleteInteractable?.())}
+      >
         {text('FABRICATE.Canvas.Interactable.Config.Delete', 'Delete interactable')}
       </button>
     </section>

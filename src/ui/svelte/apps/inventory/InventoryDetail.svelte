@@ -45,7 +45,7 @@
     onReorderSalvageStage = () => {},
     onSalvageReorderSettled = () => {},
     salvageOrderIsCustom = false,
-    onResetSalvageOrder = () => {}
+    onResetSalvageOrder = () => {},
   } = $props();
 
   const isRecipeItem = $derived(item?.isRecipeItem === true);

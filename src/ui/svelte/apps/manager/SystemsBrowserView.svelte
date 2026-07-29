@@ -15,7 +15,7 @@
     onExportSystem = () => {},
     onDeleteSystem = () => {},
     onToggleSystemEnabled = () => {},
-    systemsLoading = false
+    systemsLoading = false,
   } = $props();
 
   let searchTerm = $state('');
@@ -29,16 +29,24 @@
   const systemLabels = $derived(buildSystemLabelMap(systems));
 
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
-  const filteredSystems = $derived((systems || []).filter(system => {
-    const matchesSearch = !normalizedSearchTerm
-      || `${system.name || ''} ${system.description || ''}`.toLowerCase().includes(normalizedSearchTerm);
-    const matchesStatus = statusFilter === 'all'
-      || (statusFilter === 'active' && system.enabled !== false)
-      || (statusFilter === 'disabled' && system.enabled === false);
-    return matchesSearch && matchesStatus;
-  }));
+  const filteredSystems = $derived(
+    (systems || []).filter((system) => {
+      const matchesSearch =
+        !normalizedSearchTerm ||
+        `${system.name || ''} ${system.description || ''}`
+          .toLowerCase()
+          .includes(normalizedSearchTerm);
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && system.enabled !== false) ||
+        (statusFilter === 'disabled' && system.enabled === false);
+      return matchesSearch && matchesStatus;
+    })
+  );
   const filtersActive = $derived(normalizedSearchTerm.length > 0 || statusFilter !== 'all');
-  const paginatedSystems = $derived(filteredSystems.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+  const paginatedSystems = $derived(
+    filteredSystems.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+  );
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredSystems.length) {
@@ -58,12 +66,17 @@
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
-      routedByIngredients: text('FABRICATE.Admin.Manager.ResolutionRoutedByIngredients', 'Routed by ingredients'),
+      routedByIngredients: text(
+        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
+        'Routed by ingredients'
+      ),
       routedByCheck: text('FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'),
       progressive: text('FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'),
-      alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy')
+      alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'),
     };
-    return labels[mode] || mode || text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple');
+    return (
+      labels[mode] || mode || text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple')
+    );
   }
 
   function isSelectedSystem(system) {
@@ -96,51 +109,88 @@
   <section class="manager-section-header">
     <div class="manager-heading">
       <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Browse', 'Browse')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.SystemLibrary', 'System library')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.SystemLibraryHint', 'Select a row to view counts and enabled features.')}</p>
+      <h2 class="manager-title">
+        {text('FABRICATE.Admin.Manager.SystemLibrary', 'System library')}
+      </h2>
+      <p class="manager-subtitle">
+        {text(
+          'FABRICATE.Admin.Manager.SystemLibraryHint',
+          'Select a row to view counts and enabled features.'
+        )}
+      </p>
     </div>
   </section>
 
-  <section class="manager-toolbar" aria-label={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}>
+  <section
+    class="manager-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.SystemFilters', 'System filters')}
+  >
     <label class="manager-search">
       <i class="fas fa-search" aria-hidden="true"></i>
       <input
         type="search"
         bind:value={searchTerm}
-        placeholder={text('FABRICATE.Admin.Manager.SearchPlaceholder', 'Search by name or description')}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.SearchPlaceholder',
+          'Search by name or description'
+        )}
         aria-label={text('FABRICATE.Admin.Manager.SearchLabel', 'Search systems')}
       />
     </label>
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-      <select value={statusFilter} onchange={(event) => statusFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.StatusFilterLabel', 'Filter systems by status')}>
+      <select
+        value={statusFilter}
+        onchange={(event) => (statusFilter = event.currentTarget.value)}
+        aria-label={text('FABRICATE.Admin.Manager.StatusFilterLabel', 'Filter systems by status')}
+      >
         <option value="all">{text('FABRICATE.Admin.Manager.StatusAll', 'All systems')}</option>
         <option value="active">{text('FABRICATE.Admin.Manager.StatusActive', 'Active')}</option>
-        <option value="disabled">{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option>
+        <option value="disabled"
+          >{text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')}</option
+        >
       </select>
     </label>
-    <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredSystems.length).replace('{total}', systems.length)}</Chip>
+    <Chip
+      >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
+        .replace('{shown}', filteredSystems.length)
+        .replace('{total}', systems.length)}</Chip
+    >
     {#if filtersActive}
-      <button type="button" class="manager-button manager-clear-filters" data-clear-filters="systems" onclick={clearFilters}>
+      <button
+        type="button"
+        class="manager-button manager-clear-filters"
+        data-clear-filters="systems"
+        onclick={clearFilters}
+      >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </button>
     {/if}
   </section>
 
-  <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.SystemsTable', 'Crafting systems table')}>
+  <section
+    class="manager-table-scroll"
+    aria-label={text('FABRICATE.Admin.Manager.SystemsTable', 'Crafting systems table')}
+  >
     {#if systemsLoading}
       <EmptyState
         icon="fas fa-spinner"
         title={text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}
-        hint={text('FABRICATE.Admin.Manager.LoadingSystemsHint', 'Fabricate is finishing startup before the system library is shown.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.LoadingSystemsHint',
+          'Fabricate is finishing startup before the system library is shown.'
+        )}
         dataAttr="data-systems-loading"
       />
     {:else if (systems || []).length === 0}
       <EmptyState
         icon="fas fa-layer-group"
         title={text('FABRICATE.Admin.Manager.EmptyTitle', 'No crafting systems yet')}
-        hint={text('FABRICATE.Admin.Manager.EmptyHint', 'Create a system to start organizing components and recipes.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.EmptyHint',
+          'Create a system to start organizing components and recipes.'
+        )}
       >
         <button type="button" class="manager-button is-primary" onclick={onCreateSystem}>
           <i class="fas fa-plus" aria-hidden="true"></i>
@@ -151,17 +201,30 @@
       <EmptyState
         icon="fas fa-search"
         title={text('FABRICATE.Admin.Manager.EmptySearchTitle', 'No systems match this search')}
-        hint={text('FABRICATE.Admin.Manager.EmptySearchHint', 'Clear the search to show all configured systems.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.EmptySearchHint',
+          'Clear the search to show all configured systems.'
+        )}
       >
-        <button type="button" class="manager-button" onclick={() => searchTerm = ''}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
+        <button type="button" class="manager-button" onclick={() => (searchTerm = '')}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+        >
       </EmptyState>
     {:else}
-      <div class="manager-systems-table" role="table" aria-label={text('FABRICATE.Admin.Manager.SystemsTableShort', 'Crafting systems')}>
+      <div
+        class="manager-systems-table"
+        role="table"
+        aria-label={text('FABRICATE.Admin.Manager.SystemsTableShort', 'Crafting systems')}
+      >
         <div class="manager-table-head" role="row">
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.System', 'System')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span>
+          <span role="columnheader"
+            >{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span
+          >
           <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
+          <span role="columnheader"
+            >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
+          >
         </div>
         {#each paginatedSystems as system (system.id)}
           <div
@@ -178,25 +241,45 @@
                 <i class="fas fa-layer-group"></i>
               </span>
               <span class="manager-system-copy">
-                <span class="manager-system-name" title={systemDisplayLabel(system, systemLabels)}>{systemDisplayLabel(system, systemLabels)}</span>
+                <span class="manager-system-name" title={systemDisplayLabel(system, systemLabels)}
+                  >{systemDisplayLabel(system, systemLabels)}</span
+                >
                 {#if system.description}
-                  <span class="manager-system-description" title={system.description}>{system.description}</span>
+                  <span class="manager-system-description" title={system.description}
+                    >{system.description}</span
+                  >
                 {:else}
-                  <span class="manager-system-description">{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span>
+                  <span class="manager-system-description"
+                    >{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span
+                  >
                 {/if}
               </span>
             </span>
-            <span role="cell" class="manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}>
+            <span
+              role="cell"
+              class="manager-labeled-cell"
+              data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}
+            >
               <Chip>{resolutionModeLabel(system.resolutionMode)}</Chip>
             </span>
-            <span role="cell" class="manager-labeled-cell manager-status-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}>
+            <span
+              role="cell"
+              class="manager-labeled-cell manager-status-cell"
+              data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
+            >
               <button
                 type="button"
                 class={`manager-status-toggle ${system.enabled === false ? 'is-off' : 'is-on'}`}
                 aria-pressed={system.enabled !== false}
                 aria-label={system.enabled === false
-                  ? text('FABRICATE.Admin.Manager.EnableSystemNamed', 'Enable {name}').replace('{name}', systemDisplayLabel(system, systemLabels))
-                  : text('FABRICATE.Admin.Manager.DisableSystemNamed', 'Disable {name}').replace('{name}', systemDisplayLabel(system, systemLabels))}
+                  ? text('FABRICATE.Admin.Manager.EnableSystemNamed', 'Enable {name}').replace(
+                      '{name}',
+                      systemDisplayLabel(system, systemLabels)
+                    )
+                  : text('FABRICATE.Admin.Manager.DisableSystemNamed', 'Disable {name}').replace(
+                      '{name}',
+                      systemDisplayLabel(system, systemLabels)
+                    )}
                 onclick={(event) => toggleEnabled(system.id, system.enabled === false, event)}
                 onkeydown={(event) => event.stopPropagation()}
               >
@@ -204,18 +287,60 @@
                   <span class="manager-status-toggle-knob"></span>
                 </span>
                 <span class="manager-status-toggle-label">
-                  {system.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                  {system.enabled === false
+                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
                 </span>
               </button>
             </span>
-            <span role="cell" class="manager-action-group manager-labeled-cell" data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace('{name}', systemDisplayLabel(system, systemLabels))} title={text('FABRICATE.Admin.Manager.EditSystem', 'Edit system')} onclick={(event) => { event.stopPropagation(); onEditSystem(system.id); }}>
+            <span
+              role="cell"
+              class="manager-action-group manager-labeled-cell"
+              data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
+            >
+              <button
+                type="button"
+                class="manager-icon-button"
+                aria-label={text('FABRICATE.Admin.Manager.EditNamed', 'Edit {name}').replace(
+                  '{name}',
+                  systemDisplayLabel(system, systemLabels)
+                )}
+                title={text('FABRICATE.Admin.Manager.EditSystem', 'Edit system')}
+                onclick={(event) => {
+                  event.stopPropagation();
+                  onEditSystem(system.id);
+                }}
+              >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </button>
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace('{name}', systemDisplayLabel(system, systemLabels))} title={text('FABRICATE.Admin.Manager.ExportSystem', 'Export system')} onclick={(event) => { event.stopPropagation(); onExportSystem(system.id); }}>
+              <button
+                type="button"
+                class="manager-icon-button"
+                aria-label={text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace(
+                  '{name}',
+                  systemDisplayLabel(system, systemLabels)
+                )}
+                title={text('FABRICATE.Admin.Manager.ExportSystem', 'Export system')}
+                onclick={(event) => {
+                  event.stopPropagation();
+                  onExportSystem(system.id);
+                }}
+              >
                 <i class="fas fa-file-export" aria-hidden="true"></i>
               </button>
-              <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace('{name}', systemDisplayLabel(system, systemLabels))} title={text('FABRICATE.Admin.Manager.DeleteSystem', 'Delete system')} onclick={(event) => { event.stopPropagation(); onDeleteSystem(system.id); }}>
+              <button
+                type="button"
+                class="manager-icon-button is-danger"
+                aria-label={text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace(
+                  '{name}',
+                  systemDisplayLabel(system, systemLabels)
+                )}
+                title={text('FABRICATE.Admin.Manager.DeleteSystem', 'Delete system')}
+                onclick={(event) => {
+                  event.stopPropagation();
+                  onDeleteSystem(system.id);
+                }}
+              >
                 <i class="fas fa-trash" aria-hidden="true"></i>
               </button>
             </span>
@@ -229,7 +354,10 @@
     totalCount={filteredSystems.length}
     {pageSize}
     {pageIndex}
-    onPageChange={(next) => pageIndex = next}
-    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+    onPageChange={(next) => (pageIndex = next)}
+    onPageSizeChange={(next) => {
+      pageSize = next;
+      pageIndex = 0;
+    }}
   />
 </main>

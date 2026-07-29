@@ -32,7 +32,7 @@
     // DOM id of the panel the open slot controls, for `aria-controls`.
     panelId = null,
     onOpenSlot = null,
-    onPickForMe = null
+    onPickForMe = null,
   } = $props();
 
   const items = $derived(Array.isArray(slots) ? slots : []);
@@ -43,7 +43,7 @@
   const STATE_LABEL_KEYS = {
     [SLOT_STATE.MET]: 'FABRICATE.App.Crafting.Slots.TileMet',
     [SLOT_STATE.PARTIAL]: 'FABRICATE.App.Crafting.Slots.TilePartial',
-    [SLOT_STATE.SHORT]: 'FABRICATE.App.Crafting.Slots.TileShort'
+    [SLOT_STATE.SHORT]: 'FABRICATE.App.Crafting.Slots.TileShort',
   };
 
   function tileLabel(slot) {

@@ -43,7 +43,8 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardExceed',
       fallback: 'Exceed',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardExceedDesc',
-      descFallback: 'Award each result in order only while the value strictly exceeds its difficulty.',
+      descFallback:
+        'Award each result in order only while the value strictly exceeds its difficulty.',
     },
   ];
 
@@ -74,7 +75,9 @@
       />
       <span class="manager-resolution-option-body">
         <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
-        <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
+        <span class="manager-resolution-option-desc"
+          >{text(option.descKey, option.descFallback)}</span
+        >
       </span>
     </label>
   {/each}

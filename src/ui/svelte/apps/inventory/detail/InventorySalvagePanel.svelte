@@ -44,7 +44,7 @@
     onReorder = () => {},
     onReorderSettled = () => {},
     canResetOrder = false,
-    onResetOrder = () => {}
+    onResetOrder = () => {},
   } = $props();
 
   const mode = $derived(salvage?.mode ?? 'simple');
@@ -254,11 +254,7 @@
     <!-- A ruled row, not a full-width slab: the note explains the gesture's cost on the
          left and the action sits right, at its own width. -->
     <div class="salvage-footer">
-      <p
-        class="salvage-footer-note"
-        id="salvage-footer-note"
-        data-inventory-salvage-footer-note
-      >
+      <p class="salvage-footer-note" id="salvage-footer-note" data-inventory-salvage-footer-note>
         {footerNote}
       </p>
       <button

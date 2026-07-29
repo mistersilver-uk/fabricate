@@ -12,7 +12,7 @@
     describeComponentSelection,
     pruneComponentSelection,
     setComponentSelection,
-    toggleComponentSelection
+    toggleComponentSelection,
   } from '../../../../utils/componentBulkEditModel.js';
   import {
     COMPONENT_SORT_KEYS,
@@ -23,12 +23,12 @@
     filterComponents,
     groupComponentsByCategory,
     paginateComponents,
-    sortComponents
+    sortComponents,
   } from '../../../../utils/componentBrowserModel.js';
   import { countByCategory } from '../../../../utils/browserGroupCounts.js';
   import {
     GENERAL_COMPONENT_CATEGORY,
-    getComponentCategoryLabel
+    getComponentCategoryLabel,
   } from '../../../../utils/componentCategories.js';
 
   let {
@@ -63,7 +63,7 @@
     // exactly what this view did before, because it kept all of it locally. Mirrors
     // RecipesBrowserView. When unbound (the isolated mounted tests) the local fallback
     // below keeps every control reactive in-component.
-    browserState = $bindable(null)
+    browserState = $bindable(null),
   } = $props();
 
   let ownBrowserState = $state(createComponentBrowserState());
@@ -94,33 +94,53 @@
     ui.systemId = selectedSystemId;
   });
 
-  const showComponentEssences = $derived((itemCards || []).some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
-  const componentEssenceOptions = $derived(uniqueSorted((itemCards || []).flatMap(item => Array.isArray(item.essences) ? item.essences.map(essence => essence.name || essence.id) : [])));
+  const showComponentEssences = $derived(
+    (itemCards || []).some(
+      (item) => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)
+    )
+  );
+  const componentEssenceOptions = $derived(
+    uniqueSorted(
+      (itemCards || []).flatMap((item) =>
+        Array.isArray(item.essences)
+          ? item.essences.map((essence) => essence.name || essence.id)
+          : []
+      )
+    )
+  );
   const categoryOptions = $derived(componentCategoryOptions(itemCards || [], categoryVocabulary));
 
-  const filteredComponents = $derived(filterComponents(itemCards || [], {
-    category: ui.categoryFilter,
-    essence: ui.essenceFilter
-  }));
+  const filteredComponents = $derived(
+    filterComponents(itemCards || [], {
+      category: ui.categoryFilter,
+      essence: ui.essenceFilter,
+    })
+  );
   // Grouping ON ⇒ order category-major BEFORE pagination (issue 801), so each category is
   // a contiguous run across page boundaries rather than an interleaved slice on every
   // page. `groups` still groups the current `page.components`; the header's "N of M" stays
   // truthful for a category that spans a boundary. When grouping is OFF the order is
   // unchanged.
-  const sortedComponents = $derived(sortComponents(filteredComponents, {
-    key: ui.sortKey,
-    direction: ui.sortDirection,
-    categoryMajor: ui.groupByCategory
-  }));
-  const page = $derived(paginateComponents(sortedComponents, {
-    pageIndex: ui.pageIndex,
-    pageSize: ui.pageSize
-  }));
+  const sortedComponents = $derived(
+    sortComponents(filteredComponents, {
+      key: ui.sortKey,
+      direction: ui.sortDirection,
+      categoryMajor: ui.groupByCategory,
+    })
+  );
+  const page = $derived(
+    paginateComponents(sortedComponents, {
+      pageIndex: ui.pageIndex,
+      pageSize: ui.pageSize,
+    })
+  );
   // The per-category totals the group headers pair with their rendered count. Counted
   // over the FILTERED rows (`itemCards` arrives already search-filtered by the store),
   // so a total can never ignore an active filter.
   const categoryTotals = $derived(countByCategory(filteredComponents, componentCategoryOf));
-  const groups = $derived(ui.groupByCategory ? groupComponentsByCategory(page.components, categoryTotals) : []);
+  const groups = $derived(
+    ui.groupByCategory ? groupComponentsByCategory(page.components, categoryTotals) : []
+  );
 
   // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
   // `pageIds` is the set of RENDERED row ids, NOT `page.components`: with grouping on
@@ -129,19 +149,21 @@
   // the visible ones. `filteredIds` is the whole filtered set, which the results link
   // reaches and the page box deliberately cannot.
   const bulkSelectedIds = $derived(ui.bulkSelectedComponentIds ?? new Set());
-  const filteredIds = $derived(filteredComponents.map(item => item.id));
+  const filteredIds = $derived(filteredComponents.map((item) => item.id));
   const pageIds = $derived(
     ui.groupByCategory
       ? groups
-        .filter(group => !isCategoryCollapsed(group.category))
-        .flatMap(group => group.components.map(item => item.id))
-      : page.components.map(item => item.id)
+          .filter((group) => !isCategoryCollapsed(group.category))
+          .flatMap((group) => group.components.map((item) => item.id))
+      : page.components.map((item) => item.id)
   );
-  const selectionSummary = $derived(describeComponentSelection({
-    pageIds,
-    filteredIds,
-    selectedIds: bulkSelectedIds
-  }));
+  const selectionSummary = $derived(
+    describeComponentSelection({
+      pageIds,
+      filteredIds,
+      selectedIds: bulkSelectedIds,
+    })
+  );
 
   // A delete, an unlink or a store refresh must never leave a phantom id in the count or
   // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
@@ -149,7 +171,10 @@
   $effect(() => {
     const current = ui.bulkSelectedComponentIds ?? new Set();
     if (current.size === 0) return;
-    const pruned = pruneComponentSelection(current, (itemCards || []).map(item => item.id));
+    const pruned = pruneComponentSelection(
+      current,
+      (itemCards || []).map((item) => item.id)
+    );
     if (pruned.size !== current.size) ui.bulkSelectedComponentIds = pruned;
   });
 
@@ -174,16 +199,20 @@
 
   // The active-filter chips, derived by the pure model so the run and the "is anything
   // on?" question can never disagree.
-  const chips = $derived(describeActiveComponentFilters({
-    category: ui.categoryFilter,
-    essence: ui.essenceFilter,
-    search: itemSearchTerm
-  }));
+  const chips = $derived(
+    describeActiveComponentFilters({
+      category: ui.categoryFilter,
+      essence: ui.essenceFilter,
+      search: itemSearchTerm,
+    })
+  );
 
-  const sortOptions = $derived(COMPONENT_SORT_KEYS.map(key => ({
-    key,
-    label: sortLabel(key)
-  })));
+  const sortOptions = $derived(
+    COMPONENT_SORT_KEYS.map((key) => ({
+      key,
+      label: sortLabel(key),
+    }))
+  );
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -201,7 +230,7 @@
   const CHIP_LABELS = {
     category: ['FABRICATE.Admin.Manager.Component.ChipCategory', 'Category: {value}'],
     essence: ['FABRICATE.Admin.Manager.Component.ChipEssence', 'Essence: {value}'],
-    search: ['FABRICATE.Admin.Manager.Component.ChipSearch', 'Search: {value}']
+    search: ['FABRICATE.Admin.Manager.Component.ChipSearch', 'Search: {value}'],
   };
 
   function chipLabel(chip) {
@@ -221,7 +250,7 @@
       name: text('FABRICATE.Admin.Manager.Component.SortName', 'Name'),
       category: text('FABRICATE.Admin.Manager.Component.SortCategory', 'Category'),
       essences: text('FABRICATE.Admin.Manager.Component.SortEssences', 'Essences'),
-      salvage: text('FABRICATE.Admin.Manager.Component.SortSalvage', 'Salvage')
+      salvage: text('FABRICATE.Admin.Manager.Component.SortSalvage', 'Salvage'),
     };
     return labels[key] || key;
   }
@@ -239,8 +268,9 @@
   }
 
   function uniqueSorted(values) {
-    return Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b));
+    return Array.from(
+      new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
   }
 
   // Where the component's linked item lives — a real state, so it reads as a StatusPill
@@ -254,31 +284,37 @@
         id: 'missing',
         label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
         tone: 'warning',
-        icon: 'fas fa-link-slash'
+        icon: 'fas fa-link-slash',
       };
     }
     const origin = item?.sourceOrigin || '';
     if (origin === 'compendium') {
       return {
         id: 'compendium',
-        label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
+        label:
+          item?.sourceOriginLabel ||
+          text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium'),
         tone: 'accent',
-        icon: 'fas fa-book-atlas'
+        icon: 'fas fa-book-atlas',
       };
     }
     if (origin === 'world') {
       return {
         id: 'world',
-        label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
+        label:
+          item?.sourceOriginLabel ||
+          text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory'),
         tone: 'accent',
-        icon: 'fas fa-box-archive'
+        icon: 'fas fa-box-archive',
       };
     }
     return {
       id: 'unknown',
-      label: item?.sourceOriginLabel || text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
+      label:
+        item?.sourceOriginLabel ||
+        text('FABRICATE.Admin.Manager.Component.SourceOriginUnknown', 'Unknown'),
       tone: 'subtle',
-      icon: 'fas fa-circle-question'
+      icon: 'fas fa-circle-question',
     };
   }
 
@@ -341,7 +377,11 @@
     const count = group.components.length;
     const total = group.total ?? count;
     if (total > count) {
-      return format('FABRICATE.Admin.Manager.Component.GroupCountOfTotal', '{count} of {total} components', { count, total });
+      return format(
+        'FABRICATE.Admin.Manager.Component.GroupCountOfTotal',
+        '{count} of {total} components',
+        { count, total }
+      );
     }
     return count === 1
       ? text('FABRICATE.Admin.Manager.Component.GroupCountOne', '1 component')
@@ -369,7 +409,10 @@
   function difficultyBadgeFor(item) {
     if (!showProgressiveDifficulty) return '';
     const difficulty = Number(item?.difficulty);
-    const label = text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty');
+    const label = text(
+      'FABRICATE.Admin.Manager.Component.ProgressiveDifficulty',
+      'Progressive difficulty'
+    );
     return Number.isFinite(difficulty) && difficulty >= 1
       ? `${label} ${difficulty}`
       : `${label} ${text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None')}`;
@@ -388,14 +431,20 @@
       originLabel: origin.label,
       originTone: origin.tone,
       originIcon: origin.icon,
-      editLabel: format('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}', { name: item.name }),
+      editLabel: format('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}', {
+        name: item.name,
+      }),
       editTitle: text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component'),
       noDescriptionText: text('FABRICATE.Admin.Manager.NoDescription', 'No description'),
       bulkSelected: bulkSelectedIds.has(item.id),
-      selectLabel: format('FABRICATE.Admin.Manager.Component.BulkEdit.SelectRow', 'Select {name} for bulk edit', { name: item.name }),
+      selectLabel: format(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.SelectRow',
+        'Select {name} for bulk edit',
+        { name: item.name }
+      ),
       onSelect: onSelectComponent,
       onEdit: onEditComponent,
-      onToggleSelect: toggleComponentBulkSelected
+      onToggleSelect: toggleComponentBulkSelected,
     };
   }
 </script>
@@ -407,16 +456,36 @@
   breadcrumb and the titlebar's gold system badge already said. The Recipe Studio
   deleted exactly this; ruling 1 says it wins.
 -->
-<main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}>
+<main
+  class="manager-main"
+  aria-label={text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}
+>
   <section
     class="manager-component-drop-zone"
-    use:dragDrop={{ onDrop: onDropComponent, disabled: !dropEnabled, activeClass: 'is-drop-active' }}
-    aria-label={text('FABRICATE.Admin.Manager.Component.DropZoneLabel', 'Drop Foundry items to add components')}
+    use:dragDrop={{
+      onDrop: onDropComponent,
+      disabled: !dropEnabled,
+      activeClass: 'is-drop-active',
+    }}
+    aria-label={text(
+      'FABRICATE.Admin.Manager.Component.DropZoneLabel',
+      'Drop Foundry items to add components'
+    )}
   >
     <i class="fas fa-download" aria-hidden="true"></i>
     <span>
-      <strong>{text('FABRICATE.Admin.Manager.Component.DropZoneTitle', 'Drop items to add components')}</strong>
-      <small>{text('FABRICATE.Admin.Manager.Component.DropZoneHint', 'World, compendium, pack, or folder drops use the existing component import flow for the selected system.')}</small>
+      <strong
+        >{text(
+          'FABRICATE.Admin.Manager.Component.DropZoneTitle',
+          'Drop items to add components'
+        )}</strong
+      >
+      <small
+        >{text(
+          'FABRICATE.Admin.Manager.Component.DropZoneHint',
+          'World, compendium, pack, or folder drops use the existing component import flow for the selected system.'
+        )}</small
+      >
     </span>
   </section>
 
@@ -432,7 +501,10 @@
     no visual pressed state, and the direction button sat at the boxy base
     `.manager-button` scale the Recipe Studio already documented fixing.
   -->
-  <section class="manager-toolbar manager-component-toolbar" aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}>
+  <section
+    class="manager-toolbar manager-component-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Component.Filters', 'Component filters')}
+  >
     <div class="manager-component-filter-row">
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
@@ -440,7 +512,10 @@
           type="search"
           value={itemSearchTerm || ''}
           oninput={(event) => onSearchChange(event.currentTarget.value)}
-          placeholder={text('FABRICATE.Admin.Manager.Component.SearchPlaceholder', 'Search components...')}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Component.SearchPlaceholder',
+            'Search components...'
+          )}
           aria-label={text('FABRICATE.Admin.Manager.Component.SearchLabel', 'Search components')}
         />
       </label>
@@ -453,9 +528,14 @@
           data-component-essence-filter
           value={ui.essenceFilter}
           onchange={(event) => setEssenceFilter(event.currentTarget.value)}
-          aria-label={text('FABRICATE.Admin.Manager.Component.EssenceFilterLabel', 'Filter components by essence')}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Component.EssenceFilterLabel',
+            'Filter components by essence'
+          )}
         >
-          <option value="all">{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option>
+          <option value="all"
+            >{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option
+          >
           {#each componentEssenceOptions as essence (essence)}
             <option value={essence}>{essence}</option>
           {/each}
@@ -469,16 +549,23 @@
         data-component-category-filter
         value={ui.categoryFilter}
         onchange={(event) => setCategoryFilter(event.currentTarget.value)}
-        aria-label={text('FABRICATE.Admin.Manager.Component.CategoryFilterLabel', 'Filter components by category')}
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Component.CategoryFilterLabel',
+          'Filter components by category'
+        )}
       >
-        <option value="all">{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option>
+        <option value="all"
+          >{text('FABRICATE.Admin.Manager.Component.CategoryAll', 'All categories')}</option
+        >
         {#each categoryOptions as category (category.name)}
           <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
         {/each}
       </select>
       <span class="manager-component-filter-divider" aria-hidden="true"></span>
       <div class="manager-component-filter-field">
-        <span class="manager-component-filter-label" id="manager-component-group-label">{text('FABRICATE.Admin.Manager.Component.GroupByCategory', 'Group by category')}</span>
+        <span class="manager-component-filter-label" id="manager-component-group-label"
+          >{text('FABRICATE.Admin.Manager.Component.GroupByCategory', 'Group by category')}</span
+        >
         <button
           type="button"
           class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
@@ -487,12 +574,16 @@
           aria-labelledby="manager-component-group-label"
           onclick={toggleGroupByCategory}
         >
-          <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+          <span class="manager-status-toggle-track" aria-hidden="true"
+            ><span class="manager-status-toggle-knob"></span></span
+          >
         </button>
       </div>
       <span class="manager-component-filter-divider" aria-hidden="true"></span>
       <div class="manager-component-filter-field">
-        <span class="manager-component-filter-label">{text('FABRICATE.Admin.Manager.Component.SortBy', 'Sort by')}</span>
+        <span class="manager-component-filter-label"
+          >{text('FABRICATE.Admin.Manager.Component.SortBy', 'Sort by')}</span
+        >
         <select
           value={ui.sortKey}
           data-component-sort
@@ -507,25 +598,43 @@
           type="button"
           class="manager-button manager-component-sort-direction"
           data-component-sort-direction={ui.sortDirection}
-          aria-label={text('FABRICATE.Admin.Manager.Component.SortDirection', 'Toggle sort direction')}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Component.SortDirection',
+            'Toggle sort direction'
+          )}
           onclick={toggleSortDirection}
         >
-          <i class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
-          <span>{ui.sortDirection === 'asc'
-            ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
-            : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span>
+          <i
+            class={ui.sortDirection === 'asc'
+              ? 'fas fa-arrow-down-short-wide'
+              : 'fas fa-arrow-down-wide-short'}
+            aria-hidden="true"
+          ></i>
+          <span
+            >{ui.sortDirection === 'asc'
+              ? text('FABRICATE.Admin.Manager.Component.SortAsc', 'Asc')
+              : text('FABRICATE.Admin.Manager.Component.SortDesc', 'Desc')}</span
+          >
         </button>
       </div>
     </div>
 
     <div class="manager-component-filter-row is-chips">
       {#each chips as chip (chip.id)}
-        <Chip tone="info" class="manager-component-filter-chip" data-component-filter-chip={chip.id}>
+        <Chip
+          tone="info"
+          class="manager-component-filter-chip"
+          data-component-filter-chip={chip.id}
+        >
           <span>{chipLabel(chip)}</span>
           <button
             type="button"
             class="manager-component-chip-clear"
-            aria-label={format('FABRICATE.Admin.Manager.Component.ClearChip', 'Clear {filter} filter', { filter: chip.id })}
+            aria-label={format(
+              'FABRICATE.Admin.Manager.Component.ClearChip',
+              'Clear {filter} filter',
+              { filter: chip.id }
+            )}
             onclick={() => clearChip(chip.id)}
           >
             <i class="fas fa-times" aria-hidden="true"></i>
@@ -542,7 +651,7 @@
         {format('FABRICATE.Admin.Manager.Component.CountRange', '{start}–{end} of {total}', {
           start: page.rangeStart,
           end: page.rangeEnd,
-          total: page.totalCount
+          total: page.totalCount,
         })}
       </span>
     </div>
@@ -566,12 +675,18 @@
     />
   </section>
 
-  <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}>
+  <section
+    class="manager-table-scroll"
+    aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}
+  >
     {#if (itemCards || []).length === 0}
       <EmptyState
         icon="fas fa-box-open"
         title={text('FABRICATE.Admin.Manager.Component.EmptyTitle', 'No components yet')}
-        hint={text('FABRICATE.Admin.Manager.Component.EmptyHint', 'Drop Foundry items into this page to add components to the selected system.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Component.EmptyHint',
+          'Drop Foundry items into this page to add components to the selected system.'
+        )}
       />
     {:else if filteredComponents.length === 0}
       <!-- A filtered-to-nothing library is not an error state and does not want the full
@@ -579,9 +694,18 @@
            out (the Recipe Studio's treatment). -->
       <EmptyState
         filtered
-        hint={text('FABRICATE.Admin.Manager.Component.EmptySearchTitle', 'No components match your filters.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Component.EmptySearchTitle',
+          'No components match your filters.'
+        )}
       >
-        <button type="button" class="manager-button" data-clear-filters="components" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
+        <button
+          type="button"
+          class="manager-button"
+          data-clear-filters="components"
+          onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        >
       </EmptyState>
     {:else}
       <!-- A card row has no columns, so this is a LIST, not a grid: a real
@@ -599,11 +723,20 @@
                 onToggle={() => toggleCategoryCollapsed(group.category)}
               />
               {#if !isCategoryCollapsed(group.category)}
-                <ul class="manager-component-group-body" role="list" id={`manager-component-group-${group.category}`}>
+                <ul
+                  class="manager-component-group-body"
+                  role="list"
+                  id={`manager-component-group-${group.category}`}
+                >
                   {#each group.components as item (item.id)}
                     <ComponentRow {...rowProps(item)} />
                   {:else}
-                    <li class="manager-muted manager-component-group-empty">{text('FABRICATE.Admin.Manager.Component.EmptyCategory', 'No components in this category.')}</li>
+                    <li class="manager-muted manager-component-group-empty">
+                      {text(
+                        'FABRICATE.Admin.Manager.Component.EmptyCategory',
+                        'No components in this category.'
+                      )}
+                    </li>
                   {/each}
                 </ul>
               {/if}
@@ -624,7 +757,10 @@
     totalCount={page.totalCount}
     pageSize={ui.pageSize}
     pageIndex={page.pageIndex}
-    onPageChange={(next) => ui.pageIndex = next}
-    onPageSizeChange={(next) => { ui.pageSize = next; ui.pageIndex = 0; }}
+    onPageChange={(next) => (ui.pageIndex = next)}
+    onPageSizeChange={(next) => {
+      ui.pageSize = next;
+      ui.pageIndex = 0;
+    }}
   />
 </main>

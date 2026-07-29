@@ -31,7 +31,7 @@
     placeholder = '',
     emptyHint = '',
     onAdd = () => {},
-    onRemove = () => {}
+    onRemove = () => {},
   } = $props();
 
   const selected = $derived(Array.isArray(selectedIds) ? selectedIds : []);
@@ -73,7 +73,8 @@
               `Remove ${chip.name}`}
             title={chip.name}
             onclick={() => onRemove(chip.id)}
-          ><i class="fas fa-times" aria-hidden="true"></i></button>
+            ><i class="fas fa-times" aria-hidden="true"></i></button
+          >
         </Chip>
       {/each}
 
@@ -88,7 +89,7 @@
         dialogAriaLabel={addLabel}
         searchPlaceholder={placeholder}
         searchAriaLabel={placeholder}
-        emptyHint={emptyHint}
+        {emptyHint}
         showChevron={false}
         onChoose={(id) => onAdd(id)}
       />

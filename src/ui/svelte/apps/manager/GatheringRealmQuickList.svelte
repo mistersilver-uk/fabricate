@@ -25,7 +25,7 @@
     onToggleRealmEnabled = () => {},
     onUpdateRealm = () => {},
     onDeleteRealm = () => {},
-    onPickImagePath = null
+    onPickImagePath = null,
   } = $props();
 
   let createInput = $state('');
@@ -38,14 +38,16 @@
     return translated && translated !== key ? translated : (fallback ?? key);
   }
 
-  function optId(option) { return String(option?.id ?? option ?? '').trim(); }
-  function optLabel(option) { return String(option?.label ?? option?.id ?? option ?? '').trim(); }
+  function optId(option) {
+    return String(option?.id ?? option ?? '').trim();
+  }
+  function optLabel(option) {
+    return String(option?.label ?? option?.id ?? option ?? '').trim();
+  }
 
   const realmList = $derived(Array.isArray(realms) ? realms : []);
   const selectedRealm = $derived(
-    realmList.find(realm => realm.id === selectedRealmId)
-    || realmList[0]
-    || null
+    realmList.find((realm) => realm.id === selectedRealmId) || realmList[0] || null
   );
 
   // Keep the local selection valid as the list changes (create/delete/system swap).
@@ -54,19 +56,21 @@
       if (selectedRealmId) selectedRealmId = '';
       return;
     }
-    if (!realmList.some(realm => realm.id === selectedRealmId)) {
+    if (!realmList.some((realm) => realm.id === selectedRealmId)) {
       selectedRealmId = realmList[0].id;
     }
   });
 
   const selectedBiomes = $derived(Array.isArray(selectedRealm?.biomes) ? selectedRealm.biomes : []);
-  const availableBiomes = $derived(biomeOptions.filter(option => !selectedBiomes.includes(optId(option))));
+  const availableBiomes = $derived(
+    biomeOptions.filter((option) => !selectedBiomes.includes(optId(option)))
+  );
 
   function biomeLabel(id) {
-    return optLabel(biomeOptions.find(option => optId(option) === id)) || id;
+    return optLabel(biomeOptions.find((option) => optId(option) === id)) || id;
   }
   function biomeColorStyle(id) {
-    const option = biomeOptions.find(entry => optId(entry) === id);
+    const option = biomeOptions.find((entry) => optId(entry) === id);
     return biomeChipStyle(option);
   }
 
@@ -100,7 +104,9 @@
 
   function removeBiome(id) {
     if (!selectedRealm) return;
-    onUpdateRealm(systemId, selectedRealm.id, { biomes: selectedBiomes.filter(value => value !== id) });
+    onUpdateRealm(systemId, selectedRealm.id, {
+      biomes: selectedBiomes.filter((value) => value !== id),
+    });
   }
 
   async function chooseImage() {
@@ -110,7 +116,10 @@
   }
 </script>
 
-<section class="manager-travel-realms" aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.SectionLabel', 'Realms')}>
+<section
+  class="manager-travel-realms"
+  aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.SectionLabel', 'Realms')}
+>
   <header class="manager-travel-realms-header">
     <span class="manager-travel-realms-title">
       <i class="fas fa-map-location-dot" aria-hidden="true"></i>
@@ -122,7 +131,10 @@
     <input
       class="manager-travel-realm-create-input"
       bind:value={createInput}
-      placeholder={text('FABRICATE.Admin.Manager.Travel.Realms.CreatePlaceholder', 'New realm name')}
+      placeholder={text(
+        'FABRICATE.Admin.Manager.Travel.Realms.CreatePlaceholder',
+        'New realm name'
+      )}
       aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.CreateLabel', 'New realm name')}
     />
     <button type="submit" class="manager-button" disabled={saving || !createInput.trim()}>
@@ -139,7 +151,10 @@
     />
   {:else}
     <div class="manager-travel-realm-layout">
-      <ul class="manager-travel-realm-list" aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.ListLabel', 'Realms')}>
+      <ul
+        class="manager-travel-realm-list"
+        aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.ListLabel', 'Realms')}
+      >
         {#each realmList as realm (realm.id)}
           <li class="manager-travel-realm-row" data-realm-id={realm.id}>
             <button
@@ -151,17 +166,27 @@
             >
               <span class="manager-travel-realm-select-name">{realm.name}</span>
               {#if realm.secret}
-                <i class="fas fa-eye-slash manager-travel-realm-secret-flag" aria-hidden="true" title={text('FABRICATE.Admin.Manager.Travel.Realms.SecretChip', 'Secret')}></i>
+                <i
+                  class="fas fa-eye-slash manager-travel-realm-secret-flag"
+                  aria-hidden="true"
+                  title={text('FABRICATE.Admin.Manager.Travel.Realms.SecretChip', 'Secret')}
+                ></i>
               {/if}
               {#if !realm.enabled}
-                <Chip tone="disabled">{text('FABRICATE.Admin.Manager.Travel.Realms.DisabledChip', 'Disabled')}</Chip>
+                <Chip tone="disabled"
+                  >{text('FABRICATE.Admin.Manager.Travel.Realms.DisabledChip', 'Disabled')}</Chip
+                >
               {/if}
             </button>
             <button
               type="button"
               class="manager-icon-button is-danger"
               title={text('FABRICATE.Admin.Manager.Travel.Realms.Delete', 'Delete realm')}
-              aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.DeleteNamed', 'Delete {name}', { name: realm.name }).replace('{name}', realm.name)}
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Travel.Realms.DeleteNamed',
+                'Delete {name}',
+                { name: realm.name }
+              ).replace('{name}', realm.name)}
               disabled={saving}
               onclick={() => onDeleteRealm(systemId, realm.id)}
             >
@@ -177,7 +202,10 @@
             <button
               type="button"
               class="manager-travel-realm-image"
-              aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.ChooseImage', 'Choose realm image')}
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Travel.Realms.ChooseImage',
+                'Choose realm image'
+              )}
               onclick={chooseImage}
               disabled={typeof onPickImagePath !== 'function'}
             >
@@ -190,11 +218,17 @@
                 class={`manager-status-toggle ${selectedRealm.enabled ? 'is-on' : 'is-off'}`}
                 data-realm-field="enabled"
                 aria-pressed={selectedRealm.enabled}
-                aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.EnabledToggle', 'Toggle realm enabled')}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Travel.Realms.EnabledToggle',
+                  'Toggle realm enabled'
+                )}
                 disabled={saving}
-                onclick={() => onToggleRealmEnabled(systemId, selectedRealm.id, !selectedRealm.enabled)}
+                onclick={() =>
+                  onToggleRealmEnabled(systemId, selectedRealm.id, !selectedRealm.enabled)}
               >
-                <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                <span class="manager-status-toggle-track" aria-hidden="true"
+                  ><span class="manager-status-toggle-knob"></span></span
+                >
                 <span class="manager-status-toggle-label">
                   {selectedRealm.enabled
                     ? text('FABRICATE.Admin.Manager.Travel.Realms.EnabledChip', 'Enabled')
@@ -206,11 +240,17 @@
                 class={`manager-status-toggle ${selectedRealm.secret ? 'is-on' : 'is-off'}`}
                 data-realm-field="secret"
                 aria-pressed={selectedRealm.secret}
-                aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.SecretToggle', 'Toggle realm secret')}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Travel.Realms.SecretToggle',
+                  'Toggle realm secret'
+                )}
                 disabled={saving}
-                onclick={() => onUpdateRealm(systemId, selectedRealm.id, { secret: !selectedRealm.secret })}
+                onclick={() =>
+                  onUpdateRealm(systemId, selectedRealm.id, { secret: !selectedRealm.secret })}
               >
-                <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+                <span class="manager-status-toggle-track" aria-hidden="true"
+                  ><span class="manager-status-toggle-knob"></span></span
+                >
                 <span class="manager-status-toggle-label">
                   {selectedRealm.secret
                     ? text('FABRICATE.Admin.Manager.Travel.Realms.SecretChip', 'Secret')
@@ -237,21 +277,32 @@
           </label>
 
           <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Travel.Realms.DescriptionLabel', 'Description')}</span>
+            <span
+              >{text('FABRICATE.Admin.Manager.Travel.Realms.DescriptionLabel', 'Description')}</span
+            >
             <textarea
               class="manager-travel-realm-description"
               data-realm-field="description"
               value={selectedRealm.description || ''}
-              onblur={(event) => commitDescription(selectedRealm, event)}
-            ></textarea>
+              onblur={(event) => commitDescription(selectedRealm, event)}></textarea>
           </label>
 
           <div class="manager-field manager-travel-realm-biomes" data-realm-field="biomes">
             <span>{text('FABRICATE.Admin.Manager.Travel.Realms.BiomesLabel', 'Biomes')}</span>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Realms.BiomesHint', 'The terrain in this realm, drawn from the system biome vocabulary.')}</p>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Travel.Realms.BiomesHint',
+                'The terrain in this realm, drawn from the system biome vocabulary.'
+              )}
+            </p>
             {#if availableBiomes.length > 0}
-              <select aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.AddBiome', 'Add biome')} onchange={addBiome}>
-                <option value="">{text('FABRICATE.Admin.Manager.Travel.Realms.AddBiome', 'Add biome')}</option>
+              <select
+                aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.AddBiome', 'Add biome')}
+                onchange={addBiome}
+              >
+                <option value=""
+                  >{text('FABRICATE.Admin.Manager.Travel.Realms.AddBiome', 'Add biome')}</option
+                >
                 {#each availableBiomes as option (optId(option))}
                   <option value={optId(option)}>{optLabel(option)}</option>
                 {/each}
@@ -265,13 +316,23 @@
                     <button
                       type="button"
                       class="manager-availability-remove"
-                      aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.RemoveBiome', 'Remove {name}', { name: biomeLabel(id) }).replace('{name}', biomeLabel(id))}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Travel.Realms.RemoveBiome',
+                        'Remove {name}',
+                        { name: biomeLabel(id) }
+                      ).replace('{name}', biomeLabel(id))}
                       onclick={() => removeBiome(id)}
-                    ><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                      ><i class="fas fa-xmark" aria-hidden="true"></i></button
+                    >
                   </span>
                 {/each}
               {:else}
-                <span class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Realms.NoBiomes', 'No biomes selected')}</span>
+                <span class="manager-muted"
+                  >{text(
+                    'FABRICATE.Admin.Manager.Travel.Realms.NoBiomes',
+                    'No biomes selected'
+                  )}</span
+                >
               {/if}
             </div>
           </div>

@@ -43,7 +43,7 @@
     activeTab = 'tasks',
     onTabChange = null,
     selectedEventId = null,
-    onSelectEvent = null
+    onSelectEvent = null,
   } = $props();
 
   const env = $derived(environment);
@@ -55,7 +55,9 @@
   // The linked scene is an environment-level restriction: show its banner once,
   // above the task list, exactly when the environment is scene-gated.
   const envBlockedReasons = $derived(Array.isArray(env?.blockedReasons) ? env.blockedReasons : []);
-  const sceneBlocked = $derived(sceneUuid !== '' && envBlockedReasons.some(reason => reason?.code === 'SCENE_TOKEN_BLOCKED'));
+  const sceneBlocked = $derived(
+    sceneUuid !== '' && envBlockedReasons.some((reason) => reason?.code === 'SCENE_TOKEN_BLOCKED')
+  );
   const revealPolicy = $derived(String(env?.revealPolicy ?? 'never'));
   const tasks = $derived(Array.isArray(env?.tasks) ? env.tasks : []);
   const discoveredTasks = $derived(Array.isArray(env?.discoveredTasks) ? env.discoveredTasks : []);
@@ -76,7 +78,9 @@
   );
 
   const biomeTags = $derived(Array.isArray(env?.biomeTags) ? env.biomeTags : []);
-  const danger = $derived(String(env?.risk ?? (Array.isArray(env?.dangerTags) ? env.dangerTags[0] : '') ?? ''));
+  const danger = $derived(
+    String(env?.risk ?? (Array.isArray(env?.dangerTags) ? env.dangerTags[0] : '') ?? '')
+  );
   // Localize the danger value to match the GM editor's risk labels (Safe,
   // Hazardous, …); fall back to the raw value for any unmapped level.
   const dangerLabel = $derived(riskLabel(danger, localize));
@@ -136,7 +140,9 @@
             <li
               class="gathering-detail-pip is-biome"
               style={biomeChipStyle(tag)}
-              aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Biome', { value: tag.label })}
+              aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Biome', {
+                value: tag.label,
+              })}
             >
               <i class={tag.icon} aria-hidden="true"></i>
               <span>{tag.label}</span>
@@ -145,7 +151,9 @@
           {#if dangerLabel !== ''}
             <li
               class={`gathering-detail-pip is-danger ${dangerRiskClass}`}
-              aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Danger', { value: dangerLabel })}
+              aria-label={localize('FABRICATE.App.Gathering.Detail.Pips.Danger', {
+                value: dangerLabel,
+              })}
             >
               <i class="fas fa-skull" aria-hidden="true"></i>
               <span>{dangerLabel}</span>
@@ -162,22 +170,35 @@
         {#if sceneBlocked}
           {localize('FABRICATE.App.Gathering.Detail.SceneGateHint')}
         {:else}
-          {localize(isBlind
-            ? 'FABRICATE.App.Gathering.Detail.BlindHint'
-            : 'FABRICATE.App.Gathering.Detail.TargetedHint')}
+          {localize(
+            isBlind
+              ? 'FABRICATE.App.Gathering.Detail.BlindHint'
+              : 'FABRICATE.App.Gathering.Detail.TargetedHint'
+          )}
         {/if}
       </p>
     </header>
 
     {#if staminaEnabled || nodesEnabled}
-      <section class="gathering-detail-economy" data-gathering-economy-strip data-economy-mode={env?.economyMode ?? 'none'}>
+      <section
+        class="gathering-detail-economy"
+        data-gathering-economy-strip
+        data-economy-mode={env?.economyMode ?? 'none'}
+      >
         {#if staminaEnabled}
           <span class="gathering-detail-economy-item">
             <i class="fas fa-bolt" aria-hidden="true"></i>
             {#if hasStaminaPool}
-              <span data-gathering-stamina-pool>{localize('FABRICATE.App.Gathering.Detail.StaminaPool', { current: staminaPool.current, max: staminaPool.max })}</span>
+              <span data-gathering-stamina-pool
+                >{localize('FABRICATE.App.Gathering.Detail.StaminaPool', {
+                  current: staminaPool.current,
+                  max: staminaPool.max,
+                })}</span
+              >
             {:else}
-              <span data-gathering-stamina-pool="none">{localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone')}</span>
+              <span data-gathering-stamina-pool="none"
+                >{localize('FABRICATE.App.Gathering.Detail.StaminaPoolNone')}</span
+              >
             {/if}
           </span>
         {/if}

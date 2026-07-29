@@ -4,16 +4,9 @@
   import EmptyState from '../EmptyState.svelte';
   import IconFactRow from '../IconFactRow.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import {
-    projectToolBehaviorFacts,
-    projectToolRow,
-  } from './toolStudio.js';
+  import { projectToolBehaviorFacts, projectToolRow } from './toolStudio.js';
 
-  let {
-    tool = null,
-    managedItems = [],
-    authority = 'toolSpecific',
-  } = $props();
+  let { tool = null, managedItems = [], authority = 'toolSpecific' } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -40,30 +33,43 @@
       row.validation.errorCount
     );
   }
-
 </script>
 
 {#if row}
-  <section class="manager-inspector-card manager-tool-browser-inspector" data-tool-browser-inspector>
+  <section
+    class="manager-inspector-card manager-tool-browser-inspector"
+    data-tool-browser-inspector
+  >
     <div class="manager-tool-inspector-hero">
       <img src={row.img} alt="" />
       <div>
-        <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Tool page')}</p>
+        <p class="manager-kicker">
+          {text('FABRICATE.Admin.Manager.Tools.InspectorKicker', 'Tool page')}
+        </p>
         <h2 title={row.name}>{row.name}</h2>
         <Chip
           tone={row.enabled ? 'positive' : 'neutral'}
           icon={row.enabled ? 'fas fa-circle-check' : 'fas fa-circle-pause'}
         >
-          {row.enabled ? text('FABRICATE.Admin.Manager.StatusOn', 'On') : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+          {row.enabled
+            ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+            : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
         </Chip>
         {#if !row.validation.valid}
-          <Chip tone="danger" icon="fas fa-circle-exclamation" data-tool-validation-status="needs-attention">
+          <Chip
+            tone="danger"
+            icon="fas fa-circle-exclamation"
+            data-tool-validation-status="needs-attention"
+          >
             {text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention')}
           </Chip>
         {/if}
       </div>
     </div>
-    <p class="manager-muted" data-tool-inspector-description>{row.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}</p>
+    <p class="manager-muted" data-tool-inspector-description>
+      {row.description ||
+        text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+    </p>
     {#if !row.validation.valid}
       <p class="manager-muted is-danger" data-tool-inspector-validation>
         <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
@@ -94,7 +100,10 @@
     compact
     icon="fas fa-screwdriver-wrench"
     title={text('FABRICATE.Admin.Manager.Tools.SelectTitle', 'Select a Tool')}
-    hint={text('FABRICATE.Admin.Manager.Tools.SelectHint', 'Choose a Tool to inspect its behavior.')}
+    hint={text(
+      'FABRICATE.Admin.Manager.Tools.SelectHint',
+      'Choose a Tool to inspect its behavior.'
+    )}
     contextClass="manager-tool-browser-inspector-empty"
     dataAttr="data-tool-browser-inspector-empty"
   />

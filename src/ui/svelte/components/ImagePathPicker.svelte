@@ -12,7 +12,7 @@
     ariaDescribedBy = undefined,
     onChange = () => {},
     onPickImagePath = null,
-    showInput = true
+    showInput = true,
   } = $props();
 
   let picking = $state(false);
@@ -20,8 +20,8 @@
   const pickerAvailable = $derived(typeof onPickImagePath === 'function');
   const buttonLabel = $derived(
     pickerAvailable
-      ? (chooseLabel || localize('FABRICATE.Admin.Environments.ChooseImage'))
-      : (unavailableLabel || localize('FABRICATE.Admin.Environments.ImagePickerUnavailable'))
+      ? chooseLabel || localize('FABRICATE.Admin.Environments.ChooseImage')
+      : unavailableLabel || localize('FABRICATE.Admin.Environments.ImagePickerUnavailable')
   );
 
   async function pickImagePath() {

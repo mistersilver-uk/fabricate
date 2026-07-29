@@ -7,7 +7,12 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'crafting', showSalvage = true, showGathering = true, onSelect = () => {} } = $props();
+  let {
+    activeTab = 'crafting',
+    showSalvage = true,
+    showGathering = true,
+    onSelect = () => {},
+  } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -18,7 +23,7 @@
     { id: 'crafting', icon: 'fas fa-hammer', key: 'Crafting', fallback: 'Crafting' },
     { id: 'salvage', icon: 'fas fa-recycle', key: 'Salvage', fallback: 'Salvage' },
     { id: 'gathering', icon: 'fas fa-seedling', key: 'Gathering', fallback: 'Gathering' },
-    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
+    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' },
   ];
 
   // Salvage and gathering are optional features: drop their tabs when off.
@@ -39,7 +44,11 @@
   }
 </script>
 
-<div class="manager-environment-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}>
+<div
+  class="manager-environment-tabs"
+  role="tablist"
+  aria-label={text('FABRICATE.Admin.Manager.Checks.Tabs.Label', 'Checks sections')}
+>
   {#each tabs as tab, index (tab.id)}
     <button
       type="button"

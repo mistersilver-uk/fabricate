@@ -20,7 +20,7 @@
     isEmpty = false,
     emptyIcon = 'fa-inbox',
     emptyText = '',
-    children
+    children,
   } = $props();
 </script>
 

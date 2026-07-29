@@ -40,7 +40,9 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const generalCategory = $derived((categoryRows || []).find((row) => row.id === 'general') || null);
+  const generalCategory = $derived(
+    (categoryRows || []).find((row) => row.id === 'general') || null
+  );
   const customCategoryRows = $derived((categoryRows || []).filter((row) => row.id !== 'general'));
   const generalComponentCategory = $derived(
     (componentCategoryRows || []).find((row) => row.id === 'general') || null
@@ -315,10 +317,7 @@
         )}
         showIcon={true}
         iconLabel={text('FABRICATE.Admin.Manager.TagsCategories.IconLabel', 'Icon')}
-        changeIconLabel={text(
-          'FABRICATE.Admin.Manager.TagsCategories.ChangeIcon',
-          'Change icon'
-        )}
+        changeIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.ChangeIcon', 'Change icon')}
         onAdd={onAddCategory}
         onRemove={(row) => onRemoveCategory(row.name)}
         onSetIcon={onSetCategoryIcon}
@@ -393,10 +392,7 @@
         )}
         showIcon={true}
         iconLabel={text('FABRICATE.Admin.Manager.TagsCategories.IconLabel', 'Icon')}
-        changeIconLabel={text(
-          'FABRICATE.Admin.Manager.TagsCategories.ChangeIcon',
-          'Change icon'
-        )}
+        changeIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.ChangeIcon', 'Change icon')}
         onAdd={onAddComponentCategory}
         onRemove={(row) => onRemoveComponentCategory(row.name)}
         onSetIcon={onSetComponentCategoryIcon}
@@ -410,7 +406,10 @@
         )}
         inputId="manager-tag-add"
         inputLabel={text('FABRICATE.Admin.Manager.TagsCategories.TagName', 'Tag name')}
-        inputPlaceholder={text('FABRICATE.Admin.Manager.TagsCategories.TagPlaceholder', 'e.g. herb')}
+        inputPlaceholder={text(
+          'FABRICATE.Admin.Manager.TagsCategories.TagPlaceholder',
+          'e.g. herb'
+        )}
         addLabel={text('FABRICATE.Admin.Manager.TagsCategories.AddTag', 'Add tag')}
         rowAttr="data-tag-id"
         rows={decoratedTagRows}
@@ -423,10 +422,7 @@
           'FABRICATE.Admin.Manager.TagsCategories.SearchTagsLabel',
           'Search item tags'
         )}
-        emptyTitle={text(
-          'FABRICATE.Admin.Manager.TagsCategories.NoTags',
-          'No component tags yet'
-        )}
+        emptyTitle={text('FABRICATE.Admin.Manager.TagsCategories.NoTags', 'No component tags yet')}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.NoTagsHint',
           'Tags let a recipe require any component that carries them. Add a tag above, then apply it to components.'

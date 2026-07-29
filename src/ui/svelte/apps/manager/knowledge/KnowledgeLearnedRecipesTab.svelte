@@ -51,7 +51,7 @@
       title={text('FABRICATE.Admin.Manager.Knowledge.LearnedEmptyTitle', 'Nothing learned yet')}
       hint={text(
         'FABRICATE.Admin.Manager.Knowledge.LearnedEmptyHint',
-        "This character has not learned any recipe in this crafting system."
+        'This character has not learned any recipe in this crafting system.'
       )}
     />
   {:else}

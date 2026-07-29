@@ -30,7 +30,7 @@
     // NOT guarded with a `typeof … === 'function'` fallback at the call site: such a
     // guard would swallow a parent that forwards a dead `null`, which is precisely
     // the defect this default exists to close.
-    formatList = localeFormatList
+    formatList = localeFormatList,
   } = $props();
 
   const rows = $derived(Array.isArray(plan?.rows) ? plan.rows : []);
@@ -46,7 +46,7 @@
     pending.length === 0
       ? ''
       : localize('FABRICATE.App.Crafting.ConsumptionPlan.StillToChoose', {
-          items: formatList(pending.map(pendingLabel))
+          items: formatList(pending.map(pendingLabel)),
         })
   );
 </script>

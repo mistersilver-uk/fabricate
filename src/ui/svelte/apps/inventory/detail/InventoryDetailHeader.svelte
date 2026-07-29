@@ -51,7 +51,7 @@
     total = '',
     size = 64,
     chips = [],
-    children = null
+    children = null,
   } = $props();
 
   const chipList = $derived(Array.isArray(chips) ? chips.filter((chip) => chip != null) : []);

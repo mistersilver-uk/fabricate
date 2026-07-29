@@ -29,7 +29,8 @@
   }
 
   const mode = $derived(
-    resolutionModeOptions.find((option) => option.value === resolutionMode) || resolutionModeOptions[0]
+    resolutionModeOptions.find((option) => option.value === resolutionMode) ||
+      resolutionModeOptions[0]
   );
 </script>
 
@@ -39,10 +40,22 @@
   </span>
   <div class="manager-recipe-mode-banner-copy">
     <p class="manager-recipe-mode-banner-title">
-      <strong>{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}: {text(mode.labelKey, mode.fallback)}</strong>
-      <span class="manager-recipe-mode-banner-scope manager-muted">· {text('FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem', 'set for this crafting system')}</span>
+      <strong
+        >{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}: {text(
+          mode.labelKey,
+          mode.fallback
+        )}</strong
+      >
+      <span class="manager-recipe-mode-banner-scope manager-muted"
+        >· {text(
+          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem',
+          'set for this crafting system'
+        )}</span
+      >
     </p>
-    <p class="manager-recipe-mode-banner-desc manager-muted">{text(mode.descKey, mode.descFallback)}</p>
+    <p class="manager-recipe-mode-banner-desc manager-muted">
+      {text(mode.descKey, mode.descFallback)}
+    </p>
   </div>
   <Chip
     tag="button"
@@ -51,7 +64,10 @@
     class="manager-recipe-mode-banner-action"
     type="button"
     data-recipe-mode-banner-settings
-    title={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint', 'Resolution mode is set for the whole crafting system, not per recipe.')}
+    title={text(
+      'FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint',
+      'Resolution mode is set for the whole crafting system, not per recipe.'
+    )}
     onclick={() => onOpenSettings()}
   >
     <span>{text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Settings', 'System settings')}</span>

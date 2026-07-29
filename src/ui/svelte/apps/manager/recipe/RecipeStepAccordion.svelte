@@ -42,7 +42,7 @@
     onDeleteStep = () => {},
     onUpdateStep = null,
     body,
-    footer
+    footer,
   } = $props();
 
   let expandedStepId = $state('');
@@ -88,7 +88,12 @@
       class={`manager-recipe-steps-row ${isOpen(step.id) ? 'is-expanded' : ''} ${alwaysOpen ? 'is-always-open' : ''}`}
       data-recipe-step-id={step.id}
       ondragover={reorderable ? (event) => event.preventDefault() : undefined}
-      ondrop={reorderable ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
+      ondrop={reorderable
+        ? (event) => {
+            event.preventDefault();
+            handleDrop(index);
+          }
+        : undefined}
     >
       <!-- Overview only: the header is the drag handle, so a grab inside the expanded
            body inputs selects text instead of starting a drag. Drag is a mouse-only
@@ -97,10 +102,23 @@
       <div
         class="manager-recipe-steps-row-head"
         draggable={reorderable ? 'true' : undefined}
-        ondragstart={reorderable ? () => { dragIndex = index; } : undefined}
-        ondragend={reorderable ? () => { dragIndex = -1; } : undefined}
+        ondragstart={reorderable
+          ? () => {
+              dragIndex = index;
+            }
+          : undefined}
+        ondragend={reorderable
+          ? () => {
+              dragIndex = -1;
+            }
+          : undefined}
       >
-        <span class={`manager-environment-comp-handle ${reorderable ? '' : 'is-static'}`} title={reorderable ? text('FABRICATE.Admin.Manager.Recipe.DragStep', 'Drag to reorder') : undefined}>
+        <span
+          class={`manager-environment-comp-handle ${reorderable ? '' : 'is-static'}`}
+          title={reorderable
+            ? text('FABRICATE.Admin.Manager.Recipe.DragStep', 'Drag to reorder')
+            : undefined}
+        >
           {#if reorderable}<i class="fas fa-grip-vertical" aria-hidden="true"></i>{/if}
           <span class="manager-environment-comp-order">{index + 1}</span>
         </span>
@@ -110,7 +128,13 @@
           <div class="manager-recipe-steps-row-main is-static">
             <span class="manager-environment-comp-copy">
               <span class="manager-environment-comp-name">{stepName(step, index)}</span>
-              <span class="manager-environment-comp-sub">{stepDescription(step) || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description')}</span>
+              <span class="manager-environment-comp-sub"
+                >{stepDescription(step) ||
+                  text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription',
+                    'No description'
+                  )}</span
+              >
             </span>
           </div>
         {:else}
@@ -124,9 +148,18 @@
           >
             <span class="manager-environment-comp-copy">
               <span class="manager-environment-comp-name">{stepName(step, index)}</span>
-              <span class="manager-environment-comp-sub">{stepDescription(step) || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description')}</span>
+              <span class="manager-environment-comp-sub"
+                >{stepDescription(step) ||
+                  text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription',
+                    'No description'
+                  )}</span
+              >
             </span>
-            <i class={`fas manager-recipe-steps-chevron ${expandedStepId === step.id ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+            <i
+              class={`fas manager-recipe-steps-chevron ${expandedStepId === step.id ? 'fa-chevron-up' : 'fa-chevron-down'}`}
+              aria-hidden="true"
+            ></i>
           </div>
         {/if}
         <div class="manager-recipe-steps-requirements">
@@ -136,13 +169,29 @@
               onChange={(next) => onUpdateStep(step.id, { timeRequirement: next })}
             />
           {:else}
-            <Chip class={step.timeRequirement ? '' : 'is-empty'} icon="fa-solid fa-clock" data-recipe-step-time={step.id}>
-              <span>{step.timeRequirement ? formatTimeRequirement(step.timeRequirement) : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span>
+            <Chip
+              class={step.timeRequirement ? '' : 'is-empty'}
+              icon="fa-solid fa-clock"
+              data-recipe-step-time={step.id}
+            >
+              <span
+                >{step.timeRequirement
+                  ? formatTimeRequirement(step.timeRequirement)
+                  : text('FABRICATE.Admin.Manager.Recipe.Instantaneous', 'Instantaneous')}</span
+              >
             </Chip>
           {/if}
         </div>
         <div class="manager-recipe-steps-row-controls">
-          <button type="button" class="manager-icon-button is-danger" data-recipe-step-delete={step.id} aria-label={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')} title={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')} onclick={() => onDeleteStep(step.id)}><i class="fas fa-trash" aria-hidden="true"></i></button>
+          <button
+            type="button"
+            class="manager-icon-button is-danger"
+            data-recipe-step-delete={step.id}
+            aria-label={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
+            title={text('FABRICATE.Admin.Manager.Recipe.DeleteStep', 'Delete step')}
+            onclick={() => onDeleteStep(step.id)}
+            ><i class="fas fa-trash" aria-hidden="true"></i></button
+          >
         </div>
       </div>
 

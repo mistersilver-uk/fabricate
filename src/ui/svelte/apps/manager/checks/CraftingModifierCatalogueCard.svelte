@@ -30,7 +30,7 @@
     checkModifiers = [],
     defaultModifierPolicy = 'addAll',
     defaultModifierIds = [],
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -44,22 +44,22 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll',
       fallback: 'Add all',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAllDesc',
-      descFallback: 'Sum every eligible modifier into the crafting-check roll.'
+      descFallback: 'Sum every eligible modifier into the crafting-check roll.',
     },
     {
       value: 'highest',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest',
       fallback: 'Pick highest',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighestDesc',
-      descFallback: 'Use only the single largest eligible modifier (a deterministic maximum).'
+      descFallback: 'Use only the single largest eligible modifier (a deterministic maximum).',
     },
     {
       value: 'byRecipe',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe',
       fallback: 'By recipe',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipeDesc',
-      descFallback: 'Each recipe chooses its own modifier set; the chosen set is summed.'
-    }
+      descFallback: 'Each recipe chooses its own modifier set; the chosen set is summed.',
+    },
   ];
 
   const modifiers = $derived(Array.isArray(checkModifiers) ? checkModifiers : []);
@@ -79,13 +79,18 @@
   }
 
   function addModifier() {
-    emitModifiers([...modifiers, { id: newId(), label: '', icon: DEFAULT_MODIFIER_ICON, expression: '' }]);
+    emitModifiers([
+      ...modifiers,
+      { id: newId(), label: '', icon: DEFAULT_MODIFIER_ICON, expression: '' },
+    ]);
   }
 
   // A bare roll-data path with no leading `@`, e.g. `abilities.med.mod`. ONLY these
   // get the sigil re-added on write; anything else is stored verbatim.
   function updateModifier(id, patch) {
-    emitModifiers(modifiers.map((modifier) => (modifier.id === id ? { ...modifier, ...patch } : modifier)));
+    emitModifiers(
+      modifiers.map((modifier) => (modifier.id === id ? { ...modifier, ...patch } : modifier))
+    );
   }
 
   function removeModifier(id) {
@@ -102,7 +107,9 @@
   }
 
   function toggleDefault(id, checked) {
-    const next = checked ? [...new Set([...defaultIds, id])] : defaultIds.filter((defaultId) => defaultId !== id);
+    const next = checked
+      ? [...new Set([...defaultIds, id])]
+      : defaultIds.filter((defaultId) => defaultId !== id);
     onChange({ defaultModifierIds: next });
   }
 </script>
@@ -130,28 +137,46 @@
     {#each modifiers as modifier (modifier.id)}
       <div class="manager-character-modifier-row" data-crafting-modifier-row={modifier.id}>
         <div class="manager-modifier-name-row">
-          <div class="manager-field manager-modifier-icon-field" data-crafting-modifier-field="icon">
-            <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierIcon', 'Icon')}</span>
+          <div
+            class="manager-field manager-modifier-icon-field"
+            data-crafting-modifier-field="icon"
+          >
+            <span class="manager-recipe-micro-label"
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierIcon', 'Icon')}</span
+            >
             <IconPicker
               value={modifier.icon || DEFAULT_MODIFIER_ICON}
-              buttonTitle={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierChangeIcon', 'Change icon')}
+              buttonTitle={text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierChangeIcon',
+                'Change icon'
+              )}
               onChange={(iconClass) => updateModifier(modifier.id, { icon: iconClass })}
             />
           </div>
           <label class="manager-field manager-modifier-label-field">
-            <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabel', 'Label')}</span>
+            <span class="manager-recipe-micro-label"
+              >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabel', 'Label')}</span
+            >
             <input
               type="text"
               data-crafting-modifier-field="label"
               value={modifier.label || ''}
-              placeholder={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabelPlaceholder', 'Medicine')}
+              placeholder={text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierLabelPlaceholder',
+                'Medicine'
+              )}
               oninput={(event) => updateModifier(modifier.id, { label: event.currentTarget.value })}
             />
           </label>
         </div>
         <div class="manager-modifier-expression-row">
           <label class="manager-field manager-modifier-field-expression">
-            <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierExpression', 'Expression')}</span>
+            <span class="manager-recipe-micro-label"
+              >{text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierExpression',
+                'Expression'
+              )}</span
+            >
             <RollDataExpressionInput
               dataField="crafting-modifier"
               inputAttrs={{ 'data-crafting-modifier-field': 'expression' }}
@@ -164,8 +189,14 @@
             type="button"
             class="manager-icon-button is-danger manager-modifier-remove"
             data-crafting-modifier-remove={modifier.id}
-            title={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove', 'Remove modifier')}
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove', 'Remove modifier')}
+            title={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove',
+              'Remove modifier'
+            )}
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierRemove',
+              'Remove modifier'
+            )}
             onclick={() => removeModifier(modifier.id)}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
@@ -173,12 +204,7 @@
         </div>
       </div>
     {/each}
-    <button
-      type="button"
-      class="manager-button"
-      data-crafting-modifier-add
-      onclick={addModifier}
-    >
+    <button type="button" class="manager-button" data-crafting-modifier-add onclick={addModifier}>
       <i class="fas fa-plus" aria-hidden="true"></i>
       {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierAdd', 'Add modifier')}
     </button>
@@ -191,7 +217,10 @@
     class="manager-checks-type-options"
     role="radiogroup"
     data-crafting-modifier-policy
-    aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'Default combination')}
+    aria-label={text(
+      'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading',
+      'Default combination'
+    )}
   >
     {#each POLICY_OPTIONS as option (option.value)}
       <label
@@ -206,8 +235,12 @@
           onchange={() => selectPolicy(option.value)}
         />
         <span class="manager-resolution-option-body">
-          <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
-          <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
+          <span class="manager-resolution-option-name"
+            >{text(option.labelKey, option.fallback)}</span
+          >
+          <span class="manager-resolution-option-desc"
+            >{text(option.descKey, option.descFallback)}</span
+          >
         </span>
       </label>
     {/each}
@@ -228,9 +261,18 @@
         options={modifiers}
         selectedIds={defaultIds}
         testId="crafting-modifier-defaults"
-        menuLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsAdd', 'Add default modifier')}
-        allSelectedLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsAllSelected', 'All modifiers are on by default.')}
-        noneSelectedLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsNone', 'No modifiers on by default.')}
+        menuLabel={text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsAdd',
+          'Add default modifier'
+        )}
+        allSelectedLabel={text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsAllSelected',
+          'All modifiers are on by default.'
+        )}
+        noneSelectedLabel={text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsNone',
+          'No modifiers on by default.'
+        )}
         onToggle={toggleDefault}
       />
     </div>

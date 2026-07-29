@@ -29,7 +29,7 @@
     // Whether the open set requires this essence.
     required = false,
     // The essence's authored `--fab-tag-*` key, or null for the theme accent.
-    colorToken = null
+    colorToken = null,
   } = $props();
 
   const iconClass = $derived(normalizeEssenceIcon(icon));

@@ -15,8 +15,16 @@
   let { activeTab = 'tasks', onSelect = () => {} } = $props();
 
   const TABS = [
-    { id: 'tasks', icon: 'fas fa-clipboard-list', key: 'FABRICATE.App.Gathering.Detail.Tabs.Tasks' },
-    { id: 'events', icon: 'fas fa-masks-theater', key: 'FABRICATE.App.Gathering.Detail.Tabs.Events' }
+    {
+      id: 'tasks',
+      icon: 'fas fa-clipboard-list',
+      key: 'FABRICATE.App.Gathering.Detail.Tabs.Tasks',
+    },
+    {
+      id: 'events',
+      icon: 'fas fa-masks-theater',
+      key: 'FABRICATE.App.Gathering.Detail.Tabs.Events',
+    },
   ];
 
   function onKeydown(event, index) {

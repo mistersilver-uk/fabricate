@@ -27,7 +27,7 @@
     noneSelectedLabel = '',
     // A test hook mapped onto the outer element (`data-modifier-pill-select`).
     testId = '',
-    onToggle = () => {}
+    onToggle = () => {},
   } = $props();
 
   let open = $state(false);
@@ -43,7 +43,10 @@
   const availableOptions = $derived(allOptions.filter((option) => !selected.includes(option.id)));
 
   function optionLabel(option) {
-    return option.label || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier');
+    return (
+      option.label ||
+      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')
+    );
   }
 
   function add(id) {
@@ -56,7 +59,10 @@
   }
 </script>
 
-<div class="manager-field manager-availability-multi" data-modifier-pill-select={testId || undefined}>
+<div
+  class="manager-field manager-availability-multi"
+  data-modifier-pill-select={testId || undefined}
+>
   <div
     class="manager-availability-picker"
     use:dismissOnOutsideClick={{ enabled: open, onDismiss: () => (open = false) }}
@@ -70,7 +76,10 @@
       data-modifier-pill-menu-button
       onclick={() => (open = !open)}
     >
-      <span>{menuLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')}</span>
+      <span
+        >{menuLabel ||
+          text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')}</span
+      >
       <i class="fas fa-chevron-down" aria-hidden="true"></i>
     </button>
     {#if open}
@@ -89,7 +98,11 @@
           </button>
         {:else}
           <p class="manager-availability-empty">
-            {allSelectedLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected', 'All modifiers selected.')}
+            {allSelectedLabel ||
+              text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
+                'All modifiers selected.'
+              )}
           </p>
         {/each}
       </div>
@@ -113,7 +126,11 @@
       </span>
     {:else}
       <span class="manager-muted manager-availability-any">
-        {noneSelectedLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillNone', 'No modifiers selected.')}
+        {noneSelectedLabel ||
+          text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillNone',
+            'No modifiers selected.'
+          )}
       </span>
     {/each}
   </div>

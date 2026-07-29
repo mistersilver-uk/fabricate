@@ -34,7 +34,7 @@
     // the set count, never a stored toggle.
     canAddSet = false,
     onChange = () => {},
-    idPrefix = ''
+    idPrefix = '',
   } = $props();
 
   function text(key, fallback) {
@@ -132,7 +132,12 @@
       />
     </div>
     {#if canAddSet}
-      <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="ingredient-set" onclick={() => addSet()}>
+      <button
+        type="button"
+        class="manager-button is-dashed manager-recipe-add-full"
+        data-recipe-add="ingredient-set"
+        onclick={() => addSet()}
+      >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
       </button>
@@ -162,7 +167,12 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="ingredient-set" onclick={() => addSet()}>
+    <button
+      type="button"
+      class="manager-button is-dashed manager-recipe-add-full"
+      data-recipe-add="ingredient-set"
+      onclick={() => addSet()}
+    >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddIngredientSet', 'Add ingredient set')}</span>
     </button>

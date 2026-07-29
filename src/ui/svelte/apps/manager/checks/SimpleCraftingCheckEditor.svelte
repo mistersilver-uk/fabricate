@@ -35,7 +35,7 @@
     value = null,
     showDcSource = true,
     breakageAuthority = 'toolSpecific',
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
@@ -109,7 +109,9 @@
 
 <div class="manager-checks-editor" data-simple-check-editor>
   <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}</h3>
+    <h3 class="manager-card-title">
+      {text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaTitle', 'Roll formula')}
+    </h3>
     <CheckFormulaFields
       rollFormula={value?.rollFormula || ''}
       dc={value?.dc ?? 15}
@@ -127,70 +129,98 @@
   />
 
   {#if showDcSource}
-  <section class="manager-inspector-card">
-    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}</h3>
-    <div class="manager-checks-type-options" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}>
-      {#each DC_MODE_OPTIONS as option (option.value)}
-        <label
-          class={`manager-resolution-option ${dcMode === option.value ? 'is-active' : ''}`}
-          data-dc-mode-option={option.value}
-        >
-          <input
-            type="radio"
-            name="crafting-check-dc-mode"
-            value={option.value}
-            checked={dcMode === option.value}
-            onchange={() => setDcMode(option.value)}
-          />
-          <span class="manager-resolution-option-body">
-            <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
-            <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
-          </span>
-        </label>
-      {/each}
-    </div>
-  </section>
-
-  {#if dcMode === 'static'}
-    <section class="manager-inspector-card" data-static-dc>
-      <CheckRecipeTiers
-        tiers={value?.tiers || []}
-        defaultDc={value?.dc ?? 0}
-        onChange={(tiers) => emit({ tiers })}
-      />
-    </section>
-  {:else}
-    <section class="manager-inspector-card" data-dynamic-dc>
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}</h3>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroHint', 'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.')}</p>
+    <section class="manager-inspector-card">
+      <h3 class="manager-card-title">
+        {text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}
+      </h3>
       <div
-        class="manager-component-source-drop-zone manager-checks-macro-drop-zone"
-        data-check-macro-dropzone
-        role="group"
-        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
-        use:dragDrop={{ onDrop: handleMacroDrop, activeClass: 'is-drop-active' }}
+        class="manager-checks-type-options"
+        role="radiogroup"
+        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}
       >
-        <i class="fas fa-scroll" aria-hidden="true"></i>
-        {#if value?.macroUuid}
-          <span class="manager-checks-macro-name" class:is-missing={resolvedMacroMissing}>
-            {resolvedMacroMissing
-              ? text('FABRICATE.Admin.Manager.Checks.Crafting.MacroMissing', 'Linked macro not found')
-              : resolvedMacroName || value.macroUuid}
-          </span>
-          <button
-            type="button"
-            class="manager-icon-button is-danger"
-            data-unlink-macro
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroUnlink', 'Unlink macro')}
-            onclick={() => emit({ macroUuid: null })}
+        {#each DC_MODE_OPTIONS as option (option.value)}
+          <label
+            class={`manager-resolution-option ${dcMode === option.value ? 'is-active' : ''}`}
+            data-dc-mode-option={option.value}
           >
-            <i class="fas fa-times" aria-hidden="true"></i>
-          </button>
-        {:else}
-          <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.MacroDropHint', 'Drag a macro here to compute the DC.')}</span>
-        {/if}
+            <input
+              type="radio"
+              name="crafting-check-dc-mode"
+              value={option.value}
+              checked={dcMode === option.value}
+              onchange={() => setDcMode(option.value)}
+            />
+            <span class="manager-resolution-option-body">
+              <span class="manager-resolution-option-name"
+                >{text(option.labelKey, option.fallback)}</span
+              >
+              <span class="manager-resolution-option-desc"
+                >{text(option.descKey, option.descFallback)}</span
+              >
+            </span>
+          </label>
+        {/each}
       </div>
     </section>
-  {/if}
+
+    {#if dcMode === 'static'}
+      <section class="manager-inspector-card" data-static-dc>
+        <CheckRecipeTiers
+          tiers={value?.tiers || []}
+          defaultDc={value?.dc ?? 0}
+          onChange={(tiers) => emit({ tiers })}
+        />
+      </section>
+    {:else}
+      <section class="manager-inspector-card" data-dynamic-dc>
+        <h3 class="manager-card-title">
+          {text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
+        </h3>
+        <p class="manager-muted">
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.MacroHint',
+            'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.'
+          )}
+        </p>
+        <div
+          class="manager-component-source-drop-zone manager-checks-macro-drop-zone"
+          data-check-macro-dropzone
+          role="group"
+          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
+          use:dragDrop={{ onDrop: handleMacroDrop, activeClass: 'is-drop-active' }}
+        >
+          <i class="fas fa-scroll" aria-hidden="true"></i>
+          {#if value?.macroUuid}
+            <span class="manager-checks-macro-name" class:is-missing={resolvedMacroMissing}>
+              {resolvedMacroMissing
+                ? text(
+                    'FABRICATE.Admin.Manager.Checks.Crafting.MacroMissing',
+                    'Linked macro not found'
+                  )
+                : resolvedMacroName || value.macroUuid}
+            </span>
+            <button
+              type="button"
+              class="manager-icon-button is-danger"
+              data-unlink-macro
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.MacroUnlink',
+                'Unlink macro'
+              )}
+              onclick={() => emit({ macroUuid: null })}
+            >
+              <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+          {:else}
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.MacroDropHint',
+                'Drag a macro here to compute the DC.'
+              )}</span
+            >
+          {/if}
+        </div>
+      </section>
+    {/if}
   {/if}
 </div>

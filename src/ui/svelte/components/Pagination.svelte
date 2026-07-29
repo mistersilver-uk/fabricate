@@ -16,7 +16,7 @@
     // that appears only past a threshold reads as a layout glitch rather than a
     // control. Under it the summary and the per-page selector are always present, and
     // the nav renders its (disabled) arrows rather than vanishing.
-    persistent = false
+    persistent = false,
   } = $props();
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
@@ -26,7 +26,9 @@
   // meaningful — i.e. there are more items than the smallest available option. Otherwise
   // picking a size that fits everything on one page would hide the only control to change
   // it back. The prev/next nav still only appears when there is more than one page.
-  const minPageSize = $derived(pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize);
+  const minPageSize = $derived(
+    pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize
+  );
   const showPagination = $derived(persistent || totalCount > minPageSize);
   const showNav = $derived(persistent || totalPages > 1);
 
@@ -47,7 +49,10 @@
 </script>
 
 {#if showPagination}
-  <section class="manager-pagination" aria-label={text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}>
+  <section
+    class="manager-pagination"
+    aria-label={text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
+  >
     <span class="manager-pagination-summary" data-pagination-summary>
       {text('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}')
         .replace('{first}', firstShown)
@@ -55,7 +60,10 @@
         .replace('{total}', totalCount)}
     </span>
     {#if showNav}
-      <nav class="manager-pagination-nav" aria-label={text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}>
+      <nav
+        class="manager-pagination-nav"
+        aria-label={text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
+      >
         <button
           type="button"
           class="manager-icon-button"

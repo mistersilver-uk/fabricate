@@ -20,7 +20,7 @@
     // The requirement rail's interaction state (issue 917), spread straight onto
     // IoTable. One cohesive value rather than eight props threaded through four
     // bodies; `{}` renders a read-only rail with no chooser.
-    rail = {}
+    rail = {},
   } = $props();
 
   // The chosen ingredient set determines the output, so the "Produces" list must
@@ -37,7 +37,7 @@
       : (recipe?.result?.items ?? []),
     time: recipe?.result?.time ?? null,
     timeLabel: recipe?.result?.timeLabel ?? null,
-    xp: recipe?.result?.xp ?? null
+    xp: recipe?.result?.xp ?? null,
   });
 </script>
 

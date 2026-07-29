@@ -46,7 +46,7 @@
     // `data-*` hook a caller relies on). Import-free: a plain object, so this leaf
     // still carries no module dependency into the mount harnesses.
     inputProps = {},
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   const isVertical = $derived(orientation === 'vertical');

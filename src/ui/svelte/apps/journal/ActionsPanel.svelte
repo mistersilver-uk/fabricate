@@ -25,7 +25,9 @@
   // Race-free readiness: an un-armed step (no gate) is actionable now; an armed
   // gate is ready only once world time reaches `availableAt`.
   const ready = $derived(!hasGate || availableAt <= now);
-  const busy = $derived(String(services?.journal?.busyRunId ?? '') === String(run?.id ?? '') && run?.id);
+  const busy = $derived(
+    String(services?.journal?.busyRunId ?? '') === String(run?.id ?? '') && run?.id
+  );
   const disabled = $derived(!ready || Boolean(busy));
 
   // Player self-cancel (issue 848): owner-only, live crafting runs only. The
@@ -57,19 +59,25 @@
   }
 </script>
 
-<section class="journal-actions" data-journal-actions data-manual-advance={manualAdvance ? 'true' : 'false'}>
+<section
+  class="journal-actions"
+  data-journal-actions
+  data-manual-advance={manualAdvance ? 'true' : 'false'}
+>
   {#if manualAdvance}
     <button
       type="button"
       class="fabricate-app-primary-button"
       data-journal-trigger
-      disabled={disabled}
+      {disabled}
       onclick={trigger}
     >
       <i class="fas fa-play" aria-hidden="true"></i>
       <span
         >{localize(
-          isFinalStep ? 'FABRICATE.App.Journal.Actions.FinishCrafting' : 'FABRICATE.App.Journal.Actions.TriggerNextStep'
+          isFinalStep
+            ? 'FABRICATE.App.Journal.Actions.FinishCrafting'
+            : 'FABRICATE.App.Journal.Actions.TriggerNextStep'
         )}</span
       >
     </button>
@@ -81,7 +89,11 @@
       />
     {:else}
       <p class="journal-actions-hint">
-        {localize(isFinalStep ? 'FABRICATE.App.Journal.Actions.FinishHint' : 'FABRICATE.App.Journal.Actions.TriggerHint')}
+        {localize(
+          isFinalStep
+            ? 'FABRICATE.App.Journal.Actions.FinishHint'
+            : 'FABRICATE.App.Journal.Actions.TriggerHint'
+        )}
       </p>
     {/if}
     {#if canCancel}

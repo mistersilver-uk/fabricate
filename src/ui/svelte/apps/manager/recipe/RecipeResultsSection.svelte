@@ -48,7 +48,7 @@
     // Deep-link from a progressive row's read-only difficulty badge to the component
     // editor's Difficulty card.
     onOpenComponent = () => {},
-    idPrefix = ''
+    idPrefix = '',
   } = $props();
 
   function text(key, fallback) {
@@ -78,7 +78,7 @@
     return sets.map((set, index) => ({
       id: set.id,
       name: setDisplayName(set, index),
-      disabled: !!set.resultGroupId && set.resultGroupId !== group.id
+      disabled: !!set.resultGroupId && set.resultGroupId !== group.id,
     }));
   }
 
@@ -97,7 +97,7 @@
     return tierOptions.map((tier) => ({
       id: tier.id,
       name: tier.name,
-      disabled: elsewhere.has(tier.id)
+      disabled: elsewhere.has(tier.id),
     }));
   }
 
@@ -214,10 +214,18 @@
       compact
       icon="fas fa-gift"
       title={text('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}
-      hint={text('FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint', 'Add a set of items this recipe can produce.')}
+      hint={text(
+        'FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint',
+        'Add a set of items this recipe can produce.'
+      )}
       contextClass="manager-recipe-tab-empty"
     >
-      <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
+      <button
+        type="button"
+        class="manager-button is-dashed manager-recipe-add-full"
+        data-recipe-add="result-set"
+        onclick={() => addGroup()}
+      >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
       </button>
@@ -246,7 +254,12 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
+    <button
+      type="button"
+      class="manager-button is-dashed manager-recipe-add-full"
+      data-recipe-add="result-set"
+      onclick={() => addGroup()}
+    >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
     </button>

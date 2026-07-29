@@ -48,14 +48,7 @@
 <script>
   const DEFAULT_LINK_ICON = 'fas fa-arrow-up-right-from-square';
 
-  let {
-    icon = '',
-    title = '',
-    items = [],
-    links = [],
-    dataAttr = '',
-    dataValue = '',
-  } = $props();
+  let { icon = '', title = '', items = [], links = [], dataAttr = '', dataValue = '' } = $props();
 
   // Spread so the hook is genuinely absent when unset, rather than an empty attribute a
   // selector would still match.
@@ -84,7 +77,25 @@
           last token inside the `{#if}` and Svelte trims block-trailing whitespace, so the
           lead-in ran straight into the prose ("Made from a game-world Item.Drag any Item…").
           Structural assertions cannot see it — it was caught in a screenshot (issue 881).
-        --><!-- eslint-disable-next-line svelte/no-useless-mustaches -- the mustache IS the separator, per the note above; keep this directive glued to that close tag, because a markup comment on its own line here adds a second whitespace text node between glyph and prose -->
+
+          The `eslint-disable-next-line` below suppresses the mustache, and it must stay
+          glued to this close tag: a markup comment on its own line here adds a second
+          whitespace text node between glyph and prose.
+
+          `prettier-ignore` preserves the LINE ANCHOR of the directive above; it is not a
+          rendering guard (issue 923). The render is safe either way — `{' '}` is an
+          expression, and both forms compile to the same template. What breaks is the
+          suppression: Prettier always splits a `<span>` containing an `{#if}` across three
+          lines, whatever the width, which moves the mustache to the second line after an
+          `eslint-disable-next-line` that is anchored to the first. The directive then
+          suppresses nothing and the violation resurfaces as an unsuppressed error.
+          The fence must be the LAST comment before the element or Prettier ignores it.
+
+          The fence is the local fix, not the guard for the class: `linterOptions:
+          { reportUnusedDisableDirectives: 'error' }` on the `.svelte` block in
+          `eslint.config.js` is what makes a directive that has drifted off its violation
+          fail `lint:svelte` instead of rotting quietly.
+        --><!-- eslint-disable-next-line svelte/no-useless-mustaches --><!-- prettier-ignore -->
         <span>{#if row.lead}<strong>{row.lead}</strong>{' '}{/if}{row.text}</span>
       </li>
     {/each}

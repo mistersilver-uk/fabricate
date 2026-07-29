@@ -13,10 +13,7 @@
 <script>
   import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import {
-    KNOWLEDGE_TAB_LEARNED_RECIPES,
-    KNOWLEDGE_TAB_RECIPE_ITEMS,
-  } from './knowledgeStudio.js';
+  import { KNOWLEDGE_TAB_LEARNED_RECIPES, KNOWLEDGE_TAB_RECIPE_ITEMS } from './knowledgeStudio.js';
 
   let {
     activeTab = KNOWLEDGE_TAB_RECIPE_ITEMS,

@@ -21,7 +21,7 @@
     events = [],
     selectedEventId = null,
     onSelectEvent = null,
-    isBlind = false
+    isBlind = false,
   } = $props();
 
   const hasEvent = $derived(eventChance > 0);
@@ -31,13 +31,20 @@
   // Events: an independent search + pagination set.
   let eventSearchTerm = $state('');
   const normalizedEventSearch = $derived(eventSearchTerm.trim().toLowerCase());
-  const filteredEvents = $derived(events.filter(event =>
-    !normalizedEventSearch
-    || `${event?.name ?? ''} ${event?.description ?? ''}`.toLowerCase().includes(normalizedEventSearch)
-  ));
+  const filteredEvents = $derived(
+    events.filter(
+      (event) =>
+        !normalizedEventSearch ||
+        `${event?.name ?? ''} ${event?.description ?? ''}`
+          .toLowerCase()
+          .includes(normalizedEventSearch)
+    )
+  );
   let eventPageIndex = $state(0);
   let eventPageSize = $state(6);
-  const paginatedEvents = $derived(filteredEvents.slice(eventPageIndex * eventPageSize, (eventPageIndex + 1) * eventPageSize));
+  const paginatedEvents = $derived(
+    filteredEvents.slice(eventPageIndex * eventPageSize, (eventPageIndex + 1) * eventPageSize)
+  );
 
   // The center column shows the event list whenever individual events are
   // present. For a blind environment, an empty list with a non-zero chance means
@@ -57,13 +64,16 @@
 
   // Snap the list back to its first page if a search shrinks it past the offset.
   $effect(() => {
-    if (eventPageIndex > 0 && eventPageIndex * eventPageSize >= filteredEvents.length) eventPageIndex = 0;
+    if (eventPageIndex > 0 && eventPageIndex * eventPageSize >= filteredEvents.length)
+      eventPageIndex = 0;
   });
 </script>
 
 <div class="gathering-detail-event" data-gathering-event-section>
   <div class="gathering-detail-event-danger">
-    <span class="gathering-detail-event-caption">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span>
+    <span class="gathering-detail-event-caption"
+      >{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span
+    >
     <span class={`gathering-detail-event-level is-danger ${dangerRiskClass}`}>
       <i class="fas fa-skull" aria-hidden="true"></i>
       <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
@@ -72,7 +82,9 @@
 
   {#if hasEvent}
     <ChanceBar value={eventChance} scale="event" />
-    <p class="gathering-detail-event-hint">{localize('FABRICATE.App.Gathering.Detail.EventChanceHint')}</p>
+    <p class="gathering-detail-event-hint">
+      {localize('FABRICATE.App.Gathering.Detail.EventChanceHint')}
+    </p>
   {:else}
     <p class="gathering-detail-event-hint" data-gathering-safe-hint>
       {localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
@@ -121,8 +133,11 @@
           pageSize={eventPageSize}
           pageIndex={eventPageIndex}
           {pageSizeOptions}
-          onPageChange={(n) => eventPageIndex = n}
-          onPageSizeChange={(n) => { eventPageSize = n; eventPageIndex = 0; }}
+          onPageChange={(n) => (eventPageIndex = n)}
+          onPageSizeChange={(n) => {
+            eventPageSize = n;
+            eventPageIndex = 0;
+          }}
         />
       </div>
     {/if}

@@ -39,7 +39,7 @@
     onRemoveMember = () => {},
     onMoveMember = () => {},
     onSetTravelActor = () => {},
-    onClearTravelActor = () => {}
+    onClearTravelActor = () => {},
   } = $props();
 
   const PAGE_SIZE = 6;
@@ -55,7 +55,11 @@
   const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
   const filteredParties = $derived(
     normalizedSearch
-      ? parties.filter(party => String(party.name || '').toLowerCase().includes(normalizedSearch))
+      ? parties.filter((party) =>
+          String(party.name || '')
+            .toLowerCase()
+            .includes(normalizedSearch)
+        )
       : parties
   );
 
@@ -66,7 +70,9 @@
     }
   });
 
-  const pagedParties = $derived(filteredParties.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE));
+  const pagedParties = $derived(
+    filteredParties.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE)
+  );
 
   function selectRow(party) {
     onSelectParty(party.id === selectedPartyId ? '' : party.id);
@@ -79,7 +85,11 @@
   }
 
   function overrideValue(party) {
-    if (party?.overrideMode === 'manual' && Array.isArray(party.overrideRealmIds) && party.overrideRealmIds.length > 0) {
+    if (
+      party?.overrideMode === 'manual' &&
+      Array.isArray(party.overrideRealmIds) &&
+      party.overrideRealmIds.length > 0
+    ) {
       return party.overrideRealmIds[0];
     }
     return '';
@@ -96,7 +106,10 @@
   function memberCountLabel(party) {
     const count = party?.memberCount ?? 0;
     if (count === 1) return text('FABRICATE.Admin.Manager.Travel.MemberCountOne', '1 member');
-    return text('FABRICATE.Admin.Manager.Travel.MemberCount', '{count} members').replace('{count}', String(count));
+    return text('FABRICATE.Admin.Manager.Travel.MemberCount', '{count} members').replace(
+      '{count}',
+      String(count)
+    );
   }
 </script>
 
@@ -107,13 +120,19 @@
   aria-labelledby="travel-tab-parties"
   data-travel-panel="parties"
 >
-  <section class="manager-toolbar manager-travel-parties-toolbar" aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.Filters', 'Party filters')}>
+  <section
+    class="manager-toolbar manager-travel-parties-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.Filters', 'Party filters')}
+  >
     <label class="manager-search">
       <i class="fas fa-search" aria-hidden="true"></i>
       <input
         type="search"
         bind:value={searchTerm}
-        placeholder={text('FABRICATE.Admin.Manager.Travel.Parties.SearchPlaceholder', 'Search parties...')}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Travel.Parties.SearchPlaceholder',
+          'Search parties...'
+        )}
         aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.SearchLabel', 'Search parties')}
       />
     </label>
@@ -150,7 +169,10 @@
               {#if party.travelActor?.img}
                 <img class="manager-travel-parties-thumb" src={party.travelActor.img} alt="" />
               {:else}
-                <span class="manager-travel-parties-thumb manager-travel-parties-thumb-fallback" aria-hidden="true">
+                <span
+                  class="manager-travel-parties-thumb manager-travel-parties-thumb-fallback"
+                  aria-hidden="true"
+                >
                   <i class="fas fa-user"></i>
                 </span>
               {/if}
@@ -160,7 +182,13 @@
                   ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
                   : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
               </Chip>
-              <Chip tone="neutral" icon="fas fa-users" class="manager-travel-parties-members-chip" title={memberCountLabel(party)} aria-label={memberCountLabel(party)}>
+              <Chip
+                tone="neutral"
+                icon="fas fa-users"
+                class="manager-travel-parties-members-chip"
+                title={memberCountLabel(party)}
+                aria-label={memberCountLabel(party)}
+              >
                 <span>{party.memberCount ?? 0}</span>
               </Chip>
             </div>
@@ -203,7 +231,7 @@
       pageSize={PAGE_SIZE}
       {pageIndex}
       pageSizeOptions={[PAGE_SIZE]}
-      onPageChange={(next) => pageIndex = next}
+      onPageChange={(next) => (pageIndex = next)}
     />
   {/if}
 </div>

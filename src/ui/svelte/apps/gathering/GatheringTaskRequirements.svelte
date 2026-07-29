@@ -29,8 +29,16 @@
       const lines = [];
       const timeOfDay = Array.isArray(data.requiredTimeOfDay) ? data.requiredTimeOfDay : [];
       const weather = Array.isArray(data.requiredWeather) ? data.requiredWeather : [];
-      if (timeOfDay.length > 0) lines.push(localize('FABRICATE.App.Gathering.Detail.RequiresTimeOfDay', { values: timeOfDay.join(', ') }));
-      if (weather.length > 0) lines.push(localize('FABRICATE.App.Gathering.Detail.RequiresWeather', { values: weather.join(', ') }));
+      if (timeOfDay.length > 0)
+        lines.push(
+          localize('FABRICATE.App.Gathering.Detail.RequiresTimeOfDay', {
+            values: timeOfDay.join(', '),
+          })
+        );
+      if (weather.length > 0)
+        lines.push(
+          localize('FABRICATE.App.Gathering.Detail.RequiresWeather', { values: weather.join(', ') })
+        );
       if (lines.length > 0) return lines;
     }
     return [reason?.message || localize('FABRICATE.App.Gathering.Detail.Blocked')];
@@ -38,16 +46,18 @@
 
   const detailLines = $derived(
     blockedReasons
-      .filter(reason => reason?.code !== 'TOOL_BLOCKED' && reason?.code !== 'SCENE_TOKEN_BLOCKED')
+      .filter((reason) => reason?.code !== 'TOOL_BLOCKED' && reason?.code !== 'SCENE_TOKEN_BLOCKED')
       .flatMap(blockedLines)
   );
 
   const isEmpty = $derived(tools.length === 0 && detailLines.length === 0);
 
   const requirementsHeading = $derived(
-    localize(blocked
-      ? 'FABRICATE.App.Gathering.Detail.RequirementsHeading'
-      : 'FABRICATE.App.Gathering.Detail.RequirementsHeadingReady')
+    localize(
+      blocked
+        ? 'FABRICATE.App.Gathering.Detail.RequirementsHeading'
+        : 'FABRICATE.App.Gathering.Detail.RequirementsHeadingReady'
+    )
   );
 
   function toolStateLabel(state) {
@@ -75,8 +85,16 @@
           </h4>
           <ul class="gathering-task-tool-list">
             {#each tools as tool, index (tool.id ?? index)}
-              <li class={`gathering-task-tool is-${tool.state}`} data-gathering-tool data-tool-state={tool.state}>
-                <img class="gathering-task-tool-thumb" src={tool.img || 'icons/svg/item-bag.svg'} alt="" />
+              <li
+                class={`gathering-task-tool is-${tool.state}`}
+                data-gathering-tool
+                data-tool-state={tool.state}
+              >
+                <img
+                  class="gathering-task-tool-thumb"
+                  src={tool.img || 'icons/svg/item-bag.svg'}
+                  alt=""
+                />
                 <span class="gathering-task-tool-copy">
                   <span class="gathering-task-tool-name" title={tool.name}>{tool.name}</span>
                   <span class="gathering-task-tool-state">{toolStateLabel(tool.state)}</span>

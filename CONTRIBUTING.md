@@ -459,7 +459,7 @@ npm run lint:fix       # …and auto-fix what can be fixed
 npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
 npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
-npm run format         # Prettier-format the gated scope
+npm run format         # Prettier-format the gated scope (JS + every src/**/*.svelte)
 npm run format:check   # verify formatting (what CI runs)
 npm run lint:md        # markdownlint over all Markdown (what CI runs)
 npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
@@ -496,6 +496,8 @@ The gate (`npm run lint` / `npm run format:check`) now covers the **entire `src/
 
 - `src/models/`, `src/utils/`, `src/integrations/`, `src/config/`, `src/migration/`, `src/canvas/`, `src/systems/`, and `src/toolBreakageRuntime.js`
 
+`format:check` additionally covers `src/**/*.svelte`, so the Prettier half of the gate is no longer JavaScript-only.
+
 A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
 It is separate because components need the Svelte parser and their own rule set, not because they are optional.
 Note what this does and does not mean for `src/ui/**`: that directory holds both halves, and only the `.svelte` half is gated — the plain `.js` under it still is not.
@@ -504,10 +506,20 @@ Note what this does and does not mean for `src/ui/**`: that directory holds both
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
 Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
 The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
-That is the narrow case of a stronger property that covers every `eslint-disable` directive too: `eslint.config.js` declares no `linterOptions`, so ESLint 9's default `reportUnusedDisableDirectives: 'warn'` applies, and under `--max-warnings=0` a directive that suppresses nothing exits 1 — which is what stops a suppression from outliving the finding it was written for.
+That is the narrow case of a stronger property that covers every `eslint-disable` directive too: the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a directive that suppresses nothing exits 1 — which is what stops a suppression from outliving the finding it was written for.
+It is pinned explicitly rather than left to ESLint's default because it is load-bearing.
+`eslint-disable-next-line` is anchored to a line, and Prettier — which now formats components — moves lines.
+A directive that slips off its violation resurfaces the violation as an unsuppressed error; one that lands suppressing nothing is caught by this option.
+Both failure shapes fail the gate, which is what makes a mechanical reformat of a component safe.
+Where a suppression must sit on a particular line, fence the element with `<!-- prettier-ignore -->` — it has to be the LAST comment before the element to take effect.
+The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
+The fence there protects the directive's line anchor and nothing else — `{' '}` is an expression, so both the fenced and the split form compile to the same template and render identically.
 
 ESLint is the only static analysis a `.svelte` file gets.
-Prettier and Stylelint still exclude components, Svelte compiler warnings still do not fail the build, and SonarCloud indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts.
+Prettier now formats components as well — `prettier-plugin-svelte` is registered in `.prettierrc.json`, and `format:check` covers `src/**/*.svelte`.
+Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser and dropping the config entry fails loudly — the glob names the components, so `format:check` exits 2 with "No parser could be inferred".
+The silent way back is the other one, and the one `tests/prettier-svelte-scope.test.js` guards: re-ignoring `*.svelte` makes `format:check` match zero files, report success and exit 0.
+Stylelint still excludes components, Svelte compiler warnings still do not fail the build, and SonarCloud indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts.
 Each of those is tracked as its own follow-up.
 
 Not yet gated (tracked for follow-up — run `npm run lint:all` to see them):

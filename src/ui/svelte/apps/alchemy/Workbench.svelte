@@ -44,7 +44,7 @@
     onRemoveOne = null,
     onRemoveAll = null,
     onBrew = null,
-    onDrop = null
+    onDrop = null,
   } = $props();
 
   // Chip-body keyboard parity: Enter/Space add one; Shift+Enter/Shift+Space remove
@@ -68,14 +68,14 @@
     assembling: 'FABRICATE.App.Alchemy.Status.Assembling',
     ready: 'FABRICATE.App.Alchemy.Status.Ready',
     untried: 'FABRICATE.App.Alchemy.Status.Untried',
-    'no-reaction': 'FABRICATE.App.Alchemy.Status.NoReaction'
+    'no-reaction': 'FABRICATE.App.Alchemy.Status.NoReaction',
   };
   const STATUS_ICONS = {
     empty: 'fa-circle-info',
     assembling: 'fa-layer-group',
     ready: 'fa-circle-check',
     untried: 'fa-wand-sparkles',
-    'no-reaction': 'fa-ban'
+    'no-reaction': 'fa-ban',
   };
 
   const statusText = $derived(
@@ -123,7 +123,9 @@
     if (!lastBrew) return '';
     if (bannerStatus === 'produced-on-failure') {
       return lastBrew.discovered
-        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredOnFailure', { name: lastBrew.discovered })
+        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredOnFailure', {
+            name: lastBrew.discovered,
+          })
         : localize('FABRICATE.App.Alchemy.Banner.ProducedOnFailure');
     }
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') {
@@ -181,9 +183,15 @@
   >
     {#if benchEmpty}
       <div class="alchemy-bench-empty">
-        <span class="alchemy-bench-empty-icon"><i class="fas fa-hand-pointer" aria-hidden="true"></i></span>
-        <div class="alchemy-bench-empty-title">{localize('FABRICATE.App.Alchemy.BenchEmptyTitle')}</div>
-        <div class="alchemy-bench-empty-hint">{localize('FABRICATE.App.Alchemy.BenchEmptyHint')}</div>
+        <span class="alchemy-bench-empty-icon"
+          ><i class="fas fa-hand-pointer" aria-hidden="true"></i></span
+        >
+        <div class="alchemy-bench-empty-title">
+          {localize('FABRICATE.App.Alchemy.BenchEmptyTitle')}
+        </div>
+        <div class="alchemy-bench-empty-hint">
+          {localize('FABRICATE.App.Alchemy.BenchEmptyHint')}
+        </div>
       </div>
     {:else}
       <div class="alchemy-bench-grid">
@@ -247,7 +255,9 @@
       </div>
       {#if benchEssences.length}
         <div class="alchemy-bench-essences" data-alchemy-bench-essences>
-          <span class="alchemy-signature-label">{localize('FABRICATE.App.Alchemy.EssenceTotal')}</span>
+          <span class="alchemy-signature-label"
+            >{localize('FABRICATE.App.Alchemy.EssenceTotal')}</span
+          >
           <EssenceChips essences={benchEssences} size="md" />
         </div>
       {/if}
@@ -281,8 +291,12 @@
     <div class="alchemy-unknown" data-alchemy-unknown>
       <span class="alchemy-unknown-icon"><i class="fas fa-question" aria-hidden="true"></i></span>
       <div>
-        <div class="alchemy-unknown-title">{localize('FABRICATE.App.Alchemy.UnknownReactionTitle')}</div>
-        <div class="alchemy-unknown-desc">{localize('FABRICATE.App.Alchemy.UnknownReactionDesc')}</div>
+        <div class="alchemy-unknown-title">
+          {localize('FABRICATE.App.Alchemy.UnknownReactionTitle')}
+        </div>
+        <div class="alchemy-unknown-desc">
+          {localize('FABRICATE.App.Alchemy.UnknownReactionDesc')}
+        </div>
       </div>
     </div>
   {/if}
@@ -293,7 +307,10 @@
       <div class="alchemy-missing-rows">
         {#each missing as row (row.componentId)}
           <span class="alchemy-missing-chip"
-            >{localize('FABRICATE.App.Alchemy.MissingRow', { name: row.name, need: row.need })}</span
+            >{localize('FABRICATE.App.Alchemy.MissingRow', {
+              name: row.name,
+              need: row.need,
+            })}</span
           >
         {/each}
       </div>

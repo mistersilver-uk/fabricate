@@ -51,7 +51,7 @@
     onDeleteStep = () => {},
     // GM policy: may a player reorder this recipe's progressive stages? Default true
     // (issue 651). Written back through onUpdateRecipe by the shell.
-    onToggleAllowPlayerResultReorder = () => {}
+    onToggleAllowPlayerResultReorder = () => {},
   } = $props();
 
   // Default-true: only an explicit `false` turns the switch off, matching the model.
@@ -63,7 +63,9 @@
   }
 
   const resultGroups = $derived(Array.isArray(recipe?.resultGroups) ? recipe.resultGroups : []);
-  const ingredientSets = $derived(Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []);
+  const ingredientSets = $derived(
+    Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []
+  );
   const steps = $derived(Array.isArray(recipe?.steps) ? recipe.steps : []);
 
   // Per-mode heading + intro OUTSIDE any card (§C3).
@@ -76,12 +78,39 @@
   // one place that explanation belongs.
   const heading = $derived(
     progressive
-      ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingProgressive', 'Results'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroProgressive', 'What this recipe produces, awarded in order down the list.') }
+      ? {
+          title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingProgressive', 'Results'),
+          intro: text(
+            'FABRICATE.Admin.Manager.Recipe.ResultsIntroProgressive',
+            'What this recipe produces, awarded in order down the list.'
+          ),
+        }
       : routingProvider === 'check'
-        ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingCheck', 'Results by outcome'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroCheck', 'Each result set is produced on a matching crafting-check success tier.') }
+        ? {
+            title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingCheck', 'Results by outcome'),
+            intro: text(
+              'FABRICATE.Admin.Manager.Recipe.ResultsIntroCheck',
+              'Each result set is produced on a matching crafting-check success tier.'
+            ),
+          }
         : routingProvider === 'ingredientSet'
-          ? { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingIngredients', 'Results by ingredient set'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroIngredients', 'The ingredient set the crafter uses selects the result set.') }
-          : { title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingSimple', 'Result'), intro: text('FABRICATE.Admin.Manager.Recipe.ResultsIntroSimple', 'One ingredient set produces one result set.') }
+          ? {
+              title: text(
+                'FABRICATE.Admin.Manager.Recipe.ResultsHeadingIngredients',
+                'Results by ingredient set'
+              ),
+              intro: text(
+                'FABRICATE.Admin.Manager.Recipe.ResultsIntroIngredients',
+                'The ingredient set the crafter uses selects the result set.'
+              ),
+            }
+          : {
+              title: text('FABRICATE.Admin.Manager.Recipe.ResultsHeadingSimple', 'Result'),
+              intro: text(
+                'FABRICATE.Admin.Manager.Recipe.ResultsIntroSimple',
+                'One ingredient set produces one result set.'
+              ),
+            }
   );
 
   function stepResultGroups(step) {
@@ -93,7 +122,11 @@
   }
 </script>
 
-<section class="manager-recipe-tab manager-recipe-results-tab" data-recipe-tab="results" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Results', 'Results')}>
+<section
+  class="manager-recipe-tab manager-recipe-results-tab"
+  data-recipe-tab="results"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Results', 'Results')}
+>
   <div class="manager-recipe-tab-intro">
     <h2 class="manager-recipe-tab-title">{heading.title}</h2>
     <p class="manager-muted">{heading.intro}</p>
@@ -102,7 +135,12 @@
   {#if collapsed}
     <div class="manager-recipe-info-strip" data-recipe-collapsed-results-note>
       <i class="fas fa-layer-group" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote', 'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.')}</span>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.Recipe.CollapsedResultsNote',
+          'Multi-step recipes are disabled, so this recipe runs as one combined action. You are editing its final results — the output the combined action produces.'
+        )}</span
+      >
     </div>
   {/if}
 
@@ -120,7 +158,12 @@
          budget explanation must still be true, so a merged sub-line would caveat itself. -->
     <div class="manager-recipe-info-strip" data-recipe-info-strip>
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo', 'Roll budget flows down the list · each stage consumes its difficulty before the next is produced')}</span>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.Recipe.ResultsProgressiveInfo',
+          'Roll budget flows down the list · each stage consumes its difficulty before the next is produced'
+        )}</span
+      >
     </div>
 
     <ToggleCard
@@ -128,9 +171,18 @@
       icon="fas fa-arrow-down-a-z"
       section="allow-player-result-reorder"
       field="allowPlayerResultReorder"
-      title={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderTitle', 'Allow player result re-ordering')}
-      sub={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderSub', 'Players may set their own stage order for this recipe, which is remembered and used every time they craft it.')}
-      toggleLabel={text('FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderToggle', 'Allow player result re-ordering')}
+      title={text(
+        'FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderTitle',
+        'Allow player result re-ordering'
+      )}
+      sub={text(
+        'FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderSub',
+        'Players may set their own stage order for this recipe, which is remembered and used every time they craft it.'
+      )}
+      toggleLabel={text(
+        'FABRICATE.Admin.Manager.Recipe.AllowPlayerResultReorderToggle',
+        'Allow player result re-ordering'
+      )}
       on={allowPlayerResultReorder}
       onToggle={(next) => onToggleAllowPlayerResultReorder(next)}
     />
@@ -138,7 +190,12 @@
 
   {#if isMultiStep}
     {#if steps.length === 0}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.NoStepsHint', 'Add a step in Overview to configure its results.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Recipe.NoStepsHint',
+          'Add a step in Overview to configure its results.'
+        )}
+      </p>
     {:else}
       <RecipeStepAccordion {steps} alwaysOpen {onDeleteStep}>
         {#snippet body(step)}
@@ -176,5 +233,4 @@
       onChange={(nextGroups) => onUpdateResultGroups(null, nextGroups)}
     />
   {/if}
-
 </section>

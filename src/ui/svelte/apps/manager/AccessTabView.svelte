@@ -31,7 +31,7 @@
     selectedRecipeId = '',
     selectedSystemName = '',
     onSearchChange = () => {},
-    onSelectRecipe = () => {}
+    onSelectRecipe = () => {},
   } = $props();
 
   let categoryFilter = $state('all');
@@ -44,20 +44,23 @@
     return (summary.characterCount || 0) + (summary.playerCount || 0);
   }
 
-  const filteredRecipes = $derived((recipes || []).filter(recipe => {
-    const matchesCategory = categoryFilter === 'all' || recipe.category === categoryFilter;
-    const granted = grantCount(recipe) > 0;
-    const matchesAccess = accessFilter === 'all'
-      || (accessFilter === 'granted' && granted)
-      || (accessFilter === 'none' && !granted);
-    return matchesCategory && matchesAccess;
-  }));
-  const filtersActive = $derived(
-    (recipeSearchTerm || '').trim().length > 0
-    || categoryFilter !== 'all'
-    || accessFilter !== 'all'
+  const filteredRecipes = $derived(
+    (recipes || []).filter((recipe) => {
+      const matchesCategory = categoryFilter === 'all' || recipe.category === categoryFilter;
+      const granted = grantCount(recipe) > 0;
+      const matchesAccess =
+        accessFilter === 'all' ||
+        (accessFilter === 'granted' && granted) ||
+        (accessFilter === 'none' && !granted);
+      return matchesCategory && matchesAccess;
+    })
   );
-  const paginatedRecipes = $derived(filteredRecipes.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+  const filtersActive = $derived(
+    (recipeSearchTerm || '').trim().length > 0 || categoryFilter !== 'all' || accessFilter !== 'all'
+  );
+  const paginatedRecipes = $derived(
+    filteredRecipes.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+  );
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredRecipes.length) {
@@ -92,16 +95,29 @@
   }
 </script>
 
-<main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}>
+<main
+  class="manager-main"
+  aria-label={text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}
+>
   <section class="manager-section-header">
     <div class="manager-heading">
-      <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
+      <p class="manager-kicker">
+        {selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+      </p>
       <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Access.Hint', 'Grant individual recipes to specific characters or players. Only granted recipes are visible to them.')}</p>
+      <p class="manager-subtitle">
+        {text(
+          'FABRICATE.Admin.Manager.Access.Hint',
+          'Grant individual recipes to specific characters or players. Only granted recipes are visible to them.'
+        )}
+      </p>
     </div>
   </section>
 
-  <section class="manager-toolbar" aria-label={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}>
+  <section
+    class="manager-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}
+  >
     <label class="manager-search">
       <i class="fas fa-search" aria-hidden="true"></i>
       <input
@@ -115,8 +131,18 @@
     </label>
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
-      <select value={categoryFilter} onchange={(event) => categoryFilter = event.currentTarget.value} data-access-category-filter aria-label={text('FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel', 'Filter recipes by category')}>
-        <option value="all">{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option>
+      <select
+        value={categoryFilter}
+        onchange={(event) => (categoryFilter = event.currentTarget.value)}
+        data-access-category-filter
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
+          'Filter recipes by category'
+        )}
+      >
+        <option value="all"
+          >{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option
+        >
         {#each recipeCategories || [] as category (category.name)}
           <option value={category.name}>{category.name} ({category.count})</option>
         {/each}
@@ -124,35 +150,69 @@
     </label>
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Access.Filter', 'Access')}</span>
-      <select value={accessFilter} onchange={(event) => accessFilter = event.currentTarget.value} data-access-filter aria-label={text('FABRICATE.Admin.Manager.Access.FilterLabel', 'Filter recipes by access')}>
-        <option value="all">{text('FABRICATE.Admin.Manager.Access.FilterAll', 'All recipes')}</option>
-        <option value="granted">{text('FABRICATE.Admin.Manager.Access.FilterGranted', 'Granted')}</option>
-        <option value="none">{text('FABRICATE.Admin.Manager.Access.FilterNone', 'No access')}</option>
+      <select
+        value={accessFilter}
+        onchange={(event) => (accessFilter = event.currentTarget.value)}
+        data-access-filter
+        aria-label={text('FABRICATE.Admin.Manager.Access.FilterLabel', 'Filter recipes by access')}
+      >
+        <option value="all"
+          >{text('FABRICATE.Admin.Manager.Access.FilterAll', 'All recipes')}</option
+        >
+        <option value="granted"
+          >{text('FABRICATE.Admin.Manager.Access.FilterGranted', 'Granted')}</option
+        >
+        <option value="none"
+          >{text('FABRICATE.Admin.Manager.Access.FilterNone', 'No access')}</option
+        >
       </select>
     </label>
-    <Chip>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredRecipes.length).replace('{total}', (recipes || []).length)}</Chip>
+    <Chip
+      >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
+        .replace('{shown}', filteredRecipes.length)
+        .replace('{total}', (recipes || []).length)}</Chip
+    >
     {#if filtersActive}
-      <button type="button" class="manager-button manager-clear-filters" data-clear-filters="access" onclick={clearFilters}>
+      <button
+        type="button"
+        class="manager-button manager-clear-filters"
+        data-clear-filters="access"
+        onclick={clearFilters}
+      >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </button>
     {/if}
   </section>
 
-  <section class="manager-table-scroll manager-access-scroll" aria-label={text('FABRICATE.Admin.Manager.Access.Table', 'Recipe access table')}>
+  <section
+    class="manager-table-scroll manager-access-scroll"
+    aria-label={text('FABRICATE.Admin.Manager.Access.Table', 'Recipe access table')}
+  >
     {#if (recipes || []).length === 0}
       <EmptyState
         icon="fas fa-user-lock"
         title={text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}
-        hint={text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Recipe.EmptyHint',
+          'Create recipes for the selected crafting system.'
+        )}
       />
     {:else if filteredRecipes.length === 0}
       <EmptyState
         icon="fas fa-search"
-        title={text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match these filters')}
-        hint={text('FABRICATE.Admin.Manager.Access.EmptySearchHint', 'Clear search and filters to show every recipe in this system.')}
+        title={text(
+          'FABRICATE.Admin.Manager.Recipe.EmptySearchTitle',
+          'No recipes match these filters'
+        )}
+        hint={text(
+          'FABRICATE.Admin.Manager.Access.EmptySearchHint',
+          'Clear search and filters to show every recipe in this system.'
+        )}
       >
-        <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
+        <button type="button" class="manager-button" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+        >
       </EmptyState>
     {:else}
       <div class="manager-access-list" role="list">
@@ -173,11 +233,21 @@
                 <Chip class="manager-access-category">{categoryLabel(recipe)}</Chip>
               </span>
               {#if granted}
-                <Chip tone="active" icon="fas fa-users" class="manager-access-grant-chip" data-access-grant={recipe.id}>
+                <Chip
+                  tone="active"
+                  icon="fas fa-users"
+                  class="manager-access-grant-chip"
+                  data-access-grant={recipe.id}
+                >
                   <span>{grantChipLabel(recipe)}</span>
                 </Chip>
               {:else}
-                <Chip tone="danger" icon="fas fa-lock" class="manager-access-grant-chip" data-access-grant={recipe.id}>
+                <Chip
+                  tone="danger"
+                  icon="fas fa-lock"
+                  class="manager-access-grant-chip"
+                  data-access-grant={recipe.id}
+                >
                   <span>{text('FABRICATE.Admin.Manager.Access.NoAccess', 'No access')}</span>
                 </Chip>
               {/if}
@@ -193,8 +263,11 @@
     totalCount={filteredRecipes.length}
     {pageSize}
     {pageIndex}
-    onPageChange={(next) => pageIndex = next}
-    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+    onPageChange={(next) => (pageIndex = next)}
+    onPageSizeChange={(next) => {
+      pageSize = next;
+      pageIndex = 0;
+    }}
   />
 </main>
 

@@ -23,7 +23,7 @@
     favourite = false,
     onSelect = null,
     onAddToShoppingList = null,
-    onToggleFavourite = null
+    onToggleFavourite = null,
   } = $props();
 
   const id = $derived(String(recipe?.id ?? ''));

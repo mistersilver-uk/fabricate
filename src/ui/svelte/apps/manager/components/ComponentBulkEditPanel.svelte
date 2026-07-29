@@ -74,7 +74,7 @@
     setBulkDifficulty,
     setBulkEssence,
     toggleBulkDifficultyStaged,
-    toggleBulkEssencesStaged
+    toggleBulkEssencesStaged,
   } from '../../../../../utils/componentBulkEditModel.js';
 
   let {
@@ -89,7 +89,7 @@
     applying = false,
     onDraftChange = () => {},
     onClearSelection = () => {},
-    onApply = () => {}
+    onApply = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -107,7 +107,9 @@
 
   const stagedTagAdd = $derived(Array.isArray(draft?.tagAdd) ? draft.tagAdd : []);
   const stagedTagRemove = $derived(Array.isArray(draft?.tagRemove) ? draft.tagRemove : []);
-  const stagedEssences = $derived(draft?.essences && typeof draft.essences === 'object' ? draft.essences : {});
+  const stagedEssences = $derived(
+    draft?.essences && typeof draft.essences === 'object' ? draft.essences : {}
+  );
   const essencesStaged = $derived(draft?.essencesStaged === true);
   const difficultyStaged = $derived(draft?.difficultyStaged === true);
   const canApply = $derived(bulkDraftHasChanges(draft) && applying !== true);
@@ -119,7 +121,7 @@
       id: definition.id,
       name: definition.name || definition.id,
       icon: String(definition.icon || '').trim(),
-      quantity: Number(stagedEssences[definition.id]) || 0
+      quantity: Number(stagedEssences[definition.id]) || 0,
     }))
   );
 
@@ -127,17 +129,28 @@
   // counts as surely as a clear, because overwriting a hand-tuned 3 with a 5 destroys that
   // authored 3. A component with no authored essences is never counted — the staged map
   // purely ADDS to it.
-  const essenceWarningCount = $derived(countComponentsChangingEssences(selectedCards, stagedEssences));
+  const essenceWarningCount = $derived(
+    countComponentsChangingEssences(selectedCards, stagedEssences)
+  );
 
   const headingLabel = $derived(
     count === 1
-      ? text('FABRICATE.Admin.Manager.Component.BulkEdit.SelectedHeadingOne', '1 component selected')
-      : format('FABRICATE.Admin.Manager.Component.BulkEdit.SelectedHeading', '{count} components selected', { count })
+      ? text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.SelectedHeadingOne',
+          '1 component selected'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.SelectedHeading',
+          '{count} components selected',
+          { count }
+        )
   );
   const applyLabel = $derived(
     count === 1
       ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ApplyOne', 'Apply to 1 component')
-      : format('FABRICATE.Admin.Manager.Component.BulkEdit.Apply', 'Apply to {count} components', { count })
+      : format('FABRICATE.Admin.Manager.Component.BulkEdit.Apply', 'Apply to {count} components', {
+          count,
+        })
   );
   // `Unchanged`, NOT "Leave unchanged". This label sits on a `<button>` whose activation
   // ARMS the axis, so an imperative reading ("leave unchanged") names the opposite of what
@@ -145,7 +158,9 @@
   // wipe. Its staged twin reads "Will overwrite" / "Will set", which is STATE phrasing, so
   // a neutral state word is also the consistent choice. The `<select>` sentinel keeps
   // `CategoryUnchanged` ("Leave unchanged"): there it genuinely is an option to choose.
-  const unchangedLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.Unchanged', 'Unchanged'));
+  const unchangedLabel = $derived(
+    text('FABRICATE.Admin.Manager.Component.BulkEdit.Unchanged', 'Unchanged')
+  );
 
   function tagState(tag) {
     if (stagedTagAdd.includes(tag)) return 'add';
@@ -164,12 +179,24 @@
   function tagActionLabel(tag) {
     const state = tagState(tag);
     if (state === 'add') {
-      return format('FABRICATE.Admin.Manager.Component.BulkEdit.TagStateAdd', 'Add {tag} to every selected component', { tag });
+      return format(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateAdd',
+        'Add {tag} to every selected component',
+        { tag }
+      );
     }
     if (state === 'remove') {
-      return format('FABRICATE.Admin.Manager.Component.BulkEdit.TagStateRemove', 'Remove {tag} from every selected component', { tag });
+      return format(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateRemove',
+        'Remove {tag} from every selected component',
+        { tag }
+      );
     }
-    return format('FABRICATE.Admin.Manager.Component.BulkEdit.TagStateNone', 'Leave {tag} unchanged', { tag });
+    return format(
+      'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateNone',
+      'Leave {tag} unchanged',
+      { tag }
+    );
   }
 
   function categoryOptionLabel(name) {
@@ -205,7 +232,9 @@
 
 <section class="manager-component-bulk-panel" data-component-bulk-panel>
   <header class="manager-component-bulk-header">
-    <p class="manager-component-bulk-eyebrow">{text('FABRICATE.Admin.Manager.Component.BulkEdit.PanelTitle', 'Bulk edit')}</p>
+    <p class="manager-component-bulk-eyebrow">
+      {text('FABRICATE.Admin.Manager.Component.BulkEdit.PanelTitle', 'Bulk edit')}
+    </p>
     <button
       type="button"
       class="manager-component-bulk-clear"
@@ -213,19 +242,35 @@
       onclick={() => onClearSelection()}
     >
       <i class="fas fa-xmark" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Component.BulkEdit.ClearSelection', 'Clear selection')}</span>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ClearSelection',
+          'Clear selection'
+        )}</span
+      >
     </button>
   </header>
 
   <div class="manager-component-bulk-hero">
-    <span class="manager-component-bulk-hero-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></span>
+    <span class="manager-component-bulk-hero-icon" aria-hidden="true"
+      ><i class="fas fa-layer-group"></i></span
+    >
     <div class="manager-component-bulk-hero-copy">
-      <strong class="manager-component-bulk-hero-title" data-component-bulk-count>{headingLabel}</strong>
-      <span class="manager-component-bulk-hero-hint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.SelectedHint', 'Stage changes below, then apply to all at once.')}</span>
+      <strong class="manager-component-bulk-hero-title" data-component-bulk-count
+        >{headingLabel}</strong
+      >
+      <span class="manager-component-bulk-hero-hint"
+        >{text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.SelectedHint',
+          'Stage changes below, then apply to all at once.'
+        )}</span
+      >
     </div>
   </div>
 
-  <p class="manager-component-bulk-label">{text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}</p>
+  <p class="manager-component-bulk-label">
+    {text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
+  </p>
   <!--
     The sentinel is FIRST and carries `value=""`, which is the model's `Leave unchanged`.
     The options carry NO `({count})` suffix the browser's filter uses: a count of the
@@ -239,21 +284,38 @@
     aria-label={text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
     onchange={(event) => setCategory(event.currentTarget.value)}
   >
-    <option value="">{text('FABRICATE.Admin.Manager.Component.BulkEdit.CategoryUnchanged', 'Leave unchanged')}</option>
+    <option value=""
+      >{text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.CategoryUnchanged',
+        'Leave unchanged'
+      )}</option
+    >
     {#each categoryOptions as option (option.name)}
       <option value={option.name}>{categoryOptionLabel(option.name)}</option>
     {/each}
   </select>
 
   <div class="manager-component-bulk-label-row">
-    <p class="manager-component-bulk-label">{text('FABRICATE.Admin.Manager.Component.BulkEdit.Tags', 'Tags')}</p>
-    <span class="manager-component-bulk-hint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.TagsHint', 'click to add · again to remove')}</span>
+    <p class="manager-component-bulk-label">
+      {text('FABRICATE.Admin.Manager.Component.BulkEdit.Tags', 'Tags')}
+    </p>
+    <span class="manager-component-bulk-hint"
+      >{text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.TagsHint',
+        'click to add · again to remove'
+      )}</span
+    >
   </div>
   {#if tags.length === 0}
     <!-- The panel's OWN sub-hint scale, not the global `manager-muted` (0.78rem): that
          class would make an empty-state aside the LARGEST text in a rail whose loudest
          copy is 0.62rem. -->
-    <p class="manager-component-bulk-subhint" data-component-bulk-tags-empty>{text('FABRICATE.Admin.Manager.Component.BulkEdit.NoTags', 'This system defines no item tags.')}</p>
+    <p class="manager-component-bulk-subhint" data-component-bulk-tags-empty>
+      {text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.NoTags',
+        'This system defines no item tags.'
+      )}
+    </p>
   {:else}
     <!--
       A FLAT run of tri-state chips rather than an Add/Remove segmented control plus a
@@ -275,7 +337,7 @@
           aria-label={tagActionLabel(tag)}
           disabled={applying}
           onclick={() => cycleTag(tag)}
-        >{tag}<i class={TAG_ICONS[tagState(tag)]} aria-hidden="true"></i></Chip
+          >{tag}<i class={TAG_ICONS[tagState(tag)]} aria-hidden="true"></i></Chip
         >
       {/each}
     </div>
@@ -283,7 +345,9 @@
 
   {#if showEssences}
     <div class="manager-component-bulk-label-row">
-      <p class="manager-component-bulk-label">{text('FABRICATE.Admin.Manager.Component.BulkEdit.Essences', 'Essences')}</p>
+      <p class="manager-component-bulk-label">
+        {text('FABRICATE.Admin.Manager.Component.BulkEdit.Essences', 'Essences')}
+      </p>
       <!--
         Rendered in BOTH states: on a fresh draft every essence is 0 and `Stepper` emits
         nothing at that boundary, so this chip is the ONLY way to stage "clear essences on
@@ -295,11 +359,17 @@
         tone={essencesStaged ? 'warning' : 'neutral'}
         data-component-bulk-essences-staged={essencesStaged}
         aria-label={essencesStaged
-          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChipAction', 'Will overwrite — essences will be overwritten on every selected component. Activate to leave them unchanged.')
-          : text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesUnstagedChipAction', 'Unchanged — essences are left unchanged. Activate to overwrite them on every selected component.')}
+          ? text(
+              'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChipAction',
+              'Will overwrite — essences will be overwritten on every selected component. Activate to leave them unchanged.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesUnstagedChipAction',
+              'Unchanged — essences are left unchanged. Activate to overwrite them on every selected component.'
+            )}
         disabled={applying}
         onclick={() => toggleEssences()}
-      >{essencesStaged
+        >{essencesStaged
           ? text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChip', 'Will overwrite')
           : unchangedLabel}</Chip
       >
@@ -308,11 +378,20 @@
          rail is reserved for the conditional hazard below. A STANDING SENTENCE, so it
          wears `-subhint` rather than the inline `-hint` scale — the sentence that makes
          the destructive axis legible must not be the smallest text in the panel. -->
-    <p class="manager-component-bulk-subhint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesOverwriteHint', 'Applying essences overwrites the essence values on every selected component.')}</p>
+    <p class="manager-component-bulk-subhint">
+      {text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesOverwriteHint',
+        'Applying essences overwrites the essence values on every selected component.'
+      )}
+    </p>
     {#if essencesStaged && essenceWarningCount > 0}
       <Callout
         tone="warning"
-        text={format('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesOverwriteWarning', 'This will change or remove authored essence values on {count} of the selected components.', { count: essenceWarningCount })}
+        text={format(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesOverwriteWarning',
+          'This will change or remove authored essence values on {count} of the selected components.',
+          { count: essenceWarningCount }
+        )}
         dataAttr="data-component-bulk-essence-warning"
         dataValue={String(essenceWarningCount)}
       />
@@ -328,9 +407,19 @@
             icon={essence.icon}
             quantity={essence.quantity}
             disabled={applying}
-            ariaLabel={format('FABRICATE.Admin.Items.Editor.QuantityLabel', 'Quantity for {name}', { name: essence.name })}
-            decrementLabel={format('FABRICATE.Admin.Items.Editor.DecrementEssence', 'Decrement {name}', { name: essence.name })}
-            incrementLabel={format('FABRICATE.Admin.Items.Editor.IncrementEssence', 'Increment {name}', { name: essence.name })}
+            ariaLabel={format('FABRICATE.Admin.Items.Editor.QuantityLabel', 'Quantity for {name}', {
+              name: essence.name,
+            })}
+            decrementLabel={format(
+              'FABRICATE.Admin.Items.Editor.DecrementEssence',
+              'Decrement {name}',
+              { name: essence.name }
+            )}
+            incrementLabel={format(
+              'FABRICATE.Admin.Items.Editor.IncrementEssence',
+              'Increment {name}',
+              { name: essence.name }
+            )}
             onChange={(quantity) => setEssence(essence.id, quantity)}
           />
         {/each}
@@ -340,35 +429,62 @@
 
   {#if showProgressiveDifficulty}
     <div class="manager-component-bulk-label-row">
-      <p class="manager-component-bulk-label">{text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDc', 'Progressive DC')}</p>
+      <p class="manager-component-bulk-label">
+        {text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDc', 'Progressive DC')}
+      </p>
       <Chip
         tag="button"
         type="button"
         tone={difficultyStaged ? 'warning' : 'neutral'}
         data-component-bulk-difficulty-staged={difficultyStaged}
         aria-label={difficultyStaged
-          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChipAction', 'Will set — the progressive DC will be set on every selected component. Activate to leave it unchanged.')
-          : text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcUnstagedChipAction', 'Unchanged — the progressive DC is left unchanged. Activate to set it on every selected component.')}
+          ? text(
+              'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChipAction',
+              'Will set — the progressive DC will be set on every selected component. Activate to leave it unchanged.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcUnstagedChipAction',
+              'Unchanged — the progressive DC is left unchanged. Activate to set it on every selected component.'
+            )}
         disabled={applying}
         onclick={() => toggleDifficulty()}
-      >{difficultyStaged
+        >{difficultyStaged
           ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChip', 'Will set')
           : unchangedLabel}</Chip
       >
     </div>
-    <p class="manager-component-bulk-subhint">{text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcHint', 'DC when used as a progressive result')}</p>
+    <p class="manager-component-bulk-subhint">
+      {text(
+        'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcHint',
+        'DC when used as a progressive result'
+      )}
+    </p>
     <div class="manager-component-bulk-dc-row">
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
-      <span class="manager-component-bulk-dc-copy">{text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcSentence', 'Set every selected component to')}</span>
+      <span class="manager-component-bulk-dc-copy"
+        >{text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcSentence',
+          'Set every selected component to'
+        )}</span
+      >
       <!-- 0..35, matching the shipped single-component control; 0 CLEARS the value. -->
       <Stepper
         value={Number(draft?.difficulty) || 0}
         min={0}
         max={35}
         disabled={applying}
-        ariaLabel={text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDc', 'Progressive DC')}
-        decrementLabel={text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyDecrement', 'Decrease difficulty')}
-        incrementLabel={text('FABRICATE.Admin.Manager.Component.ProgressiveDifficultyIncrement', 'Increase difficulty')}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDc',
+          'Progressive DC'
+        )}
+        decrementLabel={text(
+          'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyDecrement',
+          'Decrease difficulty'
+        )}
+        incrementLabel={text(
+          'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyIncrement',
+          'Increase difficulty'
+        )}
         inputProps={{ 'data-component-bulk-difficulty': '' }}
         onChange={(value) => setDifficulty(value)}
       />

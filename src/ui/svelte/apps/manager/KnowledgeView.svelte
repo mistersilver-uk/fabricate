@@ -184,29 +184,50 @@
           <Medallion src={selectedCharacter.img} icon="fas fa-user" size={50} alt="" />
           <div class="manager-knowledge-detail-copy">
             <p class="manager-kicker">{selectedSystemName}</p>
-            <h2 class="manager-knowledge-detail-name" title={selectedCharacter.name}>{selectedCharacter.name}</h2>
+            <h2 class="manager-knowledge-detail-name" title={selectedCharacter.name}>
+              {selectedCharacter.name}
+            </h2>
           </div>
         </div>
 
         <div class="manager-knowledge-fact-cluster" data-knowledge-facts>
           <div class="manager-fact" data-knowledge-fact="items">
-            <span class="manager-fact-line"><strong>{selectedCharacter.itemCount}</strong>
-              <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Knowledge.FactItems', 'Recipe items')}</span></span>
+            <span class="manager-fact-line"
+              ><strong>{selectedCharacter.itemCount}</strong>
+              <span class="manager-fact-label"
+                >{text('FABRICATE.Admin.Manager.Knowledge.FactItems', 'Recipe items')}</span
+              ></span
+            >
           </div>
           <div class="manager-fact" data-knowledge-fact="learned">
-            <span class="manager-fact-line"><strong>{selectedCharacter.learnedCount}</strong>
-              <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Knowledge.FactLearned', 'Learned recipes')}</span></span>
+            <span class="manager-fact-line"
+              ><strong>{selectedCharacter.learnedCount}</strong>
+              <span class="manager-fact-label"
+                >{text('FABRICATE.Admin.Manager.Knowledge.FactLearned', 'Learned recipes')}</span
+              ></span
+            >
           </div>
           {#if selectedCharacter.otherSystemCount > 0}
             <div class="manager-fact" data-knowledge-fact="other-systems">
-              <span class="manager-fact-line"><strong>{selectedCharacter.otherSystemCount}</strong>
-                <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Knowledge.FactOtherSystems', 'Other systems')}</span></span>
+              <span class="manager-fact-line"
+                ><strong>{selectedCharacter.otherSystemCount}</strong>
+                <span class="manager-fact-label"
+                  >{text(
+                    'FABRICATE.Admin.Manager.Knowledge.FactOtherSystems',
+                    'Other systems'
+                  )}</span
+                ></span
+              >
             </div>
           {/if}
           {#if selectedCharacter.orphanCount > 0}
             <div class="manager-fact" data-knowledge-fact="orphans">
-              <span class="manager-fact-line"><strong>{selectedCharacter.orphanCount}</strong>
-                <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Knowledge.FactOrphans', 'Orphaned entries')}</span></span>
+              <span class="manager-fact-line"
+                ><strong>{selectedCharacter.orphanCount}</strong>
+                <span class="manager-fact-label"
+                  >{text('FABRICATE.Admin.Manager.Knowledge.FactOrphans', 'Orphaned entries')}</span
+                ></span
+              >
             </div>
           {/if}
         </div>
@@ -214,22 +235,32 @@
         <div
           class="manager-knowledge-reset-actions"
           role="group"
-          aria-label={text('FABRICATE.Admin.Manager.Knowledge.ResetActions', 'Knowledge reset actions')}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Knowledge.ResetActions',
+            'Knowledge reset actions'
+          )}
         >
           <button
             type="button"
             class="manager-button is-danger"
             data-knowledge-reset="system"
-            onclick={() => { armedToken = ''; onResetSystem(selectedCharacter.id); }}
+            onclick={() => {
+              armedToken = '';
+              onResetSystem(selectedCharacter.id);
+            }}
           >
             <i class="fas fa-rotate-left" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetSystem', 'Reset this system')}</span>
+            <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetSystem', 'Reset this system')}</span
+            >
           </button>
           <button
             type="button"
             class="manager-button is-danger"
             data-knowledge-reset="all"
-            onclick={() => { armedToken = ''; onResetAll(selectedCharacter.id); }}
+            onclick={() => {
+              armedToken = '';
+              onResetAll(selectedCharacter.id);
+            }}
           >
             <i class="fas fa-eraser" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetAll', 'Reset all systems')}</span>

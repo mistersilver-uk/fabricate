@@ -5516,7 +5516,21 @@ test('recipe tag list spans the full row width on its own line below the control
 // coverage existed for this route at all.
 test('the Books & Scrolls route names one grid track per section and grows the table', () => {
   const source = readFileSync(resolve(managerComponentDir, 'BooksScrollsView.svelte'), 'utf8');
-  const main = source.slice(source.indexOf('<main class="manager-main'));
+  // Matched as a pattern, not as `<main class="manager-main`: Prettier (issue 923) prints an
+  // element with several attributes one per line, so the class no longer sits on the open tag's
+  // own line. That miss failed LOUDLY but unhelpfully rather than silently: `indexOf` returned
+  // -1, `slice(-1)` kept only the file's last character, and the child count came out 0 against
+  // an expected 3. Anchoring on the tag name alone removes the dependence on attribute layout.
+  const mainIndex = source.search(/<main\b/);
+  assert.notEqual(mainIndex, -1, 'the route should render a <main> element');
+  // The grid tracks read below are declared against `.manager-main`, so the route carrying that
+  // class is half of this contract. Asserted separately rather than folded back into the slice
+  // anchor, so dropping the class fails here instead of quietly rebasing the child walk.
+  assert.ok(
+    /<main\b[^<]*class="manager-main[\s"]/.test(source),
+    'the books-scrolls route should render its content region as .manager-main'
+  );
+  const main = source.slice(mainIndex);
   const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
   assert.equal(children.length, 3, 'expected three unconditional top-level grid children');
   assert.equal(

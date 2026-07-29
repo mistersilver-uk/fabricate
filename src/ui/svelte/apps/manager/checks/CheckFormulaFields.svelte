@@ -19,7 +19,7 @@
     thresholdMode = 'meet',
     placeholder = '1d20+@abilities.int.mod',
     showDc = true,
-    onChange = () => {}
+    onChange = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -57,14 +57,20 @@
       />
     </label>
     <label class="manager-field manager-checks-threshold-mode">
-      <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}</span>
+      <span
+        >{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}</span
+      >
       <select
         data-threshold-mode
         value={comparison}
         onchange={(event) => onChange({ thresholdMode: event.currentTarget.value })}
       >
-        <option value="meet">{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdMeet', 'Meet or exceed')}</option>
-        <option value="exceed">{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdExceed', 'Exceed')}</option>
+        <option value="meet"
+          >{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdMeet', 'Meet or exceed')}</option
+        >
+        <option value="exceed"
+          >{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdExceed', 'Exceed')}</option
+        >
       </select>
     </label>
   {/if}

@@ -25,7 +25,7 @@
     // Extra class(es) merged onto the root, following the `Chip` precedent. Used for
     // a caller-owned selector hook (the requirement rail's `.requirement-slot-glyph`
     // is pinned by the Foundry smoke harness), never for restyling from outside.
-    class: extraClass = ''
+    class: extraClass = '',
   } = $props();
 
   const dimension = $derived(`${size}px`);

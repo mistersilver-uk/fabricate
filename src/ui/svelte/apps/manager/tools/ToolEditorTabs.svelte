@@ -3,7 +3,12 @@
   import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'overview', errorCount = 0, requirementCount = 0, onChange = () => {} } = $props();
+  let {
+    activeTab = 'overview',
+    errorCount = 0,
+    requirementCount = 0,
+    onChange = () => {},
+  } = $props();
   const tabs = [
     ['overview', 'Overview', 'fas fa-circle-info'],
     ['breakage', 'Breakage', 'fas fa-heart-crack'],
@@ -43,14 +48,15 @@
     event.preventDefault();
     const nextTab = tabs[nextIndex][0];
     onChange(nextTab);
-    event.currentTarget
-      .closest('[role="tablist"]')
-      ?.querySelector(`#tool-tab-${nextTab}`)
-      ?.focus();
+    event.currentTarget.closest('[role="tablist"]')?.querySelector(`#tool-tab-${nextTab}`)?.focus();
   }
 </script>
 
-<div class="manager-tool-editor-tabs manager-editor-tabs" role="tablist" aria-label={text('Tabs', 'Tool editor sections')}>
+<div
+  class="manager-tool-editor-tabs manager-editor-tabs"
+  role="tablist"
+  aria-label={text('Tabs', 'Tool editor sections')}
+>
   {#each tabs as tab (tab[0])}
     <button
       type="button"
@@ -73,8 +79,10 @@
         <Chip
           tone={errorCount > 0 ? 'danger' : 'positive'}
           class={`manager-editor-tab-badge ${errorCount > 0 ? '' : 'is-valid'}`}
-          aria-label={errorCount > 0 ? issueCountText(errorCount) : text('AllValid', 'All checks pass')}
-        >{errorCount > 0 ? errorCount : '✓'}</Chip>
+          aria-label={errorCount > 0
+            ? issueCountText(errorCount)
+            : text('AllValid', 'All checks pass')}>{errorCount > 0 ? errorCount : '✓'}</Chip
+        >
       {/if}
     </button>
   {/each}

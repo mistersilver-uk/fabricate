@@ -73,7 +73,7 @@
   <div class="journal-run-card-main">
     <img class="journal-run-card-thumb" src={img} alt="" />
     <div class="journal-run-card-copy">
-      <span class="journal-run-card-name" title={title}>{title}</span>
+      <span class="journal-run-card-name" {title}>{title}</span>
       {#if subtitle !== ''}
         <span class="journal-run-card-subtitle">{subtitle}</span>
       {/if}

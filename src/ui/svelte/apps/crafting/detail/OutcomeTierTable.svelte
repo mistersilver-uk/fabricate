@@ -15,7 +15,9 @@
 </script>
 
 <section class="crafting-tiers" data-recipe-section="outcome-tiers">
-  <p class="crafting-detail-section-title">{localize('FABRICATE.App.Crafting.Detail.OutcomesTitle')}</p>
+  <p class="crafting-detail-section-title">
+    {localize('FABRICATE.App.Crafting.Detail.OutcomesTitle')}
+  </p>
   {#if rows.length > 0}
     <ul class="crafting-tier-list">
       {#each rows as tier, index (tier.id ?? tier.names?.[0] ?? index)}
@@ -28,7 +30,10 @@
           <div class="crafting-tier-head">
             <span class="crafting-tier-name">{(tier.names ?? []).join(', ')}</span>
             <span class={`crafting-tier-flag tone-${tier.success ? 'success' : 'danger'}`}>
-              <i class={`fas ${tier.success ? 'fa-circle-check' : 'fa-circle-xmark'}`} aria-hidden="true"></i>
+              <i
+                class={`fas ${tier.success ? 'fa-circle-check' : 'fa-circle-xmark'}`}
+                aria-hidden="true"
+              ></i>
               {tier.success
                 ? localize('FABRICATE.App.Crafting.Detail.TierSuccess')
                 : localize('FABRICATE.App.Crafting.Detail.TierNoAward')}

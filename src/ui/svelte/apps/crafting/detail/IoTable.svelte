@@ -24,7 +24,7 @@
   import {
     ESSENCE_POOL_SLOT_ID,
     buildConsumptionPlan,
-    buildRequirementSlots
+    buildRequirementSlots,
   } from '../../../util/requirementSlots.js';
   import CraftingThumb from '../CraftingThumb.svelte';
   import QuantityTag from '../QuantityTag.svelte';
@@ -54,7 +54,7 @@
     // leave the composition root forwarding a dead wire.
     formatList = localeFormatList,
     // DOM id namespace, so several rails (a multi-step list) never collide.
-    idPrefix = 'fabricate-req'
+    idPrefix = 'fabricate-req',
   } = $props();
 
   const slots = $derived(buildRequirementSlots(craftability, { chosenGroupIds }));
@@ -71,7 +71,9 @@
   const panelId = $derived(`${idPrefix}-panel`);
   // The tile the open panel is labelled back at. Every essence tile opens the same
   // pool, so the first of them owns the label.
-  const openSlot = $derived(slots.find((slot) => slot.interactive && slot.slotId === openSlotId) ?? null);
+  const openSlot = $derived(
+    slots.find((slot) => slot.interactive && slot.slotId === openSlotId) ?? null
+  );
   const openTileId = $derived(openSlot ? `fabricate-slot-${openSlot.key}` : null);
   const poolOpen = $derived(!readOnly && openSlotId === ESSENCE_POOL_SLOT_ID && Boolean(openSlot));
   const openChoices = $derived(

@@ -11,9 +11,6 @@ docs/.jekyll-cache/
 # Lockfile & generated data
 package-lock.json
 
-# Svelte components are formatted in a later change (needs prettier-plugin-svelte)
-*.svelte
-
 # Minified / generated assets
 **/*.min.js
 **/*.min.css

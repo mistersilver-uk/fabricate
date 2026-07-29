@@ -35,7 +35,7 @@
     ariaLabel = '',
     dataAttr = '',
     optionDataAttr = '',
-    fill = false
+    fill = false,
   } = $props();
 
   function text(key, fallback) {

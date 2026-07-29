@@ -21,7 +21,7 @@
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
-    onDeleteStep = () => {}
+    onDeleteStep = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -33,12 +33,26 @@
 <section class="manager-recipe-steps-card manager-recipe-steps" data-recipe-section="steps">
   <div class="manager-recipe-steps-card-head">
     <div>
-      <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.StepDurations', 'Step durations')}</h3>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.StepDurationsHint', 'Each step takes its own time; they craft in sequence. Set the ingredients per step on the Ingredients tab.')}</p>
+      <h3 class="manager-recipe-section-title">
+        {text('FABRICATE.Admin.Manager.Recipe.StepDurations', 'Step durations')}
+      </h3>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Recipe.StepDurationsHint',
+          'Each step takes its own time; they craft in sequence. Set the ingredients per step on the Ingredients tab.'
+        )}
+      </p>
     </div>
   </div>
 
-  <RecipeStepAccordion {steps} reorderable {timeRequirementsEnabled} {onReorderSteps} {onUpdateStep} {onDeleteStep}>
+  <RecipeStepAccordion
+    {steps}
+    reorderable
+    {timeRequirementsEnabled}
+    {onReorderSteps}
+    {onUpdateStep}
+    {onDeleteStep}
+  >
     {#snippet body(step)}
       {#if timeRequirementsEnabled}
         <div class="manager-recipe-step-durations">
@@ -70,7 +84,12 @@
 
     {#snippet footer()}
       <li class="manager-recipe-steps-add">
-        <button type="button" class="manager-button" data-recipe-step-add onclick={() => onAddStep()}>
+        <button
+          type="button"
+          class="manager-button"
+          data-recipe-step-add
+          onclick={() => onAddStep()}
+        >
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Recipe.AddStep', 'Add a step')}</span>
         </button>

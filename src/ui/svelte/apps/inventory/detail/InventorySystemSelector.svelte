@@ -48,7 +48,8 @@
   function optionText(option) {
     const name = option?.systemName || option?.systemId || '';
     const affordances = [];
-    if (isSalvageable(option)) affordances.push(localize('FABRICATE.App.Inventory.Card.SalvageablePip'));
+    if (isSalvageable(option))
+      affordances.push(localize('FABRICATE.App.Inventory.Card.SalvageablePip'));
     if (isTool(option)) affordances.push(localize('FABRICATE.App.Inventory.Card.ToolPip'));
     return affordances.length > 0 ? `${name} — ${affordances.join(', ')}` : name;
   }

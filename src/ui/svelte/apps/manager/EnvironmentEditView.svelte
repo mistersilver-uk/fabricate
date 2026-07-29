@@ -24,12 +24,18 @@
     'includedByMatch',
     'explicitlyIncluded',
     'forceIncluded',
-    'includedButUnavailable'
+    'includedButUnavailable',
   ]);
 
   let {
     environmentDraft = null,
-    composition = { compositionMode: 'automatic', conditions: {}, tasks: [], events: [], counts: {} },
+    composition = {
+      compositionMode: 'automatic',
+      conditions: {},
+      tasks: [],
+      events: [],
+      counts: {},
+    },
     eventSelectionMode = 'allDrops',
     realmRecords = [],
     realmsEnabled = false,
@@ -45,7 +51,7 @@
     onRestoreRecord = () => {},
     onReorderRecord = () => {},
     onOpenSourceTask = () => {},
-    onOpenSourceEvent = () => {}
+    onOpenSourceEvent = () => {},
   } = $props();
 
   let activeTab = $state('overview');
@@ -64,7 +70,7 @@
 
   function countComposedRecords(records = []) {
     return Array.isArray(records)
-      ? records.filter(entry => INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)).length
+      ? records.filter((entry) => INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)).length
       : 0;
   }
 
@@ -76,32 +82,47 @@
     if (activeTab !== 'tasks' && activeTab !== 'events') return;
     const kind = activeTab === 'events' ? 'event' : 'task';
     const records = Array.isArray(activeTab === 'events' ? composition?.events : composition?.tasks)
-      ? (activeTab === 'events' ? composition.events : composition.tasks)
+      ? activeTab === 'events'
+        ? composition.events
+        : composition.tasks
       : [];
-    const hasValidSelection = selectedKind === kind && records.some(entry => entry.id === selectedId);
+    const hasValidSelection =
+      selectedKind === kind && records.some((entry) => entry.id === selectedId);
     if (hasValidSelection) return;
-    const firstActive = records.find(entry => entry.runtimeState === 'available');
+    const firstActive = records.find((entry) => entry.runtimeState === 'available');
     if (firstActive) selectRecord(kind, firstActive.id);
   });
 
-  const readiness = $derived(evaluateEnvironmentReadiness(environmentDraft || {}, composition || {}));
+  const readiness = $derived(
+    evaluateEnvironmentReadiness(environmentDraft || {}, composition || {})
+  );
   const taskCompositionCount = $derived(countComposedRecords(composition?.tasks));
   const eventCompositionCount = $derived(countComposedRecords(composition?.events));
-  const errorCount = $derived(readiness.issues.filter(issue => issue.severity === 'critical').length);
-  const warningCount = $derived(readiness.issues.filter(issue => issue.severity === 'warning').length);
+  const errorCount = $derived(
+    readiness.issues.filter((issue) => issue.severity === 'critical').length
+  );
+  const warningCount = $derived(
+    readiness.issues.filter((issue) => issue.severity === 'warning').length
+  );
   const validationBadges = $derived([
     ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
-    ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : [])
+    ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : []),
   ]);
   const badges = $derived({
     tasks: taskCompositionCount || 0,
     events: eventCompositionCount || 0,
-    validation: validationBadges
+    validation: validationBadges,
   });
 </script>
 
 <div class="manager-environment-edit-view" data-environment-editor>
-  <EnvironmentEditorTabs {activeTab} {badges} onSelect={(tab) => { activeTab = tab; }} />
+  <EnvironmentEditorTabs
+    {activeTab}
+    {badges}
+    onSelect={(tab) => {
+      activeTab = tab;
+    }}
+  />
 
   <div class="manager-environment-workspace" class:is-inspector-hidden={activeTab === 'validation'}>
     <div

@@ -33,7 +33,7 @@
     onSystemChange = null,
     onCategoryChange = null,
     onPageChange = null,
-    onPageSizeChange = null
+    onPageSizeChange = null,
   } = $props();
 
   const hasResults = $derived(Array.isArray(recipes) && recipes.length > 0);

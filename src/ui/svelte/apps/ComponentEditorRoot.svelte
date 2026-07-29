@@ -3,7 +3,7 @@
   import { localize } from '../util/foundryBridge.js';
   import {
     adjustComponentEssenceQuantity,
-    clampComponentEssenceQuantity
+    clampComponentEssenceQuantity,
   } from '../util/componentEditor.js';
 
   let {
@@ -14,23 +14,25 @@
       showEssences: false,
       hasEditableFields: false,
       tagOptions: [],
-      essenceOptions: []
+      essenceOptions: [],
     },
     onSave,
-    onClose
+    onClose,
   } = $props();
 
-  const cloneTagOptions = (options = []) => options.map(option => ({
-    tag: option.tag,
-    checked: option.checked === true
-  }));
+  const cloneTagOptions = (options = []) =>
+    options.map((option) => ({
+      tag: option.tag,
+      checked: option.checked === true,
+    }));
 
-  const cloneEssenceOptions = (options = []) => options.map(option => ({
-    id: option.id,
-    name: option.name,
-    icon: option.icon,
-    quantity: clampComponentEssenceQuantity(option.quantity)
-  }));
+  const cloneEssenceOptions = (options = []) =>
+    options.map((option) => ({
+      id: option.id,
+      name: option.name,
+      icon: option.icon,
+      quantity: clampComponentEssenceQuantity(option.quantity),
+    }));
 
   let tagDraft = $state([]);
   let essenceDraft = $state([]);
@@ -43,12 +45,12 @@
 
   function setEssenceQuantity(essenceId, rawValue) {
     const quantity = clampComponentEssenceQuantity(rawValue);
-    const option = essenceDraft.find(entry => entry.id === essenceId);
+    const option = essenceDraft.find((entry) => entry.id === essenceId);
     if (option) option.quantity = quantity;
   }
 
   function adjustEssenceQuantity(essenceId, delta) {
-    const option = essenceDraft.find(entry => entry.id === essenceId);
+    const option = essenceDraft.find((entry) => entry.id === essenceId);
     if (!option) return;
     option.quantity = adjustComponentEssenceQuantity(option.quantity, delta);
   }
@@ -61,7 +63,7 @@
         showTags: editorState.showTags,
         showEssences: editorState.showEssences,
         tagOptions: tagDraft,
-        essenceOptions: essenceDraft
+        essenceOptions: essenceDraft,
       });
     } finally {
       saving = false;
@@ -107,8 +109,12 @@
                   type="button"
                   class="essence-step essence-step-minus"
                   onclick={() => adjustEssenceQuantity(option.id, -1)}
-                  aria-label={localize('FABRICATE.Admin.Items.Editor.DecrementEssence', { name: option.name })}
-                  title={localize('FABRICATE.Admin.Items.Editor.DecrementEssence', { name: option.name })}
+                  aria-label={localize('FABRICATE.Admin.Items.Editor.DecrementEssence', {
+                    name: option.name,
+                  })}
+                  title={localize('FABRICATE.Admin.Items.Editor.DecrementEssence', {
+                    name: option.name,
+                  })}
                 >
                   <i class="fas fa-minus"></i>
                 </button>
@@ -119,7 +125,9 @@
                   min="0"
                   step="1"
                   value={option.quantity}
-                  aria-label={localize('FABRICATE.Admin.Items.Editor.QuantityLabel', { name: option.name })}
+                  aria-label={localize('FABRICATE.Admin.Items.Editor.QuantityLabel', {
+                    name: option.name,
+                  })}
                   oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
                 />
 
@@ -133,8 +141,12 @@
                   type="button"
                   class="essence-step essence-step-plus"
                   onclick={() => adjustEssenceQuantity(option.id, 1)}
-                  aria-label={localize('FABRICATE.Admin.Items.Editor.IncrementEssence', { name: option.name })}
-                  title={localize('FABRICATE.Admin.Items.Editor.IncrementEssence', { name: option.name })}
+                  aria-label={localize('FABRICATE.Admin.Items.Editor.IncrementEssence', {
+                    name: option.name,
+                  })}
+                  title={localize('FABRICATE.Admin.Items.Editor.IncrementEssence', {
+                    name: option.name,
+                  })}
                 >
                   <i class="fas fa-plus"></i>
                 </button>

@@ -17,7 +17,7 @@
     // glyph and keep the blueprint fallback byte-for-byte; a component or tag tile
     // passes one, which additionally makes Foundry's generic item-bag literal read as
     // "no image" rather than as artwork.
-    glyph = null
+    glyph = null,
   } = $props();
 
   const trimmed = $derived(typeof src === 'string' ? src.trim() : '');
@@ -39,7 +39,7 @@
   {#if showGlyph}
     <i class={glyph} aria-hidden="true" title={alt || undefined}></i>
   {:else}
-    <img src={resolved} alt={alt} />
+    <img src={resolved} {alt} />
   {/if}
 </span>
 

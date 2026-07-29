@@ -16,13 +16,7 @@
    - onToggle(): called on activation.
 -->
 <script>
-  let {
-    name = '',
-    countText = '',
-    expanded = true,
-    controls = '',
-    onToggle = () => {}
-  } = $props();
+  let { name = '', countText = '', expanded = true, controls = '', onToggle = () => {} } = $props();
 </script>
 
 <button
@@ -33,10 +27,7 @@
   aria-controls={controls || undefined}
   onclick={() => onToggle()}
 >
-  <i
-    class={expanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}
-    aria-hidden="true"
-  ></i>
+  <i class={expanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'} aria-hidden="true"></i>
   <i class="fas fa-folder-open fab-group-folder" aria-hidden="true"></i>
   <span class="fab-group-name">{name}</span>
   <span class="fab-group-count">{countText}</span>

@@ -297,15 +297,29 @@ export default [
   //    `<!-- eslint-disable-next-line <rule> -->`, since a `//` in markup
   //    renders as literal on-screen text.
   //
-  //    Note this gate covers the script and markup of a component only.
-  //    Prettier, Stylelint (scoped `<style>` blocks), and failing the build on
-  //    Svelte compiler warnings all still exclude `.svelte`.
+  //    Note this gate covers the script and markup of a component only. Prettier
+  //    now formats `.svelte` too — `prettier-plugin-svelte` is registered in
+  //    `.prettierrc.json` and `format:check` covers `src/**/*.svelte`. Stylelint
+  //    (scoped `<style>` blocks) and failing the build on Svelte compiler
+  //    warnings both still exclude `.svelte`.
   ...svelte.configs.recommended.map((config) => ({
     ...config,
     files: ['**/*.svelte'],
   })),
   {
     files: ['**/*.svelte'],
+    // LOAD-BEARING, and pinned rather than left to ESLint's default. The ~42
+    // `eslint-disable-next-line` directives in these components are position-
+    // sensitive: they sit on the line above the code they suppress, and a
+    // reformat (Prettier now owns `.svelte` layout) moves lines. That is safe
+    // only because BOTH failure shapes are caught. If a directive slips off its
+    // violation, the violation resurfaces as an unsuppressed error. If it lands
+    // somewhere suppressing nothing, this option reports it AS AN ERROR and the
+    // job exits 1 on its own — at `'error'` the reporting does not go through
+    // `--max-warnings=0`, unlike ESLint's `'warn'` default. Leaving the second
+    // half to that implicit default would let an unrelated config change silently
+    // drop it with no test announcing the loss.
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },
     },

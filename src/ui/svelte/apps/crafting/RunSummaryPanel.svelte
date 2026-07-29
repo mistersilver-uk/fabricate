@@ -19,7 +19,7 @@
     canCraft = true,
     busy = false,
     onCraftNext = null,
-    onDismiss = null
+    onDismiss = null,
   } = $props();
 
   const name = $derived(String(recipe?.name ?? ''));

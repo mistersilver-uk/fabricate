@@ -714,6 +714,71 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(document.querySelector('[data-recipe-add="alternative-currency"]'), null);
   });
 
+  // Whitespace between sibling elements is significant in Svelte markup: a newline in the
+  // template becomes a text node in the DOM. Adding `.svelte` to Prettier's scope (issue 923)
+  // reflowed 211 components, and these two tabs are the only ones whose compiled template
+  // changed — eight whitespace text nodes appeared between the kicker/heading/prose blocks
+  // and between the info strip's glyph and its paragraph. A Chromium geometry comparison of
+  // the pre- and post-format renders showed no layout difference (block containers collapse
+  // the run, and the one node that lands directly in a flex container generates no flex item),
+  // so the reformat shipped rather than being fenced off with `<!-- prettier-ignore -->`.
+  //
+  // Nothing else in the suite can see that class of change: every other assertion here reads a
+  // single element's own text, and `manager-layout.test.js` exercises a hand-authored fixture
+  // rather than these components. This pins the joins so the NEXT reflow cannot move them
+  // unnoticed. Expectations are derived from the children rather than written out, so a copy
+  // change does not fail the test but a whitespace change does — the same shape as the
+  // `ExplainerCard` row assertion above.
+  //
+  // The `data-*-copy` hooks exist for this test. `.manager-kicker` is not usable as a selector
+  // here: `ToolBreakageTab` renders four of them, and `:nth-of-type` scoping would silently
+  // follow the wrong node the moment the markup is reordered.
+  const joinedByOneSpace = (element, hook) => {
+    const children = [...element.children];
+    assert.ok(children.length > 1, `${hook} must have sibling children to join`);
+    assert.equal(
+      element.textContent,
+      children.map((child) => child.textContent).join(' '),
+      `${hook} must separate each pair of sibling blocks with exactly one space, got ${JSON.stringify(element.textContent.slice(0, 80))}`
+    );
+  };
+
+  it('separates the breakage tab sibling blocks with exactly one whitespace run', async () => {
+    const root = await harness.mount(props({ activeTab: 'breakage' }));
+
+    for (const hook of [
+      '[data-tool-authority-copy]',
+      '[data-tool-limited-uses-copy]',
+      '[data-tool-limited-uses-info]',
+    ]) {
+      const element = root.querySelector(hook);
+      assert.ok(element, `${hook} must render`);
+      joinedByOneSpace(element, hook);
+    }
+
+    // The on-break legend is the one join in these files with an inline element on BOTH sides
+    // — `<span>` then `<small>`, with no block box to collapse a run against. Prettier leaves
+    // it welded today; if a later reflow split it, the newline would become a text node this
+    // assertion sees. Kept deliberately opposite to the rule above: NO separator here.
+    const legend = root.querySelector('[data-tool-on-break-legend]');
+    assert.ok(legend, 'the on-break legend must render');
+    assert.equal(
+      legend.textContent,
+      [...legend.children].map((child) => child.textContent).join(''),
+      `the on-break legend must keep its label and badge welded, got ${JSON.stringify(legend.textContent)}`
+    );
+  });
+
+  it('separates the requirements tab sibling blocks with exactly one whitespace run', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+
+    for (const hook of ['[data-tool-prerequisites-copy]', '[data-tool-bonus-copy]']) {
+      const element = root.querySelector(hook);
+      assert.ok(element, `${hook} must render`);
+      joinedByOneSpace(element, hook);
+    }
+  });
+
   it('authors prerequisite AND gates, gate mode, and a hint-led bonus expression', async () => {
     const patches = [];
     const root = await harness.mount(

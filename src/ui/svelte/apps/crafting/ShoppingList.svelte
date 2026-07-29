@@ -18,7 +18,7 @@
     onIncrement = null,
     onDecrement = null,
     onRemove = null,
-    onClear = null
+    onClear = null,
   } = $props();
 
   const queued = $derived(Array.isArray(entries) ? entries : []);
@@ -44,7 +44,7 @@
         isEssence: ing.isEssence === true,
         icon: ing.icon ?? null,
         have: ing.have ?? 0,
-        need: ing.totalNeed ?? 0
+        need: ing.totalNeed ?? 0,
       })),
     ...essences
       .filter((ess) => ess?.satisfied !== true)
@@ -54,8 +54,8 @@
         icon: ess.icon ?? null,
         isEssence: true,
         have: ess.have ?? 0,
-        need: ess.totalNeed ?? 0
-      }))
+        need: ess.totalNeed ?? 0,
+      })),
   ]);
 
   const acquireTools = $derived(
@@ -65,7 +65,7 @@
         key: `tool:${tool.componentId ?? tool.name}`,
         name: tool.name ?? '',
         img: tool.img ?? null,
-        needsRepair: tool.needsRepair === true
+        needsRepair: tool.needsRepair === true,
       }))
   );
 

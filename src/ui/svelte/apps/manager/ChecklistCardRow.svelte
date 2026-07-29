@@ -29,9 +29,15 @@
   } = $props();
 </script>
 
-<label class="manager-checklist-card-row" class:is-selected={checked} class:is-disabled={disabled} data-tool-prerequisite-row>
+<label
+  class="manager-checklist-card-row"
+  class:is-selected={checked}
+  class:is-disabled={disabled}
+  data-tool-prerequisite-row
+>
   <SelectionCheckbox size="sm" wrapper="contents" {checked} {disabled} {value} {onChange} />
-  {#if icon}<span class="manager-checklist-card-icon" aria-hidden="true"><i class={icon}></i></span>{/if}
+  {#if icon}<span class="manager-checklist-card-icon" aria-hidden="true"><i class={icon}></i></span
+    >{/if}
   <span class="manager-checklist-card-copy">
     <strong>{title}</strong>
     {#if detail}<small>{detail}</small>{/if}

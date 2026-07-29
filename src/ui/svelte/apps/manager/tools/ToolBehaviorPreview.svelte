@@ -39,7 +39,13 @@
       fallback
     );
   }
-  const name = $derived(toolDisplayName(tool, managedItems, text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled Tool')));
+  const name = $derived(
+    toolDisplayName(
+      tool,
+      managedItems,
+      text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled Tool')
+    )
+  );
   const image = $derived(toolDisplayImage(tool, managedItems));
   const sourceContext = $derived(
     toolSourceUuid(tool) || tool?.componentId
@@ -54,39 +60,72 @@
   const howToolsWorkItems = $derived([
     {
       icon: 'fas fa-link',
-      lead: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFrom', 'Made from a game-world Item.'),
-      text: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFromHint', 'Drag any Item into the Tool Studio to turn it into a Tool. The Item supplies the name, art, and description.'),
+      lead: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFrom',
+        'Made from a game-world Item.'
+      ),
+      text: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidanceMadeFromHint',
+        'Drag any Item into the Tool Studio to turn it into a Tool. The Item supplies the name, art, and description.'
+      ),
     },
     {
       icon: 'fas fa-list-check',
       lead: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceRequired', 'Required by recipes.'),
-      text: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceRequiredHint', 'Recipes refer to this Tool’s library identity when they require it for crafting.'),
+      text: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidanceRequiredHint',
+        'Recipes refer to this Tool’s library identity when they require it for crafting.'
+      ),
     },
     {
       icon: 'fas fa-recycle',
-      lead: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvage', 'Used when salvaging components.'),
-      text: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvageHint', 'Component salvage can require this Tool and apply its eligible check bonus.'),
+      lead: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvage',
+        'Used when salvaging components.'
+      ),
+      text: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidanceSalvageHint',
+        'Component salvage can require this Tool and apply its eligible check bonus.'
+      ),
     },
     {
       icon: 'fas fa-user-shield',
-      lead: text('FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisites', 'Character prerequisites.'),
-      text: text('FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisitesHint', 'Shared character prerequisites decide who can use the Tool or receive its bonus.'),
+      lead: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisites',
+        'Character prerequisites.'
+      ),
+      text: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidancePrerequisitesHint',
+        'Shared character prerequisites decide who can use the Tool or receive its bonus.'
+      ),
     },
     {
       icon: 'fas fa-plus-minus',
       lead: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceBonus', 'Check bonus.'),
-      text: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceBonusHint', 'An enabled bonus adds its expression to eligible crafting checks.'),
+      text: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidanceBonusHint',
+        'An enabled bonus adds its expression to eligible crafting checks.'
+      ),
     },
     {
       icon: 'fas fa-heart-crack',
       lead: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceWearOut', 'Breakage.'),
-      text: text('FABRICATE.Admin.Manager.Tools.Editor.GuidanceWearOutHint', 'Breakage controls decide when this Tool wears out and what happens next.'),
+      text: text(
+        'FABRICATE.Admin.Manager.Tools.Editor.GuidanceWearOutHint',
+        'Breakage controls decide when this Tool wears out and what happens next.'
+      ),
     },
   ]);
 </script>
 
-<aside class="manager-tool-preview" data-tool-behavior-preview aria-label={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}>
-  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}</p>
+<aside
+  class="manager-tool-preview"
+  data-tool-behavior-preview
+  aria-label={text('FABRICATE.Admin.Manager.Tools.Preview', 'Live behavior preview')}
+>
+  <p class="manager-kicker">
+    {text('FABRICATE.Admin.Manager.Tools.Editor.PreviewKicker', 'How it behaves')}
+  </p>
   <div class="manager-tool-preview-identity" data-tool-preview-identity>
     <img src={image} alt="" />
     <div>
@@ -97,15 +136,26 @@
       tone={tool?.enabled === false ? 'neutral' : 'positive'}
       icon={tool?.enabled === false ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
     >
-      {tool?.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+      {tool?.enabled === false
+        ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+        : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
     </Chip>
     <div class="manager-tool-preview-chips">
       <Chip tone="neutral" icon="fas fa-heart-crack">{breakageLabel}</Chip>
       <Chip tone="neutral" icon="fas fa-plus-minus">{bonusValue}</Chip>
     </div>
   </div>
-  <aside class="manager-tool-preview-live" data-tool-preview-live-update><i class="fas fa-circle-check" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate', 'This preview updates live as you change the controls on the left.')}</span></aside>
-  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}</p>
+  <aside class="manager-tool-preview-live" data-tool-preview-live-update>
+    <i class="fas fa-circle-check" aria-hidden="true"></i><span
+      >{text(
+        'FABRICATE.Admin.Manager.Tools.Editor.LiveUpdate',
+        'This preview updates live as you change the controls on the left.'
+      )}</span
+    >
+  </aside>
+  <p class="manager-kicker">
+    {text('FABRICATE.Admin.Manager.Tools.Editor.EffectiveRules', 'Effective rules')}
+  </p>
   <ul class="manager-tool-preview-rules">
     {#each rules as rule (rule.id)}
       <li data-tool-preview-rule={rule.id}>
@@ -120,7 +170,10 @@
   </ul>
   <ExplainerCard
     icon="fas fa-circle-question"
-    title={text('FABRICATE.Admin.Manager.Tools.Editor.HowToolsWorkTitle', 'How Tools work in Fabricate')}
+    title={text(
+      'FABRICATE.Admin.Manager.Tools.Editor.HowToolsWorkTitle',
+      'How Tools work in Fabricate'
+    )}
     items={howToolsWorkItems}
     links={[
       {

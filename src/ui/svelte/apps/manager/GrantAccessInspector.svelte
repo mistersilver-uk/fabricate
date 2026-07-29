@@ -25,12 +25,7 @@
   // the roster is longer than one page.
   const ROSTER_PAGE_SIZE = 6;
 
-  let {
-    recipe = null,
-    characters = [],
-    players = [],
-    onSaveAccess = () => {}
-  } = $props();
+  let { recipe = null, characters = [], players = [], onSaveAccess = () => {} } = $props();
 
   let charQuery = $state('');
   let playerQuery = $state('');
@@ -62,7 +57,12 @@
 
   function matches(name, query) {
     const q = (query || '').trim().toLowerCase();
-    return !q || String(name || '').toLowerCase().includes(q);
+    return (
+      !q ||
+      String(name || '')
+        .toLowerCase()
+        .includes(q)
+    );
   }
 
   // Reset each roster to page 1 whenever its own search term changes, so a filter
@@ -101,20 +101,24 @@
   // that appear are Player and Trusted Player. A GM is never a grantable target: the
   // runtime predicate already returns true for any GM viewer before it reads
   // `playerIds`, so granting one would do nothing.
-  const playerRows = $derived((players || []).map((player) => ({
-    id: player.id,
-    name: player.name,
-    subtitle: player.role || text('FABRICATE.Admin.Manager.Access.RolePlayer', 'Player'),
-    icon: 'fas fa-user',
-    iconColor: player.color || ''
-  })));
-  const characterRows = $derived((characters || []).map((character) => ({
-    id: character.id,
-    name: character.name,
-    subtitle: character.subtitle || '',
-    icon: 'fas fa-user',
-    iconColor: ''
-  })));
+  const playerRows = $derived(
+    (players || []).map((player) => ({
+      id: player.id,
+      name: player.name,
+      subtitle: player.role || text('FABRICATE.Admin.Manager.Access.RolePlayer', 'Player'),
+      icon: 'fas fa-user',
+      iconColor: player.color || '',
+    }))
+  );
+  const characterRows = $derived(
+    (characters || []).map((character) => ({
+      id: character.id,
+      name: character.name,
+      subtitle: character.subtitle || '',
+      icon: 'fas fa-user',
+      iconColor: '',
+    }))
+  );
 
   function pageSlice(rows, query, page) {
     const filtered = rows.filter((row) => matches(row.name, query));
@@ -134,7 +138,10 @@
       icon: 'fas fa-user',
       showSearch: characterRows.length > ROSTER_PAGE_SIZE,
       query: charQuery,
-      searchPlaceholder: text('FABRICATE.Admin.Manager.Access.SearchCharacters', 'Search characters…'),
+      searchPlaceholder: text(
+        'FABRICATE.Admin.Manager.Access.SearchCharacters',
+        'Search characters…'
+      ),
       onSearch: (value) => (charQuery = value),
       slice: charSlice,
       page: charPage,
@@ -142,7 +149,7 @@
       onNext: () => (charPage += 1),
       granted: grantedCharacterIds,
       onToggle: toggleCharacter,
-      dataAttr: 'data-access-character-row'
+      dataAttr: 'data-access-character-row',
     },
     {
       key: 'players',
@@ -158,8 +165,8 @@
       onNext: () => (playerPage += 1),
       granted: grantedPlayerIds,
       onToggle: togglePlayer,
-      dataAttr: 'data-access-player-row'
-    }
+      dataAttr: 'data-access-player-row',
+    },
   ]);
 
   function totalPages(count) {
@@ -172,19 +179,30 @@
     <EmptyState
       icon="fas fa-hand-pointer"
       title={text('FABRICATE.Admin.Manager.Access.NoSelectionTitle', 'Select a recipe')}
-      hint={text('FABRICATE.Admin.Manager.Access.NoSelectionHint', 'Choose a recipe to grant access to characters or players.')}
+      hint={text(
+        'FABRICATE.Admin.Manager.Access.NoSelectionHint',
+        'Choose a recipe to grant access to characters or players.'
+      )}
     />
   {:else}
-    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Access.GrantTitle', 'Grant access')}</p>
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.Access.GrantTitle', 'Grant access')}
+    </p>
     <div class="manager-inspector-title-row">
-      <span class="manager-inspector-icon" aria-hidden="true"><img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)} alt="" /></span>
+      <span class="manager-inspector-icon" aria-hidden="true"
+        ><img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)} alt="" /></span
+      >
       <div class="manager-inspector-copy">
         <span class="manager-inspector-name" title={recipe.name}>{recipe.name}</span>
         <Chip class="manager-access-category">{categoryLabel()}</Chip>
       </div>
     </div>
     <div class="manager-access-summary">
-      <Chip tone={characterCount + playerCount === 0 ? 'danger' : 'active'} icon="fas fa-users" data-access-summary>
+      <Chip
+        tone={characterCount + playerCount === 0 ? 'danger' : 'active'}
+        icon="fas fa-users"
+        data-access-summary
+      >
         <span>{summaryLabel}</span>
       </Chip>
     </div>
@@ -222,7 +240,10 @@
                 iconColor={row.iconColor || ''}
                 granted={section.granted.has(row.id)}
                 onToggle={(next) => section.onToggle(row.id, next)}
-                ariaLabel={text('FABRICATE.Admin.Manager.Access.ToggleNamed', 'Toggle access for {name}').replace('{name}', row.name)}
+                ariaLabel={text(
+                  'FABRICATE.Admin.Manager.Access.ToggleNamed',
+                  'Toggle access for {name}'
+                ).replace('{name}', row.name)}
                 dataAttr={section.dataAttr}
               />
             {/each}

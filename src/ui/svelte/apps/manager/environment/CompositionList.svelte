@@ -1,7 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import EmptyState from '../EmptyState.svelte';
-  import { DEFAULT_GATHERING_EVENT_IMG, DEFAULT_GATHERING_TASK_IMG } from '../../../../../gatheringImageDefaults.js';
+  import {
+    DEFAULT_GATHERING_EVENT_IMG,
+    DEFAULT_GATHERING_TASK_IMG,
+  } from '../../../../../gatheringImageDefaults.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
   import RuntimeStatePill from './RuntimeStatePill.svelte';
@@ -24,14 +27,16 @@
     onExclude = () => {},
     onRestore = () => {},
     onReorder = () => {},
-    onOpenSource = () => {}
+    onOpenSource = () => {},
   } = $props();
 
   let nonMatchingPageIndex = $state(0);
   let nonMatchingPageSize = $state(10);
 
   const showBlindWeights = $derived(kind === 'task' && selectionMode === 'blind');
-  const showEventRankControls = $derived(kind === 'event' && eventSelectionMode === 'highestRankedDrop');
+  const showEventRankControls = $derived(
+    kind === 'event' && eventSelectionMode === 'highestRankedDrop'
+  );
   function weightFor(id) {
     const raw = Number(weights?.[id]);
     return Number.isFinite(raw) && raw >= 0 ? raw : 1;
@@ -45,13 +50,25 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const defaultImg = $derived(kind === 'event' ? DEFAULT_GATHERING_EVENT_IMG : DEFAULT_GATHERING_TASK_IMG);
+  const defaultImg = $derived(
+    kind === 'event' ? DEFAULT_GATHERING_EVENT_IMG : DEFAULT_GATHERING_TASK_IMG
+  );
 
-  function recordImage(entry) { return entry?.record?.img || defaultImg; }
-  function recordName(entry) { return entry?.record?.name || entry?.id || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed'); }
+  function recordImage(entry) {
+    return entry?.record?.img || defaultImg;
+  }
+  function recordName(entry) {
+    return (
+      entry?.record?.name ||
+      entry?.id ||
+      text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Unnamed', 'Unnamed')
+    );
+  }
   function recordDescription(entry) {
-    return String(entry?.record?.description || '').trim()
-      || text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description');
+    return (
+      String(entry?.record?.description || '').trim() ||
+      text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoDescription', 'No description')
+    );
   }
 
   function runtimePillState(entry) {
@@ -60,45 +77,83 @@
       : entry?.runtimeState;
   }
 
-  const included = $derived(records.filter(entry =>
-    entry.compositionState === 'includedByMatch'
-    || entry.compositionState === 'explicitlyIncluded'
-    || entry.compositionState === 'forceIncluded'
-    || entry.compositionState === 'includedButUnavailable'));
-  const includedWeightTotal = $derived(included.reduce((total, entry) => total + weightFor(entry.id), 0));
-  const excluded = $derived(records.filter(entry => entry.compositionState === 'excluded'));
-  const nonMatching = $derived(records.filter(entry =>
-    entry.compositionState === 'notMatching' || entry.compositionState === 'libraryDisabled'));
-  const availableToAddMatching = $derived(records.filter(entry =>
-    entry.compositionState === 'candidate'));
-  const availableToAddNonMatching = $derived(records.filter(entry =>
-    entry.compositionState === 'notMatching'));
-  const availableToAddLibraryDisabled = $derived(records.filter(entry =>
-    entry.compositionState === 'libraryDisabled'));
-  const availableToAdd = $derived([...availableToAddMatching, ...availableToAddNonMatching, ...availableToAddLibraryDisabled]);
-  const paginatedNonMatching = $derived(nonMatching.slice(
-    nonMatchingPageIndex * nonMatchingPageSize,
-    (nonMatchingPageIndex + 1) * nonMatchingPageSize
-  ));
+  const included = $derived(
+    records.filter(
+      (entry) =>
+        entry.compositionState === 'includedByMatch' ||
+        entry.compositionState === 'explicitlyIncluded' ||
+        entry.compositionState === 'forceIncluded' ||
+        entry.compositionState === 'includedButUnavailable'
+    )
+  );
+  const includedWeightTotal = $derived(
+    included.reduce((total, entry) => total + weightFor(entry.id), 0)
+  );
+  const excluded = $derived(records.filter((entry) => entry.compositionState === 'excluded'));
+  const nonMatching = $derived(
+    records.filter(
+      (entry) =>
+        entry.compositionState === 'notMatching' || entry.compositionState === 'libraryDisabled'
+    )
+  );
+  const availableToAddMatching = $derived(
+    records.filter((entry) => entry.compositionState === 'candidate')
+  );
+  const availableToAddNonMatching = $derived(
+    records.filter((entry) => entry.compositionState === 'notMatching')
+  );
+  const availableToAddLibraryDisabled = $derived(
+    records.filter((entry) => entry.compositionState === 'libraryDisabled')
+  );
+  const availableToAdd = $derived([
+    ...availableToAddMatching,
+    ...availableToAddNonMatching,
+    ...availableToAddLibraryDisabled,
+  ]);
+  const paginatedNonMatching = $derived(
+    nonMatching.slice(
+      nonMatchingPageIndex * nonMatchingPageSize,
+      (nonMatchingPageIndex + 1) * nonMatchingPageSize
+    )
+  );
   $effect(() => {
-    if (nonMatchingPageIndex > 0 && nonMatchingPageIndex * nonMatchingPageSize >= nonMatching.length) {
+    if (
+      nonMatchingPageIndex > 0 &&
+      nonMatchingPageIndex * nonMatchingPageSize >= nonMatching.length
+    ) {
       nonMatchingPageIndex = 0;
     }
   });
 
-  const includedTitle = $derived(mode === 'manual'
-    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.IncludedInEnvironment', 'Included in this environment')
-    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.IncludedByMatchHeading', 'Included by match'));
+  const includedTitle = $derived(
+    mode === 'manual'
+      ? text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.IncludedInEnvironment',
+          'Included in this environment'
+        )
+      : text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.IncludedByMatchHeading',
+          'Included by match'
+        )
+  );
 
-  const unit = $derived(kind === 'event'
-    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.EventsUnit', 'events')
-    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.TasksUnit', 'tasks'));
-  const recordColumnLabel = $derived(kind === 'event'
-    ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColEvent', 'Event')
-    : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task'));
+  const unit = $derived(
+    kind === 'event'
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.EventsUnit', 'events')
+      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.TasksUnit', 'tasks')
+  );
+  const recordColumnLabel = $derived(
+    kind === 'event'
+      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColEvent', 'Event')
+      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColTask', 'Task')
+  );
 
-  function toggleMenu(id) { openMenuId = openMenuId === id ? '' : id; }
-  function closeMenu() { openMenuId = ''; }
+  function toggleMenu(id) {
+    openMenuId = openMenuId === id ? '' : id;
+  }
+  function closeMenu() {
+    openMenuId = '';
+  }
 
   function handleDrop(targetIndex) {
     if (dragIndex >= 0 && dragIndex !== targetIndex) onReorder(kind, dragIndex, targetIndex);
@@ -130,7 +185,12 @@
   }
 </script>
 
-<div class="manager-environment-comp" data-composition-kind={kind} data-composition-mode={mode} data-composition-selection={selectionMode}>
+<div
+  class="manager-environment-comp"
+  data-composition-kind={kind}
+  data-composition-mode={mode}
+  data-composition-selection={selectionMode}
+>
   <!-- Included -->
   <section class="manager-environment-comp-section" data-section="included">
     <header class="manager-environment-comp-band">
@@ -138,12 +198,28 @@
       <span class="manager-environment-comp-count">{included.length} {unit}</span>
     </header>
 
-    <div class="manager-environment-comp-head" class:has-rank-controls={showEventRankControls} aria-hidden="true">
+    <div
+      class="manager-environment-comp-head"
+      class:has-rank-controls={showEventRankControls}
+      aria-hidden="true"
+    >
       {#if showEventRankControls}<span></span>{/if}
       <span>{recordColumnLabel}</span>
-      {#if showBlindWeights}<span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight', 'Weight')}</span>{/if}
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColOverride', 'Override')}</span>
-      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColRuntime', 'Runtime state')}</span>
+      {#if showBlindWeights}<span
+          >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight', 'Weight')}</span
+        >{/if}
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColOverride',
+          'Override'
+        )}</span
+      >
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColRuntime',
+          'Runtime state'
+        )}</span
+      >
       <span></span>
     </div>
 
@@ -151,7 +227,15 @@
       <EmptyState
         compact
         icon={kind === 'event' ? 'fas fa-masks-theater' : 'fas fa-list-check'}
-        title={kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedEvents', 'No events are available in this environment yet.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedTasks', 'No tasks are available in this environment yet.')}
+        title={kind === 'event'
+          ? text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedEvents',
+              'No events are available in this environment yet.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoIncludedTasks',
+              'No tasks are available in this environment yet.'
+            )}
       />
     {:else}
       <ul class="manager-environment-comp-rows">
@@ -161,12 +245,27 @@
             data-record-id={entry.id}
             data-runtime-state={entry.runtimeState}
             draggable={showEventRankControls ? true : undefined}
-            ondragstart={showEventRankControls ? () => { dragIndex = index; } : undefined}
+            ondragstart={showEventRankControls
+              ? () => {
+                  dragIndex = index;
+                }
+              : undefined}
             ondragover={showEventRankControls ? (event) => event.preventDefault() : undefined}
-            ondrop={showEventRankControls ? (event) => { event.preventDefault(); handleDrop(index); } : undefined}
+            ondrop={showEventRankControls
+              ? (event) => {
+                  event.preventDefault();
+                  handleDrop(index);
+                }
+              : undefined}
           >
             {#if showEventRankControls}
-              <span class="manager-environment-comp-handle" title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder', 'Drag to reorder')}>
+              <span
+                class="manager-environment-comp-handle"
+                title={text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder',
+                  'Drag to reorder'
+                )}
+              >
                 <i class="fas fa-grip-vertical" aria-hidden="true"></i>
                 <span class="manager-environment-comp-order">{index + 1}</span>
               </span>
@@ -189,7 +288,12 @@
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
                 <label class="manager-environment-comp-weight-field">
-                  <span class="sr-only">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')}</span>
+                  <span class="sr-only"
+                    >{text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
+                      'Weight'
+                    )}</span
+                  >
                   <input
                     type="number"
                     min="0"
@@ -202,9 +306,15 @@
                 <span
                   class="manager-environment-comp-weight-percent"
                   data-composition-weight-percent={entry.id}
-                  title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage', 'Selection share')}
-                  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage', 'Selection share')}
-                >{formatWeightPercentage(entry.id)}</span>
+                  title={text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage',
+                    'Selection share'
+                  )}
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.WeightPercentage',
+                    'Selection share'
+                  )}>{formatWeightPercentage(entry.id)}</span
+                >
               </div>
             {/if}
             <div class="manager-environment-comp-override">
@@ -220,25 +330,113 @@
                   class="manager-icon-button is-danger manager-environment-comp-quick-action"
                   data-quick-action="exclude"
                   data-action="exclude"
-                  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove', 'Remove')}
-                  title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove', 'Remove')}
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
+                    'Remove'
+                  )}
+                  title={text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickRemove',
+                    'Remove'
+                  )}
                   onclick={() => onExclude(kind, entry.id)}
                 >
                   <i class="fas fa-ban" aria-hidden="true"></i>
                 </button>
               {/if}
-              <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
-                <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
+              <div
+                class="manager-environment-comp-menu-wrap"
+                use:dismissOnOutsideClick={{
+                  enabled: openMenuId === entry.id,
+                  onDismiss: closeMenu,
+                }}
+              >
+                <button
+                  type="button"
+                  class="manager-icon-button"
+                  aria-haspopup="menu"
+                  aria-expanded={openMenuId === entry.id}
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
+                    'More actions'
+                  )}
+                  onclick={() => toggleMenu(entry.id)}
+                >
                   <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
                 </button>
                 {#if openMenuId === entry.id}
                   <div class="manager-environment-comp-menu" role="menu">
                     {#if showEventRankControls}
-                      <button type="button" role="menuitem" disabled={index === 0} onclick={() => { onReorder(kind, index, index - 1); closeMenu(); }}><i class="fas fa-arrow-up" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp', 'Move up')}</span></button>
-                      <button type="button" role="menuitem" disabled={index === included.length - 1} onclick={() => { onReorder(kind, index, index + 1); closeMenu(); }}><i class="fas fa-arrow-down" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down')}</span></button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={index === 0}
+                        onclick={() => {
+                          onReorder(kind, index, index - 1);
+                          closeMenu();
+                        }}
+                        ><i class="fas fa-arrow-up" aria-hidden="true"></i><span
+                          >{text(
+                            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp',
+                            'Move up'
+                          )}</span
+                        ></button
+                      >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={index === included.length - 1}
+                        onclick={() => {
+                          onReorder(kind, index, index + 1);
+                          closeMenu();
+                        }}
+                        ><i class="fas fa-arrow-down" aria-hidden="true"></i><span
+                          >{text(
+                            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown',
+                            'Move down'
+                          )}</span
+                        ></button
+                      >
                     {/if}
-                    <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent', 'Open source event') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask', 'Open source task')}</span></button>
-                    <button type="button" role="menuitem" class="is-danger" data-action="exclude" onclick={() => { onExclude(kind, entry.id); closeMenu(); }}><i class="fas fa-ban" aria-hidden="true"></i><span>{mode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove', 'Remove from environment') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude', 'Exclude from environment')}</span></button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onclick={() => {
+                        onOpenSource(kind, entry.id);
+                        closeMenu();
+                      }}
+                      ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
+                        >{kind === 'event'
+                          ? text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
+                              'Open source event'
+                            )
+                          : text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
+                              'Open source task'
+                            )}</span
+                      ></button
+                    >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="is-danger"
+                      data-action="exclude"
+                      onclick={() => {
+                        onExclude(kind, entry.id);
+                        closeMenu();
+                      }}
+                      ><i class="fas fa-ban" aria-hidden="true"></i><span
+                        >{mode === 'manual'
+                          ? text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Remove',
+                              'Remove from environment'
+                            )
+                          : text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Exclude',
+                              'Exclude from environment'
+                            )}</span
+                      ></button
+                    >
                   </div>
                 {/if}
               </div>
@@ -253,19 +451,37 @@
   {#if mode === 'manual'}
     <section class="manager-environment-comp-section" data-section="available-to-add">
       <header class="manager-environment-comp-band">
-        <h4>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.AvailableToAdd', 'Available to add')}</h4>
+        <h4>
+          {text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.AvailableToAdd',
+            'Available to add'
+          )}
+        </h4>
         <span class="manager-environment-comp-count">{availableToAdd.length} {unit}</span>
       </header>
       {#if availableToAdd.length === 0}
         <EmptyState
           compact
           icon="fas fa-circle-plus"
-          title={kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableEventsToAdd', 'No matching or non-matching events to add.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableTasksToAdd', 'No matching or non-matching tasks to add.')}
+          title={kind === 'event'
+            ? text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableEventsToAdd',
+                'No matching or non-matching events to add.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoAvailableTasksToAdd',
+                'No matching or non-matching tasks to add.'
+              )}
         />
       {:else}
         <ul class="manager-environment-comp-rows is-available-to-add">
           {#each availableToAdd as entry (entry.id)}
-            <li class={`manager-environment-comp-row ${availableRowBucket(entry) === 'candidate' ? '' : 'is-non-matching'} ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row={availableRowBucket(entry)} data-composition-state={entry.compositionState}>
+            <li
+              class={`manager-environment-comp-row ${availableRowBucket(entry) === 'candidate' ? '' : 'is-non-matching'} ${selectedId === entry.id ? 'is-selected' : ''}`}
+              data-record-id={entry.id}
+              data-section-row={availableRowBucket(entry)}
+              data-composition-state={entry.compositionState}
+            >
               <div
                 role="button"
                 tabindex="0"
@@ -281,9 +497,15 @@
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
               </div>
-              {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
-              <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
-              <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
+              {#if showBlindWeights}<div class="manager-environment-comp-weight">
+                  <span class="manager-environment-comp-none">—</span>
+                </div>{/if}
+              <div class="manager-environment-comp-override">
+                <OverrideIndicator active={entry.hasDropRateAdjustment === true} />
+              </div>
+              <div class="manager-environment-comp-runtime">
+                <CompositionStatePill state={entry.compositionState} />
+              </div>
               <div class="manager-environment-comp-actions">
                 {#if availableRowAction(entry) === 'include'}
                   <button
@@ -291,8 +513,14 @@
                     class="manager-icon-button is-primary manager-environment-comp-quick-action"
                     data-quick-action="include"
                     data-action="include"
-                    aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd', 'Add')}
-                    title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd', 'Add')}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
+                      'Add'
+                    )}
+                    title={text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.QuickAdd',
+                      'Add'
+                    )}
                     onclick={() => onInclude(kind, entry.id)}
                   >
                     <i class="fas fa-circle-plus" aria-hidden="true"></i>
@@ -303,27 +531,106 @@
                     class="manager-icon-button is-warning-action manager-environment-comp-quick-action"
                     data-quick-action="force-include"
                     data-action="force-include"
-                    aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}
-                    title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
+                      'Force add'
+                    )}
+                    title={text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
+                      'Force add'
+                    )}
                     onclick={() => onForceInclude(kind, entry.id)}
                   >
                     <i class="fas fa-circle-plus" aria-hidden="true"></i>
                   </button>
                 {/if}
-                <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
-                  <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
+                <div
+                  class="manager-environment-comp-menu-wrap"
+                  use:dismissOnOutsideClick={{
+                    enabled: openMenuId === entry.id,
+                    onDismiss: closeMenu,
+                  }}
+                >
+                  <button
+                    type="button"
+                    class="manager-icon-button"
+                    aria-haspopup="menu"
+                    aria-expanded={openMenuId === entry.id}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
+                      'More actions'
+                    )}
+                    onclick={() => toggleMenu(entry.id)}
+                  >
                     <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
                   </button>
                   {#if openMenuId === entry.id}
                     <div class="manager-environment-comp-menu" role="menu">
                       {#if availableRowAction(entry) === 'include'}
-                        <button type="button" role="menuitem" data-action="include" onclick={() => { onInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include', 'Include')}</span></button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-action="include"
+                          onclick={() => {
+                            onInclude(kind, entry.id);
+                            closeMenu();
+                          }}
+                          ><i class="fas fa-plus" aria-hidden="true"></i><span
+                            >{text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Include',
+                              'Include'
+                            )}</span
+                          ></button
+                        >
                       {:else if availableRowAction(entry) === 'force-include'}
-                        <button type="button" role="menuitem" data-action="force-include" onclick={() => { onForceInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span></button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-action="force-include"
+                          onclick={() => {
+                            onForceInclude(kind, entry.id);
+                            closeMenu();
+                          }}
+                          ><i class="fas fa-plus" aria-hidden="true"></i><span
+                            >{text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
+                              'Force add'
+                            )}</span
+                          ></button
+                        >
                       {:else if availableRowAction(entry) === 'library-disabled'}
-                        <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span></button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="manager-environment-comp-menu-note"
+                          disabled
+                          ><span
+                            >{text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
+                              'Enable in library first'
+                            )}</span
+                          ></button
+                        >
                       {/if}
-                      <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent', 'Open source event') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask', 'Open source task')}</span></button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onclick={() => {
+                          onOpenSource(kind, entry.id);
+                          closeMenu();
+                        }}
+                        ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
+                          >{kind === 'event'
+                            ? text(
+                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
+                                'Open source event'
+                              )
+                            : text(
+                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
+                                'Open source task'
+                              )}</span
+                        ></button
+                      >
                     </div>
                   {/if}
                 </div>
@@ -339,19 +646,31 @@
     <!-- Excluded -->
     <section class="manager-environment-comp-section" data-section="excluded">
       <header class="manager-environment-comp-band">
-        <h4>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ExcludedFromEnvironment', 'Excluded from this environment')}</h4>
+        <h4>
+          {text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ExcludedFromEnvironment',
+            'Excluded from this environment'
+          )}
+        </h4>
         <span class="manager-environment-comp-count">{excluded.length} {unit}</span>
       </header>
       {#if excluded.length === 0}
         <EmptyState
           compact
           icon="fas fa-ban"
-          title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoExcluded', 'Nothing is excluded.')}
+          title={text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoExcluded',
+            'Nothing is excluded.'
+          )}
         />
       {:else}
         <ul class="manager-environment-comp-rows">
           {#each excluded as entry (entry.id)}
-            <li class={`manager-environment-comp-row is-excluded ${selectedId === entry.id ? 'is-selected' : ''}`} data-record-id={entry.id} data-section-row="excluded">
+            <li
+              class={`manager-environment-comp-row is-excluded ${selectedId === entry.id ? 'is-selected' : ''}`}
+              data-record-id={entry.id}
+              data-section-row="excluded"
+            >
               <div
                 role="button"
                 tabindex="0"
@@ -367,26 +686,90 @@
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
               </div>
-              {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
-              <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
-              <div class="manager-environment-comp-runtime"><CompositionStatePill state="excluded" /></div>
+              {#if showBlindWeights}<div class="manager-environment-comp-weight">
+                  <span class="manager-environment-comp-none">—</span>
+                </div>{/if}
+              <div class="manager-environment-comp-override">
+                <OverrideIndicator active={entry.hasDropRateAdjustment === true} />
+              </div>
+              <div class="manager-environment-comp-runtime">
+                <CompositionStatePill state="excluded" />
+              </div>
               <div class="manager-environment-comp-actions">
                 {#if kind === 'task'}
-                  <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
-                    <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
+                  <div
+                    class="manager-environment-comp-menu-wrap"
+                    use:dismissOnOutsideClick={{
+                      enabled: openMenuId === entry.id,
+                      onDismiss: closeMenu,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      aria-haspopup="menu"
+                      aria-expanded={openMenuId === entry.id}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
+                        'More actions'
+                      )}
+                      onclick={() => toggleMenu(entry.id)}
+                    >
                       <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
                     </button>
                     {#if openMenuId === entry.id}
                       <div class="manager-environment-comp-menu" role="menu">
-                        <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent', 'Open source event') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask', 'Open source task')}</span></button>
-                        <button type="button" role="menuitem" data-action="restore" onclick={() => { onRestore(kind, entry.id); closeMenu(); }}><i class="fas fa-rotate-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore')}</span></button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onclick={() => {
+                            onOpenSource(kind, entry.id);
+                            closeMenu();
+                          }}
+                          ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
+                            >{kind === 'event'
+                              ? text(
+                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
+                                  'Open source event'
+                                )
+                              : text(
+                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
+                                  'Open source task'
+                                )}</span
+                          ></button
+                        >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-action="restore"
+                          onclick={() => {
+                            onRestore(kind, entry.id);
+                            closeMenu();
+                          }}
+                          ><i class="fas fa-rotate-left" aria-hidden="true"></i><span
+                            >{text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore',
+                              'Restore'
+                            )}</span
+                          ></button
+                        >
                       </div>
                     {/if}
                   </div>
                 {:else}
-                  <button type="button" class="manager-button manager-environment-restore" data-action="restore" onclick={() => onRestore(kind, entry.id)}>
+                  <button
+                    type="button"
+                    class="manager-button manager-environment-restore"
+                    data-action="restore"
+                    onclick={() => onRestore(kind, entry.id)}
+                  >
                     <i class="fas fa-rotate-left" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore', 'Restore')}</span>
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Restore',
+                        'Restore'
+                      )}</span
+                    >
                   </button>
                 {/if}
               </div>
@@ -399,19 +782,37 @@
     <!-- Non-matching (replaces the diagnostics disclosure; manual mode allows force-add). -->
     <section class="manager-environment-comp-section" data-section="non-matching">
       <header class="manager-environment-comp-band">
-        <h4>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NonMatching', 'Non-matching')}</h4>
+        <h4>
+          {text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NonMatching',
+            'Non-matching'
+          )}
+        </h4>
         <span class="manager-environment-comp-count">{nonMatching.length} {unit}</span>
       </header>
       {#if nonMatching.length === 0}
         <EmptyState
           compact
           icon="fas fa-filter-circle-xmark"
-          title={kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingEvents', 'No non-matching or disabled events.') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingTasks', 'No non-matching or disabled tasks.')}
+          title={kind === 'event'
+            ? text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingEvents',
+                'No non-matching or disabled events.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.NoNonMatchingTasks',
+                'No non-matching or disabled tasks.'
+              )}
         />
       {:else}
         <ul class="manager-environment-comp-rows is-non-matching">
           {#each paginatedNonMatching as entry (entry.id)}
-            <li class="manager-environment-comp-row is-non-matching" data-record-id={entry.id} data-section-row="non-matching" data-composition-state={entry.compositionState}>
+            <li
+              class="manager-environment-comp-row is-non-matching"
+              data-record-id={entry.id}
+              data-section-row="non-matching"
+              data-composition-state={entry.compositionState}
+            >
               <div
                 role="button"
                 tabindex="0"
@@ -427,36 +828,129 @@
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
               </div>
-              {#if showBlindWeights}<div class="manager-environment-comp-weight"><span class="manager-environment-comp-none">—</span></div>{/if}
-              <div class="manager-environment-comp-override"><OverrideIndicator active={entry.hasDropRateAdjustment === true} /></div>
-              <div class="manager-environment-comp-runtime"><CompositionStatePill state={entry.compositionState} /></div>
+              {#if showBlindWeights}<div class="manager-environment-comp-weight">
+                  <span class="manager-environment-comp-none">—</span>
+                </div>{/if}
+              <div class="manager-environment-comp-override">
+                <OverrideIndicator active={entry.hasDropRateAdjustment === true} />
+              </div>
+              <div class="manager-environment-comp-runtime">
+                <CompositionStatePill state={entry.compositionState} />
+              </div>
               <div class="manager-environment-comp-actions">
                 {#if kind === 'task'}
-                  <div class="manager-environment-comp-menu-wrap" use:dismissOnOutsideClick={{ enabled: openMenuId === entry.id, onDismiss: closeMenu }}>
-                    <button type="button" class="manager-icon-button" aria-haspopup="menu" aria-expanded={openMenuId === entry.id} aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions', 'More actions')} onclick={() => toggleMenu(entry.id)}>
+                  <div
+                    class="manager-environment-comp-menu-wrap"
+                    use:dismissOnOutsideClick={{
+                      enabled: openMenuId === entry.id,
+                      onDismiss: closeMenu,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      aria-haspopup="menu"
+                      aria-expanded={openMenuId === entry.id}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoreActions',
+                        'More actions'
+                      )}
+                      onclick={() => toggleMenu(entry.id)}
+                    >
                       <i class="fas fa-ellipsis-vertical" aria-hidden="true"></i>
                     </button>
                     {#if openMenuId === entry.id}
                       <div class="manager-environment-comp-menu" role="menu">
                         {#if mode === 'manual' && entry.compositionState === 'notMatching'}
-                          <button type="button" role="menuitem" data-action="force-include" onclick={() => { onForceInclude(kind, entry.id); closeMenu(); }}><i class="fas fa-plus" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span></button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            data-action="force-include"
+                            onclick={() => {
+                              onForceInclude(kind, entry.id);
+                              closeMenu();
+                            }}
+                            ><i class="fas fa-plus" aria-hidden="true"></i><span
+                              >{text(
+                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
+                                'Force add'
+                              )}</span
+                            ></button
+                          >
                         {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
-                          <button type="button" role="menuitem" class="manager-environment-comp-menu-note" disabled><span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span></button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            class="manager-environment-comp-menu-note"
+                            disabled
+                            ><span
+                              >{text(
+                                'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
+                                'Enable in library first'
+                              )}</span
+                            ></button
+                          >
                         {/if}
-                        <button type="button" role="menuitem" onclick={() => { onOpenSource(kind, entry.id); closeMenu(); }}><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span>{kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent', 'Open source event') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask', 'Open source task')}</span></button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onclick={() => {
+                            onOpenSource(kind, entry.id);
+                            closeMenu();
+                          }}
+                          ><i class="fas fa-up-right-from-square" aria-hidden="true"></i><span
+                            >{kind === 'event'
+                              ? text(
+                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
+                                  'Open source event'
+                                )
+                              : text(
+                                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
+                                  'Open source task'
+                                )}</span
+                          ></button
+                        >
                       </div>
                     {/if}
                   </div>
                 {:else}
                   {#if mode === 'manual' && entry.compositionState === 'notMatching'}
-                    <button type="button" class="manager-button is-warning manager-environment-force-include" data-action="force-include" onclick={() => onForceInclude(kind, entry.id)}>
+                    <button
+                      type="button"
+                      class="manager-button is-warning manager-environment-force-include"
+                      data-action="force-include"
+                      onclick={() => onForceInclude(kind, entry.id)}
+                    >
                       <i class="fas fa-plus" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd', 'Force add')}</span>
+                      <span
+                        >{text(
+                          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ForceAdd',
+                          'Force add'
+                        )}</span
+                      >
                     </button>
                   {:else if mode === 'manual' && entry.compositionState === 'libraryDisabled'}
-                    <span class="manager-muted manager-environment-comp-disabled-note">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote', 'Enable in library first')}</span>
+                    <span class="manager-muted manager-environment-comp-disabled-note"
+                      >{text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.LibraryDisabledNote',
+                        'Enable in library first'
+                      )}</span
+                    >
                   {/if}
-                  <button type="button" class="manager-icon-button" aria-label={kind === 'event' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent', 'Open source event') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask', 'Open source task')} onclick={() => onOpenSource(kind, entry.id)}>
+                  <button
+                    type="button"
+                    class="manager-icon-button"
+                    aria-label={kind === 'event'
+                      ? text(
+                          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceEvent',
+                          'Open source event'
+                        )
+                      : text(
+                          'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.OpenSourceTask',
+                          'Open source task'
+                        )}
+                    onclick={() => onOpenSource(kind, entry.id)}
+                  >
                     <i class="fas fa-up-right-from-square" aria-hidden="true"></i>
                   </button>
                 {/if}
@@ -468,8 +962,11 @@
           totalCount={nonMatching.length}
           pageSize={nonMatchingPageSize}
           pageIndex={nonMatchingPageIndex}
-          onPageChange={(next) => nonMatchingPageIndex = next}
-          onPageSizeChange={(next) => { nonMatchingPageSize = next; nonMatchingPageIndex = 0; }}
+          onPageChange={(next) => (nonMatchingPageIndex = next)}
+          onPageSizeChange={(next) => {
+            nonMatchingPageSize = next;
+            nonMatchingPageIndex = 0;
+          }}
         />
       {/if}
     </section>

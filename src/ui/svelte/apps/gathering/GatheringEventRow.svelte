@@ -16,11 +16,7 @@
   import { riskClass, riskLabel, descriptionOrDefault } from '../../util/gatheringFormat.js';
   import ChanceBar from './ChanceBar.svelte';
 
-  let {
-    event = null,
-    selected = false,
-    onSelect = null
-  } = $props();
+  let { event = null, selected = false, onSelect = null } = $props();
 
   const id = $derived(String(event?.id ?? ''));
   const name = $derived(String(event?.name ?? ''));
@@ -34,7 +30,9 @@
 
   // Localize the danger value to match the GM editor's risk labels, mirroring
   // GatheringDetail; fall back to the raw value for any unmapped level.
-  const danger = $derived(String(event?.risk ?? (Array.isArray(event?.dangerTags) ? event.dangerTags[0] : '') ?? ''));
+  const danger = $derived(
+    String(event?.risk ?? (Array.isArray(event?.dangerTags) ? event.dangerTags[0] : '') ?? '')
+  );
   const dangerLabel = $derived(riskLabel(danger, localize));
   const dangerRiskClass = $derived(riskClass(danger));
 
@@ -65,7 +63,12 @@
   >
     <div class="gathering-event-main">
       <span class="gathering-event-thumb-wrap">
-        <img class="gathering-event-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
+        <img
+          class="gathering-event-thumb"
+          class:is-fallback={!img}
+          src={img || DEFAULT_GATHERING_EVENT_IMG}
+          alt=""
+        />
       </span>
 
       <span class="gathering-event-copy">
@@ -89,7 +92,9 @@
       class="gathering-event-description"
       class:is-fallback={!hasDescription}
       data-gathering-event-description
-    >{descriptionText}</p>
+    >
+      {descriptionText}
+    </p>
   </div>
 </div>
 

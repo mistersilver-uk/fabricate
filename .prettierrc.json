@@ -1,4 +1,5 @@
 {
+  "plugins": ["prettier-plugin-svelte"],
   "printWidth": 100,
   "tabWidth": 2,
   "useTabs": false,
@@ -8,5 +9,8 @@
   "trailingComma": "es5",
   "bracketSpacing": true,
   "arrowParens": "always",
-  "endOfLine": "lf"
+  "endOfLine": "lf",
+  "svelteAllowShorthand": true,
+  "svelteSortOrder": "options-scripts-markup-styles",
+  "svelteIndentScriptAndStyle": true
 }

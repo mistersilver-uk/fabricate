@@ -123,10 +123,12 @@
 
   // The GM advancing the clock can change owned stacks (regen, etc.); bump the
   // world-time tick and quietly re-fetch.
-  $effect(() => subscribeWorldTime(() => {
-    store?.tickWorldTime();
-    store?.load(true);
-  }));
+  $effect(() =>
+    subscribeWorldTime(() => {
+      store?.tickWorldTime();
+      store?.load(true);
+    })
+  );
 </script>
 
 {#if isLoading}

@@ -53,7 +53,7 @@
               <span class="alchemy-chooser-card-count">
                 {localize('FABRICATE.App.Alchemy.SystemSummary', {
                   known: system.knownCount,
-                  total: system.totalCount
+                  total: system.totalCount,
                 })}
               </span>
             </span>

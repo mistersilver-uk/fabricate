@@ -14,7 +14,7 @@
     onExcludeRecord = () => {},
     onRestoreRecord = () => {},
     onReorderRecord = () => {},
-    onOpenSourceEvent = () => {}
+    onOpenSourceEvent = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -27,12 +27,27 @@
   const activeSelectedId = $derived(selectedKind === 'event' ? selectedId : '');
 </script>
 
-<section class="manager-environment-tab" data-environment-tab="events" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Events.Title', 'Events')}>
+<section
+  class="manager-environment-tab"
+  data-environment-tab="events"
+  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Events.Title', 'Events')}
+>
   <p class="manager-environment-comp-callout" data-composition-mode={mode}>
-    <i class={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'} aria-hidden="true"></i>
-    <span>{mode === 'manual'
-      ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Events.ManualIntro', 'Only events you explicitly include apply here. You can add matching events or force add non-matching events.')
-      : text('FABRICATE.Admin.Manager.EnvironmentEditor.Events.AutomaticIntro', 'All matching enabled library events apply unless you exclude them here.')}</span>
+    <i
+      class={mode === 'manual' ? 'fas fa-hand-pointer' : 'fas fa-wand-magic-sparkles'}
+      aria-hidden="true"
+    ></i>
+    <span
+      >{mode === 'manual'
+        ? text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Events.ManualIntro',
+            'Only events you explicitly include apply here. You can add matching events or force add non-matching events.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Events.AutomaticIntro',
+            'All matching enabled library events apply unless you exclude them here.'
+          )}</span
+    >
   </p>
 
   <CompositionList

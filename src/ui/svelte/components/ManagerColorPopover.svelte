@@ -22,7 +22,7 @@
     manageDismiss = true,
     popoverStyle = '',
     portalTarget = null,
-    registerPopoverNode = () => {}
+    registerPopoverNode = () => {},
   } = $props();
 
   let popoverRoot = $state(null);
@@ -35,12 +35,12 @@
     { token: 'peach', label: 'Peach' },
     { token: 'butter', label: 'Butter' },
     { token: 'aqua', label: 'Aqua' },
-    { token: 'mauve', label: 'Mauve' }
+    { token: 'mauve', label: 'Mauve' },
   ];
 
   function normalizedToken(value) {
     const token = String(value || '').replace(/^--fab-tag-/, '');
-    return presets.some(preset => preset.token === token) ? token : 'sage';
+    return presets.some((preset) => preset.token === token) ? token : 'sage';
   }
 
   function validCustomHex(value) {

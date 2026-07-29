@@ -41,7 +41,9 @@
   </span>
   <span class="manager-item-drop-zone-copy">
     <strong>{item?.name || title}</strong>
-    {#if hint}<small data-tool-source-drop-hint={kind === 'tool-source' ? true : undefined}>{hint}</small>{/if}
+    {#if hint}<small data-tool-source-drop-hint={kind === 'tool-source' ? true : undefined}
+        >{hint}</small
+      >{/if}
   </span>
   {#if item && (onCopy || onUnlink)}
     <span class="manager-item-drop-zone-actions">

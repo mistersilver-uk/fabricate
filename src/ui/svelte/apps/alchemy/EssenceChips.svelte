@@ -17,10 +17,13 @@
 
   const DEFAULT_ESSENCE_ICON = 'fas fa-mortar-pestle';
 
-  const rows = $derived(Array.isArray(essences) ? essences.filter((entry) => entry && entry.quantity > 0) : []);
+  const rows = $derived(
+    Array.isArray(essences) ? essences.filter((entry) => entry && entry.quantity > 0) : []
+  );
 
   function tintStyle(colorToken) {
-    const token = typeof colorToken === 'string' ? colorToken.trim().replace(/^--fab-tag-/, '') : '';
+    const token =
+      typeof colorToken === 'string' ? colorToken.trim().replace(/^--fab-tag-/, '') : '';
     return token ? `--alchemy-essence-color: var(--fab-tag-${token})` : '';
   }
 </script>

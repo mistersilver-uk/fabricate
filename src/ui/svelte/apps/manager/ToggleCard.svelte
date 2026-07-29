@@ -45,7 +45,7 @@
     // `data-recipe-locked-state`. Without it the retrofit hits the same wall on the
     // second card that `toggleTitle` clears on the first.
     subAttr = '',
-    onToggle = () => {}
+    onToggle = () => {},
   } = $props();
 </script>
 
@@ -59,7 +59,7 @@
     <!-- `''` not `true`: a bare attribute renders `=""`, which is the byte the Overview
          cards emit today. Every consumer form is insensitive, but the issue 658 retrofit
          is a no-op DOM diff only if this matches exactly. -->
-    <p class="manager-recipe-status-sub manager-muted" {...(subAttr ? { [subAttr]: '' } : {})}>
+    <p class="manager-recipe-status-sub manager-muted" {...subAttr ? { [subAttr]: '' } : {}}>
       {sub}
     </p>
   </div>
