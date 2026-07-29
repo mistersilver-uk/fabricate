@@ -73,6 +73,13 @@ jobs:
       - name: Lint Svelte components (ESLint)
         run: npm run lint:svelte
 
+      # The graph-independent Svelte compiler-warning sweep (issue 924). `npm run build`
+      # also fails on a warning via `onwarn` in `svelte.config.js`, but a Vite build
+      # compiles only the entry graph and is blind to a component nothing imports, so the
+      # authoritative gate is this sweep over every `src/**/*.svelte`.
+      - name: Check Svelte compiler warnings
+        run: npm run lint:svelte:warnings
+
       - name: Lint styles (Stylelint)
         run: npm run lint:css
 

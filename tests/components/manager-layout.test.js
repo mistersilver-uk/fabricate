@@ -5612,6 +5612,12 @@ test('the Tags & Categories route names one grid track per section and grows the
 // sentence used to stack under the name, making it the one card in an `align-items: start`
 // grid whose content exceeded the 34px icon tile — so it stood visibly taller than every
 // sibling. Source-reading cannot see that; only layout can, so this measures both cards.
+//
+// The fixture's tab strip and workspace are a `<div role="tablist">` / `<div role="tabpanel">`
+// because that is what the view now ships (issue 924 — the `<nav>`/`<section>` forms carried
+// implicit landmark roles for the ARIA roles to override). Every governing selector below is
+// class-based, so nothing here depends on the element; the fixture is updated so it keeps
+// MIRRORING shipped markup rather than quietly describing a shape that no longer exists.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 760, height: 600 } });
@@ -5628,7 +5634,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
     </div>`;
     await page.setContent(
-      withChipHash(`<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><nav class="manager-editor-tabs manager-vocabulary-tabs"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></nav><section class="manager-tags-categories-workspace"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></section></main></div></div>`)
+      withChipHash(`<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`)
     );
     const geometry = await page.evaluate(() => {
       const locked = document.querySelector('[data-vocabulary-locked-card]');

@@ -319,9 +319,13 @@ export default [
   //
   //    Note this gate covers the script and markup of a component only. Prettier
   //    now formats `.svelte` too — `prettier-plugin-svelte` is registered in
-  //    `.prettierrc.json` and `format:check` covers `src/**/*.svelte`. Stylelint
-  //    (scoped `<style>` blocks) and failing the build on Svelte compiler
-  //    warnings both still exclude `.svelte`.
+  //    `.prettierrc.json` and `format:check` covers `src/**/*.svelte`. Svelte
+  //    COMPILER warnings are gated separately as of issue 924 — `onwarn` in
+  //    `svelte.config.js` fails `npm run build`, and `npm run lint:svelte:warnings`
+  //    sweeps every component graph-independently as its own step of this same CI
+  //    job — so a11y and `css_unused_selector` findings are ESLint's business no
+  //    more than they were, but they no longer pass unnoticed either. Stylelint
+  //    (scoped `<style>` blocks) still excludes `.svelte`.
   ...svelte.configs.recommended.map((config) => ({
     ...config,
     files: ['**/*.svelte'],

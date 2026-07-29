@@ -361,6 +361,48 @@ describe('ComponentsBrowserView bulk selection (issue 772)', () => {
     assert.equal(selectionCountText(root), '', 'the readout disappears with an empty selection');
   });
 
+  // Issue 924. `ComponentSelectionToolbar` draws the page box's focus ring itself, because it
+  // passes `wrapper="contents"` and so opts out of the ring `SelectionCheckbox` scopes to the
+  // `<label>` IT renders. That rule reaches across a component boundary:
+  //
+  //   .manager-component-selection-all
+  //     :global(.fab-selection-input:focus-visible + .fab-selection-check)
+  //
+  // NOTHING ELSE IN THE REPOSITORY CAN SEE THAT CONTRACT BREAK. Svelte's unused-selector
+  // analysis does not look inside `:global()`, Stylelint excludes `.svelte`, SonarCloud indexes
+  // none of it, and the sweep compiles each component alone. Before issue 924 the `input` half
+  // sat OUTSIDE the `:global()`, the compiler pruned the whole rule as unused and the ring was
+  // dead in every shipped build — loudly wrong, and now caught by `onwarn`. Moving the whole
+  // cross-boundary part inside `:global()` fixed the ring and made the SAME breakage silent:
+  // rename either class in `SelectionCheckbox.svelte`, or interpose an element between the
+  // input and its box, and the selector matches nothing with no gate objecting.
+  //
+  // So the contract is asserted here, on the real mounted DOM, where a rename shows up as a
+  // failing test instead of an invisible regression.
+  it('keeps the page box adjacent to its visible box, so the host focus ring still matches', async () => {
+    const root = await browser.mount({ itemCards: manyGeneral(3) });
+
+    const host = root.querySelector('.manager-component-selection-all');
+    assert.ok(host, 'the toolbar renders the label that owns the focus ring');
+
+    const input = host.querySelector('input.fab-selection-input');
+    assert.ok(
+      input,
+      'the ring selector keys on `.fab-selection-input` — SelectionCheckbox must still render' +
+        ' the real control under that class inside this host'
+    );
+
+    // `nextElementSibling` skips the comment anchors Svelte interleaves, which is exactly why
+    // the rule uses `+` rather than a descendant combinator.
+    const box = input.nextElementSibling;
+    assert.ok(
+      box?.classList.contains('fab-selection-check'),
+      'the visible box must remain the input\'s IMMEDIATE element sibling: the ring is drawn by' +
+        ' `.fab-selection-input:focus-visible + .fab-selection-check`, so interposing an element' +
+        ' or renaming the box silently kills the focus ring on the page-selection control'
+    );
+  });
+
   it('toggles ONLY the rendered rows from the page box, leaving a collapsed group alone', async () => {
     const root = await browser.mount({
       itemCards: twoCategoryLibrary(),

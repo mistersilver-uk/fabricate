@@ -104,7 +104,19 @@ const FIXTURE = `
             <span class="manager-chip is-info manager-component-filter-chip" data-m="filter-chip"><span>Category: Reagent</span></span>
             <span class="manager-component-count" data-m="count">1–2 of 2</span>
           </div>
-          <!-- The multi-select row (issue 772) — the toolbar's FOURTH row, above the list. -->
+          <!-- The multi-select row (issue 772) — the toolbar's FOURTH row, above the list.
+
+               The input/box pair below is a HAND-COPY of what SelectionCheckbox.svelte renders
+               inside ComponentSelectionToolbar.svelte, and it silently duplicates a structural
+               contract: that component's focus ring is drawn by the adjacent-sibling selector
+               ".fab-selection-input:focus-visible + .fab-selection-check", written inside
+               :global() because it reaches across a component boundary — so nothing analyses
+               it (issue 924). This fixture is a font-size probe and does not check the ring;
+               the ring's structure is asserted in
+               tests/components/components-browser-view-mounted.test.js. If either class name
+               changes in SelectionCheckbox.svelte, update this fixture too, so the two stop
+               disagreeing about what the studio renders.
+               (No backticks in here — this whole block is a JS template literal.) -->
           <div class="manager-component-filter-row is-selection" data-component-selection-toolbar>
             <label class="manager-component-selection-all" data-m="bulk-select-all">
               <input type="checkbox" class="fab-selection-input">

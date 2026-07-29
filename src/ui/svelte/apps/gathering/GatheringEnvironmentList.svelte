@@ -7,6 +7,7 @@
   names / chip rows cannot blow out the column.
 -->
 <script>
+  import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EnvironmentCard from './EnvironmentCard.svelte';
   import Pagination from '../../components/Pagination.svelte';
@@ -20,7 +21,16 @@
   // from the services getter and written back through the services setter, so
   // the component never touches Foundry globals. Every access is optional-chained
   // so a mount with a bare/absent `services` bag defaults to off (show all).
-  let hideUnavailable = $state(services?.getHideUnavailableEnvironments?.() === true);
+  //
+  // The seed is a ONE-TIME read of `services`, and `untrack` says so rather than
+  // leaving the compiler to guess (it reported `state_referenced_locally` here). This
+  // must NOT become a `$derived`: after mount the toggle is owned by the user, and
+  // re-reading the persisted value would silently revert an in-session toggle the
+  // moment anything upstream re-passed the services bag. The setter is the sync path
+  // in the other direction, so the stored value never goes stale either.
+  let hideUnavailable = $state(
+    untrack(() => services?.getHideUnavailableEnvironments?.() === true)
+  );
 
   function setHideUnavailable(next) {
     hideUnavailable = next === true;

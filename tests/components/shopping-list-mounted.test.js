@@ -1,5 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
@@ -227,6 +228,122 @@ describe('ShoppingList mounted behavior', () => {
     target.querySelector('.crafting-shopping-remove').click();
     flushSync();
     assert.deepEqual(removed, ['recipe-1'], 'onRemove called with the recipe id');
-    assert.deepEqual(inc, [], 'the × does not also increment (stops propagation)');
+    assert.deepEqual(
+      inc,
+      [],
+      'the × is a SIBLING of the activation button, not a descendant, so its click was never' +
+        ' on a path to the increment handler'
+    );
+  });
+
+  // Issue 924. The row is a `listitem` that NESTS a real `<button>`; it is not itself one,
+  // because `<button>`'s content model forbids the remove `<button>` as a descendant — and
+  // Svelte builds the DOM with `createElement`, never through the HTML parser, so that
+  // invalid nesting would ship rather than being implicitly closed.
+  it('nests a real activation button in the queue row rather than making the row one', async () => {
+    const target = await harness.mount({ aggregate: aggregate(), entries: [ENTRY] });
+
+    const row = target.querySelector('.crafting-shopping-entry');
+    assert.equal(row.tagName, 'LI', 'the queue row stays a listitem');
+    assert.equal(row.getAttribute('role'), null, 'and carries no interactive role of its own');
+    assert.equal(row.getAttribute('tabindex'), null, 'nor a hand-rolled tabindex');
+    assert.equal(row.closest('button'), null, 'the row is not inside a button');
+
+    const entry = target.querySelector('[data-shopping-entry="recipe-1"]');
+    assert.equal(entry.tagName, 'BUTTON', 'the actionable element is a real button');
+    assert.equal(entry.getAttribute('type'), 'button', 'and never submits a form');
+    assert.equal(entry.parentElement, row, 'it is a direct child of the row');
+    assert.equal(
+      entry.querySelector('button'),
+      null,
+      'the × must stay a SIBLING of the activation button — nesting it would be invalid HTML'
+    );
+    assert.equal(
+      row.querySelectorAll(':scope > button').length,
+      2,
+      'the row holds exactly two sibling buttons: activate and remove'
+    );
+  });
+
+  // The keyboard contract is now the PLATFORM's, which is the point of the change: a native
+  // `<button>` fires `click` on Enter and Space and swallows the space-scroll itself, so the
+  // hand-rolled `onEntryKey` is gone.
+  //
+  // happy-dom does not implement the UA's synthetic-click activation steps, so a dispatched
+  // `keydown` cannot be expected to activate anything here. That makes this test two halves,
+  // and together they are the contract: the row runs NO key handler of its own (so nothing
+  // hand-rolled survives to be relied upon), and the event the UA would deliver instead — a
+  // `click` on a focused, natively focusable button — does increment.
+  it('leaves Enter/Space activation to the platform, with no hand-rolled key handler', async () => {
+    const inc = [];
+    const target = await harness.mount({
+      aggregate: aggregate(),
+      entries: [ENTRY],
+      onIncrement: (id) => inc.push(id)
+    });
+
+    const entry = target.querySelector('[data-shopping-entry="recipe-1"]');
+    entry.focus();
+    assert.equal(
+      target.ownerDocument.activeElement,
+      entry,
+      'the button is focusable with no tabindex of its own'
+    );
+
+    for (const key of ['Enter', ' ']) {
+      entry.dispatchEvent(
+        new globalThis.window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      );
+      flushSync();
+    }
+    assert.deepEqual(
+      inc,
+      [],
+      'no listener of ours answers a keydown — activation is the UA\'s job now, and it' +
+        ' delivers it as the click asserted next'
+    );
+
+    entry.click();
+    flushSync();
+    assert.deepEqual(inc, ['recipe-1'], 'the activation click the UA synthesises increments');
+  });
+
+  // The reset that keeps the nested button from drawing Foundry's own button chrome inside
+  // the row, plus the ring suppression that stops it painting a SECOND concentric focus ring
+  // over the row's border. No smoke frame reaches `:focus-visible`, so nothing photographic
+  // can catch the latter regressing.
+  it('resets Foundry button chrome on the entry button and suppresses its own focus ring', () => {
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/crafting/ShoppingList.svelte'),
+      'utf8'
+    );
+    const block = source.match(/\.crafting-shopping-entry-main\s*{([^}]*)}/)?.[1];
+    assert.ok(block, 'the entry button must declare its own reset block');
+    for (const declaration of [
+      'background: transparent',
+      'border: 0',
+      'text-align: left',
+      'font-size: inherit',
+      'height: auto',
+      'min-height:',
+      'flex: 1 1 auto',
+      'min-width: 0'
+    ]) {
+      assert.ok(
+        block.includes(declaration),
+        `the entry button must reset "${declaration}" against Foundry's global button rule`
+      );
+    }
+
+    assert.match(
+      source,
+      /\.crafting-shopping-entry-main:focus-visible\s*{\s*outline:\s*none;\s*}/,
+      'the button must suppress its own ring — the ROW draws it, via the :has() rule'
+    );
+    assert.match(
+      source,
+      /\.crafting-shopping-entry:has\(\.crafting-shopping-entry-main:focus-visible\)/,
+      'the row draws the focus ring for the button it contains'
+    );
   });
 });
