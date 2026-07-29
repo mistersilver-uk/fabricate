@@ -151,22 +151,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REPO: ${{ github.repository }}
         run: |
           # Read the live body (not the event payload) so a re-run or `edited`
           # event sees screenshots added after the PR was opened.
-          PR_BODY=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json body --jq .body)
+          PR_BODY=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json body --jq .body)
           printf '%s\n' "$PR_BODY" > pr-body.md
 
-          # Get changed files
-          CHANGED_FILES=$(gh pr diff "$PR_NUMBER" \
-            --repo "${{ github.repository }}" \
-            --name-only)
-          printf '%s\n' "$CHANGED_FILES" > changed-files.txt
+          # Get changed files. Use the files endpoint, NOT `gh pr diff
+          # --name-only`: that fetches the unified diff, which the API caps at
+          # 20,000 lines and rejects with `HTTP 406 ... diff too_large` beyond
+          # it. This step runs under `bash -e`, so on a large PR the job died
+          # here — before the evidence script ran — and the maintainer-applied
+          # `screenshots-exempt` label was never even read, making the gate
+          # unskippable. The files endpoint returns metadata rather than a diff
+          # body, so no line cap applies; `--paginate` walks its 100-per-page
+          # pages. It does cap out at 3000 files (a limit no PR should reach).
+          gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" \
+            --paginate \
+            --jq '.[].filename' > changed-files.txt
 
           # Read the live label list. Only a maintainer-applied
           # `screenshots-exempt` label can skip this check; agents cannot
           # self-apply labels, so this cannot be no-op'd from the PR body.
-          PR_LABELS=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json labels --jq '.labels[].name')
+          PR_LABELS=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json labels --jq '.labels[].name')
           printf '%s\n' "$PR_LABELS" > labels.txt
 
           node scripts/ui-pr-screenshot-evidence.mjs check \
