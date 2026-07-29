@@ -517,7 +517,8 @@ The fence there protects the directive's line anchor and nothing else — `{' '}
 
 ESLint is the only static analysis a `.svelte` file gets.
 Prettier now formats components as well — `prettier-plugin-svelte` is registered in `.prettierrc.json`, and `format:check` covers `src/**/*.svelte`.
-Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser; without the config entry `prettier --check` reports success while matching zero files.
+Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser and dropping the config entry fails loudly — the glob names the components, so `format:check` exits 2 with "No parser could be inferred".
+The silent way back is the other one, and the one `tests/prettier-svelte-scope.test.js` guards: re-ignoring `*.svelte` makes `format:check` match zero files, report success and exit 0.
 Stylelint still excludes components, Svelte compiler warnings still do not fail the build, and SonarCloud indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts.
 Each of those is tracked as its own follow-up.
 
