@@ -91,8 +91,7 @@ import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { compile } from 'svelte/compiler';
-
+import { compileComponent } from './lib/svelteCompilerWarnings.js';
 import { listSvelteComponents, toRepositoryPaths } from './lib/svelteComponentFiles.js';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -550,9 +549,26 @@ function compareWarningCodes(a, b) {
   return left > right ? 1 : 0;
 }
 
-/** The compiled-render fingerprint of one component. */
+/**
+ * The compiled-render fingerprint of one component.
+ *
+ * The compile itself goes through `scripts/lib/svelteCompilerWarnings.js`, which reads the
+ * build's options out of `svelte.config.js`. That matters for the `warnings` field below: it is
+ * the same signal `scripts/check-svelte-warnings.mjs` and `svelte.config.js`'s `onwarn` produce,
+ * and three independent `compile()` calls with three private option sets is how a baseline goes
+ * quietly wrong.
+ *
+ * `css: 'external'` is the one deliberate departure from the build's own `css: 'injected'`, and
+ * it is confined to where the stylesheet is EMITTED, not whether it is ANALYSED — the warning
+ * set is identical either way, which `tests/svelte-warning-scope.test.js` asserts against a real
+ * component rather than leaving to this comment. Under `injected` the compiler returns
+ * `result.css === null` and folds the stylesheet into a string literal inside the JS, which
+ * would collapse the separate `css` signal below into the whole-module `code` fallback and turn
+ * every rewrapped CSS declaration into a reported difference — the exact noise this script
+ * normalises away everywhere else.
+ */
 function fingerprint(source, filename) {
-  const result = compile(source, { filename, generate: 'client', dev: false });
+  const result = compileComponent(source, filename, { css: 'external' });
   const maskHash = (text) => text.replaceAll(/svelte-[\da-z]+/g, 'svelte-HASH');
   const templates = [];
   const code = normalise(maskHash(result.js.code), templates);
