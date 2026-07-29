@@ -1466,8 +1466,14 @@ export class GatheringRichStateService {
         ? cloneJson(normalized.staminaCostModifiers)
         : [],
       gatheringModifier: normalized.gatheringModifier,
+      // resultGroups is read by the routed path (GatheringEngine.matchResultGroupsByName
+      // and normalizeList(task.resultGroups)[0]); dormant until #683 ships routed
+      // resolution, but must stay carried so that path is not broken on arrival.
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
-      resultSelection: { provider: 'd100Rows' },
+      // Per-task routed-check DC override (issue 904). resolutionMode stays hardcoded
+      // to 'd100' above — routed gathering is disabled ("Coming soon") pending #683 —
+      // so this plumbing is deliberately dormant until routed resolution ships.
+      dcOverride: normalized.dcOverride,
       catalysts: [],
       toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : [],
     };
@@ -1925,6 +1931,17 @@ function normalizeLibraryTask(task = {}) {
       ? task.toolIds.map((id) => String(id ?? '').trim()).filter(Boolean)
       : [],
     nodes: normalizeNodeConfig(task.nodes),
+    // Per-task routed-check DC override (issue 904): replaces the routed check's
+    // own dc at gather time when set. Guard null/''/undefined explicitly before
+    // `Number()` so re-normalizing a null stays null (Number(null) is 0, which
+    // would otherwise mint a spurious 0 override the GM never set). Mirrors
+    // `_normalizeGatheringTask` in src/ui/svelte/stores/adminStore.js exactly.
+    dcOverride: (() => {
+      const raw = task.dcOverride;
+      if ([null, undefined, ''].includes(raw)) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    })(),
   };
 }
 
