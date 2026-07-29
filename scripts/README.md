@@ -164,3 +164,37 @@ The smoke test gates releases via the `foundry-integration.yml` workflow:
 - Runs on push to main, PRs to main (on `src/`, `scripts/`, `module.json` changes), weekly, and as part of `release.yml`
 - Uploads `test-results/` as a build artifact on every run
 - Opens a GitHub issue with `foundry-smoke-failure` label on failure
+
+## Svelte Render Comparison
+
+`compare-svelte-render.mjs` answers one question a source diff cannot: did a change to a
+`.svelte` file change what it RENDERS?
+
+Whitespace between elements is significant in Svelte markup and whitespace inside an attribute
+list is not, so a reformat and a real markup change look alike in a diff.
+This compiles every `src/**/*.svelte` on both sides and compares the compiler's output — all
+generated template literals, every DOM-writing statement (`set_text`, `set_class`,
+`set_attribute`, `set_style`, …), and the compiled CSS — with code whitespace and quote style
+normalised away.
+It reports the compiler warning count for the working tree in the same pass.
+
+```bash
+node scripts/compare-svelte-render.mjs
+node scripts/compare-svelte-render.mjs --base <ref> --filter manager/tools
+node scripts/compare-svelte-render.mjs --json --fail-on-drift
+```
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Option | Description |
+|---|---|
+| `--base <ref>` | Ref to compare against. Defaults to `origin/main`. |
+| `--filter <text>` | Only compare components whose path contains `<text>`. |
+| `--json` | Emit the full record as JSON instead of a summary. |
+| `--fail-on-drift` | Exit 1 when any render drift is found; the default reports and exits 0. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Drift is a finding, not a verdict: it means a whitespace text node appeared or disappeared in the
+DOM, which no other gate in this repository can see.
+Read the reported window, decide whether it matters, and pin it with a test where it does.
