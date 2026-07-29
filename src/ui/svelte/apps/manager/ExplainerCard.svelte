@@ -82,12 +82,19 @@
           glued to this close tag: a markup comment on its own line here adds a second
           whitespace text node between glyph and prose.
 
-          `prettier-ignore` keeps the `<span>` on ONE line, and is load-bearing rather than
-          cosmetic (issue 923). Prettier always breaks a `<span>` that contains an `{#if}`
-          onto three lines, whatever the width. That moves the mustache to the SECOND line
-          after the directive, which then suppresses nothing and the violation resurfaces —
-          `eslint-disable-next-line` is anchored to a line, and a formatter moves lines.
-          It must also be the LAST comment before the element or Prettier ignores it.
+          `prettier-ignore` preserves the LINE ANCHOR of the directive above; it is not a
+          rendering guard (issue 923). The render is safe either way — `{' '}` is an
+          expression, and both forms compile to the same template. What breaks is the
+          suppression: Prettier always splits a `<span>` containing an `{#if}` across three
+          lines, whatever the width, which moves the mustache to the second line after an
+          `eslint-disable-next-line` that is anchored to the first. The directive then
+          suppresses nothing and the violation resurfaces as an unsuppressed error.
+          The fence must be the LAST comment before the element or Prettier ignores it.
+
+          The fence is the local fix, not the guard for the class: `linterOptions:
+          { reportUnusedDisableDirectives: 'error' }` on the `.svelte` block in
+          `eslint.config.js` is what makes a directive that has drifted off its violation
+          fail `lint:svelte` instead of rotting quietly.
         --><!-- eslint-disable-next-line svelte/no-useless-mustaches --><!-- prettier-ignore -->
         <span>{#if row.lead}<strong>{row.lead}</strong>{' '}{/if}{row.text}</span>
       </li>

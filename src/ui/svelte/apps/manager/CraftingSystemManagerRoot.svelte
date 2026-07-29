@@ -7240,10 +7240,13 @@
                     <div class="manager-fact" data-gathering-task-fact="biomes">
                       <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
                       <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
-                      <!-- `prettier-ignore` keeps the line below whole and is load-bearing (issue 923): -->
-                      <!-- Prettier splits a `<span>` holding an `{#if}` across several lines whatever -->
-                      <!-- the width, which moves the mustache off the line the directive is anchored -->
-                      <!-- to. It must also be the LAST comment before the element to take effect. -->
+                      <!-- `prettier-ignore` preserves the LINE ANCHOR of the directive below, not -->
+                      <!-- the render (issue 923): Prettier splits a `<span>` holding an `{#if}` -->
+                      <!-- across several lines whatever the width, which moves the mustache off -->
+                      <!-- the line `eslint-disable-next-line` is anchored to, so the suppression -->
+                      <!-- stops applying and the violation resurfaces. The fence must be the LAST -->
+                      <!-- comment before the element to take effect. The durable guard for this -->
+                      <!-- whole class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
                       <!-- eslint-disable-next-line svelte/no-useless-mustaches --><!-- prettier-ignore -->
                       <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                     </div>
@@ -8410,10 +8413,13 @@
                   <div class="manager-fact" data-gathering-event-fact="biomes">
                     <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
                     <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
-                    <!-- `prettier-ignore` keeps the line below whole and is load-bearing (issue 923): -->
-                    <!-- Prettier splits a `<span>` holding an `{#if}` across several lines whatever -->
-                    <!-- the width, which moves the mustache off the line the directive is anchored -->
-                    <!-- to. It must also be the LAST comment before the element to take effect. -->
+                    <!-- `prettier-ignore` preserves the LINE ANCHOR of the directive below, not -->
+                    <!-- the render (issue 923): Prettier splits a `<span>` holding an `{#if}` -->
+                    <!-- across several lines whatever the width, which moves the mustache off -->
+                    <!-- the line `eslint-disable-next-line` is anchored to, so the suppression -->
+                    <!-- stops applying and the violation resurfaces. The fence must be the LAST -->
+                    <!-- comment before the element to take effect. The durable guard for this -->
+                    <!-- whole class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
                     <!-- eslint-disable-next-line svelte/no-useless-mustaches --><!-- prettier-ignore -->
                     <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0 ? selectedGatheringEvent.biomes.length : text('FABRICATE.Admin.Manager.Environment.Events.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
                   </div>
@@ -10176,9 +10182,11 @@
                       <!-- `{' '}` is the separator between the leading span and the trailing label: -->
                       <!-- a literal space is the first token inside the `{#if}` and Svelte trims -->
                       <!-- block-leading whitespace, so the two would run together. -->
-                      <!-- The fence above is load-bearing (issue 923): Prettier splits the line -->
-                      <!-- below across three, which moves the mustache off the line the -->
-                      <!-- directive is anchored to, and the suppression stops applying. -->
+                      <!-- The fence above preserves the LINE ANCHOR of the directive below, not -->
+                      <!-- the render (issue 923): Prettier splits the line below across three, -->
+                      <!-- which moves the mustache off the line the directive is anchored to, -->
+                      <!-- and the suppression stops applying. The durable guard for this whole -->
+                      <!-- class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
                       <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
                       <span class="manager-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-fact-label">{labelParts.rest}</span>{/if}
                     </span>

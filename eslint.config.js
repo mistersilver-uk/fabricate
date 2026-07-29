@@ -314,9 +314,11 @@ export default [
     // reformat (Prettier now owns `.svelte` layout) moves lines. That is safe
     // only because BOTH failure shapes are caught. If a directive slips off its
     // violation, the violation resurfaces as an unsuppressed error. If it lands
-    // somewhere suppressing nothing, this option reports it and `--max-warnings=0`
-    // fails the job. Leaving the second half to an implicit default would let an
-    // unrelated config change silently drop it with no test announcing the loss.
+    // somewhere suppressing nothing, this option reports it AS AN ERROR and the
+    // job exits 1 on its own — at `'error'` the reporting does not go through
+    // `--max-warnings=0`, unlike ESLint's `'warn'` default. Leaving the second
+    // half to that implicit default would let an unrelated config change silently
+    // drop it with no test announcing the loss.
     linterOptions: { reportUnusedDisableDirectives: 'error' },
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },
