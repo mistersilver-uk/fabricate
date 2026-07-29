@@ -8,7 +8,7 @@
  * as `` `${BASE}.${suffix}` ``. This is the half that catches a key that
  * renders as a raw dotted path or a hardcoded fallback (issues 664/665, and
  * the `name:`/`hint:` gap in issue #885 — `src/config/settings.js` registers
- * the theme setting outside `src/ui`, in a shape none of the five patterns
+ * the theme setting outside `src/ui`, in a shape none of the four patterns
  * below match).
  *
  * One base is deliberately EXCLUDED from assertion A: a literal immediately
@@ -22,7 +22,7 @@
  * is NOT excluded — the regex captures it WITHOUT the trailing dot, it
  * resolves to an object, and it is admitted by assertion A on its own terms.
  *
- * Assertion B (narrow, retained): a LEAF reference in one of five specific
+ * Assertion B (narrow, retained): a LEAF reference in one of four specific
  * shapes must resolve to a STRING, not merely something. This is the
  * namespace-shadowing detector — a string occupying a namespace slot
  * silently shadows every key beneath it, and `Localization#localize()`
@@ -70,7 +70,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC_ROOT = join(ROOT, 'src');
 
-// Assertion B's five leaf-reference shapes. Each pattern captures the literal
+// Assertion B's four leaf-reference shapes. Each pattern captures the literal
 // key in group 2. A dynamic first argument (e.g. `text(varKey)`, `labelKey:
 // someVar`) does not start with a quote and is therefore never matched —
 // exactly the intended skip.
