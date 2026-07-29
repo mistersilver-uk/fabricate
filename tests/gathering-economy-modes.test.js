@@ -1151,6 +1151,16 @@ describe('gathering economy — library task dcOverride composition (issue 904)'
     assert.equal(composedTask({}).dcOverride, null);
   });
 
+  it("composes dcOverride: '' to null, not 0 (the Number('') === 0 trap)", () => {
+    const composed = composedTask({ dcOverride: '' });
+    assert.equal(composed.dcOverride, null);
+    assert.notEqual(composed.dcOverride, 0, "a naive Number(dcOverride) coercion would mint a spurious 0");
+  });
+
+  it('composes a non-numeric string dcOverride to null (guarded by Number.isFinite)', () => {
+    assert.equal(composedTask({ dcOverride: 'abc' }).dcOverride, null);
+  });
+
   it('is idempotent: re-composing an already-composed dcOverride round-trips (finite and null)', () => {
     const withDc = composedTask({ dcOverride: 9 });
     assert.equal(
