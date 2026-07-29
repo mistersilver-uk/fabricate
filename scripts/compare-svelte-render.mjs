@@ -69,8 +69,22 @@
  *   --json            emit the full record as JSON instead of a summary
  *   --fail-on-drift   exit 1 when any render drift is found (default: report and exit 0)
  *
- * Exit codes: 0 clean (or drift without `--fail-on-drift`), 1 drift, 2 a component failed to
- * compile on either side.
+ * EXIT CODES. 2 is kept distinct from 1 so a caller can tell "could not compare" apart from
+ * "compared, and found drift":
+ *
+ *   0   compared at least one component and found nothing blocking (or found drift, without
+ *       `--fail-on-drift`)
+ *   1   render drift, with `--fail-on-drift`
+ *   2   the run could not compare — the base ref does not resolve, no component was compared, or
+ *       a component failed to compile on either side
+ *
+ * A run that compares NOTHING is a failure here, not a pass. It used to be a pass, and silently:
+ * `--base` naming an unresolvable ref made `readAtRef` report every component as absent from the
+ * base, so the run printed `compared=0`, listed all ~240 components as `new`, and exited 0 EVEN
+ * under `--fail-on-drift`. That is this script's own instance of the vacuous gate issue 923
+ * exists to remove — a check reporting success while checking nothing. The CI shape is the
+ * dangerous one: `actions/checkout` fetches a single commit by default, so `origin/main` — this
+ * script's default base — is frequently absent there.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -117,7 +131,32 @@ function parseArgs(argv) {
   return options;
 }
 
-/** `git show <ref>:<path>`, or null when the path does not exist there. */
+/**
+ * Resolve a ref to a commit SHA, or null when it does not resolve in this repository.
+ *
+ * `^{commit}` makes this reject a ref that exists but does not name a commit, and `--quiet` turns
+ * the failure into a plain exit code so the caller can word its own message.
+ */
+function resolveCommit(ref) {
+  try {
+    // execFile, not a shell: `^` and `{}` are metacharacters to a shell, and none is quoted here.
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `git show <ref>:<path>`, or null when the path does not exist there.
+ *
+ * Every failure reads as "absent from the base", which is only sound because `main` has already
+ * proved the ref resolves. Without that preflight an unresolvable ref makes EVERY component look
+ * new and the whole run vacuous.
+ */
 function readAtRef(ref, relativePath) {
   try {
     // execFile, not a shell: an MSYS shell rewrites the `<ref>:<path>` argument on Windows.
@@ -364,6 +403,21 @@ function window_(base, head) {
 function main() {
   const options = parseArgs(process.argv.slice(2));
 
+  // Preflight, before any compilation: an unresolvable base is a failed run, not a clean one.
+  const baseCommit = resolveCommit(options.base);
+  if (!baseCommit) {
+    console.error(
+      `compare-svelte-render: base ref "${options.base}" does not resolve to a commit here.`
+    );
+    console.error('  Nothing can be compared against it, so this run fails instead of reporting');
+    console.error('  a clean sweep over zero comparisons.');
+    console.error(
+      `  On CI, actions/checkout fetches a single commit by default: use fetch-depth: 0, or fetch` +
+        ` the ref explicitly (git fetch origin ${options.base}), before running this.`
+    );
+    return 2;
+  }
+
   const components = toRepositoryPaths(
     repoRoot,
     listSvelteComponents(path.join(repoRoot, 'src'))
@@ -371,6 +425,9 @@ function main() {
 
   const report = {
     base: options.base,
+    // The resolved SHA, because `--base origin/main` is a moving target: without it a recorded
+    // report cannot say WHICH commit it found clean.
+    baseCommit,
     components: components.length,
     compared: 0,
     added: [],
@@ -452,6 +509,18 @@ function main() {
   }
 
   if (report.failed.length > 0) return 2;
+  // Same rule as the base-ref preflight, applied to the outcome rather than the input: a run that
+  // compared nothing proves nothing, so it must not read as a pass. The usual cause is a
+  // `--filter` that matches no component.
+  if (report.compared === 0) {
+    const scope = options.filter ? ` matching --filter "${options.filter}"` : '';
+    console.error(
+      `compare-svelte-render: compared 0 of ${report.components} components${scope} against` +
+        ` ${options.base} — a run that compares nothing cannot detect drift, so it fails rather` +
+        ' than reporting clean.'
+    );
+    return 2;
+  }
   return options.failOnDrift && report.drift.length > 0 ? 1 : 0;
 }
 
