@@ -65,6 +65,43 @@ class FakeItem {
   }
 }
 
+/**
+ * A FakeItem that models Foundry's STRICT embedded-document deletion (issue 917).
+ *
+ * On V13/V14 `Item#delete` resolves the id through `collection.get(id, {strict: true})`
+ * and THROWS when it is already gone, so a duplicate consumption-plan entry for one
+ * shared unit aborts mid-consumption — after earlier ingredients are deleted and
+ * before any result exists. A permissive fake would pass with two entries and let
+ * that contract ship unverified.
+ */
+class StrictFakeItem extends FakeItem {
+  constructor(id, name, quantity = 1, essences = null) {
+    super(id, name, quantity);
+    this.deleteCalls = 0;
+    this._essences = essences || {};
+  }
+  getFlag(scope, key) {
+    if (scope !== 'fabricate') return undefined;
+    const scopes = { fabricate: { essences: this._essences }, essences: this._essences };
+    return String(key)
+      .split('.')
+      .reduce((value, part) => (value == null ? undefined : value[part]), scopes);
+  }
+  async delete() {
+    this.deleteCalls += 1;
+    if (this._deleted) {
+      throw new Error(`Item ${this.id} does not exist in the EmbeddedCollection Actor.items`);
+    }
+    this._deleted = true;
+  }
+  async update(payload) {
+    if (this._deleted) {
+      throw new Error(`Item ${this.id} does not exist in the EmbeddedCollection Actor.items`);
+    }
+    return super.update(payload);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // FakeActor
 // ---------------------------------------------------------------------------
@@ -298,6 +335,60 @@ test('simple mode: validate, consume ingredients, create result item', async () 
   assert.ok(Array.isArray(result.results), 'result.results should be an array');
   assert.equal(result.results.length, 1, 'one result item should be created');
   assert.equal(result.results[0].name, 'Plank', 'result item should be the plank');
+});
+
+test('simple mode: a 1-unit dual-essence carrier funding two requirements is deleted exactly once', async () => {
+  // Issue 917: the essence block contributes AT MOST ONE plan entry per item key.
+  // One entry per (item, requirement) would call delete() twice on a 1-unit stack —
+  // the second on a document that is already gone, which throws mid-consumption.
+  const systemId = 'sys-917-shared-essence';
+  const system = buildSystem({ id: systemId });
+  system.features.essences = true;
+  setupGame(system);
+
+  const duskcrystal = new StrictFakeItem('duskcrystal', 'Duskcrystal', 1, {
+    radiant: 2,
+    shadow: 1,
+  });
+  const sourceActor = new FakeActor('Alchemist', [duskcrystal]);
+  const craftingActor = new FakeActor('Alchemist');
+
+  const ingredientSet = IngredientSet.fromJSON({
+    id: 'set-917-shared',
+    ingredientGroups: [
+      {
+        id: 'group-917-radiant',
+        options: [{ match: { type: 'essence', essenceId: 'radiant', amount: 2 }, quantity: 1 }],
+      },
+      {
+        id: 'group-917-shadow',
+        options: [{ match: { type: 'essence', essenceId: 'shadow', amount: 1 }, quantity: 1 }],
+      },
+    ],
+  });
+  const recipe = new Recipe({
+    id: 'recipe-917-shared',
+    name: 'Twilight Draught',
+    craftingSystemId: systemId,
+    ingredientSets: [ingredientSet.toJSON()],
+    resultGroups: [
+      { id: 'rg-917', results: [{ id: 'result-917', componentId: 'comp-draught', quantity: 1 }] },
+    ],
+  });
+
+  const recipeManager = new RecipeManager();
+  const engine = new CraftingEngine(recipeManager, null, buildResolutionService(system));
+  stubEngine(
+    engine,
+    { success: true, outcome: null, value: null, data: {} },
+    new FakeItem('result-917', 'Draught')
+  );
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, true, 'one shared carrier funds both essence requirements');
+  assert.equal(duskcrystal.deleteCalls, 1, 'deleted exactly once — a second call would throw');
+  assert.equal(duskcrystal._updates.length, 0, 'a fully consumed 1-unit stack is deleted, not updated');
 });
 
 test('simple mode: craft consumes the owned item whose managed component carries a required tag', async () => {

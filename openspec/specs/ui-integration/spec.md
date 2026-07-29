@@ -74,9 +74,10 @@ Product UI padding, margin, and gap spacing must derive from a shared 4px-based 
 - Documented literal exemptions that must NOT be tokenized: `1px` hairlines (borders, dividers, and `-1px` overlap bleeds) and one-off fixed dimensions in the 34–42px range (search-input icon clearances and grid-alignment offsets) where the value reserves space for a fixed element rather than expressing spacing rhythm.
 - Positioning offsets (`left`/`right`/`top`/`bottom`), `width`/`height`, `border-*` widths, `border-radius`, `grid-template-columns` track sizes, `@container`/media breakpoints, and font sizes are not spacing-scale members and remain literal.
 
-### Shared manager primitives
+### Shared product UI primitives
 
-Wherever two or more manager surfaces perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component every site imports.
+Wherever two or more product UI surfaces perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component every site imports.
+The subject is every product surface — the GM manager and the player crafting, alchemy, gathering, inventory, and Journal surfaces alike — because two surfaces rendering the same meaning are duplicates whichever audience they face.
 A shared CSS class that each site hand-rolls markup against does not satisfy this, and neither does a copy.
 Adding flexibility to the primitive that already owns the meaning takes precedence over introducing a second component that owns half of it.
 A primitive that coexists with unconverted duplicates has added a variant rather than removed one.
@@ -85,6 +86,15 @@ A primitive's CSS MUST live in its own scoped `<style>` block rather than in `st
 Required-screenshot detection maps changed file paths to affected views, so global-sheet styling makes every tweak look like a global change and demands a wide core frame set, while co-located styling scopes the evidence to the views that actually render the component.
 Only two kinds of rule for a primitive stay in the global sheet: what must beat Foundry's host CSS (button geometry, focus rings) and LAYOUT-CONTEXT rules whose subject is reached through an ancestor the component does not render, such as how a specific container places, stretches, or spans the panel.
 A layout-context rule places the primitive and MUST NOT restyle it: no `font-size`, `font-family`, `font-weight`, `border`, `border-radius`, or `background`.
+The player crafting app's requirement rail, requirement tile, essence pool, consumption-plan panel, and essence-contribution chip are held to that CSS rule as player-side primitives, which is why they added no rules to `styles/fabricate.css`.
+
+Two live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+
+- The repo carries five hand-rolled horizontal fill bars: `src/ui/svelte/apps/gathering/ChanceBar.svelte`, `src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte`, `src/ui/svelte/apps/journal/RunCard.svelte`, `src/ui/svelte/components/ActorSelectTopBar.svelte`, and now `src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte`.
+  The primitive that should exist is a shared `FillBar` leaf that `ChanceBar` is itself rebuilt on: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would make it the second component owning half a meaning rather than the primitive that owns one.
+  Conversion is deferred because converting the other four would drag their screenshot-label sets into a single evidence run.
+- `tests/components/mounted-harness-primitive-allowlist.test.js` requires every `SHARED_PRIMITIVES` entry to be reachable from `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`, so the allowlist that encodes "this is a shared primitive" is structurally manager-scoped in exactly the way this rule is not.
+  Only its second test carries that assumption; the fix is to widen it to a declared root set rather than one root.
 
 #### No-state messages
 
@@ -133,6 +143,7 @@ Responsive layout rules for application bodies must therefore be keyed to the ap
 - The player `Gathering` app responds to its own app container width: active/history regions collapse to one column, task rows reserve icon width, and row metadata stacks without horizontal overflow.
 - The player `Gathering` view's three columns (environments list, centre detail, right inspector) all carry the same non-zero minimum width so the centre column cannot collapse to nothing ahead of the side columns; the three columns scale down together proportionally as the window narrows.
   Below the combined three-column minimum the columns reflow into a single vertical stack so the view stays usable instead of clipping or overflowing.
+- The player `Crafting` view's requirement rail responds to its own app container width: slot tiles wrap onto further rows rather than shrinking below their minimum tile size, and the essence pool's carrier and requirement bars reflow rather than crushing when a set carries three or more essence requirements.
 - The unified Fabricate window enforces a minimum window width and height, derived from the gathering view's column minimums plus the navigation rail and chrome, so a resize can never shrink the window below the size where the columns would be clipped.
 - These responsive rules are presentation-only.
   They must not change gathering runtime semantics, validation behavior, task visibility, attemptability, or persistence.
@@ -596,6 +607,8 @@ Capabilities:
 
 - Browse, create, edit, duplicate when supported, and delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
+- Set an optional colour for an essence, chosen from the shared token palette through the manager's existing colour picker with custom hex entry disabled.
+  The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
 - Set optional source component identity by picker/drag-drop only when effect transfer is enabled.
   The source component may in turn expose a source item UUID.
 - In Manager, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
@@ -1543,6 +1556,13 @@ Alchemy is the only conditional entry; the others are always present.
   Each block renders inputs only; intermediate step yields are not shown.
   A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
   A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
+- Only the **active** execution step's requirement block is interactive; every other step stays a read-only preview, consistent with the static-preview contract above.
+  The active step is derived the way the engine derives it — the recipe's active run's `currentStepIndex` (`0` when there is no active run) indexed into `Recipe.getExecutionSteps()` — and is baked onto the projected model as `activeStepId` / `activeStepIndex`, so the rendered rail and the executing engine resolve the same step from the same reads.
+  Without this, a player whose run is parked at a later step edits a step-0 rail that drives a later step's craft: group ids are randomly generated and so survive a step mismatch by luck, but item references are not step-scoped and would actively steer the wrong step's consumption.
+  A projection that renders no step list at all (a single-step recipe, or any non-`simple` mode) is covered by the same rule, because its displayed step is read-only whenever it is not the active step.
+- A step's requirement block is also read-only while its **time gate is armed** — an in-progress timed step whose availability time has not been reached.
+  That step's consumption is already committed, so offering a selection would misrepresent what the craft will spend.
+- The projection is presentation-only and is never the enforcement point: the engine remains authoritative and drops any player allocation whose step does not match the step it actually resolved, because the displayed index can move between render and click (a time gate maturing on a world-time tick, or another owner advancing the run).
 - A fully revealed timed implicit recipe projects its positive authored
   `timeRequirement` as `RecipeListingModel.duration`.
   For a fully revealed `simple` recipe with more than one execution step, each
@@ -1656,6 +1676,36 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - A set's craftability folds in its essence requirements, its **per-set** Tool
   requirements (Tools are per-set, not recipe-global), and the actor-bound
   currency probe, reusing the recipe manager's `evaluateCraftability` per-set pass.
+- A set's craftability also carries an `essencePool` describing the shared essence
+  funding for that set: `requirements` (per essence group — `groupId`, `essenceId`,
+  name, icon, `colorToken`, `need`, `delivered`, `owned`, `satisfied`), `carriers`
+  (per held item — `itemKey`, `componentId`, name, image, `ownedUnits`,
+  `allocatedUnits`, `perUnit`), the resolved `allocation`, its `totals`, and the
+  `suggested` allocation.
+- `carriers[].ownedUnits` is the units remaining AFTER the set's non-essence
+  consumption plan has claimed, derived from the resolver's own ledger.
+  No UI or helper re-reads `item.system.quantity` to compute it: that field is
+  game-system-specific and can be absent or `NaN`, and a raw stack count would
+  offer the player units the craft cannot spend.
+- `requirements[].delivered` and `requirements[].owned` are named apart
+  deliberately.
+  `delivered` is the essence amount the resolved allocation supplies to that
+  requirement — the tile's numerator — while `owned` is the essence amount held
+  across every matching carrier.
+  In this projection and the rail it feeds, neither is reported as the
+  component/tag `have`, which is not net of plan and would read off a different
+  denominator in a rail whose invariant is that the tiles show what the craft
+  consumes.
+  The session shopping aggregation is the one deliberate exception, for a reason
+  that does not apply here (see §Shopping List Panel).
+  An essence requirement's own ingredient state carries `delivered` for the same
+  reason and by the same rule.
+  The key is renamed rather than aliased: leaving it named `have` while changing
+  what it means would re-create the ambiguity inside a single array, where a
+  component/tag entry's `have` and an essence entry's would answer different
+  questions under one name.
+- `essencePool` is `null` when the crafting system has essences disabled, matching
+  the existing per-set essence-state projection.
 
 ##### Check Descriptor
 
@@ -1723,8 +1773,48 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - Show blocking reasons when not craftable (derived from `browseStatus`).
 - Essence requirements use the GM-authored `EssenceDefinition.icon` after canonical icon normalization for legacy set-level requirements, first-class essence ingredient tiles, and essence choices within mixed alternatives.
   Missing or unusable icons use `DEFAULT_ESSENCE_ICON`.
+  An essence's authored `EssenceDefinition.colorToken` additionally tints its glyph and its pool bar through the shared `--fab-tag-*` palette, and a `null` or unrecognized token falls back to the theme accent — which is what every essence renders as today, so an unauthored system is unchanged.
+  The tint is scoped to the glyph and the bar; label text keeps the standard body/muted text colours, so an authored colour can never reduce label contrast.
   Non-essence images and the existing accessible labels and selection semantics remain unchanged.
+- A component or tag requirement tile treats Foundry's generic `icons/svg/item-bag.svg` sentinel as "no image" and renders the tile's fallback glyph, never the bag itself.
+  The sentinel reaches a tile two ways — a tag requirement with nothing matching in inventory has no item to read an image from, and a matched item may carry the bag literal as its own `img` — and both resolve to the glyph.
+  It never falls back to `DEFAULT_RECIPE_IMAGE`: the blueprint is the _recipe's_ fallback (see `data-models` §Recipe requirement 16) and is not a material's fallback.
+  The recipe-image chokepoints and the tool-state image path keep their existing fallbacks unchanged.
 - (No learn action on the Crafting tab: recipe learning is wired through the Inventory surface only — see §Books & Scrolls learning.)
+
+##### Requirement Rail
+
+- A set's fixed, choice and essence requirements render in ONE rail of uniform slot tiles, replacing the separate image grid, the stacked alternatives picker, and the essence list.
+  Three disconnected surfaces cannot tell a player which requirement still needs attention, which is the whole job of this area.
+- Every slot carries one of three states — **met**, **partial**, **short** — because a two-state surface renders an untouched choice and a genuinely unaffordable one identically, and marks a half-filled essence as an error.
+  A fixed requirement is met at or above its need and short below it; an unchosen choice slot is **partial** (a to-do, never an error); a chosen choice slot is met or short on its own numbers; an essence requirement is short at zero delivered, partial while partly delivered, and met when fully delivered.
+- At most ONE chooser is open at a time; the open slot is the rail's single point of interaction.
+- Focus auto-advances to the first unsatisfied slot until the player opens a slot themselves, after which the player's choice sticks.
+  The remembered slot is re-validated on every read against the live slot list, falling back to the first unsatisfied slot and then to the first slot, so changing set, step or recipe can never leave a stale or absent chooser open.
+  Clicking the open slot's tile again closes the chooser instead of reopening it, and the closed choice is remembered the same scoped way: it stays closed until the player opens a slot again (including re-clicking the same tile), while changing set, step or recipe re-derives the default open slot as before.
+- Auto-advance never steals focus, and it announces through its **own** live region rather than the progressive stage list's reorder region, because a progressive recipe renders both surfaces at once.
+- The rail is a **disclosure**, not a tablist: fixed slots are not selectable, so tab semantics would promise a selection the surface does not offer.
+  A choice or essence slot is a `<button>` carrying `aria-expanded` and `aria-controls` over the whole tile column, and the panel it opens is labelled back at its tile.
+  That panel is itself an exposed named `role="region"`, because `aria-labelledby` on a roleless element exposes nothing to assistive technology.
+  A fixed slot is `role="img"` with a label, because an `aria-label` on a non-focusable span exposes nothing.
+- Open state is drawn as an accent-soft fill plus a caption line, never as an accent ring: the app already paints an accent ring for `:focus-visible`, so a ring would make "focused" and "open" indistinguishable to a keyboard user.
+  Open state and satisfaction are independent, so the open treatment sits on top of the status border rather than replacing it.
+- "Pick for me" fills the set's unmade choices and suggests an essence allocation.
+  It lives in the rail header, scoped to the rail, rather than in the app footer: the rail renders inside step and routed bodies while Craft sits in a fixed footer outside the scrolling body.
+  On an infeasible inventory it returns the best partial suggestion and an honest shortfall rather than throwing or looping.
+- Every rail control is keyboard-operable and named for assistive technology, and bar transitions honour `prefers-reduced-motion`.
+
+##### Essence Pool and Consumption Plan
+
+- A set's essence requirements are funded from one shared, player-editable **essence pool**, scoped to a single ingredient set on a single step, because that is the granularity at which the engine consumes.
+- Each carrier row offers a keyboard-operable stepper allocating units of one held item to the pool, and the allocation the player sees is exactly what the craft consumes.
+- A carrier's allocatable maximum is its `ownedUnits` — the units left AFTER the set's non-essence plan has claimed — never the raw stack quantity, so the stepper cannot allocate the player into an infeasible state.
+- A requirement's ratio reports `delivered / need` as essence amounts, so a satisfied requirement reads exactly `need / need` rather than the whole matching inventory.
+  Unit-granular overshoot is visible in the per-carrier allocation, never in a requirement's ratio.
+- The **consumption-plan panel** states what the craft will spend before it is spent: one row per planned item with the quantity that item contributes, plus a pending line naming the requirements still to choose.
+  That "still to choose" list is joined with the platform list formatter rather than an authored separator key, so the join is correct in every locale.
+- Legacy set-level essence requirements (`IngredientSet.essences`) are threshold-only and never consumed, so they cannot enter the pool.
+  They keep their existing requirement-row presentation.
 
 #### Shopping List Panel
 
@@ -1733,6 +1823,8 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - Essence shortages from first-class ingredient states and legacy set-level essence states retain the first nonblank GM-authored icon across aggregation.
   Later blank values do not erase it.
   Render-time canonical normalization uses `DEFAULT_ESSENCE_ICON` when the retained value is missing or unusable, without changing need/have totals.
+- The aggregation shops an essence requirement against the amount **held**, not the amount the plan delivers: `RecipeManager.evaluateShoppingRequirement` deliberately restates an essence state's `owned` as the `have` it aggregates on.
+  This is the one place `owned` is reported as `have` (see §Per-Set Craftability), because `delivered` is capped at `need` and a shortage shopped against it would always read satisfied.
 
 #### Right Rail (Run Summary or Shopping List)
 

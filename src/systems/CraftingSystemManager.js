@@ -1121,7 +1121,29 @@ export class CraftingSystemManager {
     return normalized;
   }
 
+  /**
+   * The GM-authored per-essence colour (issue 917): a bare `--fab-tag-*` palette key,
+   * or null when unauthored. There is deliberately NO `customColor` sibling — the
+   * palette is the whole vocabulary, because a free hex cannot be guaranteed legible
+   * against all seven themes. Stored bare (the `--fab-tag-` prefix is stripped) so a
+   * round-trip through an export cannot accumulate prefixes.
+   *
+   * The palette itself is not validated here: an unrecognized token renders as the
+   * theme accent, which is what an unauthored essence renders as, so a hand-edited or
+   * imported value degrades rather than being silently discarded.
+   * @private
+   */
+  _normalizeEssenceColorToken(value) {
+    const token = String(value ?? '')
+      .trim()
+      .replace(/^--fab-tag-/, '');
+    return token || null;
+  }
+
   _normalizeEssenceDefinition(entry, usedIds = new Set()) {
+    // BOTH branches below are whitelist REBUILDS that drop any key they do not name,
+    // so every persisted field must appear in both or it is silently lost on the next
+    // save. `colorToken` is the newest such field (issue 917).
     if (typeof entry === 'string') {
       const base = entry.trim();
       if (!base) return null;
@@ -1130,6 +1152,7 @@ export class CraftingSystemManager {
         name: base,
         description: '',
         icon: 'fas fa-mortar-pestle',
+        colorToken: null,
         sourceComponentId: null,
         sourceItemUuid: null,
         associatedSystemItemId: null, // transitional alias
@@ -1153,6 +1176,7 @@ export class CraftingSystemManager {
       name: rawName || id,
       description: String(entry.description || '').trim(),
       icon: String(entry.icon || '').trim() || 'fas fa-mortar-pestle',
+      colorToken: this._normalizeEssenceColorToken(entry.colorToken),
       sourceComponentId,
       sourceItemUuid,
       associatedSystemItemId: sourceComponentId, // transitional alias

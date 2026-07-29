@@ -657,7 +657,7 @@ test('_projectOwnedComponents surfaces resolved essences when the system has ess
 
   const ember = listing.components.find((c) => c.componentId === 'emberroot');
   const springwater = listing.components.find((c) => c.componentId === 'springwater');
-  assert.deepEqual(ember.essences, [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 }]);
+  assert.deepEqual(ember.essences, [{ id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: null, quantity: 2 }]);
   assert.deepEqual(springwater.essences, [], 'a component with no essences projects an empty list');
   // The Produces result surfaces the result component's essences too.
   assert.deepEqual(listing.recipes[0].result.essences, []);
@@ -822,8 +822,8 @@ test('an essence-only recipe projects a resolved essenceRequirement', () => {
   const projected = projectEssenceRecipe(bladeVenom);
   assert.equal(projected.concrete, null, 'an essence set has no concrete multiset');
   assert.deepEqual(projected.essenceRequirement, [
-    { id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', quantity: 2 },
-    { id: 'water', name: 'Water', icon: 'fas fa-droplet', quantity: 1 },
+    { id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', colorToken: null, quantity: 2 },
+    { id: 'water', name: 'Water', icon: 'fas fa-droplet', colorToken: null, quantity: 1 },
   ]);
 });
 

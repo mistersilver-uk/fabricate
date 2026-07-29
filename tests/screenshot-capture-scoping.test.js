@@ -307,6 +307,60 @@ test('a scoped run renumbers the counter yet still selects the intended candidat
   }
 });
 
+// ── Requirement-rail capture states (issue 917) ────────────────────────────────
+
+// Walk order, which is also the order they must appear in SCREENSHOT_CAPTURE_ORDER:
+// scoping only FILTERS labels, never reorders them, so the relative order here is what
+// keeps each view's single frame the one `collect` picks.
+const REQUIREMENT_RAIL_LABELS = [
+  'player-crafting-slot-rail',
+  'player-crafting-tag-unmatched',
+  'player-crafting-essence-pool',
+  'player-crafting-pick-for-me',
+  'player-crafting-essence-pool-shared',
+  'player-crafting-consumption-plan',
+];
+
+test('every requirement-rail label is a capturable phase-E routine in walk order', () => {
+  for (const label of REQUIREMENT_RAIL_LABELS) {
+    assert.ok(isCapturableLabel(label), `${label} is not registered in SCREENSHOT_CAPTURE_ORDER`);
+    // These frames are captured in the player-app walk, never the manager walk, so a
+    // rail-only PR must be able to skip phase-D0's sections entirely.
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_E, label);
+    // The generic drift guard below proves every map label has a harness literal; this
+    // states the stronger fact for these six — the literal is a real capture call.
+    assert.match(HARNESS, new RegExp(`screenshot\\(page, '${label}'\\)`), label);
+  }
+  // The block sits between the existing essence frames and the multi-step frame, which
+  // is where the walk actually captures it.
+  assert.ok(
+    captureOrderIndex('player-crafting-essence-shopping') < captureOrderIndex(REQUIREMENT_RAIL_LABELS[0]),
+  );
+  assert.ok(
+    captureOrderIndex(REQUIREMENT_RAIL_LABELS.at(-1)) < captureOrderIndex('player-crafting-multistep'),
+  );
+  for (let i = 1; i < REQUIREMENT_RAIL_LABELS.length; i += 1) {
+    assert.ok(
+      captureOrderIndex(REQUIREMENT_RAIL_LABELS[i - 1]) < captureOrderIndex(REQUIREMENT_RAIL_LABELS[i]),
+      `${REQUIREMENT_RAIL_LABELS[i - 1]} must be captured before ${REQUIREMENT_RAIL_LABELS[i]}`,
+    );
+  }
+});
+
+test('a requirement-rail-only change needs phase-E and NO phase-D0 section', () => {
+  const targets = smokeLabelsForChangedFiles(['src/ui/svelte/util/requirementSlots.js']);
+  assert.deepEqual(targets, REQUIREMENT_RAIL_LABELS);
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_E, targets), true);
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_D0, targets), false);
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    assert.equal(
+      isD0SectionNeededForTargets(section.name, targets),
+      false,
+      `a rail-only target incorrectly kept D0 section '${section.name}'`,
+    );
+  }
+});
+
 // ── Map integrity / drift guards ───────────────────────────────────────────────
 
 test('the capture map is a playwright-free, no-autorun pure module', () => {

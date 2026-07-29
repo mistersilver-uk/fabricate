@@ -7,11 +7,25 @@
   new-code duplication gate).
 -->
 <script>
-  import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
+  import { DEFAULT_CRAFTING_IMAGE, GENERIC_ITEM_IMAGE } from '../../util/craftingImageDefaults.js';
 
-  let { src = '', alt = '', size = 48 } = $props();
+  let {
+    src = '',
+    alt = '',
+    size = 48,
+    // Opt-in glyph fallback for MATERIAL tiles (issue 917). Recipe surfaces pass no
+    // glyph and keep the blueprint fallback byte-for-byte; a component or tag tile
+    // passes one, which additionally makes Foundry's generic item-bag literal read as
+    // "no image" rather than as artwork.
+    glyph = null
+  } = $props();
 
-  const hasImage = $derived(typeof src === 'string' && src.trim() !== '');
+  const trimmed = $derived(typeof src === 'string' ? src.trim() : '');
+  const hasGlyph = $derived(typeof glyph === 'string' && glyph.trim() !== '');
+  // The sentinel is only "no image" for a tile that has a glyph to fall back to;
+  // without one, blanking it would leave nothing at all to render.
+  const hasImage = $derived(trimmed !== '' && !(hasGlyph && trimmed === GENERIC_ITEM_IMAGE));
+  const showGlyph = $derived(hasGlyph && !hasImage);
   const resolved = $derived(hasImage ? src : DEFAULT_CRAFTING_IMAGE);
   const dimension = $derived(`${size}px`);
 </script>
@@ -19,9 +33,14 @@
 <span
   class="crafting-thumb"
   class:is-fallback={!hasImage}
+  class:is-glyph={showGlyph}
   style={`--crafting-thumb-size:${dimension}`}
 >
-  <img src={resolved} alt={alt} />
+  {#if showGlyph}
+    <i class={glyph} aria-hidden="true" title={alt || undefined}></i>
+  {:else}
+    <img src={resolved} alt={alt} />
+  {/if}
 </span>
 
 <style>
@@ -49,5 +68,14 @@
     padding: 6px;
     box-sizing: border-box;
     opacity: 0.85;
+  }
+
+  .crafting-thumb.is-glyph {
+    color: var(--fab-text-muted);
+  }
+
+  .crafting-thumb.is-glyph i {
+    font-size: calc(var(--crafting-thumb-size, 48px) * 0.45);
+    line-height: 1;
   }
 </style>

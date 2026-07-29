@@ -137,15 +137,16 @@ test('component-vs-tag overlap is craftable in both group orders', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Multi-essence overlap: the only carrier of one essence is a dual item that also
-// carries the other essence; the resolver must steer the dual to the essence only
-// it can satisfy.
+// Multi-essence overlap. Issue 917 INVERTED this case by design: two essence
+// requirements in one set are now funded from a single shared block, so one unit of
+// a dual carrier credits BOTH of them. The pre-917 expectation (dual -> earth,
+// fire-only -> fire, two units spent) described the per-group draw-down this change
+// deliberately relaxes; the set is still craftable, but it now costs one unit, and
+// `fire-only` is left alone because nothing needs it.
 // ---------------------------------------------------------------------------
 
-test('multi-essence overlap steers the dual item to the essence only it satisfies', () => {
+test('multi-essence overlap funds both essence requirements from one shared carrier', () => {
   const probe = essenceProbe({ dual: { fire: 2, earth: 2 }, 'fire-only': { fire: 2 } });
-  // fire group first: greedy would grab `dual` for fire, stranding earth (dual is
-  // the only earth carrier). The search reassigns fire -> fire-only, earth -> dual.
   const set = new IngredientSet({
     id: 's',
     ingredientGroups: [essenceGroup('g-fire', 'fire', 2), essenceGroup('g-earth', 'earth', 2)],
@@ -155,10 +156,11 @@ test('multi-essence overlap steers the dual item to the essence only it satisfie
     resolveItemEssences: probe,
   });
 
-  assert.equal(selection.success, true, 'earth can only come from the dual item, fire from fire-only');
+  assert.equal(selection.success, true, 'the block funds fire and earth together');
   const consumed = consumedByUuid(selection);
-  assert.equal(consumed.dual, 1, 'the dual item is consumed once (for earth)');
-  assert.equal(consumed['fire-only'], 1, 'the fire-only item covers fire');
+  assert.equal(consumed.dual, 1, 'the dual carrier is consumed once and credits both essences');
+  assert.equal(consumed['fire-only'], undefined, 'no second unit is spent on an already-funded essence');
+  assert.equal(selection.plan.length, 1, 'one plan entry — one item key, one draw');
 });
 
 // ---------------------------------------------------------------------------

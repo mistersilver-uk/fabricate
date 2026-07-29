@@ -10,8 +10,22 @@
     buttonTitle = 'Choose colour',
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
+    // Forwarded to the popover: false offers the preset palette only. See
+    // ManagerColorPopover for why the per-essence colour (issue 917) has no free hex.
+    allowCustom = true,
+    // TRUE when the caller's model holds no authored colour at all. `colorToken`
+    // normalizes an absent value to `sage`, so without this the trigger paints a Sage
+    // swatch and the popover marks Sage selected while the caller's own copy says "No
+    // colour" — the control would assert an authored choice nobody made. Unset paints a
+    // neutral swatch and selects no preset; picking any preset ends the unset state
+    // through the caller's own `onChange`.
+    unset = false,
     onChange = () => {}
   } = $props();
+
+  // Neutral, from the theme's own border token: visibly a swatch, unmistakably not one
+  // of the eight saturated palette colours.
+  const UNSET_SWATCH = '--manager-color-swatch: var(--fab-border-strong)';
 
   let open = $state(false);
   let pickerRoot = $state(null);
@@ -147,10 +161,11 @@
     type="button"
     bind:this={triggerButton}
     class="manager-color-picker-trigger"
+    class:is-unset={unset}
     aria-expanded={open}
     aria-label={buttonTitle}
     title={buttonTitle}
-    style={swatchStyle()}
+    style={unset ? UNSET_SWATCH : swatchStyle()}
     onclick={togglePicker}
   >
     <span class="manager-color-swatch" aria-hidden="true"></span>
@@ -161,6 +176,8 @@
       {customColor}
       {presetGridLabel}
       {customHexLabel}
+      {allowCustom}
+      {unset}
       {onChange}
       popoverStyle={popoverStyle}
       portalTarget={() => getPopoverHost()}

@@ -8,6 +8,15 @@
     customColor = '',
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
+    // Whether the free-hex entry is offered alongside the preset palette. Callers whose
+    // stored model has no `customColor` sibling (the per-essence colour, issue 917) set
+    // this false: the palette is then the whole vocabulary, because a free hex cannot be
+    // guaranteed legible across all seven themes.
+    allowCustom = true,
+    // TRUE when the caller holds no authored colour. `normalizedToken` folds an absent
+    // value onto `sage`, so without this the palette would mark Sage selected for a
+    // model that has chosen nothing. See ManagerColorPicker for the full reasoning.
+    unset = false,
     onChange = () => {},
     onDismiss = () => {},
     manageDismiss = true,
@@ -71,7 +80,7 @@
     {#each presets as preset (preset.token)}
       <button
         type="button"
-        class={`manager-color-preset ${normalizedToken(colorToken) === preset.token ? 'is-selected' : ''}`}
+        class={`manager-color-preset ${!unset && normalizedToken(colorToken) === preset.token ? 'is-selected' : ''}`}
         aria-label={preset.label}
         title={preset.label}
         data-manager-color-token={preset.token}
@@ -82,13 +91,15 @@
       </button>
     {/each}
   </span>
-  <label class="manager-color-custom">
-    <span>{customHexLabel}</span>
-    <input
-      value={customColor || ''}
-      placeholder="hex"
-      data-manager-custom-color
-      oninput={(event) => updateCustomColor(event.currentTarget.value)}
-    />
-  </label>
+  {#if allowCustom}
+    <label class="manager-color-custom">
+      <span>{customHexLabel}</span>
+      <input
+        value={customColor || ''}
+        placeholder="hex"
+        data-manager-custom-color
+        oninput={(event) => updateCustomColor(event.currentTarget.value)}
+      />
+    </label>
+  {/if}
 </span>

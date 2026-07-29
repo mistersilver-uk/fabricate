@@ -864,6 +864,10 @@ test('TC9a: missing legacy essence states retain authored presentation metadata'
     type: essenceId,
     name: 'Restorative',
     icon: 'fas fa-heart',
+    // Issue 917 adds the GM-authored per-essence colour token to every essence
+    // projection; null (unauthored) renders as the theme accent, which is what every
+    // essence renders as today.
+    colorToken: null,
     isEssence: true,
     need: 2,
     have: 0,
@@ -1220,8 +1224,12 @@ test('issue 551: a short-stocked tag group shows the first matching held item im
   );
 });
 
-test('issue 551: an unmatched tag group falls back to a tag icon, never a null image', () => {
-  const systemId = 'sys-551-tagfallback';
+test('issue 917: an unmatched tag group reports NO image so the tile draws its glyph', () => {
+  // This reverses the issue-551 expectation by design (issue 917 AC5). The bag SVG is
+  // Foundry's generic default Item image, not artwork: rendering it told the player
+  // their requirement looked like a bag. A null image is the signal the tile needs to
+  // fall back to a material glyph instead.
+  const systemId = 'sys-917-tagfallback';
   const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['gem'], 1)])]);
   const recipe = new Recipe({
     name: 'Empty Tag Recipe',
@@ -1235,10 +1243,30 @@ test('issue 551: an unmatched tag group falls back to a tag icon, never a null i
   assert.equal(result.ingredientStates[0].satisfied, false);
   assert.equal(
     result.ingredientStates[0].img,
-    'icons/svg/item-bag.svg',
-    'tag tile with nothing in inventory falls back to a tag icon, not null'
+    null,
+    'a tag tile with nothing in inventory reports no image, never the item-bag sentinel'
   );
-  assert.notEqual(result.ingredientStates[0].img, null);
+});
+
+test('issue 917: a matched item carrying the item-bag literal also reports NO image', () => {
+  // The sentinel reaches a tile a second way: a matched item whose own `img` IS the
+  // bag. Stripping only the unmatched path would still render the bag here.
+  const systemId = 'sys-917-bag-literal';
+  const set = makeIngredientSet([makeGroupData([makeTagIngredientData(['gem'], 1)])]);
+  const recipe = new Recipe({
+    name: 'Bag Literal Recipe',
+    craftingSystemId: systemId,
+    ingredientSets: [set.toJSON()],
+    resultGroups: [{ id: 'rg-1', results: [] }],
+  });
+  const manager = makeRecipeManagerWithSystem(systemId, []);
+  const bagged = makeItem('gem-item', 1);
+  bagged.img = 'icons/svg/item-bag.svg';
+  manager.ingredientMatchesItem = (_recipe, ingredient, item) =>
+    ingredient?.match?.type === 'tags' && item.uuid === 'gem-item';
+
+  const result = manager.evaluateCraftability([makeActor([bagged])], recipe);
+  assert.equal(result.ingredientStates[0].img, null, 'the bag literal is a sentinel, not an image');
 });
 
 test('issue 551: a currency-matched tile shows a coin icon instead of a blank', () => {
@@ -1416,9 +1444,14 @@ test('essence group tile resolves the essence NAME + icon (never the raw id) and
   assert.equal(state.icon, 'fas fa-heart', 'the essence definition icon is carried on the tile');
   assert.equal(state.isEssence, true, 'the tile is marked for essence glyph rendering');
   assert.equal(state.img, null, 'the tile does not expose the synthetic aura image');
-  // Finding 2: a SATISFIED essence tile shows amount-based need + accumulated have.
+  // Issue 917 renames the essence tile's numerator: `delivered` is the essence amount
+  // the resolved allocation actually supplies (capped at `need`, so a satisfied tile
+  // reads exactly 2/2), while the uncapped amount held moves to `owned`. It used to
+  // read `have: 3` — the whole inventory — for a plan that draws 2.
   assert.equal(state.need, 2, 'need is the essence amount, not the option quantity');
-  assert.equal(state.have, 3, 'have is the accumulated essence (3 herbs x 1 each)');
+  assert.equal(state.delivered, 2, 'delivered is what the plan supplies, never 3/2');
+  assert.equal(state.owned, 3, 'owned is the accumulated essence (3 herbs x 1 each)');
+  assert.equal(state.have, undefined, 'the ambiguous `have` key is renamed, not aliased');
   assert.equal(state.satisfied, true);
 });
 
@@ -1447,7 +1480,8 @@ test('a MISSING essence group tile shows the accumulated have and the essence am
   assert.equal(result.canCraft, false, 'one fire essence cannot meet a need of four');
   const state = result.ingredientStates.find((s) => s.groupId === 'g-ess');
   assert.equal(state.need, 4);
-  assert.equal(state.have, 1, 'have reflects the accumulated fire essence');
+  assert.equal(state.delivered, 1, 'delivered reflects what the block actually supplies');
+  assert.equal(state.owned, 1, 'owned reflects the accumulated fire essence');
   assert.equal(state.satisfied, false);
   assert.equal(state.isEssence, true);
   assert.equal(state.icon, 'fas fa-fire-flame-curved');

@@ -3278,7 +3278,10 @@
           updates.name,
           updates.description,
           updates.icon,
-          showEssenceSourceUi ? updates.sourceComponentId || null : null
+          showEssenceSourceUi ? updates.sourceComponentId || null : null,
+          // The authored colour (issue 917) has to travel with the create call too, or a
+          // new essence loses the colour the GM picked before its first save.
+          updates.colorToken || null
         );
       if (result === false) return false;
       essenceEditDirty = false;

@@ -3,7 +3,13 @@
   import Chip from './Chip.svelte';
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
-  import { DEFAULT_ESSENCE_ICON, getEssenceIconOption, normalizeEssenceIcon } from '../../util/essenceIcons.js';
+  import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
+  import {
+    DEFAULT_ESSENCE_ICON,
+    getEssenceIconOption,
+    normalizeEssenceColorToken,
+    normalizeEssenceIcon
+  } from '../../util/essenceIcons.js';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -21,6 +27,10 @@
   let name = $state('');
   let description = $state('');
   let icon = $state(DEFAULT_ESSENCE_ICON);
+  // The optional per-essence colour (issue 917). '' is the first-class "unset" state:
+  // the essence then renders in the theme accent, which is what every essence renders
+  // as today, so an unauthored system needs no migration.
+  let colorToken = $state('');
   let sourceComponentId = $state('');
   let sourceTouched = $state(false);
   let saveFailed = $state(false);
@@ -34,6 +44,10 @@
     : null);
   const selectedIconOption = $derived(getEssenceIconOption(normalizeEssenceIcon(icon)));
   const selectedIconLabel = $derived(selectedIconOption?.label || text('FABRICATE.Admin.Manager.Essence.CustomIcon', 'Custom icon'));
+  const colourSwatchStyle = $derived(colorToken ? `color: var(--fab-tag-${colorToken})` : '');
+  const colourLabel = $derived(colorToken
+    ? `${colorToken.charAt(0).toUpperCase()}${colorToken.slice(1)}`
+    : text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour'));
   const sourceState = $derived(essenceSourceState());
   const dirty = $derived(isDirty());
   const validName = $derived(Boolean(name.trim()));
@@ -43,6 +57,7 @@
     draftSummary.name,
     draftSummary.description,
     draftSummary.icon,
+    draftSummary.colorToken || '',
     draftSummary.sourceComponentId,
     draftSummary.sourceName,
     draftSummary.sourceState,
@@ -58,6 +73,7 @@
     name = essence?.name || '';
     description = essence?.description || '';
     icon = normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON);
+    colorToken = normalizeEssenceColorToken(essence?.colorToken) || '';
     sourceComponentId = sourceIdentity(essence);
     sourceTouched = false;
     saveFailed = false;
@@ -129,7 +145,10 @@
     const updates = {
       name: name.trim(),
       description,
-      icon: normalizeEssenceIcon(icon)
+      icon: normalizeEssenceIcon(icon),
+      // Always sent, so clearing an authored colour persists as null rather than
+      // leaving the stored value untouched.
+      colorToken: normalizeEssenceColorToken(colorToken)
     };
     if (showSourceUi && (isNew || sourceTouched)) {
       updates.sourceComponentId = sourceComponentId || null;
@@ -146,6 +165,7 @@
       name: name.trim() || text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft'),
       description,
       icon: normalizedIcon,
+      colorToken: normalizeEssenceColorToken(colorToken),
       sourceComponentId: showSourceUi ? sourceComponentId || '' : '',
       sourceName: showSourceUi
         ? selectedSource?.name || (sourceComponentId ? sourceComponentId : !sourceTouched ? (essence?.sourceName || essence?.sourceItemUuid || '') : '')
@@ -162,11 +182,12 @@
 
   function isDirty() {
     if (isNew) {
-      return Boolean(name.trim() || description.trim() || normalizeEssenceIcon(icon) !== DEFAULT_ESSENCE_ICON || (showSourceUi && sourceComponentId));
+      return Boolean(name.trim() || description.trim() || normalizeEssenceIcon(icon) !== DEFAULT_ESSENCE_ICON || colorToken || (showSourceUi && sourceComponentId));
     }
     return name !== (essence?.name || '')
       || description !== (essence?.description || '')
       || normalizeEssenceIcon(icon) !== normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON)
+      || normalizeEssenceColorToken(colorToken) !== normalizeEssenceColorToken(essence?.colorToken)
       || (showSourceUi && (sourceTouched || sourceComponentId !== sourceIdentity(essence)));
   }
 
@@ -211,7 +232,7 @@
       <div class="manager-essence-edit-grid">
         <div class="manager-essence-icon-panel">
           <span class="manager-essence-field-label">{text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}</span>
-          <span class="manager-essence-icon-preview" aria-hidden="true">
+          <span class="manager-essence-icon-preview" aria-hidden="true" style={colourSwatchStyle}>
             <i class={normalizeEssenceIcon(icon)}></i>
           </span>
           <div class="manager-essence-icon-actions">
@@ -231,6 +252,29 @@
             <small>{normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON
               ? text('FABRICATE.Admin.Manager.Essence.DefaultIconLabel', 'Default essence icon')
               : text('FABRICATE.Admin.Manager.Essence.IconLabel', 'Selected icon')}</small>
+          </span>
+
+          <span class="manager-essence-field-label">{text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')}</span>
+          <div class="manager-essence-icon-actions" data-manager-essence-colour>
+            <ManagerColorPicker
+              colorToken={colorToken || 'sage'}
+              customColor=""
+              allowCustom={false}
+              unset={!colorToken}
+              buttonTitle={text('FABRICATE.Admin.Manager.Essence.Colour.Change', 'Change essence colour')}
+              presetGridLabel={text('FABRICATE.Admin.Manager.Essence.Colour.Presets', 'Essence colour presets')}
+              onChange={(next) => { colorToken = normalizeEssenceColorToken(next?.colorToken) || ''; }}
+            />
+            <button type="button" class="manager-button" onclick={() => { colorToken = ''; }} disabled={saving || !colorToken}>
+              <i class="fas fa-undo" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Essence.Colour.Clear', 'Clear colour')}</span>
+            </button>
+          </div>
+          <span class="manager-essence-icon-copy">
+            <strong>{colourLabel}</strong>
+            <small>{colorToken
+              ? text('FABRICATE.Admin.Manager.Essence.Colour.Authored', 'This essence renders in its own colour.')
+              : text('FABRICATE.Admin.Manager.Essence.Colour.Unset', 'This essence renders in the theme accent.')}</small>
           </span>
         </div>
 
