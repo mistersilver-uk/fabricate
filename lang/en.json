@@ -1029,6 +1029,7 @@
         "Loading": "Loading alchemy…",
         "Error": "Something went wrong loading the workbench",
         "NoActor": "Select a character to use the workbench",
+        "NoIngredients": "No ingredients selected.",
         "YourComponents": "Your components",
         "TapToPlace": "Tap or drag onto the bench",
         "SearchComponents": "Search components…",
@@ -1156,7 +1157,9 @@
       "SalvageSource": "Source",
       "SalvageRecovered": "Recovered",
       "SalvageConsumed": "Broken Down",
-      "SalvageTools": "Tools Broken"
+      "SalvageTools": "Tools Broken",
+      "NaturalStepUp": "Natural 20 - stepped up one tier",
+      "NaturalStepDown": "Natural 1 - stepped down one tier"
     },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",
@@ -4520,7 +4523,10 @@
             "Uncategorized": "General"
           },
           "Delete": "Delete recipe item",
+          "DeleteContent": "Delete this recipe item? Recipes linked to it will be unlinked.",
+          "DeleteTitle": "Delete recipe item?",
           "Dirty": "Unsaved",
+          "DiscardDirtyContent": "The current recipe item has unsaved changes. Save them and continue, or discard them?",
           "EditBreadcrumb": "Edit recipe item",
           "EditMissingHint": "Pick a recipe item from Books & Scrolls to open its editor.",
           "EditSubtitle": "Link a world item and recipes, then set its use and learn caps.",
@@ -5025,7 +5031,8 @@
       "AutoFillPartial": "Auto-fill: {count} ingredient group(s) could not be satisfied",
       "AutoFillComplete": "Workbench populated from recipe",
       "ComponentsNotFound": "Could not find any of the workbench components in your inventory",
-      "ComponentsMissing": "Some components could not be found: {names}"
+      "ComponentsMissing": "Some components could not be found: {names}",
+      "FailureResult": "The brew failed."
     },
     "Gathering": {
       "Title": "Gathering",
