@@ -245,11 +245,16 @@ export default [
   //    length is capped. Do NOT widen the gate to `scripts/lib/**` or `scripts/**` on
   //    the strength of that guard; it tracks the debt, it does not clear it.
   //
-  //    If you widen the `files` glob below to a new EXTENSION, widen that test's
-  //    `LINTED_EXTENSIONS` too — it must stay a superset of this glob, or the newly
-  //    configured files become invisible to the ratchet instead of gated by it.
+  //    The `files` glob below and that test's `LINTED_EXTENSIONS` must name the same
+  //    extensions, or a newly configured file becomes invisible to the ratchet instead
+  //    of gated by it. That is not left to prose: the test PARSES this glob and fails
+  //    if it names an extension the enumeration would miss. `cjs` is listed because
+  //    this repository is `"type": "module"`, so `.cjs` is how CommonJS gets written
+  //    here — without it such a file would be forced into the `lint` list by the
+  //    ratchet and then fail `no-undef` on `require`, having missed this block's
+  //    Node globals.
   {
-    files: ['scripts/**/*.{js,mjs}', '*.config.js', 'eslint.config.js'],
+    files: ['scripts/**/*.{js,mjs,cjs}', '*.config.js', 'eslint.config.js'],
     languageOptions: {
       globals: { ...globals.node },
     },

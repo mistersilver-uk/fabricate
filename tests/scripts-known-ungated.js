@@ -14,10 +14,12 @@
  *     `lint`/`format`/`format:check` lists. The gate list can no longer be forgotten silently.
  *   - Gating a file listed here, or deleting it, makes its entry STALE, which the test also
  *     fails on. So this list can only shrink.
- *   - And it cannot quietly grow instead: the test caps its length at MAX_ACKNOWLEDGED_UNGATED,
- *     so writing a new script down here rather than gating it means raising a number in
- *     `tests/scripts-lint-gate-coverage.test.js` — a visible act needing its own justification,
- *     not a one-line append lost in a fifteen-line array.
+ *   - And it cannot quietly grow instead: the test pins its length to
+ *     ACKNOWLEDGED_UNGATED_COUNT, so writing a new script down here rather than gating it means
+ *     changing a number in `tests/scripts-lint-gate-coverage.test.js` — a visible act needing its
+ *     own justification, not a one-line append lost in a fifteen-line array. The count is pinned
+ *     EXACTLY rather than capped, so paying debt down also fails until the number follows the
+ *     list; a ceiling would instead bank a free slot on every payment for the next author to use.
  *
  * Paths are POSIX (forward slash) always: the test enumerates with `fs.readdirSync`, which yields
  * `lib\zip.js` on Windows and `lib/zip.js` on the `ubuntu-latest` runner, and normalises to POSIX
@@ -38,7 +40,8 @@
  *     longer. Its autofixes land on the Windows `Compress-Archive` path that builds the published
  *     artefact, again untested.
  *
- * 15 entries, which is also the cap (issue #933 gated four of the previous 19). Do not grow it.
+ * 15 entries, which ACKNOWLEDGED_UNGATED_COUNT pins exactly (issue #933 gated four of the previous
+ * 19). Do not grow it; when you shrink it, lower that constant in the same commit.
  */
 export const KNOWN_UNGATED_SCRIPTS = [
   'scripts/foundry-fetch-systems.mjs',
