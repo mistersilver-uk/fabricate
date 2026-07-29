@@ -193,6 +193,75 @@ test('_respawnNode (expression) pre-rolls per interval via the evaluator', async
   assert.equal(next.current, 4, '2 intervals × rolled 2');
 });
 
+// --- issue 896: a null anchor must not pre-roll expression amounts ---------
+
+/**
+ * A depleted `expression` pool whose accrual anchor is an explicit `null` — the
+ * shape `normalizeRespawn` persists for a pool that has never been evaluated.
+ *
+ * The literal `null` is load-bearing and NOT a style choice: `Number(undefined)`
+ * is `NaN`, so a fixture that OMITS `lastEvaluatedWorldTime` already takes the
+ * correct branch on the unfixed code and proves nothing. Only `null` differs
+ * between the old lax predicate and #403's nullish-or-non-finite one, because
+ * `Number(null) === 0` is finite and therefore read as "anchored at world time 0".
+ */
+function nullAnchoredExpressionPool() {
+  return {
+    current: 0,
+    max: 5,
+    enabled: true,
+    respawn: {
+      policy: 'overTime',
+      gainMode: 'expression',
+      amountExpression: '1d4',
+      intervalUnit: 'hours',
+      intervalAmount: 1,
+      lastEvaluatedWorldTime: null
+    }
+  };
+}
+
+/** A service whose expression evaluator counts every real evaluation. */
+function countingEvaluatorService() {
+  let evaluations = 0;
+  const { service } = makeService({
+    evaluate: () => {
+      evaluations += 1;
+      return 2;
+    }
+  });
+  return { service, evaluations: () => evaluations };
+}
+
+// Both cases assert the COUNT of expression evaluations, not the resulting pool
+// state: the state was already correct before the fix (the math's seed branch
+// consumed none of the pre-rolls), so the wasted work is the only defect signal.
+// The pair is symmetric because the two pre-roll blocks are structurally
+// identical but live 79 lines apart — `respawnInteractableNode` had no
+// expression-mode coverage at all, so a partial fix would otherwise ship green.
+
+test('_respawnNode: a null-anchored expression pool pre-rolls nothing on its seeding tick', async () => {
+  const { service, evaluations } = countingEvaluatorService();
+  const { node: next } = await service._respawnNode(nullAnchoredExpressionPool(), {
+    now: 500 * HOUR,
+    environment: null,
+    environmentId: 'e',
+    taskId: 't'
+  });
+  assert.equal(evaluations(), 0, 'issue 896: _respawnNode must roll no expression amounts on the seeding tick');
+  assert.equal(next.respawn.lastEvaluatedWorldTime, 500 * HOUR, 'the tick seeds the anchor at now');
+});
+
+test('respawnInteractableNode: a null-anchored expression pool pre-rolls nothing on its seeding tick', async () => {
+  const { service, evaluations } = countingEvaluatorService();
+  const { node: next } = await service.respawnInteractableNode({
+    node: nullAnchoredExpressionPool(),
+    worldTime: 500 * HOUR
+  });
+  assert.equal(evaluations(), 0, 'issue 896: respawnInteractableNode must roll no expression amounts on the seeding tick');
+  assert.equal(next.respawn.lastEvaluatedWorldTime, 500 * HOUR, 'the tick seeds the anchor at now');
+});
+
 // --- _resolveNodeSource (interactable scope) -------------------------------
 
 test('_resolveNodeSource resolves the environment pool by default', () => {
