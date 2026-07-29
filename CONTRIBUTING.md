@@ -457,6 +457,7 @@ All of these run as a **required CI check** (`lint` job in `.github/workflows/ci
 npm run lint           # ESLint over the gated JS scope (fails on any warning)
 npm run lint:fix       # …and auto-fix what can be fixed
 npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
+npm run lint:svelte:warnings  # Svelte COMPILER warnings, every component (what CI runs)
 npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
 npm run format         # Prettier-format the gated scope (JS + every src/**/*.svelte)
@@ -515,12 +516,22 @@ Where a suppression must sit on a particular line, fence the element with `<!-- 
 The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
 The fence there protects the directive's line anchor and nothing else — `{' '}` is an expression, so both the fenced and the split form compile to the same template and render identically.
 
-ESLint is the only static analysis a `.svelte` file gets.
+ESLint and the Svelte compiler are the static analysis a `.svelte` file gets.
 Prettier now formats components as well — `prettier-plugin-svelte` is registered in `.prettierrc.json`, and `format:check` covers `src/**/*.svelte`.
 Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser and dropping the config entry fails loudly — the glob names the components, so `format:check` exits 2 with "No parser could be inferred".
 The silent way back is the other one, and the one `tests/prettier-svelte-scope.test.js` guards: re-ignoring `*.svelte` makes `format:check` match zero files, report success and exit 0.
-Stylelint still excludes components, Svelte compiler warnings still do not fail the build, and SonarCloud indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts.
-Each of those is tracked as its own follow-up.
+
+Svelte compiler warnings fail the build as of issue 924, which found seven of them passing unnoticed — five real accessibility defects, and a `css_unused_selector` that was not dead code at all but a focus ring the compiler was emitting COMMENTED OUT, so the ring had never applied in a shipped build.
+The gate has two halves.
+`onwarn` in `svelte.config.js` throws, so `npm run build` fails; that is the fast local signal, but a Vite build compiles only the entry graph and cannot see a component nothing imports (`GatheringTravelView.svelte`, issue 927).
+`npm run lint:svelte:warnings` (`scripts/check-svelte-warnings.mjs`) sweeps every `src/**/*.svelte` regardless of reachability and is the step CI runs, so it is the authoritative half.
+Both take their compiler options from `svelte.config.js` through `scripts/lib/svelteCompilerWarnings.js`, which is what makes a disagreement between them diagnostic: it can only be graph reachability, never config drift.
+A disagreement in which the sweep is the clean one is a bug in the sweep, not grounds to override `onwarn`.
+`tests/svelte-warning-scope.test.js` keeps the whole thing honest — it drives the real sweep against a fixture tree to prove it still detects a warning, and asserts the CI wiring.
+A warning worth keeping is suppressed at its site with `<!-- svelte-ignore <code> -->` and a stated reason, which `svelte/no-unused-svelte-ignore` then polices in the other direction; there is deliberately no allowlist.
+
+SonarCloud still indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts, and Stylelint still excludes their scoped `<style>` blocks.
+Both are tracked as their own follow-ups.
 
 Not yet gated (tracked for follow-up — run `npm run lint:all` to see them):
 
@@ -529,7 +540,7 @@ Not yet gated (tracked for follow-up — run `npm run lint:all` to see them):
 - `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by source-text assertions in `tests/gathering-bootstrap-api.test.js`, so they change with that test)
 
 `scripts/**` is NOT in that list, and is a different shape worth understanding before you add a script.
-It IS gated — but file by file, 18 files today, each named individually in the `lint`, `format` and `format:check` scripts rather than matched by a glob.
+It IS gated — but file by file, 20 files today, each named individually in the `lint`, `format` and `format:check` scripts rather than matched by a glob.
 The consequence is that adding a script does not lint it, which is exactly how a new BUG and a new VULNERABILITY reached SonarCloud in issue 933.
 `tests/scripts-lint-gate-coverage.test.js` now closes that at `npm test` speed: it parses the paths back out of the `lint` script, enumerates `scripts/**`, and fails on any ungated file that is not recorded as acknowledged debt in `tests/scripts-known-ungated.js`.
 That baseline only shrinks, and its length is pinned exactly, so recording a new script as debt instead of gating it means changing a number in review rather than appending a line — and paying debt down means lowering that number in the same commit.
