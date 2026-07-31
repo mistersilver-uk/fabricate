@@ -243,3 +243,42 @@ files` line `compare-svelte-render.mjs` prints, so two runs can be diffed withou
 The bar is zero: fix the code rather than suppressing the warning, or suppress it at its site with a
 `<!-- svelte-ignore <code> -->` comment and a stated reason.
 There is deliberately no allowlist.
+
+## View Lab window chrome
+
+`scripts/view-lab-screenshots.mjs` renders whole Fabricate application windows in Chromium with no
+Foundry, no Docker, and no world, and writes one PNG per registry case into
+`ui-screenshot-artifact/apps/`.
+The chrome those windows wear is Foundry's own, harvested from the release archive
+`npm run test:foundry:up` already caches.
+
+```sh
+npm run viewlab:chrome:harvest     # extract chrome + core art into the gitignored .foundry-chrome/
+npm run viewlab:chrome:status      # what is cached, and whether it is intact
+node scripts/view-lab-screenshots.mjs apps            # every case
+node scripts/view-lab-screenshots.mjs apps <id,id>    # a subset
+```
+
+Nothing harvested is ever committed.
+`tests/view-lab-chrome-license.test.js` enforces that against the whole tracked tree and never skips.
+Captured PNGs are ordinary evidence and stay publishable; the restriction is on redistributing
+Foundry's assets, not on frames drawn with them.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+## Fidelity gap
+
+A green View Lab render is trustworthy for the window, its cascade, its typography, and its content.
+It is NOT the fidelity authority — the live smoke is.
+Where the two disagree about the same view, the smoke is right.
+
+| Gap | Why it exists |
+|---|---|
+| No canvas backdrop, sidebar, scene-control rails, or chat bar | The lab draws one application, not the Foundry desktop around it. |
+| No live Foundry JS | No dialogs, tooltips, context menus, ProseMirror, drag, resize, or minimize. A surface that raises a dialog shows the window behind it. |
+| No system stylesheet | `dnd5e.css` (production: `layer(system)`) is not loaded. Low risk today — every dnd5e `.application` rule is scoped under `.dnd5e2`/`.sheet` — but re-verify on a dnd5e major. |
+| No other modules | A real world loads other modules at `layer(modules)` alongside `fabricate.css`. |
+| Fixture world, not the smoke world | Three crafting systems rather than ten, with different names and counts. Structure matches; content does not. |
+| Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->

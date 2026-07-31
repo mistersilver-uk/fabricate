@@ -552,6 +552,37 @@ The remainder stays ungated for a measured reason: the Foundry smoke harness alo
 When you bring a new path to green (ESLint **and** SonarCloud), add it to the `lint`, `format` **and** `format:check` lists in `package.json` so the gate keeps it green.
 All three, not two — `tests/scripts-lint-gate-coverage.test.js` asserts the three carry the same set of `scripts/` paths, so a file added to only some of them fails `npm test`.
 
+## The View Lab (Foundry-free window captures)
+
+The View Lab renders whole Fabricate application windows in Chromium — the real app roots, the real
+stores, production `styles/fabricate.css` at its production cascade layer — with no Foundry, no
+Docker, and no world.
+It exists because PR screenshot evidence should not cost a container boot and a twenty-minute walk.
+
+```sh
+npm run viewlab:chrome:harvest              # one-off; see below
+node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
+```
+
+The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up`
+already caches under `.foundry-e2e/cache/`.
+That material is proprietary: it lands in the gitignored `.foundry-chrome/`, is never committed, and
+is never downloaded for you.
+Without it the lab fails closed rather than approximating — a frame drawn without the real cascade is
+worse than no frame, because it looks authoritative.
+
+Cases live in `scripts/lib/viewLabCases.js`.
+A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from
+a changed-file set.
+Every manager case declares `expectView`, which the capture asserts against the app's actual route
+before taking the frame — without it a mis-click silently screenshots the wrong screen.
+
+**The live smoke is still the fidelity authority.**
+Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and
+the lab is defective.
+`scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, no live Foundry
+JS, fixture world rather than the smoke world).
+
 ## Foundry integration (smoke) tests
 
 The smoke harness boots a real Foundry VTT instance in Docker, loads the built module, and walks the Crafting System Manager UI and the unified Fabricate shell end-to-end with Playwright.

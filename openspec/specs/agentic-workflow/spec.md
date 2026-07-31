@@ -302,7 +302,8 @@ An escalated lane proven clean at its assigned base with zero commits MAY be dis
 - **THEN** the container identity (name, hostname, compose project, host port) is derived deterministically from the worktree root, so it is stable within a worktree yet distinct across worktrees and concurrent worktrees do not collide on the fixed name
 - **AND** the derivation preserves the container-reuse cache and the hostname-bound cached license within a worktree
 - **AND** — CONDITIONAL on the licensing probe passing and the prebaked world existing — the capture may be sharded across containers within a run, with the merged frame set required to equal the single-container scoped set
-- **AND** the evidence producer is unchanged: still real-Foundry scoped capture, never a Foundry-free render
+- **AND** sharding does not change this scenario's producer: it remains real-Foundry scoped capture
+- **AND** a Foundry-free renderer MAY produce evidence only under the Harvested Foundry window chrome requirement, and never by approximating chrome it has not harvested
 
 #### Scenario: cleaning integrated lanes
 
@@ -493,16 +494,49 @@ Agents planning or implementing Manager feature routes MUST account for placehol
 - **THEN** route/component code may prefer explicit `value` plus `oninput`/`onchange` handlers for controls under test
 - **AND** tests should dispatch the event that the component actually handles before asserting state
 
+### Requirement: Harvested Foundry window chrome
+
+A Foundry-free renderer that claims window fidelity MUST draw chrome harvested from the operator's own licensed Foundry installation.
+It MUST fail closed when that material is absent rather than substituting an approximation, MUST NOT commit, publish, or download it, and MUST record which Foundry build its frames were drawn with.
+
+#### Scenario: chrome is unavailable
+
+- **WHEN** a capture is requested and no harvested chrome is present
+- **THEN** the capture aborts, naming the sources it searched and the commands that would provide them
+- **AND** it emits no frame, because a frame drawn without the real cascade is worse than no frame — it looks authoritative
+
+#### Scenario: harvested material is never redistributed
+
+- **WHEN** chrome is harvested
+- **THEN** the harvested files are ignored by version control and no harvested file is tracked anywhere in the repository
+- **AND** the committed record carries provenance only — the Foundry version, the source archive identity, and digests — never file contents
+- **AND** captured screenshots remain publishable evidence; the restriction is on redistributing Foundry's own assets, not on the frames drawn with them
+
+#### Scenario: window geometry
+
+- **WHEN** a window is captured
+- **THEN** it is rendered at its application's declared position, and the applied geometry is asserted to equal the declared geometry
+- **AND** a capture whose geometry was clamped fails rather than publishing a wrong-sized frame
+
+#### Scenario: the chrome source changes
+
+- **WHEN** the harvested Foundry build differs from the one the frame builder was transcribed against
+- **THEN** the mismatch is reported as a failure that names the recorded and actual builds, so the transcription is re-verified rather than silently drifting
+
 ### Requirement: UI PR screenshot evidence
 
-Pull requests that change UI files MUST include smoke-run screenshot evidence for the relevant changed views before the PR is opened or updated.
+Pull requests that change UI files MUST include screenshot evidence for the relevant changed views before the PR is opened or updated.
+Evidence MUST depict the changed view as a full application window.
 Every collected automated view MUST prove successful, non-degraded, exact-run provenance.
 
 #### Scenario: UI files changed
 
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
-- **THEN** the agent runs the Foundry smoke harness locally with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which captures the changed-file-affected views as full real-Foundry app windows, and collects the relevant smoke screenshots for the changed views
+- **THEN** the affected views are selected from the canonical view-case registry, and each is captured as a full application window at the application's declared `DEFAULT_OPTIONS.position`
+- **AND** a view the registry covers MAY be captured by the Foundry-free renderer, which renders the real application root over production `styles/fabricate.css` at its production cascade layer, inside harvested Foundry window chrome
+- **AND** a view the registry does not cover is captured by the Foundry smoke harness with the scoped `screenshots` profile (`npm run test:foundry:screenshots`)
 - **AND** the reduced `rc`/`ci` smoke stays the CI/release gate and the `full` profile remains the occasional outer-loop visual-regression suite; the `full` profile is not run on a GitHub Actions runner
+- **AND** the live-Foundry smoke remains the fidelity authority: where a Foundry-free frame and a smoke frame of the same view disagree, the smoke frame is correct and the renderer is defective
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence
 - **AND** `npm run screenshots:ui:publish -- --pr <number>` uploads the collected screenshots to S3 (`pr-screenshots/<number>/`) and embeds the returned `![pr-<number> ...]` markdown into a managed block in the PR body
 - **AND** the agent cleans `tmp/pr-screenshots/<number>/` immediately after the evidence is added to the PR
@@ -517,6 +551,12 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **AND** requested target labels include the view and the PNG is bound to its capture record
 - **AND** manifest-declared dimensions equal decoded PNG dimensions
 - **AND** view-specific parity, stress-frame, or dimension constraints remain additive and may be stricter than the generic provenance check
+
+#### Scenario: reaching a named view state
+
+- **WHEN** a captured view requires the application to be on a particular internal route or selection
+- **THEN** the case declares the state it expects and the capture asserts the application reached it before the frame is taken
+- **AND** a case whose navigation resolves to a different state fails rather than publishing the frame it reached
 
 #### Scenario: screenshot capture is blocked
 
