@@ -577,6 +577,12 @@ a changed-file set.
 Every manager case declares `expectView`, which the capture asserts against the app's actual route
 before taking the frame — without it a mis-click silently screenshots the wrong screen.
 
+A case also declares `reaches`: `state` when the frame lands on its smoke counterpart's own
+condition, `screen` when it reaches the right screen but not that state (known remaining work), and
+`beyond` for a state the live smoke never walks at all — the routed resolution modes, the visibility
+modes it does not visit, Foundry's light application theme.
+A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
+
 **The live smoke is still the fidelity authority.**
 Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and
 the lab is defective.

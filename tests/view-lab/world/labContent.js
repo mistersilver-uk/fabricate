@@ -586,6 +586,125 @@ const SMITHING_RECIPES = [
       toolIds: ['sm-tool-hammer'],
     }
   ),
+
+  // ── Essence requirements ───────────────────────────────────────────────────────────────────────
+  // An essence requirement is `match: { type: 'essence', essenceId, amount }` — a demand on the
+  // essence POOL rather than on a named component, funded by whatever the crafter consumes. These
+  // draw the essence pool rail, the carrier picker and the shopping-list essence rows, none of which
+  // any component-only recipe reaches. They sit on the SMITHING system because it is the globally
+  // visible one; on the knowledge-gated herbalism system a player who has learned nothing sees none
+  // of it.
+  recipe(
+    'sm-r-emberbrand',
+    'Emberbrand a Blade',
+    LAB_SYSTEM_IDS.SMITHING,
+    'weapons/swords/sword-guard-blue.webp',
+    {
+      description: 'Quench the blade in fire-bearing stock, whatever stock you happen to have.',
+      categories: ['Weaponsmithing'],
+      complex: true,
+      ingredientSets: [
+        {
+          id: 'sm-set-ember',
+          name: 'Fire-bearing stock',
+          ingredientGroups: [
+            { id: 'sm-set-ember-g1', options: [{ componentId: 'sm-longsword', quantity: 1 }] },
+            {
+              id: 'sm-set-ember-g2',
+              name: 'Fire essence',
+              options: [{ match: { type: 'essence', essenceId: 'fire', amount: 4 } }],
+            },
+          ],
+        },
+      ],
+      resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-dagger', quantity: 1 }] }],
+      check: { enabled: true, rollFormula: '1d20 + @prof', thresholds: { success: 14 } },
+      toolIds: ['sm-tool-hammer'],
+    }
+  ),
+  recipe(
+    'sm-r-deepbind',
+    'Deepbind an Ingot',
+    LAB_SYSTEM_IDS.SMITHING,
+    'commodities/metal/ingot-stack-steel.webp',
+    {
+      description: 'Two essences at once, which one dual-bearing carrier can fund on its own.',
+      categories: ['Refining'],
+      complex: true,
+      ingredientSets: [
+        {
+          id: 'sm-set-deepbind',
+          name: 'Bound stock',
+          ingredientGroups: [
+            {
+              id: 'sm-set-deepbind-g1',
+              name: 'Earth essence',
+              options: [{ match: { type: 'essence', essenceId: 'earth', amount: 6 } }],
+            },
+            {
+              id: 'sm-set-deepbind-g2',
+              name: 'Fire essence',
+              options: [{ match: { type: 'essence', essenceId: 'fire', amount: 3 } }],
+            },
+          ],
+        },
+      ],
+      resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-steel-ingot', quantity: 2 }] }],
+      check: { enabled: true, rollFormula: '1d20 + 4', thresholds: { success: 16 } },
+    }
+  ),
+
+  // ── Multi-step ─────────────────────────────────────────────────────────────────────────────────
+  // Explicit `steps[]`, each with its own ingredient sets, results, tools and time requirement. The
+  // step rail only renders for a recipe that has them, so without one the whole multi-step player
+  // path — the rail, the per-step consumption panel, the advance affordance — is unphotographed.
+  recipe(
+    'sm-r-pattern-blade',
+    'Forge a Pattern-Welded Blade',
+    LAB_SYSTEM_IDS.SMITHING,
+    'weapons/swords/greatsword-crossguard-blue.webp',
+    {
+      description: 'Three sittings: draw the billet, fold the pattern, hang the furniture.',
+      categories: ['Weaponsmithing'],
+      complex: true,
+      steps: [
+        {
+          id: 'sm-step-draw',
+          name: 'Draw the billet',
+          description: 'Bring the stock to heat and draw it long.',
+          ingredientSets: [simpleSet('sm-step-draw-s1', { 'sm-steel-ingot': 2, 'sm-coal': 2 })],
+          resultGroups: [{ id: 'sm-step-draw-rg', results: [] }],
+          toolIds: ['sm-tool-hammer', 'sm-tool-tongs'],
+          timeRequirement: { hours: 4 },
+        },
+        {
+          id: 'sm-step-fold',
+          name: 'Fold the pattern',
+          description: 'Fold and re-weld until the figure shows.',
+          ingredientSets: [simpleSet('sm-step-fold-s1', { 'sm-coal': 3 })],
+          resultGroups: [{ id: 'sm-step-fold-rg', results: [] }],
+          toolIds: ['sm-tool-hammer', 'sm-tool-anvil'],
+          timeRequirement: { hours: 8 },
+        },
+        {
+          id: 'sm-step-furniture',
+          name: 'Hang the furniture',
+          description: 'Grip, guard and pommel, then the final edge.',
+          ingredientSets: [
+            simpleSet('sm-step-furniture-s1', { 'sm-leather': 1, 'sm-whetstone': 1 }),
+          ],
+          resultGroups: [
+            {
+              id: 'sm-step-furniture-rg',
+              results: [{ componentId: 'sm-greatsword', quantity: 1 }],
+            },
+          ],
+          timeRequirement: { hours: 2 },
+        },
+      ],
+      check: { enabled: true, rollFormula: '1d20 + @prof', thresholds: { success: 15 } },
+    }
+  ),
 ];
 
 const HERBALISM_RECIPES = [

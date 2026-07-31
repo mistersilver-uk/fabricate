@@ -266,6 +266,23 @@ Foundry's assets, not on frames drawn with them.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
+## What a case claims
+
+Every entry in `scripts/lib/viewLabCases.js` declares `reaches`, which is the registry's honesty
+field — an approximate case that does not say it is approximate is worse than no case at all.
+
+| `reaches` | Meaning | `smokeLabels` |
+|---|---|---|
+| `state` | The frame lands on the smoke label's own condition. Directly comparable. | one or more |
+| `screen` | The frame reaches the right screen but not that label's specific state — known remaining work. | one or more |
+| `beyond` | A state the live smoke never walks, so there is no counterpart to fall short of. | empty, always |
+
+`beyond` exists because the smoke is not a coverage ceiling worth inheriting: it visits one crafting
+system per screen, so two of the three visibility modes, both routed resolution modes, and Foundry's
+light application theme appear in no frame it produces.
+The lab carries a fixture system per canonical resolution mode (`simple`, `routedByIngredients`,
+`routedByCheck`, `progressive`, `alchemy`) precisely so those paths can be photographed.
+
 ## Fidelity gap
 
 A green View Lab render is trustworthy for the window, its cascade, its typography, and its content.
@@ -278,7 +295,8 @@ Where the two disagree about the same view, the smoke is right.
 | No live Foundry JS | No dialogs, tooltips, context menus, ProseMirror, drag, resize, or minimize. A surface that raises a dialog shows the window behind it. |
 | No system stylesheet | `dnd5e.css` (production: `layer(system)`) is not loaded. Low risk today — every dnd5e `.application` rule is scoped under `.dnd5e2`/`.sheet` — but re-verify on a dnd5e major. |
 | No other modules | A real world loads other modules at `layer(modules)` alongside `fabricate.css`. |
-| Fixture world, not the smoke world | Three crafting systems rather than ten, with different names and counts. Structure matches; content does not. |
+| Fixture world, not the smoke world | Five crafting systems rather than ten, with different names and counts. Structure matches; content does not. Pass `--smoke-fixtures` to replay the smoke's own seed instead. |
+| No progressive player detail frame | The only progressive system is knowledge-gated, so a player who has learned nothing sees none of its recipes. The progressive AUTHORING path is covered. |
 | Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
