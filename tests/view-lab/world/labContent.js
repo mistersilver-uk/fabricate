@@ -126,10 +126,31 @@ const SMITHING_COMPONENTS = [
     difficulty: 8,
     essences: { water: 3 },
   }),
+  // Salvage authored on purpose. `_normalizeSalvage` clamps `enabled` off when a component has no
+  // result group, so a component with `salvage.enabled` and nothing else renders the editor's
+  // salvage section in its DISABLED state — the salvage frames need a component that actually
+  // carries one. Smithing runs Simple salvage mode, where the clamp keeps exactly the first success
+  // group, so one group is the whole authored config.
   component('sm-longsword', 'Longsword', 'weapons/swords/sword-guard-worn.webp', {
     categories: ['Finished Goods'],
     tags: ['weapon'],
     difficulty: 6,
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      toolIds: ['sm-tool-hammer'],
+      dcOverride: 13,
+      resultGroups: [
+        {
+          id: 'sm-salv-longsword',
+          name: 'Reclaimed stock',
+          results: [
+            { componentId: 'sm-steel-ingot', quantity: 1 },
+            { componentId: 'sm-leather', quantity: 1 },
+          ],
+        },
+      ],
+    },
   }),
   component('sm-greatsword', 'Greatsword', 'weapons/swords/greatsword-crossguard-blue.webp', {
     categories: ['Finished Goods'],
@@ -146,10 +167,24 @@ const SMITHING_COMPONENTS = [
     tags: ['armour'],
     difficulty: 7,
   }),
+  // The counterpart: salvage configured but switched OFF, which is a different editor state from
+  // "never configured" — the groups are still authored and still shown, greyed.
   component('sm-chainmail', 'Chainmail Shirt', 'equipment/chest/breastplate-scale-grey.webp', {
     categories: ['Finished Goods'],
     tags: ['armour'],
     difficulty: 8,
+    salvage: {
+      enabled: false,
+      ingredientQuantity: 1,
+      toolIds: [],
+      resultGroups: [
+        {
+          id: 'sm-salv-chainmail',
+          name: 'Rings and rivets',
+          results: [{ componentId: 'sm-iron-ingot', quantity: 2 }],
+        },
+      ],
+    },
   }),
   component('sm-horseshoe', 'Horseshoe', 'sundries/misc/horseshoe-iron.webp', {
     categories: ['Finished Goods'],
@@ -1393,6 +1428,9 @@ export function buildLabContent() {
       enabled: true,
       visibilityMode: 'global',
       resolutionMode: 'simple',
+      // Salvage has its OWN resolution mode, authored independently of the crafting one. Simple
+      // keeps exactly the first success group; the `routed`/`progressive` modes keep every group.
+      salvageResolutionMode: 'simple',
       craftingCheck: SIMPLE_CHECK,
       features: {
         essences: true,
