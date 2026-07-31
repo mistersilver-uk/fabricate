@@ -23,11 +23,50 @@ const MANAGER = 'fabricate-crafting-system-manager';
 const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 
 /**
+ * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
+ * the Foundry shim it renders against, and this registry. None of these is a render file, so none
+ * is selectable by {@link isUiFile} — but a change to any of them can move every frame at once.
+ */
+const LAB_INFRASTRUCTURE_PATTERN =
+  /^(tests\/view-lab\/|scripts\/lib\/viewLabCases\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
+
+/**
  * Signals too broad to attribute to one window. A shared primitive or a global stylesheet can
  * affect every screen, so selecting every case would make the evidence set useless noise. These map
  * to the representative set below plus the fallback.
  */
-const BROAD_SIGNAL_PATTERN = /^(styles\/|src\/ui\/svelte\/components\/|src\/ui\/theme\.js$)/;
+/**
+ * The MANAGER's own shared primitives — its equivalent of `src/ui/svelte/components/`.
+ *
+ * An explicit list rather than a directory glob, because `apps/manager/` mixes primitives with
+ * feature views: a glob would swallow `RecipesBrowserView.svelte` too and route every manager
+ * change to the representative set, destroying the targeting this registry exists for.
+ */
+const MANAGER_PRIMITIVES = [
+  'ArmedDangerButton',
+  'Callout',
+  'Chip',
+  'EditorValidationSurface',
+  'EmptyState',
+  'ExplainerCard',
+  'IconFactRow',
+  'ItemDropZone',
+  'ManagerModal',
+  'RadioCardGroup',
+  'RollDataExpressionInput',
+  'SearchablePopover',
+  'SegmentedControl',
+  'ToggleCard',
+];
+
+export const BROAD_SIGNAL_PATTERN = new RegExp(
+  [
+    '^styles/',
+    '^src/ui/svelte/components/',
+    String.raw`^src/ui/theme\.js$`,
+    String.raw`^src/ui/svelte/apps/manager/(${MANAGER_PRIMITIVES.join('|')})\.svelte$`,
+  ].join('|')
+);
 
 /** One player screen and one manager screen: enough to show a shared-primitive change in context. */
 const REPRESENTATIVE_CASE_IDS = Object.freeze(['fabricate-app-shell', 'manager-components-normal']);
@@ -69,6 +108,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/Systems?(Browser|Overview)View\.svelte$/,
     ],
   },
   {
@@ -156,7 +196,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'system-edit'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/(ResolutionModeCard|CraftingEffectPanel|ItemPageInspector)\.svelte$/,
+    ],
   },
   {
     id: 'manager-system-edit-narrow',
@@ -1018,7 +1061,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'tags'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategories/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
+      /^src\/ui\/svelte\/apps\/manager\/(VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
+    ],
   },
   {
     id: 'manager-tags-categories-tags-tab',
@@ -1111,6 +1157,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/environment\//,
     ],
   },
   {
@@ -1234,6 +1281,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
     ],
   },
   {
@@ -1586,7 +1634,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'knowledge', 'responsive', 'window-only'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
+    ],
   },
   {
     id: 'manager-components-progressive',
@@ -1661,6 +1712,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/Import(ReportModal|FolderMappingModal)\.svelte$/,
     ],
   },
   {
@@ -1743,6 +1795,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
+      /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
     ],
   },
   {
@@ -2743,6 +2796,19 @@ export function fallbackCase() {
  */
 export function mapChangedFilesToCases(files = []) {
   const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
+
+  // A change to the lab's own fixture world or to this registry selects EVERYTHING that publishes.
+  //
+  // This is the rule that stops the harness lying about its riskiest change. Every frame renders
+  // from one fixture world, so an edit to `labContent.js` can reflow all 150 — and none of those
+  // paths is a render file, so `isUiFile` rejects them and the selection came back EMPTY. The PRs
+  // most able to invalidate the whole corpus were precisely the PRs that selected no evidence and
+  // passed green. Verified before this rule existed:
+  //   mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []
+  if (normalized.some((file) => LAB_INFRASTRUCTURE_PATTERN.test(file))) {
+    return publishableCases();
+  }
+
   const renderFiles = normalized.filter((file) => isUiFile(file));
   if (renderFiles.length === 0) {
     // Nothing here renders, so there is no frame to select — a lang-only change included. The
