@@ -13,6 +13,8 @@
  *   - unsatisfiable (nothing held).
  */
 
+import { makeGetFlag, makeSetFlag } from './labFlags.js';
+
 const PORTRAIT_BASE = '/@foundry-chrome/icons';
 
 /**
@@ -25,7 +27,7 @@ const PORTRAIT_BASE = '/@foundry-chrome/icons';
  * @returns {object} A duck-typed item.
  */
 function ownedItem(componentId, component, quantity, index) {
-  return {
+  const item = {
     // The uuid is what `Ingredient.matches` compares against `originItemUuid`.
     uuid: `Item.${componentId}`,
     id: `item-${componentId}-${index}`,
@@ -34,9 +36,15 @@ function ownedItem(componentId, component, quantity, index) {
     type: 'loot',
     system: { quantity, description: { value: '' } },
     flags: {},
-    getFlag: () => null,
     isOwner: true,
   };
+  // Real V13 flag semantics rather than `() => null`. Tool wear, breakage, catalyst usage, item
+  // essences and role identity are all owned-item flags read through `getFabricateFlag`, which
+  // normalises to the dotted `fabricate.<key>` — a hard null answers every one of them with its
+  // default and renders a pristine, unworn, unbroken frame no matter what the fixture seeded.
+  item.getFlag = makeGetFlag(item);
+  item.setFlag = makeSetFlag(item);
+  return item;
 }
 
 /**
@@ -140,7 +148,7 @@ export function buildLabActors(content) {
     const items = Object.entries(stacks).map(([componentId, quantity], index) =>
       ownedItem(componentId, componentsById.get(componentId), quantity, index)
     );
-    return {
+    const actor = {
       ...definition,
       uuid: `Actor.${definition.id}`,
       type: 'character',
@@ -151,10 +159,14 @@ export function buildLabActors(content) {
         abilities: { int: { mod: 3 }, str: { mod: 2 } },
       },
       flags: {},
-      getFlag: () => null,
-      setFlag: () => Promise.resolve(),
       isOwner: true,
       testUserPermission: () => true,
+      // `checkRoll.js` and `craftingModifierResolver.js` resolve `@`-expressions against this. A
+      // real dnd5e actor supplies it; without it every `@prof` / `@abilities.*.mod` in a check
+      // formula resolves to NaN and the card renders a broken formula.
+      getRollData() {
+        return { ...this.system, prof: 3 };
+      },
       /**
        * The smoke's seed stocks the crafter through this, so an actor has to accept embedded items
        * or every inventory-dependent frame renders empty. Items arrive as plain specs carrying
@@ -189,6 +201,9 @@ export function buildLabActors(content) {
         return removed;
       },
     };
+    actor.getFlag = makeGetFlag(actor);
+    actor.setFlag = makeSetFlag(actor);
+    return actor;
   });
 }
 
@@ -209,7 +224,7 @@ export function buildDocumentIndex(content, actors) {
 
   for (const component of [...content.components, ...content.tools]) {
     const uuid = component.originItemUuid ?? `Item.${component.id}`;
-    documents.set(uuid, {
+    const document = {
       uuid,
       id: component.id,
       name: component.name,
@@ -217,8 +232,13 @@ export function buildDocumentIndex(content, actors) {
       type: 'loot',
       system: { quantity: 1, description: { value: component.description ?? '' } },
       flags: {},
-      getFlag: () => null,
-    });
+    };
+    // `sourceUuid.js` resolves component and tool identity through `roles` on the ORIGIN item, so
+    // an index entry answering `null` sends every lookup to the name-matching fallback tier rather
+    // than the flag tier production reaches first.
+    document.getFlag = makeGetFlag(document);
+    document.setFlag = makeSetFlag(document);
+    documents.set(uuid, document);
   }
 
   for (const actor of actors) documents.set(actor.uuid, actor);

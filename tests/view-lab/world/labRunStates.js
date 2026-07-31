@@ -19,7 +19,7 @@
  * crossed with single-step and multi-step, because the step rail only appears for the latter.
  */
 
-const FLAG_NAMESPACE = 'fabricate';
+import { RUN_CONTAINER_PATHS, makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
 
 /** World time the lab pins to; a run's timestamps are relative to it. */
 const NOW = 1_209_600;
@@ -290,34 +290,26 @@ export function buildLabRunStates({ actor, userId, recipes }) {
  * @param {object} containers Output of {@link buildLabRunStates}.
  */
 export function installLabRunStates(actor, containers) {
-  actor.flags = actor.flags ?? {};
-  const scope = { ...(actor.flags[FLAG_NAMESPACE] ?? {}) };
-
-  // Written under BOTH the bare key and the dotted one. `getFabricateFlag` normalises
-  // `craftingRuns` to `fabricate.craftingRuns` before calling `getFlag`, because Foundry V13 stores
-  // a dotted flag key literally — so a container written only at the bare key is invisible to every
-  // reader, and the journal renders empty with the runs sitting right there on the actor.
+  // Each container goes at the ONE depth production writes it, and the three do not agree:
+  //
+  //   crafting  flags.fabricate.fabricate.craftingRuns   (setFabricateFlag -> dotted top-level key
+  //   salvage   flags.fabricate.fabricate.salvageRuns     -> V13 expandObject -> doubly nested)
+  //   gathering flags.fabricate.gatheringRuns            (bare setFlag, inner key has no dot)
+  //
+  // Verified against `src/systems/runFlagInvalidation.js`, which is the authority, and against
+  // V13's `updateSource` expanding only when a TOP-LEVEL key contains a dot.
+  //
+  // This previously wrote every container at BOTH the bare and the dotted key "to be safe". That
+  // was worse than picking wrong: with both spellings present, every reader finds something at
+  // whatever depth it looks, so the lab could never reproduce a depth bug — including the one this
+  // branch shipped and then fixed. Seeding one shape is what makes the frame evidence.
   for (const [key, container] of Object.entries(containers)) {
-    scope[key] = container;
-    scope[`${FLAG_NAMESPACE}.${key}`] = container;
+    const path = RUN_CONTAINER_PATHS[key];
+    if (!path) throw new Error(`labRunStates: no known flag path for container "${key}"`);
+    seedFabricateFlag(actor, path, container);
   }
-  actor.flags[FLAG_NAMESPACE] = scope;
 
-  // The lab's actors answer `getFlag` from a closure over their original flags object, so rebind it
-  // to what was just written — literal key first, then a dotted traversal, which is how Foundry
-  // resolves the two spellings.
-  actor.getFlag = (namespace, key) => {
-    const bucket = actor.flags?.[namespace];
-    if (!bucket) return null;
-    if (key in bucket) return bucket[key];
-    return (
-      String(key)
-        .split('.')
-        .reduce((current, part) => (current == null ? current : current[part]), bucket) ?? null
-    );
-  };
-  actor.setFlag = async (namespace, key, value) => {
-    actor.flags[namespace] = { ...(actor.flags[namespace] ?? {}), [key]: value };
-    return actor;
-  };
+  // Rebind so the accessors read the flags object as it now stands, with real V13 semantics.
+  actor.getFlag = makeGetFlag(actor);
+  actor.setFlag = makeSetFlag(actor);
 }

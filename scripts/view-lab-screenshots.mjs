@@ -92,8 +92,16 @@ async function startLabServer() {
  * read as what a user does, and a step that matches nothing fails loudly rather than silently
  * capturing the wrong screen.
  *
+ * A step is either a rail label (matched by text against `.manager-nav-button`) or an object naming
+ * a stable selector plus the verb to apply to it:
+ *
+ *   { selector }                  click it (the default)
+ *   { selector, select: 'macro' } choose that option on a `<select>`
+ *   { selector, fill: 'text' }    type into it, which is the only way to reach a dirty form
+ *   { selector, scroll: true }    scroll it into view inside its own overflow container
+ *
  * @param {import('playwright').Page} page The lab page.
- * @param {string[]} steps Accessible names to click, in order.
+ * @param {Array<string|object>} steps Ordered steps.
  * @param {string} label Case label, for error messages.
  */
 async function runSteps(page, steps, label) {
@@ -107,7 +115,29 @@ async function runSteps(page, steps, label) {
           `${label}: nothing matches "${step.selector}" — the case cannot reach its view state`
         );
       }
-      await element.first().click();
+      const target = element.first();
+
+      // Four verbs, because a click alone cannot reach every state the smoke photographs. The smoke
+      // itself drives these surfaces with `selectOption` and `fill`; a click-only runner leaves those
+      // states permanently out of reach no matter how many stable hooks exist, which is not a
+      // fixture problem and cannot be solved by fixture work.
+      if ('select' in step) {
+        // A `<select>` whose chosen value changes the screen — the system currency strategy picker
+        // and the recipe category filter both work this way.
+        await target.selectOption(step.select);
+      } else if ('fill' in step) {
+        // Typed input. The only route to a DIRTY form: `data-system-details-dirty` appears on an
+        // `input` event, so no click reaches it.
+        await target.fill(step.fill);
+      } else if (step.scroll) {
+        // Element exists but sits below an inner panel's fold. `frame.screenshot()` on the outer
+        // `.application` does NOT scroll nested overflow containers, so a card that never scrolled
+        // into view is simply absent from the frame while every assertion still passes.
+        await target.scrollIntoViewIfNeeded();
+      } else {
+        await target.click();
+      }
+
       await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());
       continue;
     }
@@ -296,6 +326,31 @@ async function commandApps() {
   const only = positional ? new Set(positional.split(',')) : null;
   const cases = only ? APP_CASES.filter((entry) => only.has(entry.id)) : APP_CASES;
 
+  // A requested id that names no case is a TYPO, not an empty result. Without this the driver
+  // silently rendered whatever subset happened to match — and a fully-unmatched list produced zero
+  // frames, zero failures, and exit 0, which is indistinguishable from success to any caller.
+  if (only) {
+    const unmatched = [...only].filter((id) => APP_CASES.every((entry) => entry.id !== id));
+    if (unmatched.length > 0) {
+      console.error(
+        `no publishable case matches: ${unmatched.join(', ')}\n` +
+          `  (${APP_CASES.length} publishable cases; check scripts/lib/viewLabCases.js)`
+      );
+      return 1;
+    }
+  }
+
+  // An empty selection is a legitimate outcome — a PR that changes no render file needs no frame —
+  // but it MUST announce itself rather than look like a successful run that produced nothing.
+  if (cases.length === 0) {
+    console.log('SELECTION EMPTY: no cases selected, so no frames were rendered.');
+    writeFileSync(
+      join(outputDir, 'manifest.json'),
+      `${JSON.stringify({ selectionEmpty: true, frames: [], failures: [] }, null, 2)}\n`
+    );
+    return 0;
+  }
+
   const server = await startLabServer();
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
   const rendered = [];
@@ -356,6 +411,18 @@ async function commandApps() {
   if (failures.length > 0) {
     console.log('\nfailures:');
     for (const failure of failures) console.log(`\n--- ${failure.id} ---\n${failure.message}`);
+  }
+
+  // Selected cases but rendered nothing is a HARNESS failure, not an empty result. It can happen
+  // with zero entries in `failures` — a browser or server that dies before the loop body runs — and
+  // without this the run would exit 0 having published no evidence at all. The genuinely-empty
+  // selection returned above, before any of this, so reaching here with no frames is always wrong.
+  if (rendered.length === 0) {
+    console.error(
+      `\nrendered 0 of ${cases.length} selected cases and recorded ${failures.length} failures — ` +
+        'the harness produced no frames at all.'
+    );
+    return 1;
   }
   return failures.length === 0 ? 0 : 1;
 }

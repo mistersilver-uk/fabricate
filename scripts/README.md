@@ -273,15 +273,21 @@ field — an approximate case that does not say it is approximate is worse than 
 
 | `reaches` | Meaning | `smokeLabels` |
 |---|---|---|
-| `state` | The frame lands on the smoke label's own condition. Directly comparable. | one or more |
-| `screen` | The frame reaches the right screen but not that label's specific state — known remaining work. | one or more |
-| `beyond` | A state the live smoke never walks, so there is no counterpart to fall short of. | empty, always |
+| `exact` | The frame lands on the smoke counterpart's own condition. Directly comparable. | one or more |
+| `window` | The frame reaches the right application window but not that counterpart's condition — known remaining work, accounted for by the register below. | one or more |
+| `beyond` | A condition the live smoke never walks, so there is no counterpart to fall short of. | empty, always |
 
 `beyond` exists because the smoke is not a coverage ceiling worth inheriting: it visits one crafting
-system per screen, so two of the three visibility modes, both routed resolution modes, and Foundry's
-light application theme appear in no frame it produces.
-The lab carries a fixture system per canonical resolution mode (`simple`, `routedByIngredients`,
-`routedByCheck`, `progressive`, `alchemy`) precisely so those paths can be photographed.
+system per window, so two of the three visibility modes, both routed recipe resolution modes, and
+Foundry's light application theme appear in no frame it produces.
+The lab carries a fixture system per canonical **recipe** resolution mode (`simple`,
+`routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`) precisely so those paths can be
+photographed.
+Salvage has its own separate mode enum and is not covered by that claim — see the register below.
+
+A `window`-reach case does not carry its own written excuse.
+Seventy-one near-identical case comments would rot; the shortfalls are recorded once per **class** in
+the known-gaps register, which is where a reviewer can actually find them.
 
 ## Fidelity gap
 
@@ -297,6 +303,9 @@ Where the two disagree about the same view, the smoke is right.
 | No other modules | A real world loads other modules at `layer(modules)` alongside `fabricate.css`. |
 | Fixture world, not the smoke world | Five crafting systems rather than ten, with different names and counts. Structure matches; content does not. Pass `--smoke-fixtures` to replay the smoke's own seed instead. |
 | No progressive player detail frame | The only progressive system is knowledge-gated, so a player who has learned nothing sees none of its recipes. The progressive AUTHORING path is covered. |
+| Salvage resolution mode | Only `simple` has fixture coverage; `progressive` and `routed` salvage (`salvageResolutionModeOptions`) are not represented by any lab system. Recipe resolution modes are all five covered — the two enums are separate. |
+| States behind a native Foundry dialog | `installFoundryShim.js` stubs `DialogV2` as an empty class, so `confirmDialog` returns `false` unconditionally and the surface behind the dialog is what renders. Anything gated on `DialogV2.confirm` or a roll prompt stays `window`-reach; the alternative is drawing a facsimile of a dialog Fabricate never renders, which would be worse than no frame. |
+| States behind a Foundry-side service call | `game.fabricate` is null on purpose, so operations like `repairItemData` and `addItemFromUuid` cannot be driven. Their END states are fixture-able; the operations themselves are not. |
 | Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

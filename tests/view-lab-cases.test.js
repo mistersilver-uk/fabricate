@@ -101,11 +101,25 @@ test('every interaction step names text that exists in the manager UI', () => {
   const haystack = [...sources.values()].join('\n');
 
   const missing = [];
+  const VERBS = ['select', 'fill', 'scroll'];
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step === 'string') {
         if (!haystack.includes(step)) missing.push(`${viewCase.id}: label "${step}"`);
         continue;
+      }
+      // The runner dispatches on which verb key is present, so a typo'd key (`selectOption`,
+      // `value`, `text`) silently degrades the step to a plain click and the case captures the
+      // screen it started on. Only the known verbs may appear alongside `selector`.
+      const extra = Object.keys(step).filter((key) => key !== 'selector' && !VERBS.includes(key));
+      if (extra.length > 0) {
+        missing.push(
+          `${viewCase.id}: step for "${step.selector}" has unknown key(s) ${extra.join(', ')} — ` +
+            `the runner would silently click instead. Known verbs: ${VERBS.join(', ')}`
+        );
+      }
+      if (VERBS.filter((verb) => verb in step).length > 1) {
+        missing.push(`${viewCase.id}: step for "${step.selector}" names more than one verb`);
       }
       // An editor tab strip renders `id={`<family>-tab-${tab.id}`}`, so neither half of the
       // selector appears literally. Both halves still have to be checked, and checking them
@@ -279,14 +293,19 @@ test('manager cases pin the geometry their smoke label was captured at', () => {
 });
 
 test('every case declares how far it actually gets', () => {
-  // A case that reaches the right SCREEN but not the smoke label's specific state is useful evidence
-  // and a known piece of remaining work. Recording which is which keeps that honest — an
-  // approximate case that does not say so is worse than no case. `beyond` is the third answer: a
-  // state the smoke never photographs, so there is no label to fall short of.
+  // `exact` — lands on the smoke counterpart's own condition, so a side-by-side is meaningful.
+  // `window` — reaches the right application window but not that counterpart's specific condition;
+  //   useful evidence and known remaining work, accounted for by a class-level entry in the
+  //   known-gaps register in `scripts/README.md` rather than by 71 near-identical case comments.
+  // `beyond` — a condition the smoke never walks, so there is no counterpart to fall short of.
+  //
+  // The values were `state` / `screen` before plan-review: `state` collided with Svelte's `$state`
+  // and with the spec's own broader "the state it expects" phrasing one requirement over, and
+  // `screen` collided with this file's own definition of a screen as the whole captured window.
   for (const viewCase of VIEW_LAB_CASES) {
     assert.ok(
-      ['state', 'screen', 'beyond'].includes(viewCase.reaches),
-      `case "${viewCase.id}" must declare reaches: 'state' | 'screen' | 'beyond'`
+      ['exact', 'window', 'beyond'].includes(viewCase.reaches),
+      `case "${viewCase.id}" must declare reaches: 'exact' | 'window' | 'beyond'`
     );
   }
 });

@@ -577,11 +577,20 @@ a changed-file set.
 Every manager case declares `expectView`, which the capture asserts against the app's actual route
 before taking the frame — without it a mis-click silently screenshots the wrong screen.
 
-A case also declares `reaches`: `state` when the frame lands on its smoke counterpart's own
-condition, `screen` when it reaches the right screen but not that state (known remaining work), and
-`beyond` for a state the live smoke never walks at all — the routed resolution modes, the visibility
-modes it does not visit, Foundry's light application theme.
+A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own
+condition, `window` when it reaches the right application window but not that condition (known
+remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe
+resolution modes, the visibility modes it does not visit, Foundry's light application theme.
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
+A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
+`scripts/README.md`, not by a per-case comment.
+
+Steps are ordered and take four verbs — `{selector}` clicks, `{selector, select}` chooses a
+`<select>` option, `{selector, fill}` types (the only route to a dirty form), and
+`{selector, scroll: true}` scrolls an element into view inside its own overflow container.
+The last matters more than it sounds: `frame.screenshot()` on the outer `.application` does not
+scroll nested containers, so a card that never scrolled into view is absent from the frame while
+every assertion still passes.
 
 **The live smoke is still the fidelity authority.**
 Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and
