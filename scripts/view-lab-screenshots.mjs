@@ -272,6 +272,9 @@ async function commandChrome() {
 const SMOKE_SYSTEM_FOR = Object.freeze({
   'lab-alchemy': 'Warded Athenaeum',
   'lab-herbalism': "The Herbalist's Compendium",
+  'lab-smithing': 'Smoke Simple Forge',
+  'lab-jewelry': 'Smoke Ingredient Router',
+  'lab-runework': 'Smoke Check Router',
 });
 
 const APP_CASES = publishableCases();

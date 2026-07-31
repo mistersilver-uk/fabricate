@@ -14,7 +14,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { APP_CHROME, FOUNDRY_CHROME_SPEC, minimumViewportFor } from '../scripts/lib/foundryChromeSpec.js';
+import {
+  APP_CHROME,
+  FOUNDRY_CHROME_SPEC,
+  minimumViewportFor,
+} from '../scripts/lib/foundryChromeSpec.js';
 import {
   FALLBACK_CASE_ID,
   VIEW_LAB_CASES,
@@ -53,7 +57,10 @@ test('every case names a window the chrome spec knows how to build', () => {
     );
     assert.ok(viewCase.label.trim().length > 0, `case "${viewCase.id}" has no label`);
     assert.equal(labelForCaseId(viewCase.id), viewCase.label);
-    assert.ok(viewCase.readySelector.trim().length > 0, `case "${viewCase.id}" has no readySelector`);
+    assert.ok(
+      viewCase.readySelector.trim().length > 0,
+      `case "${viewCase.id}" has no readySelector`
+    );
   }
 });
 
@@ -81,15 +88,17 @@ test('every interaction step names text that exists in the manager UI', () => {
   // the case would capture whichever screen happened to be showing.
   // Includes `src/ui/**/*.js`: the crafting sub-tab ids the selector steps target are declared in
   // `crafting/craftingNav.js`, not in any component file.
-  const haystack = tracked
-    .filter(
-      (file) =>
-        file.endsWith('.svelte') ||
-        file === 'lang/en.json' ||
-        (file.startsWith('src/ui/') && file.endsWith('.js'))
-    )
-    .map((file) => readFileSync(resolve(ROOT, file), 'utf8'))
-    .join('\n');
+  const sources = new Map(
+    tracked
+      .filter(
+        (file) =>
+          file.endsWith('.svelte') ||
+          file === 'lang/en.json' ||
+          (file.startsWith('src/ui/') && file.endsWith('.js'))
+      )
+      .map((file) => [file, readFileSync(resolve(ROOT, file), 'utf8')])
+  );
+  const haystack = [...sources.values()].join('\n');
 
   const missing = [];
   for (const viewCase of VIEW_LAB_CASES) {
@@ -98,8 +107,28 @@ test('every interaction step names text that exists in the manager UI', () => {
         if (!haystack.includes(step)) missing.push(`${viewCase.id}: label "${step}"`);
         continue;
       }
-      // A `{selector}` step targets a stable hook. Two shapes exist, and each needs a different
-      // token to look for:
+      // An editor tab strip renders `id={`<family>-tab-${tab.id}`}`, so neither half of the
+      // selector appears literally. Both halves still have to be checked, and checking them
+      // against the WHOLE tree would pass on a coincidence — `'overview'` occurs everywhere. So
+      // locate the file that builds those ids, and require the tab id to be declared in THAT file.
+      const editorTab = /^#([a-z-]+)-tab-([a-z-]+)$/.exec(step.selector);
+      if (editorTab) {
+        const [, family, tabId] = editorTab;
+        const builders = [...sources].filter(([, text]) => text.includes(`${family}-tab-\${`));
+        if (builders.length === 0) {
+          missing.push(
+            `${viewCase.id}: selector "${step.selector}" (no component builds ${family}-tab-* ids)`
+          );
+        } else if (!builders.some(([, text]) => text.includes(`'${tabId}'`))) {
+          missing.push(
+            `${viewCase.id}: selector "${step.selector}" (${builders
+              .map(([file]) => file)
+              .join(', ')} declares no "${tabId}" tab)`
+          );
+        }
+        continue;
+      }
+      // A `{selector}` step targets a stable hook. Two other shapes exist:
       //   - `#manager-crafting-nav-<id>` is BUILT from a nav item's id, so the literal never appears
       //     in source; the id stem is what a rename would move.
       //   - a class or attribute selector appears as its class name in the markup.
@@ -110,7 +139,9 @@ test('every interaction step names text that exists in the manager UI', () => {
         continue;
       }
       if (!haystack.includes(token)) {
-        missing.push(`${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`);
+        missing.push(
+          `${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`
+        );
       }
     }
   }
@@ -167,7 +198,11 @@ test('the capture viewport clears the max-height Foundry clamps windows to', () 
 test('exactly one fallback case exists and it publishes', () => {
   const fallback = fallbackCase();
   assert.ok(fallback, `FALLBACK_CASE_ID "${FALLBACK_CASE_ID}" names no case`);
-  assert.equal(fallback.publish, true, 'the fallback case must publish or a broad change yields no evidence');
+  assert.equal(
+    fallback.publish,
+    true,
+    'the fallback case must publish or a broad change yields no evidence'
+  );
 });
 
 test('getCaseById round-trips and rejects unknown ids', () => {
@@ -184,7 +219,10 @@ test('UI file detection matches the documented rule', () => {
   assert.ok(!isUiFile('src/systems/CraftingEngine.js'));
   // A lang-only change needs no evidence; a lang change alongside a render file does.
   assert.equal(hasUiChanges(['lang/en.json']), false);
-  assert.equal(hasUiChanges(['lang/en.json', 'src/ui/svelte/apps/crafting/CraftingView.svelte']), true);
+  assert.equal(
+    hasUiChanges(['lang/en.json', 'src/ui/svelte/apps/crafting/CraftingView.svelte']),
+    true
+  );
 });
 
 test('changed files map to the windows they affect', () => {
@@ -202,7 +240,10 @@ test('changed files map to the windows they affect', () => {
 
   // A shared primitive or a global stylesheet can change every screen. Selecting all of them would
   // bury the reviewer, so those signals map to one player screen and one manager screen.
-  assert.deepEqual(ids(['styles/fabricate.css']).sort(), ['fabricate-app-shell', 'manager-components-normal']);
+  assert.deepEqual(ids(['styles/fabricate.css']).sort(), [
+    'fabricate-app-shell',
+    'manager-components-normal',
+  ]);
 
   // An unmatched render file still yields evidence rather than none.
   assert.deepEqual(ids(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']), [FALLBACK_CASE_ID]);
@@ -240,22 +281,31 @@ test('manager cases pin the geometry their smoke label was captured at', () => {
 test('every case declares how far it actually gets', () => {
   // A case that reaches the right SCREEN but not the smoke label's specific state is useful evidence
   // and a known piece of remaining work. Recording which is which keeps that honest — an
-  // approximate case that does not say so is worse than no case.
+  // approximate case that does not say so is worse than no case. `beyond` is the third answer: a
+  // state the smoke never photographs, so there is no label to fall short of.
   for (const viewCase of VIEW_LAB_CASES) {
     assert.ok(
-      ['state', 'screen'].includes(viewCase.reaches),
-      `case "${viewCase.id}" must declare reaches: 'state' | 'screen'`
+      ['state', 'screen', 'beyond'].includes(viewCase.reaches),
+      `case "${viewCase.id}" must declare reaches: 'state' | 'screen' | 'beyond'`
     );
   }
 });
 
 test('every case records the smoke labels it corresponds to', () => {
   // The pairing is what makes a side-by-side possible, and what makes "which smoke frame does this
-  // replace?" answerable without reading the capture walk.
+  // replace?" answerable without reading the capture walk. A `beyond` case has no counterpart by
+  // definition, and must say so with an EMPTY array rather than by omitting the field — the
+  // difference between "the smoke does not cover this" and "nobody filled this in".
   for (const viewCase of VIEW_LAB_CASES) {
-    assert.ok(
-      Array.isArray(viewCase.smokeLabels) && viewCase.smokeLabels.length > 0,
-      `case "${viewCase.id}" declares no smokeLabels`
-    );
+    assert.ok(Array.isArray(viewCase.smokeLabels), `case "${viewCase.id}" declares no smokeLabels`);
+    if (viewCase.reaches === 'beyond') {
+      assert.equal(
+        viewCase.smokeLabels.length,
+        0,
+        `case "${viewCase.id}" reaches beyond the smoke but claims smoke labels`
+      );
+      continue;
+    }
+    assert.ok(viewCase.smokeLabels.length > 0, `case "${viewCase.id}" declares no smokeLabels`);
   }
 });

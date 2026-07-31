@@ -65,6 +65,14 @@ const INVENTORIES = {
     'sm-tool-anvil': 1,
     'sm-tool-tongs': 1,
     'hb-healing-potion': 2,
+    // Routed stock, deliberately ASYMMETRIC. Brenna holds the silver billet but not the gold one,
+    // so `jw-r-cast` renders with one route satisfied and one short — which is the whole point of
+    // a routedByIngredients frame. The wire is one under the three a circlet needs, for the same
+    // reason: a routed recipe where every route is green shows none of the routing.
+    'jw-ingot-silver': 2,
+    'jw-wire': 2,
+    'rw-bar': 2,
+    'rw-chalk': 4,
   },
   'lab-actor-idrin': {
     'hb-moonleaf': 8,
@@ -92,6 +100,10 @@ const INVENTORIES = {
     'hb-moonleaf': 4,
     'hb-spring-water': 5,
     'al-sulphur': 2,
+    // The gold billet lives on the mule, not the crafter — so the routed recipe's second route is
+    // reachable only through the multi-source picker.
+    'jw-ingot-gold': 3,
+    'rw-bar': 6,
   },
 };
 
@@ -134,7 +146,10 @@ export function buildLabActors(content) {
       type: 'character',
       // Iterated with `[...actor.items]` throughout the engine, so a plain array is enough.
       items,
-      system: { currency: { gp: 45, sp: 12, cp: 30 }, abilities: { int: { mod: 3 }, str: { mod: 2 } } },
+      system: {
+        currency: { gp: 45, sp: 12, cp: 30 },
+        abilities: { int: { mod: 3 }, str: { mod: 2 } },
+      },
       flags: {},
       getFlag: () => null,
       setFlag: () => Promise.resolve(),
