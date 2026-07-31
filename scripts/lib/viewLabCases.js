@@ -33,6 +33,19 @@ const BROAD_SIGNAL_PATTERN = /^(styles\/|src\/ui\/svelte\/components\/|src\/ui\/
 /** One player screen and one manager screen: enough to show a shared-primitive change in context. */
 const REPRESENTATIVE_CASE_IDS = Object.freeze(['player-crafting', 'manager-components']);
 
+/**
+ * The geometry the live smoke captures the manager at.
+ *
+ * NOT the app's declared 1280x940. `setManagerWindowSize` in `scripts/foundry-test-run.mjs` forces
+ * this size (into a 1366x900 viewport, window at left 43, top 0) for its manager frames, so every
+ * smoke manager screenshot is 120px shorter than a freshly-opened window. Capturing the lab at the
+ * declared default would make a side-by-side impossible to read: different content height means a
+ * different rail and inspector layout, and every difference would look like a rendering defect.
+ *
+ * The smoke is the fidelity authority, so the lab matches the smoke rather than the other way round.
+ */
+const SMOKE_MANAGER_POSITION = Object.freeze({ width: 1280, height: 820 });
+
 export const FALLBACK_CASE_ID = 'player-crafting';
 
 export const VIEW_LAB_CASES = Object.freeze([
@@ -42,6 +55,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     app: PLAYER,
     query: { tab: 'crafting' },
     steps: [],
+    smokeLabels: ['fabricate-app-shell', 'crafting-recipe-selected'],
     readySelector: '.fabricate-app-shell',
     publish: true,
     kinds: ['player', 'crafting'],
@@ -57,6 +71,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     app: PLAYER,
     query: { tab: 'gathering' },
     steps: [],
+    smokeLabels: ['gathering-environments'],
     readySelector: '.fabricate-app-shell',
     publish: true,
     kinds: ['player', 'gathering'],
@@ -68,6 +83,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     app: PLAYER,
     query: { tab: 'alchemy' },
     steps: [],
+    smokeLabels: ['alchemy-workbench'],
     readySelector: '.fabricate-app-shell',
     publish: true,
     kinds: ['player', 'alchemy'],
@@ -82,6 +98,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     app: PLAYER,
     query: { tab: 'journal' },
     steps: [],
+    smokeLabels: ['fabricate-journal'],
     readySelector: '.fabricate-app-shell',
     publish: true,
     kinds: ['player', 'journal'],
@@ -93,6 +110,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     app: PLAYER,
     query: { tab: 'inventory' },
     steps: [],
+    smokeLabels: ['player-inventory'],
     readySelector: '.fabricate-app-shell',
     publish: true,
     kinds: ['player', 'inventory'],
@@ -108,6 +126,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [],
     expectView: 'systems',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-default-selection', 'manager-selected-normal', 'manager-rail-expanded'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager'],
@@ -123,6 +143,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['System Overview'],
     expectView: 'system-edit',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-system-edit-normal', 'manager-system-edit-lists'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager'],
@@ -135,6 +157,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Components'],
     expectView: 'components',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-components-normal', 'manager-components-grouped-continuation'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'components'],
@@ -147,6 +171,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Crafting'],
     expectView: 'recipes',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-recipes-normal', 'manager-recipes-grouped-continuation'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'recipes'],
@@ -165,6 +191,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: ['Crafting', { selector: '#manager-crafting-nav-books-scrolls' }],
     expectView: 'books-scrolls',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-books-scrolls-normal'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'recipes'],
@@ -180,6 +208,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-herbalism' },
     steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
     expectView: 'knowledge',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-knowledge-owned-copies'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'knowledge'],
@@ -192,6 +222,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Crafting', { selector: '#manager-crafting-nav-settings' }],
     expectView: 'crafting-settings',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-crafting-settings'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'settings'],
@@ -205,6 +237,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-alchemy' },
     steps: ['Crafting', { selector: '#manager-crafting-nav-access' }],
     expectView: 'access',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-recipe-edit-access-rail'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'access'],
@@ -220,6 +254,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Essences'],
     expectView: 'essences',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-essences-normal'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'essences'],
@@ -232,6 +268,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Tags & Categories'],
     expectView: 'tags',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-tags-categories-normal'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'tags'],
@@ -244,6 +282,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Tools'],
     expectView: 'tools',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-tools-library'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'tools'],
@@ -256,6 +296,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Checks'],
     expectView: 'checks',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-checks-crafting-consumption', 'manager-checks-gathering'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'checks'],
@@ -268,6 +310,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Gathering'],
     expectView: 'environments',
+    position: SMOKE_MANAGER_POSITION,
+    smokeLabels: ['manager-environments-normal'],
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'gathering'],

@@ -291,7 +291,13 @@ async function commandApps() {
       try {
         const { buffer, box } = await renderPage(browser, server.baseUrl, {
           appId: viewCase.app,
-          query: { ...viewCase.query, case: viewCase.id },
+          query: {
+            ...viewCase.query,
+            case: viewCase.id,
+            ...(viewCase.position
+              ? { w: String(viewCase.position.width), h: String(viewCase.position.height) }
+              : {}),
+          },
           label: viewCase.id,
           steps: viewCase.steps ?? [],
           expectView: viewCase.expectView ?? null,

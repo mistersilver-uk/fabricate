@@ -50,11 +50,24 @@ function readParams() {
     appId: params.get('app') ?? 'fabricate-app',
     caseId: params.get('case') ?? null,
     tab: params.get('tab') ?? null,
-    colorScheme: params.get('colorScheme') === 'dark' ? 'dark' : 'light',
+    // DARK by default, because that is what the smoke renders and the smoke is the fidelity
+    // authority. Foundry's configureUI prefers the world's core.uiConfig.colorScheme.applications
+    // over the browser's prefers-color-scheme, so reasoning from Playwright's default (light) gets
+    // this wrong - as an earlier version of this file did. It matters more than it sounds:
+    // Fabricate's headings inherit Foundry's --color-text-primary, which is rgb(17,17,17) under
+    // theme-light and rgb(247,243,232) under theme-dark, so the wrong theme renders every heading
+    // near-black on Fabricate's dark panels.
+    colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',
     // Which crafting system the manager opens on. A seeded setting rather than a click, because
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
+    // Capture geometry override. The smoke photographs the manager at 1280x820, not its declared
+    // 1280x940, so a case pins the size its smoke counterpart uses (see SMOKE_MANAGER_POSITION).
+    position:
+      params.get('w') && params.get('h')
+        ? { width: Number(params.get('w')), height: Number(params.get('h')) }
+        : null,
     chromeOnly: params.get('chromeOnly') === '1',
   };
 }
@@ -181,7 +194,7 @@ async function boot() {
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
 
-  const built = buildAppWindow({ appId: params.appId, localize });
+  const built = buildAppWindow({ appId: params.appId, localize, position: params.position ?? undefined });
   // Geometry BEFORE content: a clamped frame is wrong no matter what is inside it, and failing
   // here keeps the error about the window rather than about whatever failed to render in it.
   assertWindowGeometry(built);

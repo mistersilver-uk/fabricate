@@ -20,7 +20,7 @@ import { APP_CHROME, FOUNDRY_CHROME_SPEC } from '../../scripts/lib/foundryChrome
  * @param {string} [options.systemId] Game system id, for the `system-<id>` body class.
  * @param {'light'|'dark'} [options.colorScheme] Which Foundry chrome theme to render.
  */
-export function configureLabPage({ systemId = 'dnd5e', colorScheme = 'light' } = {}) {
+export function configureLabPage({ systemId = 'dnd5e', colorScheme = 'dark' } = {}) {
   document.documentElement.style.fontSize = `${FOUNDRY_CHROME_SPEC.rootFontSizePx}px`;
   document.body.className = [...FOUNDRY_CHROME_SPEC.bodyClasses, `system-${systemId}`, `theme-${colorScheme}`].join(' ');
   for (const [name, value] of Object.entries(FOUNDRY_CHROME_SPEC.bodyStyleVars)) {

@@ -204,3 +204,30 @@ test('every publishable case is in the registry order the driver iterates', () =
     VIEW_LAB_CASES.filter((viewCase) => viewCase.publish).map((viewCase) => viewCase.id)
   );
 });
+
+test('manager cases capture at the geometry the smoke captures at', () => {
+  // The smoke does not photograph the manager at its declared 1280x940 — `setManagerWindowSize`
+  // forces 1280x820. A case captured at the default cannot be compared with its smoke counterpart:
+  // 120px of extra content changes the rail and inspector layout, and every difference then looks
+  // like a rendering defect rather than a size difference.
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (viewCase.app !== 'fabricate-crafting-system-manager') continue;
+    assert.ok(viewCase.position, `manager case "${viewCase.id}" must pin its capture geometry`);
+    assert.deepEqual(
+      viewCase.position,
+      { width: 1280, height: 820 },
+      `manager case "${viewCase.id}" must capture at the smoke's manager geometry`
+    );
+  }
+});
+
+test('every case records the smoke labels it corresponds to', () => {
+  // The pairing is what makes a side-by-side possible, and what makes "which smoke frame does this
+  // replace?" answerable without reading the capture walk.
+  for (const viewCase of VIEW_LAB_CASES) {
+    assert.ok(
+      Array.isArray(viewCase.smokeLabels) && viewCase.smokeLabels.length > 0,
+      `case "${viewCase.id}" declares no smokeLabels`
+    );
+  }
+});
