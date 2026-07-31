@@ -1,0 +1,199 @@
+name: "PR Screenshots (View Lab)"
+
+# Renders the Fabricate application windows a PR's changed files select, and publishes them into
+# the PR's managed screenshot block — so UI evidence costs the author nothing.
+#
+# THIS JOB IS AN ACCELERATOR, NOT A GATE.
+#
+# It cannot be a gate, and the reason is structural rather than a preference. A fork PR receives no
+# secrets and a read-only `GITHUB_TOKEN`, so it can neither harvest Foundry's chrome nor write the
+# PR body. Failing such a PR for want of evidence it is not permitted to produce would make the
+# check unsatisfiable by its author. `check-screenshots` in `ci.yml` remains the gate; this job
+# just satisfies it automatically where it can. Where it cannot, the maintainer-pasted evidence
+# path is unchanged.
+#
+# LICENSING — the constraint that shapes everything below.
+#
+# `.foundry-chrome/**` holds Foundry's proprietary client source, `foundry2.css`, and Font Awesome
+# 6 PRO webfonts. This repository is PUBLIC, and artifacts on a public repository are downloadable
+# by anyone. So:
+#
+#   - no step uploads `.foundry-chrome/**`, or any parent of it, as an artifact;
+#   - the publish step is scoped to `ui-screenshot-artifact/` by explicit path, never a walk of a
+#     directory that could contain the cache;
+#   - no new `actions/cache` entry holds harvested material.
+#
+# Only PNGs leave the runner. A raster drawn with a font is not the font.
+
+on:
+  pull_request:
+    # NEVER `pull_request_target`. That trigger runs the BASE workflow with secrets available to a
+    # checkout of untrusted head code — with Foundry credentials and AWS keys in scope here, it is
+    # a straightforward arbitrary-code-execution vector on a public repository.
+    # `edited` is deliberately absent. Publishing rewrites the PR body, which itself fires `edited`
+    # — listening for it would make this job retrigger its own output indefinitely. The trade is
+    # that `check-screenshots` in `ci.yml` may read the body before this job has written it and go
+    # red once; the body edit then fires the `edited` event `ci.yml` DOES listen for, and the
+    # re-run sees the published block. Red-then-green, not stuck-red.
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-screenshots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write # to update the managed screenshot block
+
+jobs:
+  capture:
+    # Same-repo PRs only. A fork PR has no secrets to harvest with and no write token to publish
+    # with, so running it would produce a guaranteed red that its author cannot clear.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
+      FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
+      FOUNDRY_LICENSE_KEY: ${{ secrets.FOUNDRY_LICENSE_KEY }}
+      FOUNDRY_ADMIN_KEY: fabricate-test-admin
+      FOUNDRY_TELEMETRY: "false"
+      # The drift test skips without a cache. On the one runner that actually draws frames, a skip
+      # is the failure mode — so require it here.
+      VIEWLAB_REQUIRE_CHROME: '1'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check Foundry credentials
+        run: |
+          if [ -z "$FOUNDRY_USERNAME" ] || [ -z "$FOUNDRY_PASSWORD" ]; then
+            echo "::warning::Foundry credentials unavailable; the View Lab cannot harvest chrome."
+            echo "::warning::Falling back to the maintainer-pasted evidence path."
+            echo "SKIP_CAPTURE=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Compute the selected cases
+        if: env.SKIP_CAPTURE != 'true'
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REPO: ${{ github.repository }}
+        run: |
+          # The files endpoint, not `gh pr diff --name-only`: the diff endpoint caps at 20,000
+          # lines and 406s beyond it, which under `bash -e` kills the step before selection runs.
+          gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' > changed-files.txt
+          IDS=$(node -e '
+            const { readFileSync } = require("node:fs");
+            import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases }) => {
+              const files = readFileSync("changed-files.txt", "utf8").split("\n").filter(Boolean);
+              process.stdout.write(mapChangedFilesToCases(files).map((c) => c.id).join(","));
+            });
+          ')
+          echo "ids=$IDS" >> "$GITHUB_OUTPUT"
+          if [ -z "$IDS" ]; then
+            echo "No changed file selects a View Lab case; nothing to render."
+          else
+            echo "Selected $(echo "$IDS" | tr ',' '\n' | wc -l) case(s)."
+          fi
+
+      - name: Setup Node.js
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        run: npm ci
+
+      - name: Cache Playwright Chromium
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        id: cache-playwright
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != '' && steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npm run test:foundry:install
+
+      # Caches the Foundry release ARCHIVE, which the harvest reads. This is the same cache entry
+      # the smoke workflow already maintains, reused rather than duplicated — deliberately, because
+      # a second entry holding licensed material is a second exposure.
+      - name: Cache Foundry binary
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        uses: actions/cache@v5
+        with:
+          path: .foundry-e2e/cache
+          key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
+
+      # The felddy image does NOT bundle Foundry; it authenticates and downloads on first boot. So
+      # on a cold archive cache there is no way to obtain the chrome without a credentialed boot,
+      # and the lab's "seconds, no Docker" property does not transfer to CI. This step pays that
+      # cost only when the cache missed.
+      - name: Obtain the Foundry release archive
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        run: |
+          if ! ls .foundry-e2e/cache/foundryvtt-*.zip >/dev/null 2>&1; then
+            echo "Archive cache is cold — booting Foundry once to populate it."
+            npm run test:foundry:up
+            npm run test:foundry:down
+          else
+            echo "Archive cache is warm; no boot required."
+          fi
+
+      - name: Harvest window chrome
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        run: npm run viewlab:chrome:harvest
+
+      # The chrome and the frame builder are two halves of one artefact: `foundryChromeSpec.js` is
+      # a hand transcription of `_renderFrame`/`_updateFrame`/`#applyPosition`, pinned by the
+      # `applicationMjsSha256` in committed provenance. A newer stylesheet rendered through markup
+      # transcribed from an older build gives genuine CSS around a stale DOM, and the PNG cannot
+      # tell you which — strictly worse than no frame, because a wrong frame is believed.
+      #
+      # CI never rewrites the provenance. That file is a human attestation that someone re-read
+      # `application.mjs` and confirmed the transcription still holds; a bot that refreshes it on
+      # mismatch converts the drift gate into a rubber stamp.
+      - name: Verify chrome matches committed provenance
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        run: |
+          PINNED=$(node -p "require('./tests/view-lab/chrome-provenance.json').foundryVersion")
+          HARVESTED=$(node -e "
+            import('./scripts/lib/foundryChromeCache.js').then(({ resolveChromeCache }) => {
+              const cache = resolveChromeCache(process.cwd());
+              process.stdout.write(cache ? cache.version : '');
+            });
+          ")
+          echo "pinned=$PINNED harvested=$HARVESTED"
+          if [ "$PINNED" != "$HARVESTED" ]; then
+            echo "::error::Harvested Foundry $HARVESTED does not match the pinned $PINNED."
+            echo "::error::Re-read client/applications/api/application.mjs, confirm the frame builder still transcribes it, and commit the refreshed provenance."
+            exit 1
+          fi
+
+      - name: Build module
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        run: npm run build
+
+      - name: Render the selected frames
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        run: node scripts/view-lab-screenshots.mjs apps "${{ steps.select.outputs.ids }}"
+
+      # Scoped to the PNG output directory BY NAME. Never a parent, and never `.foundry-chrome`.
+      - name: Publish into the PR's screenshot block
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          node scripts/ui-pr-screenshot-evidence.mjs publish \
+            --pr "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --output-dir ui-screenshot-artifact/apps \
+            --head-sha "${{ github.event.pull_request.head.sha }}"
