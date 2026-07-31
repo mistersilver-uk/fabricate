@@ -14,6 +14,8 @@ stats.html
 .foundry-e2e/systems/
 # Foundry installation cache (avoids re-downloading)
 .foundry-e2e/cache/
+# Harvested Foundry window chrome for the View Lab (proprietary; never commit)
+/.foundry-chrome/
 # Assembled data directory for Docker mount (contains symlinks)
 .foundry-e2e/data/
 test-results/
@@ -33,3 +35,4 @@ packs/*/LOG.old
 packs/*/LOCK
 packs/*/*.log
 design/
+ui-screenshot-artifact/
