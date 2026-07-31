@@ -51,6 +51,10 @@ function readParams() {
     caseId: params.get('case') ?? null,
     tab: params.get('tab') ?? null,
     colorScheme: params.get('colorScheme') === 'dark' ? 'dark' : 'light',
+    // Which crafting system the manager opens on. A seeded setting rather than a click, because
+    // three manager surfaces exist only for a system in the right visibility mode - clicking to
+    // them is impossible when the rail entry is not rendered at all.
+    system: params.get('system') ?? null,
     chromeOnly: params.get('chromeOnly') === '1',
   };
 }
@@ -173,7 +177,7 @@ async function boot() {
 
   installDeterminismStyles();
 
-  const world = params.chromeOnly ? null : await buildLabWorld();
+  const world = params.chromeOnly ? null : await buildLabWorld({ managedSystemId: params.system });
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
 

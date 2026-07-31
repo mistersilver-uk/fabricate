@@ -30,7 +30,7 @@ const FABRICATE_NAMESPACE = 'fabricate';
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
-function seedSettings(content, actors) {
+function seedSettings(content, actors, managedSystemId) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
 
@@ -52,12 +52,16 @@ function seedSettings(content, actors) {
   put('lastCraftingActor', actors[0].id);
   put('lastGatheringActor', actors[0].id);
   put('lastComponentSources', actors.map((actor) => actor.id));
-  put('lastManagedCraftingSystem', LAB_SYSTEM_IDS.SMITHING);
+  put('lastManagedCraftingSystem', managedSystemId ?? LAB_SYSTEM_IDS.SMITHING);
   put('lastAlchemySystem', LAB_SYSTEM_IDS.ALCHEMY);
   put('favouriteRecipes', ['sm-r-longsword', 'hb-r-healing']);
   put('progressiveResultOrder', {});
   put('gatheringHideUnavailableEnvironments', false);
   put('managerRailCollapsed', false);
+  // The smoke world runs with experimental features on, and the manager rail advertises its Graph
+  // placeholder only behind that toggle. Leaving it off gives the lab an eight-row rail where the
+  // smoke has nine - a structural difference in every manager frame.
+  put('experimentalFeatures', true);
   return settings;
 }
 
@@ -68,7 +72,7 @@ function seedSettings(content, actors) {
  * @param {number} [options.seed] Determinism seed.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
-export async function buildLabWorld({ seed = 20_260_601 } = {}) {
+export async function buildLabWorld({ seed = 20_260_601, managedSystemId = null } = {}) {
   const content = buildLabContent();
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
@@ -77,7 +81,7 @@ export async function buildLabWorld({ seed = 20_260_601 } = {}) {
   const world = {
     seed,
     content,
-    settings: seedSettings(content, actors),
+    settings: seedSettings(content, actors, managedSystemId),
     documents,
     actorList: actors,
     scenes: [{ id: 'lab-scene', uuid: 'Scene.lab-map', name: 'The Verdant Reach', regions: [] }],

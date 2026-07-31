@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <title>Fabricate View Lab</title>
     <!--
+      Foundry serves the game view from the web ROOT, so module code that references an asset the
+      Foundry way - `icons/svg/item-bag.svg`, no leading slash - resolves against `/`. The lab page
+      lives at /tests/view-lab/, so without this those paths would resolve against that directory
+      and 404. Setting the base is what makes a production-shaped relative path behave as it does in
+      production; the `/icons/` mount below then serves it from the harvested core art.
+    -->
+    <base href="/" />
+    <!--
       Stylesheet order reproduces Foundry's own game view (templates/views/layouts/main.hbs plus
       Express.CORE_VIEW_STYLES). It is load-bearing, and NOT the order a bundler would pick:
 

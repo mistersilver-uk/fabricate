@@ -120,9 +120,40 @@ function recipe(id, name, systemId, icon, config) {
   };
 }
 
+/**
+ * One ingredient set in which every listed component is required.
+ *
+ * `IngredientSet` models "all groups required, one option satisfies each group", so a plain
+ * requirement list becomes one single-option group per component — NOT one group with many options,
+ * which would mean "any one of these will do".
+ *
+ * @param {string} setId Stable set id.
+ * @param {Record<string, number>} ingredients componentId -> quantity.
+ * @returns {object} A persisted-shape ingredient set.
+ */
 const simpleSet = (setId, ingredients) => ({
   id: setId,
-  ingredientOptions: [{ id: `${setId}-opt`, ingredients }],
+  ingredientGroups: Object.entries(ingredients).map(([componentId, quantity], index) => ({
+    id: `${setId}-g${index + 1}`,
+    options: [{ componentId, quantity }],
+  })),
+});
+
+/**
+ * One set whose single group accepts any of several components — an interchangeable slot.
+ *
+ * @param {string} setId Stable set id.
+ * @param {Array<[string, number]>} options componentId/quantity pairs.
+ * @returns {object} A persisted-shape ingredient set.
+ */
+const eitherSet = (setId, options) => ({
+  id: setId,
+  ingredientGroups: [
+    {
+      id: `${setId}-g1`,
+      options: options.map(([componentId, quantity]) => ({ componentId, quantity })),
+    },
+  ],
 });
 
 const SMITHING_RECIPES = [
@@ -152,14 +183,10 @@ const SMITHING_RECIPES = [
   recipe('sm-r-longsword', 'Forge Longsword', LAB_SYSTEM_IDS.SMITHING, 'weapons/swords/sword-guard-worn.webp', {
     description: 'A soldier’s blade: two ingots, a leather grip, and patience.',
     categories: ['Weaponsmithing'],
+    // Two genuine alternatives: steel is the good way, iron is the affordable way.
     ingredientSets: [
-      {
-        id: 's1',
-        ingredientOptions: [
-          { id: 'opt-steel', ingredients: { 'sm-steel-ingot': 2, 'sm-leather': 1 } },
-          { id: 'opt-iron', ingredients: { 'sm-iron-ingot': 3, 'sm-leather': 1 } },
-        ],
-      },
+      simpleSet('s-steel', { 'sm-steel-ingot': 2, 'sm-leather': 1 }),
+      simpleSet('s-iron', { 'sm-iron-ingot': 3, 'sm-leather': 1 }),
     ],
     resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-longsword', quantity: 1 }] }],
     check: { enabled: true, rollFormula: '1d20 + @prof', thresholds: { success: 15 } },
@@ -257,14 +284,11 @@ const HERBALISM_RECIPES = [
     description: 'Any dry reagent, reduced to a workable powder.',
     categories: ['Preparation'],
     ingredientSets: [
-      {
-        id: 's1',
-        ingredientOptions: [
-          { id: 'opt-bark', ingredients: { 'hb-bitterbark': 1 } },
-          { id: 'opt-root', ingredients: { 'hb-sunroot': 1 } },
-          { id: 'opt-cap', ingredients: { 'hb-frostcap': 1 } },
-        ],
-      },
+      eitherSet('s1', [
+        ['hb-bitterbark', 1],
+        ['hb-sunroot', 1],
+        ['hb-frostcap', 1],
+      ]),
     ],
     resultGroups: [{ id: 'rg', results: [{ componentId: 'hb-mortar-dust', quantity: 2 }] }],
     toolIds: ['hb-tool-mortar'],
@@ -439,7 +463,7 @@ export function buildLabContent() {
       visibilityMode: 'global',
       resolutionMode: 'simple',
       craftingCheck: SIMPLE_CHECK,
-      features: { essences: true, recipeCategories: true, itemTags: true, gathering: true },
+      features: { essences: true, recipeCategories: true, itemTags: true, gathering: true, multiStepRecipes: true },
       essenceDefinitions: ESSENCES,
       categories: ['Refining', 'Weaponsmithing', 'Armoursmithing', 'Sundries'],
       itemTags: ['ore', 'ingot', 'fuel', 'hide', 'wood', 'gem', 'weapon', 'armour', 'sundry', 'abrasive'],
@@ -455,10 +479,12 @@ export function buildLabContent() {
       description: 'Field herbalism as the Greenwardens teach it, from foraging to the long distillation.',
       img: `${ICON_BASE}/tools/cooking/mortar-stone-yellow.webp`,
       enabled: true,
-      visibilityMode: 'global',
+      visibilityMode: 'knowledge',
+      // Knowledge-gated on purpose: this is what makes the Books & Scrolls and Knowledge rail
+      // entries exist at all (see buildCraftingNavItems).
       resolutionMode: 'progressive',
       craftingCheck: PROGRESSIVE_CHECK,
-      features: { essences: true, recipeCategories: true, itemTags: true, gathering: true },
+      features: { essences: true, recipeCategories: true, itemTags: true, gathering: true, multiStepRecipes: true },
       essenceDefinitions: ESSENCES,
       categories: ['Potions', 'Salves', 'Oils', 'Preparation'],
       itemTags: ['reagent', 'fungus', 'solvent', 'vessel', 'prepared', 'potion', 'oil', 'salve'],
@@ -474,7 +500,8 @@ export function buildLabContent() {
       description: 'Transmutative alchemy: reagents combined by essence rather than by recipe.',
       img: `${ICON_BASE}/consumables/potions/bottle-conical-bubbling-blue.webp`,
       enabled: true,
-      visibilityMode: 'global',
+      visibilityMode: 'restricted',
+      // Restricted on purpose: this is what makes the Access rail entry exist.
       resolutionMode: 'alchemy',
       craftingCheck: SIMPLE_CHECK,
       features: { essences: true, recipeCategories: true, itemTags: true, gathering: false, alchemy: true },
@@ -513,7 +540,7 @@ export function buildLabContent() {
         tasks: GATHERING_TASKS.filter((task) => task.craftingSystemId === LAB_SYSTEM_IDS.SMITHING),
         events: GATHERING_EVENTS.filter((event) => event.craftingSystemId === LAB_SYSTEM_IDS.SMITHING),
         conditions: {
-          weather: { enabled: false, current: 'clear', values: GATHERING_VOCABULARIES.weather },
+          weather: { enabled: true, current: 'rain', values: GATHERING_VOCABULARIES.weather },
           timeOfDay: { enabled: true, current: 'day', values: GATHERING_VOCABULARIES.timeOfDay },
         },
         characterModifiers: [],

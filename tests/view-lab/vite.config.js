@@ -109,6 +109,8 @@ export default defineConfig({
     // them and discard the layer annotations, which are what reproduce Foundry's cascade.
     staticMount('/@fabricate-styles/', join(repoRoot, 'styles'), 'The Fabricate stylesheet'),
     staticMount('/@view-lab/', resolve(import.meta.dirname), 'The View Lab cascade shim'),
+    // Foundry serves its core art at /icons/; Fabricate's default images reference it that way.
+    staticMount('/icons/', chromeCache ? join(chromeCache.dir, 'icons') : null, 'Foundry core icons'),
   ],
   server: {
     host: '127.0.0.1',

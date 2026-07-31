@@ -20,6 +20,7 @@ import { chromium } from 'playwright';
 
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
+import { publishableCases } from './lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACT_DIR = join(ROOT, 'ui-screenshot-artifact');
@@ -97,17 +98,54 @@ async function startLabServer() {
  */
 async function runSteps(page, steps, label) {
   for (const step of steps) {
-    const target = page.getByRole('button', { name: step, exact: false }).first();
-    const count = await page.getByRole('button', { name: step, exact: false }).count();
-    if (count === 0) {
-      throw new Error(`${label}: no button named "${step}" — the case cannot reach its view state`);
+    // A `{selector}` step clicks a stable element id — preferred wherever the UI offers one, since
+    // it survives a label change. A string step is a rail entry matched by its label.
+    if (typeof step === 'object') {
+      const element = page.locator(step.selector);
+      if ((await element.count()) === 0) {
+        throw new Error(
+          `${label}: nothing matches "${step.selector}" — the case cannot reach its view state`
+        );
+      }
+      await element.first().click();
+      await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());
+      continue;
     }
-    await target.click();
+
+    const selector = '.manager-nav-button';
+    const name = step;
+
+    // Scoped and exact-prefixed, deliberately. A loose `getByRole('button', {name, exact: false})`
+    // matched the "Crafting Systems" BREADCRUMB before the rail's "Crafting" entry, so the case
+    // clicked its way back to the systems browser and captured that instead — green run, wrong
+    // screen. Rail buttons render as "<Label> <count>", hence the prefix match rather than equality.
+    // `hasText` matches raw textContent, which carries the markup's own indentation — hence the
+    // leading `\s*`. The trailing `(\s|$)` is what keeps "Crafting" off "Crafting Systems".
+    const matches = page
+      .locator(selector)
+      .filter({ hasText: new RegExp(String.raw`^\s*${escapeForRegExp(name)}(\s|$)`) });
+    const count = await matches.count();
+    if (count === 0) {
+      const available = await page.locator(selector).allInnerTexts();
+      throw new Error(
+        `${label}: no "${selector}" element labelled "${name}" — the case cannot reach its view state.\n` +
+          `  available: ${available.map((text) => JSON.stringify(text.replaceAll(/\s+/g, ' ').trim())).join(', ')}`
+      );
+    }
+    await matches.first().click();
     await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());
   }
 }
 
-async function renderPage(browser, baseUrl, { appId, query, label, steps = [] }) {
+function escapeForRegExp(value) {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+async function renderPage(
+  browser,
+  baseUrl,
+  { appId, query, label, steps = [], expectView = null }
+) {
   const context = await browser.newContext(BROWSER_CONTEXT);
   const page = await context.newPage();
   const consoleErrors = [];
@@ -145,6 +183,23 @@ async function renderPage(browser, baseUrl, { appId, query, label, steps = [] })
     if (failure) throw new Error(`${label}: ${failure}`);
 
     if (steps.length > 0) await runSteps(page, steps, label);
+
+    // The hard gate against the failure this harness is most exposed to: a step that clicks
+    // something, changes nothing, and captures whichever screen happened to be showing. The manager
+    // publishes its route on the root element, so the case can state which screen it expects and be
+    // held to it. Found the hard way — a loose text match hit the "Crafting Systems" breadcrumb and
+    // the recipes case quietly captured the systems browser instead.
+    if (expectView) {
+      const actual = await page.evaluate(
+        () => globalThis.document.querySelector('.fabricate-manager')?.dataset.managerView ?? null
+      );
+      if (actual !== expectView) {
+        throw new Error(
+          `${label}: expected the manager to be on "${expectView}" after its steps, but it is on ` +
+            `"${actual}". The capture would have shown the wrong screen.`
+        );
+      }
+    }
 
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });
@@ -213,25 +268,7 @@ async function commandChrome() {
  * and is reached by interaction rather than by parameter, so its entries land on the default route
  * until the case registry lands.
  */
-const MANAGER = 'fabricate-crafting-system-manager';
-const PLAYER = 'fabricate-app';
-
-const APP_CASES = [
-  { id: 'player-crafting', app: PLAYER, query: { tab: 'crafting' } },
-  { id: 'player-gathering', app: PLAYER, query: { tab: 'gathering' } },
-  { id: 'player-alchemy', app: PLAYER, query: { tab: 'alchemy' } },
-  { id: 'player-journal', app: PLAYER, query: { tab: 'journal' } },
-  { id: 'player-inventory', app: PLAYER, query: { tab: 'inventory' } },
-  { id: 'manager-systems', app: MANAGER, query: {} },
-  { id: 'manager-system-overview', app: MANAGER, query: {}, steps: ['System Overview'] },
-  { id: 'manager-components', app: MANAGER, query: {}, steps: ['Components'] },
-  { id: 'manager-recipes', app: MANAGER, query: {}, steps: ['Crafting'] },
-  { id: 'manager-essences', app: MANAGER, query: {}, steps: ['Essences'] },
-  { id: 'manager-tags', app: MANAGER, query: {}, steps: ['Tags & Categories'] },
-  { id: 'manager-tools', app: MANAGER, query: {}, steps: ['Tools'] },
-  { id: 'manager-checks', app: MANAGER, query: {}, steps: ['Checks'] },
-  { id: 'manager-gathering', app: MANAGER, query: {}, steps: ['Gathering'] },
-];
+const APP_CASES = publishableCases();
 
 async function commandApps() {
   const cache = ensureChrome();
@@ -257,6 +294,7 @@ async function commandApps() {
           query: { ...viewCase.query, case: viewCase.id },
           label: viewCase.id,
           steps: viewCase.steps ?? [],
+          expectView: viewCase.expectView ?? null,
         });
         writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
         rendered.push({
