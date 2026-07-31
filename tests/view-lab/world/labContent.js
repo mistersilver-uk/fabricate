@@ -404,6 +404,30 @@ function systemRules() {
  *
  * @returns {{systems: object[], recipes: object[], environments: object[], gatheringConfig: object, realms: object[]}}
  */
+/**
+ * System-level crafting-check configuration.
+ *
+ * Not decoration: `evaluateSystemValidation` treats a progressive system with no progressive roll
+ * formula as `blocks: 'system'`, which hides EVERY recipe in that system from a non-GM viewer.
+ * The symptom is an empty player listing with no error anywhere — so this is load-bearing for the
+ * herbalism frames specifically.
+ */
+const SIMPLE_CHECK = Object.freeze({
+  enabled: true,
+  consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  simple: { rollFormula: '1d20 + @abilities.int.mod', thresholds: { success: 12 } },
+});
+
+const PROGRESSIVE_CHECK = Object.freeze({
+  enabled: true,
+  consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  progressive: {
+    rollFormula: '1d20 + @abilities.int.mod',
+    thresholds: { success: 12 },
+    stageAdvanceOnSuccess: 1,
+  },
+});
+
 export function buildLabContent() {
   const systems = [
     {
@@ -414,6 +438,7 @@ export function buildLabContent() {
       enabled: true,
       visibilityMode: 'global',
       resolutionMode: 'simple',
+      craftingCheck: SIMPLE_CHECK,
       features: { essences: true, recipeCategories: true, itemTags: true, gathering: true },
       essenceDefinitions: ESSENCES,
       categories: ['Refining', 'Weaponsmithing', 'Armoursmithing', 'Sundries'],
@@ -432,6 +457,7 @@ export function buildLabContent() {
       enabled: true,
       visibilityMode: 'global',
       resolutionMode: 'progressive',
+      craftingCheck: PROGRESSIVE_CHECK,
       features: { essences: true, recipeCategories: true, itemTags: true, gathering: true },
       essenceDefinitions: ESSENCES,
       categories: ['Potions', 'Salves', 'Oils', 'Preparation'],
@@ -449,8 +475,8 @@ export function buildLabContent() {
       img: `${ICON_BASE}/consumables/potions/bottle-conical-bubbling-blue.webp`,
       enabled: true,
       visibilityMode: 'global',
-      resolutionMode: 'simple',
-      alchemyMode: true,
+      resolutionMode: 'alchemy',
+      craftingCheck: SIMPLE_CHECK,
       features: { essences: true, recipeCategories: true, itemTags: true, gathering: false, alchemy: true },
       essenceDefinitions: ESSENCES,
       categories: ['Bombs', 'Utility', 'Elixirs'],

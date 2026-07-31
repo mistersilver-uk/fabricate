@@ -82,7 +82,32 @@ async function startLabServer() {
   return { baseUrl: `http://127.0.0.1:${port}`, close: () => server.close() };
 }
 
-async function renderPage(browser, baseUrl, { appId, query, label }) {
+/**
+ * Drive a case to its named view state.
+ *
+ * The manager's route (`activeView`) is component-local `$state` — not a prop, and not in
+ * `adminStore` — so there is no parameter that reaches it. Clicking is the only mechanism, which is
+ * exactly how the live smoke reaches those views too. Steps are matched by accessible name so they
+ * read as what a user does, and a step that matches nothing fails loudly rather than silently
+ * capturing the wrong screen.
+ *
+ * @param {import('playwright').Page} page The lab page.
+ * @param {string[]} steps Accessible names to click, in order.
+ * @param {string} label Case label, for error messages.
+ */
+async function runSteps(page, steps, label) {
+  for (const step of steps) {
+    const target = page.getByRole('button', { name: step, exact: false }).first();
+    const count = await page.getByRole('button', { name: step, exact: false }).count();
+    if (count === 0) {
+      throw new Error(`${label}: no button named "${step}" — the case cannot reach its view state`);
+    }
+    await target.click();
+    await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());
+  }
+}
+
+async function renderPage(browser, baseUrl, { appId, query, label, steps = [] }) {
   const context = await browser.newContext(BROWSER_CONTEXT);
   const page = await context.newPage();
   const consoleErrors = [];
@@ -96,7 +121,9 @@ async function renderPage(browser, baseUrl, { appId, query, label }) {
   // asset one of the slowest things here to diagnose. Record the URL and the element that asked.
   page.on('response', (response) => {
     if (response.status() < 400) return;
-    consoleErrors.push(`${response.status()} ${response.request().resourceType()} ${response.url()}`);
+    consoleErrors.push(
+      `${response.status()} ${response.request().resourceType()} ${response.url()}`
+    );
   });
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
@@ -116,6 +143,8 @@ async function renderPage(browser, baseUrl, { appId, query, label }) {
       () => globalThis.document.body.dataset.viewLabError ?? null
     );
     if (failure) throw new Error(`${label}: ${failure}`);
+
+    if (steps.length > 0) await runSteps(page, steps, label);
 
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });
@@ -184,13 +213,24 @@ async function commandChrome() {
  * and is reached by interaction rather than by parameter, so its entries land on the default route
  * until the case registry lands.
  */
+const MANAGER = 'fabricate-crafting-system-manager';
+const PLAYER = 'fabricate-app';
+
 const APP_CASES = [
-  { id: 'player-crafting', app: 'fabricate-app', query: { tab: 'crafting' } },
-  { id: 'player-gathering', app: 'fabricate-app', query: { tab: 'gathering' } },
-  { id: 'player-alchemy', app: 'fabricate-app', query: { tab: 'alchemy' } },
-  { id: 'player-journal', app: 'fabricate-app', query: { tab: 'journal' } },
-  { id: 'player-inventory', app: 'fabricate-app', query: { tab: 'inventory' } },
-  { id: 'manager-systems', app: 'fabricate-crafting-system-manager', query: {} },
+  { id: 'player-crafting', app: PLAYER, query: { tab: 'crafting' } },
+  { id: 'player-gathering', app: PLAYER, query: { tab: 'gathering' } },
+  { id: 'player-alchemy', app: PLAYER, query: { tab: 'alchemy' } },
+  { id: 'player-journal', app: PLAYER, query: { tab: 'journal' } },
+  { id: 'player-inventory', app: PLAYER, query: { tab: 'inventory' } },
+  { id: 'manager-systems', app: MANAGER, query: {} },
+  { id: 'manager-system-overview', app: MANAGER, query: {}, steps: ['System Overview'] },
+  { id: 'manager-components', app: MANAGER, query: {}, steps: ['Components'] },
+  { id: 'manager-recipes', app: MANAGER, query: {}, steps: ['Crafting'] },
+  { id: 'manager-essences', app: MANAGER, query: {}, steps: ['Essences'] },
+  { id: 'manager-tags', app: MANAGER, query: {}, steps: ['Tags & Categories'] },
+  { id: 'manager-tools', app: MANAGER, query: {}, steps: ['Tools'] },
+  { id: 'manager-checks', app: MANAGER, query: {}, steps: ['Checks'] },
+  { id: 'manager-gathering', app: MANAGER, query: {}, steps: ['Gathering'] },
 ];
 
 async function commandApps() {
@@ -216,14 +256,22 @@ async function commandApps() {
           appId: viewCase.app,
           query: { ...viewCase.query, case: viewCase.id },
           label: viewCase.id,
+          steps: viewCase.steps ?? [],
         });
         writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
-        rendered.push({ id: viewCase.id, app: viewCase.app, width: Math.round(box.width), height: Math.round(box.height) });
-        console.log(`  ok    ${viewCase.id}.png  ${Math.round(box.width)}x${Math.round(box.height)}`);
+        rendered.push({
+          id: viewCase.id,
+          app: viewCase.app,
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+        });
+        console.log(
+          `  ok    ${viewCase.id}.png  ${Math.round(box.width)}x${Math.round(box.height)}`
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         failures.push({ id: viewCase.id, message });
-        console.log(`  FAIL  ${viewCase.id}: ${message.split('\n')[0]}`);
+        console.log(`  FAIL  ${viewCase.id}: ${message.split('\n', 1)[0]}`);
       }
     }
   } finally {
@@ -235,7 +283,9 @@ async function commandApps() {
     join(outputDir, 'manifest.json'),
     `${JSON.stringify({ foundryVersion: cache.version, frames: rendered, failures }, null, 2)}\n`
   );
-  console.log(`\n${rendered.length}/${cases.length} frames captured to ui-screenshot-artifact/apps/`);
+  console.log(
+    `\n${rendered.length}/${cases.length} frames captured to ui-screenshot-artifact/apps/`
+  );
   if (failures.length > 0) {
     console.log('\nfailures:');
     for (const failure of failures) console.log(`\n--- ${failure.id} ---\n${failure.message}`);

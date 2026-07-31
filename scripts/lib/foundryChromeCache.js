@@ -296,7 +296,9 @@ export function harvestChrome({ repoRoot, archivePath, force = false, log = () =
   // Tree members are summarised rather than enumerated: `public/icons/` alone is ~6300 files, and
   // a per-file digest list would push the COMMITTABLE provenance record from a few KB into the
   // megabytes. The rolling digest still detects any change to the set or its contents.
-  const treeDigests = new Map(EXTRA_TREES.map((prefix) => [prefix, { files: 0, bytes: 0, hash: createHash('sha256') }]));
+  const treeDigests = new Map(
+    EXTRA_TREES.map((prefix) => [prefix, { files: 0, bytes: 0, hash: createHash('sha256') }])
+  );
   for (const [memberName, buffer] of [...payload].sort(([a], [b]) => a.localeCompare(b))) {
     const relative = cachePathForMember(memberName);
     const target = join(dir, relative);
