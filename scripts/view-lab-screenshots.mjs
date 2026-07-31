@@ -294,9 +294,10 @@ async function commandApps() {
           query: {
             ...viewCase.query,
             case: viewCase.id,
-            ...(viewCase.position
-              ? { w: String(viewCase.position.width), h: String(viewCase.position.height) }
-              : {}),
+            ...(viewCase.position && {
+              w: String(viewCase.position.width),
+              h: String(viewCase.position.height),
+            }),
           },
           label: viewCase.id,
           steps: viewCase.steps ?? [],
