@@ -30,7 +30,7 @@ const FABRICATE_NAMESPACE = 'fabricate';
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
-function seedSettings(content, actors, managedSystemId) {
+function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
 
@@ -61,7 +61,7 @@ function seedSettings(content, actors, managedSystemId) {
   // The smoke world runs with experimental features on, and the manager rail advertises its Graph
   // placeholder only behind that toggle. Leaving it off gives the lab an eight-row rail where the
   // smoke has nine - a structural difference in every manager frame.
-  put('experimentalFeatures', true);
+  put('experimentalFeatures', experimentalFeatures);
   return settings;
 }
 
@@ -72,7 +72,7 @@ function seedSettings(content, actors, managedSystemId) {
  * @param {number} [options.seed] Determinism seed.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
-export async function buildLabWorld({ seed = 20_260_601, managedSystemId = null } = {}) {
+export async function buildLabWorld({ seed = 20_260_601, managedSystemId = null, experimentalFeatures = true } = {}) {
   const content = buildLabContent();
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
@@ -81,7 +81,7 @@ export async function buildLabWorld({ seed = 20_260_601, managedSystemId = null 
   const world = {
     seed,
     content,
-    settings: seedSettings(content, actors, managedSystemId),
+    settings: seedSettings(content, actors, managedSystemId, experimentalFeatures),
     documents,
     actorList: actors,
     scenes: [{ id: 'lab-scene', uuid: 'Scene.lab-map', name: 'The Verdant Reach', regions: [] }],

@@ -62,6 +62,9 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
+    // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
+    // reproduces the smoke's experimental-off frame has to turn it back off.
+    experimental: params.get('experimental') !== '0',
     // Capture geometry override. The smoke photographs the manager at 1280x820, not its declared
     // 1280x940, so a case pins the size its smoke counterpart uses (see SMOKE_MANAGER_POSITION).
     position:
@@ -190,7 +193,7 @@ async function boot() {
 
   installDeterminismStyles();
 
-  const world = params.chromeOnly ? null : await buildLabWorld({ managedSystemId: params.system });
+  const world = params.chromeOnly ? null : await buildLabWorld({ managedSystemId: params.system, experimentalFeatures: params.experimental });
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
 

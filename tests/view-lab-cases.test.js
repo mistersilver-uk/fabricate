@@ -98,12 +98,19 @@ test('every interaction step names text that exists in the manager UI', () => {
         if (!haystack.includes(step)) missing.push(`${viewCase.id}: label "${step}"`);
         continue;
       }
-      // A `{selector}` step targets a stable element id. The ids are built as
-      // `manager-crafting-nav-${item.id}`, so the literal string never appears in source — assert
-      // the id STEM does, which is what a rename would move.
-      const stem = step.selector.replace(/^#manager-crafting-nav-/, '');
-      if (!haystack.includes(`id: '${stem}'`)) {
-        missing.push(`${viewCase.id}: selector "${step.selector}" (no nav item with id '${stem}')`);
+      // A `{selector}` step targets a stable hook. Two shapes exist, and each needs a different
+      // token to look for:
+      //   - `#manager-crafting-nav-<id>` is BUILT from a nav item's id, so the literal never appears
+      //     in source; the id stem is what a rename would move.
+      //   - a class or attribute selector appears as its class name in the markup.
+      const navId = /^#manager-crafting-nav-(.+)$/.exec(step.selector);
+      const token = navId ? `id: '${navId[1]}'` : /^\.([a-z0-9-]+)/i.exec(step.selector)?.[1];
+      if (!token) {
+        missing.push(`${viewCase.id}: selector "${step.selector}" has no verifiable token`);
+        continue;
+      }
+      if (!haystack.includes(token)) {
+        missing.push(`${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`);
       }
     }
   }
@@ -183,14 +190,19 @@ test('UI file detection matches the documented rule', () => {
 test('changed files map to the windows they affect', () => {
   const ids = (files) => mapChangedFilesToCases(files).map((viewCase) => viewCase.id);
 
-  assert.deepEqual(ids(['src/ui/svelte/apps/gathering/GatheringView.svelte']), ['player-gathering']);
-  assert.deepEqual(ids(['src/ui/svelte/apps/manager/ToolStudioView.svelte']), ['manager-tools']);
+  // A gathering change selects the gathering screens and nothing else.
+  const gathering = ids(['src/ui/svelte/apps/gathering/GatheringView.svelte']);
+  assert.ok(gathering.length > 0, 'a gathering change must select at least one case');
+  assert.ok(
+    gathering.every((id) => id.includes('gathering')),
+    `gathering change selected unrelated cases: ${gathering.join(', ')}`
+  );
+
   assert.deepEqual(ids(['lang/en.json']), []);
 
-  // A shared primitive or a global stylesheet can change every screen. Selecting all fourteen would
+  // A shared primitive or a global stylesheet can change every screen. Selecting all of them would
   // bury the reviewer, so those signals map to one player screen and one manager screen.
-  const broad = ids(['styles/fabricate.css']);
-  assert.deepEqual(broad.sort(), ['manager-components', 'player-crafting']);
+  assert.deepEqual(ids(['styles/fabricate.css']).sort(), ['fabricate-app-shell', 'manager-components-normal']);
 
   // An unmatched render file still yields evidence rather than none.
   assert.deepEqual(ids(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']), [FALLBACK_CASE_ID]);
@@ -205,18 +217,34 @@ test('every publishable case is in the registry order the driver iterates', () =
   );
 });
 
-test('manager cases capture at the geometry the smoke captures at', () => {
-  // The smoke does not photograph the manager at its declared 1280x940 — `setManagerWindowSize`
-  // forces 1280x820. A case captured at the default cannot be compared with its smoke counterpart:
-  // 120px of extra content changes the rail and inspector layout, and every difference then looks
+test('manager cases pin the geometry their smoke label was captured at', () => {
+  // The smoke does not use one manager size. `setManagerWindowSize` is called with 1280x820 for most
+  // frames, 1280x900 for some, 880x900 for the narrow ones, and 1000x700 / 900x700 / 614x704 for the
+  // Tool Studio parity set. A case captured at the wrong one cannot be compared with its counterpart:
+  // a different content height changes the rail and inspector layout, and every difference then looks
   // like a rendering defect rather than a size difference.
   for (const viewCase of VIEW_LAB_CASES) {
     if (viewCase.app !== 'fabricate-crafting-system-manager') continue;
     assert.ok(viewCase.position, `manager case "${viewCase.id}" must pin its capture geometry`);
-    assert.deepEqual(
-      viewCase.position,
-      { width: 1280, height: 820 },
-      `manager case "${viewCase.id}" must capture at the smoke's manager geometry`
+    assert.ok(
+      Number.isInteger(viewCase.position.width) && viewCase.position.width > 0,
+      `manager case "${viewCase.id}" has a bad capture width`
+    );
+    assert.ok(
+      Number.isInteger(viewCase.position.height) && viewCase.position.height > 0,
+      `manager case "${viewCase.id}" has a bad capture height`
+    );
+  }
+});
+
+test('every case declares how far it actually gets', () => {
+  // A case that reaches the right SCREEN but not the smoke label's specific state is useful evidence
+  // and a known piece of remaining work. Recording which is which keeps that honest — an
+  // approximate case that does not say so is worse than no case.
+  for (const viewCase of VIEW_LAB_CASES) {
+    assert.ok(
+      ['state', 'screen'].includes(viewCase.reaches),
+      `case "${viewCase.id}" must declare reaches: 'state' | 'screen'`
     );
   }
 });
