@@ -140,6 +140,39 @@ export function buildLabActors(content) {
       setFlag: () => Promise.resolve(),
       isOwner: true,
       testUserPermission: () => true,
+      /**
+       * The smoke's seed stocks the crafter through this, so an actor has to accept embedded items
+       * or every inventory-dependent frame renders empty. Items arrive as plain specs carrying
+       * `flags.core.sourceId`, which is how Fabricate matches an owned stack to a managed component.
+       */
+      async createEmbeddedDocuments(type, specs = []) {
+        if (type !== 'Item') return [];
+        const created = specs.map((spec, offset) => ({
+          uuid: spec.flags?.core?.sourceId ?? `Item.${definition.id}-${items.length + offset}`,
+          id: `item-${definition.id}-${items.length + offset}`,
+          name: spec.name,
+          img: spec.img ?? null,
+          type: spec.type ?? 'loot',
+          system: { quantity: 1, description: { value: '' }, ...(spec.system ?? {}) },
+          flags: spec.flags ?? {},
+          getFlag(scope, key) {
+            return this.flags?.[scope]?.[key] ?? null;
+          },
+          async setFlag(scope, key, value) {
+            this.flags[scope] = { ...(this.flags[scope] ?? {}), [key]: value };
+            return this;
+          },
+          isOwner: true,
+        }));
+        items.push(...created);
+        return created;
+      },
+      async deleteEmbeddedDocuments(type, ids = []) {
+        if (type !== 'Item') return [];
+        const removed = items.filter((item) => ids.includes(item.id));
+        for (const item of removed) items.splice(items.indexOf(item), 1);
+        return removed;
+      },
     };
   });
 }

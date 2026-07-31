@@ -222,7 +222,9 @@ export function installFoundryShim(world) {
     macros: createCollection([]),
     tables: createCollection([]),
     packs: Object.assign(createCollection([]), { get: () => null }),
-    system: { id: 'dnd5e', version: '4.0.0' },
+    system: { id: 'dnd5e', version: '4.0.0', documentTypes: { Item: ['loot', 'weapon', 'equipment', 'consumable'] } },
+    // The smoke's seed picks an item type from here before creating its world items.
+    documentTypes: { Item: ['loot', 'weapon', 'equipment', 'consumable'] },
     modules: { get: () => ({ id: 'fabricate', version: '0.0.0-viewlab', active: true }) },
     settings: createSettings(world.settings),
     i18n: world.i18n,
@@ -235,6 +237,51 @@ export function installFoundryShim(world) {
   };
 
   globalThis.game = game;
+
+  /**
+   * A world `Item` collection good enough for the smoke's seed.
+   *
+   * `Item.createDocuments` is the seed's only document-creation call, and everything downstream
+   * resolves those items through `fromUuid` — `csm.addItemFromUuid` in particular — so a created
+   * item MUST land in the uuid index or the whole seed registers nothing.
+   */
+  globalThis.Item = {
+    async createDocuments(specs = []) {
+      return specs.map((spec) => {
+        const id = random.randomID(16);
+        const document = {
+          id,
+          _id: id,
+          uuid: `Item.${id}`,
+          name: spec.name,
+          type: spec.type ?? 'loot',
+          img: spec.img ?? null,
+          system: { quantity: 1, description: { value: '' }, ...(spec.system ?? {}) },
+          flags: spec.flags ?? {},
+          getFlag(scope, key) {
+            return this.flags?.[scope]?.[key] ?? null;
+          },
+          async setFlag(scope, key, value) {
+            this.flags[scope] = { ...(this.flags[scope] ?? {}), [key]: value };
+            return this;
+          },
+          async update(changes) {
+            Object.assign(this, changes);
+            return this;
+          },
+        };
+        world.documents.set(document.uuid, document);
+        game.items.contents.push(document);
+        return document;
+      });
+    },
+    async create(spec) {
+      return (await this.createDocuments([spec]))[0];
+    },
+  };
+  globalThis.Actor = { async createDocuments(specs = []) { return specs; } };
+  globalThis.Folder = { async createDocuments(specs = []) { return specs; } };
+
   globalThis.ui = {
     notifications: { info: () => {}, warn: () => {}, error: () => {}, notify: () => {} },
     windows: {},

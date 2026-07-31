@@ -275,11 +275,16 @@ async function commandApps() {
   assertViewportFits();
   console.log(`using harvested Foundry ${cache.version} chrome`);
 
-  const outputDir = join(ARTIFACT_DIR, 'apps');
+  // `--smoke-fixtures` replays the live smoke's own crafting seed instead of the compact lab
+  // fixture, so a frame differs from its smoke counterpart in nothing but the chrome around it.
+  const smokeFixtures = process.argv.includes('--smoke-fixtures');
+  const positional = process.argv.slice(3).find((a) => !a.startsWith('--'));
+
+  const outputDir = join(ARTIFACT_DIR, smokeFixtures ? 'apps-smoke-data' : 'apps');
   rmSync(outputDir, { recursive: true, force: true });
   mkdirSync(outputDir, { recursive: true });
 
-  const only = process.argv[3] ? new Set(process.argv[3].split(',')) : null;
+  const only = positional ? new Set(positional.split(',')) : null;
   const cases = only ? APP_CASES.filter((entry) => only.has(entry.id)) : APP_CASES;
 
   const server = await startLabServer();
@@ -294,6 +299,7 @@ async function commandApps() {
           query: {
             ...viewCase.query,
             case: viewCase.id,
+            ...(smokeFixtures && { smokeFixtures: '1' }),
             ...(viewCase.position && {
               w: String(viewCase.position.width),
               h: String(viewCase.position.height),

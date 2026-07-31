@@ -23,6 +23,7 @@
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
+import { seedSmokeExecutionFixtures } from './smokeSeed.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
@@ -30,13 +31,16 @@ const FABRICATE_NAMESPACE = 'fabricate';
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
-function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
+function seedSettings(content, actors, managedSystemId, experimentalFeatures, smokeFixtures) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
 
-  put('craftingSystems', content.systems);
-  put('recipes', content.recipes);
-  put('gatheringEnvironments', content.environments);
+  // With the smoke seed enabled the lab's own three systems would sit ALONGSIDE the smoke's, which
+  // is not a 1:1 comparison - the system library would show seven rows where the smoke shows its
+  // own set. Start empty and let the replayed seed be the only source of crafting data.
+  put('craftingSystems', smokeFixtures ? [] : content.systems);
+  put('recipes', smokeFixtures ? [] : content.recipes);
+  put('gatheringEnvironments', smokeFixtures ? [] : content.environments);
   put('gatheringConfig', content.gatheringConfig);
   put('gatheringParties', [
     {
@@ -72,7 +76,12 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
  * @param {number} [options.seed] Determinism seed.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
-export async function buildLabWorld({ seed = 20_260_601, managedSystemId = null, experimentalFeatures = true } = {}) {
+export async function buildLabWorld({
+  seed = 20_260_601,
+  managedSystemId = null,
+  experimentalFeatures = true,
+  smokeFixtures = false,
+} = {}) {
   const content = buildLabContent();
   const actors = buildLabActors(content);
   const documents = buildDocumentIndex(content, actors);
@@ -81,7 +90,7 @@ export async function buildLabWorld({ seed = 20_260_601, managedSystemId = null,
   const world = {
     seed,
     content,
-    settings: seedSettings(content, actors, managedSystemId, experimentalFeatures),
+    settings: seedSettings(content, actors, managedSystemId, experimentalFeatures, smokeFixtures),
     documents,
     actorList: actors,
     scenes: [{ id: 'lab-scene', uuid: 'Scene.lab-map', name: 'The Verdant Reach', regions: [] }],
@@ -105,6 +114,42 @@ export async function buildLabWorld({ seed = 20_260_601, managedSystemId = null,
   }
   if (!fabricate.recipeManager?.initialized) {
     throw new Error('view lab: RecipeManager did not initialize; the fixture world is unusable');
+  }
+
+  // Replay the live smoke's own seed against the same real API it targets, so a lab frame and a
+  // smoke frame differ in nothing but the chrome around them. Opt-in: it costs a few seconds and
+  // the compact lab fixture is the better default for everyday PR evidence.
+  if (smokeFixtures) {
+    // The seed expects the Arcane Forge and its Mystic Herb component to already exist - the smoke
+    // creates them in an earlier phase. Build them the same way, through the real API, so the ids
+    // the seed threads into gathering environments and recipes actually resolve.
+    const csm = fabricate.getCraftingSystemManager();
+    const arcane = await csm.createSystem({
+      name: 'Arcane Forge',
+      description: 'The primary crafting system the smoke world builds on.',
+    });
+    const [herb] = await globalThis.Item.createDocuments([
+      { name: 'Mystic Herb', type: 'loot', img: 'icons/commodities/flowers/blooms-purple.webp' },
+    ]);
+    const registered = await csm.addItemFromUuid(arcane.id, herb.uuid);
+
+    world.smokeSeed = await seedSmokeExecutionFixtures({
+      arcaneSystemId: arcane.id,
+      mysticHerbComponentId: registered.item.id,
+      crafterId: actors[0].id,
+    });
+
+    // The seeded system ids are generated at runtime, so the "which system is the manager looking
+    // at" preference cannot be written up front. Point it at a system that actually has recipes:
+    // Arcane Forge is created empty, and a manager case that navigates to the recipe editor has
+    // nothing to click when the selected system's list is empty.
+    const recipeManager = fabricate.getRecipeManager();
+    const populated = csm
+      .getSystems()
+      .find((system) => (recipeManager.getRecipes({ craftingSystemId: system.id }) ?? []).length > 0);
+    if (populated) {
+      world.settings.set(settingsKey(FABRICATE_NAMESPACE, 'lastManagedCraftingSystem'), populated.id);
+    }
   }
 
   return world;

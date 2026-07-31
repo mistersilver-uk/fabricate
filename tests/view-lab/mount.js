@@ -65,6 +65,9 @@ function readParams() {
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
     experimental: params.get('experimental') !== '0',
+    // Replay the live smoke's own crafting seed instead of the compact lab fixture, so a frame can
+    // be compared with its smoke counterpart data-for-data rather than only layout-for-layout.
+    smokeFixtures: params.get('smokeFixtures') === '1',
     // Capture geometry override. The smoke photographs the manager at 1280x820, not its declared
     // 1280x940, so a case pins the size its smoke counterpart uses (see SMOKE_MANAGER_POSITION).
     position:
@@ -193,7 +196,7 @@ async function boot() {
 
   installDeterminismStyles();
 
-  const world = params.chromeOnly ? null : await buildLabWorld({ managedSystemId: params.system, experimentalFeatures: params.experimental });
+  const world = params.chromeOnly ? null : await buildLabWorld({ managedSystemId: params.system, experimentalFeatures: params.experimental, smokeFixtures: params.smokeFixtures });
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
 
