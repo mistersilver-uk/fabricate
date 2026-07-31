@@ -21,6 +21,7 @@
  *   5. flip the viewer for player frames.
  */
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
+import { buildLabRunStates, installLabRunStates } from './labRunStates.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import {
@@ -171,6 +172,57 @@ export async function buildLabWorld({
       settingsKey(FABRICATE_NAMESPACE, 'lastManagedCraftingSystem'),
       named?.id ?? craftingSetup.systemId
     );
+  }
+
+  // Journal runs. Written after the crafting data exists, because each run resolves to a real
+  // recipe - a run pointing at a recipe that is not there renders as a redacted stub and proves
+  // nothing about how the journal draws a failed or time-gated run.
+  // Only recipes the PLAYER can see. A run pointing at a recipe the viewer has no access to renders
+  // as "Hidden recipe" — correct behaviour, but it tells you nothing about how a failed or
+  // time-gated run draws, which is the whole point of the journal frames.
+  const rememberedIdForVisibility =
+    world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastCraftingActor')) ??
+    world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastGatheringActor'));
+  const visibilityActor = globalThis.game.actors.get(rememberedIdForVisibility) ?? actors[0];
+  const allRecipes = fabricate.getRecipeManager().getRecipes({ enabled: true }) ?? [];
+  const visibility = fabricate.recipeVisibilityService;
+  const playerViewer = { id: 'user-lab-player', isGM: false };
+  const journalRecipes = allRecipes.filter((recipe) => {
+    try {
+      return (
+        visibility?.evaluateRecipeAccess?.({
+          recipe,
+          viewer: playerViewer,
+          craftingActor: visibilityActor,
+          componentSourceActors: [visibilityActor],
+        })
+          ?.visible === true
+      );
+    } catch {
+      return false;
+    }
+  });
+  // Onto the actor the JOURNAL resolves, not the lab's own first actor. Under the smoke seed the
+  // crafter is an imported hero and the seed points `lastCraftingActor` at it, so writing runs onto
+  // the lab actor puts them somewhere the journal never looks - it renders empty and nothing says why.
+  const rememberedId =
+    world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastCraftingActor')) ??
+    world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastGatheringActor'));
+  const journalActor = globalThis.game.actors.get(rememberedId) ?? actors[0];
+  // If the viewer can see none of them, fall back to the full set: a journal of redacted rows still
+  // shows how each STATUS renders, where an empty journal shows nothing at all.
+  const runRecipes = journalRecipes.length > 0 ? journalRecipes : allRecipes;
+  if (runRecipes.length > 0) {
+    installLabRunStates(
+      journalActor,
+      buildLabRunStates({ actor: journalActor, userId: 'user-lab-player', recipes: runRecipes })
+    );
+    // The run managers memoise each actor's container the first time they read it, and
+    // `initialize()` reads it — so a container written afterwards is invisible until the cache is
+    // dropped. The symptom is a journal with runs on the actor and none on screen.
+    for (const manager of [fabricate.craftingRunManager, fabricate.salvageRunManager, fabricate.gatheringRunManager]) {
+      manager?.invalidateCache?.();
+    }
   }
 
   return world;

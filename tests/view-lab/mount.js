@@ -163,11 +163,31 @@ async function mountManagerApp(content, params) {
  *
  * @param {HTMLElement} root Subtree to watch.
  */
-async function settle(root) {
+async function settle(root, services = null) {
   for (let pass = 0; pass < 6; pass++) {
     await Promise.resolve();
     flushSync();
     await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+
+  // Wait for the STORES, not just the DOM. A store that is still loading renders its empty state,
+  // which is quiet in exactly the same way a finished render is — so DOM stillness alone let the
+  // journal capture "No active runs" while three were on their way in. Each player store exposes
+  // `loading`, and most also `loadedOnce`; a store that has neither is skipped rather than waited on.
+  if (services) {
+    const watched = ['journal', 'crafting', 'inventory', 'alchemy', 'craftingSources', 'actorBar']
+      .map((name) => services[name])
+      .filter((store) => store && typeof store === 'object' && 'loading' in store);
+
+    for (let pass = 0; pass < 40; pass++) {
+      const pending = watched.filter(
+        (store) => store.loading === true || ('loadedOnce' in store && store.loadedOnce === false)
+      );
+      if (pending.length === 0) break;
+      flushSync();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    flushSync();
   }
 
   await new Promise((resolve) => {
@@ -214,7 +234,7 @@ async function boot() {
       params.appId === 'fabricate-app'
         ? await mountPlayerApp(built.content, params)
         : await mountManagerApp(built.content, params);
-    await settle(built.frame);
+    await settle(built.frame, mounted?.services ?? null);
   } else {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -228,7 +248,7 @@ async function boot() {
     services: mounted?.services ?? null,
     store: mounted?.store ?? null,
     frame: built.frame,
-    settle: () => settle(built.frame),
+    settle: () => settle(built.frame, mounted?.services ?? null),
   };
   document.body.setAttribute(READY_ATTRIBUTE, params.caseId ?? params.appId);
 }
