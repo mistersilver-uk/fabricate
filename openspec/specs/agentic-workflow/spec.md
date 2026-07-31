@@ -286,6 +286,7 @@ An escalated lane proven clean at its assigned base with zero commits MAY be dis
 - **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, Foundry or Docker smoke, and screenshot generation
 - **AND** the driver runs required final gates from the fully integrated coordinator branch
 - **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
+- **AND** CI MAY additionally PRODUCE screenshot evidence for the pull request under the UI PR screenshot evidence requirement, which is authoring rather than gate-running, and is therefore stated here explicitly rather than read into "unchanged gates"
 
 #### Scenario: recovering interrupted or stale Foundry smoke
 
@@ -558,6 +559,27 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **THEN** the case declares the state it expects and the capture asserts the application reached it before the frame is taken
 - **AND** a case whose navigation resolves to a different state fails rather than publishing the frame it reached
 
+#### Scenario: evidence is produced without a local run
+
+- **WHEN** a PR changes render files and the change is able to run the automated producer
+- **THEN** the affected cases are selected from the changed-file set, rendered, and published into the PR's managed screenshot block without a maintainer running anything locally
+- **AND** the automated producer is an accelerator, not an additional gate: a change that cannot run it (for want of the credentials or the write access the producer needs) falls back to the existing evidence path and is not failed for producing nothing
+- **AND** a selection that resolves to no case announces that outcome explicitly, and is never reported the same way as a run that rendered frames
+- **AND** a producer that selected cases but rendered none fails, because a run that publishes nothing is indistinguishable from success to every downstream check
+
+#### Scenario: a changed render file claims no case
+
+- **WHEN** a render file inside a captured window is claimed by no case's selection patterns
+- **THEN** the omission fails at authoring time rather than at capture time
+- **AND** the reason this is gated is that an unclaimed path does not produce NO evidence — selection falls back — it produces UNRELATED evidence, a frame of a different window offered as proof of a change it does not contain
+- **AND** a path deliberately left unclaimed carries a recorded reason, and that record is itself gated so it cannot outlive the thing it exempts
+
+#### Scenario: the producer's own inputs change
+
+- **WHEN** a PR changes the fixture world, the mounting page, or the case registry the producer renders from
+- **THEN** every publishable case is selected, because a change to a shared fixture can alter every frame at once
+- **AND** this holds even though none of those paths is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the whole corpus
+
 #### Scenario: screenshot capture is blocked
 
 - **WHEN** a UI-changing PR genuinely cannot capture screenshots because the Foundry smoke harness or browser is unavailable
@@ -576,6 +598,24 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **WHEN** smoke fixture data needs item, environment, event, or placeholder imagery
 - **THEN** it uses Foundry VTT core or dnd5e non-SVG raster icon paths directly
 - **AND** it does not invent custom SVG preview art for smoke screenshots
+
+### Requirement: View-case reach declaration
+
+Every case in the canonical view-case registry MUST declare how far it actually gets: whether it lands on its live-smoke counterpart's own condition, reaches only the application window that counterpart shows, or covers a condition the smoke never walks.
+A case of the third kind MUST carry no smoke pairing, because there is nothing to compare it against.
+An approximate case that does not declare itself approximate is worse than no case, because a reviewer cannot tell which frames are evidence and which are gestures.
+
+#### Scenario: a case falls short of its counterpart
+
+- **WHEN** a case reaches the right application window but not the specific condition its counterpart shows
+- **THEN** it declares that, and its shortfall is accounted for by an entry in the standing known-gaps register
+- **AND** the register records shortfalls by CLASS rather than per case, so that one entry covers every case blocked by the same cause and the record stays worth reading
+
+#### Scenario: a condition cannot be reached by the renderer at all
+
+- **WHEN** a condition depends on behaviour the Foundry-free renderer does not have, such as a native Foundry dialog or a Foundry-side service call
+- **THEN** the case stays declared as falling short and the limitation is recorded in the register
+- **AND** the renderer does not substitute a facsimile of the missing behaviour, because a frame depicting UI the product never draws is evidence of something that does not exist
 
 ### Requirement: Provider-specific skill metadata
 
