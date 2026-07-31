@@ -268,6 +268,12 @@ async function commandChrome() {
  * and is reached by interaction rather than by parameter, so its entries land on the default route
  * until the case registry lands.
  */
+/** Lab fixture system id -> the smoke system that carries the same capability. */
+const SMOKE_SYSTEM_FOR = Object.freeze({
+  'lab-alchemy': 'Warded Athenaeum',
+  'lab-herbalism': "The Herbalist's Compendium",
+});
+
 const APP_CASES = publishableCases();
 
 async function commandApps() {
@@ -300,6 +306,13 @@ async function commandApps() {
             ...viewCase.query,
             case: viewCase.id,
             ...(smokeFixtures && { smokeFixtures: '1' }),
+            // The lab fixture's system ids do not exist under the smoke seed, so a case that seeds
+            // one is remapped to the smoke system carrying the same capability — the Access rail
+            // exists only for a restricted-visibility system, which is the Warded Athenaeum.
+            ...(smokeFixtures &&
+              viewCase.query?.system && {
+                system: SMOKE_SYSTEM_FOR[viewCase.query.system] ?? viewCase.query.system,
+              }),
             ...(viewCase.position && {
               w: String(viewCase.position.width),
               h: String(viewCase.position.height),

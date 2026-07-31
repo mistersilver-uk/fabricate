@@ -23,7 +23,13 @@
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
-import { seedSmokeExecutionFixtures } from './smokeSeed.js';
+import {
+  renameSmokePrimarySystem,
+  seedSmokeCraftingSetup,
+  seedSmokeExecutionFixtures,
+  seedSmokeGatheringLibrary,
+  seedSmokeWorldDocuments,
+} from './smokeSeed.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
@@ -120,36 +126,51 @@ export async function buildLabWorld({
   // smoke frame differ in nothing but the chrome around them. Opt-in: it costs a few seconds and
   // the compact lab fixture is the better default for everyday PR evidence.
   if (smokeFixtures) {
-    // The seed expects the Arcane Forge and its Mystic Herb component to already exist - the smoke
-    // creates them in an earlier phase. Build them the same way, through the real API, so the ids
-    // the seed threads into gathering environments and recipes actually resolve.
-    const csm = fabricate.getCraftingSystemManager();
-    const arcane = await csm.createSystem({
-      name: 'Arcane Forge',
-      description: 'The primary crafting system the smoke world builds on.',
-    });
-    const [herb] = await globalThis.Item.createDocuments([
-      { name: 'Mystic Herb', type: 'loot', img: 'icons/commodities/flowers/blooms-purple.webp' },
-    ]);
-    const registered = await csm.addItemFromUuid(arcane.id, herb.uuid);
+    // The smoke's own order, and it is load-bearing: the crafting setup creates the primary system
+    // whose id every later block threads through, the gathering library configures that system, the
+    // execution fixtures build the four Smoke* systems around it, and the rename is the last thing
+    // the smoke does before its manager walk — which is why every manager frame shows "The
+    // Herbalist's Compendium" rather than the name the system was created with.
+    // The world items every later block reads off `game.items.contents` — without these the
+    // crafting setup registers nothing and its component map comes back empty.
+    await seedSmokeWorldDocuments();
 
-    world.smokeSeed = await seedSmokeExecutionFixtures({
-      arcaneSystemId: arcane.id,
-      mysticHerbComponentId: registered.item.id,
+    const craftingSetup = await seedSmokeCraftingSetup({
+      gathererUserId: 'user-lab-player',
+      crafterId: actors[0].id,
+      travelMemberId: actors[1].id,
+    });
+
+    await seedSmokeGatheringLibrary({
+      sysId: craftingSetup.systemId,
+      componentMap: craftingSetup.componentMap,
+    });
+
+    const executionFixtures = await seedSmokeExecutionFixtures({
+      arcaneSystemId: craftingSetup.systemId,
+      mysticHerbComponentId: Object.values(craftingSetup.componentMap ?? {})[0] ?? null,
       crafterId: actors[0].id,
     });
 
-    // The seeded system ids are generated at runtime, so the "which system is the manager looking
-    // at" preference cannot be written up front. Point it at a system that actually has recipes:
-    // Arcane Forge is created empty, and a manager case that navigates to the recipe editor has
-    // nothing to click when the selected system's list is empty.
-    const recipeManager = fabricate.getRecipeManager();
-    const populated = csm
-      .getSystems()
-      .find((system) => (recipeManager.getRecipes({ craftingSystemId: system.id }) ?? []).length > 0);
-    if (populated) {
-      world.settings.set(settingsKey(FABRICATE_NAMESPACE, 'lastManagedCraftingSystem'), populated.id);
-    }
+    await renameSmokePrimarySystem(craftingSetup.systemId);
+
+    world.smokeSeed = { craftingSetup, executionFixtures };
+
+    // The manager opens on whichever system this names, and the ids are generated at runtime so it
+    // cannot be written up front. The smoke's walk sits on the primary system, so the lab does too.
+    // A case may ask for a system by NAME as well as by id. Under the smoke seed the ids are
+    // generated at runtime, so a case that needs a particular capability — the Access rail exists
+    // only for a restricted-visibility system — can only name the system it means.
+    const named = managedSystemId
+      ? fabricate
+          .getCraftingSystemManager()
+          .getSystems()
+          .find((system) => system.id === managedSystemId || system.name === managedSystemId)
+      : null;
+    world.settings.set(
+      settingsKey(FABRICATE_NAMESPACE, 'lastManagedCraftingSystem'),
+      named?.id ?? craftingSetup.systemId
+    );
   }
 
   return world;

@@ -72,7 +72,8 @@ function createCollection(entries, { idKey = 'id' } = {}) {
     find: (predicate) => entries.find((element) => predicate(element)) ?? null,
     filter: (predicate) => entries.filter((element) => predicate(element)),
     map: (mapper) => entries.map((element) => mapper(element)),
-    reduce: (reducer, initial) => entries.reduce((accumulator, element) => reducer(accumulator, element), initial),
+    reduce: (reducer, initial) =>
+      entries.reduce((accumulator, element) => reducer(accumulator, element), initial),
     forEach: (visitor) => entries.forEach((element) => visitor(element)),
     get size() {
       return entries.length;
@@ -109,7 +110,11 @@ function createUtils(randomID) {
       if (!exists && !insertKeys) continue;
       if (exists && !overwrite) continue;
       result[key] =
-        value && typeof value === 'object' && !Array.isArray(value) && result[key] && typeof result[key] === 'object'
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        result[key] &&
+        typeof result[key] === 'object'
           ? mergeObject(result[key], value, { insertKeys, overwrite })
           : deepClone(value);
     }
@@ -132,7 +137,11 @@ function createUtils(randomID) {
     },
     parseUuid: (uuid) => {
       const parts = String(uuid ?? '').split('.');
-      return { collection: parts[0] ?? null, documentId: parts.at(-1) ?? null, id: parts.at(-1) ?? null };
+      return {
+        collection: parts[0] ?? null,
+        documentId: parts.at(-1) ?? null,
+        id: parts.at(-1) ?? null,
+      };
     },
     debounce: (fn) => fn,
     escapeHTML: (value) =>
@@ -184,7 +193,58 @@ function createTextEditor(documents) {
       const name = label || documents.get(uuid)?.name;
       return name ? `<a class="content-link" data-uuid="${uuid}">${name}</a>` : whole;
     });
-  return { implementation: { enrichHTML: async (raw) => enrich(raw) }, enrichHTML: async (raw) => enrich(raw) };
+  return {
+    implementation: { enrichHTML: async (raw) => enrich(raw) },
+    enrichHTML: async (raw) => enrich(raw),
+  };
+}
+
+/**
+ * The two dnd5e Starter Heroes the smoke imports, reconstructed.
+ *
+ * HONEST LIMIT. Everything else the smoke seeds — systems, components, recipes, tools, inventories,
+ * gathering library — is the smoke's own code replayed verbatim. These two actors are not: the real
+ * `dnd5e.heroes` compendium is a LevelDB pack with snappy-compressed blocks, which cannot be read
+ * without a decoder the lab does not carry. So their identity is reconstructed from what the smoke
+ * demonstrably uses — the names appear on its own actor-sheet frames, and the portraits come from
+ * the dnd5e system's own class art.
+ *
+ * The seed sorts the index by name and imports the first two `character` entries, so the order here
+ * is what decides which is the crafter and which the travel member.
+ */
+const DND5E_STARTER_HEROES = Object.freeze([
+  {
+    _id: 'labhero000000001',
+    name: 'Akra (Dragonborn Cleric)',
+    type: 'character',
+    img: '/@foundry-system/dnd5e/icons/classes/cleric.webp',
+  },
+  {
+    _id: 'labhero000000002',
+    name: 'Aoth (Human Druid)',
+    type: 'character',
+    img: '/@foundry-system/dnd5e/icons/classes/druid.webp',
+  },
+]);
+
+/** A `game.packs` carrying just the hero pack the smoke's seed asks for by id. */
+function createHeroPacks() {
+  const pack = {
+    collection: 'dnd5e.heroes',
+    documentName: 'Actor',
+    metadata: { id: 'dnd5e.heroes', label: 'Starter Heroes', type: 'Actor' },
+    async getIndex() {
+      return DND5E_STARTER_HEROES.map((hero) => ({ ...hero }));
+    },
+    async getDocument(id) {
+      return DND5E_STARTER_HEROES.find((hero) => hero._id === id) ?? null;
+    },
+  };
+  const packs = createCollection([pack], { idKey: 'collection' });
+  return Object.assign(packs, {
+    get: (id) => (id === 'dnd5e.heroes' ? pack : null),
+    find: (predicate) => [pack].find((element) => predicate(element)) ?? null,
+  });
 }
 
 /**
@@ -208,21 +268,46 @@ export function installFoundryShim(world) {
   };
 
   const gmUser = { id: 'user-lab-gm', name: 'Lab GM', isGM: true, color: { css: '#f1d1b5' } };
-  const playerUser = { id: 'user-lab-player', name: 'Lab Player', isGM: false, color: { css: '#8ecae6' } };
+  const playerUser = {
+    id: 'user-lab-player',
+    name: 'Lab Player',
+    isGM: false,
+    color: { css: '#8ecae6' },
+  };
 
   const game = {
     ready: true,
     user: gmUser,
-    users: Object.assign(createCollection([gmUser, playerUser]), { activeGM: gmUser, players: [playerUser] }),
-    actors: createCollection(world.actorList),
+    users: Object.assign(createCollection([gmUser, playerUser]), {
+      activeGM: gmUser,
+      players: [playerUser],
+    }),
+    actors: Object.assign(createCollection(world.actorList), {
+      // The smoke imports its crafter and travel member from the hero pack rather than creating
+      // them, so this is the call that decides who owns the inventory every craftability frame reads.
+      async importFromCompendium(pack, id) {
+        const entry = await pack.getDocument(id);
+        if (!entry) return null;
+        const [actor] = await globalThis.Actor.createDocuments([
+          { name: entry.name, type: entry.type, img: entry.img },
+        ]);
+        return actor;
+      },
+    }),
     items: createCollection([]),
-    scenes: Object.assign(createCollection(world.scenes ?? []), { current: world.scenes?.[0] ?? null }),
+    scenes: Object.assign(createCollection(world.scenes ?? []), {
+      current: world.scenes?.[0] ?? null,
+    }),
     journal: createCollection([]),
     folders: createCollection([]),
     macros: createCollection([]),
     tables: createCollection([]),
-    packs: Object.assign(createCollection([]), { get: () => null }),
-    system: { id: 'dnd5e', version: '4.0.0', documentTypes: { Item: ['loot', 'weapon', 'equipment', 'consumable'] } },
+    packs: createHeroPacks(),
+    system: {
+      id: 'dnd5e',
+      version: '4.0.0',
+      documentTypes: { Item: ['loot', 'weapon', 'equipment', 'consumable'] },
+    },
     // The smoke's seed picks an item type from here before creating its world items.
     documentTypes: { Item: ['loot', 'weapon', 'equipment', 'consumable'] },
     modules: { get: () => ({ id: 'fabricate', version: '0.0.0-viewlab', active: true }) },
@@ -279,8 +364,88 @@ export function installFoundryShim(world) {
       return (await this.createDocuments([spec]))[0];
     },
   };
-  globalThis.Actor = { async createDocuments(specs = []) { return specs; } };
-  globalThis.Folder = { async createDocuments(specs = []) { return specs; } };
+  /**
+   * Enough of a document to satisfy the smoke's seed: an id, a uuid the index resolves, and the
+   * embedded-collection call it uses. `Scene` needs `createEmbeddedDocuments('Region', …)` because
+   * the seed attaches Fabricate interactable behaviours to regions.
+   */
+  const makeDocument = (spec, prefix, extra = {}) => {
+    const id = random.randomID(16);
+    const document = {
+      id,
+      _id: id,
+      uuid: `${prefix}.${id}`,
+      name: spec.name,
+      img: spec.img ?? null,
+      flags: spec.flags ?? {},
+      ...spec,
+      ...extra,
+      getFlag(scope, key) {
+        return this.flags?.[scope]?.[key] ?? null;
+      },
+      async setFlag(scope, key, value) {
+        this.flags[scope] = { ...(this.flags[scope] ?? {}), [key]: value };
+        return this;
+      },
+      async update(changes) {
+        Object.assign(this, changes);
+        return this;
+      },
+      async createEmbeddedDocuments(type, embedded = []) {
+        const created = embedded.map((entry) => makeDocument(entry, `${prefix}.${id}.${type}`));
+        this[type] = [...(this[type] ?? []), ...created];
+        for (const child of created) world.documents.set(child.uuid, child);
+        return created;
+      },
+      async deleteEmbeddedDocuments() {
+        return [];
+      },
+    };
+    // The id is regenerated above via spread order, so pin the canonical one back.
+    document.id = id;
+    document._id = id;
+    document.uuid = `${prefix}.${id}`;
+    world.documents.set(document.uuid, document);
+    return document;
+  };
+
+  globalThis.Scene = {
+    async create(spec) {
+      const scene = makeDocument(spec, 'Scene', { regions: [] });
+      game.scenes.contents.push(scene);
+      return scene;
+    },
+    async createDocuments(specs = []) {
+      return Promise.all(specs.map((spec) => globalThis.Scene.create(spec)));
+    },
+  };
+  globalThis.Actor = {
+    async createDocuments(specs = []) {
+      const created = specs.map((spec) =>
+        makeDocument(spec, 'Actor', { items: [], type: spec.type ?? 'character', isOwner: true })
+      );
+      game.actors.contents.push(...created);
+      return created;
+    },
+  };
+  globalThis.Folder = {
+    async createDocuments(specs = []) {
+      return specs;
+    },
+  };
+  globalThis.User = {
+    async createDocuments(specs = []) {
+      return specs.map((spec) => makeDocument(spec, 'User', { isGM: spec.role >= 3 }));
+    },
+  };
+
+  // The smoke's world-document block opens by deleting stale data from a previous run. In a lab
+  // realm there is never any, so these are no-ops — but they must EXIST, because the seed calls
+  // them unconditionally and a missing static would abort the whole replay on its first line.
+  for (const collection of [globalThis.Item, globalThis.Actor, globalThis.Scene, globalThis.User]) {
+    collection.deleteDocuments = async () => [];
+    collection.updateDocuments = async (updates = []) => updates;
+  }
 
   globalThis.ui = {
     notifications: { info: () => {}, warn: () => {}, error: () => {}, notify: () => {} },
@@ -291,6 +456,8 @@ export function installFoundryShim(world) {
     DOCUMENT_OWNERSHIP_LEVELS: { INHERIT: -1, NONE: 0, LIMITED: 1, OBSERVER: 2, OWNER: 3 },
     CANVAS_PERFORMANCE_MODES: { LOW: 0, MED: 1, HIGH: 2, MAX: 3 },
     CHAT_MESSAGE_STYLES: { OTHER: 0, OOC: 1, IC: 2, EMOTE: 3 },
+    // The smoke's seed creates its gatherer user at PLAYER role.
+    USER_ROLES: { NONE: 0, PLAYER: 1, TRUSTED: 2, ASSISTANT: 3, GAMEMASTER: 4 },
   };
 
   /**
@@ -321,7 +488,11 @@ export function installFoundryShim(world) {
   globalThis.foundry = {
     utils,
     applications: {
-      api: { ApplicationV2: LabApplicationV2, HandlebarsApplicationMixin: (base) => base, DialogV2: class {} },
+      api: {
+        ApplicationV2: LabApplicationV2,
+        HandlebarsApplicationMixin: (base) => base,
+        DialogV2: class {},
+      },
       ux: { TextEditor: createTextEditor(world.documents) },
       instances: new Map(),
     },
