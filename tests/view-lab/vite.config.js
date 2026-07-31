@@ -75,9 +75,32 @@ function staticMount(prefix, root, label) {
   };
 }
 
+/**
+ * `src/main.js` imports `../styles/fabricate.css` so the production bundle carries it. The lab
+ * already loads that stylesheet itself, RAW and at `layer(modules)`, to reproduce Foundry's
+ * cascade — letting Vite inject a second, unlayered copy would put it above every layer and quietly
+ * invert the precedence the lab exists to get right. Same intent as `stripGlobalCss` in the
+ * production `vite.config.js`, applied for the opposite reason.
+ */
+function stripGlobalCssImport() {
+  const NOOP_ID = '\0view-lab-global-css-noop';
+  return {
+    name: 'view-lab-strip-global-css',
+    enforce: 'pre',
+    resolveId(source) {
+      if (source.includes('styles/fabricate.css')) return NOOP_ID;
+      return null;
+    },
+    load(id) {
+      return id === NOOP_ID ? '' : null;
+    },
+  };
+}
+
 export default defineConfig({
   root: repoRoot,
   plugins: [
+    stripGlobalCssImport(),
     svelte(),
     staticMount('/@foundry-chrome/', chromeCache?.dir ?? null, 'Harvested Foundry window chrome'),
     staticMount('/@foundry-system/dnd5e/', existsSync(dnd5eRoot) ? dnd5eRoot : null, 'The dnd5e system tree'),

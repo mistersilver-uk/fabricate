@@ -98,7 +98,7 @@ test('the tracked provenance record carries metadata only, never licensed bytes'
   const provenance = JSON.parse(raw);
   assert.deepEqual(
     Object.keys(provenance).sort(),
-    ['assets', 'chromeMarkup', 'foundryVersion', 'harvestedAt', 'schemaVersion', 'source'],
+    ['assets', 'chromeMarkup', 'foundryVersion', 'harvestedAt', 'schemaVersion', 'source', 'trees'],
     `${PROVENANCE_PATH} has unexpected top-level keys; the shape is pinned so a new one cannot ` +
       'quietly become a payload.'
   );

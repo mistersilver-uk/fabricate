@@ -37,6 +37,19 @@ const ENTRY_STYLESHEETS = ['public/css/foundry2.css', 'public/fonts/fontawesome/
  */
 const EXTRA_MEMBERS = ['client/applications/api/application.mjs', 'public/lang/en.json'];
 
+/**
+ * Whole subtrees to harvest beyond the stylesheet closure.
+ *
+ * `public/icons/` is Foundry's core art — ~6300 files, ~40 MB compressed. It is here because item
+ * thumbnails are load-bearing for a screenshot: the first View Lab attempt fulfilled every
+ * unresolvable image with a 1x1 transparent PNG, which renders as blank squares AND collapses the
+ * intrinsic dimensions of anything sized by its image. Serving the genuine art is what makes a
+ * populated window look populated. `AGENTS.md` already requires fixture data to use real Foundry
+ * or dnd5e raster icon paths rather than invented preview art; this is what makes that possible
+ * without Foundry running.
+ */
+const EXTRA_TREES = ['public/icons/'];
+
 const ARCHIVE_NAME_PATTERN = /^foundryvtt-(\d+\.\d+(?:\.\d+)?)\.zip$/;
 const CSS_URL_PATTERN = /url\(\s*(["']?)([^"')]+)\1\s*\)/g;
 
@@ -273,23 +286,42 @@ export function harvestChrome({ repoRoot, archivePath, force = false, log = () =
   }
 
   const wanted = new Set([...ENTRY_STYLESHEETS, ...EXTRA_MEMBERS, ...closure]);
-  const payload = readEntries(archive.path, (name) => wanted.has(name));
+  const inTree = (name) => EXTRA_TREES.some((prefix) => name.startsWith(prefix));
+  const payload = readEntries(archive.path, (name) => wanted.has(name) || inTree(name));
 
   const dir = join(repoRoot, CHROME_CACHE_DIRNAME, archive.version);
   rmSync(dir, { recursive: true, force: true });
 
   const assets = [];
+  // Tree members are summarised rather than enumerated: `public/icons/` alone is ~6300 files, and
+  // a per-file digest list would push the COMMITTABLE provenance record from a few KB into the
+  // megabytes. The rolling digest still detects any change to the set or its contents.
+  const treeDigests = new Map(EXTRA_TREES.map((prefix) => [prefix, { files: 0, bytes: 0, hash: createHash('sha256') }]));
   for (const [memberName, buffer] of [...payload].sort(([a], [b]) => a.localeCompare(b))) {
     const relative = cachePathForMember(memberName);
     const target = join(dir, relative);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, buffer);
-    assets.push({
-      path: relative.replaceAll('\\', '/'),
-      bytes: buffer.length,
-      sha256: sha256(buffer),
-    });
+
+    const treePrefix = EXTRA_TREES.find((prefix) => memberName.startsWith(prefix));
+    const digest = sha256(buffer);
+    if (treePrefix && !wanted.has(memberName)) {
+      const summary = treeDigests.get(treePrefix);
+      summary.files += 1;
+      summary.bytes += buffer.length;
+      summary.hash.update(`${relative}:${digest}\n`);
+      continue;
+    }
+    assets.push({ path: relative.replaceAll('\\', '/'), bytes: buffer.length, sha256: digest });
   }
+  const trees = [...treeDigests]
+    .filter(([, summary]) => summary.files > 0)
+    .map(([prefix, summary]) => ({
+      prefix: cachePathForMember(prefix),
+      files: summary.files,
+      bytes: summary.bytes,
+      sha256: summary.hash.digest('hex'),
+    }));
 
   const manifest = {
     schemaVersion: PROVENANCE_SCHEMA_VERSION,
@@ -303,9 +335,14 @@ export function harvestChrome({ repoRoot, archivePath, force = false, log = () =
     },
     skippedRedundantFontFormats: skipped,
     assets,
+    trees,
   };
   writeFileSync(join(dir, 'harvest-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  log(`harvested ${assets.length} files into ${CHROME_CACHE_DIRNAME}/${archive.version}`);
+  const treeFiles = trees.reduce((total, tree) => total + tree.files, 0);
+  log(
+    `harvested ${assets.length} chrome files + ${treeFiles} art files into ` +
+      `${CHROME_CACHE_DIRNAME}/${archive.version}`
+  );
   return { dir, version: archive.version, manifest, reused: false };
 }
 
@@ -335,6 +372,14 @@ export function buildProvenance(cache) {
       path: asset.path,
       bytes: asset.bytes,
       sha256: asset.sha256,
+    })),
+    // Summarised, not enumerated — see the harvest. One rolling digest per tree keeps the
+    // committable record a few KB while still detecting any change to the art set.
+    trees: (manifest.trees ?? []).map((tree) => ({
+      prefix: tree.prefix,
+      files: tree.files,
+      bytes: tree.bytes,
+      sha256: tree.sha256,
     })),
   };
 }

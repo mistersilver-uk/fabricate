@@ -221,5 +221,13 @@
       "bytes": 54,
       "sha256": "1196768e8b5ccfa3cb501944d3d1517f9dcb455a53788d9b2113461ac124da08"
     }
+  ],
+  "trees": [
+    {
+      "prefix": "icons/",
+      "files": 6319,
+      "bytes": 42620184,
+      "sha256": "badb254b5718e53f984f6886118ef5c3bba7dfc24a9e39c9de11ea031ec296c1"
+    }
   ]
 }

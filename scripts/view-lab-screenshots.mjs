@@ -92,6 +92,12 @@ async function renderPage(browser, baseUrl, { appId, query, label }) {
   page.on('pageerror', (error) => {
     consoleErrors.push(String(error?.message ?? error));
   });
+  // A bare "Failed to load resource: 404" from the console names nothing, which makes a missing
+  // asset one of the slowest things here to diagnose. Record the URL and the element that asked.
+  page.on('response', (response) => {
+    if (response.status() < 400) return;
+    consoleErrors.push(`${response.status()} ${response.request().resourceType()} ${response.url()}`);
+  });
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
   try {
@@ -171,7 +177,73 @@ async function commandChrome() {
   return 0;
 }
 
-const COMMANDS = { chrome: commandChrome };
+/**
+ * The window states captured with real content. Each entry is one PNG.
+ *
+ * `tab` drives the player app's nav rail; the manager's own routing is component-local `$state`
+ * and is reached by interaction rather than by parameter, so its entries land on the default route
+ * until the case registry lands.
+ */
+const APP_CASES = [
+  { id: 'player-crafting', app: 'fabricate-app', query: { tab: 'crafting' } },
+  { id: 'player-gathering', app: 'fabricate-app', query: { tab: 'gathering' } },
+  { id: 'player-alchemy', app: 'fabricate-app', query: { tab: 'alchemy' } },
+  { id: 'player-journal', app: 'fabricate-app', query: { tab: 'journal' } },
+  { id: 'player-inventory', app: 'fabricate-app', query: { tab: 'inventory' } },
+  { id: 'manager-systems', app: 'fabricate-crafting-system-manager', query: {} },
+];
+
+async function commandApps() {
+  const cache = ensureChrome();
+  assertViewportFits();
+  console.log(`using harvested Foundry ${cache.version} chrome`);
+
+  const outputDir = join(ARTIFACT_DIR, 'apps');
+  rmSync(outputDir, { recursive: true, force: true });
+  mkdirSync(outputDir, { recursive: true });
+
+  const only = process.argv[3] ? new Set(process.argv[3].split(',')) : null;
+  const cases = only ? APP_CASES.filter((entry) => only.has(entry.id)) : APP_CASES;
+
+  const server = await startLabServer();
+  const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
+  const rendered = [];
+  const failures = [];
+  try {
+    for (const viewCase of cases) {
+      try {
+        const { buffer, box } = await renderPage(browser, server.baseUrl, {
+          appId: viewCase.app,
+          query: { ...viewCase.query, case: viewCase.id },
+          label: viewCase.id,
+        });
+        writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
+        rendered.push({ id: viewCase.id, app: viewCase.app, width: Math.round(box.width), height: Math.round(box.height) });
+        console.log(`  ok    ${viewCase.id}.png  ${Math.round(box.width)}x${Math.round(box.height)}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push({ id: viewCase.id, message });
+        console.log(`  FAIL  ${viewCase.id}: ${message.split('\n')[0]}`);
+      }
+    }
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+
+  writeFileSync(
+    join(outputDir, 'manifest.json'),
+    `${JSON.stringify({ foundryVersion: cache.version, frames: rendered, failures }, null, 2)}\n`
+  );
+  console.log(`\n${rendered.length}/${cases.length} frames captured to ui-screenshot-artifact/apps/`);
+  if (failures.length > 0) {
+    console.log('\nfailures:');
+    for (const failure of failures) console.log(`\n--- ${failure.id} ---\n${failure.message}`);
+  }
+  return failures.length === 0 ? 0 : 1;
+}
+
+const COMMANDS = { chrome: commandChrome, apps: commandApps };
 
 const requested = process.argv[2] ?? 'chrome';
 const command = COMMANDS[requested];
