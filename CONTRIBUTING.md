@@ -562,6 +562,7 @@ It exists because PR screenshot evidence should not cost a container boot and a 
 ```sh
 npm run viewlab:chrome:harvest              # one-off; see below
 node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
+npm run viewlab:index                       # regenerate the evidence index on its own
 ```
 
 The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up`
@@ -570,6 +571,14 @@ That material is proprietary: it lands in the gitignored `.foundry-chrome/`, is 
 is never downloaded for you.
 Without it the lab fails closed rather than approximating — a frame drawn without the real cascade is
 worse than no frame, because it looks authoritative.
+
+A capture accumulates in `ui-screenshot-artifact/apps/` rather than replacing it.
+Each frame's manifest entry records the head sha it was drawn at, so a rerun can tell an older frame
+from a fresh one.
+Pass `--clean` to force a full reset.
+The same directory also carries a self-contained `index.html`, grouped by application and area with
+a multi-tag filter, written automatically at the end of every capture.
+It shows the lab's own frames only, never a smoke label, because it is not a comparison.
 
 Cases live in `scripts/lib/viewLabCases.js`.
 A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from
@@ -584,19 +593,29 @@ resolution modes, the visibility modes it does not visit, Foundry's light applic
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
 `scripts/README.md`, not by a per-case comment.
+As of this writing the registry holds 150 cases: 132 `exact`, 5 `window`, 13 `beyond`.
 
-Steps are ordered and take four verbs — `{selector}` clicks, `{selector, select}` chooses a
-`<select>` option, `{selector, fill}` types (the only route to a dirty form), and
-`{selector, scroll: true}` scrolls an element into view inside its own overflow container.
-The last matters more than it sounds: `frame.screenshot()` on the outer `.application` does not
-scroll nested containers, so a card that never scrolled into view is absent from the frame while
+Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
+`<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
+true}` scrolls an element into view inside its own overflow container, and `{selector, upload}`
+chooses a file on a native file input.
+The scroll verb matters more than it sounds: `frame.screenshot()` on the outer `.application` does
+not scroll nested containers, so a card that never scrolled into view is absent from the frame while
 every assertion still passes.
+
+A real `DialogV2` confirmation or prompt, transcribed from the harvested
+`client/applications/api/dialog.mjs`, can be left open for the screenshot, answered with its default
+button, or answered with a named button action, so a state that used to be blocked behind a native
+Foundry dialog is often reachable now.
+`input` and `query` are not wired, and a native drag-and-drop payload is outside the runner's step
+vocabulary, so a handful of cases still cannot reach their state.
+The known-gaps register in `scripts/README.md` names them.
 
 **The live smoke is still the fidelity authority.**
 Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and
 the lab is defective.
-`scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, no live Foundry
-JS, fixture world rather than the smoke world).
+`scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, a real `DialogV2`
+confirmation but otherwise no live Foundry JS, fixture world rather than the smoke world).
 
 ## Foundry integration (smoke) tests
 
