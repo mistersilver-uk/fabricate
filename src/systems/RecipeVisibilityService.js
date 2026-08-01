@@ -9,6 +9,7 @@ import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { selectWritableActors } from './writableActors.js';
 
 const LEARN_RECIPE_MESSAGES = {
   systemNotFound: 'FABRICATE.Knowledge.SystemNotFound',
@@ -1848,8 +1849,16 @@ export class RecipeVisibilityService {
     await this._setLearnedMap(craftingActor, next);
   }
 
+  /**
+   * Startup maintenance: drop learned-recipe entries naming a deleted recipe.
+   *
+   * Scoped to the actors THIS client may write (issue 970). It runs on every client
+   * at `initialize()` and mutates actor flags directly (there is no GM relay), so an
+   * un-filtered walk had a player attempting `Actor#update` on every other
+   * character in the world.
+   */
   async cleanupLearnedRecipes(validRecipeIds = new Set()) {
-    for (const actor of game.actors || []) {
+    for (const actor of selectWritableActors(game.actors)) {
       const learned = this._getLearnedMap(actor);
       const staleIds = Object.keys(learned || {}).filter((id) => !validRecipeIds.has(id));
       if (staleIds.length === 0) continue;

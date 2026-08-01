@@ -17,10 +17,14 @@ function singleStepRecipe(suffix) {
 }
 
 class FakeActor {
-  constructor(name = 'Test Actor') {
+  constructor(name = 'Test Actor', { isOwner = true } = {}) {
     this.name = name;
     this.uuid = `Actor.${name.replace(/\s+/g, '-')}`;
     this._flags = {};
+    // A real Foundry actor always answers this. The startup cleanup passes only
+    // touch actors THIS client may write (issue 970), so a fixture that omitted it
+    // would be silently skipped rather than exercised.
+    this.isOwner = isOwner;
   }
 
   getFlag(namespace, key) {
@@ -561,6 +565,63 @@ test('CraftingRunManager: cleanupInvalidRuns keeps a fizzle on a valid system, p
   assert.ok(
     !history.some((run) => run.id === dropped.id),
     'the removed-system fizzle is gone'
+  );
+});
+
+// Issue 970: both startup cleanup passes run on EVERY client and write directly to
+// actor documents (there is no GM relay). A player owns only their own characters,
+// so an un-filtered walk had them attempt `Actor#update` on every other character in
+// the world; Foundry refuses it, `setFabricateFlag` rejects by design, and the
+// rejection propagated out of `initialize()` before `ready` was ever set.
+test('CraftingRunManager: the startup cleanup passes skip actors this client cannot write', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const mine = new FakeActor('MyCharacter');
+  mine.id = 'mine';
+  const theirs = new FakeActor('SomeoneElse', { isOwner: false });
+  theirs.id = 'theirs';
+  globalThis.game.actors = [mine, theirs];
+
+  const myFizzle = await manager.recordFizzle(mine, { craftingSystemId: 'system-gone' });
+  const theirFizzle = await manager.recordFizzle(theirs, { craftingSystemId: 'system-gone' });
+
+  await manager.cleanupInvalidRuns(new Set(), new Set(['system-live']));
+
+  assert.equal(manager.getRunHistory(mine).length, 0, 'my own stale entry is cleaned');
+  assert.deepEqual(
+    manager.getRunHistory(theirs).map((run) => run.id),
+    [theirFizzle.id],
+    'a character I do not own is left entirely alone'
+  );
+  assert.ok(myFizzle.id, 'sanity: the owned fixture really did record an entry');
+});
+
+test('CraftingRunManager: pruneInstantaneousActiveRuns skips actors this client cannot write', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const mine = new FakeActor('MyCrafter');
+  mine.id = 'mine';
+  const theirs = new FakeActor('TheirCrafter', { isOwner: false });
+  theirs.id = 'theirs';
+  globalThis.game.actors = [mine, theirs];
+
+  const recipe = {
+    id: 'recipe-instant',
+    name: 'Instant',
+    craftingSystemId: 'system-1',
+    getExecutionSteps: () => [{ id: 'implicit-step', name: 'Only Step' }],
+  };
+  await manager.createRun(mine, recipe, []);
+  await manager.createRun(theirs, recipe, []);
+
+  const pruned = await manager.pruneInstantaneousActiveRuns(() => recipe);
+
+  assert.equal(pruned, 1, 'only the owned actor’s phantom run is counted');
+  assert.equal(manager.getActiveRuns(mine).length, 0, 'my phantom run is pruned');
+  assert.equal(
+    manager.getActiveRuns(theirs).length,
+    1,
+    'a character I do not own keeps its run rather than triggering a refused write'
   );
 });
 

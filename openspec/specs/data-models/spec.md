@@ -1871,6 +1871,25 @@ StepModel = {
    A non-terminal run with no armed gate is `inProgress`.
    The persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips to `inProgress` asynchronously off the same world-time hook) is NEVER consulted for the active-run derivation — only the gate's `availableAt` against `worldTime` — so the readiness read is race-free.
    The `processWorldTime` write side (the salvage/crafting timed resume and its `_persist`/`setFlag` broadcast write) is **primary-GM-gated** (`game.users.activeGM?.id === game.user?.id`) so it fires exactly once even though `updateWorldTime` is a synced hook on every client — mirroring the gathering matured-run publication gate; a resume deferred while no GM is connected is caught up by the primary GM's startup `processWorldTime` pass.
+
+### Startup Maintenance Passes
+
+The housekeeping passes `Fabricate#initialize` runs — `CraftingRunManager.cleanupInvalidRuns`, `CraftingRunManager.pruneInstantaneousActiveRuns`, `SalvageRunManager.cleanupInvalidRuns`, and `RecipeVisibilityService.cleanupLearnedRecipes` — drop run and learned-knowledge entries that name deleted content.
+They are governed by two rules that are deliberately DIFFERENT from the `processWorldTime` gate above (issue 970).
+
+**Write scoping.** Each pass walks only the actors the CURRENT client may update (`selectWritableActors`, keyed on `Actor#isOwner`), not all of `game.actors`.
+Fabricate has no socket-to-GM relay, so a pass that writes to an actor a player does not own is refused by Foundry, and `setFabricateFlag` REJECTS on a refused update by contract rather than reporting a phantom success.
+`isOwner` is unconditionally true for a GM, so a GM client still sweeps the whole world while a player sweeps only their own characters.
+An ownership scope is chosen over a primary-GM gate because these passes are idempotent key deletions rather than state advances — several clients each doing their own share is harmless, and unlike a primary-GM gate it does not make cleanup hostage to a GM ever connecting.
+The predicate FAILS CLOSED: an actor that does not answer `isOwner === true` is skipped, because a skipped cleanup is strictly less harmful than the rejected startup a permissive default would restore.
+This is a WRITE-permission question and is NOT the `isGatheringActorSelectableByUser` predicate, which asks which actor a user may ACT AS.
+
+**Failure isolation.** The passes run through `runStartupMaintenance`, which runs each one in order, reports a failure, and continues to the next.
+None of them is a precondition for Fabricate working, and `initialize()` must reach `ready` regardless: every facade method throws through `_requireReady()`, so an escaping rejection took the whole module down for that client — and skipped the remaining `ready`-body steps (world-time processing and the flag auto-stamps) with it.
+`runStartupMaintenance` therefore never rejects.
+The two rules compose as defence in depth: scoping should make a refusal unreachable, and isolation bounds the damage if one occurs anyway.
+
+The GM-only cascade walkers (`removeRunsForSystem`, `removeRunsForComponent`, and the `CraftingSystemManager._cleanupSalvage*` pair) are out of this scope: they are reachable only behind `_assertGM`, and a GM owns every actor.
 2. **Per-runType `timeGate` source.**
    For a crafting run, `timeGate` and the readiness derivation come from the ACTIVE step's gate (the step at `currentStepIndex`).
    For gathering and salvage runs, they come from the RUN-level `timeGate`.
