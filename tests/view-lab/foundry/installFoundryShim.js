@@ -18,6 +18,7 @@
  *   drifting from production's.
  */
 import { installLabRandom } from './labRandom.js';
+import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
 
 /**
  * Compose the Map key for one setting.
@@ -173,7 +174,22 @@ function createHooks() {
     off(_event, id) {
       registrations.delete(id);
     },
-    /** The lab never dispatches; nothing in a static screenshot depends on a hook firing. */
+    // Inert, and that is a finding rather than laziness.
+    //
+    // `Hooks.once('ready')` in `src/main.js` runs `processFabricateWorldTime` and four flag
+    // auto-stamps that the lab therefore never runs, so tool and component identity resolves through
+    // the name-matching fallback tier rather than the tier-1 `roles` flag production reaches first.
+    // Dispatching the event is the only faithful route, because none of those functions is exported.
+    //
+    // It was tried and reverted. The same body reaches `addModuleButtonsToItemsDirectory`, which
+    // injects a button into Foundry's Items sidebar and `console.error`s when it is absent — and the
+    // lab has no sidebar by design. Satisfying it would mean building a facsimile of Foundry chrome,
+    // which is the one thing this harness must not do; muting the error would blind the gate that
+    // catches real fixture defects. Neither trade is worth what the unrun body currently buys: no
+    // captured surface draws the identity tier, and `ownedItem` sets its uuid from the component's
+    // declared `originItemUuid`, so the source-ref tier resolves correctly anyway.
+    //
+    // Tracked in issue #953, with that reasoning, rather than left as a silent gap.
     callAll: () => true,
     call: () => true,
     registrations,
@@ -408,18 +424,12 @@ export function installFoundryShim(world) {
           img: spec.img ?? null,
           system: { quantity: 1, description: { value: '' }, ...(spec.system ?? {}) },
           flags: spec.flags ?? {},
-          getFlag(scope, key) {
-            return this.flags?.[scope]?.[key] ?? null;
-          },
-          async setFlag(scope, key, value) {
-            this.flags[scope] = { ...(this.flags[scope] ?? {}), [key]: value };
-            return this;
-          },
-          async update(changes) {
-            Object.assign(this, changes);
-            return this;
-          },
         };
+        // Real V13 semantics rather than three literal-key stubs: getFlag walks dotted keys,
+        // update expands and deep-merges, and -=key deletes. See world/labFlags.js.
+        document.getFlag = makeGetFlag(document);
+        document.setFlag = makeSetFlag(document);
+        installUpdateSemantics(document);
         world.documents.set(document.uuid, document);
         game.items.contents.push(document);
         return document;
@@ -445,17 +455,6 @@ export function installFoundryShim(world) {
       flags: spec.flags ?? {},
       ...spec,
       ...extra,
-      getFlag(scope, key) {
-        return this.flags?.[scope]?.[key] ?? null;
-      },
-      async setFlag(scope, key, value) {
-        this.flags[scope] = { ...(this.flags[scope] ?? {}), [key]: value };
-        return this;
-      },
-      async update(changes) {
-        Object.assign(this, changes);
-        return this;
-      },
       async createEmbeddedDocuments(type, embedded = []) {
         const created = embedded.map((entry) => makeDocument(entry, `${prefix}.${id}.${type}`));
         this[type] = [...(this[type] ?? []), ...created];
@@ -470,6 +469,16 @@ export function installFoundryShim(world) {
     document.id = id;
     document._id = id;
     document.uuid = `${prefix}.${id}`;
+    // Real V13 semantics: `getFlag` walks dotted keys, `update` expands and deep-merges, `-=key`
+    // deletes, and `updateSource` exists so `setFabricateFlag` takes the branch production takes.
+    //
+    // This is also where the old literal-key `getFlag` did the most damage. Under `--smoke-fixtures`
+    // the crafting actor IS a `makeDocument` hero, so every `learnedRecipes`, `roles`, `toolUsage`
+    // and `toolBroken` read on it — and on every item it embeds — answered `null` and rendered a
+    // pristine, unworn, unlearned frame regardless of what the fixture seeded.
+    document.getFlag = makeGetFlag(document);
+    document.setFlag = makeSetFlag(document);
+    installUpdateSemantics(document);
     world.documents.set(document.uuid, document);
     return document;
   };

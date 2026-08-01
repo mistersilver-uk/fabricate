@@ -89,6 +89,89 @@ export const RUN_CONTAINER_PATHS = Object.freeze({
 });
 
 /**
+ * Foundry's `expandObject`: a dotted TOP-LEVEL key becomes nested objects.
+ *
+ * `updateSource` applies this only when a top-level key contains a dot — which is the whole reason
+ * the three run containers sit at two different depths. See {@link RUN_CONTAINER_PATHS}.
+ *
+ * @param {object} changes Flat or partly-dotted change set.
+ * @returns {object} The expanded set.
+ */
+export function expandObject(changes) {
+  const expanded = {};
+  for (const [key, value] of Object.entries(changes)) {
+    if (!key.includes('.')) {
+      expanded[key] = value;
+      continue;
+    }
+    const parts = key.split('.');
+    let node = expanded;
+    for (const part of parts.slice(0, -1)) {
+      if (typeof node[part] !== 'object' || node[part] === null) node[part] = {};
+      node = node[part];
+    }
+    node[parts.at(-1)] = value;
+  }
+  return expanded;
+}
+
+/**
+ * Apply an expanded change set the way V13's `_updateDiff` does: deep merge, and `-=key` DELETES.
+ *
+ * The lab's documents previously updated with `Object.assign`, which is not an update in any sense
+ * Foundry would recognise. Two consequences, both silent:
+ *
+ *   - a nested change replaced the whole branch instead of merging into it;
+ *   - a deletion key produced a own-property literally NAMED
+ *     `flags.fabricate.fabricate.craftingRuns.active.-=lab-run-x` and deleted nothing.
+ *
+ * `deleteRemovedActiveRunFlags`, `GatheringRunManager` and `RecipeVisibilityService.forgetLearnedRecipes`
+ * all issue `-=` keys. Under `Object.assign` each appeared to succeed while changing nothing, so the
+ * UI would render unchanged and the frame would read as a UI bug rather than a harness bug.
+ *
+ * @param {object} target Object to mutate.
+ * @param {object} changes Expanded change set.
+ * @returns {object} The mutated target.
+ */
+export function applyUpdate(target, changes) {
+  for (const [key, value] of Object.entries(changes)) {
+    if (key.startsWith('-=')) {
+      delete target[key.slice(2)];
+      continue;
+    }
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if (typeof target[key] !== 'object' || target[key] === null || Array.isArray(target[key])) {
+        target[key] = {};
+      }
+      applyUpdate(target[key], value);
+      continue;
+    }
+    target[key] = value;
+  }
+  return target;
+}
+
+/**
+ * Install V13-shaped `update` and `updateSource` on a lab document.
+ *
+ * `updateSource` matters beyond correctness of the write: `setFabricateFlag` forks on
+ * `typeof document.updateSource === 'function'`, so without it EVERY lab write took the legacy
+ * `setFlag` fallback while every production write took the `update` branch. The lab could not
+ * exercise the path production runs.
+ *
+ * @param {object} document Document to equip.
+ * @returns {object} The same document.
+ */
+export function installUpdateSemantics(document) {
+  document.updateSource = (changes = {}) => applyUpdate(document, expandObject(changes));
+  document.update = async (changes = {}) => {
+    applyUpdate(document, expandObject(changes));
+    return document;
+  };
+  return document;
+}
+
+/**
  * Seed a Fabricate flag at the depth production writes it.
  *
  * @param {object} document Document to stock.

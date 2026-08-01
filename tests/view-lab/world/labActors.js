@@ -13,7 +13,7 @@
  *   - unsatisfiable (nothing held).
  */
 
-import { makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
+import { installUpdateSemantics, makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
 
 const PORTRAIT_BASE = '/@foundry-chrome/icons';
 
@@ -49,6 +49,7 @@ function ownedItem(componentId, component, quantity, index) {
   // default and renders a pristine, unworn, unbroken frame no matter what the fixture seeded.
   item.getFlag = makeGetFlag(item);
   item.setFlag = makeSetFlag(item);
+  installUpdateSemantics(item);
   return item;
 }
 
@@ -323,23 +324,24 @@ export function buildLabActors(content) {
        */
       async createEmbeddedDocuments(type, specs = []) {
         if (type !== 'Item') return [];
-        const created = specs.map((spec, offset) => ({
-          uuid: spec.flags?.core?.sourceId ?? `Item.${definition.id}-${items.length + offset}`,
-          id: `item-${definition.id}-${items.length + offset}`,
-          name: spec.name,
-          img: spec.img ?? null,
-          type: spec.type ?? 'loot',
-          system: { quantity: 1, description: { value: '' }, ...(spec.system ?? {}) },
-          flags: spec.flags ?? {},
-          getFlag(scope, key) {
-            return this.flags?.[scope]?.[key] ?? null;
-          },
-          async setFlag(scope, key, value) {
-            this.flags[scope] = { ...(this.flags[scope] ?? {}), [key]: value };
-            return this;
-          },
-          isOwner: true,
-        }));
+        const created = specs.map((spec, offset) => {
+          const item = {
+            uuid: spec.flags?.core?.sourceId ?? `Item.${definition.id}-${items.length + offset}`,
+            id: `item-${definition.id}-${items.length + offset}`,
+            name: spec.name,
+            img: spec.img ?? null,
+            type: spec.type ?? 'loot',
+            system: { quantity: 1, description: { value: '' }, ...(spec.system ?? {}) },
+            flags: spec.flags ?? {},
+            isOwner: true,
+          };
+          // The same V13 semantics the statically-built stacks get. An embedded item is where tool
+          // wear and breakage flags land, so a literal-key lookup here renders every tool pristine.
+          item.getFlag = makeGetFlag(item);
+          item.setFlag = makeSetFlag(item);
+          installUpdateSemantics(item);
+          return item;
+        });
         items.push(...created);
         return created;
       },
@@ -352,12 +354,14 @@ export function buildLabActors(content) {
     };
     actor.getFlag = makeGetFlag(actor);
     actor.setFlag = makeSetFlag(actor);
+    installUpdateSemantics(actor);
     const learned = LEARNED_RECIPES[definition.id];
     // `flags.fabricate.fabricate.learnedRecipes`, which is where production's dotted-top-level-key
     // `update` lands it after V13 expands the path — the same doubly-nested depth every Fabricate
     // read normalises to. Seeded through the shared helper so the lab can never hold one key at
     // two depths and answer a depth bug from whichever copy the reader happens to find.
-    if (learned) seedFabricateFlag(actor, ['fabricate', 'learnedRecipes'], structuredClone(learned));
+    if (learned)
+      seedFabricateFlag(actor, ['fabricate', 'learnedRecipes'], structuredClone(learned));
     return actor;
   });
 }
