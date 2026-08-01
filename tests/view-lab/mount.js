@@ -39,8 +39,26 @@ function installDeterminismStyles() {
       caret-color: transparent !important;
       scroll-behavior: auto !important;
     }
-    /* Scoped to window content: a document-wide gutter would shift the frame itself. */
-    .window-content, .window-content * { scrollbar-gutter: stable; }
+    /*
+      NO scrollbar-gutter. There used to be
+      \`.window-content, .window-content * { scrollbar-gutter: stable; }\` here, for capture
+      determinism, and it was the single worst thing in the page.
+
+      \`scrollbar-gutter: stable\` reserves gutter space on any element that is a SCROLL CONTAINER,
+      and \`overflow: hidden\` makes one. The \`*\` therefore carved ~10px out of the content box of
+      every clipping element under the window — \`.crafting-thumb\` measured a 44px box with a 34px
+      content box, so every item image in every published frame was drawn narrow, left-aligned and
+      needlessly cropped by its own \`object-fit: cover\`.
+
+      Narrowing it to \`.window-content\` alone is not enough either: when the content does not
+      overflow, production draws no scrollbar and uses the full width, while a reserved gutter
+      still takes 10px. That is the same lie at the top level, and \`assertNoLabInducedClipping\`
+      catches it.
+
+      So there is no gutter at all now, and scrollbars behave exactly as they do in production.
+      Determinism instead rests on what it should rest on: fixed fixtures, asserted-loaded fonts,
+      and decoded images — a scrollbar that appears here is one that appears for a real user.
+    */
   `;
   document.head.appendChild(style);
 }
@@ -311,6 +329,61 @@ async function assertChromeFontsLoaded() {
 }
 
 /**
+ * Fail the render when a lab-injected style has resized an element's content box.
+ *
+ * The determinism styles above are the lab's own, and they are the one thing in the page that
+ * production does not have — so when one of them changes layout, the frame lies and nothing else
+ * would notice. `scrollbar-gutter: stable` on every `.window-content` descendant did exactly that
+ * for months: it reserves gutter space on any scroll container, `overflow: hidden` makes one, and
+ * so every clipping element rendered ~10px narrower than its own box.
+ *
+ * The invariant is arithmetic and holds for any element that is not scrolling: content width ==
+ * border width - padding - border. A reserved gutter breaks it, and nothing legitimate does.
+ * Elements that genuinely scroll are exempt, because a real scrollbar breaks it too — and that is
+ * production behaviour, not a lab artefact.
+ *
+ * @param {HTMLElement} frame The application frame.
+ * @throws {Error} Naming the offending elements, because a silent 10px is exactly what shipped.
+ */
+function assertNoLabInducedClipping(frame) {
+  const offenders = [];
+  for (const element of frame.querySelectorAll('*')) {
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    if (box.width === 0) continue;
+    // `clientWidth` is defined only for elements that generate a CSS box with client geometry.
+    // A non-replaced INLINE box — every `span`, `strong`, `em` — reports 0, which read as "loses
+    // its whole width" and failed 106 of 150 frames the first time this guard ran.
+    if (style.display.startsWith('inline') && style.display !== 'inline-block') continue;
+    // A real scrollbar legitimately eats content width; only non-scrolling elements are pinned.
+    if (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth) {
+      continue;
+    }
+    const chrome =
+      Number.parseFloat(style.paddingLeft) +
+      Number.parseFloat(style.paddingRight) +
+      Number.parseFloat(style.borderLeftWidth) +
+      Number.parseFloat(style.borderRightWidth);
+    const expected = style.boxSizing === 'border-box' ? box.width - chrome : box.width;
+    const lost = expected - element.clientWidth;
+    // 1px of tolerance for sub-pixel rounding; a reserved gutter is an order of magnitude larger.
+    if (lost > 1) {
+      offenders.push(
+        `${element.tagName.toLowerCase()}.${[...element.classList].join('.') || '(no class)'} ` +
+          `loses ${lost.toFixed(1)}px of content width (box ${box.width.toFixed(1)}, client ${element.clientWidth})`
+      );
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(
+      'view lab: a lab-injected style is resizing content boxes, so this frame would not depict ' +
+        `production layout:\n  ${offenders.slice(0, 8).join('\n  ')}` +
+        (offenders.length > 8 ? `\n  ... and ${offenders.length - 8} more` : '')
+    );
+  }
+}
+
+/**
  * The subtrees a settle pass has to watch: the application window, plus any dialog standing over it.
  *
  * @param {HTMLElement} frame The application frame.
@@ -360,6 +433,9 @@ async function boot() {
         ? await mountPlayerApp(built.content, params)
         : await mountManagerApp(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
+    // After settle, because the check needs the populated tree — an empty window has nothing
+    // clipped to measure.
+    assertNoLabInducedClipping(built.frame);
   } else {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));
