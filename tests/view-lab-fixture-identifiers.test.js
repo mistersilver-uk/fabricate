@@ -58,12 +58,23 @@ const IDENTITY_SOURCES = {
   'data-recipe-edit': new Set(content.recipes.map((entry) => entry.id)),
   'data-component-select': new Set(content.components.map((entry) => entry.id)),
   'data-system-id': new Set(content.systems.map((entry) => entry.id)),
-  // Essences are never declared as a list — they exist wherever a component or recipe carries one,
-  // which is exactly how `CraftingSystemManager` discovers them.
+  // From the SYSTEM's declared vocabulary, which is what `adminStore` builds the browser's rows
+  // from and therefore what `EssenceBrowserView` writes into the attribute. Deriving these from the
+  // essences components happen to carry passes today only because the two coincide: it would
+  // falsely reject a declared-but-uncarried essence (the fixture authors exactly that deliberately
+  // for the `runic` TAG) and falsely accept an essence key typo'd onto a component.
   'data-essence-id': new Set(
-    content.components.flatMap((entry) => Object.keys(entry.essences ?? {}))
+    content.systems.flatMap((system) =>
+      (system.essenceDefinitions ?? []).map((essence) => essence.id)
+    )
   ),
-  'data-books-scrolls-edit': new Set(content.recipeItems.map((entry) => entry.id)),
+  // Also system-declared. `content.recipeItems` is the herbalism list alone, so smithing's
+  // inline `sm-book` was missing from the set and a case naming it would have been rejected.
+  'data-books-scrolls-edit': new Set(
+    content.systems.flatMap((system) =>
+      (system.recipeItemDefinitions ?? []).map((entry) => entry.id)
+    )
+  ),
   // Run ids are literals inside `buildLabRunStates`, which needs a built actor to call. Reading
   // them out of the source text keeps the guard free of that setup while still failing on a rename.
   'data-history-run-id': new Set(labRunIds()),
@@ -74,7 +85,13 @@ const IDENTITY_SOURCES = {
       (system.components ?? []).map((component) => `${system.id}:${component.id}`)
     )
   ),
-  'data-essence-carrier': new Set(content.components.map((entry) => `Item.${entry.id}`)),
+  // The carrier's key is `item.uuid || item.id`, and an owned item's uuid is the component's
+  // `originItemUuid` — which `component()` DEFAULTS to `Item.<id>` but two components override to
+  // a shared uuid. Rebuilding the default instead of reading the field admitted a value the DOM
+  // never carries and rejected the one it does.
+  'data-essence-carrier': new Set(
+    content.components.map((entry) => entry.originItemUuid ?? `Item.${entry.id}`)
+  ),
 };
 
 /** Every `key="value"` pair in a selector, in source order. */

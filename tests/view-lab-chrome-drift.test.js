@@ -354,11 +354,16 @@ test('prompt still unshifts the ok button the spec transcribes', { skip: skipDia
     ),
     `DialogV2.prompt's OK button moved. ${RETRANSCRIBE}`
   );
-  assert.ok(
-    normalized.includes(
-      `return this.wait(foundry.utils.mergeObject({ position: { width: ${FOUNDRY_DIALOG_SPEC.factoryPosition.width} } }, config));`
-    ),
-    `DialogV2.prompt's default width moved. ${RETRANSCRIBE}`
+  // BOTH factories end on that identical `return this.wait(...)` line, so a bare `includes` here
+  // would be satisfied by confirm's copy and would still pass if prompt's were deleted. Count them.
+  const waitLines = normalized.split(
+    `return this.wait(foundry.utils.mergeObject({ position: { width: ${FOUNDRY_DIALOG_SPEC.factoryPosition.width} } }, config));`
+  ).length;
+  assert.equal(
+    waitLines,
+    3,
+    `expected confirm and prompt to each end on the ${FOUNDRY_DIALOG_SPEC.factoryPosition.width}px ` +
+      `wait; found ${waitLines - 1}. ${RETRANSCRIBE}`
   );
   // The import dialog relabels it to "Import" and supplies the callback that reads the file input,
   // so a caller override has to survive the merge — as it does for confirm.

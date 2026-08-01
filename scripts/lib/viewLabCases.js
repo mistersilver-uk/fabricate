@@ -1865,8 +1865,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'systems',
     // The systems browser is what sits UNDERNEATH the report, so `expectView` alone cannot tell
-    // the two apart. This is the assertion that actually holds the frame to its name.
-    expectSelector: '[data-import-report]',
+    // the two apart. A GROUP rather than the modal root: `[data-import-report]` renders whether or
+    // not anything was reported, because `buildImportReportContent` always returns an object and
+    // the modal has an explicit empty state — so it would pass on the very "Everything resolved"
+    // frame the dangling references in this payload exist to avoid.
+    expectSelector: '[data-import-report-group]',
     kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
@@ -1887,10 +1890,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the work, and it is real work rather than a line: the payload has to satisfy
     // `resolveDropData` and the collector has to walk a folder tree the lab world does not model.
     //
-    // Left deliberately on the components browser rather than the default systems screen. It still
-    // does not show the modal — but it shows the screen the drop would land on, so the frame is at
-    // least about the right surface, and it is not a byte-duplicate of `manager-default-selection`
-    // published under another name.
+    // Left deliberately on the components browser rather than the default systems screen, so the
+    // frame is at least about the surface the drop lands on.
+    //
+    // Its PNG is byte-identical to `manager-components-normal` — same app, query, steps and
+    // geometry — and that is stated rather than dressed up. While the modal is unreachable this
+    // case's value is its `sourceMatches`, not its picture: it is what selects a frame when
+    // `ImportFolderMappingModal.svelte` changes, and no other case matches that file. The dedup
+    // guard exempts `window` cases precisely so a case can admit it falls short instead of being
+    // given an invented difference to look distinct.
     reaches: 'window',
     query: {},
     steps: ['Components'],

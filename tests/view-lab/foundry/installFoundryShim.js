@@ -229,6 +229,14 @@ function createTextEditor(documents) {
  * The seed sorts the index by name and imports the first two `character` entries, so the order here
  * is what decides which is the crafter and which the travel member.
  */
+/**
+ * The prefix every routed notification carries.
+ *
+ * `Fabricate | ` is what `scripts/view-lab-screenshots.mjs` scopes its warning gate to, so this is
+ * not decoration — it is the token that decides whether a warning fails a capture.
+ */
+const NOTIFICATION_PREFIX = 'Fabricate | notification: ';
+
 const DND5E_STARTER_HEROES = Object.freeze([
   {
     _id: 'labhero000000001',
@@ -554,17 +562,27 @@ export function installFoundryShim(world) {
   // "Import report". Routing to `console` hands them to the driver's existing console gate, which
   // makes an errored notification FAIL the frame instead of silently retitling it.
   //
-  // `info` stays quiet: it is the success path (Foundry's own toasts on import, save, delete) and
-  // is not evidence of anything wrong.
+  // `info` stays quiet, and that is checked rather than assumed: `CompendiumImporter` calls
+  // `notifications.info(message, { progress: true, console: false })` on every progress tick and
+  // reads the return value, so routing it would both flood the gate and contradict the caller's
+  // own `console: false`.
+  //
+  // THE PREFIX IS LOAD-BEARING. The driver's warning gate collects on `Fabricate |`, so a message
+  // prefixed anything else is dropped by Playwright and never seen. This shipped once as
+  // `fabricate notification:`, which matches nothing: `error` still failed a capture (the gate
+  // takes every console error), but `warn` was behaviourally identical to the no-op it replaced,
+  // and whether a warning was fatal depended on whether the PRODUCT string happened to already
+  // begin `Fabricate | `. Two `CraftingSystemManager` warnings did; the import path's validation
+  // warnings, its failed-recipe summary, and every localized `FABRICATE.Admin.*` warning did not.
   globalThis.ui = {
     notifications: {
       info: () => {},
-      warn: (message) => console.warn(`fabricate notification: ${message}`),
-      error: (message) => console.error(`fabricate notification: ${message}`),
+      warn: (message) => console.warn(`${NOTIFICATION_PREFIX}${message}`),
+      error: (message) => console.error(`${NOTIFICATION_PREFIX}${message}`),
       notify: (message, type = 'info') => {
-        if (type === 'error') console.error(`fabricate notification: ${message}`);
+        if (type === 'error') console.error(`${NOTIFICATION_PREFIX}${message}`);
         else if (type === 'warning' || type === 'warn')
-          console.warn(`fabricate notification: ${message}`);
+          console.warn(`${NOTIFICATION_PREFIX}${message}`);
       },
     },
     windows: {},
