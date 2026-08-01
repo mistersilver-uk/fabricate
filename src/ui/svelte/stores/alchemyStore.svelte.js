@@ -533,7 +533,7 @@ export function createAlchemyStore({ services } = {}) {
           discovered: discoveredName,
           message: result.message ?? '',
         };
-      } else if (result && result.disposition === 'timed-start') {
+      } else if (result?.disposition === 'timed-start') {
         // The engine's message is an untranslated developer string ("Step … is still
         // in progress (Ns remaining)"), so the banner carries the localized copy and
         // nothing is toasted — the player did not fail at anything.

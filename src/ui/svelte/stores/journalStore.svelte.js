@@ -161,7 +161,10 @@ export function createJournalStore({ services } = {}) {
       const message = result?.message;
       if (message) services?.notify?.(message);
       await load(true);
-    } catch (_err) {
+    } catch (err) {
+      // The player gets the friendly toast; the real cause goes to the console,
+      // because the whole point of this catch is that the failure was invisible.
+      console.error('Fabricate | Error advancing a crafting run:', err);
       services?.notify?.(services?.craftErrorMessage?.() ?? '');
     } finally {
       busyRunId = '';
@@ -192,7 +195,8 @@ export function createJournalStore({ services } = {}) {
       if (message) services?.notify?.(message);
       if (selectedRunId === run.id) selectedRunId = '';
       await load(true);
-    } catch (_err) {
+    } catch (err) {
+      console.error('Fabricate | Error cancelling a crafting run:', err);
       services?.notify?.(services?.craftErrorMessage?.() ?? '');
     } finally {
       busyRunId = '';
