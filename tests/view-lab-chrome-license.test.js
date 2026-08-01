@@ -38,7 +38,13 @@ const FORBIDDEN_TRACKED_PATTERNS = [
   { pattern: /(^|\/)modesto-condensed[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Modesto Condensed' },
   { pattern: /(^|\/)(amiri|bruno-ace)[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Foundry-bundled face' },
   { pattern: /^\.foundry-chrome\//, why: 'the harvested chrome cache' },
+  // Both harvested client modules, named individually rather than by a directory glob so that
+  // adding a third is a deliberate act. `application.mjs` supplies the window frame and
+  // `dialog.mjs` the DialogV2 frame; both are transcribed into `foundryChromeSpec.js` and neither
+  // may be committed. The `.foundry-chrome/` rule above already covers the cache location — these
+  // catch a copy taken anywhere else in the tree, which is how licensed source usually escapes.
   { pattern: /(^|\/)client\/applications\/api\/application\.mjs$/, why: 'Foundry client source' },
+  { pattern: /(^|\/)client\/applications\/api\/dialog\.mjs$/, why: 'Foundry client source' },
 ];
 
 /**
