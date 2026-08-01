@@ -642,3 +642,64 @@ describe('computeSystemVisibility', () => {
     assert.equal(blocksSystem, true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Alchemy: Global visibility with discovery-by-brewing switched off (issue 966)
+// ---------------------------------------------------------------------------
+
+describe('alchemyGlobalNoDiscovery', () => {
+  function alchemySystem(alchemy, overrides = {}) {
+    return makeSystem({
+      resolutionMode: 'alchemy',
+      features: { multiStepRecipes: false },
+      alchemy: { checkMode: 'none', ...alchemy },
+      ...overrides,
+    });
+  }
+
+  it('warns, without blocking, when Global visibility has learnOnCraft off', () => {
+    const system = alchemySystem({ learnOnCraft: false }, { visibilityMode: 'global' });
+    const report = evaluateSystemValidation(system, { recipes: [] });
+
+    const issue = report.issues.find((entry) => entry.code === 'alchemyGlobalNoDiscovery');
+    assert.ok(issue, 'expected the no-discovery warning to surface');
+    assert.equal(issue.severity, 'warning');
+    assert.equal(issue.blocks, undefined, 'brewing still works, so this must not block');
+    assert.equal(report.blocksSystem, false);
+    // Global reveals a recipe ONLY from `learnedRecipes`, so this pairing leaves
+    // every player's Known list permanently empty.
+    assert.match(issue.message, /Known list/);
+  });
+
+  it('stays silent when learnOnCraft is on, or under any other visibility mode', () => {
+    const on = evaluateSystemValidation(
+      alchemySystem({ learnOnCraft: true }, { visibilityMode: 'global' }),
+      { recipes: [] }
+    );
+    assert.equal(
+      on.issues.some((entry) => entry.code === 'alchemyGlobalNoDiscovery'),
+      false
+    );
+
+    // `knowledge` reveals from books, so an off flag is a legitimate choice there.
+    const knowledge = evaluateSystemValidation(
+      alchemySystem({ learnOnCraft: false }, { visibilityMode: 'knowledge' }),
+      { recipes: [] }
+    );
+    assert.equal(
+      knowledge.issues.some((entry) => entry.code === 'alchemyGlobalNoDiscovery'),
+      false
+    );
+  });
+
+  it('stays silent for a non-alchemy system, which has no learn-on-craft at all', () => {
+    const report = evaluateSystemValidation(
+      makeSystem({ visibilityMode: 'global', alchemy: { learnOnCraft: false } }),
+      { recipes: [] }
+    );
+    assert.equal(
+      report.issues.some((entry) => entry.code === 'alchemyGlobalNoDiscovery'),
+      false
+    );
+  });
+});

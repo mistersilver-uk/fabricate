@@ -154,7 +154,7 @@ It carries the alchemy check mode and the discovery/consumption options.
 | Field | Type | Default | Description |
 |:------|:-----|:--------|:------------|
 | `checkMode` | `string` | `"none"` | How a matched brew is resolved. `"none"` runs no check and always succeeds. `"simple"` runs a mandatory pass/fail check from `craftingCheck.simple` (pass produces the success group, fail produces the reserved `role: 'failure'` group). `"tiered"` runs a mandatory routed check from `craftingCheck.routed` and routes by outcome tier, exactly like `routedByCheck`. |
-| `learnOnCraft` | `boolean` | `false` | Mark a recipe as learned for the crafting character when a submission matches it. A match learns the recipe whether or not the check passed. |
+| `learnOnCraft` | `boolean` | `true` | Mark a recipe as learned for the crafting character when a submission matches it. A match learns the recipe whether or not the check passed, and whether the brew resolves immediately or after a time gate. Under `global` visibility this is the only source of discovery, so turning it off leaves every player's Known list permanently empty. |
 | `consumeOnFail` | `boolean` | `true` | Consume the submitted components on a no-match fizzle and on a matched Simple-check failure. |
 | `showAttemptHistoryToPlayers` | `boolean` | `true` | Remember a character's fizzled combinations so the workbench can mark them as a dead end rather than an untried mix. |
 

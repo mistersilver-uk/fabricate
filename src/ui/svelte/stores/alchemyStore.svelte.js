@@ -513,6 +513,9 @@ export function createAlchemyStore({ services } = {}) {
       //  tiered-tier       — a passed Tiered brew produced its outcome-tier result set;
       //  produced-on-failure — a matched Simple brew FAILED its check and produced the
       //                        reserved failure result set (must NOT read as success-green);
+      //  brewing           — a time-gated brew was STARTED: the signature matched, the
+      //                      inputs are consumed and the run is live in the Journal
+      //                      awaiting world time. Not a failure (issue 966);
       //  no-match-fizzle   — no reaction (or a Tiered fail / misconfiguration).
       if (result && result.success === true) {
         const tiered =
@@ -530,6 +533,11 @@ export function createAlchemyStore({ services } = {}) {
           discovered: discoveredName,
           message: result.message ?? '',
         };
+      } else if (result && result.disposition === 'timed-start') {
+        // The engine's message is an untranslated developer string ("Step … is still
+        // in progress (Ns remaining)"), so the banner carries the localized copy and
+        // nothing is toasted — the player did not fail at anything.
+        lastBrew = { status: 'brewing', discovered: discoveredName, message: '' };
       } else if (result && result.disposition === 'no-match') {
         lastBrew = { status: 'no-match-fizzle', discovered: null, message: result.message ?? '' };
       } else {

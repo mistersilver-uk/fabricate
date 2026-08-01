@@ -1315,6 +1315,12 @@ export class CraftingEngine {
         success: false,
         results: null,
         message: `Step "${stepLabel}" is still in progress (${remaining}s remaining)`,
+        // A START is a SUCCESSFUL arming, not a failure: inputs are secured and the
+        // run is live. `success` stays false because nothing was produced, so the
+        // disposition is what tells a caller the two apart (issue 966). Without it
+        // the alchemy workbench read this as a no-signature fizzle and told the
+        // player their brew had failed while their ingredients were being consumed.
+        disposition: 'timed-start',
       },
     };
   }
@@ -1490,10 +1496,14 @@ export class CraftingEngine {
       // Matched Simple alchemy attempt (timed twin): produce the reserved failure
       // group + learn WITHOUT re-consuming (components were spent at START). Tiered
       // alchemy failure still fizzles via `recordFailure` (routedByCheck).
-      if (
-        options?.isAlchemyAttempt === true &&
-        this._getAlchemyCheckMode(executionRecipe) === 'simple'
-      ) {
+      //
+      // Keyed on the RECIPE'S SYSTEM, never on `options.isAlchemyAttempt` (issue
+      // 966): that flag is set once, by `craftAlchemy` on the initial submit, and a
+      // time-gated brew resolves LATER through `advanceCraftingRun`, which cannot
+      // carry it. Gating on it here silently degraded every matured Simple brew
+      // failure to a generic fizzle. `_getAlchemyCheckMode` returns null for a
+      // non-alchemy system, so the mode test alone is the complete condition.
+      if (this._getAlchemyCheckMode(executionRecipe) === 'simple') {
         return this._finishAlchemySimpleFailure({
           craftingActor,
           componentSourceActors,
@@ -1622,8 +1632,11 @@ export class CraftingEngine {
         componentSourceActors,
       });
       // Learn on match for a matured timed alchemy brew too (gated inside
-      // `learnRecipeOnCraft` on `alchemy.learnOnCraft === true`).
-      if (options?.isAlchemyAttempt === true) {
+      // `learnRecipeOnCraft` on `alchemy.learnOnCraft === true`). Keyed on the
+      // recipe's own system rather than `options.isAlchemyAttempt` for the reason
+      // given at the Simple-failure branch above: the resume path cannot carry that
+      // flag, so this learn never fired for a time-gated brew (issue 966).
+      if (this._getAlchemyCheckMode(recipe) !== null) {
         await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
       }
     }

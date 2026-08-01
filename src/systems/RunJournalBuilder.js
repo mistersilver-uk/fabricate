@@ -98,6 +98,13 @@ function durationToSeconds(timeRequirement = null) {
  * every model is built from cloned primitives, and undiscovered crafting/alchemy
  * recipes are redacted to a generic label for non-GM viewers.
  *
+ * Redaction hides a run's IDENTITY (name, image, steps, results, recipe id) and
+ * NOTHING ELSE. It is not an authorization gate: an owner may still advance and
+ * cancel a redacted run (issue 966). Conflating the two deadlocked every timed
+ * craft of a recipe the crafter cannot see — alchemy brews an undiscovered
+ * recipe by design, so a timed brew consumed its ingredients, armed its gate, and
+ * then offered neither a Finish nor a Cancel affordance for the rest of time.
+ *
  * All collaborators are injected; the class touches no Foundry globals.
  */
 export class RunJournalBuilder {
@@ -358,15 +365,21 @@ export class RunJournalBuilder {
       flavor: '',
       failureReason,
       ...this._craftingResults(runSteps, redacted, stringOrNull(run.craftingSystemId)),
-      // A redacted run hides its recipe identity, so it cannot offer a manual
-      // "Trigger Next Step" advance — only a discovered crafting run can.
-      manualAdvance: !redacted,
+      // `manualAdvance` states what the run TYPE needs, not what the viewer may do:
+      // a crafting run always advances on a click, where gathering and salvage
+      // auto-resolve off the world-time hook. Redaction must NOT suppress it
+      // (issue 966) — nothing ever finishes a crafting run on its own, so a
+      // redacted run with `false` here is a permanent zombie holding consumed
+      // ingredients. The advance itself is authorized downstream by
+      // `resolveAdvanceSources`, which owns the ownership check.
+      manualAdvance: true,
       // A player may cancel their own in-progress craft (issue 848) only on an OWNED
-      // actor (the engine writes items with no GM relay), and only while the run is
-      // live (not terminal) and discovered (not redacted). `refundOnCancel` mirrors
-      // the owning system's `features.refundOnPlayerCancel` (default ON) so the UI can
-      // tell the player whether inputs will be returned before they confirm.
-      canCancel: !terminal && !redacted && actor?.isOwner === true,
+      // actor (the engine writes items with no GM relay) and only while the run is
+      // live. Redaction is deliberately NOT a condition (issue 966): a crafter who
+      // cannot see what they started still gets to abandon it. `refundOnCancel`
+      // mirrors the owning system's `features.refundOnPlayerCancel` (default ON) so
+      // the UI can tell the player whether inputs will be returned before they confirm.
+      canCancel: !terminal && actor?.isOwner === true,
       refundOnCancel: system?.features?.refundOnPlayerCancel !== false,
     };
   }

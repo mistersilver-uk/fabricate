@@ -1819,8 +1819,8 @@ RunModel = {
   failureReason: string | null,
   createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
   createdResultCount: number,
-  manualAdvance: boolean,                // true only for non-redacted crafting (the Trigger Next Step gate)
-  canCancel: boolean,                    // crafting only: true when the run is live (non-terminal), discovered (non-redacted), and the viewer OWNS the actor — a player may self-cancel only their own in-progress craft
+  manualAdvance: boolean,                // true for every crafting run (the Trigger Next Step gate); redaction does not suppress it
+  canCancel: boolean,                    // crafting only: true when the run is live (non-terminal) and the viewer OWNS the actor — a player may self-cancel only their own in-progress craft, redacted or not
   refundOnCancel: boolean,               // mirrors the system's features.refundOnPlayerCancel (default true), so the cancel affordance can tell the player whether inputs will be returned
 }
 ```
@@ -1876,7 +1876,8 @@ StepModel = {
    For gathering and salvage runs, they come from the RUN-level `timeGate`.
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
-   For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, `manualAdvance` is `false` (a hidden-identity run offers no Trigger Next Step), and `img` falls back to the default run image.
+   For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, and `img` falls back to the default run image.
+   Redaction hides IDENTITY ONLY and is NOT an authorization gate (issue 966): `manualAdvance` and `canCancel` are unaffected by it, so an owner can still finish and abandon a redacted run.
    The GM bypass precedes the missing-recipe guard: a GM viewer is never redacted, even for a run whose recipe no longer resolves, so the GM still sees the run's persisted step snapshots (requirements, roll, consumed items) rather than a redacted empty card.
    Globally-visible recipes are likewise never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
@@ -1887,8 +1888,9 @@ StepModel = {
    A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
    `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
-5. **`manualAdvance` is the Trigger Next Step gate.**
-   It is `true` only for non-redacted crafting runs (a redacted crafting run sets it `false`); the player-facing advance contract is defined in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_).
+5. **`manualAdvance` states what the run TYPE needs, not what the viewer may do.**
+   It is `true` for every crafting run — including a redacted one (issue 966) — and `false` for gathering, salvage, and recipe-less alchemy fizzle history entries, which resolve off the world-time hook or are terminal.
+   Authorization belongs to the advance seam (`resolveAdvanceSources`), not the projection; the player-facing advance contract is defined in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_).
 6. **`resolutionModeLabel` uses the player-facing label map.**
    It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (_Player-Facing Mode Labels_) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**

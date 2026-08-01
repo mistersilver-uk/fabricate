@@ -2350,6 +2350,12 @@ Runs of recipes the viewer cannot see are redacted, mirroring the gathering blin
 - A crafting or alchemy run whose recipe is undiscovered or knowledge-gated for the viewer, or whose recipe no longer resolves, is shown with a generic localized title (`FABRICATE.App.Journal.Redacted.Title`), a default image, and no recipe id, steps, results, or failure detail.
 - GM viewers and globally-visible recipes are never redacted.
 - The redaction is enforced in the projection (`data-models/spec.md` _Run Journal Projection_), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
+- **Redaction hides IDENTITY ONLY and is never an authorization gate** (issue 966).
+A redacted run still projects `manualAdvance: true` and, for an owner, `canCancel: true`, so its owner can finish it and abandon it exactly as they could a visible one.
+Nothing resolves a crafting run automatically — `CraftingRunManager.processWorldTime` only flips a matured `waitingTime` step to `inProgress` — so suppressing the affordance stranded every timed craft of a recipe the crafter cannot see, with its inputs already consumed at START.
+Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and discovery lands at FINISH, so an undiscovered timed brew could never reach the FINISH that would have revealed it.
+- Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
+The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 
 ## Data Storage (UI-relevant)
 
