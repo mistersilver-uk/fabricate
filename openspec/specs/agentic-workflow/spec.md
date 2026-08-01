@@ -286,6 +286,7 @@ An escalated lane proven clean at its assigned base with zero commits MAY be dis
 - **AND** the driver serializes dependency installation, complete tests, build, complete lint and format, Foundry or Docker smoke, and screenshot generation
 - **AND** the driver runs required final gates from the fully integrated coordinator branch
 - **AND** CI creates no agent worktrees and runs the repository's unchanged gates against the pushed integrated commit
+- **AND** CI MAY additionally PRODUCE screenshot evidence for the pull request under the UI PR screenshot evidence requirement, which is authoring rather than gate-running, and is therefore stated here explicitly rather than read into "unchanged gates"
 
 #### Scenario: recovering interrupted or stale Foundry smoke
 
@@ -302,7 +303,8 @@ An escalated lane proven clean at its assigned base with zero commits MAY be dis
 - **THEN** the container identity (name, hostname, compose project, host port) is derived deterministically from the worktree root, so it is stable within a worktree yet distinct across worktrees and concurrent worktrees do not collide on the fixed name
 - **AND** the derivation preserves the container-reuse cache and the hostname-bound cached license within a worktree
 - **AND** — CONDITIONAL on the licensing probe passing and the prebaked world existing — the capture may be sharded across containers within a run, with the merged frame set required to equal the single-container scoped set
-- **AND** the evidence producer is unchanged: still real-Foundry scoped capture, never a Foundry-free render
+- **AND** sharding does not change this scenario's producer: it remains real-Foundry scoped capture
+- **AND** a Foundry-free renderer MAY produce evidence only under the Harvested Foundry window chrome requirement, and never by approximating chrome it has not harvested
 
 #### Scenario: cleaning integrated lanes
 
@@ -493,16 +495,50 @@ Agents planning or implementing Manager feature routes MUST account for placehol
 - **THEN** route/component code may prefer explicit `value` plus `oninput`/`onchange` handlers for controls under test
 - **AND** tests should dispatch the event that the component actually handles before asserting state
 
+### Requirement: Harvested Foundry window chrome
+
+A Foundry-free renderer that claims window fidelity MUST draw chrome harvested from the operator's own licensed Foundry installation.
+It MUST fail closed when that material is absent rather than substituting an approximation, MUST NOT commit, publish, or download it, and MUST record which Foundry build its frames were drawn with.
+
+#### Scenario: chrome is unavailable
+
+- **WHEN** a capture is requested and no harvested chrome is present
+- **THEN** the capture aborts, naming the sources it searched and the commands that would provide them
+- **AND** it emits no frame, because a frame drawn without the real cascade is worse than no frame — it looks authoritative
+
+#### Scenario: harvested material is never redistributed
+
+- **WHEN** chrome is harvested
+- **THEN** the harvested files are ignored by version control and no harvested file is tracked anywhere in the repository
+- **AND** the committed record carries provenance only — the Foundry version, the source archive identity, and digests — never file contents
+- **AND** captured screenshots remain publishable evidence; the restriction is on redistributing Foundry's own assets, not on the frames drawn with them
+
+#### Scenario: window geometry
+
+- **WHEN** a window is captured
+- **THEN** it is rendered at its application's declared position, and the applied geometry is asserted to equal the declared geometry
+- **AND** a capture whose geometry was clamped fails rather than publishing a wrong-sized frame
+
+#### Scenario: the chrome source changes
+
+- **WHEN** the harvested Foundry build differs from the one the frame builder was transcribed against
+- **THEN** the mismatch is reported as a failure that names the recorded and actual builds, so the transcription is re-verified rather than silently drifting
+
 ### Requirement: UI PR screenshot evidence
 
-Pull requests that change UI files MUST include smoke-run screenshot evidence for the relevant changed views before the PR is opened or updated.
+Pull requests that change UI files MUST include screenshot evidence for the relevant changed views before the PR is opened or updated.
+Evidence MUST depict the changed view as a full application window.
 Every collected automated view MUST prove successful, non-degraded, exact-run provenance.
 
 #### Scenario: UI files changed
 
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
-- **THEN** the agent runs the Foundry smoke harness locally with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which captures the changed-file-affected views as full real-Foundry app windows, and collects the relevant smoke screenshots for the changed views
+- **THEN** the affected views are selected from the canonical view-case registry, and each is captured as a full application window at the application's declared `DEFAULT_OPTIONS.position`
+- **AND** a view the registry covers IS captured by the Foundry-free renderer, which is the DEFAULT producer: it renders the real application root over production `styles/fabricate.css` at its production cascade layer, inside harvested Foundry window chrome
+- **AND** a view the registry does not cover is captured by the Foundry smoke harness with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which is the fallback producer rather than the routine one
+- **AND** an agent does not run the smoke to produce evidence for a view the registry already covers: the smoke's `screenshots` profile costs roughly thirty seconds per frame against the renderer's five, needs Docker and a licensed Foundry container, and cannot run on a GitHub Actions runner at all, so it produces nothing per-PR and blocks on the maintainer's machine
 - **AND** the reduced `rc`/`ci` smoke stays the CI/release gate and the `full` profile remains the occasional outer-loop visual-regression suite; the `full` profile is not run on a GitHub Actions runner
+- **AND** the live-Foundry smoke remains the fidelity authority: where a Foundry-free frame and a smoke frame of the same view disagree, the smoke frame is correct and the renderer is defective
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence
 - **AND** `npm run screenshots:ui:publish -- --pr <number>` uploads the collected screenshots to S3 (`pr-screenshots/<number>/`) and embeds the returned `![pr-<number> ...]` markdown into a managed block in the PR body
 - **AND** the agent cleans `tmp/pr-screenshots/<number>/` immediately after the evidence is added to the PR
@@ -517,6 +553,33 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **AND** requested target labels include the view and the PNG is bound to its capture record
 - **AND** manifest-declared dimensions equal decoded PNG dimensions
 - **AND** view-specific parity, stress-frame, or dimension constraints remain additive and may be stricter than the generic provenance check
+
+#### Scenario: reaching a named view state
+
+- **WHEN** a captured view requires the application to be on a particular internal route or selection
+- **THEN** the case declares the state it expects and the capture asserts the application reached it before the frame is taken
+- **AND** a case whose navigation resolves to a different state fails rather than publishing the frame it reached
+
+#### Scenario: evidence is produced without a local run
+
+- **WHEN** a PR changes render files and the change is able to run the automated producer
+- **THEN** the affected cases are selected from the changed-file set, rendered, and published into the PR's managed screenshot block without a maintainer running anything locally
+- **AND** the automated producer is an accelerator, not an additional gate: a change that cannot run it (for want of the credentials or the write access the producer needs) falls back to the existing evidence path and is not failed for producing nothing
+- **AND** a selection that resolves to no case announces that outcome explicitly, and is never reported the same way as a run that rendered frames
+- **AND** a producer that selected cases but rendered none fails, because a run that publishes nothing is indistinguishable from success to every downstream check
+
+#### Scenario: a changed render file claims no case
+
+- **WHEN** a render file inside a captured window is claimed by no case's selection patterns
+- **THEN** the omission fails at authoring time rather than at capture time
+- **AND** the reason this is gated is that an unclaimed path does not produce NO evidence — selection falls back — it produces UNRELATED evidence, a frame of a different window offered as proof of a change it does not contain
+- **AND** a path deliberately left unclaimed carries a recorded reason, and that record is itself gated so it cannot outlive the thing it exempts
+
+#### Scenario: the producer's own inputs change
+
+- **WHEN** a PR changes the fixture world, the mounting page, or the case registry the producer renders from
+- **THEN** every publishable case is selected, because a change to a shared fixture can alter every frame at once
+- **AND** this holds even though none of those paths is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the whole corpus
 
 #### Scenario: screenshot capture is blocked
 
@@ -536,6 +599,24 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **WHEN** smoke fixture data needs item, environment, event, or placeholder imagery
 - **THEN** it uses Foundry VTT core or dnd5e non-SVG raster icon paths directly
 - **AND** it does not invent custom SVG preview art for smoke screenshots
+
+### Requirement: View-case reach declaration
+
+Every case in the canonical view-case registry MUST declare how far it actually gets: whether it lands on its live-smoke counterpart's own condition, reaches only the application window that counterpart shows, or covers a condition the smoke never walks.
+A case of the third kind MUST carry no smoke pairing, because there is nothing to compare it against.
+An approximate case that does not declare itself approximate is worse than no case, because a reviewer cannot tell which frames are evidence and which are gestures.
+
+#### Scenario: a case falls short of its counterpart
+
+- **WHEN** a case reaches the right application window but not the specific condition its counterpart shows
+- **THEN** it declares that, and its shortfall is accounted for by an entry in the standing known-gaps register
+- **AND** the register records shortfalls by CLASS rather than per case, so that one entry covers every case blocked by the same cause and the record stays worth reading
+
+#### Scenario: a condition cannot be reached by the renderer at all
+
+- **WHEN** a condition depends on behaviour the Foundry-free renderer does not have, such as a native Foundry dialog or a Foundry-side service call
+- **THEN** the case stays declared as falling short and the limitation is recorded in the register
+- **AND** the renderer does not substitute a facsimile of the missing behaviour, because a frame depicting UI the product never draws is evidence of something that does not exist
 
 ### Requirement: Provider-specific skill metadata
 

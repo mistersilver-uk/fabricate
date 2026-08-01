@@ -32,7 +32,7 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 - `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md` — the mandatory reference matrix, reuse-inventory, provenance, and maintainer-manual-evidence procedure for non-trivial UI work
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
-- embedded screenshot images in the PR description (S3-hosted, from `npm run screenshots:ui:publish`) and smoke screenshots when no live dev session is available
+- embedded screenshot images in the PR description (S3-hosted; the View Lab capture job publishes these on every push), View Lab frames you render yourself, and smoke screenshots for views outside the case registry
 
 ## Workflow
 
@@ -41,10 +41,13 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 3. Inspect the current Svelte components, stores, styles, and localized strings.
 4. For non-trivial UI work, open every supplied prototype, screenshot, defect matrix, named sibling, and CSS record, then complete the per-control/state reference matrix and `Reference surfaces / reuse inventory` before approval.
 5. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
-6. If no live dev session is available, check the PR body/comments/artifacts for recent smoke evidence before trying to generate fresh screenshots.
-7. Ask the workflow driver for container-backed Foundry validation when UI PR screenshot evidence must be created from real smoke artifacts, then inspect the returned evidence.
-8. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main` and ask the workflow driver to run the authoritative smoke, collection, publication, and cleanup commands from the integrated coordinator branch.
-Review the resulting `npm run test:foundry` output and the S3-hosted images embedded by `npm run screenshots:ui:publish`.
+6. If no live dev session is available, generate fresh frames yourself with the **View Lab** — it is the default producer and needs no container, no driver hand-off, and no Docker: `node scripts/view-lab-screenshots.mjs apps <comma-separated-case-ids>` writes PNGs into `ui-screenshot-artifact/apps/` in seconds (one case ~22s, five ~36s), and `ui-screenshot-artifact/apps/index.html` browses them grouped by screen with a multi-tag filter.
+Pick the case ids from `scripts/lib/viewLabCases.js`; an unknown id aborts immediately naming it.
+The lab needs harvested chrome (`npm run viewlab:chrome:harvest`, one-off) and fails closed without it rather than approximating.
+7. Ask the workflow driver for container-backed Foundry validation ONLY when the view is outside the case registry, or when the question is about real Foundry runtime behaviour the lab does not model — not to re-photograph a view the registry covers.
+The smoke's `screenshots` profile costs ~31s per frame against the lab's ~5s, cannot run on a GitHub Actions runner, and serialises on one machine, so asking for it by default stalls the lane for half an hour to produce what the lab produces in seconds.
+8. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main` against the frames CI published into the PR body — the View Lab capture job renders and publishes the changed-file-affected cases on every push, so evidence usually already exists before you ask for any.
+Ask the driver for collection, publication and cleanup only for views the lab does not cover.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label.
 An issue-specific maintainer instruction may replace the producer, but visual approval stays pending until qualifying evidence is embedded and inspected, and the instruction does not waive the gate.
 9. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.

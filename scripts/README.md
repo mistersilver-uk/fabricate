@@ -151,7 +151,8 @@ Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dra
 The smoke test uses `page.evaluate()` to interact with Foundry APIs.
 Key patterns for V13:
 
-- **Document types are Sets:** `Array.from(game.documentTypes.Item)` before `.includes()`
+- **Document types are arrays, not Sets:** `game.documentTypes.Item` comes from `Object.keys(types)` in `Game#setupPackages` (V13.351), so `.includes()` works directly.
+  The defensive `Array.from()` in this harness is harmless and stays; the note that called it a `Set` was wrong.
 - **Tab switching:** `actor.sheet.changeTab('inventory', 'primary')` — DOM clicks on `[data-tab]` don't trigger Foundry's tab management
 - **Embedded item source tracking:** Set `flags: { core: { sourceId: worldItem.uuid } }` on embedded copies so the crafting engine can match them to registered components
 - **Admin store initialization:** Pre-set `lastManagedCraftingSystem` setting before opening the Recipe Manager to ensure the correct system is selected
@@ -243,3 +244,86 @@ files` line `compare-svelte-render.mjs` prints, so two runs can be diffed withou
 The bar is zero: fix the code rather than suppressing the warning, or suppress it at its site with a
 `<!-- svelte-ignore <code> -->` comment and a stated reason.
 There is deliberately no allowlist.
+
+## View Lab window chrome
+
+`scripts/view-lab-screenshots.mjs` renders whole Fabricate application windows in Chromium with no
+Foundry, no Docker, and no world, and writes one PNG per registry case into
+`ui-screenshot-artifact/apps/`.
+The chrome those windows wear is Foundry's own, harvested from the release archive
+`npm run test:foundry:up` already caches.
+
+```sh
+npm run viewlab:chrome:harvest     # extract chrome + core art into the gitignored .foundry-chrome/
+npm run viewlab:chrome:status      # what is cached, and whether it is intact
+node scripts/view-lab-screenshots.mjs apps            # every case
+node scripts/view-lab-screenshots.mjs apps <id,id>    # a subset
+node scripts/view-lab-screenshots.mjs apps --clean    # wipe ui-screenshot-artifact/apps/ first
+npm run viewlab:index              # regenerate the index without a capture
+```
+
+Nothing harvested is ever committed.
+`tests/view-lab-chrome-license.test.js` enforces that against the whole tracked tree and never skips.
+Captured PNGs are ordinary evidence and stay publishable.
+The restriction is on redistributing Foundry's assets, not on frames drawn with them.
+
+A capture accumulates rather than replacing the directory.
+Each frame's manifest entry records the head sha it was drawn at, and a rerun merges into the
+existing manifest instead of wiping it.
+Pass `--clean` to force a full reset instead.
+
+Every capture writes `ui-screenshot-artifact/apps/index.html` when it finishes, a self-contained
+evidence index grouped by application and area with a multi-tag filter.
+`npm run viewlab:index` regenerates it on its own from whatever manifest and PNGs are already on
+disk, without capturing anything.
+It shows the lab's own frames only.
+Smoke labels are deliberately not shown, because this page is the lab's evidence, not a comparison
+against the smoke.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+## What a case claims
+
+Every entry in `scripts/lib/viewLabCases.js` declares `reaches`, which is the registry's honesty
+field — an approximate case that does not say it is approximate is worse than no case at all.
+
+| `reaches` | Meaning | `smokeLabels` |
+|---|---|---|
+| `exact` | The frame lands on the smoke counterpart's own condition. Directly comparable. | one or more |
+| `window` | The frame reaches the right application window but not that counterpart's condition — known remaining work, accounted for by the register below. | one or more |
+| `beyond` | A condition the live smoke never walks, so there is no counterpart to fall short of. | empty, always |
+
+`beyond` exists because the smoke is not a coverage ceiling worth inheriting: it visits one crafting
+system per window, so two of the three visibility modes, both routed recipe resolution modes, and
+Foundry's light application theme appear in no frame it produces.
+The lab carries a fixture system per canonical **recipe** resolution mode (`simple`,
+`routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`) precisely so those paths can be
+photographed.
+Salvage has its own separate mode enum and is not covered by that claim — see the register below.
+
+A `window`-reach case does not carry its own written excuse.
+Near-identical case comments would rot, so the shortfalls are recorded once per **class** in the
+known-gaps register below, which is where a reviewer can actually find them.
+There are 133 `exact` cases, 4 `window`, and 13 `beyond`, out of 150 total.
+
+## Fidelity gap
+
+A green View Lab render is trustworthy for the window, its cascade, its typography, and its content.
+It is NOT the fidelity authority — the live smoke is.
+Where the two disagree about the same view, the smoke is right.
+
+| Gap | Why it exists |
+|---|---|
+| No canvas backdrop, sidebar, scene-control rails, or chat bar | The lab draws one application, not the Foundry desktop around it. |
+| No tooltips, context menus, ProseMirror, drag-and-drop, resize, or minimize | A confirm or prompt dialog is the one exception to "no live Foundry JS". See the row below. |
+| No system stylesheet | `dnd5e.css` (production: `layer(system)`) is not loaded. Low risk today — every dnd5e `.application` rule is scoped under `.dnd5e2`/`.sheet` — but re-verify on a dnd5e major. |
+| No other modules | A real world loads other modules at `layer(modules)` alongside `fabricate.css`. |
+| Fixture world, not the smoke world | Six crafting systems rather than ten, with different names and counts. Structure matches. Content does not. |
+| Salvage resolution mode | Progressive and both Simple salvage bodies are covered on the player side (`player-salvage`, `player-salvage-no-check`). Routed salvage's working body is covered only on the manager authoring side (`manager-component-edit-salvage`). No player case reaches a working routed panel yet, and `player-salvage-misconfigured` reaches routed's misconfigured reason instead of the smoke counterpart's Simple-mode one. Recipe resolution modes are all five covered on the player side. The two enums are separate. |
+| A confirm or prompt dialog is real; one import path still is not | `DialogV2.confirm` and `.prompt`, transcribed from the harvested `client/applications/api/dialog.mjs`, let a case leave the dialog open (`query: { dialog: 'open' }`), press its default button (`'enter'`, the lab default), or press a named button action. This is what moved the multistep-disable confirmation, the player crafting run/roll cases, and `manager-import-report` — which uploads a real export envelope and drives the import end to end — to `exact`. `input` and `query` are not wired. `manager-import-folder-mapping` remains out of reach: its modal opens only from a drag-and-drop carrying a folder or compendium-pack payload, and the runner has no `drop` verb. |
+| Operations needing real Foundry documents | `game.fabricate` is the REAL runtime facade (`labWorld.js` installs it after `initialize()`), so service calls through it do run — that is how the import case reaches its report. What is not drivable is anything needing document or compendium behaviour past what the shim models: `Item` supports creation and uuid resolution, not the full document API. Those END states are fixture-able; the operations are not. |
+| Legacy set-level essence requirements | `RecipeManager.initialize()` migrates a stored `ingredientSet.essences` map into a first-class essence group, so the pre-migration shape cannot be reached from settings-seeded data at all. The smoke escapes it only because it authors that recipe through `createRecipe` after init. |
+| The un-stacked narrow band at 1024px | `player-crafting-progressive-stacked` cannot reach its smoke counterpart's stacked three-column layout. The counterpart shrinks past production's own `.fabricate-app { min-width: 1024px }` floor, and the lab's geometry assertion will not let a capture violate its declared box. At 1024 the grid does not stack and its stage rows overflow. That is a real product finding the live smoke never renders at that width, published as evidence of the finding rather than claimed as the counterpart's own state. |
+| Chrome is one Foundry build | Frames carry the harvested version in their manifest; a reviewer on a newer Foundry may see small differences. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->

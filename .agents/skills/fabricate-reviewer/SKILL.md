@@ -40,7 +40,9 @@ A clean, well-tested implementation of the wrong thing still fails review.
 6. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
 7. Check test quality and whether coverage matches the risk.
 8. Verify Foundry compatibility assumptions for touched APIs.
-9. For UI changes, verify generated screenshots are present for the changed views as embedded screenshot images in the PR `Screenshots (if applicable)` section (S3-hosted, produced by `npm run screenshots:ui:publish`), and evaluated against acceptance criteria rather than merely attached.
+9. For UI changes, verify generated screenshots are present for the changed views as embedded screenshot images in the PR `Screenshots (if applicable)` section (S3-hosted; the View Lab `capture` job publishes these on every push, and the smoke's `npm run screenshots:ui:publish` for views outside the case registry), and evaluated against acceptance criteria rather than merely attached.
+If a frame you need is missing, check whether a case covers that state (`scripts/lib/viewLabCases.js`) before asking for a smoke run: rendering one is `node scripts/view-lab-screenshots.mjs apps <case-id>` and takes seconds, whereas the smoke costs ~26 minutes and cannot run in CI.
+A state no case covers is a finding in itself — the change published a frame of something other than what it altered.
 For non-trivial UI changes, verify the plan's reference/reuse inventory covers every supplied artifact and assigns authority per control/state, then compare the evidence against that matrix and the named shipped primitives.
 When an issue-specific maintainer instruction replaced automated production, keep visual approval pending until qualifying maintainer evidence is embedded; the instruction alone does not waive `check-screenshots`.
 10. Reconcile the canonical-spec changes against the plan: compare the `openspec/specs/` portion of the diff against the issue delta's `### Spec Deltas`.
