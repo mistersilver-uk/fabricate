@@ -712,14 +712,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-multistep-disable-confirm',
     label: 'Manager — Multistep disable confirm',
     smokeLabels: ['manager-multistep-disable-confirm'],
-    reaches: 'window',
-    query: {},
+    reaches: 'exact',
+    // `dialog: 'open'` leaves Foundry's own DialogV2 standing and unresolved, which is the whole
+    // point of this frame: the confirmation itself is the state, not what follows it. Reachable
+    // only since the dialog was transcribed from the harvested `client/applications/api/dialog.mjs`
+    // — before that, `confirmDialog` returned false unconditionally and the toggle silently no-oped.
+    query: { dialog: 'open' },
     steps: [
-      'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
-      { selector: '#recipe-tab-overview' },
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '.manager-feature-tile[data-feature-key="multiStepRecipes"] button' },
     ],
-    expectView: 'recipe-edit',
+    expectView: 'system-edit',
     kinds: ['manager', 'recipes', 'window-only'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -1336,13 +1340,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-gathering-travel-normal',
     label: 'Manager — Gathering travel normal',
     smokeLabels: ['manager-gathering-travel-normal'],
-    // Still `window`, and the steps below are why it is now honestly so: the case lands on the
-    // real Travel and parties surface (parties/realms/map-region tabs, a party row, the selected-
-    // party inspector) instead of the environments browser it used to capture. What it cannot yet
-    // match is the smoke's POPULATED party: `labWorld.js` seeds `memberActorIds` and no
-    // `travelActorUuid`, while `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and
-    // refuses to enable a party without a travel actor — so the card renders "Disabled, 0
-    // members". That seed is a one-line fix in `tests/view-lab/world/labWorld.js`.
+    // Lands on the real Travel and parties surface — the parties/realms/map-region tabs, an
+    // ENABLED party with its three members, and the selected-party inspector — rather than the
+    // environments browser this used to capture. The seed that blocked it is fixed: it authored
+    // `memberActorIds` where `GatheringPartyStore._normalizeParty` reads `memberActorUuids`, so
+    // every field normalised away and the card read "Disabled, 0 members".
     reaches: 'exact',
     // SMITHING, not herbalism. The Travel subitem exists only while the owning system's
     // `gatheringRealmSettings.enabled` is true, and switching that on for herbalism would
