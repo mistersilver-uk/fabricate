@@ -59,7 +59,9 @@ export function escapeHtml(value) {
  */
 export function tagsFor(viewCase) {
   if (!viewCase) return ['unregistered'];
-  return [...new Set([...(viewCase.kinds ?? []), viewCase.reaches].filter(Boolean))].sort();
+  return [...new Set([...(viewCase.kinds ?? []), viewCase.reaches].filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right)
+  );
 }
 
 /**
