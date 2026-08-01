@@ -160,7 +160,7 @@ test('every interaction step names text that exists in the manager UI', () => {
   const haystack = [...sources.values()].join('\n');
 
   const missing = [];
-  const VERBS = ['select', 'fill', 'scroll'];
+  const VERBS = ['select', 'fill', 'scroll', 'upload'];
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step === 'string') {

@@ -47,8 +47,16 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
       id: 'lab-party',
       name: 'The Ashfall Company',
       craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
-      memberActorIds: actors.map((actor) => actor.id),
-      travelActorUuid: null,
+      // `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and `enabled`, and it takes
+      // UUIDs rather than ids. This was authored as `memberActorIds` with bare ids and
+      // `travelActorUuid: null`, so every field normalised away and the Travel tab rendered
+      // "Disabled · 0 members" — the ninth instance of the same defect class on this branch: a
+      // shape production does not read, degrading to a default that looks like a rendered state.
+      enabled: true,
+      memberActorUuids: actors.map((actor) => actor.uuid),
+      // A party cannot enable without one. The mule carries the load, which is also why he holds
+      // the multi-source stock the crafting frames draw from.
+      travelActorUuid: actors[2]?.uuid ?? actors[0].uuid,
     },
   ]);
   // Selection preferences, so the player app opens on a populated actor and system rather than on

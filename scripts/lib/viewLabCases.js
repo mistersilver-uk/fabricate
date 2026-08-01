@@ -1556,7 +1556,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `travelActorUuid`, while `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and
     // refuses to enable a party without a travel actor — so the card renders "Disabled, 0
     // members". That seed is a one-line fix in `tests/view-lab/world/labWorld.js`.
-    reaches: 'window',
+    reaches: 'exact',
     // SMITHING, not herbalism. The Travel subitem exists only while the owning system's
     // `gatheringRealmSettings.enabled` is true, and switching that on for herbalism would
     // realm-lock all three of its environments (every one names an included realm) and take the
@@ -1581,7 +1581,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     app: MANAGER,
     smokeLabels: ['manager-gathering-travel-stacked'],
     // `window` for the same reason as its normal-width twin above.
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
     expectView: 'environments',

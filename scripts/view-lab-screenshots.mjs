@@ -14,6 +14,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -114,6 +115,7 @@ async function startLabServer() {
  *   { selector, select: 'macro' } choose that option on a `<select>`
  *   { selector, fill: 'text' }    type into it, which is the only way to reach a dirty form
  *   { selector, scroll: true }    scroll it into view inside its own overflow container
+ *   { selector, upload: json }     choose a file on a native file input
  *
  * @param {import('playwright').Page} page The lab page.
  * @param {Array<string|object>} steps Ordered steps.
@@ -132,7 +134,7 @@ async function runSteps(page, steps, label) {
       }
       const target = element.first();
 
-      // Four verbs, because a click alone cannot reach every state the smoke photographs. The smoke
+      // Five verbs, because a click alone cannot reach every state the smoke photographs. The smoke
       // itself drives these surfaces with `selectOption` and `fill`; a click-only runner leaves those
       // states permanently out of reach no matter how many stable hooks exist, which is not a
       // fixture problem and cannot be solved by fixture work.
@@ -144,6 +146,17 @@ async function runSteps(page, steps, label) {
         // Typed input. The only route to a DIRTY form: `data-system-details-dirty` appears on an
         // `input` event, so no click reaches it.
         await target.fill(step.fill);
+      } else if ('upload' in step) {
+        // A native `<input type="file">`. `renderSystemImportDialog` returns null unless a file was
+        // actually chosen, so the import report is unreachable without this — and `fill` THROWS on a
+        // file input rather than degrading, which is why the case sat blocked rather than wrong.
+        //
+        // The payload is written to a temp file because Playwright's `setInputFiles` wants a path;
+        // it carries the case's own name so a failure names the case that produced it.
+        const payload = join(tmpdir(), `view-lab-${label}.json`);
+        writeFileSync(payload, step.upload);
+        await target.setInputFiles(payload);
+        rmSync(payload, { force: true });
       } else if (step.scroll) {
         // Element exists but sits below an inner panel's fold. `frame.screenshot()` on the outer
         // `.application` does NOT scroll nested overflow containers, so a card that never scrolled
