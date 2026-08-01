@@ -102,6 +102,7 @@ function renderButtons(buttons, localize) {
         style = {},
         type = FOUNDRY_DIALOG_SPEC.buttonDefaults.type,
         disabled,
+        tooltip,
       } = buttonOptions;
       const isDefault = FOUNDRY_DIALOG_SPEC.isDefaultButton(buttons, index);
       const button = document.createElement('button');
@@ -113,6 +114,14 @@ function renderButtons(buttons, localize) {
         else button.style.setProperty(key, value);
       }
       button.toggleAttribute('disabled', Boolean(disabled));
+      // V14 only, and between the two toggles rather than after them — attribute order is what
+      // ends up in the captured markup. No Fabricate dialog passes a tooltip today; it is
+      // transcribed anyway, because a partial transcription is the thing the drift gate exists to
+      // catch and the first caller to pass one would otherwise silently lose it.
+      if (tooltip) {
+        button.setAttribute('data-tooltip', '');
+        button.setAttribute('aria-label', localize(tooltip));
+      }
       button.toggleAttribute('autofocus', isDefault);
       if (icon) {
         const iconElement = document.createElement('i');
@@ -448,7 +457,7 @@ export function createLabDialogV2({ localize }) {
      * `DialogV2.prompt` — one button, defaulted, over the same `wait`.
      *
      * Transcribed from `dialog.mjs`'s own `static async prompt`, which unshifts a single
-     * `{action: 'ok', label: 'Confirm', icon: 'fa-solid fa-check', default: true}` before delegating
+     * `{action: 'ok', label: 'COMMON.Confirm', icon: 'fa-solid fa-check', default: true}` before delegating
      * to `wait` with the 400px factory position. The caller's `ok` overrides win, which is how
      * Fabricate's system import relabels it "Import".
      *

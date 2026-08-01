@@ -1,5 +1,5 @@
 /**
- * Harvest Foundry's real window chrome out of the maintainer's own licensed installation
+ * Harvest Foundry's real window chrome out of the maintainer's own licensed Foundry
  * (issue: full-window View Lab).
  *
  * The View Lab renders whole Fabricate application windows. Everything outside
@@ -9,8 +9,17 @@
  * closed), the lab reads the genuine article from the release archive that
  * `scripts/foundry-test-up.mjs` already caches under `.foundry-e2e/cache/`.
  *
- * LICENSING. Everything this module writes is proprietary to Foundry (and, for Font Awesome 6
- * Pro and Modesto Condensed, to third parties Foundry licenses from). It lands in the
+ * TWO SOURCES, ONE OF THEM AUTHORITATIVE. The default is the release archive
+ * `scripts/foundry-test-up.mjs` caches under `.foundry-e2e/cache/`, downloaded by the operator's own
+ * credentials. `--from-dir` reads an unpacked desktop installation instead, which renders
+ * identically and needs no Docker — but it may not WRITE provenance, because the two disagree byte
+ * for byte: the Windows installer ships `application.mjs` with CRLF where the release archive uses
+ * LF. Same code, different digest. A provenance record written from an install would pin a digest CI
+ * can never reproduce and would fail the drift gate on every later PR. See
+ * {@link assertProvenanceWritable}.
+ *
+ * LICENSING. Everything this module writes is proprietary to Foundry (and, for Font Awesome Pro
+ * and Modesto Condensed, to third parties Foundry licenses from). It lands in the
  * gitignored `.foundry-chrome/` and is NEVER committed, published, or downloaded on the user's
  * behalf. `tests/view-lab-chrome-license.test.js` is the enforcement.
  *
@@ -18,10 +27,22 @@
  * harness's assemble and `--clean` teardown paths can never reach it.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, posix, resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, join, posix, relative, resolve, sep } from 'node:path';
 
+import { FOUNDRY_CHROME_SPEC } from './foundryChromeSpec.js';
 import { listEntries, readEntries } from './zipRead.js';
+
+/** The Foundry major whose file layout the member lists below were written against. */
+const FOUNDRY_LAYOUT_MAJOR = FOUNDRY_CHROME_SPEC.coreMajor;
 
 export const CHROME_CACHE_DIRNAME = '.foundry-chrome';
 export const PROVENANCE_PATH = 'tests/view-lab/chrome-provenance.json';
@@ -177,6 +198,156 @@ function compareVersions(left, right) {
 }
 
 /**
+ * A place chrome can be read from. Both implementations answer the same four questions, so
+ * {@link harvestChrome} does not branch on where the bytes came from.
+ *
+ * @typedef {object} ChromeSource
+ * @property {string} version The Foundry build, `<major>.<build>`.
+ * @property {{kind: string, path: string, name: string, sha256: string|null}} descriptor
+ *   Recorded verbatim as the manifest's `source`.
+ * @property {(memberName: string) => boolean} has Whether a member exists.
+ * @property {(prefix: string) => string[]} listTree Member names under a prefix.
+ * @property {(wanted: Set<string>) => Map<string, Buffer>} readMany Read members, in one pass.
+ */
+
+/**
+ * Read chrome out of a Foundry release archive. This is the authoritative source: it is what CI
+ * harvests, so it is the only one whose digests may be recorded as provenance.
+ *
+ * @param {{path: string, version: string}} archive A discovered archive.
+ * @returns {ChromeSource}
+ */
+function openArchiveSource(archive) {
+  const names = new Set(listEntries(archive.path).map((entry) => entry.name));
+  // Memoized and LAZY. Digesting the archive means reading ~150 MB, and a source is opened before
+  // the "already harvested, nothing to do" check — so computing it eagerly would charge a second
+  // and a whole file read to every no-op harvest. Only the manifest needs it.
+  let archiveDigest;
+  return {
+    version: archive.version,
+    descriptor: {
+      kind: 'release-archive',
+      path: archive.path,
+      name: basename(archive.path),
+      get sha256() {
+        archiveDigest ??= sha256(readFileSync(archive.path));
+        return archiveDigest;
+      },
+    },
+    has: (memberName) => names.has(memberName),
+    listTree: (prefix) => [...names].filter((name) => name.startsWith(prefix)),
+    readMany: (wanted) => readEntries(archive.path, (name) => wanted.has(name)),
+  };
+}
+
+/** Recursively list files under a directory, as archive-style forward-slashed relative names. */
+function listFilesUnder(root, directory) {
+  if (!existsSync(directory)) return [];
+  const found = [];
+  const pending = [directory];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const absolute = join(current, entry.name);
+      if (entry.isDirectory()) pending.push(absolute);
+      else if (entry.isFile()) found.push(relative(root, absolute).split(sep).join('/'));
+    }
+  }
+  return found;
+}
+
+/**
+ * Read chrome out of an unpacked Foundry installation.
+ *
+ * Accepts either the application directory itself or an installation root containing
+ * `resources/app`, because "where Foundry is installed" means the latter to most people and the
+ * former to the harvest. The layout below that point mirrors the archive exactly, which is what lets
+ * {@link cachePathForMember} and the whole `url()` closure work unchanged.
+ *
+ * @param {string} fromDir Path given to `--from-dir`.
+ * @returns {ChromeSource}
+ */
+function openDirectorySource(fromDir) {
+  const candidates = [resolve(fromDir), resolve(fromDir, 'resources', 'app')];
+  const root = candidates.find((candidate) =>
+    existsSync(join(candidate, 'public', 'css', 'foundry2.css'))
+  );
+  if (!root) {
+    throw new Error(
+      `--from-dir ${fromDir} does not look like a Foundry installation: no ` +
+        'public/css/foundry2.css under it or under its resources/app. Point it at the directory ' +
+        'holding Foundry\'s "public" and "client" trees (on Windows, ' +
+        String.raw`"C:\Program Files\Foundry Virtual Tabletop\resources\app").`
+    );
+  }
+
+  const manifestPath = join(root, 'package.json');
+  if (!existsSync(manifestPath)) {
+    throw new Error(`${root} has no package.json, so its Foundry version cannot be determined`);
+  }
+  const release = JSON.parse(readFileSync(manifestPath, 'utf8')).release ?? {};
+  if (typeof release.generation !== 'number' || typeof release.build !== 'number') {
+    throw new TypeError(
+      `${manifestPath} does not carry a release.generation/release.build pair, so its Foundry ` +
+        'version cannot be determined'
+    );
+  }
+
+  return {
+    version: `${release.generation}.${release.build}`,
+    descriptor: {
+      kind: 'local-install',
+      path: root,
+      name: basename(root),
+      // Deliberately null. There is no single artefact to digest, and pretending otherwise would
+      // put a meaningless hash where a reviewer expects a verifiable one.
+      sha256: null,
+    },
+    has: (memberName) => {
+      const path = join(root, memberName);
+      return existsSync(path) && statSync(path).isFile();
+    },
+    listTree: (prefix) => listFilesUnder(root, join(root, prefix)),
+    readMany: (wanted) =>
+      new Map([...wanted].map((memberName) => [memberName, readFileSync(join(root, memberName))])),
+  };
+}
+
+/**
+ * Refuse to record provenance for a source whose bytes CI cannot reproduce.
+ *
+ * `tests/view-lab/chrome-provenance.json` is a human attestation that someone read Foundry's
+ * `application.mjs` and confirmed the frame builder still transcribes it, and the digests in it are
+ * checked on the CI runner that draws. CI harvests the release archive. A desktop installation is
+ * the same Foundry but not the same bytes — the Windows installer rewrites line endings — so
+ * committing an install-derived record would red the drift gate forever, on every later PR, for a
+ * reason nothing in the failure message would explain.
+ *
+ * @param {{manifest: {source: {kind: string}, foundryVersion: string}}} cache A harvested cache.
+ * @throws {Error} When the cache was not harvested from a release archive.
+ */
+export function assertProvenanceWritable(cache) {
+  const { kind } = cache.manifest.source;
+  if (kind === 'release-archive') return;
+  throw new Error(
+    [
+      `refusing to write ${PROVENANCE_PATH} from a ${kind} harvest.`,
+      '',
+      'Provenance digests are verified on the CI runner, which harvests the release archive.',
+      "A desktop installation is the same Foundry but not the same bytes (Windows' installer",
+      'rewrites line endings), so a record written from one pins digests CI can never reproduce',
+      'and fails the frame-builder drift gate on every later pull request.',
+      '',
+      `Harvest from the archive instead, then re-run with --write-provenance:`,
+      '  npm run test:foundry:up      # caches .foundry-e2e/cache/foundryvtt-<version>.zip',
+      '  npm run viewlab:chrome:harvest -- --force --write-provenance',
+      '',
+      '--from-dir remains fine for rendering: the frames it draws are identical.',
+    ].join('\n')
+  );
+}
+
+/**
  * Locate an already-harvested cache.
  *
  * @param {string} repoRoot Absolute repository root.
@@ -243,10 +414,10 @@ export function missingChromeMessage(repoRoot) {
   return [
     'Fabricate View Lab: no harvested Foundry window chrome found.',
     '',
-    'The View Lab draws real Foundry V13 window chrome - foundry2.css, Signika,',
-    'Modesto Condensed, Font Awesome 6 Pro - harvested from YOUR OWN licensed Foundry',
-    'installation. Those files are proprietary. This repository never commits them,',
-    'never publishes them, and never downloads them for you.',
+    'The View Lab draws real Foundry window chrome - foundry2.css, Signika, Modesto',
+    'Condensed, Font Awesome Pro. Those files are proprietary to Foundry and its',
+    'licensors. This repository never commits them, never publishes them, and never',
+    'downloads them for you: every source below is Foundry you already licensed.',
     '',
     'Looked for, in order:',
     `  1. harvested cache    ${CHROME_CACHE_DIRNAME}/<version>/                    (missing)`,
@@ -254,65 +425,88 @@ export function missingChromeMessage(repoRoot) {
     '',
     'Do ONE of:',
     '  npm run test:foundry:up',
-    '      # populates .foundry-e2e/cache/foundryvtt-<version>.zip, then re-run',
-    '  npm run viewlab:chrome:harvest',
+    '      # your credentials download the release archive into .foundry-e2e/cache/,',
+    '      # then: npm run viewlab:chrome:harvest',
+    '  npm run viewlab:chrome:harvest -- --from-dir "<your Foundry installation>"',
+    '      # reads an unpacked desktop install instead - no Docker, no credentials.',
+    '      # Renders identically, but cannot record provenance: an install and the',
+    '      # release archive hold the same code with different line endings, so their',
+    '      # digests differ and CI could never reproduce an install-derived record.',
     '',
     'Detail: scripts/README.md, "View Lab window chrome".',
   ].join('\n');
 }
 
 /**
- * Harvest the chrome from a release archive.
+ * Harvest the chrome from a release archive or an unpacked installation.
  *
  * @param {object} options Harvest options.
  * @param {string} options.repoRoot Absolute repository root.
  * @param {string} [options.archivePath] Explicit archive; discovered when omitted.
+ * @param {string} [options.fromDir] An unpacked Foundry installation, instead of an archive.
  * @param {boolean} [options.force] Re-harvest even when the cache verifies.
  * @param {(message: string) => void} [options.log] Progress sink.
  * @returns {{dir: string, version: string, manifest: object, reused: boolean}}
  */
-export function harvestChrome({ repoRoot, archivePath, force = false, log = () => {} }) {
-  const archive = archivePath
-    ? {
-        path: archivePath,
-        version: ARCHIVE_NAME_PATTERN.exec(archivePath.split(/[\\/]/).pop())?.[1] ?? 'unknown',
-      }
-    : discoverArchive(repoRoot);
-  if (!archive) throw new Error(missingChromeMessage(repoRoot));
+export function harvestChrome({ repoRoot, archivePath, fromDir, force = false, log = () => {} }) {
+  let source;
+  if (fromDir) {
+    source = openDirectorySource(fromDir);
+  } else {
+    const archive = archivePath
+      ? {
+          path: archivePath,
+          version: ARCHIVE_NAME_PATTERN.exec(basename(archivePath))?.[1] ?? 'unknown',
+        }
+      : discoverArchive(repoRoot);
+    if (!archive) throw new Error(missingChromeMessage(repoRoot));
+    source = openArchiveSource(archive);
+  }
 
-  const existing = resolveChromeCache(repoRoot, archive.version);
+  const existing = resolveChromeCache(repoRoot, source.version);
   if (existing && !force && verifyChromeCache(existing).ok) {
     log(`chrome cache already harvested: ${CHROME_CACHE_DIRNAME}/${existing.version}`);
     return { ...existing, reused: true };
   }
 
-  log(`harvesting Foundry ${archive.version} chrome from ${archive.path}`);
-  const archiveSha = sha256(readFileSync(archive.path));
+  log(`harvesting Foundry ${source.version} chrome from ${source.descriptor.path}`);
 
-  const memberNames = new Set(listEntries(archive.path).map((entry) => entry.name));
   for (const required of [...ENTRY_STYLESHEETS, ...EXTRA_MEMBERS]) {
-    if (!memberNames.has(required)) {
+    if (!source.has(required)) {
       throw new Error(
-        `Foundry ${archive.version} does not contain ${required}. ` +
-          'The View Lab chrome harvest is pinned to the Foundry V13 layout; a newer major ' +
-          'may have moved it. Update ENTRY_STYLESHEETS/EXTRA_MEMBERS and re-verify the frame builder.'
+        `Foundry ${source.version} does not contain ${required}. ` +
+          `The View Lab chrome harvest is written against the Foundry ${FOUNDRY_LAYOUT_MAJOR} ` +
+          'layout; a newer major may have moved it. Update ENTRY_STYLESHEETS/EXTRA_MEMBERS and ' +
+          're-verify the frame builder.'
       );
     }
   }
 
-  const sheets = readEntries(archive.path, (name) => ENTRY_STYLESHEETS.includes(name));
-  const { assets: closure, skipped } = computeStyleClosure(sheets);
-  for (const member of closure) {
-    if (!memberNames.has(member)) {
-      throw new Error(`stylesheet references ${member}, which is not in the archive`);
-    }
+  const sheets = source.readMany(new Set(ENTRY_STYLESHEETS));
+  const { assets: referenced, skipped } = computeStyleClosure(sheets);
+  // A `url()` target Foundry ships a rule for but no file for is RECORDED, not fatal. Foundry 14's
+  // Font Awesome 7 does exactly this: `all.min.css` still declares the `fa-v4compatibility`
+  // @font-face while the webfont itself is gone. A face is fetched only when a glyph needs it, and
+  // the renderer already fails any capture whose page issues a >=400 (see
+  // scripts/view-lab-screenshots.mjs) — so the harvest records what is missing and the renderer
+  // enforces it where it can actually tell. Throwing here instead would make a stale @font-face in
+  // a third-party stylesheet block every screenshot in the repository.
+  const closure = new Set([...referenced].filter((member) => source.has(member)));
+  const unresolvedReferences = [...referenced]
+    .filter((member) => !source.has(member))
+    .sort((left, right) => left.localeCompare(right));
+  if (unresolvedReferences.length > 0) {
+    log(
+      `note: ${unresolvedReferences.length} stylesheet url() reference(s) have no file in this ` +
+        `Foundry build and were skipped: ${unresolvedReferences.join(', ')}`
+    );
   }
 
   const wanted = new Set([...ENTRY_STYLESHEETS, ...EXTRA_MEMBERS, ...closure]);
-  const inTree = (name) => EXTRA_TREES.some((prefix) => name.startsWith(prefix));
-  const payload = readEntries(archive.path, (name) => wanted.has(name) || inTree(name));
+  const treeMembers = EXTRA_TREES.flatMap((prefix) => source.listTree(prefix));
+  const payload = source.readMany(new Set([...wanted, ...treeMembers]));
 
-  const dir = join(repoRoot, CHROME_CACHE_DIRNAME, archive.version);
+  const dir = join(repoRoot, CHROME_CACHE_DIRNAME, source.version);
   rmSync(dir, { recursive: true, force: true });
 
   const assets = [];
@@ -350,15 +544,11 @@ export function harvestChrome({ repoRoot, archivePath, force = false, log = () =
 
   const manifest = {
     schemaVersion: PROVENANCE_SCHEMA_VERSION,
-    foundryVersion: archive.version,
+    foundryVersion: source.version,
     harvestedAt: new Date().toISOString(),
-    source: {
-      kind: 'release-archive',
-      path: archive.path,
-      name: archive.path.split(/[\\/]/).pop(),
-      sha256: archiveSha,
-    },
+    source: source.descriptor,
     skippedRedundantFontFormats: skipped,
+    unresolvedReferences,
     assets,
     trees,
   };
@@ -366,9 +556,9 @@ export function harvestChrome({ repoRoot, archivePath, force = false, log = () =
   const treeFiles = trees.reduce((total, tree) => total + tree.files, 0);
   log(
     `harvested ${assets.length} chrome files + ${treeFiles} art files into ` +
-      `${CHROME_CACHE_DIRNAME}/${archive.version}`
+      `${CHROME_CACHE_DIRNAME}/${source.version}`
   );
-  return { dir, version: archive.version, manifest, reused: false };
+  return { dir, version: source.version, manifest, reused: false };
 }
 
 /**
@@ -397,6 +587,10 @@ export function buildProvenance(cache) {
       applicationMjsSha256: digestOf('client/applications/api/application.mjs'),
       dialogMjsSha256: digestOf('client/applications/api/dialog.mjs'),
     },
+    // Stylesheet `url()` targets this Foundry build declares but does not ship. Committed rather
+    // than left in the gitignored manifest so the harvest's tolerance is auditable in review: a
+    // silently-skipped reference is indistinguishable from a genuinely missing asset otherwise.
+    unresolvedReferences: [...(manifest.unresolvedReferences ?? [])],
     assets: manifest.assets.map((asset) => ({
       path: asset.path,
       bytes: asset.bytes,

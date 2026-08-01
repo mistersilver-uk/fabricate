@@ -2,7 +2,7 @@
 
 ## Project
 
-System-agnostic FoundryVTT crafting module targeting Foundry VTT V13.
+System-agnostic FoundryVTT crafting module supporting Foundry VTT V13 as a minimum and verified on V14 (see `module.json`); the smoke harness and the View Lab both run V14.365.
 Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Playwright, and Jekyll docs.
 
 ## Planning & Workflow
@@ -494,8 +494,8 @@ When renaming variables, refactoring markup, or removing i18n keys, grep these a
 
 - `game`, `ui`, `Hooks`, and `CONFIG` are runtime globals.
 Never import them.
-- The module targets Foundry V13.
-Account for V13 API shapes when touching Foundry-facing code.
+- The module declares `minimum: "13"` and `verified: "14"`, and the smoke harness boots the pinned V14.365.
+Account for both API shapes when touching Foundry-facing code, and treat a note below that cites a specific build as verified against that build rather than as a claim about every supported one.
 - V13 **animates token movement**: at the `updateToken` hook the document is already at the destination, but the placeable (`token.object.center`) and `TokenDocument#getCenterPoint()` still report the *animating* position — the spot the token just left.
 Any Scene Region containment / "where is this token" read at the hook is off-by-one if it uses the placeable.
 Read `TokenDocument#regions` (authoritative membership) or compute the centre from the document `x/y` + footprint, and defer until the move animation settles.

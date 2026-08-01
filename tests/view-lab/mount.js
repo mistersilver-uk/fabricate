@@ -233,6 +233,84 @@ async function settle(roots, services = null) {
 }
 
 /**
+ * The faces the chrome paints with, matched by PATTERN rather than by name.
+ *
+ * Foundry 14 moved Font Awesome from Pro 6 to Pro 7, which renames the CSS family from
+ * `Font Awesome 6 Pro` to `Font Awesome 7 Pro`. Nothing would have noticed: the stylesheet still
+ * returns 200, `document.fonts.ready` still resolves, and every `.fa-solid` element simply falls
+ * back to the default sans-serif — so the icons vanish and a blank-iconed PNG publishes as
+ * authoritative evidence. `await document.fonts.ready` is not a check; it resolves happily when
+ * zero faces loaded. So the family is discovered from the registered `@font-face` set (which keeps
+ * this from needing an edit on the next Font Awesome major) and then actually loaded.
+ */
+const REQUIRED_CHROME_FACES = [
+  {
+    // Foundry ships Pro; the header controls, the resize grip and every Fabricate icon are drawn
+    // with it. V14's stylesheet also declares `Font Awesome 5 Pro` as a back-compat alias, and
+    // either resolving proves the webfonts harvested.
+    family: /^Font Awesome \d+ Pro$/,
+    probes: ['900 1em', '400 1em'],
+    what: 'Font Awesome Pro — every icon in the chrome and in Fabricate',
+  },
+  {
+    // `--font-primary`. Only 400 and 700 are declared by `foundry2.css`.
+    family: /^Signika$/,
+    probes: ['400 1em', '700 1em'],
+    what: 'Signika — the body face of every window',
+  },
+  {
+    // `--font-h1`, which is what the window title is set in.
+    family: /^Modesto Condensed$/,
+    probes: ['1em'],
+    what: 'Modesto Condensed — the window title',
+  },
+];
+
+/**
+ * Fail the render when a face the chrome depends on did not load.
+ *
+ * Runs for chrome-only baselines too: the empty frame is precisely where a missing face is most
+ * visible and least excusable.
+ *
+ * @returns {Promise<void>}
+ * @throws {Error} Naming every missing family and probe, because "fonts did not load" is not
+ *   actionable and this is the one V14 breakage that is otherwise silent.
+ */
+async function assertChromeFontsLoaded() {
+  await document.fonts.ready;
+  const registered = [...document.fonts].map((face) => face.family.replaceAll('"', ''));
+  const problems = [];
+
+  for (const required of REQUIRED_CHROME_FACES) {
+    const family = registered.find((name) => required.family.test(name));
+    if (!family) {
+      problems.push(
+        `no @font-face family matching ${required.family} is registered (${required.what})`
+      );
+      continue;
+    }
+    for (const probe of required.probes) {
+      const specifier = `${probe} "${family}"`;
+      // `load()` is what pulls a lazily-fetched face; `check()` alone reports false for a face
+      // nothing has needed yet, which would fail every render rather than the broken ones.
+      await document.fonts.load(specifier).catch(() => {});
+      if (!document.fonts.check(specifier)) {
+        problems.push(`${specifier} did not load (${required.what})`);
+      }
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `view lab: harvested Foundry fonts are missing or renamed, so this frame would publish with ` +
+        `fallback glyphs:\n  ${problems.join('\n  ')}\n` +
+        `Registered families: ${[...new Set(registered)].sort().join(', ') || '(none)'}\n` +
+        'Re-harvest the chrome: npm run viewlab:chrome:harvest -- --force'
+    );
+  }
+}
+
+/**
  * The subtrees a settle pass has to watch: the application window, plus any dialog standing over it.
  *
  * @param {HTMLElement} frame The application frame.
@@ -266,6 +344,9 @@ async function boot() {
   // Geometry BEFORE content: a clamped frame is wrong no matter what is inside it, and failing
   // here keeps the error about the window rather than about whatever failed to render in it.
   assertWindowGeometry(built);
+  // Same reasoning for the faces. A frame drawn in fallback glyphs is wrong whatever it contains,
+  // and this is the one way the chrome can be wrong without anything else complaining.
+  await assertChromeFontsLoaded();
 
   let mounted = null;
   if (!params.chromeOnly) {

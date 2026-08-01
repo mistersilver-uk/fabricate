@@ -28,7 +28,13 @@
 
 services:
   foundry:
-    image: "${FOUNDRY_IMAGE:-felddy/foundryvtt:13}"
+    # Pinned to an EXACT build rather than the floating `:14`. Two reasons. The View Lab harvests
+    # its window chrome from whatever archive this image downloads, and
+    # `tests/view-lab/chrome-provenance.json` pins that version as a human attestation — a floating
+    # tag would let Foundry auto-upgrade into a red provenance gate on an unrelated PR. And the CI
+    # `foundry-binary-*` cache key hashes THIS FILE, so only an exact tag rotates the key when the
+    # build changes. Keep it in step with DEFAULT_FOUNDRY_IMAGE in scripts/foundry-test-up.mjs.
+    image: "${FOUNDRY_IMAGE:-felddy/foundryvtt:14.365}"
     # Per-worktree-stable identity (issue #827). foundry-test-up.mjs derives both from
     # the worktree root via scripts/lib/foundryRunIdentity.js so the name is unique
     # across worktrees (no more fixed-name collision + manual `docker rm -f`) yet stable

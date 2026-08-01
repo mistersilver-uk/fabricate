@@ -497,8 +497,9 @@ Agents planning or implementing Manager feature routes MUST account for placehol
 
 ### Requirement: Harvested Foundry window chrome
 
-A Foundry-free renderer that claims window fidelity MUST draw chrome harvested from the operator's own licensed Foundry installation.
+A Foundry-free renderer that claims window fidelity MUST draw chrome harvested from Foundry the operator already licenses, whether a release archive their own credentials fetched or an unpacked installation of theirs.
 It MUST fail closed when that material is absent rather than substituting an approximation, MUST NOT commit, publish, or download it, and MUST record which Foundry build its frames were drawn with.
+It MUST draw the same Foundry build that the live smoke boots, because the smoke is the fidelity authority and frames of different builds are not comparable.
 
 #### Scenario: chrome is unavailable
 
@@ -523,6 +524,23 @@ It MUST fail closed when that material is absent rather than substituting an app
 
 - **WHEN** the harvested Foundry build differs from the one the frame builder was transcribed against
 - **THEN** the mismatch is reported as a failure that names the recorded and actual builds, so the transcription is re-verified rather than silently drifting
+
+#### Scenario: the renderer and the smoke name different Foundry builds
+
+- **WHEN** the Foundry build recorded for the renderer's chrome differs from the build the live smoke is pinned to
+- **THEN** the mismatch fails a check that runs without any harvested material present, so a machine with no Foundry licence still catches it
+- **AND** the failure names both builds and the steps that re-harvest and re-attest
+
+#### Scenario: recording which build the frames were drawn with
+
+- **WHEN** the committed provenance record is written
+- **THEN** it is written only from the source the automated pipeline itself harvests, so its digests are reproducible there
+- **AND** a harvest from any other source is refused for that purpose, naming why, while remaining usable for rendering
+
+#### Scenario: the chrome depends on fonts that did not load
+
+- **WHEN** a window is captured and a face the chrome paints with is absent, renamed, or unloaded
+- **THEN** the capture fails naming the missing family, because a frame drawn in fallback glyphs looks deliberate and would publish as evidence
 
 ### Requirement: UI PR screenshot evidence
 
