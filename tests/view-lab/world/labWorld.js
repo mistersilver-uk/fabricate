@@ -109,6 +109,27 @@ export async function buildLabWorld({
   const fabricate = runtime.default;
   await fabricate.initialize();
   globalThis.game.fabricate = fabricate;
+
+  // The rest of `Hooks.once('ready')`, called directly.
+  //
+  // `initialize()` is not the whole startup. The ready body also matures world time and runs four
+  // flag auto-stamps, and those are what populate the tier-1 `roles` identity that `sourceUuid.js`
+  // resolves against FIRST — without them every tool and component fell through to the
+  // name-matching tier that production never reaches on a stamped world.
+  //
+  // Called individually rather than by dispatching the `ready` event, which was tried and reverted:
+  // the same body reaches `addModuleButtonsToItemsDirectory`, which injects into Foundry's Items
+  // sidebar and errors when it is absent. The lab has no sidebar by design, and satisfying it would
+  // mean drawing a facsimile of Foundry chrome. Naming the five functions gets the startup work
+  // without the sidebar integration the lab can never honestly satisfy.
+  //
+  // Order matches `src/main.js`: the tool stamp reads refs the component stamp and the migration
+  // runner write, and the owned-item restamp reads what the component stamp produced.
+  await runtime.processFabricateWorldTime();
+  await runtime.runRecipeItemFlagAutoStamp();
+  await runtime.runComponentFlagAutoStamp();
+  await runtime.runToolFlagAutoStamp();
+  await runtime.runOwnedItemComponentIdentityRestamp();
   world.fabricate = fabricate;
 
   if (!fabricate.craftingSystemManager?.initialized) {

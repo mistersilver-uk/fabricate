@@ -3357,4 +3357,29 @@ export const __test = {
   matchGatheringTools
 };
 
+/**
+ * The rest of the `ready` startup, exported so a Foundry-free host can run it.
+ *
+ * `initialize()` is not the whole of startup. The `ready` hook also matures world time and runs four
+ * flag auto-stamps, and those populate the tier-1 `roles` identity that `sourceUuid.js` resolves
+ * against before any name-matching fallback. A host that calls only `initialize()` gets a world
+ * where every tool and component resolves through a tier production never reaches.
+ *
+ * Exported as a BLOCK rather than by prefixing each declaration, deliberately: several tests assert
+ * against the literal source text of those functions, and moving the keyword onto the declaration
+ * line breaks those patterns for no behavioural gain.
+ *
+ * The View Lab calls these directly rather than dispatching `ready`, because the same hook body also
+ * injects a button into Foundry's Items sidebar, which a Foundry-free host cannot honestly provide.
+ * Call them in this order: the tool stamp reads refs the component stamp and the migration runner
+ * write, and the owned-item restamp reads what the component stamp produced.
+ */
+export {
+  processFabricateWorldTime,
+  runRecipeItemFlagAutoStamp,
+  runComponentFlagAutoStamp,
+  runToolFlagAutoStamp,
+  runOwnedItemComponentIdentityRestamp,
+};
+
 export default fabricate;
