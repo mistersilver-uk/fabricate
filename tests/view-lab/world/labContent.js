@@ -1505,11 +1505,11 @@ const GATHERING_TASKS = [
     enabled: true,
     craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
     img: `${ICON_BASE}/commodities/flowers/blooms-purple.webp`,
-    dropTable: [
-      { id: 'row-1', componentId: 'hb-moonleaf', quantity: 2, weight: 40 },
-      { id: 'row-2', componentId: 'hb-sunroot', quantity: 1, weight: 30 },
-      { id: 'row-3', componentId: 'hb-bitterbark', quantity: 1, weight: 20 },
-      { id: 'row-4', componentId: 'hb-emberbloom', quantity: 1, weight: 10 },
+    dropRows: [
+      { id: 'row-1', componentId: 'hb-moonleaf', quantity: 2, dropRate: 40, enabled: true },
+      { id: 'row-2', componentId: 'hb-sunroot', quantity: 1, dropRate: 30, enabled: true },
+      { id: 'row-3', componentId: 'hb-bitterbark', quantity: 1, dropRate: 20, enabled: true },
+      { id: 'row-4', componentId: 'hb-emberbloom', quantity: 1, dropRate: 10, enabled: true },
     ],
   },
   {
@@ -1519,10 +1519,10 @@ const GATHERING_TASKS = [
     enabled: true,
     craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
     img: `${ICON_BASE}/consumables/mushrooms/campanulate-bell-shiny-blue.webp`,
-    dropTable: [
-      { id: 'row-1', componentId: 'hb-frostcap', quantity: 2, weight: 55 },
-      { id: 'row-2', componentId: 'hb-moonleaf', quantity: 1, weight: 30 },
-      { id: 'row-3', componentId: 'hb-bitterbark', quantity: 2, weight: 15 },
+    dropRows: [
+      { id: 'row-1', componentId: 'hb-frostcap', quantity: 2, dropRate: 55, enabled: true },
+      { id: 'row-2', componentId: 'hb-moonleaf', quantity: 1, dropRate: 30, enabled: true },
+      { id: 'row-3', componentId: 'hb-bitterbark', quantity: 2, dropRate: 15, enabled: true },
     ],
   },
   {
@@ -1532,17 +1532,24 @@ const GATHERING_TASKS = [
     enabled: true,
     craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
     img: `${ICON_BASE}/consumables/potions/bottle-round-corked-blue.webp`,
-    dropTable: [
-      { id: 'row-1', componentId: 'hb-spring-water', quantity: 3, weight: 70 },
-      { id: 'row-2', componentId: 'hb-frostcap', quantity: 1, weight: 30 },
+    dropRows: [
+      { id: 'row-1', componentId: 'hb-spring-water', quantity: 3, dropRate: 70, enabled: true },
+      { id: 'row-2', componentId: 'hb-frostcap', quantity: 1, dropRate: 30, enabled: true },
     ],
   },
   // ── Attemptable tasks ────────────────────────────────────────────────────────────────────────
-  // The four tasks above browse correctly but cannot be ATTEMPTED: they carry the legacy
-  // `dropTable`/`weight` shape, and `validateTaskConfiguration` rejects a d100 task with no
-  // `dropRows` (verified live — the attempt returns `TASK_MISCONFIGURED`). Rather than restate
-  // them (which would change every already-captured task row), the attemptable states are three
-  // NEW tasks in the canonical `dropRows` shape the live smoke's library uses.
+  // The three tasks below carry states the four above do not: a time gate, a required tool, and a
+  // realm lock. They were authored separately because those states need their own configuration,
+  // not because the earlier four were malformed.
+  //
+  // They WERE malformed, though, and the note that used to sit here misdiagnosed it. It blamed
+  // `validateTaskConfiguration`'s d100 rule for the attempt failing, when the real cause was that
+  // the four tasks authored `dropTable`/`weight` — a shape NOTHING in `src/` reads.
+  // `_normalizeGatheringTask` takes `task.dropRows ?? task.itemDrops` and normalises each row's
+  // `dropRate`. So all four normalised to `dropRows: []` and browsed with no drops at all, while
+  // several frames declared they were showing a populated yield library. Both tasks composing
+  // `hb-env-grove` were among them, and that is the environment every player gathering frame opens
+  // on. Now authored in the shape the normalizer reads.
   //
   // `biomes: ['mountain']` is what keeps them contained. Composition is automatic and biome-
   // matched, and the four legacy tasks declare no biome at all, so they compose into every
@@ -1621,11 +1628,11 @@ const GATHERING_TASKS = [
     enabled: true,
     craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
     img: `${ICON_BASE}/commodities/stone/ore-chunk-brown.webp`,
-    dropTable: [
-      { id: 'row-1', componentId: 'sm-iron-ore', quantity: 3, weight: 50 },
-      { id: 'row-2', componentId: 'sm-copper-ore', quantity: 2, weight: 30 },
-      { id: 'row-3', componentId: 'sm-silver-ore', quantity: 1, weight: 15 },
-      { id: 'row-4', componentId: 'sm-ruby', quantity: 1, weight: 5 },
+    dropRows: [
+      { id: 'row-1', componentId: 'sm-iron-ore', quantity: 3, dropRate: 50, enabled: true },
+      { id: 'row-2', componentId: 'sm-copper-ore', quantity: 2, dropRate: 30, enabled: true },
+      { id: 'row-3', componentId: 'sm-silver-ore', quantity: 1, dropRate: 15, enabled: true },
+      { id: 'row-4', componentId: 'sm-ruby', quantity: 1, dropRate: 5, enabled: true },
     ],
   },
 ];

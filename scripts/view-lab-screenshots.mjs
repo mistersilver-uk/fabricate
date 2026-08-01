@@ -299,27 +299,15 @@ async function commandChrome() {
  * until the case registry lands.
  */
 /** Lab fixture system id -> the smoke system that carries the same capability. */
-const SMOKE_SYSTEM_FOR = Object.freeze({
-  'lab-alchemy': 'Warded Athenaeum',
-  'lab-herbalism': "The Herbalist's Compendium",
-  'lab-smithing': 'Smoke Simple Forge',
-  'lab-jewelry': 'Smoke Ingredient Router',
-  'lab-runework': 'Smoke Check Router',
-});
-
 const APP_CASES = publishableCases();
 
 async function commandApps() {
   const cache = ensureChrome();
   assertViewportFits();
   console.log(`using harvested Foundry ${cache.version} chrome`);
-
-  // `--smoke-fixtures` replays the live smoke's own crafting seed instead of the compact lab
-  // fixture, so a frame differs from its smoke counterpart in nothing but the chrome around it.
-  const smokeFixtures = process.argv.includes('--smoke-fixtures');
   const positional = process.argv.slice(3).find((a) => !a.startsWith('--'));
 
-  const outputDir = join(ARTIFACT_DIR, smokeFixtures ? 'apps-smoke-data' : 'apps');
+  const outputDir = join(ARTIFACT_DIR, 'apps');
   rmSync(outputDir, { recursive: true, force: true });
   mkdirSync(outputDir, { recursive: true });
 
@@ -363,14 +351,6 @@ async function commandApps() {
           query: {
             ...viewCase.query,
             case: viewCase.id,
-            ...(smokeFixtures && { smokeFixtures: '1' }),
-            // The lab fixture's system ids do not exist under the smoke seed, so a case that seeds
-            // one is remapped to the smoke system carrying the same capability — the Access rail
-            // exists only for a restricted-visibility system, which is the Warded Athenaeum.
-            ...(smokeFixtures &&
-              viewCase.query?.system && {
-                system: SMOKE_SYSTEM_FOR[viewCase.query.system] ?? viewCase.query.system,
-              }),
             ...(viewCase.position && {
               w: String(viewCase.position.width),
               h: String(viewCase.position.height),

@@ -198,6 +198,45 @@ test('every interaction step names text that exists in the manager UI', () => {
   );
 });
 
+test('no two cases claiming exact reach produce the same frame', () => {
+  // Identical inputs produce a byte-identical PNG, by construction. So two cases that both claim
+  // `exact` from the same tuple cannot both be landing on their own counterpart's condition — at
+  // least one is publishing a frame of something else under its name.
+  //
+  // This is mechanical where reading the registry is not. Three separate overclaims of exactly this
+  // shape survived hand review: `manager-default-selection` / `-selected-normal` / `-rail-expanded`
+  // are three different smoke screens sharing one tuple, `manager-component-edit-salvage` claimed a
+  // ROUTED salvage editor while opening the same Simple-mode component as `-salvage-simple`, and
+  // `manager-tags-categories-stacked` pinned the normal geometry while declaring itself responsive.
+  //
+  // A `window` case sharing a tuple with an `exact` one is fine and deliberately not flagged: it has
+  // already declared that it falls short, which is the honest state for a case still to be reached.
+  const byTuple = new Map();
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (!viewCase.publish || viewCase.reaches !== 'exact') continue;
+    const tuple = JSON.stringify([
+      viewCase.app,
+      viewCase.query ?? {},
+      viewCase.steps ?? [],
+      viewCase.position ?? null,
+    ]);
+    byTuple.set(tuple, [...(byTuple.get(tuple) ?? []), viewCase.id]);
+  }
+
+  const collisions = [...byTuple.values()]
+    .filter((ids) => ids.length > 1)
+    .map((ids) => ids.join(' == '));
+
+  assert.deepEqual(
+    collisions,
+    [],
+    'these cases all claim `exact` while rendering identical frames, so at least one is publishing ' +
+      'a picture of something other than what it names. Give each the steps, query or geometry that ' +
+      'distinguishes it, or downgrade the ones that fall short to `window`:\n  ' +
+      collisions.join('\n  ')
+  );
+});
+
 test('every case declaring an expectView targets the manager', () => {
   // `data-manager-view` only exists on the manager root, so an expectView on a player case would
   // silently never be checked.

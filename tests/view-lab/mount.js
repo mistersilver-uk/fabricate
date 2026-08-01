@@ -65,9 +65,6 @@ function readParams() {
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
     experimental: params.get('experimental') !== '0',
-    // Replay the live smoke's own crafting seed instead of the compact lab fixture, so a frame can
-    // be compared with its smoke counterpart data-for-data rather than only layout-for-layout.
-    smokeFixtures: params.get('smokeFixtures') === '1',
     // Capture geometry override. The smoke photographs the manager at 1280x820, not its declared
     // 1280x940, so a case pins the size its smoke counterpart uses (see SMOKE_MANAGER_POSITION).
     position:
@@ -99,11 +96,12 @@ function borrowInstance(AppClass, fields) {
 }
 
 async function mountPlayerApp(content, params) {
-  const [{ SvelteFabricateApp }, { default: FabricateAppRoot }, { isAlchemyTabAvailable }] = await Promise.all([
-    import('/src/ui/SvelteFabricateApp.svelte.js'),
-    import('/src/ui/svelte/apps/FabricateAppRoot.svelte'),
-    import('/src/ui/svelte/util/alchemyTabAvailability.js'),
-  ]);
+  const [{ SvelteFabricateApp }, { default: FabricateAppRoot }, { isAlchemyTabAvailable }] =
+    await Promise.all([
+      import('/src/ui/SvelteFabricateApp.svelte.js'),
+      import('/src/ui/svelte/apps/FabricateAppRoot.svelte'),
+      import('/src/ui/svelte/util/alchemyTabAvailability.js'),
+    ]);
 
   const activeTab = params.tab ?? 'crafting';
   const app = borrowInstance(SvelteFabricateApp, {
@@ -135,10 +133,11 @@ async function mountPlayerApp(content, params) {
 }
 
 async function mountManagerApp(content, params) {
-  const [{ SvelteCraftingSystemManagerApp }, { default: CraftingSystemManagerRoot }] = await Promise.all([
-    import('/src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
-    import('/src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
-  ]);
+  const [{ SvelteCraftingSystemManagerApp }, { default: CraftingSystemManagerRoot }] =
+    await Promise.all([
+      import('/src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
+      import('/src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
+    ]);
 
   const app = borrowInstance(SvelteCraftingSystemManagerApp, {
     _adminStore: null,
@@ -200,13 +199,20 @@ async function settle(root, services = null) {
       observer.disconnect();
       resolve();
     };
-    observer.observe(root, { childList: true, subtree: true, attributes: true, characterData: true });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    });
     quietTimer = setTimeout(finish, 120);
   });
 
   await document.fonts.ready;
   const images = [...root.querySelectorAll('img')].filter((img) => img.getAttribute('src'));
-  await Promise.all(images.map((img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve())));
+  await Promise.all(
+    images.map((img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()))
+  );
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 }
 
@@ -216,11 +222,20 @@ async function boot() {
 
   installDeterminismStyles();
 
-  const world = params.chromeOnly ? null : await buildLabWorld({ managedSystemId: params.system, experimentalFeatures: params.experimental, smokeFixtures: params.smokeFixtures });
+  const world = params.chromeOnly
+    ? null
+    : await buildLabWorld({
+        managedSystemId: params.system,
+        experimentalFeatures: params.experimental,
+      });
   const localize = world ? world.localize : (key) => key;
   configureLabPage({ colorScheme: params.colorScheme });
 
-  const built = buildAppWindow({ appId: params.appId, localize, position: params.position ?? undefined });
+  const built = buildAppWindow({
+    appId: params.appId,
+    localize,
+    position: params.position ?? undefined,
+  });
   // Geometry BEFORE content: a clamped frame is wrong no matter what is inside it, and failing
   // here keeps the error about the window rather than about whatever failed to render in it.
   assertWindowGeometry(built);

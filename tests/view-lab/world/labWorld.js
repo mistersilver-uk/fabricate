@@ -24,13 +24,6 @@ import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import { buildLabRunStates, installLabRunStates } from './labRunStates.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
-import {
-  renameSmokePrimarySystem,
-  seedSmokeCraftingSetup,
-  seedSmokeExecutionFixtures,
-  seedSmokeGatheringLibrary,
-  seedSmokeWorldDocuments,
-} from './smokeSeed.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
@@ -38,16 +31,16 @@ const FABRICATE_NAMESPACE = 'fabricate';
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
-function seedSettings(content, actors, managedSystemId, experimentalFeatures, smokeFixtures) {
+function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
   const settings = new Map();
   const put = (key, value) => settings.set(settingsKey(FABRICATE_NAMESPACE, key), value);
 
   // With the smoke seed enabled the lab's own three systems would sit ALONGSIDE the smoke's, which
   // is not a 1:1 comparison - the system library would show seven rows where the smoke shows its
   // own set. Start empty and let the replayed seed be the only source of crafting data.
-  put('craftingSystems', smokeFixtures ? [] : content.systems);
-  put('recipes', smokeFixtures ? [] : content.recipes);
-  put('gatheringEnvironments', smokeFixtures ? [] : content.environments);
+  put('craftingSystems', content.systems);
+  put('recipes', content.recipes);
+  put('gatheringEnvironments', content.environments);
   put('gatheringConfig', content.gatheringConfig);
   put('gatheringParties', [
     {
@@ -62,7 +55,10 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, sm
   // an empty-state prompt that says nothing about the UI.
   put('lastCraftingActor', actors[0].id);
   put('lastGatheringActor', actors[0].id);
-  put('lastComponentSources', actors.map((actor) => actor.id));
+  put(
+    'lastComponentSources',
+    actors.map((actor) => actor.id)
+  );
   put('lastManagedCraftingSystem', managedSystemId ?? LAB_SYSTEM_IDS.SMITHING);
   put('lastAlchemySystem', LAB_SYSTEM_IDS.ALCHEMY);
   put('favouriteRecipes', ['sm-r-longsword', 'hb-r-healing']);
@@ -87,7 +83,6 @@ export async function buildLabWorld({
   seed = 20_260_601,
   managedSystemId = null,
   experimentalFeatures = true,
-  smokeFixtures = false,
 } = {}) {
   const content = buildLabContent();
   const actors = buildLabActors(content);
@@ -97,7 +92,7 @@ export async function buildLabWorld({
   const world = {
     seed,
     content,
-    settings: seedSettings(content, actors, managedSystemId, experimentalFeatures, smokeFixtures),
+    settings: seedSettings(content, actors, managedSystemId, experimentalFeatures),
     documents,
     actorList: actors,
     scenes: [{ id: 'lab-scene', uuid: 'Scene.lab-map', name: 'The Verdant Reach', regions: [] }],
@@ -117,61 +112,12 @@ export async function buildLabWorld({
   world.fabricate = fabricate;
 
   if (!fabricate.craftingSystemManager?.initialized) {
-    throw new Error('view lab: CraftingSystemManager did not initialize; the fixture world is unusable');
+    throw new Error(
+      'view lab: CraftingSystemManager did not initialize; the fixture world is unusable'
+    );
   }
   if (!fabricate.recipeManager?.initialized) {
     throw new Error('view lab: RecipeManager did not initialize; the fixture world is unusable');
-  }
-
-  // Replay the live smoke's own seed against the same real API it targets, so a lab frame and a
-  // smoke frame differ in nothing but the chrome around them. Opt-in: it costs a few seconds and
-  // the compact lab fixture is the better default for everyday PR evidence.
-  if (smokeFixtures) {
-    // The smoke's own order, and it is load-bearing: the crafting setup creates the primary system
-    // whose id every later block threads through, the gathering library configures that system, the
-    // execution fixtures build the four Smoke* systems around it, and the rename is the last thing
-    // the smoke does before its manager walk — which is why every manager frame shows "The
-    // Herbalist's Compendium" rather than the name the system was created with.
-    // The world items every later block reads off `game.items.contents` — without these the
-    // crafting setup registers nothing and its component map comes back empty.
-    await seedSmokeWorldDocuments();
-
-    const craftingSetup = await seedSmokeCraftingSetup({
-      gathererUserId: 'user-lab-player',
-      crafterId: actors[0].id,
-      travelMemberId: actors[1].id,
-    });
-
-    await seedSmokeGatheringLibrary({
-      sysId: craftingSetup.systemId,
-      componentMap: craftingSetup.componentMap,
-    });
-
-    const executionFixtures = await seedSmokeExecutionFixtures({
-      arcaneSystemId: craftingSetup.systemId,
-      mysticHerbComponentId: Object.values(craftingSetup.componentMap ?? {})[0] ?? null,
-      crafterId: actors[0].id,
-    });
-
-    await renameSmokePrimarySystem(craftingSetup.systemId);
-
-    world.smokeSeed = { craftingSetup, executionFixtures };
-
-    // The manager opens on whichever system this names, and the ids are generated at runtime so it
-    // cannot be written up front. The smoke's walk sits on the primary system, so the lab does too.
-    // A case may ask for a system by NAME as well as by id. Under the smoke seed the ids are
-    // generated at runtime, so a case that needs a particular capability — the Access rail exists
-    // only for a restricted-visibility system — can only name the system it means.
-    const named = managedSystemId
-      ? fabricate
-          .getCraftingSystemManager()
-          .getSystems()
-          .find((system) => system.id === managedSystemId || system.name === managedSystemId)
-      : null;
-    world.settings.set(
-      settingsKey(FABRICATE_NAMESPACE, 'lastManagedCraftingSystem'),
-      named?.id ?? craftingSetup.systemId
-    );
   }
 
   // Journal runs. Written after the crafting data exists, because each run resolves to a real
@@ -195,8 +141,7 @@ export async function buildLabWorld({
           viewer: playerViewer,
           craftingActor: visibilityActor,
           componentSourceActors: [visibilityActor],
-        })
-          ?.visible === true
+        })?.visible === true
       );
     } catch {
       return false;
@@ -220,7 +165,11 @@ export async function buildLabWorld({
     // The run managers memoise each actor's container the first time they read it, and
     // `initialize()` reads it — so a container written afterwards is invisible until the cache is
     // dropped. The symptom is a journal with runs on the actor and none on screen.
-    for (const manager of [fabricate.craftingRunManager, fabricate.salvageRunManager, fabricate.gatheringRunManager]) {
+    for (const manager of [
+      fabricate.craftingRunManager,
+      fabricate.salvageRunManager,
+      fabricate.gatheringRunManager,
+    ]) {
       manager?.invalidateCache?.();
     }
   }
