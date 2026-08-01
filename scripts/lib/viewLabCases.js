@@ -1791,8 +1791,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     // screen — it needs a file verb in `scripts/view-lab-screenshots.mjs`, alongside the real
     // `DialogV2` the folder-mapping case is also waiting on.
     reaches: 'window',
-    query: {},
-    steps: [],
+    query: { dialog: 'open' },
+    steps: [
+      { selector: '[data-manager-import-system]' },
+      {
+        selector: 'input[name="importFile"]',
+        upload: JSON.stringify({ name: 'Imported Forge', components: [], recipes: [] }),
+      },
+      { selector: '.application.dialog button[data-action="ok"]' },
+    ],
     expectView: 'systems',
     kinds: ['manager', 'systems', 'window-only'],
     sourceMatches: [

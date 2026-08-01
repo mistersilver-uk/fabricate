@@ -6104,7 +6104,15 @@
               >
             </button>
           {:else}
-            <button type="button" class="manager-button" onclick={importSystem}>
+            <!-- data-manager-import-system: a zero-behaviour hook. The only other handle on
+                 this button is `manager-button`, which a dozen header controls share, so a
+                 screenshot case could not name it without matching whichever came first. -->
+            <button
+              type="button"
+              class="manager-button"
+              data-manager-import-system
+              onclick={importSystem}
+            >
               <i class="fas fa-file-import" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
             </button>

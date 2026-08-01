@@ -435,6 +435,36 @@ export function createLabDialogV2({ localize }) {
         position: { ...FOUNDRY_DIALOG_SPEC.factoryPosition, ...config.position },
       });
     }
+
+    /**
+     * `DialogV2.prompt` — one button, defaulted, over the same `wait`.
+     *
+     * Transcribed from `dialog.mjs`'s own `static async prompt`, which unshifts a single
+     * `{action: 'ok', label: 'Confirm', icon: 'fa-solid fa-check', default: true}` before delegating
+     * to `wait` with the 400px factory position. The caller's `ok` overrides win, which is how
+     * Fabricate's system import relabels it "Import".
+     *
+     * Left unimplemented when the dialog was first transcribed, on the principle that a half-built
+     * API is worse than an absent one. It is here now because the import-report frame needs it, and
+     * because with `wait` already in place it is a button list rather than new machinery.
+     *
+     * @param {object} [config] Dialog configuration, with an optional `ok` override.
+     * @returns {Promise<any>} The ok callback's value, or `null` on dismissal.
+     */
+    static async prompt({ ok = {}, ...config } = {}) {
+      config.buttons ??= [];
+      config.buttons.unshift({
+        action: 'ok',
+        label: 'Confirm',
+        icon: 'fa-solid fa-check',
+        default: true,
+        ...ok,
+      });
+      return this.wait({
+        ...config,
+        position: { ...FOUNDRY_DIALOG_SPEC.factoryPosition, ...config.position },
+      });
+    }
   }
 
   return {
