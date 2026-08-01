@@ -9,10 +9,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  collectTags,
   escapeHtml,
   groupFrames,
   renderIndexHtml,
   summarise,
+  tagsFor,
 } from '../scripts/lib/viewLabIndex.js';
 
 const CASES = [
@@ -102,7 +104,6 @@ test('the rendered page is self-contained and references every frame', () => {
   });
 
   assert.match(html, /^<!doctype html>/);
-  assert.ok(!/<script/i.test(html), 'no scripts');
   assert.ok(!/https?:\/\//.test(html), 'no external references');
   for (const frame of FRAMES) assert.ok(html.includes(`${frame.id}.png`), `${frame.id} is linked`);
   assert.ok(html.includes('Foundry 13.351 chrome'));
@@ -139,4 +140,56 @@ test('frames with no recorded head are not falsely flagged stale', () => {
     head: 'bbbbbbb',
   });
   assert.ok(!html.includes('captured at'));
+});
+
+test('tags come from the case, and every kind is kept', () => {
+  // The previous version used only the first two `kinds` entries and discarded the rest, which is
+  // exactly the vocabulary a filter needs. `reaches` joins them because "only the frames that land
+  // on their exact state" is the most common question asked of this page.
+  assert.deepEqual(tagsFor(CASES[0]), ['exact', 'manager', 'recipes']);
+  assert.deepEqual(tagsFor(null), ['unregistered'], 'an unexplained PNG is still filterable');
+});
+
+test('the tag vocabulary is collected with counts, most common first', () => {
+  const tags = collectTags(groupFrames(FRAMES, CASES));
+  const manager = tags.find((entry) => entry.tag === 'manager');
+  assert.equal(manager.count, 2);
+  assert.ok(tags[0].count >= tags.at(-1).count, 'sorted by frequency');
+});
+
+test('each card carries its tags in a filterable attribute', () => {
+  const html = renderIndexHtml({
+    sections: groupFrames([FRAMES[1]], CASES),
+    counts: summarise([FRAMES[1]], CASES),
+  });
+  assert.match(html, /data-tags="exact manager recipes"/);
+});
+
+test('smoke labels are not published in the evidence index', () => {
+  // Which smoke frame a case corresponds to is provenance for whoever is BUILDING the harness, and
+  // noise for anyone reading the evidence. This page is the View Lab's frames, not a comparison.
+  const html = renderIndexHtml({
+    sections: groupFrames(FRAMES, CASES),
+    counts: summarise(FRAMES, CASES),
+  });
+  // A distinctive label, because the obvious assertion collides: the fixture case id
+  // `a-manager-recipes` ENDS with its own smoke label, so searching for the label finds the id.
+  const labelled = [{ ...CASES[0], smokeLabels: ['zzz-smoke-only-label'] }];
+  const page = renderIndexHtml({
+    sections: groupFrames([FRAMES[1]], labelled),
+    counts: summarise([FRAMES[1]], labelled),
+  });
+  assert.ok(!page.includes('smoke:'), 'no smoke provenance on the cards');
+  assert.ok(!page.includes('zzz-smoke-only-label'), 'the smoke label itself is absent');
+});
+
+test('the filter bar offers every tag present and nothing else', () => {
+  const html = renderIndexHtml({
+    sections: groupFrames(FRAMES, CASES),
+    counts: summarise(FRAMES, CASES),
+  });
+  for (const { tag } of collectTags(groupFrames(FRAMES, CASES))) {
+    assert.ok(html.includes(`data-tag="${tag}"`), `${tag} is offered`);
+  }
+  assert.ok(!html.includes('data-tag="nonexistent"'));
 });

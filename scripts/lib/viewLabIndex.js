@@ -43,6 +43,49 @@ export function escapeHtml(value) {
 }
 
 /**
+ * Every tag a frame can be filtered by.
+ *
+ * Derived from the case, never authored twice. `kinds` already carries the whole vocabulary the
+ * registry uses — the application, the area, the resolution mode, the outcome — and the previous
+ * version of this file threw all but the first two entries away, which is exactly the filter this
+ * page needs. `reaches` joins them because "show me only the frames that land on their exact state"
+ * is the question a reviewer asks most often.
+ *
+ * A frame with no case gets one honest tag rather than none: an untagged card would vanish from
+ * every filter, which is the opposite of what an unexplained PNG deserves.
+ *
+ * @param {object|null} viewCase The registry entry, or null.
+ * @returns {string[]} Sorted, de-duplicated tags.
+ */
+export function tagsFor(viewCase) {
+  if (!viewCase) return ['unregistered'];
+  return [...new Set([...(viewCase.kinds ?? []), viewCase.reaches].filter(Boolean))].sort();
+}
+
+/**
+ * The whole tag vocabulary present in a set of frames, with how many carry each.
+ *
+ * Counts matter: a filter offering a tag that matches two frames out of 150 is worth showing
+ * differently from one that matches sixty, and a tag matching zero should not be offered at all.
+ *
+ * @param {Array<object>} sections Output of {@link groupFrames}.
+ * @returns {Array<{tag: string, count: number}>} Tags, most common first then alphabetical.
+ */
+export function collectTags(sections) {
+  const counts = new Map();
+  for (const section of sections) {
+    for (const area of section.areas) {
+      for (const frame of area.frames) {
+        for (const tag of frame.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+  }
+  return [...counts]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((left, right) => right.count - left.count || left.tag.localeCompare(right.tag));
+}
+
+/**
  * Group captured frames into the sections the page renders.
  *
  * Takes the manifest's frame list and the registry, and returns only frames that were ACTUALLY
@@ -71,7 +114,7 @@ export function groupFrames(frames, cases) {
       label: viewCase?.label ?? frame.id,
       reach: viewCase?.reaches ?? null,
       note: viewCase ? REACH_NOTE[viewCase.reaches] : 'not in the case registry',
-      smokeLabels: viewCase?.smokeLabels ?? [],
+      tags: tagsFor(viewCase),
       width: frame.width ?? null,
       height: frame.height ?? null,
       head: frame.head ?? null,
@@ -118,17 +161,18 @@ function renderFrame(frame, head) {
     head && frame.head && frame.head !== head
       ? `<p class="stale">captured at ${escapeHtml(frame.head)}, not the current ${escapeHtml(head)}</p>`
       : '';
-  const smoke =
-    frame.smokeLabels.length > 0
-      ? `<p class="smoke">smoke: ${escapeHtml(frame.smokeLabels.join(', '))}</p>`
-      : '';
   const note = frame.note ? `<p class="note">${escapeHtml(frame.note)}</p>` : '';
-  return `      <figure class="frame" id="${escapeHtml(frame.id)}">
+  // The smoke label a frame corresponds to used to be printed here. It is provenance for whoever is
+  // BUILDING the harness and noise for anyone reading the evidence, so it is gone — this page is the
+  // View Lab's own frames, not a comparison against the smoke.
+  const tags = frame.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+  return `      <figure class="frame" id="${escapeHtml(frame.id)}" data-tags="${escapeHtml(frame.tags.join(' '))}">
         <a href="${escapeHtml(frame.file)}"><img src="${escapeHtml(frame.file)}" alt="${escapeHtml(frame.label)}" loading="lazy"></a>
         <figcaption>
           <p class="label">${escapeHtml(frame.label)}</p>
-          <p class="meta"><code>${escapeHtml(frame.id)}</code>${dimensions ? ` · ${dimensions}` : ''}${frame.reach ? ` · <span class="reach reach-${escapeHtml(frame.reach)}">${escapeHtml(frame.reach)}</span>` : ''}</p>
-          ${note}${stale}${smoke}
+          <p class="meta"><code>${escapeHtml(frame.id)}</code>${dimensions ? ` · ${dimensions}` : ''}</p>
+          <p class="tags">${tags}</p>
+          ${note}${stale}
         </figcaption>
       </figure>`;
 }
@@ -156,7 +200,7 @@ ${section.areas
   .map(
     (
       area
-    ) => `    <h3>${escapeHtml(area.area)} <span class="count">${area.frames.length}</span></h3>
+    ) => `    <h3 data-area>${escapeHtml(area.area)} <span class="count">${area.frames.length}</span></h3>
     <div class="grid">
 ${area.frames.map((frame) => renderFrame(frame, head)).join('\n')}
     </div>`
@@ -165,6 +209,13 @@ ${area.frames.map((frame) => renderFrame(frame, head)).join('\n')}
   </section>`
     )
     .join('\n');
+
+  const filters = collectTags(sections)
+    .map(
+      ({ tag, count }) =>
+        `<button type="button" class="tag-filter" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}<span class="count">${count}</span></button>`
+    )
+    .join('');
 
   const chrome = foundryVersion
     ? `Foundry ${escapeHtml(foundryVersion)} chrome`
@@ -191,10 +242,20 @@ ${area.frames.map((frame) => renderFrame(frame, head)).join('\n')}
   .label { margin: 0 0 .2rem; font-size: .875rem; font-weight: 600; }
   .meta { margin: 0; font-size: .75rem; color: #a6907f; }
   code { font-family: ui-monospace, monospace; font-size: .72rem; }
-  .note, .smoke { margin: .35rem 0 0; font-size: .72rem; }
+  .note, .stale { margin: .35rem 0 0; font-size: .72rem; }
   .note { color: #d2a679; }
   .stale { color: #d98c6a; }
-  .smoke { color: #7f8f99; }
+  .filters { position: sticky; top: 0; z-index: 2; padding: .75rem 0 1rem; background: #14100d; border-bottom: 1px solid #3a2f28; margin-bottom: 1rem; }
+  .tag-filters { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .tag-filter { font: inherit; font-size: .74rem; cursor: pointer; padding: .18rem .5rem; border-radius: 999px; border: 1px solid #3a2f28; background: #1d1713; color: #c8b1a3; display: inline-flex; gap: .35rem; align-items: baseline; }
+  .tag-filter:hover { border-color: #6d5847; }
+  .tag-filter.is-on { background: #f1d1b5; border-color: #f1d1b5; color: #1d1713; font-weight: 600; }
+  .tag-filter .count { font-size: .66rem; opacity: .7; }
+  .filter-state { margin: .6rem 0 0; font-size: .75rem; color: #a6907f; }
+  .filter-state button { font: inherit; background: none; border: 0; color: #d2a679; cursor: pointer; text-decoration: underline; padding: 0; }
+  .tags { margin: .35rem 0 0; display: flex; flex-wrap: wrap; gap: .22rem; }
+  .tag { font-size: .66rem; padding: .1rem .38rem; border-radius: 3px; background: #2a221c; color: #b39d8b; }
+  [hidden] { display: none !important; }
   .reach { padding: 0 .35rem; border-radius: 3px; font-size: .7rem; }
   .reach-exact { background: #24402c; color: #a8e0b4; }
   .reach-window { background: #40361f; color: #e0cf9a; }
@@ -209,7 +270,65 @@ ${area.frames.map((frame) => renderFrame(frame, head)).join('\n')}
 <body>
 <h1>Fabricate View Lab</h1>
 <p class="summary">${counts.total} frames · ${counts.exact} exact · ${counts.window} window · ${counts.beyond} beyond${counts.unknown > 0 ? ` · ${counts.unknown} unrecognised` : ''} · ${chrome}</p>
+<div class="filters">
+  <div class="tag-filters">${filters}</div>
+  <p class="filter-state"><span data-visible-count>${counts.total}</span> of ${counts.total} shown · <button type="button" data-clear hidden>clear filters</button></p>
+</div>
 ${body}
+<script>
+/* Multi-tag filter, AND semantics: a frame shows when it carries EVERY selected tag.
+   AND rather than OR because the question is "crafting AND progressive AND success", and an OR
+   filter over 27 tags widens toward showing everything, which is what the unfiltered page does.
+
+   This is the one script on the page, and it is why the page is no longer script-free — a
+   deliberate trade for the filtering. It stays self-contained: no imports, no network, so the page
+   still works from file://. */
+(() => {
+  const selected = new Set();
+  const frames = [...document.querySelectorAll('.frame')];
+  const buttons = [...document.querySelectorAll('.tag-filter')];
+  const visibleCount = document.querySelector('[data-visible-count]');
+  const clear = document.querySelector('[data-clear]');
+
+  function apply() {
+    let shown = 0;
+    for (const frame of frames) {
+      const tags = new Set(frame.dataset.tags.split(' '));
+      const match = [...selected].every((tag) => tags.has(tag));
+      frame.hidden = !match;
+      if (match) shown += 1;
+    }
+    /* Hide a heading whose frames are all filtered out, and the whole section with it — a page of
+       empty headings reads as "no results" far less clearly than the headings simply going away. */
+    for (const heading of document.querySelectorAll('[data-area]')) {
+      const grid = heading.nextElementSibling;
+      const any = [...grid.querySelectorAll('.frame')].some((frame) => !frame.hidden);
+      heading.hidden = !any;
+      grid.hidden = !any;
+    }
+    for (const section of document.querySelectorAll('section')) {
+      section.hidden = ![...section.querySelectorAll('.frame')].some((frame) => !frame.hidden);
+    }
+    visibleCount.textContent = String(shown);
+    clear.hidden = selected.size === 0;
+  }
+
+  for (const button of buttons) {
+    button.addEventListener('click', () => {
+      const tag = button.dataset.tag;
+      if (selected.has(tag)) selected.delete(tag);
+      else selected.add(tag);
+      button.classList.toggle('is-on', selected.has(tag));
+      apply();
+    });
+  }
+  clear.addEventListener('click', () => {
+    selected.clear();
+    for (const button of buttons) button.classList.remove('is-on');
+    apply();
+  });
+})();
+</script>
 </body>
 </html>
 `;
