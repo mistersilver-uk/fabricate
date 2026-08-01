@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -41,6 +41,69 @@ const CAPTURE_VIEWPORT = { width: 1920, height: 1080 };
 const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' })
   .split('\0')
   .filter(Boolean);
+
+/**
+ * Hooks the CAPTURE DRIVER hard-codes, which appear in no case and were therefore guarded by
+ * nothing. Renaming `.manager-nav-button` breaks every label step at once — 92 of them across ~60
+ * cases — with `npm test` green, because the registry never mentions it. Same for the route probe.
+ */
+const RAIL_BUTTON_CLASS = 'manager-nav-button';
+const DRIVER_HOOKS = [
+  RAIL_BUTTON_CLASS, // `runSteps` clicks every rail label through this — 1 file
+  'data-manager-view', // the attribute the `expectView` probe reads — 1 file
+  'fabricate-app-shell', // the player readiness root — 1 file
+  'data-active-tab', // the attribute `expectTab` reads — 1 file
+  // `fabricate-manager` is deliberately NOT here. It is the `expectView` probe's root, but it is
+  // also a styling scope used in ten components, so a presence check over the tree would stay green
+  // long after the root element stopped carrying it — the weak-check shape this file keeps finding.
+  // Guarding it properly means asserting it is a class ATTRIBUTE on the manager root specifically,
+  // which is worth doing and is not done here rather than being pretended at.
+];
+
+/**
+ * Every tracked file that can carry a UI hook, keyed by path so a check can be scoped to the
+ * component that actually renders the thing rather than to the whole tree. Scoping is what stops a
+ * check passing on a coincidence, which has happened three times in this file.
+ *
+ * Includes : some nav ids are declared in a plain module rather than a component.
+ */
+function trackedRenderSources() {
+  return new Map(
+    tracked
+      .filter(
+        (file) =>
+          file.endsWith('.svelte') ||
+          file === 'lang/en.json' ||
+          (file.startsWith('src/ui/') && file.endsWith('.js'))
+      )
+      .map((file) => [file, readFileSync(resolve(ROOT, file), 'utf8')])
+  );
+}
+
+/**
+ * The files that could legitimately declare a nav item id: whichever component builds the id
+ * template, plus the modules it imports by relative path.
+ *
+ * One hop, not a full closure. A nav list is either inline in the component or in a module beside
+ * it, and widening further starts readmitting the coincidences this scoping exists to exclude.
+ *
+ * @param {Map<string, string>} sources Tracked render sources.
+ * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
+ * @returns {Array<[string, string]>} `[path, text]` pairs to search.
+ */
+function navDeclarationScope(sources, template) {
+  const builders = [...sources].filter(([, text]) => text.includes(template));
+  const scope = new Map(builders);
+  for (const [file, text] of builders) {
+    for (const match of text.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
+      const resolved = normalizePath(
+        relative(ROOT, resolve(dirname(resolve(ROOT, file)), match[1]))
+      );
+      if (sources.has(resolved)) scope.set(resolved, sources.get(resolved));
+    }
+  }
+  return [...scope];
+}
 
 /** Selector tokens are matched as regular expressions, so their own metacharacters must not be. */
 function escapeForRegExp(value) {
@@ -93,16 +156,7 @@ test('every interaction step names text that exists in the manager UI', () => {
   // the case would capture whichever screen happened to be showing.
   // Includes `src/ui/**/*.js`: the crafting sub-tab ids the selector steps target are declared in
   // `crafting/craftingNav.js`, not in any component file.
-  const sources = new Map(
-    tracked
-      .filter(
-        (file) =>
-          file.endsWith('.svelte') ||
-          file === 'lang/en.json' ||
-          (file.startsWith('src/ui/') && file.endsWith('.js'))
-      )
-      .map((file) => [file, readFileSync(resolve(ROOT, file), 'utf8')])
-  );
+  const sources = trackedRenderSources();
   const haystack = [...sources.values()].join('\n');
 
   const missing = [];
@@ -110,7 +164,20 @@ test('every interaction step names text that exists in the manager UI', () => {
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step === 'string') {
-        if (!haystack.includes(step)) missing.push(`${viewCase.id}: label "${step}"`);
+        // Scoped to the component that RENDERS the rail, not the whole tree. The eight rail labels
+        // are `Crafting`, `Components`, `Essences`, `Tools`, `Gathering` and friends — common
+        // English words that occur all over a 300-file haystack, so an unscoped `includes` could
+        // never fail. Demonstrated: deleting the entire manager rail still resolved all eight, out
+        // of `lang/en.json` and unrelated components, leaving 92 steps across ~60 cases unguarded.
+        const railFiles = [...sources].filter(([, text]) => text.includes(RAIL_BUTTON_CLASS));
+        if (railFiles.length === 0) {
+          missing.push(`${viewCase.id}: nothing renders "${RAIL_BUTTON_CLASS}" any more`);
+        } else if (!railFiles.some(([, text]) => text.includes(step))) {
+          missing.push(
+            `${viewCase.id}: rail label "${step}" appears in no component that renders ` +
+              `"${RAIL_BUTTON_CLASS}" (${railFiles.map(([file]) => file).join(', ')})`
+          );
+        }
         continue;
       }
       // The runner dispatches on which verb key is present, so a typo'd key (`selectOption`,
@@ -150,12 +217,29 @@ test('every interaction step names text that exists in the manager UI', () => {
       // The two rail groups build their subitem ids from a nav item's id
       // (`manager-crafting-nav-${id}` / `manager-gathering-nav-${id}`), so the literal selector
       // never appears in source; the id stem is what a rename would move.
-      const navId = /^#manager-(?:crafting|gathering)-nav-(.+)$/.exec(step.selector);
+      //
+      // Scoped to the file that BUILDS those ids, exactly as the editor-tab branch above is. This
+      // branch used to search the whole tree, which is the pass-on-a-coincidence failure that branch
+      // exists to prevent — found by mutation: renaming `gatheringNavItems`' `id: 'tasks'` in
+      // `CraftingSystemManagerRoot.svelte` left the guard green, because `id: 'tasks'` also occurs in
+      // `GatheringDetailTabs.svelte`, which is a PLAYER-app component that has nothing to do with the
+      // manager rail. Three nav ids were in that state: tasks, encounters, travel.
+      const navId = /^#manager-(crafting|gathering)-nav-(.+)$/.exec(step.selector);
       if (navId) {
-        const token = `id: '${navId[1]}'`;
-        if (!haystack.includes(token)) {
+        const [, group, id] = navId;
+        // The scope is the builder PLUS what it imports: the gathering items are declared inline in
+        // the root, but the crafting ones live in `crafting/craftingNav.js`, which the root pulls
+        // in. Builder-only would reject every crafting nav id; whole-tree would accept anything.
+        const scope = navDeclarationScope(sources, `manager-${group}-nav-\${`);
+        if (scope.length === 0) {
           missing.push(
-            `${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`
+            `${viewCase.id}: selector "${step.selector}" (no component builds manager-${group}-nav-* ids)`
+          );
+        } else if (!scope.some(([, text]) => text.includes(`id: '${id}'`))) {
+          missing.push(
+            `${viewCase.id}: selector "${step.selector}" (${scope
+              .map(([file]) => file)
+              .join(', ')} declares no "${id}" nav item)`
           );
         }
         continue;
@@ -202,6 +286,33 @@ test('every interaction step names text that exists in the manager UI', () => {
     missing,
     [],
     `these steps reference UI that no longer exists:\n  ${missing.join('\n  ')}`
+  );
+});
+
+test('the hooks the capture driver hard-codes still exist in the UI', () => {
+  // These are the load-bearing selectors no case names, so nothing else can notice them going away.
+  // `scripts/view-lab-screenshots.mjs` clicks every rail label through `.manager-nav-button` and
+  // reads both route probes off the two roots — a rename there breaks the whole registry at once
+  // while every other assertion in this file still passes.
+  // Comments are stripped first, and that is not fastidiousness — it is a bug this check had.
+  // A comment I wrote in `FabricateAppRoot.svelte` mentioned `data-manager-view` by name to explain
+  // what the new player attribute mirrors. Renaming the REAL attribute then left the guard green,
+  // because the prose still matched. A check whose haystack includes its own documentation cannot
+  // fail on a rename that only the documentation survives.
+  const haystack = [...trackedRenderSources().values()]
+    .join('\n')
+    .replaceAll(/<!--[\S\s]*?-->/g, '')
+    .replaceAll(/\/\*[\S\s]*?\*\//g, '')
+    .replaceAll(/^\s*\/\/.*$/gm, '');
+  const absent = DRIVER_HOOKS.filter(
+    (hook) => !new RegExp(String.raw`(?<![\w-])${hook}(?![\w-])`).test(haystack)
+  );
+  assert.deepEqual(
+    absent,
+    [],
+    'the capture driver hard-codes these hooks and no case references them, so nothing else would ' +
+      'catch their removal. Update `scripts/view-lab-screenshots.mjs` alongside the rename:\n  ' +
+      absent.join('\n  ')
   );
 });
 
