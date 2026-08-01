@@ -1,4 +1,5 @@
 import { RunContainerManagerBase } from './runContainerStore.js';
+import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -194,8 +195,15 @@ export class SalvageRunManager extends RunContainerManagerBase {
     }
   }
 
+  /**
+   * Startup maintenance: drop salvage runs naming a deleted crafting system or a
+   * component that system no longer defines.
+   *
+   * Scoped to the actors THIS client may write (issue 970) — it runs on every
+   * client at `initialize()`, where a player owns only their own characters.
+   */
   async cleanupInvalidRuns(validSystemIds = new Set(), validComponentIdsBySystem = new Map()) {
-    for (const actor of game.actors || []) {
+    for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
       let dirty = false;
 
