@@ -8,13 +8,19 @@
     "sha256": "3d3904e9c4f384bd5bbb315b762beddc1911357af0db8633664c4d990ba40144"
   },
   "chromeMarkup": {
-    "applicationMjsSha256": "596e5b7397742c44b1eee8d0375dd9510d2e57d7e26e9677815baf549a87263e"
+    "applicationMjsSha256": "596e5b7397742c44b1eee8d0375dd9510d2e57d7e26e9677815baf549a87263e",
+    "dialogMjsSha256": "1303ba1d43099aeeedf648c6a9365245d75aa5b07244e2e0adceb81845f1837e"
   },
   "assets": [
     {
       "path": "client/applications/api/application.mjs",
       "bytes": 63719,
       "sha256": "596e5b7397742c44b1eee8d0375dd9510d2e57d7e26e9677815baf549a87263e"
+    },
+    {
+      "path": "client/applications/api/dialog.mjs",
+      "bytes": 18917,
+      "sha256": "1303ba1d43099aeeedf648c6a9365245d75aa5b07244e2e0adceb81845f1837e"
     },
     {
       "path": "css/foundry2.css",

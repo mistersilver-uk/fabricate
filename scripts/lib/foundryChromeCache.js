@@ -32,10 +32,20 @@ const ENTRY_STYLESHEETS = ['public/css/foundry2.css', 'public/fonts/fontawesome/
 
 /**
  * Non-stylesheet members the lab needs. `application.mjs` is the anti-drift source of truth for
- * the frame markup; `lang/en.json` carries the `APPLICATION.TOOLS.*` labels the header controls
- * are titled with.
+ * the window frame markup and `dialog.mjs` for the `DialogV2` frame Fabricate's confirmations open
+ * inside it; `lang/en.json` carries the `APPLICATION.TOOLS.*` labels the header controls are
+ * titled with.
+ *
+ * `dialog.mjs` is here for the same reason `application.mjs` is: a dialog drawn from anywhere else
+ * would be a facsimile of Foundry chrome, which is the one thing this harness must never publish.
+ * Drawn from Foundry's own module, under the same never-commit rule and the same drift gate, it is
+ * the genuine article.
  */
-const EXTRA_MEMBERS = ['client/applications/api/application.mjs', 'public/lang/en.json'];
+const EXTRA_MEMBERS = [
+  'client/applications/api/application.mjs',
+  'client/applications/api/dialog.mjs',
+  'public/lang/en.json',
+];
 
 /**
  * Whole subtrees to harvest beyond the stylesheet closure.
@@ -357,9 +367,7 @@ export function harvestChrome({ repoRoot, archivePath, force = false, log = () =
  */
 export function buildProvenance(cache) {
   const { manifest } = cache;
-  const applicationMjs = manifest.assets.find(
-    (asset) => asset.path === 'client/applications/api/application.mjs'
-  );
+  const digestOf = (path) => manifest.assets.find((asset) => asset.path === path)?.sha256 ?? null;
   return {
     schemaVersion: PROVENANCE_SCHEMA_VERSION,
     foundryVersion: manifest.foundryVersion,
@@ -369,7 +377,13 @@ export function buildProvenance(cache) {
       name: manifest.source.name,
       sha256: manifest.source.sha256,
     },
-    chromeMarkup: { applicationMjsSha256: applicationMjs?.sha256 ?? null },
+    // One digest per module the frame builders were transcribed from. Two halves of one artefact:
+    // rendering a newer module's behaviour through markup transcribed from an older build gives
+    // genuine CSS around a stale DOM, and the PNG cannot tell you which.
+    chromeMarkup: {
+      applicationMjsSha256: digestOf('client/applications/api/application.mjs'),
+      dialogMjsSha256: digestOf('client/applications/api/dialog.mjs'),
+    },
     assets: manifest.assets.map((asset) => ({
       path: asset.path,
       bytes: asset.bytes,

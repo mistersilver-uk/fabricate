@@ -14,6 +14,7 @@ import { flushSync, mount } from 'svelte';
 
 import { APP_CHROME } from '../../scripts/lib/foundryChromeSpec.js';
 import { assertWindowGeometry, buildAppWindow, configureLabPage } from './foundryFrame.js';
+import { DEFAULT_LAB_DIALOG_ANSWER } from './foundryDialog.js';
 import { buildLabWorld } from './world/labWorld.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
@@ -72,6 +73,11 @@ function readParams() {
         ? { width: Number(params.get('w')), height: Number(params.get('h')) }
         : null,
     chromeOnly: params.get('chromeOnly') === '1',
+    // How the lab answers a Foundry DialogV2: `open` to leave it standing for the screenshot,
+    // `enter` (the default) to press whichever button Foundry marks default, or a button action by
+    // name. A case that wants a dialog IN FRAME must ask for `dialog=open` — see `foundryDialog.js`
+    // for why leaving every dialog open by default silently rewrote a shipped frame.
+    dialog: params.get('dialog') ?? DEFAULT_LAB_DIALOG_ANSWER,
   };
 }
 
@@ -160,9 +166,15 @@ async function mountManagerApp(content, params) {
  * The gate is: let microtasks and Svelte effects settle, then require the DOM to be quiet for a
  * short window, then let two frames paint. A timeout throws with the case named rather than hanging.
  *
- * @param {HTMLElement} root Subtree to watch.
+ * Takes a LIST of roots because a Foundry `DialogV2` is a sibling of the application window, not a
+ * child of it (`_insertElement` appends to `document.body`) — so a dialog opened by a step is
+ * outside the frame's subtree and would otherwise be neither observed nor image-decoded before the
+ * capture, even though it lands on top of the frame in the photograph.
+ *
+ * @param {HTMLElement[]} roots Subtrees to watch.
+ * @param {object|null} [services] Player service bag, whose stores are waited on.
  */
-async function settle(root, services = null) {
+async function settle(roots, services = null) {
   for (let pass = 0; pass < 6; pass++) {
     await Promise.resolve();
     flushSync();
@@ -199,21 +211,36 @@ async function settle(root, services = null) {
       observer.disconnect();
       resolve();
     };
-    observer.observe(root, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      characterData: true,
-    });
+    for (const root of roots) {
+      observer.observe(root, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true,
+      });
+    }
     quietTimer = setTimeout(finish, 120);
   });
 
   await document.fonts.ready;
-  const images = [...root.querySelectorAll('img')].filter((img) => img.getAttribute('src'));
+  const images = roots
+    .flatMap((root) => [...root.querySelectorAll('img')])
+    .filter((img) => img.getAttribute('src'));
   await Promise.all(
     images.map((img) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()))
   );
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+/**
+ * The subtrees a settle pass has to watch: the application window, plus any dialog standing over it.
+ *
+ * @param {HTMLElement} frame The application frame.
+ * @param {object|null} world The lab world, or null for a chrome-only render.
+ * @returns {HTMLElement[]} Roots to observe.
+ */
+function labSettleRoots(frame, world) {
+  return [frame, ...(world ? world.shim.openDialogs() : [])];
 }
 
 async function boot() {
@@ -245,11 +272,13 @@ async function boot() {
     // Player frames must render as a NON-GM viewer or redaction never engages; the world had to be
     // built as GM, so the flip happens here, after initialization and before the services are built.
     world.shim.setViewer(params.appId === 'fabricate-app' ? 'player' : 'gm');
+    // Before any step can click something that confirms.
+    world.shim.setDialogAnswer(params.dialog);
     mounted =
       params.appId === 'fabricate-app'
         ? await mountPlayerApp(built.content, params)
         : await mountManagerApp(built.content, params);
-    await settle(built.frame, mounted?.services ?? null);
+    await settle([built.frame], mounted?.services ?? null);
   } else {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -263,7 +292,12 @@ async function boot() {
     services: mounted?.services ?? null,
     store: mounted?.store ?? null,
     frame: built.frame,
-    settle: () => settle(built.frame, mounted?.services ?? null),
+    // The dialogs standing in the page, so a case can assert one opened and the driver can settle
+    // it. `frame.screenshot()` clips the PAGE to the frame's box rather than rendering the frame in
+    // isolation, so a dialog centred in the viewport lands on top of the window in the capture —
+    // which is where Foundry puts it.
+    dialogs: () => (world ? world.shim.openDialogs() : []),
+    settle: () => settle(labSettleRoots(built.frame, world), mounted?.services ?? null),
   };
   document.body.setAttribute(READY_ATTRIBUTE, params.caseId ?? params.appId);
 }

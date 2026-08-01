@@ -18,6 +18,7 @@
  *   drifting from production's.
  */
 import { installLabRandom } from './labRandom.js';
+import { createLabDialogV2 } from '../foundryDialog.js';
 import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
 
 /**
@@ -583,13 +584,19 @@ export function installFoundryShim(world) {
     }
   }
 
+  // A REAL DialogV2, drawn from Foundry's own `client/applications/api/dialog.mjs`. It used to be
+  // `class {}`, which made `confirmDialog` return false unconditionally (`foundryBridge.js`:105) —
+  // so every Fabricate confirmation was unreachable and three registry cases could photograph the
+  // screen behind a dialog but never the dialog. See `../foundryDialog.js`.
+  const dialogs = createLabDialogV2({ localize: world.i18n.localize });
+
   globalThis.foundry = {
     utils,
     applications: {
       api: {
         ApplicationV2: LabApplicationV2,
         HandlebarsApplicationMixin: (base) => base,
-        DialogV2: class {},
+        DialogV2: dialogs.DialogV2,
       },
       ux: { TextEditor: createTextEditor(world.documents) },
       instances: new Map(),
@@ -612,6 +619,20 @@ export function installFoundryShim(world) {
      */
     setViewer(role) {
       game.user = role === 'player' ? playerUser : gmUser;
+    },
+    /**
+     * Choose how the lab answers a dialog Foundry would wait on a human for: `open` to leave it
+     * standing for a screenshot, `enter` (the default) to press whichever button Foundry marks
+     * default, or a button action by name.
+     *
+     * @param {string} answer Answer mode.
+     */
+    setDialogAnswer(answer) {
+      dialogs.setAnswer(answer);
+    },
+    /** @returns {HTMLElement[]} The dialog elements currently rendered into the page. */
+    openDialogs() {
+      return dialogs.openDialogs();
     },
     restore() {
       random.restore();

@@ -3,10 +3,11 @@
  * descriptors it reproduces it for.
  *
  * This module is a TRANSCRIPTION, not an invention. Every value below is copied from Foundry's
- * own `client/applications/api/application.mjs` and `client/game.mjs`, and
- * `tests/view-lab-chrome-drift.test.js` re-reads the harvested source to prove the transcription
- * still matches. Do not "improve" anything here — if a value looks wrong, it is because Foundry
- * does it that way, and changing it makes the lab render something production never shows.
+ * own `client/applications/api/application.mjs`, `client/applications/api/dialog.mjs`, and
+ * `client/game.mjs`, and `tests/view-lab-chrome-drift.test.js` re-reads the harvested source to
+ * prove the transcription still matches. Do not "improve" anything here — if a value looks wrong,
+ * it is because Foundry does it that way, and changing it makes the lab render something
+ * production never shows.
  *
  * Pure data + string builders only: no DOM, so the drift test can run under `node --test`.
  */
@@ -89,6 +90,143 @@ export const FOUNDRY_CHROME_SPEC = Object.freeze({
    */
   toolLabelFallbacks: Object.freeze({ toggleControls: 'Toggle Controls', close: 'Close' }),
 });
+
+/**
+ * Foundry V13's `DialogV2` (`client/applications/api/dialog.mjs`), transcribed exactly as
+ * {@link FOUNDRY_CHROME_SPEC} transcribes the window frame.
+ *
+ * A confirmation dialog is Foundry's chrome, not Fabricate's: `foundryBridge.confirmDialog` hands
+ * `DialogV2.confirm` a title, some content and two button labels, and every element, class and
+ * attribute around them is drawn by this module. Reproducing it from Foundry's own source under
+ * the same never-commit rule and the same drift gate is what makes it genuine; drawing a Svelte
+ * lookalike would be a facsimile, which this harness must never publish.
+ *
+ * The frame itself is inherited unchanged — `DialogV2` does not override `_renderFrame` — so the
+ * header, title, controls dropdown and content element all come from {@link FOUNDRY_CHROME_SPEC}.
+ * What is new here is the `<dialog>` tag, the `dialog` class, and the form the dialog puts in the
+ * `.window-content`.
+ */
+export const FOUNDRY_DIALOG_SPEC = Object.freeze({
+  /** `static DEFAULT_OPTIONS` (dialog.mjs:140-152). */
+  defaultOptions: Object.freeze({
+    id: 'dialog-{id}',
+    classes: Object.freeze(['dialog']),
+    tag: 'dialog',
+    form: Object.freeze({ closeOnSubmit: true }),
+    window: Object.freeze({ frame: true, positioned: true, minimizable: false }),
+  }),
+  /** `_renderHTML`: `form.className = "dialog-form standard-form"` / `form.autocomplete = "off"`. */
+  formClassName: 'dialog-form standard-form',
+  formAutocomplete: 'off',
+  /**
+   * `_renderHTML`'s template literal, reproduced character for character including its whitespace,
+   * so the drift test can find it verbatim in the harvested source.
+   *
+   * @param {string} content Dialog content HTML (empty for a contentless dialog).
+   * @param {string} buttonsHtml The joined `outerHTML` of the rendered buttons.
+   * @returns {string} The form's inner HTML.
+   */
+  formInnerHtml: (content, buttonsHtml) => `
+      ${content ? `<div class="dialog-content standard-form">${content}</div>` : ''}
+      <footer class="form-footer">${buttonsHtml}</footer>
+    `,
+  /**
+   * `_renderButtons`' destructuring defaults:
+   * `const { action, label, icon, class: cls="", style={}, type="submit", disabled } = buttonOptions`.
+   */
+  buttonDefaults: Object.freeze({ class: '', type: 'submit' }),
+  /**
+   * `_renderButtons`:
+   * `const isDefault = !!buttonOptions.default || ((i === 0) && !buttons.some(b => b.default))`.
+   *
+   * It decides which button gets `autofocus`, and `confirm` puts `default: true` on **No** — so in
+   * a Fabricate confirmation the focused button is the one that declines.
+   *
+   * @param {ReadonlyArray<{default?: boolean}>} buttons All buttons, in render order.
+   * @param {number} index Index of the button being rendered.
+   * @returns {boolean} Whether this button is the default.
+   */
+  isDefaultButton: (buttons, index) =>
+    // `every(not)` rather than Foundry's `!some(...)`, which `unicorn/no-negated-array-predicate`
+    // rejects. Identical semantics, and the drift test pins Foundry's own wording of the line.
+    Boolean(buttons[index].default) || (index === 0 && buttons.every((button) => !button.default)),
+  /**
+   * `confirm`'s `position` merge: `this.wait(foundry.utils.mergeObject({ position: { width: 400 } },
+   * config))` — so 400 is a floor the caller overrides, not a fixed width.
+   */
+  factoryPosition: Object.freeze({ width: 400 }),
+});
+
+/**
+ * The two buttons `DialogV2.confirm` unshifts onto the caller's list (dialog.mjs:315-323).
+ *
+ * `mergeObject` is reproduced as a spread: every field of a button descriptor is a scalar, an
+ * `icon` string or a callback, so a recursive merge and a shallow one agree. The one field where
+ * they could differ is `style`, and no Fabricate caller passes one.
+ *
+ * @param {object} [overrides] Caller overrides.
+ * @param {object} [overrides.yes] `config.yes`.
+ * @param {object} [overrides.no] `config.no`.
+ * @returns {Array<object>} The yes/no descriptors, in Foundry's order.
+ */
+export function confirmDialogButtons({ yes = {}, no = {} } = {}) {
+  return [
+    { action: 'yes', label: 'Yes', icon: 'fa-solid fa-check', callback: () => true, ...yes },
+    {
+      action: 'no',
+      label: 'No',
+      icon: 'fa-solid fa-xmark',
+      default: true,
+      callback: () => false,
+      ...no,
+    },
+  ];
+}
+
+/**
+ * Resolve the frame description Foundry would render a `DialogV2` with.
+ *
+ * `_initializeApplicationOptions` merges, in inheritance order, ApplicationV2's `DEFAULT_OPTIONS`
+ * (application.mjs:59-84), then DialogV2's (dialog.mjs:140-152), then the caller's config — arrays
+ * concatenating and objects merging (`#mergeApplicationOptions`, application.mjs:419-432) — and
+ * finally unshifts `"application"` onto the class list. Each field below cites the line it comes
+ * from rather than being re-derived, because a wrong default here draws a window Foundry never does.
+ *
+ * @param {object} [config] The configuration handed to `DialogV2.confirm` / `wait`.
+ * @returns {{tag: string, classes: string[], window: object, position: object}}
+ */
+export function resolveDialogChrome(config = {}) {
+  const declared = config.window ?? {};
+  return {
+    // dialog.mjs:143 — a `<dialog>`, not a `<div>`; `.application.dialog:not([open])` is
+    // `display: none`, so it is invisible until `show()`/`showModal()`.
+    tag: FOUNDRY_DIALOG_SPEC.defaultOptions.tag,
+    classes: frameClassesFor({
+      // dialog.mjs:142 `classes: ["dialog"]`, concatenated with the caller's.
+      classes: [...FOUNDRY_DIALOG_SPEC.defaultOptions.classes, ...(config.classes ?? [])],
+      // dialog.mjs:148 `frame: true`, which is what makes `application` get unshifted.
+      window: { frame: FOUNDRY_DIALOG_SPEC.defaultOptions.window.frame },
+    }),
+    window: {
+      // application.mjs:66-67 — DialogV2 overrides neither, so a dialog with no `window.title`
+      // renders an empty title bar and a hidden icon.
+      title: declared.title ?? '',
+      icon: declared.icon ?? '',
+      // application.mjs:68-72.
+      controls: declared.controls ?? [],
+      resizable: declared.resizable ?? false,
+      contentTag: declared.contentTag ?? 'section',
+      contentClasses: declared.contentClasses ?? [],
+    },
+    position: {
+      // application.mjs:80-83 `width: "auto", height: "auto"`. `confirm`'s `width: 400` is NOT
+      // applied here: it is merged into the config by the factory (dialog.mjs:322), so a dialog
+      // constructed directly keeps Foundry's auto width.
+      width: config.position?.width ?? 'auto',
+      height: config.position?.height ?? 'auto',
+    },
+  };
+}
 
 /**
  * The Fabricate windows the lab can draw. Mirrors each application's `static DEFAULT_OPTIONS`;
