@@ -42,6 +42,11 @@ const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: '
   .split('\0')
   .filter(Boolean);
 
+/** Selector tokens are matched as regular expressions, so their own metacharacters must not be. */
+function escapeForRegExp(value) {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
 test('case ids are unique and non-empty', () => {
   assert.equal(new Set(caseIds).size, caseIds.length, 'duplicate case id');
   for (const id of caseIds) {
@@ -172,7 +177,14 @@ test('every interaction step names text that exists in the manager UI', () => {
         continue;
       }
       for (const token of tokens) {
-        if (haystack.includes(token)) continue;
+        // Anchored on a WORD BOUNDARY, not a bare substring. `haystack.includes(token)` passes on
+        // a coincidence whenever one hook name is a prefix of another: renaming the real
+        // `data-component-select` left `data-component-select-all-page` in a sibling component, the
+        // substring still matched, and the guard stayed green over six broken selectors. Verified
+        // by that exact negative control. `[\w-]` is the character class an attribute or class name
+        // continues with, so requiring the next character not to be one of them is what makes a
+        // prefix stop matching its own longer sibling.
+        if (new RegExp(String.raw`${escapeForRegExp(token)}(?![\w-])`).test(haystack)) continue;
         missing.push(
           `${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`
         );

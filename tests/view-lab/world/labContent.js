@@ -262,30 +262,44 @@ const SMITHING_COMPONENTS = [
   // reference WITH its separator (a stranded ", ." is the reported defect), and carries no
   // GM-gated span at all — a `data-visibility="gm"` fragment must never survive into a stored,
   // player-visible description.
-  component('sm-desc-raw', 'Ember Quenching Oil', 'consumables/potions/bottle-conical-corked-yellow.webp', {
-    categories: ['Reagents'],
-    tags: ['reagent'],
-    difficulty: 5,
-    description:
-      'Quench with: @UUID[Compendium.dnd5e.items.Item.6BgAoYuMzpUuGaFB], ' +
-      '@UUID[Compendium.dnd5e.items.Item.SFI4b4wJhg5aSJqL]{Flask of Oil}, ' +
-      '@UUID[Compendium.dnd5e.items.Item.doesnotexist0000]. ' +
-      'Burns for [[/r 1d4]]{1d4 rounds} dealing [[2d6]] fire damage.',
-  }),
-  component('sm-desc-repaired', 'Rimefrost Quenching Oil', 'consumables/potions/bottle-conical-corked-green.webp', {
-    categories: ['Reagents'],
-    tags: ['reagent'],
-    difficulty: 5,
-    description:
-      'Quench with: Acid, Flask of Oil. Burns for 1d4 rounds dealing 2d6 fire damage.',
-  }),
-  component('sm-desc-ingested', 'Ashfall Reagent Case', 'containers/chest/chest-worn-oak-tan.webp', {
-    categories: ['Reagents'],
-    tags: ['reagent'],
-    difficulty: 3,
-    description:
-      'Contains: Acid, Flask of Oil. Each vial keeps for [[/r 2d6]]{2d6 days} once the seal is broken.',
-  }),
+  component(
+    'sm-desc-raw',
+    'Ember Quenching Oil',
+    'consumables/potions/bottle-conical-corked-yellow.webp',
+    {
+      categories: ['Reagents'],
+      tags: ['reagent'],
+      difficulty: 5,
+      description:
+        'Quench with: @UUID[Compendium.dnd5e.items.Item.6BgAoYuMzpUuGaFB], ' +
+        '@UUID[Compendium.dnd5e.items.Item.SFI4b4wJhg5aSJqL]{Flask of Oil}, ' +
+        '@UUID[Compendium.dnd5e.items.Item.doesnotexist0000]. ' +
+        'Burns for [[/r 1d4]]{1d4 rounds} dealing [[2d6]] fire damage.',
+    }
+  ),
+  component(
+    'sm-desc-repaired',
+    'Rimefrost Quenching Oil',
+    'consumables/potions/bottle-conical-corked-green.webp',
+    {
+      categories: ['Reagents'],
+      tags: ['reagent'],
+      difficulty: 5,
+      description: 'Quench with: Acid, Flask of Oil. Burns for 1d4 rounds dealing 2d6 fire damage.',
+    }
+  ),
+  component(
+    'sm-desc-ingested',
+    'Ashfall Reagent Case',
+    'containers/chest/chest-worn-oak-tan.webp',
+    {
+      categories: ['Reagents'],
+      tags: ['reagent'],
+      difficulty: 3,
+      description:
+        'Contains: Acid, Flask of Oil. Each vial keeps for [[/r 2d6]]{2d6 days} once the seal is broken.',
+    }
+  ),
   // Half of the multi-system stack (issue 766). ONE physical item, registered as a component in
   // TWO systems, must collapse to a single inventory card carrying a system selector. The
   // collapse key is `item.uuid` ALONE, so both halves declare the SAME `originItemUuid` and the
@@ -1217,8 +1231,8 @@ const SMITHING_TOOLS = [
     originItemUuid: 'Item.sm-tool-hammer',
     img: `${ICON_BASE}/tools/smithing/hammer-sledge-steel-grey.webp`,
     aliasItemUuids: [],
-    breakage: { enabled: true, chance: 5 },
-    onBreak: { action: 'consume', replacementComponentId: null },
+    breakage: { mode: 'breakageChance', breakageChance: 5 },
+    onBreak: { mode: 'destroy' },
   },
   {
     id: 'sm-tool-anvil',
@@ -1228,7 +1242,7 @@ const SMITHING_TOOLS = [
     originItemUuid: 'Item.sm-tool-anvil',
     img: `${ICON_BASE}/tools/smithing/anvil.webp`,
     aliasItemUuids: [],
-    breakage: { enabled: false, chance: 0 },
+    breakage: { mode: 'limitedUses', maxUses: null },
   },
   {
     id: 'sm-tool-tongs',
@@ -1238,7 +1252,7 @@ const SMITHING_TOOLS = [
     originItemUuid: 'Item.sm-tool-tongs',
     img: `${ICON_BASE}/tools/smithing/tongs-steel-grey.webp`,
     aliasItemUuids: [],
-    breakage: { enabled: true, chance: 2 },
+    breakage: { mode: 'breakageChance', breakageChance: 2 },
   },
 ];
 
@@ -1251,7 +1265,7 @@ const HERBALISM_TOOLS = [
     originItemUuid: 'Item.hb-tool-mortar',
     img: `${ICON_BASE}/tools/cooking/mortar-stone-yellow.webp`,
     aliasItemUuids: [],
-    breakage: { enabled: false, chance: 0 },
+    breakage: { mode: 'limitedUses', maxUses: 25 },
   },
   {
     id: 'hb-tool-alembic',
@@ -1261,8 +1275,11 @@ const HERBALISM_TOOLS = [
     originItemUuid: 'Item.hb-tool-alembic',
     img: `${ICON_BASE}/tools/laboratory/alembic-glass-ball-blue.webp`,
     aliasItemUuids: [],
-    breakage: { enabled: true, chance: 8 },
-    onBreak: { action: 'consume', replacementComponentId: 'hb-empty-vial' },
+    breakage: { mode: 'breakageChance', breakageChance: 8 },
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'component', componentId: 'hb-empty-vial' },
+    },
   },
 ];
 
@@ -1441,7 +1458,10 @@ const RUNEWORK_TOOLS = [
     breakage: { mode: 'diceExpression', formula: '1d20', threshold: 3 },
     // A CHOSEN replacement target: an unchosen one renders the picker in its empty state and
     // fails the editor's own `onBreak` validity check, which is a different frame entirely.
-    onBreak: { mode: 'replaceWith', replacementTarget: { type: 'component', componentId: 'rw-slag' } },
+    onBreak: {
+      mode: 'replaceWith',
+      replacementTarget: { type: 'component', componentId: 'rw-slag' },
+    },
   },
   {
     id: 'rw-tool-anvilstone',
@@ -1541,7 +1561,13 @@ const GATHERING_TASKS = [
     // the "timed, ready" and "timed, already running" pair two different screens rather than one.
     timeRequirement: { hours: 6 },
     dropRows: [
-      { id: 'hb-slowbloom-drop', componentId: 'hb-emberbloom', quantity: 1, dropRate: 85, enabled: true },
+      {
+        id: 'hb-slowbloom-drop',
+        componentId: 'hb-emberbloom',
+        quantity: 1,
+        dropRate: 85,
+        enabled: true,
+      },
     ],
   },
   {
@@ -1558,7 +1584,13 @@ const GATHERING_TASKS = [
     // is refused with TOOL_BLOCKED before any roll.
     toolIds: ['hb-tool-alembic'],
     dropRows: [
-      { id: 'hb-icecap-drop', componentId: 'hb-frostcap', quantity: 2, dropRate: 75, enabled: true },
+      {
+        id: 'hb-icecap-drop',
+        componentId: 'hb-frostcap',
+        quantity: 2,
+        dropRate: 75,
+        enabled: true,
+      },
     ],
   },
   {
@@ -1573,7 +1605,13 @@ const GATHERING_TASKS = [
     // dropRate 100: the "after a successful gather" frame has to be reached by actually
     // gathering, and a probabilistic drop would make the frame depend on the seeded PRNG's mood.
     dropRows: [
-      { id: 'hb-ridgemoss-drop', componentId: 'hb-bitterbark', quantity: 2, dropRate: 100, enabled: true },
+      {
+        id: 'hb-ridgemoss-drop',
+        componentId: 'hb-bitterbark',
+        quantity: 2,
+        dropRate: 100,
+        enabled: true,
+      },
     ],
   },
   {
@@ -2231,7 +2269,9 @@ export function buildLabContent() {
       // rows, so switching it on for the default system would move the already-captured recipe
       // and tool frames. Runework has no tools, and the two cases that render it are a recipe
       // editor's Results tab and the Checks view, neither of which reads the flag.
-      requirements: { currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS } },
+      requirements: {
+        currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS },
+      },
     },
   ];
 
