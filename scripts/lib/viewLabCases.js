@@ -68,6 +68,56 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
   ].join('|')
 );
 
+/**
+ * The player crafting app, split by which resolution mode's body a file belongs to.
+ *
+ * Every crafting case used to carry one blanket `^src/ui/svelte/apps/crafting/` pattern, so a change
+ * to `detail/ProgressiveBody.svelte` selected all 27 crafting frames when only the four progressive
+ * ones render it — 2.5 minutes of capture to answer a question four frames answer. Targeting that
+ * over-selects is not wrong, but it is what makes a per-PR capture feel expensive enough to skip.
+ *
+ * The split is derived from the real import graph, not guessed. `RecipeDetail.svelte:69-72` maps
+ * mode -> body component, and exactly four bodies exist; each is imported ONLY by `RecipeDetail`,
+ * and three of them own one further component apiece that nothing else imports. Everything else
+ * under `crafting/` — `RecipeBodyShell`, `IoTable`, `RequirementRail`, `CraftingCheckCard`,
+ * `EssencePoolPanel` and the rest — is reached from more than one body and stays shared.
+ *
+ * `tests/view-lab-cases.test.js` derives each case's mode from the fixture recipe its steps select
+ * and asserts the case carries the matching pattern, so this cannot drift by hand-editing.
+ */
+const CRAFTING_MODE_FILES = Object.freeze({
+  simple: ['SimpleRecipeBody', 'StepRequirementsList'],
+  routedByIngredients: ['IngredientRoutedBody'],
+  routedByCheck: ['RoutedByCheckBody', 'OutcomeTierTable'],
+  progressive: ['ProgressiveBody', 'ProgressiveStageList'],
+});
+
+/** Everything under `crafting/` that is NOT one mode's own body. Applies to every crafting case. */
+const CRAFTING_SHARED = new RegExp(
+  '^src/ui/svelte/apps/crafting/(?!detail/(' +
+    Object.values(CRAFTING_MODE_FILES).flat().join('|') +
+    String.raw`)\.svelte$)`
+);
+
+/**
+ * The body files one resolution mode owns.
+ *
+ * @param {string} mode One of `CRAFTING_MODE_FILES`' keys.
+ * @returns {RegExp} Pattern matching only that mode's body files.
+ */
+function craftingMode(mode) {
+  return new RegExp(
+    '^src/ui/svelte/apps/crafting/detail/(' +
+      CRAFTING_MODE_FILES[mode].join('|') +
+      String.raw`)\.svelte$`
+  );
+}
+
+const CRAFTING_SIMPLE = craftingMode('simple');
+const CRAFTING_ROUTED_INGREDIENTS = craftingMode('routedByIngredients');
+const CRAFTING_ROUTED_CHECK = craftingMode('routedByCheck');
+const CRAFTING_PROGRESSIVE = craftingMode('progressive');
+
 /** One player screen and one manager screen: enough to show a shared-primitive change in context. */
 const REPRESENTATIVE_CASE_IDS = Object.freeze(['fabricate-app-shell', 'manager-components-normal']);
 
@@ -1954,7 +2004,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
+      CRAFTING_SHARED,
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
     ],
@@ -2268,10 +2318,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1100, height: 760 },
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-ingredient-routed',
@@ -2282,7 +2329,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="jw-r-cast"]' }],
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
+      CRAFTING_SHARED,
+      CRAFTING_ROUTED_INGREDIENTS,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
@@ -2295,7 +2343,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' }],
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
+      CRAFTING_SHARED,
+      CRAFTING_ROUTED_CHECK,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
@@ -2323,10 +2372,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-roll-result',
@@ -2355,10 +2401,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-essence-alternative',
@@ -2381,10 +2424,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-quenchoil"]' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-alternatives',
@@ -2394,10 +2434,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' }],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-essence-legacy',
@@ -2420,10 +2457,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-essence-ingredient',
@@ -2433,10 +2467,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-emberbrand"]' }],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-essence-shopping',
@@ -2461,10 +2492,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-slot-rail',
@@ -2485,10 +2513,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-tag-unmatched',
@@ -2506,10 +2531,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-silver-ingot"]' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-essence-pool',
@@ -2519,10 +2541,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' }],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-pick-for-me',
@@ -2553,10 +2572,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.requirement-rail-wand' },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-essence-pool-shared',
@@ -2588,10 +2604,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-consumption-plan',
@@ -2601,10 +2614,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-shield"]' }],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-multistep',
@@ -2614,10 +2624,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' }],
     kinds: ['player', 'crafting'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-crafting-progressive',
@@ -2640,7 +2647,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
+      CRAFTING_SHARED,
+      CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
@@ -2662,7 +2670,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
+      CRAFTING_SHARED,
+      CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
@@ -2683,7 +2692,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     kinds: ['player', 'crafting'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
+      CRAFTING_SHARED,
+      CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
@@ -2714,7 +2724,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
+      CRAFTING_SHARED,
+      CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
   }),
@@ -2727,10 +2738,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [],
     position: { width: 1024, height: 860 },
     kinds: ['player', 'crafting', 'responsive'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/crafting\//,
-      /^src\/ui\/svelte\/stores\/craftingStore/,
-    ],
+    sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
     id: 'player-alchemy-chooser',
@@ -2874,7 +2882,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' }],
     kinds: ['player', 'crafting', 'resolution-mode'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/crafting\//],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE],
   }),
   // KNOWN GAP — no `coverage-mode-progressive-detail`. The only progressive system in the fixture
   // is `lab-herbalism`, which is knowledge-gated on purpose (that is what makes the Books & Scrolls
@@ -2893,7 +2901,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // and one short — which is the only way a routed body's routing is visible at all.
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="jw-r-cast"]' }],
     kinds: ['player', 'crafting', 'resolution-mode'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/crafting\//],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_INGREDIENTS],
   }),
   playerCase({
     id: 'coverage-mode-routed-check-detail',
@@ -2903,7 +2911,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' }],
     kinds: ['player', 'crafting', 'resolution-mode'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/crafting\//],
+    sourceMatches: [CRAFTING_SHARED, CRAFTING_ROUTED_CHECK],
   }),
   // Visibility mode changes which rails EXIST, not merely what they contain — a restricted system
   // has an Access rail, a knowledge-gated one has Books & Scrolls and Knowledge, a global one has
@@ -3002,7 +3010,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting', experimental: '0' },
     steps: [],
     kinds: ['player', 'crafting', 'settings'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/crafting\//],
+    sourceMatches: [CRAFTING_SHARED],
   }),
 ]);
 

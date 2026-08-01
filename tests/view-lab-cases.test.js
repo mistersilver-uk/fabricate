@@ -33,7 +33,12 @@ import {
   publishableCases,
 } from '../scripts/lib/viewLabCases.js';
 
+import { buildLabContent } from './view-lab/world/labContent.js';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The fixture world, for checks that must derive a case's truth rather than trust its author. */
+const content = buildLabContent();
 
 /** The viewport the capture driver uses; asserted here so the arithmetic is gated, not just run. */
 const CAPTURE_VIEWPORT = { width: 1920, height: 1080 };
@@ -348,6 +353,88 @@ test('no two cases claiming exact reach produce the same frame', () => {
       'a picture of something other than what it names. Give each the steps, query or geometry that ' +
       'distinguishes it, or downgrade the ones that fall short to `window`:\n  ' +
       collisions.join('\n  ')
+  );
+});
+
+test('every crafting case claims exactly the resolution-mode body it renders', () => {
+  // The crafting cases carry a per-MODE `sourceMatches` pattern so that editing
+  // `detail/ProgressiveBody.svelte` selects the four progressive frames rather than all 27. That
+  // narrowing is only safe while each case's declared mode matches the mode it actually renders,
+  // and the case list is hand-maintained — so derive the truth from the fixture instead.
+  //
+  // `resolutionMode` is a SYSTEM property (`labContent.js`), so a case's mode is the mode of the
+  // system owning the recipe its steps select. A case that opens no recipe detail renders no body
+  // and must claim none.
+  const modeOfSystem = new Map(
+    content.systems.map((system) => [system.id, system.resolutionMode ?? null])
+  );
+  const systemOfRecipe = new Map(
+    content.recipes.map((recipe) => [recipe.id, recipe.craftingSystemId])
+  );
+  const MODE_PATTERN_FILES = {
+    simple: 'SimpleRecipeBody',
+    routedByIngredients: 'IngredientRoutedBody',
+    routedByCheck: 'RoutedByCheckBody',
+    progressive: 'ProgressiveBody',
+  };
+
+  // `RegExp.source` escapes every forward slash, so a literal `apps/crafting` never matches it.
+  // Comparing against the unescaped form is what makes this check non-vacuous — the first draft
+  // examined zero cases and passed.
+  const plain = (pattern) => pattern.source.replaceAll('\\', '');
+
+  const examined = [];
+  const wrong = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    const claimsCrafting = viewCase.sourceMatches.some((pattern) =>
+      plain(pattern).includes('apps/crafting')
+    );
+    if (!claimsCrafting) continue;
+    examined.push(viewCase.id);
+
+    const step = (viewCase.steps ?? []).find(
+      (entry) => typeof entry === 'object' && /data-recipe-id="([^"]+)"/.test(entry.selector ?? '')
+    );
+    const recipeId = step ? /data-recipe-id="([^"]+)"/.exec(step.selector)[1] : null;
+    const expected = recipeId ? (modeOfSystem.get(systemOfRecipe.get(recipeId)) ?? null) : null;
+
+    for (const [mode, file] of Object.entries(MODE_PATTERN_FILES)) {
+      const claimed = viewCase.sourceMatches.some(
+        (pattern) => plain(pattern).includes(file) && !plain(pattern).includes('?!')
+      );
+      const shouldClaim = expected === mode;
+      if (claimed !== shouldClaim) {
+        wrong.push(
+          `${viewCase.id}: renders ${expected ?? 'no body'} but ${claimed ? 'claims' : 'does not claim'} ${mode}`
+        );
+      }
+    }
+  }
+
+  assert.deepEqual(
+    wrong,
+    [],
+    'these crafting cases declare a resolution-mode body they do not render, or omit the one they ' +
+      'do — either way the changed-file mapping sends a reviewer the wrong frames:\n  ' +
+      wrong.join('\n  ')
+  );
+
+  // The check above is only worth anything if it looked at the cases. It did not, in its first
+  // draft, and passed clean.
+  assert.equal(
+    examined.length,
+    27,
+    `expected the 27 crafting cases to be examined, saw ${examined.length}`
+  );
+  assert.ok(
+    examined.filter((id) =>
+      getCaseById(id).sourceMatches.some((pattern) =>
+        /SimpleRecipeBody|IngredientRoutedBody|RoutedByCheckBody|ProgressiveBody/.test(
+          pattern.source.replaceAll('\\', '')
+        )
+      )
+    ).length >= 20,
+    'expected most crafting cases to claim a resolution-mode body'
   );
 });
 
