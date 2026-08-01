@@ -79,14 +79,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipes editor roundtrip',
     app: MANAGER,
     smokeLabels: ['manager-recipes-editor-roundtrip'],
-    reaches: 'window',
+    // The state is what SURVIVED a round trip, so every step is load-bearing: filter to a
+    // category, select a row into the shared inspector (the collapse below leaves no row to
+    // click), collapse the group, open the editor from the inspector, and come back. The frame is
+    // the browser afterwards — filter chip still lit, group still collapsed, zero rows rendered.
+    reaches: 'exact',
     query: {},
-    steps: ['Crafting'],
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-category-filter]', select: 'Weaponsmithing' },
+      { selector: '.manager-recipe-row .manager-recipe-identity' },
+      { selector: '.manager-recipe-group [data-group-header]' },
+      { selector: '.manager-recipe-browser-inspector [data-recipe-action="edit"]' },
+      { selector: '.manager-header-actions .manager-button.is-ghost' },
+    ],
     expectView: 'recipes',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
@@ -116,9 +127,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Selected normal',
     app: MANAGER,
     smokeLabels: ['manager-selected-normal'],
-    reaches: 'window',
+    // Reached the way the smoke reaches it: by CLICKING the system row's identity, which is what
+    // `selectSmokeSystemInManager` does. A seeded `lastManagedCraftingSystem` lands on the same
+    // scope, but a case that seeds it is evidence that the setting works, not that the row does.
+    //
+    // The resulting frame is the same screen as `manager-default-selection`, and that is faithful
+    // rather than a duplicate to be explained away: the smoke's own two counterparts
+    // (screenshot-13 / screenshot-14) are the same screen too, because it captures the default
+    // selection AFTER selecting and then re-clicks an already-selected row.
+    reaches: 'exact',
     query: {},
-    steps: [],
+    steps: [
+      { selector: '.manager-system-row[data-system-id="lab-smithing"] .manager-system-identity' },
+    ],
     expectView: 'systems',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -134,9 +155,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Rail expanded',
     app: MANAGER,
     smokeLabels: ['manager-rail-expanded'],
-    reaches: 'window',
+    // The smoke's counterpart is the EXPANDED baseline it establishes before collapsing: it enters
+    // the system scope, collapses the rail if it is not already expanded, and photographs that.
+    // Here the rail starts expanded, so the equivalent of "prove it is expanded because the toggle
+    // put it there" is a round trip through the toggle — collapse, expand — which also means this
+    // case fails loudly if the toggle stops restoring the rail, instead of quietly capturing a rail
+    // that merely never moved.
+    reaches: 'exact',
     query: {},
-    steps: [],
+    steps: [
+      { selector: '.manager-system-row[data-system-id="lab-smithing"] .manager-system-identity' },
+      { selector: '.manager-rail-toggle' },
+      { selector: '.manager-rail-toggle' },
+    ],
     expectView: 'systems',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -242,14 +273,26 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — System edit lists',
     app: MANAGER,
     smokeLabels: ['manager-system-edit-lists'],
-    reaches: 'window',
-    query: {},
-    steps: ['System Overview', { selector: '#system-tab-settings' }],
+    // The three settings-list cards together — Character modifiers, Character prerequisites and
+    // Currency Units — with one modifier open and its IconPicker down, and the Currency Units
+    // section collapsed to show whole-section collapse. That needs ONE system carrying all three,
+    // and herbalism is the only one that can: the modifiers card is gated on `gathering`, which
+    // Runework (the currency system) does not have.
+    reaches: 'exact',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '[data-section-collapse="currency"]' },
+      { selector: '[data-system-character-modifier] [data-toggle-character-modifier]' },
+      { selector: '[data-system-character-modifier] .essence-icon-picker-trigger' },
+      { selector: '[data-system-character-modifiers]', scroll: true },
+    ],
     expectView: 'system-edit',
     position: { width: 1280, height: 980 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'system-edit', 'window-only'],
+    kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   },
   {
@@ -362,14 +405,30 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipes no check',
     app: MANAGER,
     smokeLabels: ['manager-recipes-no-check'],
-    reaches: 'window',
+    // The row's "No check" warning pill is a SYSTEM-level fact, not a recipe one:
+    // `_buildRecipeCheckSummary` reports `kind: 'none'` for any non-`routedByIngredients` system
+    // whose check slot carries no authored roll formula — "check enabled" is not the same thing.
+    // Every lab system authors one, so the case CLEARS it, which is the GM action that produces
+    // this state and is the same fact the smoke reaches by switching to a system authored without
+    // one. Driven rather than fixtured because a permanently check-less system would strip the DC
+    // pill from the flagship recipe library every other recipe frame photographs.
+    reaches: 'exact',
     query: {},
-    steps: ['Crafting'],
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '' },
+      // The Checks view is a STAGED editor: typing only marks the draft dirty, and the browser's
+      // check pills read the PERSISTED system. Without this the case cleared the field, navigated
+      // away, and photographed twelve DC pills while claiming to show the no-check warning.
+      { selector: '[data-checks-save]' },
+      'Crafting',
+    ],
     expectView: 'recipes',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
@@ -380,14 +439,24 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipes grouped continuation',
     app: MANAGER,
     smokeLabels: ['manager-recipes-grouped-continuation'],
-    reaches: 'window',
+    // Page TWO of a grouped list: with "Group by category" on, ordering is category-major BEFORE
+    // pagination, so a category larger than the page continues across the boundary instead of
+    // being re-sliced alphabetically per page. The smoke seeds 14 rows into one category to force
+    // that; here the page is shrunk to 10 instead, which produces the same boundary against the
+    // library the other recipe frames photograph rather than a throwaway category that has to be
+    // seeded and torn down.
+    reaches: 'exact',
     query: {},
-    steps: ['Crafting'],
+    steps: [
+      'Crafting',
+      { selector: '.manager-main [data-pagination-size]', select: '10' },
+      { selector: '.manager-main [data-pagination-next]' },
+    ],
     expectView: 'recipes',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
@@ -398,8 +467,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Crafting group expanded',
     app: MANAGER,
     smokeLabels: ['manager-crafting-group-expanded'],
-    reaches: 'window',
-    query: {},
+    // The rail's Crafting GROUP expanded to all four subitems — Recipes, Books & Scrolls,
+    // Knowledge, Settings — over a multi-category recipe library. Books & Scrolls and Knowledge
+    // exist only for a knowledge-gated system (`buildCraftingNavItems`), so the default globally
+    // visible system advertises two of the four and cannot show this rail at all.
+    reaches: 'exact',
+    query: { system: 'lab-herbalism' },
     steps: ['Crafting'],
     expectView: 'recipes',
     position: { width: 1280, height: 820 },
@@ -449,14 +522,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe item validation',
     app: MANAGER,
     smokeLabels: ['manager-recipe-item-validation'],
-    reaches: 'window',
+    // The recipe-item editor's Validation tab in its ALL-CLEAR state. `hb-book` is the world's
+    // only definition that passes every check for a knowledge-gated system: it links a world item
+    // (`registeredItemUuid`), links three recipes, and caps learning at a positive number.
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Crafting', { selector: '#manager-crafting-nav-books-scrolls' }],
-    expectView: 'books-scrolls',
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="validation"]' },
+    ],
+    expectView: 'recipe-item-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'books-scrolls', 'window-only'],
+    kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
@@ -467,14 +548,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe item validation blocked',
     app: MANAGER,
     smokeLabels: ['manager-recipe-item-validation-blocked'],
-    reaches: 'window',
+    // The same tab in its BLOCKING state, which is a different summary card, a different count
+    // split and a Block pill on the offending row. `hb-primer` links a world item but no recipes,
+    // so `recipeLinked` fails — the one blocking check the fixture can hold without also breaking
+    // the owned-copy frames that read the same definition on the Knowledge surface.
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Crafting', { selector: '#manager-crafting-nav-books-scrolls' }],
-    expectView: 'books-scrolls',
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-primer"]' },
+      { selector: '[data-recipe-item-tab-button="validation"]' },
+    ],
+    expectView: 'recipe-item-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'books-scrolls', 'window-only'],
+    kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
@@ -509,9 +599,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-books-scrolls'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
+    // Pinned by row id rather than left on "whichever row is first". Recipes now carry the
+    // category the fixture always meant them to (`Recipe` reads the SINGULAR `category`), so the
+    // library groups category-major and the first row is no longer the alphabetically first
+    // recipe. Naming the recipe keeps this frame showing the same editor it has always shown.
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="hb-r-greater-healing"]' },
       { selector: '#recipe-tab-books-scrolls' },
     ],
     expectView: 'recipe-edit',
@@ -573,18 +667,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe edit ingredients cost',
     app: MANAGER,
     smokeLabels: ['manager-recipe-edit-ingredients-cost'],
-    reaches: 'window',
-    query: {},
+    // The essence + currency-cost requirement rows, which sit BELOW the fold of the plain
+    // ingredients frame — the smoke splits them into their own capture for exactly that reason and
+    // scrolls the currency row (the last requirement) into view so both rows and their end-of-row
+    // Steppers are on screen. The currency row needs the system's currency feature ON with units
+    // authored (`canAddCost`), so this runs on herbalism, the only currency-enabled system the
+    // player never sees.
+    reaches: 'exact',
+    query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="hb-r-tincture"]' },
       { selector: '#recipe-tab-ingredients' },
+      { selector: '[data-recipe-option-currency]', scroll: true },
     ],
     expectView: 'recipe-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -617,18 +718,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe edit multistep',
     app: MANAGER,
     smokeLabels: ['manager-recipe-edit-multistep'],
-    reaches: 'window',
+    // The Overview tab's editable STEPS accordion, with a per-step duration control on each header.
+    // Only a recipe carrying authored `steps[]` renders it, and `sm-r-pattern-blade` is the world's
+    // only one — the first-row default opens a single-step recipe and photographs an Overview with
+    // no steps card at all.
+    reaches: 'exact',
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="sm-r-pattern-blade"]' },
       { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-section="steps"]', scroll: true },
     ],
     expectView: 'recipe-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -661,18 +767,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe edit results multistep',
     app: MANAGER,
     smokeLabels: ['manager-recipe-edit-results-multistep'],
-    reaches: 'window',
+    // The Results tab's PER-STEP result sections — the frame that proves a multi-step recipe's
+    // Results renders something rather than an empty tab (the structural bug that shipped unseen
+    // for want of exactly this coverage). Needs the same authored-steps recipe as the Overview
+    // frame above; every other recipe here draws the single-set Results shape already captured by
+    // `manager-recipe-edit-results`.
+    reaches: 'exact',
     query: {},
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="sm-r-pattern-blade"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -705,18 +816,24 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe edit collapsed',
     app: MANAGER,
     smokeLabels: ['manager-recipe-edit-collapsed'],
-    reaches: 'window',
-    query: {},
+    // The COLLAPSED editor: `RecipeEditView` draws a read-only steps card plus its explanatory
+    // note, instead of the editable accordion, whenever `!multiStepEnabled && steps.length > 1`.
+    // The smoke reaches it by toggling the feature off through a confirm dialog; the lab reaches
+    // the same end state from persisted data, because Sablewright Jewellers declares
+    // `multiStepRecipes: false` and `jw-r-circlet` carries two authored steps.
+    reaches: 'exact',
+    query: { system: 'lab-jewelry' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="jw-r-circlet"]' },
       { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-section="collapsed-steps"]', scroll: true },
     ],
     expectView: 'recipe-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -727,18 +844,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe edit results progressive',
     app: MANAGER,
     smokeLabels: ['manager-recipe-edit-results-progressive'],
-    reaches: 'window',
-    query: {},
+    // Progressive Results: an ORDERED stage list with a roll-budget strip, a read-only difficulty
+    // badge and keyboard move chevrons — a wholly different tab body from the routed and simple
+    // shapes. It is a SYSTEM-mode fact, so it can only be photographed on the progressive system.
+    reaches: 'exact',
+    query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="hb-r-grind"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -749,18 +869,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe edit results alchemy',
     app: MANAGER,
     smokeLabels: ['manager-recipe-edit-results-alchemy'],
-    reaches: 'window',
-    query: {},
+    // Alchemy Results: the two-slot shape — an authored success set plus a RESERVED, undeletable
+    // "On a failed check" set the editor draws itself. Also a system-mode fact, so only the
+    // alchemy system can show it.
+    reaches: 'exact',
+    query: { system: 'lab-alchemy' },
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="al-r-elixir"]' },
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -956,20 +1079,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Component edit salvage',
     app: MANAGER,
     smokeLabels: ['manager-component-edit-salvage'],
-    reaches: 'window',
-    query: {},
+    // The ROUTED salvage authoring body: per-component result groups plus a POPULATED
+    // outcome-routing table (`[data-salvage-routing]`) and the DC override. Three things have to
+    // be true at once — routed salvage mode, an authored routed salvage check with tiers, and
+    // more than one result group — and Runework is the only system where they all are. The
+    // Simple-mode smithing component this case used to open cannot draw the routing table at all;
+    // its own body is `manager-component-edit-salvage-simple`.
+    reaches: 'exact',
+    query: { system: 'lab-runework' },
     steps: [
       'Components',
       {
         selector:
-          '.manager-component-row[data-component-id="sm-longsword"] .manager-icon-button[aria-label^="Edit"]',
+          '.manager-component-row[data-component-id="rw-slag"] .manager-icon-button[aria-label^="Edit"]',
       },
+      { selector: '[data-salvage-routing]', scroll: true },
     ],
     expectView: 'component-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   },
   {
@@ -1073,14 +1203,26 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Checks crafting modifiers',
     app: MANAGER,
     smokeLabels: ['manager-checks-crafting-modifiers'],
-    reaches: 'window',
-    query: {},
-    steps: ['Checks', { selector: '#checks-tab-crafting' }],
+    // The check-modifier CATALOGUE card, which sits last in the crafting panel and is therefore
+    // below the fold of `manager-checks-crafting-consumption`'s frame — hence a dedicated capture
+    // that scrolls to it. Populated on herbalism alone: a non-empty catalogue also un-hides the
+    // recipe editor's per-recipe modifier override, which would have added a control to every
+    // already-captured smithing recipe Overview frame.
+    reaches: 'exact',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      // The card is taller than the window, so `scrollIntoViewIfNeeded` on the card itself lands
+      // the frame above the default-modifier pill select. Anchoring on the LAST thing the card
+      // draws is what puts the whole policy block — radios and pills — inside the frame.
+      { selector: '[data-crafting-modifier-defaults]', scroll: true },
+    ],
     expectView: 'checks',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'checks', 'window-only'],
+    kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
@@ -1109,14 +1251,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components grouped continuation',
     app: MANAGER,
     smokeLabels: ['manager-components-grouped-continuation'],
-    reaches: 'window',
+    // The component library's half of the grouped-continuation pair: page two of a
+    // category-major list, where a category larger than the page continues across the boundary.
+    // Same mechanism as the recipe frame — shrink the page rather than seed and tear down a
+    // throwaway category — over the 23-component smithing library the other component frames use.
+    reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    steps: [
+      'Components',
+      { selector: '.manager-main [data-pagination-size]', select: '10' },
+      { selector: '.manager-main [data-pagination-next]' },
+    ],
     expectView: 'components',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
@@ -1205,14 +1355,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essence edit first state',
     app: MANAGER,
     smokeLabels: ['manager-essence-edit-first-state'],
-    reaches: 'window',
+    // Already lands where its counterpart does: the smoke opens the FIRST essence row's Edit
+    // action and photographs the editor as it arrives. Pinned to `earth` by row rather than left
+    // on "whichever row is first", so the frame's identity card, its in-use inspector and its
+    // deletion-blocked notice cannot change under a re-order.
+    reaches: 'exact',
     query: {},
-    steps: ['Essences', { selector: '.manager-icon-button[aria-label^="Edit"]' }],
+    steps: [
+      'Essences',
+      { selector: '.manager-essence-row[data-essence-id="earth"] .manager-icon-button' },
+    ],
     expectView: 'essence-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'essences', 'window-only'],
+    kinds: ['manager', 'essences'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/],
   },
   {
@@ -1319,14 +1476,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Environment edit placeholder',
     app: MANAGER,
     smokeLabels: ['manager-environment-edit-placeholder'],
-    reaches: 'window',
+    // The environment editor's Overview tab — identity, context, player-facing behaviour and
+    // composition mode, with the summary/linked-scene/validation/runtime inspector beside it. The
+    // name is historical: the route stopped being a placeholder when the composition editor
+    // landed, and the smoke label kept its old name. Pinned to `hb-env-grove` by row, which is the
+    // one environment carrying a linked scene, an automatic composition and node runtime.
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Gathering', { selector: '.manager-icon-button[aria-label^="Edit"]' }],
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+      },
+    ],
     expectView: 'environment-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
-    kinds: ['manager', 'environments', 'window-only'],
+    kinds: ['manager', 'environments'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/],
   },
   {
@@ -1903,6 +2071,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Import report',
     app: MANAGER,
     smokeLabels: ['manager-import-report'],
+    // Stays `window`, and the blocker is the harness's step vocabulary rather than the fixture.
+    // `ImportReportModal` opens on ONE path: `importSystem()` -> `renderSystemImportDialog()`,
+    // which puts up a `DialogV2.prompt` carrying a native `<input type="file" name="importFile">`
+    // and returns `null` unless a FILE was chosen. The smoke feeds that input with
+    // `setInputFiles`; the runner's four verbs are click / select / fill / scroll, and `fill` on a
+    // file input throws rather than selecting anything. So there is no fixture that reaches this
+    // screen — it needs a file verb in `scripts/view-lab-screenshots.mjs`, alongside the real
+    // `DialogV2` the folder-mapping case is also waiting on.
     reaches: 'window',
     query: {},
     steps: [],

@@ -617,10 +617,49 @@ const RUNEWORK_COMPONENTS = [
     tags: ['weapon'],
     difficulty: 6,
   }),
+  // ROUTED salvage, and the world's only POPULATED outcome-routing table.
+  //
+  // The routing selects are drawn from `salvageCraftingCheck.routed`'s outcome tier NAMES
+  // (`salvageOutcomeNames`), and each row's chosen value is a RESULT GROUP ID — so a routed
+  // config needs three things at once: the system in routed salvage mode, an authored routed
+  // salvage check with tiers, and more than one result group to route between. Jewelry has the
+  // first and deliberately not the second (it is the misconfigured-salvage fixture), so the
+  // routing table there renders its "no outcome tiers to route yet" empty state.
+  //
+  // On `rw-slag` specifically because no lab actor holds any: a component with a salvage config
+  // grows a whole salvage panel in the player's inventory detail, and every other Runework
+  // component is stocked on Brenna or Vosk.
   component('rw-slag', 'Ruined Slag', 'commodities/metal/fragments-steel-barbed.webp', {
     categories: ['Waste'],
     tags: ['scrap'],
     difficulty: 1,
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      toolIds: ['rw-tool-mallet'],
+      dcOverride: 11,
+      resultGroups: [
+        {
+          id: 'rw-salv-clean',
+          name: 'Clean reclaim',
+          results: [
+            { componentId: 'rw-bar', quantity: 1 },
+            { componentId: 'rw-chalk', quantity: 1 },
+          ],
+        },
+        {
+          id: 'rw-salv-partial',
+          name: 'Partial reclaim',
+          results: [{ componentId: 'rw-chalk', quantity: 1 }],
+        },
+      ],
+      // Keyed by outcome tier NAME, valued by result-group id — the shape
+      // `_normalizeSalvage` preserves and the routing selects read back.
+      outcomeRouting: {
+        Masterwork: 'rw-salv-clean',
+        Standard: 'rw-salv-partial',
+      },
+    },
   }),
 ];
 
@@ -655,7 +694,7 @@ const ESSENCES = [
   },
 ];
 
-function recipe(id, name, systemId, icon, config) {
+function recipe(id, name, systemId, icon, { categories = [], ...config } = {}) {
   return {
     id,
     name,
@@ -665,7 +704,15 @@ function recipe(id, name, systemId, icon, config) {
     ingredientSets: [],
     resultGroups: [],
     toolIds: [],
-    categories: [],
+    // SINGULAR, translated from the authored list here — exactly as `component()` does, and for
+    // exactly the same reason. `Recipe` (src/models/Recipe.js:28) reads `data.category` and runs it
+    // through `normalizeRecipeCategory`; a `categories` ARRAY is not read by anything in `src/`, so
+    // every recipe in this fixture normalized to the reserved `general` bucket while the system's
+    // own category vocabulary sat unused beside it. The recipe library therefore rendered ONE
+    // undifferentiated group and claimed, via its lit "Group by category" toggle, to be showing
+    // the grouping feature working. The authored list stays the input because it reads as intent;
+    // only the first entry can survive, because a recipe HAS one category.
+    category: categories[0] ?? '',
     ...config,
   };
 }
@@ -1091,10 +1138,57 @@ const HERBALISM_RECIPES = [
     LAB_SYSTEM_IDS.HERBALISM,
     'consumables/potions/bottle-round-corked-blue.webp',
     {
-      description: 'Moonleaf and frostcap, held just below a simmer.',
+      description: 'Moonleaf and frostcap, held just below a simmer — and a fee for the still.',
       categories: ['Potions'],
+      // The world's SHOWCASE requirement set: one row of every kind the ingredients editor can
+      // author, which is what the live smoke photographs its own "Showcase Requirements" recipe
+      // for. The component / OR-group / tag rows sit above the fold and the essence and
+      // currency-cost rows below it, so the two captures split there.
+      //
+      // The currency row is `match: { type: 'currency', unit, amount }` — the shape
+      // `matchTypes.js`'s `currencyHandler.normalize` reads. `{ currency: 'gp' }` or a bare
+      // `cost` field would normalize through the COMPONENT fallback to
+      // `{ type: 'component', componentId: null }` and render as an unset component row.
+      //
+      // It lives on herbalism because herbalism is the only system that is both currency-enabled
+      // and invisible to the player, so no player frame's requirement rail moves.
+      complex: true,
       ingredientSets: [
-        simpleSet('s1', { 'hb-moonleaf': 3, 'hb-frostcap': 2, 'hb-spring-water': 1 }),
+        {
+          id: 'hb-set-tincture',
+          name: 'Bench requirements',
+          ingredientGroups: [
+            {
+              id: 'hb-set-tincture-g1',
+              options: [{ componentId: 'hb-moonleaf', quantity: 3 }],
+            },
+            {
+              id: 'hb-set-tincture-g2',
+              name: 'Either cap',
+              options: [
+                { componentId: 'hb-frostcap', quantity: 2 },
+                { componentId: 'hb-emberbloom', quantity: 2 },
+              ],
+            },
+            {
+              id: 'hb-set-tincture-g3',
+              name: 'Any solvent',
+              options: [
+                { match: { type: 'tags', tags: ['solvent'], tagMatch: 'any' }, quantity: 1 },
+              ],
+            },
+            {
+              id: 'hb-set-tincture-g4',
+              name: 'Water essence',
+              options: [{ match: { type: 'essence', essenceId: 'water', amount: 4 } }],
+            },
+            {
+              id: 'hb-set-tincture-g5',
+              name: 'Still fee',
+              options: [{ match: { type: 'currency', unit: 'gp', amount: 25 } }],
+            },
+          ],
+        },
       ],
       resultGroups: [{ id: 'rg', results: [{ componentId: 'hb-tincture', quantity: 1 }] }],
       check: { enabled: true, rollFormula: '1d20 + 2', thresholds: { success: 15 } },
@@ -1126,7 +1220,8 @@ const HERBALISM_RECIPES = [
     LAB_SYSTEM_IDS.HERBALISM,
     'commodities/materials/bowl-powder-grey.webp',
     {
-      description: 'Any dry reagent, reduced to a workable powder.',
+      description:
+        'Any dry reagent, reduced to a workable powder — and whatever else the pass yields.',
       categories: ['Preparation'],
       ingredientSets: [
         eitherSet('s1', [
@@ -1135,7 +1230,23 @@ const HERBALISM_RECIPES = [
           ['hb-frostcap', 1],
         ]),
       ],
-      resultGroups: [{ id: 'rg', results: [{ componentId: 'hb-mortar-dust', quantity: 2 }] }],
+      // THREE ordered results in ONE group, which is what a progressive recipe's Results tab
+      // renders as its ordered stage list: the roll budget flows down the list and each stage
+      // consumes its own difficulty before the next is produced. A single-result group draws the
+      // same tab with one row and two disabled chevrons, which shows the ORDERING affordance
+      // without showing an order — the emptiest possible version of the one frame that exists to
+      // photograph this shape. The stage DCs are the RESULT COMPONENTS' own difficulties (1, 2, 4),
+      // so they rank low → high without anything here restating them.
+      resultGroups: [
+        {
+          id: 'rg',
+          results: [
+            { componentId: 'hb-empty-vial', quantity: 1 },
+            { componentId: 'hb-mortar-dust', quantity: 2 },
+            { componentId: 'hb-frostcap', quantity: 1 },
+          ],
+        },
+      ],
       toolIds: ['hb-tool-mortar'],
     }
   ),
@@ -1195,7 +1306,19 @@ const ALCHEMY_RECIPES = [
       ingredientSets: [
         simpleSet('s1', { 'al-dragon-scale': 1, 'al-quicksilver': 2, 'al-flask': 1 }),
       ],
-      resultGroups: [{ id: 'rg', results: [{ componentId: 'al-elixir', quantity: 1 }] }],
+      // TWO groups: the success set plus the reserved `role: 'failure'` set that alchemy Simple's
+      // fixed two-slot Results editor draws. Its absence is tolerated by validation (a settings-only
+      // None -> Simple flip runs no recipe migration), which is exactly why it has to be authored
+      // here — an unauthored failure slot renders as "Nothing produced on this outcome" and the
+      // one frame covering this shape shows half of it.
+      resultGroups: [
+        { id: 'rg', results: [{ componentId: 'al-elixir', quantity: 1 }] },
+        {
+          id: 'rg-fail',
+          role: 'failure',
+          results: [{ componentId: 'al-flask', quantity: 1 }],
+        },
+      ],
       check: {
         enabled: true,
         rollFormula: '1d20 + @abilities.int.mod',
@@ -1416,6 +1539,37 @@ const RUNEWORK_PREREQUISITES = [
     icon: 'fas fa-wand-sparkles',
     path: 'attributes.attuned',
     op: 'isTrue',
+  },
+];
+
+/**
+ * Herbalism's character prerequisites, and why they are not Runework's.
+ *
+ * The System Overview settings page renders Character modifiers, Character prerequisites and
+ * Currency Units as three sibling list cards, and the live smoke photographs all three together
+ * with one modifier open and its icon picker down. That frame needs ONE system carrying all three
+ * — and the modifiers card is gated on `gathering`, which Runework does not have, while Runework's
+ * own prerequisites are read by the Tool Studio frames and must stay where they are.
+ *
+ * PATHS ARE ROLL-DATA PATHS, NOT DOCUMENT PATHS — see RUNEWORK_PREREQUISITES for the full note and
+ * for what a `system.`-prefixed path silently does here.
+ */
+const HERBALISM_PREREQUISITES = [
+  {
+    id: 'hb-prereq-nature',
+    name: 'Trained in Nature',
+    icon: 'fas fa-leaf',
+    path: 'skills.nat.value',
+    op: 'gte',
+    value: 1,
+  },
+  {
+    id: 'hb-prereq-wis',
+    name: 'Wisdom 12 or higher',
+    icon: 'fas fa-eye',
+    path: 'abilities.wis.value',
+    op: 'gte',
+    value: 12,
   },
 ];
 
@@ -1942,6 +2096,34 @@ const JEWELRY_RECIPES = [
       description: 'Gold wire drawn thin, then chased over a former.',
       categories: ['Chasing'],
       complex: true,
+      // AUTHORED STEPS ON A SYSTEM WHOSE MULTI-STEP FEATURE IS OFF. That pairing is the whole
+      // point: `RecipeEditView`'s `collapsed = !multiStepEnabled && steps.length > 1`, so this is
+      // the only arrangement in the world that draws the editor's read-only collapsed-steps card
+      // and its explanatory note in place of the editable steps accordion. Jewelry declares
+      // `multiStepRecipes: false`, so no feature toggle has to be driven to reach it.
+      //
+      // The two steps' combined requirements are EXACTLY the single set they replace (3 wire +
+      // 1 gold billet), so the collapsed one-combined-action reading of this recipe demands the
+      // same stock it demanded before and its craftability — and therefore its row status in the
+      // already-captured player crafting list — is unmoved.
+      steps: [
+        {
+          id: 'jw-step-draw',
+          name: 'Draw the wire',
+          description: 'Pull the billet down through the drawplate until the gauge is right.',
+          ingredientSets: [simpleSet('jw-step-draw-s1', { 'jw-wire': 3 })],
+          resultGroups: [{ id: 'jw-step-draw-rg', results: [] }],
+        },
+        {
+          id: 'jw-step-chase',
+          name: 'Chase the former',
+          description: 'Work the figure over the former, then close the band.',
+          ingredientSets: [simpleSet('jw-step-chase-s1', { 'jw-ingot-gold': 1 })],
+          resultGroups: [
+            { id: 'jw-step-chase-rg', results: [{ componentId: 'jw-circlet', quantity: 1 }] },
+          ],
+        },
+      ],
       ingredientSets: [
         {
           id: 'jw-set-circlet',
@@ -2044,6 +2226,31 @@ const ROUTED_CHECK = Object.freeze({
 });
 
 /**
+ * Runework's SALVAGE check: routed, with named outcome tiers.
+ *
+ * The tier NAMES are what the per-component outcome-routing rows are keyed by, so they are the
+ * load-bearing part — `rw-slag`'s `outcomeRouting` map names `Masterwork` and `Standard` and would
+ * route nothing if either drifted. Its own block, not a reference to `ROUTED_CHECK`: salvage
+ * resolves on `salvageCraftingCheck` and never on `craftingCheck`, and a shared object would imply
+ * a coupling the code does not have.
+ */
+const ROUTED_SALVAGE_CHECK = Object.freeze({
+  enabled: true,
+  consumption: { consumeIngredientsOnFail: true, breakToolsOnFail: false },
+  routed: {
+    type: 'relative',
+    rollFormula: '1d20 + @abilities.int.mod',
+    dc: 10,
+    thresholdMode: 'meet',
+    relativeOutcomes: [
+      { id: 'rw-salv-masterwork', name: 'Masterwork', success: true, breakTools: false, dc: 5 },
+      { id: 'rw-salv-standard', name: 'Standard', success: true, breakTools: false, dc: 0 },
+      { id: 'rw-salv-ruined', name: 'Ruined', success: false, breakTools: true, dc: -5 },
+    ],
+  },
+});
+
+/**
  * Herbalism's SALVAGE check — a separate block from its crafting check.
  *
  * Progressive salvage REQUIRES an authored roll formula: without one `_buildSalvage` reports
@@ -2105,6 +2312,45 @@ const CURRENCY_UNITS = Object.freeze([
   },
 ]);
 
+/**
+ * The crafting check-modifier CATALOGUE, and why it lives on Herbalism alone.
+ *
+ * `checkModifiers` / `defaultModifierPolicy` / `defaultModifierIds` are siblings of the per-mode
+ * check block, normalized by `CraftingSystemManager._normalizeCheckModifierConfig` — NOT the
+ * gathering `characterModifiers`, which are a different aggregate on a different setting. Each
+ * entry is `{id, label, icon?, expression}` and the expression is a roll-data expression, so it
+ * carries the `@` sigil the editor's `RollDataExpressionInput` renders.
+ *
+ * A populated catalogue also un-hides the recipe editor's per-recipe "Crafting modifier" override
+ * (`RecipeOverviewTab`'s `craftingModifierOptions`), so putting it on the default system would add
+ * a control to every already-captured smithing recipe Overview frame. Herbalism's recipe Overview
+ * is captured by nothing, and its Checks route by nothing else — so this is the one system where a
+ * catalogue is free.
+ *
+ * `highest` rather than `addAll` because it is the policy whose meaning is least obvious from the
+ * rows alone, and it is what the live smoke's counterpart frame is captured with.
+ */
+const HERBALISM_CHECK_MODIFIERS = Object.freeze([
+  {
+    id: 'hb-mod-medicine',
+    label: 'Medicine',
+    icon: 'fa-solid fa-kit-medical',
+    expression: '@skills.med.mod',
+  },
+  {
+    id: 'hb-mod-nature',
+    label: 'Nature',
+    icon: 'fa-solid fa-leaf',
+    expression: '@skills.nat.mod',
+  },
+  {
+    id: 'hb-mod-tools',
+    label: 'Herbalism kit',
+    icon: 'fa-solid fa-mortar-pestle',
+    expression: '@prof',
+  },
+]);
+
 const PROGRESSIVE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
@@ -2113,6 +2359,9 @@ const PROGRESSIVE_CHECK = Object.freeze({
     thresholds: { success: 12 },
     stageAdvanceOnSuccess: 1,
   },
+  checkModifiers: HERBALISM_CHECK_MODIFIERS,
+  defaultModifierPolicy: 'highest',
+  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature'],
 });
 
 export function buildLabContent() {
@@ -2199,8 +2448,20 @@ export function buildLabContent() {
       componentCategories: componentCategoryVocabulary(HERBALISM_COMPONENTS),
       recipeItemDefinitions: HERBALISM_RECIPE_ITEMS,
       tools: HERBALISM_TOOLS,
+      characterPrerequisites: HERBALISM_PREREQUISITES,
       gatheringRealms: REALMS,
       gatheringRealmSettings: { revealMode: 'onDiscovery', modifierVisibility: 'visible' },
+      // Currency, switched on with the SAME unit ladder Runework carries. It is here for the
+      // System Overview settings frame, which needs Character modifiers, Character prerequisites
+      // and Currency Units on one page — and for the recipe editor's currency-cost requirement
+      // row, which `canAddCost` gates on `currencyEnabled && units.length > 0`.
+      //
+      // Safe on this system specifically: herbalism is knowledge-gated and no lab actor has been
+      // granted it, so no herbalism recipe reaches the player crafting listing at all, and the
+      // Tool Studio's currency-bearing repair rows are captured on smithing and runework.
+      requirements: {
+        currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS },
+      },
     },
     {
       id: LAB_SYSTEM_IDS.ALCHEMY,
@@ -2212,6 +2473,18 @@ export function buildLabContent() {
       // Restricted on purpose: this is what makes the Access rail entry exist.
       resolutionMode: 'alchemy',
       craftingCheck: SIMPLE_CHECK,
+      // `checkMode: 'simple'` is what draws the alchemy Results tab's FIXED TWO-SLOT editor — a
+      // labelled "On success" set plus a reserved, undeletable "On a failed check" set
+      // (`recipeAlchemySimple = alchemyCheckMode === 'simple'`). The default `none` draws the
+      // ordinary single-group editor instead, which is the SAME shape three other modes already
+      // photograph: an alchemy Results frame captured under `none` is a picture of the generic
+      // editor with an alchemy system name on it.
+      //
+      // It obliges the roll formula that `SIMPLE_CHECK` already carries: `systemValidation` raises
+      // `alchemyCheckNoFormula` with `blocks: 'system'` for a Simple/Tiered alchemy system with no
+      // formula, which hides every alchemy recipe from a non-GM viewer and would empty the
+      // player's workbench frames.
+      alchemy: { checkMode: 'simple' },
       features: {
         essences: true,
         recipeCategories: true,
@@ -2269,6 +2542,13 @@ export function buildLabContent() {
       visibilityMode: 'global',
       resolutionMode: 'routedByCheck',
       craftingCheck: ROUTED_CHECK,
+      // ROUTED salvage WITH an authored check, which is the pairing jewelry deliberately does not
+      // have. `salvageOutcomeNames` is read off `salvageCraftingCheck.routed`'s tier names, and
+      // those names are what the per-component outcome-routing rows are keyed by — so the routing
+      // table is populated here and empty on jewelry, and the two component frames say different
+      // things rather than the same thing twice.
+      salvageResolutionMode: 'routed',
+      salvageCraftingCheck: ROUTED_SALVAGE_CHECK,
       features: {
         essences: true,
         recipeCategories: true,
@@ -2314,20 +2594,30 @@ export function buildLabContent() {
           weather: { enabled: true, current: 'clear', values: GATHERING_VOCABULARIES.weather },
           timeOfDay: { enabled: true, current: 'day', values: GATHERING_VOCABULARIES.timeOfDay },
         },
+        // `{id, label, icon, expression}` — the shape `_normalizeGatheringCharacterModifier`
+        // reads, and nothing else. These were authored `{name, description, value, enabled}`:
+        // every one of those four keys is dropped, and `label` falls back to `String(entry.id)`,
+        // so the System Overview's modifier list rendered two rows reading "hb-mod-skilled" and
+        // "hb-mod-tired" under a default user glyph with no expression at all — a raw fixture id
+        // presented as a GM-authored label.
+        //
+        // A modifier is a ROLL EXPRESSION, not a flat bonus: `@skills.<key>.total` /
+        // `@abilities.<key>.mod` for a dnd5e world, which is what
+        // `DND5E_CHARACTER_MODIFIER_PRESETS` seeds and what the editor's
+        // `RollDataExpressionInput` renders. Note the `@` sigil, which this convention keeps and
+        // the sibling `characterPrerequisites` paths deliberately do not.
         characterModifiers: [
           {
-            id: 'hb-mod-skilled',
-            name: 'Skilled Forager',
-            description: 'Trained in the field.',
-            value: 10,
-            enabled: true,
+            id: 'hb-mod-nature',
+            label: 'Herbalism Training',
+            icon: 'fa-solid fa-leaf',
+            expression: '@skills.nat.total',
           },
           {
-            id: 'hb-mod-tired',
-            name: 'Exhausted',
-            description: 'A long day already.',
-            value: -15,
-            enabled: true,
+            id: 'hb-mod-survival',
+            label: 'Field Survival',
+            icon: 'fa-solid fa-campground',
+            expression: '@skills.sur.total',
           },
         ],
       },
