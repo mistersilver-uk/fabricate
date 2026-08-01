@@ -209,8 +209,19 @@ jobs:
       # in this repository — so the render succeeded, the upload failed with "Region is missing",
       # and the publish step exited 1 on every run. The accelerator rendered 150 frames and dropped
       # all of them.
+      #
+      # `continue-on-error`, matching `pr-screenshots-cleanup.yml`, because the role's TRUST POLICY
+      # is repository infrastructure rather than something a PR can change. A trust policy that
+      # scopes `sts:AssumeRoleWithWebIdentity` to named workflow refs will refuse this workflow
+      # until it is added — observed here as "Not authorized to perform
+      # sts:AssumeRoleWithWebIdentity" against an otherwise correctly resolved role and region.
+      #
+      # This job is an accelerator, not a gate, so an infrastructure gap outside the PR must not red
+      # it. The publish step below warns loudly and the maintainer-pasted evidence path is unchanged.
       - name: Configure AWS credentials (OIDC)
+        id: aws
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_SCREENSHOTS_ROLE_TO_ASSUME }}
@@ -230,6 +241,13 @@ jobs:
           PR_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          if [ "${{ steps.aws.outcome }}" != "success" ]; then
+            echo "::warning::Could not assume the screenshot upload role, so no frames were published."
+            echo "::warning::The frames rendered fine — this is an IAM trust-policy gap, not a PR problem."
+            echo "::warning::Add this workflow's ref to the trust policy of ${{ vars.AWS_SCREENSHOTS_ROLE_TO_ASSUME }}."
+            echo "::warning::Until then, paste evidence manually or apply the screenshots-exempt label."
+            exit 0
+          fi
           node scripts/ui-pr-screenshot-evidence.mjs publish \
             --pr "$PR_NUMBER" \
             --repo "$PR_REPO" \
