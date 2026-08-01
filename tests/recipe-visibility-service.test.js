@@ -178,11 +178,19 @@ class FakeItem extends FakeDocument {
 // ---------------------------------------------------------------------------
 
 class FakeActor extends FakeDocument {
-  constructor({ id = 'actor-1', name = 'Test Actor', items = [], flagsArg = {} } = {}) {
+  constructor({
+    id = 'actor-1',
+    name = 'Test Actor',
+    items = [],
+    flagsArg = {},
+    isOwner = true,
+  } = {}) {
     super(flagsArg);
     this.id = id;
     this.name = name;
     this.items = items;
+    // `cleanupLearnedRecipes` only touches actors this client may write (issue 970).
+    this.isOwner = isOwner;
     for (const item of items) {
       if (item && !item.parent) item.parent = this;
     }
@@ -1801,6 +1809,47 @@ test('AC7.6 - cleanupLearnedRecipes removes stale entries and retains valid ones
     assert.ok('recipe-a' in learned, 'recipe-a should be retained');
     assert.ok('recipe-c' in learned, 'recipe-c should be retained');
     assert.ok(!('recipe-b' in learned), 'recipe-b should be removed');
+  } finally {
+    globalThis.game.actors = originalActors;
+  }
+});
+
+// Issue 970: this pass runs on every client at startup and mutates actor flags
+// directly (there is no GM relay). An un-filtered walk had a player attempt
+// `Actor#update` on every other character in the world; Foundry refuses it and
+// `setFabricateFlag` rejects by design, which took `initialize()` down before
+// `ready` was ever set.
+test('cleanupLearnedRecipes skips actors this client cannot write', async () => {
+  const service = buildService();
+  const mine = new FakeActor({
+    id: 'mine',
+    flagsArg: { fabricate: { learnedRecipes: { 'recipe-gone': { learnedAt: 1 } } } }
+  });
+  const theirs = new FakeActor({
+    id: 'theirs',
+    isOwner: false,
+    flagsArg: { fabricate: { learnedRecipes: { 'recipe-gone': { learnedAt: 1 } } } }
+  });
+
+  const originalActors = globalThis.game.actors;
+  globalThis.game.actors = [mine, theirs];
+
+  try {
+    await service.cleanupLearnedRecipes(new Set(['recipe-live']));
+
+    assert.ok(
+      mine.updateCalls.length > 0,
+      'my own character is cleaned'
+    );
+    assert.equal(
+      theirs.updateCalls.length,
+      0,
+      'a character I do not own is never written to'
+    );
+    assert.ok(
+      'recipe-gone' in theirs.getFlag('fabricate', 'fabricate.learnedRecipes'),
+      'and its stale entry is left for a client that may clean it'
+    );
   } finally {
     globalThis.game.actors = originalActors;
   }

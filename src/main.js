@@ -28,6 +28,7 @@ import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
+import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
@@ -644,26 +645,41 @@ class Fabricate {
         new Set((system.components || []).map(component => component.id))
       ])
     );
-    await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
-    // Prune legacy phantom crafting runs: a single-step recipe with no time
-    // requirement can never legitimately persist an active run, so any such run left
-    // in the active store predates the craft() cleanup guard and is stranded.
-    await this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
-      this.recipeManager.getRecipe(id)
-    );
-    await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
-    await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
-    // Flatten the per-system salvage component sets the run cleanup above already
+    // Flatten the per-system salvage component sets the run cleanup below already
     // computed: the progressive-order map's `salvage:<componentId>` keys are not
     // system-scoped, so the prune needs one flat id set.
     const validComponentIds = new Set(
       [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
     );
-    await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
-      resolveGatheringActor,
-      isSelectableGatheringActor,
-      validComponentIds
-    });
+    // Housekeeping that drops entries naming deleted content. Each pass is
+    // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
+    // refused or otherwise failed write must never prevent `this.ready` below —
+    // every facade method throws through `_requireReady()`, so one stale entry
+    // Foundry declined to clean would take the whole module down for that client.
+    // Each pass is also scoped to the actors this client owns (see
+    // `selectWritableActors`), so a refusal should no longer be reachable at all;
+    // this guard is the belt to that braces.
+    await runStartupMaintenance([
+      ['crafting runs', () =>
+        this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
+      // Prune legacy phantom crafting runs: a single-step recipe with no time
+      // requirement can never legitimately persist an active run, so any such run left
+      // in the active store predates the craft() cleanup guard and is stranded.
+      ['phantom crafting runs', () =>
+        this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
+          this.recipeManager.getRecipe(id)
+        )],
+      ['salvage runs', () =>
+        this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem)],
+      ['learned recipes', () =>
+        this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes)],
+      ['stale preferences', () =>
+        cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
+          resolveGatheringActor,
+          isSelectableGatheringActor,
+          validComponentIds
+        })]
+    ]);
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
