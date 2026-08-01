@@ -40,6 +40,16 @@ const MOUNTED_ROOTS = [
  */
 const UNCLAIMED_BY_DESIGN = Object.freeze([]);
 
+/**
+ * Components a case may match even though no mounted window renders them.
+ *
+ * Kept EMPTY on purpose. A pattern reaching an unrenderable component is the "unrelated evidence"
+ * failure, so the fix is nearly always to narrow the pattern rather than to record an exception. An
+ * entry here has to be a component that is genuinely dead or genuinely out of scope AND that no
+ * narrower pattern can exclude — and it is checked below, so it cannot outlive that condition.
+ */
+const EXPECTED_OUTSIDE_CLOSURE = new Set([]);
+
 const tracked = new Set(
   execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' })
     .split('\0')
@@ -112,6 +122,41 @@ test('every component a mounted window can render is claimed by some case', () =
       'one selects an UNRELATED frame as its evidence. Add a `sourceMatches` pattern to the case ' +
       'that shows the component, or add an `UNCLAIMED_BY_DESIGN` entry stating why not:\n  ' +
       unclaimed.join('\n  ')
+  );
+});
+
+test('no case claims a component that appears in no window', () => {
+  // The completeness test above checks one direction — that everything renderable is claimed. This
+  // is the other, and it is the direction that produces WRONG evidence rather than none.
+  //
+  // `GatheringTravelView.svelte` was claimed by eight cases through a `Gathering` prefix, and
+  // `EnvironmentsBrowserView.svelte` says outright that it "is imported by nothing under src/". So a
+  // PR editing it selected eight frames as evidence of a change none of them can contain.
+  //
+  // It also bounds pattern BREADTH, which nothing else did: the registry could be satisfied by
+  // pasting one blanket `/^src\/ui\//` onto a single case, which reports zero unclaimed and passes.
+  // An over-broad pattern now starts matching unrenderable components and fails here.
+  const svelteFiles = [...tracked].filter((file) => file.endsWith('.svelte'));
+  const phantom = [];
+
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const pattern of viewCase.sourceMatches) {
+      const unrenderable = svelteFiles.filter(
+        (file) => pattern.test(file) && !CLOSURE.has(file) && !EXPECTED_OUTSIDE_CLOSURE.has(file)
+      );
+      if (unrenderable.length > 0) {
+        phantom.push(`${viewCase.id}: ${pattern} also matches ${unrenderable.join(', ')}`);
+      }
+    }
+  }
+
+  assert.deepEqual(
+    phantom,
+    [],
+    'these patterns claim components that no mounted window renders, so a change to one selects ' +
+      'frames that cannot contain it — unrelated evidence, which is worse than none. Narrow the ' +
+      'pattern, or add the file to EXPECTED_OUTSIDE_CLOSURE if it is deliberately unrenderable:\n  ' +
+      phantom.join('\n  ')
   );
 });
 

@@ -1230,7 +1230,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
     ],
   },
@@ -1249,7 +1249,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
     ],
   },
   {
@@ -1279,7 +1279,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'window-only'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
     ],
   },
   {
@@ -1311,7 +1311,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'responsive', 'window-only'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
     ],
   },
   {
@@ -1348,7 +1348,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'window-only'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
     ],
   },
   {
@@ -1373,7 +1373,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'window-only'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
     ],
   },
   {
@@ -1403,7 +1403,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'window-only'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
       /^src\/ui\/svelte\/apps\/manager\/(Party|Realm|RosterRow|MapRegionLinkPicker)/,
     ],
   },
@@ -1423,7 +1423,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'responsive', 'window-only'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
-      /^src\/ui\/svelte\/apps\/manager\/Gathering/,
+      /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
     ],
   },
   {
