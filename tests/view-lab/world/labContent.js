@@ -1376,13 +1376,29 @@ const HERBALISM_RECIPE_ITEMS = [
  * photograph: five more rows would move the tools library frames, and the rail's "Tools" count
  * rides in every one of the ~60 default-system manager frames. Runework has no tools at all and is
  * rendered by two `beyond` coverage frames that never open the Tool Studio.
+ *
+ * PATHS ARE ROLL-DATA PATHS, NOT DOCUMENT PATHS. `characterPrerequisites` resolves each one against
+ * `actor.getRollData()`, which Foundry has ALREADY flattened — dnd5e's roll data exposes
+ * `skills.arc.value`, not `system.skills.arc.value`. `characterPrerequisitePresets.js` ships
+ * `skills.arc.value` for exactly this reason, and the canonical data-models spec states it as a
+ * requirement.
+ *
+ * These were authored `system.`-prefixed. Every one resolved to `undefined`, so `coerceNumber` gave
+ * 0 and `coerceBoolean` gave false and each gate read permanently unmet — and, worse, the manager
+ * RENDERS the raw path, so a published frame documented the exact convention the spec exists to
+ * prevent. A screenshot that shows an authoring convention IS documentation.
+ *
+ * It failed silently because the resolver logs a `console.warn`, and the capture driver's gate
+ * collects `console.error` only. Note the neighbouring gathering-modifier presets use the OTHER
+ * convention (`@actor.system.…`) — two conventions in one codebase is what makes this easy to get
+ * wrong.
  */
 const RUNEWORK_PREREQUISITES = [
   {
     id: 'rw-prereq-arcana',
     name: 'Trained in Arcana',
     icon: 'fas fa-hat-wizard',
-    path: 'system.skills.arc.value',
+    path: 'skills.arc.value',
     op: 'gte',
     value: 1,
   },
@@ -1390,7 +1406,7 @@ const RUNEWORK_PREREQUISITES = [
     id: 'rw-prereq-int',
     name: 'Intelligence 13 or higher',
     icon: 'fas fa-brain',
-    path: 'system.abilities.int.value',
+    path: 'abilities.int.value',
     op: 'gte',
     value: 13,
   },
@@ -1398,7 +1414,7 @@ const RUNEWORK_PREREQUISITES = [
     id: 'rw-prereq-attuned',
     name: 'Attuned to the Weave',
     icon: 'fas fa-wand-sparkles',
-    path: 'system.attributes.attuned',
+    path: 'attributes.attuned',
     op: 'isTrue',
   },
 ];

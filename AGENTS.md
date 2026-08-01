@@ -534,8 +534,14 @@ For BOTH compendium cases, read folder membership from `pack.index[].folder` —
 Do **NOT** use `Folder#getSubfolders` for a packed folder: it filters `game.folders` (world-only) and returns `[]` for an in-pack folder, silently dropping nested items; derive the in-pack subtree from the `pack.folders` parent links instead (`descendantFolderIdSet` in `src/ui/svelte/util/importFolderGroups.js`).
 A compendium-**directory** world folder (resolved `folder.documentType === 'Compendium'`) groups packs, not items, and has no item-level grouping — skip it with a notice.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
-- `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
+- `game.documentTypes.Item` is a plain **array**, not a `Set` — `Game#setupPackages` builds it with `Object.keys(types)` (verified against V13.351 `client/game.mjs`).
+  A defensive `Array.from()` is harmless and still appears in the harness, but code may index and `.includes()` it directly.
+  This note previously claimed `Set`; a `.has()` written against it would have failed at runtime while passing every fake that copied the note.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
+- **Character-prerequisite paths are ROLL-DATA paths, not document paths.**
+  They resolve against `actor.getRollData()`, which Foundry has already flattened, so dnd5e wants `skills.arc.value` — never `system.skills.arc.value`.
+  Gathering character modifiers use the *other* convention (`@actor.system.…`), which is what makes this easy to get wrong.
+  A `system.`-prefixed prerequisite resolves to `undefined`, coerces to 0/false, and fails its gate permanently while logging only a `console.warn` — and the manager renders the raw path, so the mistake reaches published screenshots.
 - Use `sheet.changeTab(tabName, groupName)` for ApplicationV2 tab switches.
 - Foundry core styles fight Fabricate styles for `button`/`input` controls; the override usually belongs in global per-area CSS in `styles/fabricate.css`, not in scoped Svelte `<style>`.
 Two recurring instances:

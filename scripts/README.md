@@ -151,7 +151,8 @@ Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dra
 The smoke test uses `page.evaluate()` to interact with Foundry APIs.
 Key patterns for V13:
 
-- **Document types are Sets:** `Array.from(game.documentTypes.Item)` before `.includes()`
+- **Document types are arrays, not Sets:** `game.documentTypes.Item` comes from `Object.keys(types)` in `Game#setupPackages` (V13.351), so `.includes()` works directly.
+  The defensive `Array.from()` in this harness is harmless and stays; the note that called it a `Set` was wrong.
 - **Tab switching:** `actor.sheet.changeTab('inventory', 'primary')` — DOM clicks on `[data-tab]` don't trigger Foundry's tab management
 - **Embedded item source tracking:** Set `flags: { core: { sourceId: worldItem.uuid } }` on embedded copies so the crafting engine can match them to registered components
 - **Admin store initialization:** Pre-set `lastManagedCraftingSystem` setting before opening the Recipe Manager to ensure the correct system is selected

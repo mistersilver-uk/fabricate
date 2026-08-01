@@ -253,6 +253,68 @@ function createHeroPacks() {
  * @param {object} world The lab world (see `../world/labWorld.js`) supplying documents and actors.
  * @returns {{restore: () => void, randomID: (length?: number) => string}}
  */
+/**
+ * A calendar, because `game.time.calendar` is never null in a booted V13 world.
+ *
+ * `Time#initializeCalendar` constructs one unconditionally from
+ * `CONFIG.time.worldCalendarClass`, so `null` is not a state Foundry can be in. The lab had it null,
+ * and the consequence was visible: `getWorldTimeComponents` bails on a missing `timeToComponents`,
+ * `worldTimeLabel` then returns `''`, and every "Day N, <phase>" label on the Journal screen and
+ * every maturing time-gate rendered EMPTY — a blank where production has text, which reads as a
+ * Fabricate layout bug in a published frame.
+ *
+ * Simplified Gregorian, matching Foundry's own default. `day` is a 0-based day-of-year, which is
+ * what `timeToComponents` returns and what `worldTimeLabel` compensates for.
+ */
+const LAB_CALENDAR = Object.freeze({
+  days: { hoursPerDay: 24, minutesPerHour: 60, secondsPerMinute: 60, daysPerYear: 365 },
+  timeToComponents(time = 0) {
+    const seconds = Math.max(0, Math.floor(Number(time) || 0));
+    const secondsPerDay = 86_400;
+    const dayIndex = Math.floor(seconds / secondsPerDay);
+    const within = seconds % secondsPerDay;
+    return {
+      year: Math.floor(dayIndex / 365),
+      day: dayIndex % 365,
+      hour: Math.floor(within / 3600),
+      minute: Math.floor((within % 3600) / 60),
+      second: within % 60,
+    };
+  },
+  componentsToTime(components = {}) {
+    const { year = 0, day = 0, hour = 0, minute = 0, second = 0 } = components;
+    return ((year * 365 + day) * 24 + hour) * 3600 + minute * 60 + second;
+  },
+});
+
+/**
+ * The two `Roll` statics Fabricate reads, and nothing else.
+ *
+ * `checkRoll.js` returns null the moment `Roll.replaceFormulaData` is missing, so every check card
+ * fell through to the RAW formula: a published frame printed `1d20 + @prof` where Foundry prints
+ * `1d20 + 3`. That is an under-show rather than a lie, but it is a visible content difference across
+ * roughly fifteen recipes, and the fidelity register never disclosed it.
+ *
+ * Both methods are pure string work — no dice engine is involved in resolving a formula for DISPLAY,
+ * which is all the lab ever needs. Rolling is not implemented and must not be: a lab that could roll
+ * would invite fixtures whose frames depend on an outcome this harness does not actually compute.
+ */
+const LAB_ROLL = {
+  replaceFormulaData(formula, data = {}, { missing = 'NaN' } = {}) {
+    return String(formula).replaceAll(/@([\w.]+)/g, (_match, path) => {
+      const value = String(path)
+        .split('.')
+        .reduce((current, part) => (current == null ? undefined : current[part]), data);
+      return value === undefined || value === null ? missing : String(value);
+    });
+  },
+  // A formula is valid here when nothing unresolved survives. Foundry parses the expression; the
+  // lab only has to answer the question `checkRoll.js` actually asks of it.
+  validate(formula) {
+    return !/NaN|@/.test(String(formula));
+  },
+};
+
 export function installFoundryShim(world) {
   const random = installLabRandom({ seed: world.seed });
   const utils = createUtils(random.randomID);
@@ -316,7 +378,7 @@ export function installFoundryShim(world) {
     modules: { get: () => ({ id: 'fabricate', version: '0.0.0-viewlab', active: true }) },
     settings: createSettings(world.settings),
     i18n: world.i18n,
-    time: { worldTime: world.worldTime, calendar: null, advance: () => {} },
+    time: { worldTime: world.worldTime, calendar: LAB_CALENDAR, advance: () => {} },
     // Deliberately null: every player seam reads `game?.fabricate?.X?.() ?? fallback`, so leaving
     // this null until the real facade is installed proves nothing reaches around the seam layer.
     fabricate: null,
@@ -452,6 +514,8 @@ export function installFoundryShim(world) {
   // Nothing renders the returned document — the chat log is Foundry's, not Fabricate's, and is one
   // of the disclosed gaps — so this is a sink with a realistic shape, not a stub pretending to be a
   // chat log.
+  globalThis.Roll = LAB_ROLL;
+
   globalThis.ChatMessage = {
     async create(data = {}) {
       return makeDocument({ ...data, _id: `lab-chat-${chatMessageSequence++}` }, 'ChatMessage');

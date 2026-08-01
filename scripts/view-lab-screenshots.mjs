@@ -39,6 +39,19 @@ const BROWSER_CONTEXT = {
   timezoneId: 'UTC',
 };
 
+/**
+ * Fabricate warnings that describe the LAB's environment rather than a defect in what it renders.
+ *
+ * Kept to an explicit, reasoned list rather than a prefix carve-out. A warning gate that tolerates a
+ * category tolerates the next bug in that category too; this one has to name the message it excuses.
+ */
+const TOLERATED_WARNINGS = [
+  // The lab declares module version `0.0.0-viewlab`, which cannot satisfy the Item Piles minimum.
+  // It is a statement about the harness's own manifest, not about any rendered surface, and it
+  // fires on every case regardless of fixture.
+  /Item Piles integration: version .* does not meet minimum/,
+];
+
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color-profile=srgb'];
 const READY_TIMEOUT_MS = 20_000;
 
@@ -180,7 +193,29 @@ async function renderPage(
   const page = await context.newPage();
   const consoleErrors = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+      return;
+    }
+    // FABRICATE'S OWN WARNINGS ARE FATAL HERE. Not Foundry's, not Vite's, not a dependency's —
+    // Fabricate's, which are prefixed `Fabricate |` by convention.
+    //
+    // This is the generic defence against the defect class that has cost this harness the most: a
+    // fixture authored in a shape production does not read. Every instance so far degraded to a
+    // DEFAULT rather than throwing — a tool breakage config, four gathering drop tables, three
+    // character-prerequisite paths — so the frame rendered cleanly, published, and claimed to be
+    // evidence of the thing it was not showing. In each case the resolver did say something; it
+    // said it at `warn`, and this listener only collected `error`.
+    //
+    // Scoped to the prefix on purpose: an unscoped warning gate would fail on the Item Piles version
+    // notice every run, and a gate that has to be muted is a gate nobody keeps.
+    if (
+      message.type() === 'warning' &&
+      message.text().includes('Fabricate |') &&
+      TOLERATED_WARNINGS.every((pattern) => !pattern.test(message.text()))
+    ) {
+      consoleErrors.push(`warning: ${message.text()}`);
+    }
   });
   page.on('pageerror', (error) => {
     consoleErrors.push(String(error?.message ?? error));

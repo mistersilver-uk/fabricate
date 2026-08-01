@@ -177,14 +177,21 @@ test('every interaction step names text that exists in the manager UI', () => {
         continue;
       }
       for (const token of tokens) {
-        // Anchored on a WORD BOUNDARY, not a bare substring. `haystack.includes(token)` passes on
-        // a coincidence whenever one hook name is a prefix of another: renaming the real
-        // `data-component-select` left `data-component-select-all-page` in a sibling component, the
-        // substring still matched, and the guard stayed green over six broken selectors. Verified
-        // by that exact negative control. `[\w-]` is the character class an attribute or class name
-        // continues with, so requiring the next character not to be one of them is what makes a
-        // prefix stop matching its own longer sibling.
-        if (new RegExp(String.raw`${escapeForRegExp(token)}(?![\w-])`).test(haystack)) continue;
+        // Anchored on a word boundary at BOTH ends, not a bare substring. `haystack.includes(token)`
+        // passes on a coincidence whenever one hook name contains another:
+        //
+        //   prefix — renaming the real `data-component-select` left `data-component-select-all-page`
+        //     in a sibling component, so the substring still matched and the guard stayed green over
+        //     six broken selectors.
+        //   suffix — deleting the `.inventory-card` CLASS while keeping the `data-inventory-card`
+        //     ATTRIBUTE left the token `inventory-card` still matching, because the attribute name
+        //     ENDS with it. A trailing-only boundary does not see this.
+        //
+        // Both were found by mutation, the second after the first was "fixed". `[\w-]` is what an
+        // attribute or class name continues with, so requiring neither neighbour to be one is what
+        // makes a token stop matching a longer name that merely contains it.
+        const bounded = new RegExp(String.raw`(?<![\w-])${escapeForRegExp(token)}(?![\w-])`);
+        if (bounded.test(haystack)) continue;
         missing.push(
           `${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`
         );
