@@ -127,7 +127,11 @@ test('the missing-chrome message tells the operator what to do', () => {
 /* -------------------------------------------------------------------------- */
 
 test('provenance may be written from a release-archive harvest', () => {
-  assertProvenanceWritable({ manifest: { source: { kind: 'release-archive' }, foundryVersion: '14.365' } });
+  assert.doesNotThrow(() =>
+    assertProvenanceWritable({
+      manifest: { source: { kind: 'release-archive' }, foundryVersion: '14.365' },
+    })
+  );
 });
 
 test('provenance is refused for a local-install harvest, and says why', () => {

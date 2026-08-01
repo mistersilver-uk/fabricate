@@ -123,11 +123,15 @@ async function fetchSystem({ id, version, url }) {
     // because an MSYS/Git-Bash shell puts GNU tar first, and GNU tar reads the `C:\...`
     // destination as a remote host spec and fails with "Cannot connect to C".
     if (process.platform === 'win32') {
-      const bsdtar = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
-      execFileSync(existsSync(bsdtar) ? bsdtar : 'tar', ['-xf', tmpZip, '-C', staging], {
-        cwd: ROOT,
-        stdio: 'inherit',
-      });
+      // Absolute path, with no PATH fallback on purpose. An MSYS or Git-Bash shell puts GNU tar
+      // ahead of bsdtar, and GNU tar reads the `C:\...` destination as a remote host spec and dies
+      // with "Cannot connect to C" — so falling back to whatever `tar` resolves to reintroduces
+      // exactly the failure this line exists to avoid.
+      const bsdtar = join(process.env.SystemRoot ?? String.raw`C:\Windows`, 'System32', 'tar.exe');
+      if (!existsSync(bsdtar)) {
+        throw new Error(`cannot extract ${id}: ${bsdtar} is missing (Windows 10 build 17063+ ships it)`);
+      }
+      execFileSync(bsdtar, ['-xf', tmpZip, '-C', staging], { cwd: ROOT, stdio: 'inherit' });
     } else {
       execFileSync('unzip', ['-o', '-q', tmpZip, '-d', staging], { cwd: ROOT });
     }

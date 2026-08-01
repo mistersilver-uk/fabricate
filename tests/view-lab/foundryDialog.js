@@ -119,7 +119,10 @@ function renderButtons(buttons, localize) {
       // transcribed anyway, because a partial transcription is the thing the drift gate exists to
       // catch and the first caller to pass one would otherwise silently lose it.
       if (tooltip) {
-        button.setAttribute('data-tooltip', '');
+        // `dataset` rather than `setAttribute('data-tooltip', ...)`: identical resulting markup,
+        // and Foundry's own line is pinned by the drift test rather than mirrored letter for letter
+        // here.
+        button.dataset.tooltip = '';
         button.setAttribute('aria-label', localize(tooltip));
       }
       button.toggleAttribute('autofocus', isDefault);

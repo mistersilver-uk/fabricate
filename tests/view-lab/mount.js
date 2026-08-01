@@ -304,7 +304,7 @@ async function assertChromeFontsLoaded() {
     throw new Error(
       `view lab: harvested Foundry fonts are missing or renamed, so this frame would publish with ` +
         `fallback glyphs:\n  ${problems.join('\n  ')}\n` +
-        `Registered families: ${[...new Set(registered)].sort().join(', ') || '(none)'}\n` +
+        `Registered families: ${[...new Set(registered)].sort((left, right) => left.localeCompare(right)).join(', ') || '(none)'}\n` +
         'Re-harvest the chrome: npm run viewlab:chrome:harvest -- --force'
     );
   }

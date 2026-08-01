@@ -30,12 +30,15 @@ import {
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+/** Flags that set a boolean, mapped to the field each one writes. */
+const BOOLEAN_FLAGS = Object.freeze({ force: 'force', 'write-provenance': 'writeProvenance' });
+
 /**
- * Flags that carry a value. `--from-dir` is separated out because a Windows installation path
- * contains spaces, so it has to be usable as `--from-dir "C:\Program Files\..."` — two argv
- * entries — as well as in the `--flag=value` form the other options use.
+ * Flags that carry a value, mapped to the field each one writes. Both forms are accepted —
+ * `--flag=value` and two argv entries — because a Windows installation path contains spaces, so
+ * `--from-dir "C:\Program Files\..."` has to work.
  */
-const VALUE_FLAGS = new Set(['foundry-version', 'from-dir']);
+const VALUE_FLAGS = Object.freeze({ 'foundry-version': 'version', 'from-dir': 'fromDir' });
 
 function parseArgs(argv) {
   const args = {
@@ -45,43 +48,23 @@ function parseArgs(argv) {
     version: undefined,
     fromDir: undefined,
   };
-  let pendingFlag = null;
+  let pending = null;
   for (const raw of argv) {
-    if (pendingFlag) {
-      args[pendingFlag] = raw;
-      pendingFlag = null;
-      continue;
-    }
-    if (!raw.startsWith('--')) {
+    if (pending) {
+      args[VALUE_FLAGS[pending]] = raw;
+      pending = null;
+    } else if (raw.startsWith('--')) {
+      const [flag, value] = raw.slice(2).split(/=(.*)/s);
+      if (flag in BOOLEAN_FLAGS) args[BOOLEAN_FLAGS[flag]] = true;
+      else if (flag in VALUE_FLAGS) {
+        if (value === undefined) pending = flag;
+        else args[VALUE_FLAGS[flag]] = value;
+      } else throw new Error(`unknown flag --${flag}`);
+    } else {
       args.command = raw;
-      continue;
-    }
-    const [flag, value] = raw.slice(2).split(/=(.*)/s);
-    switch (flag) {
-      case 'force': {
-        args.force = true;
-        break;
-      }
-      case 'write-provenance': {
-        args.writeProvenance = true;
-        break;
-      }
-      case 'foundry-version': {
-        if (value === undefined) pendingFlag = 'version';
-        else args.version = value;
-        break;
-      }
-      case 'from-dir': {
-        if (value === undefined) pendingFlag = 'fromDir';
-        else args.fromDir = value;
-        break;
-      }
-      default: {
-        throw new Error(`unknown flag --${flag}`);
-      }
     }
   }
-  if (pendingFlag) throw new Error(`--${[...VALUE_FLAGS].join('/--')} needs a value`);
+  if (pending) throw new Error(`--${pending} needs a value`);
   return args;
 }
 

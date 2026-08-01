@@ -438,6 +438,25 @@ export function missingChromeMessage(repoRoot) {
 }
 
 /**
+ * Resolve which of the two sources a harvest should read from.
+ *
+ * @param {{repoRoot: string, archivePath?: string, fromDir?: string}} options Source selection.
+ * @returns {ChromeSource}
+ * @throws {Error} The fail-closed message when no source can be found.
+ */
+function openChromeSource({ repoRoot, archivePath, fromDir }) {
+  if (fromDir) return openDirectorySource(fromDir);
+  const archive = archivePath
+    ? {
+        path: archivePath,
+        version: ARCHIVE_NAME_PATTERN.exec(basename(archivePath))?.[1] ?? 'unknown',
+      }
+    : discoverArchive(repoRoot);
+  if (!archive) throw new Error(missingChromeMessage(repoRoot));
+  return openArchiveSource(archive);
+}
+
+/**
  * Harvest the chrome from a release archive or an unpacked installation.
  *
  * @param {object} options Harvest options.
@@ -449,19 +468,7 @@ export function missingChromeMessage(repoRoot) {
  * @returns {{dir: string, version: string, manifest: object, reused: boolean}}
  */
 export function harvestChrome({ repoRoot, archivePath, fromDir, force = false, log = () => {} }) {
-  let source;
-  if (fromDir) {
-    source = openDirectorySource(fromDir);
-  } else {
-    const archive = archivePath
-      ? {
-          path: archivePath,
-          version: ARCHIVE_NAME_PATTERN.exec(basename(archivePath))?.[1] ?? 'unknown',
-        }
-      : discoverArchive(repoRoot);
-    if (!archive) throw new Error(missingChromeMessage(repoRoot));
-    source = openArchiveSource(archive);
-  }
+  const source = openChromeSource({ repoRoot, archivePath, fromDir });
 
   const existing = resolveChromeCache(repoRoot, source.version);
   if (existing && !force && verifyChromeCache(existing).ok) {

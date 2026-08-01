@@ -24,10 +24,16 @@ export const COMPOSE_FILENAME = 'docker-compose.foundry.yml';
  * `${FOUNDRY_IMAGE:-...}` default-substitution form. Anchored to `image:` at the start of a line so
  * a mention inside a comment cannot satisfy it.
  */
-const IMAGE_LINE_PATTERN = /^\s*image:\s*"?(?:\$\{FOUNDRY_IMAGE:-([^}"]+)\}|([^"\s]+))"?\s*$/m;
+const IMAGE_LINE_PATTERN =
+  /^[ \t]*image:[ \t]*"?(?:\$\{FOUNDRY_IMAGE:-([^}"]+)}|([^"\s]+))"?[ \t]*$/m;
 
-/** `<repo>/<name>:<tag>` — the tag is what carries the Foundry build. */
-const IMAGE_REFERENCE_PATTERN = /^(?<repository>[^:\s]+):(?<tag>[^:\s]+)$/;
+/**
+ * `<repo>/<name>:<tag>` — the tag is what carries the Foundry build.
+ *
+ * Positional rather than named groups: the two halves are read once, immediately below, and a
+ * named group that is only ever consumed by an object spread reads as unused.
+ */
+const IMAGE_REFERENCE_PATTERN = /^([^:\s]+):([^:\s]+)$/;
 
 /**
  * Read the pinned Foundry image out of a compose file.
@@ -51,7 +57,8 @@ export function readPinnedFoundryImage(composePath) {
         'chrome cannot drift from what the smoke boots.'
     );
   }
-  return { image, ...reference.groups };
+  const [, repository, tag] = reference;
+  return { image, repository, tag };
 }
 
 /**
