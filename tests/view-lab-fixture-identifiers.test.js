@@ -16,7 +16,10 @@
  * passed over six broken selectors before it was tightened.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
@@ -24,6 +27,19 @@ import { buildLabActors } from './view-lab/world/labActors.js';
 
 const content = buildLabContent();
 const actors = buildLabActors(content);
+
+/**
+ * The run ids `buildLabRunStates` authors, read from its source.
+ *
+ * @returns {string[]} Every `id: 'lab-run-…'` literal in the module.
+ */
+function labRunIds() {
+  const source = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), 'view-lab', 'world', 'labRunStates.js'),
+    'utf8'
+  );
+  return [...source.matchAll(/id: '(lab-run-[\w-]+)'/g)].map((match) => match[1]);
+}
 
 /** Attribute name -> the set of values the lab world actually contains. */
 const IDENTITY_SOURCES = {
@@ -35,6 +51,30 @@ const IDENTITY_SOURCES = {
   'data-gathering-event-id': new Set(content.gatheringConfig.events.map((entry) => entry.id)),
   'data-environment-id': new Set(content.environments.map((entry) => entry.id)),
   'data-knowledge-actor': new Set(actors.map((entry) => entry.id)),
+
+  // The ten below were the gap this file's own header describes and did not actually close. Each
+  // pins a fixture id in a selector, so a rename is caught only by a capture run — which does not
+  // run on fork PRs, and which is the slowest possible place to learn about a typo.
+  'data-recipe-edit': new Set(content.recipes.map((entry) => entry.id)),
+  'data-component-select': new Set(content.components.map((entry) => entry.id)),
+  'data-system-id': new Set(content.systems.map((entry) => entry.id)),
+  // Essences are never declared as a list — they exist wherever a component or recipe carries one,
+  // which is exactly how `CraftingSystemManager` discovers them.
+  'data-essence-id': new Set(
+    content.components.flatMap((entry) => Object.keys(entry.essences ?? {}))
+  ),
+  'data-books-scrolls-edit': new Set(content.recipeItems.map((entry) => entry.id)),
+  // Run ids are literals inside `buildLabRunStates`, which needs a built actor to call. Reading
+  // them out of the source text keeps the guard free of that setup while still failing on a rename.
+  'data-history-run-id': new Set(labRunIds()),
+  // Composite keys. The listing builds these itself, so the guard has to build them the same way
+  // or it would reject the very values the DOM carries.
+  'data-inventory-card': new Set(
+    content.systems.flatMap((system) =>
+      (system.components ?? []).map((component) => `${system.id}:${component.id}`)
+    )
+  ),
+  'data-essence-carrier': new Set(content.components.map((entry) => `Item.${entry.id}`)),
 };
 
 /** Every `key="value"` pair in a selector, in source order. */

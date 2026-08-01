@@ -125,10 +125,6 @@ test('every case names a window the chrome spec knows how to build', () => {
     );
     assert.ok(viewCase.label.trim().length > 0, `case "${viewCase.id}" has no label`);
     assert.equal(labelForCaseId(viewCase.id), viewCase.label);
-    assert.ok(
-      viewCase.readySelector.trim().length > 0,
-      `case "${viewCase.id}" has no readySelector`
-    );
   }
 });
 
@@ -352,6 +348,31 @@ test('no two cases claiming exact reach produce the same frame', () => {
       'a picture of something other than what it names. Give each the steps, query or geometry that ' +
       'distinguishes it, or downgrade the ones that fall short to `window`:\n  ' +
       collisions.join('\n  ')
+  );
+});
+
+test('no case tags itself with a second, competing reach vocabulary', () => {
+  // `reaches` is this registry's honesty contract, and the index page prints `kinds` and `reaches`
+  // into one tag list. So a kind that reads like a reach value is not a label — it is a SECOND
+  // claim about the same thing, free to contradict the first.
+  //
+  // It did. `window-only` survived on 85 cases while only 5 still reached `window`, so most of the
+  // registry would have rendered tagged `exact` and `window-only` at once, on the very page whose
+  // job is to tell a reviewer what each frame is evidence of. It was defined nowhere and consumed
+  // by nothing but the filter.
+  const RESERVED = new Set(['exact', 'window', 'beyond', 'window-only', 'state', 'screen']);
+  const offenders = VIEW_LAB_CASES.flatMap((viewCase) =>
+    (viewCase.kinds ?? [])
+      .filter((kind) => RESERVED.has(kind))
+      .map((kind) => `${viewCase.id}: ${kind}`)
+  );
+
+  assert.deepEqual(
+    offenders,
+    [],
+    'these cases carry a `kinds` entry from the reach vocabulary, which the index renders beside ' +
+      'the real `reaches` value and which is free to contradict it. Say it once, in `reaches`:\n  ' +
+      offenders.join('\n  ')
   );
 });
 

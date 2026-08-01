@@ -406,7 +406,8 @@ Run `npm run lint:md:fix` to auto-split prose, re-running until the count stops 
 - For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
 - Fall back to `npm run test:foundry` when a change depends on real Foundry runtime behavior, when no Vite dev server is available, or when clean reproducible screenshots are needed.
 - UI-changing PRs (files under `src/ui/`, `styles/`, or any `*.svelte`/`*.css`) must include screenshot evidence for the relevant changed views before opening or updating the PR; a `lang/` change requires screenshots only when the same PR also changes one of those render files.
-Evidence is always a FULL APPLICATION WINDOW at the app's declared size (player 1280x860, manager 1280x940) — never a component on a blank page.
+Evidence is always a FULL APPLICATION WINDOW — never a component on a blank page.
+Each case pins the size its smoke counterpart photographs rather than the app's declared `DEFAULT_OPTIONS.position`: the two differ (the smoke shoots the manager at 1280x820, not its declared 1280x940), and responsive cases deliberately pin narrower geometry, so the registry spans twelve sizes and the size is a per-case fact rather than a per-app one.
 - For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`), the **View Lab** produces that frame in seconds without Foundry or Docker: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
 It needs a one-off `npm run viewlab:chrome:harvest` first, which extracts Foundry's real window chrome from the release archive `npm run test:foundry:up` already caches; nothing harvested is ever committed.
 The lab fails closed rather than approximating: no harvested chrome, no frame.

@@ -184,6 +184,22 @@ export function confirmDialogButtons({ yes = {}, no = {} } = {}) {
 }
 
 /**
+ * The single button `DialogV2.prompt` unshifts (`dialog.mjs:338-344`).
+ *
+ * Here rather than inline in `foundryDialog.js` for the same reason `confirmDialogButtons` is: the
+ * descriptor is transcribed from Foundry, so it belongs on the side of the split that
+ * `tests/view-lab-chrome-drift.test.js` pins string-for-string against the harvested source. The
+ * label and icon are what the import dialog's Import button inherits, and a drifted one would
+ * publish a frame captioned with a button Foundry no longer draws.
+ *
+ * @param {object} [ok] `config.ok`.
+ * @returns {Array<object>} The single ok descriptor.
+ */
+export function promptDialogButtons(ok = {}) {
+  return [{ action: 'ok', label: 'Confirm', icon: 'fa-solid fa-check', default: true, ...ok }];
+}
+
+/**
  * Resolve the frame description Foundry would render a `DialogV2` with.
  *
  * `_initializeApplicationOptions` merges, in inheritance order, ApplicationV2's `DEFAULT_OPTIONS`

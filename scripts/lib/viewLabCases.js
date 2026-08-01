@@ -76,11 +76,15 @@ export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 /**
  * Case factories.
  *
- * `app`, `readySelector` and `publish` are not independent facts — they follow from which window a
- * case targets. Restating them 150 times made the registry longer without making it clearer, and
- * made every entry look alike to a duplication detector because every entry WAS alike in four of
- * its lines. `position` defaults to the geometry most of that app's cases use; a case that needs a
- * responsive size still states it, which is now the only reason a case mentions position at all.
+ * `app` and `publish` are not independent facts — they follow from which window a case targets.
+ * Restating them 150 times made the registry longer without making it clearer, and made every entry
+ * look alike to a duplication detector because every entry WAS alike in several of its lines.
+ * `position` defaults to the geometry most of that app's cases use; a case that needs a responsive
+ * size still states it, which is now the only reason a case mentions position at all.
+ *
+ * There was a third such field, `readySelector`. It is gone: nothing read it. The driver waits on
+ * `data-view-lab-ready`, and the only other reference was a test asserting the string was non-empty
+ * — a guard over a value with no consumer, which reads as coverage and is not.
  *
  * @param {object} entry Case fields.
  * @returns {object} A complete case.
@@ -89,7 +93,6 @@ function managerCase(entry) {
   return {
     app: MANAGER,
     position: { width: 1280, height: 820 },
-    readySelector: '.fabricate-manager',
     publish: true,
     ...entry,
   };
@@ -103,7 +106,6 @@ function playerCase(entry) {
   return {
     app: PLAYER,
     position: { width: 1280, height: 860 },
-    readySelector: '.fabricate-app-shell',
     publish: true,
     ...entry,
   };
@@ -216,9 +218,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-selected-stacked',
     label: 'Manager — Selected stacked',
     smokeLabels: ['manager-selected-stacked'],
+    // Clicks the row, exactly as its normal-width twin does. It had no steps at all, so it captured
+    // the DEFAULT selection at the stacked breakpoint — the thing that case's own comment rejects
+    // as "evidence that the setting works, not that the row does".
     reaches: 'exact',
     query: {},
-    steps: [],
+    steps: [
+      { selector: '.manager-system-row[data-system-id="lab-smithing"] .manager-system-identity' },
+    ],
     expectView: 'systems',
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'systems', 'responsive'],
@@ -267,7 +274,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-system-name', fill: 'Karrun Forgecraft (unsaved edit)' },
     ],
     expectView: 'system-edit',
-    kinds: ['manager', 'system-edit', 'window-only'],
+    kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   }),
   managerCase({
@@ -313,7 +320,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'system-edit',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit', 'window-only'],
+    kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   }),
   managerCase({
@@ -331,7 +338,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'system-edit',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit', 'window-only'],
+    kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   }),
   managerCase({
@@ -351,7 +358,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'system-edit',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'system-edit', 'window-only'],
+    kinds: ['manager', 'system-edit'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/],
   }),
   managerCase({
@@ -559,7 +566,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#recipe-tab-books-scrolls' },
     ],
     expectView: 'recipe-edit',
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -577,7 +584,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#recipe-tab-tools' },
     ],
     expectView: 'recipe-edit',
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -595,7 +602,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#recipe-tab-ingredients' },
     ],
     expectView: 'recipe-edit',
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -638,7 +645,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#recipe-tab-validation' },
     ],
     expectView: 'recipe-edit',
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -679,7 +686,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#recipe-tab-results' },
     ],
     expectView: 'recipe-edit',
-    kinds: ['manager', 'recipes', 'window-only'],
+    kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
@@ -724,10 +731,18 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.manager-feature-tile[data-feature-key="multiStepRecipes"] button' },
     ],
     expectView: 'system-edit',
-    kinds: ['manager', 'recipes', 'window-only'],
+    // The dialog IS the state, so the frame has to be held to it: `expectView: 'system-edit'` is
+    // satisfied by the settings tab with no dialog standing, which is precisely the screen a
+    // silently no-oping toggle would have published.
+    expectSelector: '.application.dialog',
+    kinds: ['manager', 'recipes'],
+    // Matches the screen it RENDERS. These named `RecipeEditView.svelte` and `manager/recipe/`,
+    // neither of which appears in this frame — so a change to the settings tab did not select the
+    // only case showing its confirmation, and a change to the recipe editor selected a frame of
+    // the system-edit screen.
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
     ],
   }),
   managerCase({
@@ -846,7 +861,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-component-bulk-essences] [data-stepper-increment]' },
     ],
     expectView: 'components',
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
@@ -866,7 +881,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
     ],
     expectView: 'components',
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
@@ -887,7 +902,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'components',
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
@@ -911,7 +926,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'components',
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
@@ -932,7 +947,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'components',
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
@@ -987,7 +1002,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'component-edit',
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -1004,7 +1019,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'component-edit',
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -1015,7 +1030,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Checks', { selector: '#checks-tab-gathering' }],
     expectView: 'checks',
-    kinds: ['manager', 'checks', 'window-only'],
+    kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
@@ -1029,7 +1044,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Checks', { selector: '#checks-tab-validation' }],
     expectView: 'checks',
-    kinds: ['manager', 'checks', 'window-only'],
+    kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
@@ -1134,7 +1149,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: ['Tags & Categories', { selector: '#vocabulary-tab-tag' }],
     expectView: 'tags',
-    kinds: ['manager', 'tags', 'window-only'],
+    kinds: ['manager', 'tags'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategories/],
   }),
   managerCase({
@@ -1240,7 +1255,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'gathering-task-edit',
-    kinds: ['manager', 'environments', 'window-only'],
+    kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
@@ -1269,7 +1284,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // 1000x720, the width its smoke counterpart stacks at — the previous 1280x820 was the
     // NORMAL geometry, so the two cases differed in nothing at all.
     position: { width: 1000, height: 720 },
-    kinds: ['manager', 'environments', 'responsive', 'window-only'],
+    kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
@@ -1309,7 +1324,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The events library is a SECTION of the environments route, so the route key is unchanged;
     // the section is what the second step moves.
     expectView: 'environments',
-    kinds: ['manager', 'environments', 'window-only'],
+    kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
@@ -1330,7 +1345,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'gathering-event-edit',
-    kinds: ['manager', 'environments', 'window-only'],
+    kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
@@ -1354,7 +1369,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-smithing' },
     steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
     expectView: 'environments',
-    kinds: ['manager', 'environments', 'window-only'],
+    kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
@@ -1365,13 +1380,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-gathering-travel-stacked',
     label: 'Manager — Gathering travel stacked',
     smokeLabels: ['manager-gathering-travel-stacked'],
-    // `window` for the same reason as its normal-width twin above.
+    // Reaches Travel for the same reason as its normal-width twin above, at the stacked breakpoint.
     reaches: 'exact',
     query: { system: 'lab-smithing' },
     steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
     expectView: 'environments',
     position: { width: 1000, height: 720 },
-    kinds: ['manager', 'environments', 'responsive', 'window-only'],
+    kinds: ['manager', 'environments', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView|TravelTabs)/,
@@ -1401,7 +1416,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: ['Tools'],
     expectView: 'tools',
     position: { width: 1280, height: 720 },
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Tool/,
       /^src\/ui\/svelte\/apps\/manager\/tools\//,
@@ -1420,7 +1435,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1442,7 +1457,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#tool-tab-overview' },
     ],
     expectView: 'tool-edit',
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1458,7 +1473,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1482,7 +1497,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-tool-repair-requirements]', scroll: true },
     ],
     expectView: 'tool-edit',
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1504,7 +1519,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-tool-replacement-target]', scroll: true },
     ],
     expectView: 'tool-edit',
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1528,7 +1543,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#tool-tab-breakage' },
     ],
     expectView: 'tool-edit',
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1544,7 +1559,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1560,7 +1575,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1585,7 +1600,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
-    kinds: ['manager', 'tools', 'window-only'],
+    kinds: ['manager', 'tools'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1601,7 +1616,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     position: { width: 900, height: 700 },
-    kinds: ['manager', 'tools', 'responsive', 'window-only'],
+    kinds: ['manager', 'tools', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/],
   }),
   managerCase({
@@ -1613,7 +1628,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: ['Tools'],
     expectView: 'tools',
     position: { width: 680, height: 700 },
-    kinds: ['manager', 'tools', 'responsive', 'window-only'],
+    kinds: ['manager', 'tools', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Tool/,
       /^src\/ui\/svelte\/apps\/manager\/tools\//,
@@ -1647,7 +1662,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'knowledge', 'window-only'],
+    kinds: ['manager', 'knowledge'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/],
   }),
   managerCase({
@@ -1666,7 +1681,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'knowledge', 'window-only'],
+    kinds: ['manager', 'knowledge'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/],
   }),
   managerCase({
@@ -1685,7 +1700,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'knowledge', 'window-only'],
+    kinds: ['manager', 'knowledge'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/],
   }),
   managerCase({
@@ -1705,7 +1720,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'knowledge', 'window-only'],
+    kinds: ['manager', 'knowledge'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/],
   }),
   managerCase({
@@ -1717,7 +1732,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
     expectView: 'knowledge',
     position: { width: 880, height: 900 },
-    kinds: ['manager', 'knowledge', 'responsive', 'window-only'],
+    kinds: ['manager', 'knowledge', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
@@ -1754,7 +1769,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'components',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
@@ -1775,51 +1790,116 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     position: { width: 1280, height: 900 },
-    kinds: ['manager', 'components', 'window-only'],
+    kinds: ['manager', 'components'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
     id: 'manager-import-report',
     label: 'Manager — Import report',
     smokeLabels: ['manager-import-report'],
-    // Stays `window`, and the blocker is the harness's step vocabulary rather than the fixture.
-    // `ImportReportModal` opens on ONE path: `importSystem()` -> `renderSystemImportDialog()`,
-    // which puts up a `DialogV2.prompt` carrying a native `<input type="file" name="importFile">`
-    // and returns `null` unless a FILE was chosen. The smoke feeds that input with
-    // `setInputFiles`; the runner's four verbs are click / select / fill / scroll, and `fill` on a
-    // file input throws rather than selecting anything. So there is no fixture that reaches this
-    // screen — it needs a file verb in `scripts/view-lab-screenshots.mjs`, alongside the real
-    // `DialogV2` the folder-mapping case is also waiting on.
-    reaches: 'window',
+    // The uploaded payload is a REAL export envelope, because `validateImportData` rejects
+    // anything else. This case spent increment 2 at `window` behind a blocker comment naming the
+    // step vocabulary and the missing `DialogV2` — both of which this branch had already removed.
+    // The actual blocker was the fixture: the payload was `{name, components, recipes}` with no
+    // `system` key, so validation errored, `renderSystemImportDialog` returned `null`, and the
+    // frame published the plain systems browser under the name "Import report".
+    //
+    // It stayed invisible because `ui.notifications.error` was a no-op in the shim. Production
+    // said "Invalid file: Missing required 'system' field" and nothing carried it. The shim now
+    // routes notifications to `console`, so this exact defect fails the capture instead of
+    // retitling it — see `tests/view-lab/foundry/installFoundryShim.js`.
+    //
+    // The system id must be NEW: `importFromPackData` reports an existing one as
+    // `summary.system.skipped`, which is an info toast and an early `null` return, not a report.
+    reaches: 'exact',
     query: { dialog: 'open' },
     steps: [
       { selector: '[data-manager-import-system]' },
       {
         selector: 'input[name="importFile"]',
-        upload: JSON.stringify({ name: 'Imported Forge', components: [], recipes: [] }),
+        upload: JSON.stringify({
+          schemaVersion: 2,
+          fabricateVersion: '1.1.0',
+          runtimeStateIncluded: false,
+          system: {
+            id: 'lab-imported-forge',
+            name: 'Imported Forge',
+            summary: 'A system that arrived by file.',
+            enabled: true,
+            // Dangling `originItemUuid`s on purpose. The report's subject is
+            // `summary.unresolvedReferences` — a reference the importer could not bind — and the
+            // ordinary way to produce them is the ordinary way people hit this screen: export from
+            // one world, import into another that does not have the items. A payload whose every
+            // reference resolves renders the modal's EMPTY state, which is a real state but not
+            // the one this frame is named for.
+            components: [
+              {
+                id: 'imp-emberglass',
+                name: 'Emberglass Shard',
+                originItemUuid: 'Item.absent-emberglass',
+                essences: {},
+                tags: [],
+              },
+              {
+                id: 'imp-quenching-salt',
+                name: 'Quenching Salt',
+                originItemUuid: 'Item.absent-quenching-salt',
+                essences: {},
+                tags: [],
+              },
+            ],
+            essences: [],
+            componentCategories: [],
+            itemTags: [],
+          },
+          // No recipes. One was authored here and the importer counted it as a FAILED recipe — it
+          // contributed nothing to this modal (the report's subject is unresolved references, not
+          // failed records) while leaving a knowingly-invalid record in a fixture, which is the
+          // defect class this branch spent its length removing.
+          recipes: [],
+          gatheringEnvironments: [],
+          gatheringConfig: {},
+        }),
       },
       { selector: '.application.dialog button[data-action="ok"]' },
     ],
     expectView: 'systems',
-    kinds: ['manager', 'systems', 'window-only'],
+    // The systems browser is what sits UNDERNEATH the report, so `expectView` alone cannot tell
+    // the two apart. This is the assertion that actually holds the frame to its name.
+    expectSelector: '[data-import-report]',
+    kinds: ['manager', 'systems'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/Import(ReportModal|FolderMappingModal)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
     ],
   }),
   managerCase({
     id: 'manager-import-folder-mapping',
     label: 'Manager — Import folder mapping',
     smokeLabels: ['manager-import-folder-mapping'],
+    // The one case on this branch whose blocker is a MISSING VERB rather than a fixture shape.
+    // `ImportFolderMappingModal` opens on exactly one path — `dropComponent(data)` calls
+    // `services.collectImportFolderGroups(data)` and opens the modal only when the returned plan
+    // carries `groups.length`. That is a DRAG-DROP: it needs a `DataTransfer` carrying a Foundry
+    // folder or compendium-pack payload dispatched at the components drop target, which the
+    // runner's click / select / fill / scroll / upload vocabulary cannot express. A `drop` verb is
+    // the work, and it is real work rather than a line: the payload has to satisfy
+    // `resolveDropData` and the collector has to walk a folder tree the lab world does not model.
+    //
+    // Left deliberately on the components browser rather than the default systems screen. It still
+    // does not show the modal — but it shows the screen the drop would land on, so the frame is at
+    // least about the right surface, and it is not a byte-duplicate of `manager-default-selection`
+    // published under another name.
     reaches: 'window',
     query: {},
-    steps: [],
-    expectView: 'systems',
-    kinds: ['manager', 'systems', 'window-only'],
+    steps: ['Components'],
+    expectView: 'components',
+    kinds: ['manager', 'components'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
     ],
   }),
   managerCase({
@@ -1902,7 +1982,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
     ],
-    kinds: ['player', 'inventory', 'window-only'],
+    kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
@@ -1925,7 +2005,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
     ],
-    kinds: ['player', 'inventory', 'window-only'],
+    kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
@@ -1949,7 +2029,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
     ],
-    kinds: ['player', 'inventory', 'window-only'],
+    kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
@@ -1972,7 +2052,7 @@ export const VIEW_LAB_CASES = Object.freeze([
           '.inventory-card[data-inventory-card="lab-smithing:sm-air-shard"] .inventory-card-button',
       },
     ],
-    kinds: ['player', 'inventory', 'window-only'],
+    kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
@@ -2011,7 +2091,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
     ],
-    kinds: ['player', 'inventory', 'window-only'],
+    kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
@@ -2032,7 +2112,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
       { selector: '[data-gathering-detail-tab="events"]' },
     ],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2049,7 +2129,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
     ],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2077,7 +2157,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
       { selector: '.gathering-task-detail-attempt' },
     ],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2094,7 +2174,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-icecap"] .gathering-task-summary' },
     ],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2110,7 +2190,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-slowbloom"] .gathering-task-summary' },
     ],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2129,7 +2209,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.gathering-task-row[data-task-id="hb-task-slowbloom"] .gathering-task-summary' },
       { selector: '.gathering-task-detail-attempt' },
     ],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2141,7 +2221,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `[data-gathering-blind-card]`: a blind-selection environment redacts its task list entirely
     // — one opaque attempt card instead of rows, with the mask chip on the environment card.
     steps: [{ selector: '.gathering-env-card[data-environment-id="hb-env-thicket"]' }],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2157,7 +2237,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // containers, and a card that never scrolled in is simply absent from the frame while every
     // assertion still passes.
     steps: [{ selector: '.gathering-env-card.is-locked', scroll: true }],
-    kinds: ['player', 'gathering', 'window-only'],
+    kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2168,7 +2248,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'gathering' },
     steps: [],
     position: { width: 1024, height: 860 },
-    kinds: ['player', 'gathering', 'responsive', 'window-only'],
+    kinds: ['player', 'gathering', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
   }),
   playerCase({
@@ -2192,7 +2272,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="jw-r-cast"]' }],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2205,7 +2285,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="rw-r-blade"]' }],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2234,7 +2314,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-iron-ingot"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2266,7 +2346,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         scroll: true,
       },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2292,7 +2372,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Quench in Fire' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-quenchoil"]' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2305,7 +2385,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-longsword"]' }],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2331,7 +2411,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'window',
     query: { tab: 'crafting' },
     steps: [],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2344,7 +2424,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-emberbrand"]' }],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2372,7 +2452,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"] .crafting-recipe-row-add',
       },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2396,7 +2476,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Temper a Tidebound' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2417,7 +2497,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Refine Silver' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-silver-ingot"]' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2430,7 +2510,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' }],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2464,7 +2544,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
       { selector: '.requirement-rail-wand' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2499,7 +2579,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         fill: '2',
       },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2512,7 +2592,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-shield"]' }],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2525,7 +2605,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' }],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2550,7 +2630,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2572,7 +2652,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
       { selector: '[data-progressive-stage-move-down]' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2593,7 +2673,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-browser-search input', fill: 'Set the Drying Kiln' },
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-kiln"]' },
     ],
-    kinds: ['player', 'crafting', 'window-only'],
+    kinds: ['player', 'crafting'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2609,7 +2689,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // takes the grid under its 900px container breakpoint so the three columns STACK and the stage
     // rows get the full width. The lab cannot do that: `assertWindowGeometry` requires the applied
     // box to equal the declared one, and production's `.fabricate-app { min-width: 1024px }` is
-    // therefore the floor — which is why every `responsive` case in this registry is 1024.
+    // therefore the floor for a PLAYER case. (That floor is player-only: `.fabricate-app` is the
+    // player shell, so the manager's responsive cases sit below it at 1000, 900 and 680.)
     //
     // At 1024 the grid does NOT stack; the centre column lands at ~290px, and the counterpart's
     // own assertions fail there. Measured: `rowOverflow: 3` where the counterpart demands 0, and
@@ -2623,7 +2704,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
     ],
     position: { width: 1024, height: 860 },
-    kinds: ['player', 'crafting', 'responsive', 'window-only'],
+    kinds: ['player', 'crafting', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2637,7 +2718,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'crafting' },
     steps: [],
     position: { width: 1024, height: 860 },
-    kinds: ['player', 'crafting', 'responsive', 'window-only'],
+    kinds: ['player', 'crafting', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/crafting\//,
       /^src\/ui\/svelte\/stores\/craftingStore/,
@@ -2658,7 +2739,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'alchemy' },
     steps: [{ selector: '[data-alchemy-switch]' }],
-    kinds: ['player', 'alchemy', 'window-only'],
+    kinds: ['player', 'alchemy'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
   }),
   playerCase({
@@ -2679,7 +2760,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'alchemy' },
     steps: [],
     position: { width: 1024, height: 860 },
-    kinds: ['player', 'alchemy', 'responsive', 'window-only'],
+    kinds: ['player', 'alchemy', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
   }),
   playerCase({
@@ -2714,7 +2795,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         scroll: true,
       },
     ],
-    kinds: ['player', 'journal', 'window-only'],
+    kinds: ['player', 'journal'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
   // ───────────────────────────────────────────────────────────────────────────────────────────────

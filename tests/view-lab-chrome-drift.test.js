@@ -32,6 +32,7 @@ import {
   FOUNDRY_CHROME_SPEC,
   FOUNDRY_DIALOG_SPEC,
   confirmDialogButtons,
+  promptDialogButtons,
   frameClassesFor,
   resolveDialogChrome,
 } from '../scripts/lib/foundryChromeSpec.js';
@@ -342,6 +343,29 @@ test('confirm still unshifts the yes/no buttons the spec transcribes', { skip: s
   const [relabelled] = confirmDialogButtons({ yes: { label: 'Delete' } });
   assert.equal(relabelled.label, 'Delete');
   assert.equal(relabelled.icon, yes.icon);
+});
+
+test('prompt still unshifts the ok button the spec transcribes', { skip: skipDialog }, () => {
+  const normalized = normalize(dialogSource);
+  const [ok] = promptDialogButtons();
+  assert.ok(
+    normalized.includes(
+      `action: "${ok.action}", label: "${ok.label}", icon: "${ok.icon}", default: ${ok.default}`
+    ),
+    `DialogV2.prompt's OK button moved. ${RETRANSCRIBE}`
+  );
+  assert.ok(
+    normalized.includes(
+      `return this.wait(foundry.utils.mergeObject({ position: { width: ${FOUNDRY_DIALOG_SPEC.factoryPosition.width} } }, config));`
+    ),
+    `DialogV2.prompt's default width moved. ${RETRANSCRIBE}`
+  );
+  // The import dialog relabels it to "Import" and supplies the callback that reads the file input,
+  // so a caller override has to survive the merge — as it does for confirm.
+  const [relabelled] = promptDialogButtons({ label: 'Import' });
+  assert.equal(relabelled.label, 'Import');
+  assert.equal(relabelled.icon, ok.icon);
+  assert.equal(relabelled.default, true);
 });
 
 test('the dialog is still opened and closed the way the lab opens it', { skip: skipDialog }, () => {

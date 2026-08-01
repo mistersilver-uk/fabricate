@@ -12,7 +12,15 @@
  * Commands:
  *   chrome    capture the empty window chrome for every app - the fidelity baseline
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -119,8 +127,9 @@ async function startLabServer() {
  * @param {import('playwright').Page} page The lab page.
  * @param {Array<string|object>} steps Ordered steps.
  * @param {string} label Case label, for error messages.
+ * @param {string} scratch Per-render temp directory for `upload` payloads.
  */
-async function runSteps(page, steps, label) {
+async function runSteps(page, steps, label, scratch) {
   for (const step of steps) {
     // A `{selector}` step clicks a stable element id — preferred wherever the UI offers one, since
     // it survives a label change. A string step is a rail entry matched by its label.
@@ -150,12 +159,17 @@ async function runSteps(page, steps, label) {
         // actually chosen, so the import report is unreachable without this — and `fill` THROWS on a
         // file input rather than degrading, which is why the case sat blocked rather than wrong.
         //
-        // The payload is written to a temp file because Playwright's `setInputFiles` wants a path;
-        // it carries the case's own name so a failure names the case that produced it.
-        const payload = join(tmpdir(), `view-lab-${label}.json`);
+        // The payload is written to a temp file because Playwright's `setInputFiles` wants a path.
+        //
+        // It must OUTLIVE the step. A `File` in Chromium is a lazy handle on the path, not a copy
+        // of its bytes, so `file.text()` — which `renderSystemImportDialog` calls when the Import
+        // button is pressed, several steps later — reads the file at THAT moment. Deleting it here
+        // made every import fail with a bare "A requested file or directory could not be found",
+        // caught only once notifications stopped being swallowed. The scratch directory is removed
+        // when the page closes, which is the first point at which nothing can still read it.
+        const payload = join(scratch, `${label}.json`);
         writeFileSync(payload, step.upload);
         await target.setInputFiles(payload);
-        rmSync(payload, { force: true });
       } else if (step.scroll) {
         // Element exists but sits below an inner panel's fold. `frame.screenshot()` on the outer
         // `.application` does NOT scroll nested overflow containers, so a card that never scrolled
@@ -201,10 +215,14 @@ function escapeForRegExp(value) {
 async function renderPage(
   browser,
   baseUrl,
-  { appId, query, label, steps = [], expectView = null, expectTab = null }
+  { appId, query, label, steps = [], expectView = null, expectTab = null, expectSelector = null }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
   const page = await context.newPage();
+  // `mkdtemp` rather than a fixed name in `tmpdir()`: the old path was predictable, and a harness
+  // that writes a predictable path in a shared directory is a symlink-swap away from writing
+  // somewhere else. It costs one call to not have that property.
+  const scratch = mkdtempSync(join(tmpdir(), 'view-lab-'));
   const consoleErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -261,7 +279,7 @@ async function renderPage(
     );
     if (failure) throw new Error(`${label}: ${failure}`);
 
-    if (steps.length > 0) await runSteps(page, steps, label);
+    if (steps.length > 0) await runSteps(page, steps, label, scratch);
 
     // The hard gate against the failure this harness is most exposed to: a step that clicks
     // something, changes nothing, and captures whichever screen happened to be showing. The manager
@@ -298,6 +316,26 @@ async function renderPage(
       }
     }
 
+    // `expectView` and `expectTab` gate the ROUTE, and a route survives everything that happens on
+    // top of it: a modal that never opened, a dialog that was dismissed, an inspector that stayed
+    // collapsed. `manager-import-report` published the plain systems browser for the whole of
+    // increment 2 while passing `expectView: 'systems'`, because the systems browser is exactly
+    // what is underneath the report. A case whose subject is an OVERLAY names the element that
+    // proves it, and is held to it.
+    if (expectSelector) {
+      const present = await page.evaluate(
+        (selector) => globalThis.document.querySelector(selector) !== null,
+        expectSelector
+      );
+      if (!present) {
+        throw new Error(
+          `${label}: expected "${expectSelector}" to be present after its steps, and it is not. ` +
+            `The route is right, so the capture would have shown the screen UNDERNEATH the state ` +
+            `this case is named for.`
+        );
+      }
+    }
+
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });
     const box = await frame.boundingBox();
@@ -307,6 +345,7 @@ async function renderPage(
     return { buffer, box };
   } finally {
     await context.close();
+    rmSync(scratch, { recursive: true, force: true });
   }
 }
 
@@ -384,20 +423,57 @@ function currentHead() {
   // which are one file read. No subprocess, no PATH dependency, and it works in a container that
   // has no git installed.
   try {
-    const head = readFileSync(join(ROOT, '.git', 'HEAD'), 'utf8').trim();
+    const dirs = resolveGitDirs();
+    if (!dirs) return null;
+
+    const head = readFileSync(join(dirs.gitDir, 'HEAD'), 'utf8').trim();
     const ref = /^ref:\s*(.+)$/.exec(head);
     if (!ref) return head.slice(0, 8);
 
-    const refPath = join(ROOT, '.git', ref[1]);
-    if (existsSync(refPath)) return readFileSync(refPath, 'utf8').trim().slice(0, 8);
+    // Per-worktree refs (`refs/bisect`, `refs/worktree`) live in the worktree gitdir; everything
+    // else — including `refs/heads` — lives in the common dir shared with the main checkout.
+    for (const base of [dirs.gitDir, dirs.commonDir]) {
+      const refPath = join(base, ref[1]);
+      if (existsSync(refPath)) return readFileSync(refPath, 'utf8').trim().slice(0, 8);
+    }
 
     // A packed ref — the loose file is absent once `git gc` has run.
-    const packed = readFileSync(join(ROOT, '.git', 'packed-refs'), 'utf8');
+    const packed = readFileSync(join(dirs.commonDir, 'packed-refs'), 'utf8');
     const line = packed.split('\n').find((entry) => entry.endsWith(` ${ref[1]}`));
     return line ? line.slice(0, 8) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * The git directory pair for this checkout.
+ *
+ * In an ordinary clone `.git` is a directory and both are the same path. In a WORKTREE it is a
+ * file holding `gitdir: <path>`, and reading it as a directory throws `ENOTDIR` — which the caller
+ * swallows, so every frame stamps `null` and nothing is ever marked stale. That matters more here
+ * than it looks: `AGENTS.md` mandates an isolated worktree for every lane, so the environment this
+ * project actually runs captures in is exactly the one where head-stamping silently did nothing,
+ * and head-stamping is what pays for capture accumulation.
+ *
+ * @returns {{gitDir: string, commonDir: string}|null} Resolved dirs, or null outside a repository.
+ */
+function resolveGitDirs() {
+  const dotGit = join(ROOT, '.git');
+  if (!existsSync(dotGit)) return null;
+
+  let gitDir = dotGit;
+  if (statSync(dotGit).isFile()) {
+    const pointer = /^gitdir:\s*(.+)$/m.exec(readFileSync(dotGit, 'utf8'));
+    if (!pointer) return null;
+    gitDir = resolve(ROOT, pointer[1].trim());
+  }
+
+  const commonPath = join(gitDir, 'commondir');
+  const commonDir = existsSync(commonPath)
+    ? resolve(gitDir, readFileSync(commonPath, 'utf8').trim())
+    : gitDir;
+  return { gitDir, commonDir };
 }
 
 /**
@@ -507,6 +583,7 @@ async function commandApps() {
           // be showing. Deriving it here means a case cannot declare a tab that disagrees with the
           // query that produced the frame.
           expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
+          expectSelector: viewCase.expectSelector ?? null,
         });
         writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
         rendered.push({

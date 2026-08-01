@@ -46,7 +46,12 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures) {
     {
       id: 'lab-party',
       name: 'The Ashfall Company',
-      craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
+      // No `craftingSystemId`. Parties are world-level and cross-system by design
+      // (`GatheringPartyStore`), and `_normalizeParty` returns a fixed six-field record that has no
+      // such key — so authoring one asserts a scoping that does not exist and is dropped on read.
+      // It also read as a CONTRADICTION of the frame it feeds: `manager-gathering-travel-normal`
+      // photographs this herbalism-named party on SMITHING's Travel tab, which is correct precisely
+      // because the scoping is not real.
       // `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and `enabled`, and it takes
       // UUIDs rather than ids. This was authored as `memberActorIds` with bare ids and
       // `travelActorUuid: null`, so every field normalised away and the Travel tab rendered

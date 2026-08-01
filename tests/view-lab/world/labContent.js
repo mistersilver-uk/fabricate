@@ -3003,8 +3003,8 @@ export function buildLabContent() {
         // The world's ONLY `full` event tier, and it is on smithing precisely because no captured
         // frame selects a smithing environment: `full` is what mounts the player's Events tab
         // (`GatheringDetail.showEventsTab`) and lists individual event rows, and switching it on
-        // for herbalism would move the five herbalism gathering frames. Old Karrun Mine carries
-        // one event, which is what the events frame photographs.
+        // for herbalism would move the five herbalism gathering frames. Old Karrun Mine enables
+        // three events — collapse, firedamp and floodwater — which is what the events frame lists.
         rules: systemRules('full'),
         // The world's only enabled resource economy. `nodesEnabled` is read off
         // `systems[<id>].economy.nodes.enabled`, and with it off a per-environment `nodeRuntime`

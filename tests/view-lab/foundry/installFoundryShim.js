@@ -546,8 +546,27 @@ export function installFoundryShim(world) {
     collection.updateDocuments = async (updates = []) => updates;
   }
 
+  // Notifications are Fabricate TELLING THE USER something went wrong, so swallowing them is the
+  // most expensive stub in this file. It hid `manager-import-report` for the whole of increment 2:
+  // the case fed `renderSystemImportDialog` a payload with no `system` key, `validateImportData`
+  // rejected it, production called `ui.notifications.error('Invalid file: ...')`, and the no-op
+  // above dropped it — so the capture passed and published a clean systems browser under the name
+  // "Import report". Routing to `console` hands them to the driver's existing console gate, which
+  // makes an errored notification FAIL the frame instead of silently retitling it.
+  //
+  // `info` stays quiet: it is the success path (Foundry's own toasts on import, save, delete) and
+  // is not evidence of anything wrong.
   globalThis.ui = {
-    notifications: { info: () => {}, warn: () => {}, error: () => {}, notify: () => {} },
+    notifications: {
+      info: () => {},
+      warn: (message) => console.warn(`fabricate notification: ${message}`),
+      error: (message) => console.error(`fabricate notification: ${message}`),
+      notify: (message, type = 'info') => {
+        if (type === 'error') console.error(`fabricate notification: ${message}`);
+        else if (type === 'warning' || type === 'warn')
+          console.warn(`fabricate notification: ${message}`);
+      },
+    },
     windows: {},
   };
   globalThis.Hooks = createHooks();

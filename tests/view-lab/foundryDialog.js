@@ -25,14 +25,15 @@
  *   balanced `<p>`/`<strong>` fragments Fabricate's confirmations pass it.
  * - Drag, resize, minimize, the controls dropdown, and `Escape`-to-dismiss. A screenshot never
  *   exercises them; the same omission is already disclosed for the app frame.
- * - `prompt` / `input` / `query`. Only `confirm` (and the `wait` it is built on) is wired, because
- *   only `confirm` is what `confirmDialog` needs. A caller reaching for the others still finds them
- *   absent, exactly as before, rather than finding a half-built stand-in.
+ * - `input` / `query`. `confirm` and `prompt` are wired, both on the shared `wait`, because those
+ *   are the two Fabricate calls: `confirmDialog` and `renderSystemImportDialog`. A caller reaching
+ *   for the remaining two still finds them absent, rather than finding a half-built stand-in.
  */
 import {
   FOUNDRY_CHROME_SPEC,
   FOUNDRY_DIALOG_SPEC,
   confirmDialogButtons,
+  promptDialogButtons,
   resolveDialogChrome,
 } from '../../scripts/lib/foundryChromeSpec.js';
 
@@ -369,7 +370,14 @@ export function createLabDialogV2({ localize }) {
       const result = (await button?.callback?.(event, target, this)) ?? button?.action;
       await this.#config.submit?.(result, this);
       for (const [element, disabled] of priorDisabledStates) element.disabled = disabled;
-      return FOUNDRY_DIALOG_SPEC.defaultOptions.form.closeOnSubmit ? this.close() : this;
+      // Foundry reads `this.options.form.closeOnSubmit` — the RESOLVED value, after the caller's
+      // config merged over DialogV2's default. Reading the class default directly made a caller
+      // passing `form: { closeOnSubmit: false }` close anyway. No Fabricate caller passes one
+      // today, so this was latent; a transcription that silently ignores an input is exactly the
+      // shape of thing this file exists not to be.
+      const closeOnSubmit =
+        this.#config.form?.closeOnSubmit ?? FOUNDRY_DIALOG_SPEC.defaultOptions.form.closeOnSubmit;
+      return closeOnSubmit ? this.close() : this;
     }
 
     /**
@@ -453,13 +461,7 @@ export function createLabDialogV2({ localize }) {
      */
     static async prompt({ ok = {}, ...config } = {}) {
       config.buttons ??= [];
-      config.buttons.unshift({
-        action: 'ok',
-        label: 'Confirm',
-        icon: 'fa-solid fa-check',
-        default: true,
-        ...ok,
-      });
+      config.buttons.unshift(...promptDialogButtons(ok));
       return this.wait({
         ...config,
         position: { ...FOUNDRY_DIALOG_SPEC.factoryPosition, ...config.position },
