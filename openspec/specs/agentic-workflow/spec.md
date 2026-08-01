@@ -534,8 +534,9 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 
 - **WHEN** a PR changes files under `src/ui/`, `styles/`, files ending in `.svelte` or `.css`, or a `lang/` file alongside any of those render files (a `lang/`-only change does not require screenshots)
 - **THEN** the affected views are selected from the canonical view-case registry, and each is captured as a full application window at the application's declared `DEFAULT_OPTIONS.position`
-- **AND** a view the registry covers MAY be captured by the Foundry-free renderer, which renders the real application root over production `styles/fabricate.css` at its production cascade layer, inside harvested Foundry window chrome
-- **AND** a view the registry does not cover is captured by the Foundry smoke harness with the scoped `screenshots` profile (`npm run test:foundry:screenshots`)
+- **AND** a view the registry covers IS captured by the Foundry-free renderer, which is the DEFAULT producer: it renders the real application root over production `styles/fabricate.css` at its production cascade layer, inside harvested Foundry window chrome
+- **AND** a view the registry does not cover is captured by the Foundry smoke harness with the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which is the fallback producer rather than the routine one
+- **AND** an agent does not run the smoke to produce evidence for a view the registry already covers: the smoke's `screenshots` profile costs roughly thirty seconds per frame against the renderer's five, needs Docker and a licensed Foundry container, and cannot run on a GitHub Actions runner at all, so it produces nothing per-PR and blocks on the maintainer's machine
 - **AND** the reduced `rc`/`ci` smoke stays the CI/release gate and the `full` profile remains the occasional outer-loop visual-regression suite; the `full` profile is not run on a GitHub Actions runner
 - **AND** the live-Foundry smoke remains the fidelity authority: where a Foundry-free frame and a smoke frame of the same view disagree, the smoke frame is correct and the renderer is defective
 - **AND** the agent stores PR-scoped screenshots only under `tmp/pr-screenshots/<number>/` while preparing evidence
