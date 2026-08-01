@@ -174,7 +174,7 @@ function escapeForRegExp(value) {
 async function renderPage(
   browser,
   baseUrl,
-  { appId, query, label, steps = [], expectView = null }
+  { appId, query, label, steps = [], expectView = null, expectTab = null }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
   const page = await context.newPage();
@@ -227,6 +227,24 @@ async function renderPage(
         throw new Error(
           `${label}: expected the manager to be on "${expectView}" after its steps, but it is on ` +
             `"${actual}". The capture would have shown the wrong screen.`
+        );
+      }
+    }
+
+    // The same gate for the player window, which had none. Every player case shares
+    // `.fabricate-app-shell` as its readiness selector, and that element is present on every tab in
+    // every state — so a case whose `?tab=` never applied, or whose steps silently no-oped, still
+    // published a frame and still passed. `expectTab` is derived rather than declared: the tab a
+    // case asks for in its query IS the tab it must be showing, so there is no second field to keep
+    // in sync and no way to declare one that disagrees with the URL.
+    if (expectTab) {
+      const actual = await page.evaluate(
+        () => globalThis.document.querySelector('.fabricate-app-shell')?.dataset.activeTab ?? null
+      );
+      if (actual !== expectTab) {
+        throw new Error(
+          `${label}: expected the player app to be on the "${expectTab}" tab after its steps, but ` +
+            `it is on "${actual}". The capture would have shown the wrong tab.`
         );
       }
     }
@@ -359,6 +377,10 @@ async function commandApps() {
           label: viewCase.id,
           steps: viewCase.steps ?? [],
           expectView: viewCase.expectView ?? null,
+          // The player app has no declared route field: the tab it was ASKED for is the tab it must
+          // be showing. Deriving it here means a case cannot declare a tab that disagrees with the
+          // query that produced the frame.
+          expectTab: viewCase.app === 'fabricate-app' ? (viewCase.query?.tab ?? 'crafting') : null,
         });
         writeFileSync(join(outputDir, `${viewCase.id}.png`), buffer);
         rendered.push({

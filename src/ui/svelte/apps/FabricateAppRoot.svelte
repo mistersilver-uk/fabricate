@@ -143,7 +143,16 @@
   );
 </script>
 
-<div class="fabricate-app-shell">
+<!-- `data-active-tab` publishes the route, mirroring what the manager root already does with
+     `data-manager-view`. It is a zero-behaviour attribute: nothing reads it at runtime, no style
+     binds to it, and removing it would change nothing a user sees.
+
+     It exists because the screenshot harness had no way to tell which tab a captured frame is
+     showing. Every player case shared one readiness selector — this element's class — which is
+     present on every tab in every state, so a case whose navigation silently no-oped still
+     published a frame and still passed. The manager half has been held to its route from the
+     start; this gives the player half the same footing. -->
+<div class="fabricate-app-shell" data-active-tab={activeTab}>
   <div class="fabricate-app-nav" role="tablist" aria-orientation="vertical">
     {#each tabs as tab (tab.id)}
       <button
