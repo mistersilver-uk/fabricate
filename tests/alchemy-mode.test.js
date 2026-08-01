@@ -181,9 +181,20 @@ test('CraftingSystemManager normalizes alchemy config with defaults', () => {
   const system = manager._normalizeSystem({ resolutionMode: 'alchemy', cauldron: {} });
   assert.ok(system.alchemy, 'alchemy config should be set');
   assert.equal(system.alchemy.checkMode, 'none', 'checkMode defaults to none');
-  assert.equal(system.alchemy.learnOnCraft, false);
+  // learnOnCraft defaults ON (issue 966): `global` visibility reveals a recipe only
+  // from `learnedRecipes`, which only this flag writes, so an off default made the
+  // most permissive-sounding visibility mode reveal nothing to anyone.
+  assert.equal(system.alchemy.learnOnCraft, true);
   assert.equal(system.alchemy.consumeOnFail, true);
   assert.equal(system.alchemy.showAttemptHistoryToPlayers, true);
+
+  // An explicitly stored `false` is still honoured — the default only fills an
+  // absent flag.
+  const optedOut = manager._normalizeSystem({
+    resolutionMode: 'alchemy',
+    alchemy: { learnOnCraft: false },
+  });
+  assert.equal(optedOut.alchemy.learnOnCraft, false);
 });
 
 test('CraftingSystemManager normalizes alchemy checkMode enum (none/simple/tiered; invalid → none)', () => {

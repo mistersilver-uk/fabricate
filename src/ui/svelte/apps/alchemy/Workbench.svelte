@@ -106,21 +106,35 @@
 
   // Brew status enum → banner tone + icon. `produced-on-failure` is a distinct
   // WARNING state (a failed Simple brew that still yielded the failure result set),
-  // never success-green; a discovery composes with it.
+  // never success-green; a discovery composes with it. `brewing` is INFORMATIONAL —
+  // a time-gated brew that started successfully and now waits on world time — and
+  // must never take the danger tone the fizzle branch would otherwise give it
+  // (issue 966).
   const bannerStatus = $derived(lastBrew?.status ?? null);
   const bannerTone = $derived.by(() => {
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'is-success';
     if (bannerStatus === 'produced-on-failure') return 'is-warning';
+    if (bannerStatus === 'brewing') return 'is-info';
     return 'is-danger';
   });
   const bannerIcon = $derived.by(() => {
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'fa-circle-check';
     if (bannerStatus === 'produced-on-failure') return 'fa-triangle-exclamation';
+    if (bannerStatus === 'brewing') return 'fa-hourglass-half';
     return 'fa-circle-xmark';
   });
 
   const bannerText = $derived.by(() => {
     if (!lastBrew) return '';
+    if (bannerStatus === 'brewing') {
+      // A brew-discovery can land at START too (a known recipe re-brewed), so the
+      // discovery composes with the in-progress copy exactly as it does elsewhere.
+      return lastBrew.discovered
+        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredBrewing', {
+            name: lastBrew.discovered,
+          })
+        : localize('FABRICATE.App.Alchemy.Banner.Brewing');
+    }
     if (bannerStatus === 'produced-on-failure') {
       return lastBrew.discovered
         ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredOnFailure', {
@@ -806,6 +820,12 @@
     background: var(--fab-warning-soft);
     border-color: var(--fab-warning-border);
     color: var(--fab-warning-text);
+  }
+
+  .alchemy-banner.is-info {
+    background: var(--fab-info-soft);
+    border-color: var(--fab-info-border);
+    color: var(--fab-info-text);
   }
 
   .alchemy-brew {

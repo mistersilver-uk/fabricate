@@ -96,7 +96,8 @@
       labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Global',
       fallback: 'Global',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.GlobalAlchemyDesc',
-      descFallback: 'Every recipe a character brews is revealed to them. Brewing is never gated.',
+      descFallback:
+        'Discovery by brewing is the only way a recipe is revealed, so this needs "Learn a recipe when its ingredients are matched" (Checks → Crafting) left on. Brewing is never gated.',
     },
     {
       value: 'restricted',

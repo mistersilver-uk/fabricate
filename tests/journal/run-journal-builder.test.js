@@ -399,14 +399,20 @@ test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () =
   // The step label is blanked so a hidden multi-step recipe never leaks its
   // step count / active step name through the run journal.
   assert.equal(redacted.stepLabel, '');
-  // A hidden-identity run offers no "Trigger Next Step" advance.
-  assert.equal(redacted.manualAdvance, false);
-  // ...nor a player cancel (issue 848): a redacted run cannot be self-cancelled even by
-  // an owner, since surfacing the affordance would leak that a run exists to cancel.
+  // Redaction hides IDENTITY ONLY (issue 966). A crafting run always advances on a
+  // click — nothing resolves one automatically — so suppressing the affordance here
+  // stranded every timed craft of a recipe the crafter cannot see. The run card is
+  // already listed, so the affordance leaks nothing its redacted title does not.
+  assert.equal(redacted.manualAdvance, true);
+  // ...and an owner may still abandon it (issue 848 + 966).
   const redactedOwned = makeBuilder({ active: [activeCraftingRun()], recipeVisibility })
     .buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER })
     .activeRuns[0];
-  assert.equal(redactedOwned.canCancel, false, 'a redacted run is never cancellable');
+  assert.equal(redactedOwned.canCancel, true, 'an owner can cancel a redacted run');
+  // The identity redaction itself is unchanged on that owned projection.
+  assert.equal(redactedOwned.recipeId, null);
+  assert.equal(redactedOwned.names.title, 'FABRICATE.App.Journal.Redacted.Title');
+  assert.deepEqual(redactedOwned.steps, []);
 
   const visible = makeBuilder({ active: [activeCraftingRun()], recipeVisibility }).buildListing({
     actor: ACTOR,

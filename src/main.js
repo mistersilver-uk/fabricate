@@ -28,6 +28,7 @@ import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
+import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
@@ -644,26 +645,41 @@ class Fabricate {
         new Set((system.components || []).map(component => component.id))
       ])
     );
-    await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
-    // Prune legacy phantom crafting runs: a single-step recipe with no time
-    // requirement can never legitimately persist an active run, so any such run left
-    // in the active store predates the craft() cleanup guard and is stranded.
-    await this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
-      this.recipeManager.getRecipe(id)
-    );
-    await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
-    await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
-    // Flatten the per-system salvage component sets the run cleanup above already
+    // Flatten the per-system salvage component sets the run cleanup below already
     // computed: the progressive-order map's `salvage:<componentId>` keys are not
     // system-scoped, so the prune needs one flat id set.
     const validComponentIds = new Set(
       [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
     );
-    await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
-      resolveGatheringActor,
-      isSelectableGatheringActor,
-      validComponentIds
-    });
+    // Housekeeping that drops entries naming deleted content. Each pass is
+    // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
+    // refused or otherwise failed write must never prevent `this.ready` below —
+    // every facade method throws through `_requireReady()`, so one stale entry
+    // Foundry declined to clean would take the whole module down for that client.
+    // Each pass is also scoped to the actors this client owns (see
+    // `selectWritableActors`), so a refusal should no longer be reachable at all;
+    // this guard is the belt to that braces.
+    await runStartupMaintenance([
+      ['crafting runs', () =>
+        this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
+      // Prune legacy phantom crafting runs: a single-step recipe with no time
+      // requirement can never legitimately persist an active run, so any such run left
+      // in the active store predates the craft() cleanup guard and is stranded.
+      ['phantom crafting runs', () =>
+        this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
+          this.recipeManager.getRecipe(id)
+        )],
+      ['salvage runs', () =>
+        this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem)],
+      ['learned recipes', () =>
+        this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes)],
+      ['stale preferences', () =>
+        cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
+          resolveGatheringActor,
+          isSelectableGatheringActor,
+          validComponentIds
+        })]
+    ]);
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
@@ -2299,16 +2315,23 @@ class Fabricate {
    * cannot advance the run — that case returns a clear "needs owner" message
    * instead of throwing.
    *
+   * The recipe comes from the RESOLVED RUN, never from the caller (issue 966). The
+   * Journal redacts `recipeId` to null for a run whose recipe the viewer cannot see,
+   * so a client-supplied id cannot be trusted to be present — and trusting it at all
+   * let a caller advance run X while naming recipe Y, resolving Y's steps against X's
+   * persisted state. The `recipeId` parameter is retained for macro back-compat and
+   * ignored.
+   *
    * @param {object} options
    * @param {string} options.actorId World-actor id the run is keyed to.
    * @param {string} options.runId Active run id.
-   * @param {string} options.recipeId Recipe id to craft.
+   * @param {string} [options.recipeId] Ignored; retained for back-compat.
    * @param {boolean} [options.interactive] When true (a player "Trigger Next Step"
    *   click), prompt the interactive roll dialog + post the roll to chat. Defaults
    *   false so automated/headless advances stay silent.
    * @returns {Promise<object>} The craft result, or a `{ success: false, message }`.
    */
-  async advanceCraftingRun({ actorId, runId, recipeId, interactive = false } = {}) {
+  async advanceCraftingRun({ actorId, runId, interactive = false } = {}) {
     this._requireReady();
     const actor = game.actors?.get(actorId);
     const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
@@ -2316,7 +2339,13 @@ class Fabricate {
     if (resolved.blocked) {
       return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
     }
-    return this.craft(actor, recipeId, {
+    // A run that vanished between render and click (a concurrent cancel, a GM
+    // deleting the system) has no recipe to resolve. Report it rather than falling
+    // through to `craft()`, which would treat the missing run as a fresh craft.
+    if (!run?.recipeId) {
+      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NoRun') };
+    }
+    return this.craft(actor, run.recipeId, {
       runId,
       componentSourceActors: resolved.componentSourceActors,
       interactive,
@@ -2378,11 +2407,14 @@ class Fabricate {
       throw new Error('Fabricate not initialized');
     }
 
-    // Get recipe object if ID was provided
+    // Get recipe object if ID was provided. Capture the id BEFORE the reassignment
+    // so the not-found message names it — reading `recipe` after the lookup always
+    // reported "Recipe undefined not found".
     if (typeof recipe === 'string') {
-      recipe = this.recipeManager.getRecipe(recipe);
+      const recipeId = recipe;
+      recipe = this.recipeManager.getRecipe(recipeId);
       if (!recipe) {
-        throw new Error(`Recipe ${recipe} not found`);
+        throw new Error(`Recipe ${recipeId} not found`);
       }
     }
 

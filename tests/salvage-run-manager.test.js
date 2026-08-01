@@ -9,11 +9,14 @@ import {
 } from './helpers/run-history-retention.js';
 
 class FakeActor {
-  constructor(name = 'Test Actor') {
+  constructor(name = 'Test Actor', { isOwner = true } = {}) {
     this.id = name.replace(/\s+/g, '-').toLowerCase();
     this.name = name;
     this.uuid = `Actor.${this.id}`;
     this._flags = {};
+    // See the crafting run-manager fixture: the startup cleanup only touches
+    // actors this client may write (issue 970).
+    this.isOwner = isOwner;
   }
 
   getFlag(namespace, key) {
@@ -122,6 +125,32 @@ test('SalvageRunManager: cleanupInvalidRuns removes active and historical runs w
   assert.equal(manager.getActiveRun(actor, freshActive.id), null);
   assert.equal(manager.getRunHistory(actor).length, 1);
   assert.equal(manager.getRunHistory(actor)[0].componentId, 'component-valid');
+});
+
+// Issue 970: the pass runs on every client at startup and writes directly to actor
+// documents, so it must only touch the actors this client owns.
+test('SalvageRunManager: cleanupInvalidRuns skips actors this client cannot write', async () => {
+  const mine = new FakeActor('MySalvager');
+  const theirs = new FakeActor('TheirSalvager', { isOwner: false });
+  setupGlobals(1000, [mine, theirs]);
+  const manager = new SalvageRunManager();
+
+  const myRun = await manager.createRun(mine, {
+    craftingSystemId: 'system-missing',
+    componentId: 'component-missing'
+  });
+  const theirRun = await manager.createRun(theirs, {
+    craftingSystemId: 'system-missing',
+    componentId: 'component-missing'
+  });
+
+  await manager.cleanupInvalidRuns(new Set(['system-valid']), new Map());
+
+  assert.equal(manager.getActiveRun(mine, myRun.id), null, 'my own stale run is cleaned');
+  assert.ok(
+    manager.getActiveRun(theirs, theirRun.id),
+    'a character I do not own keeps its run rather than triggering a refused write'
+  );
 });
 
 test('SalvageRunManager: removeRunsForSystem and removeRunsForComponent cancel active runs and trim history', async () => {

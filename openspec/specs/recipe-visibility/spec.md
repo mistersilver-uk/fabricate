@@ -254,8 +254,12 @@ Alchemy visibility is **reveal-not-gate**: `visibilityMode` selects which source
    - `knowledge` — a recipe learned via the Inventory learn path (`learnedRecipes`).
    - `restricted`/Manual — the per-recipe `access` grant admits the viewer (`_isRecipeVisibleByAccessGrant`).
 2. Discovery-by-brew reveal is unioned across ALL modes and is on a MATCHED SIGNATURE, decoupled from check success (issue 554):
+   - `alchemy.learnOnCraft` DEFAULTS ON (issue 966): `_normalizeAlchemyConfig` reads `!== false`, so only an explicitly stored `false` disables it.
+Under `global` the learned map is the ONLY reveal source, so an off default left the most permissive-sounding mode revealing nothing to any player; `systemValidation` raises the non-blocking `alchemyGlobalNoDiscovery` warning for a `global` alchemy system that turns it off.
    - if `alchemy.learnOnCraft === true`, a matched-signature attempt writes `learnedRecipes` REGARDLESS of the check outcome — a passed OR failed Simple brew (and any matched Tiered brew) learns it; the recipe is then revealed under any mode.
    - if `alchemy.learnOnCraft !== true`, a brew writes nothing to `learnedRecipes`; `learnOnCraft` governs ONLY the brew-discovery union, not whether anything is revealed (a book/grant/learn under item/knowledge/Manual still reveals independent of `learnOnCraft`).
+   - The write happens wherever the brew RESOLVES, which for a time-gated brew is the matured FINISH, not the START that armed the gate.
+Both alchemy tails at FINISH (`learnRecipeOnCraft` and the reserved-failure-group branch) derive alchemy-ness from the RECIPE'S OWN SYSTEM, never from a per-call submission flag: a matured brew resumes through `advanceCraftingRun`, which carries no `isAlchemyAttempt` (issue 966).
 3. Learning is never granted by a NO-SIGNATURE fizzle (which still grants nothing — dead-end/`no-reaction` memory only).
 A matched-signature check FAILURE is a genuine discovery, not a fizzle.
 4. No-signature attempts are treated as failed attempts (fizzles, not misconfiguration errors).

@@ -8,7 +8,9 @@
   runs to inProgress asynchronously off the same world-time hook. Gathering/salvage
   runs
   (manualAdvance: false) auto-resolve, so they show an explanatory line and the
-  TimeRemainingBox instead of a button.
+  TimeRemainingBox instead of a button. Both branches gate that box on `!ready`:
+  a matured run must never keep showing a "once enough world time has passed"
+  callout while its status pill reads Ready (issue 966).
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -147,7 +149,7 @@
       <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
       <span>{localize('FABRICATE.App.Journal.Actions.AutoResolve')}</span>
     </p>
-    {#if hasGate}
+    {#if hasGate && !ready}
       <TimeRemainingBox {availableAt} {services} />
     {/if}
   {/if}
