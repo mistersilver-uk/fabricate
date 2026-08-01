@@ -2014,7 +2014,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     // evidence, which is worse than an honest window-reach frame.
     reaches: 'window',
     query: { tab: 'gathering' },
-    steps: [],
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
+      { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
+      { selector: '.gathering-task-detail-attempt' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,

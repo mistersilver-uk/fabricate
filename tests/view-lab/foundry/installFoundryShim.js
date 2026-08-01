@@ -256,6 +256,9 @@ function createHeroPacks() {
 export function installFoundryShim(world) {
   const random = installLabRandom({ seed: world.seed });
   const utils = createUtils(random.randomID);
+  // A counter rather than `randomID()`: chat ids never reach a frame, and a counter keeps them
+  // stable across runs without spending the seeded stream, which the rendered ids do depend on.
+  let chatMessageSequence = 0;
 
   const previous = {
     game: globalThis.game,
@@ -436,6 +439,28 @@ export function installFoundryShim(world) {
   globalThis.User = {
     async createDocuments(specs = []) {
       return specs.map((spec) => makeDocument(spec, 'User', { isGM: spec.role >= 3 }));
+    },
+  };
+
+  // A run that SUCCEEDS posts a chat card. Without this the engine's `ChatMessage.create` throws,
+  // the engine catches it and logs, and the driver's console-error gate fails the whole case — so
+  // the lab could photograph a gather that was blocked, in progress, or missing a tool, but never
+  // one that worked. The alternative considered and rejected was turning the system's `chatOutput`
+  // feature off, which would have hidden a missing seam rather than supplied one, and would have
+  // made the frame a picture of a configuration the fixture does not otherwise use.
+  //
+  // Nothing renders the returned document — the chat log is Foundry's, not Fabricate's, and is one
+  // of the disclosed gaps — so this is a sink with a realistic shape, not a stub pretending to be a
+  // chat log.
+  globalThis.ChatMessage = {
+    async create(data = {}) {
+      return makeDocument({ ...data, _id: `lab-chat-${chatMessageSequence++}` }, 'ChatMessage');
+    },
+    async createDocuments(specs = []) {
+      return Promise.all(specs.map((spec) => globalThis.ChatMessage.create(spec)));
+    },
+    getSpeaker(options = {}) {
+      return { alias: options.actor?.name ?? 'Fabricate', actor: options.actor?.id ?? null };
     },
   };
 
