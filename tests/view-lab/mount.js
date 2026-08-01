@@ -104,9 +104,9 @@ function borrowInstance(AppClass, fields) {
 async function mountPlayerApp(content, params) {
   const [{ SvelteFabricateApp }, { default: FabricateAppRoot }, { isAlchemyTabAvailable }] =
     await Promise.all([
-      import('/src/ui/SvelteFabricateApp.svelte.js'),
-      import('/src/ui/svelte/apps/FabricateAppRoot.svelte'),
-      import('/src/ui/svelte/util/alchemyTabAvailability.js'),
+      import('../../src/ui/SvelteFabricateApp.svelte.js'),
+      import('../../src/ui/svelte/apps/FabricateAppRoot.svelte'),
+      import('../../src/ui/svelte/util/alchemyTabAvailability.js'),
     ]);
 
   const activeTab = params.tab ?? 'crafting';
@@ -141,8 +141,8 @@ async function mountPlayerApp(content, params) {
 async function mountManagerApp(content, params) {
   const [{ SvelteCraftingSystemManagerApp }, { default: CraftingSystemManagerRoot }] =
     await Promise.all([
-      import('/src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
-      import('/src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
+      import('../../src/ui/SvelteCraftingSystemManagerApp.svelte.js'),
+      import('../../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),
     ]);
 
   const app = borrowInstance(SvelteCraftingSystemManagerApp, {

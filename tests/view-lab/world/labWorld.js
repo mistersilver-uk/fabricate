@@ -113,7 +113,7 @@ export async function buildLabWorld({
   world.shim = shim;
 
   // Dynamic, and only now: `src/main.js` registers hooks at module scope.
-  const runtime = await import('/src/main.js');
+  const runtime = await import('../../../src/main.js');
   const fabricate = runtime.default;
   await fabricate.initialize();
   globalThis.game.fabricate = fabricate;

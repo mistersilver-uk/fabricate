@@ -12,7 +12,6 @@
  * Commands:
  *   chrome    capture the empty window chrome for every app - the fidelity baseline
  */
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -379,11 +378,23 @@ const APP_CASES = publishableCases();
  * @returns {string|null} Short head sha, or null outside a repository.
  */
 function currentHead() {
+  // Read `.git` directly rather than shelling out to `git rev-parse`. Spawning a binary resolved
+  // through PATH is a security finding (S4036) for a script that CI runs with an OIDC role in
+  // scope, and it is unnecessary here: HEAD is either a ref pointer or a detached sha, both of
+  // which are one file read. No subprocess, no PATH dependency, and it works in a container that
+  // has no git installed.
   try {
-    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
-      cwd: ROOT,
-      encoding: 'utf8',
-    }).trim();
+    const head = readFileSync(join(ROOT, '.git', 'HEAD'), 'utf8').trim();
+    const ref = /^ref:\s*(.+)$/.exec(head);
+    if (!ref) return head.slice(0, 8);
+
+    const refPath = join(ROOT, '.git', ref[1]);
+    if (existsSync(refPath)) return readFileSync(refPath, 'utf8').trim().slice(0, 8);
+
+    // A packed ref — the loose file is absent once `git gc` has run.
+    const packed = readFileSync(join(ROOT, '.git', 'packed-refs'), 'utf8');
+    const line = packed.split('\n').find((entry) => entry.endsWith(` ${ref[1]}`));
+    return line ? line.slice(0, 8) : null;
   } catch {
     return null;
   }

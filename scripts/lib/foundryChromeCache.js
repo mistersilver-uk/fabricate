@@ -61,7 +61,15 @@ const EXTRA_MEMBERS = [
 const EXTRA_TREES = ['public/icons/'];
 
 const ARCHIVE_NAME_PATTERN = /^foundryvtt-(\d+\.\d+(?:\.\d+)?)\.zip$/;
-const CSS_URL_PATTERN = /url\(\s*(["']?)([^"')]+)\1\s*\)/g;
+/**
+ * Three explicit alternatives rather than an optional quote plus a backreference.
+ *
+ * The previous form, `url\(\s*(["']?)([^"')]+)\1\s*\)`, pairs an optional capture with a negated
+ * class that already excludes both quote characters, which is what makes its backtracking
+ * superlinear. The input here is a 429 KB stylesheet, so that is a real cost rather than a
+ * theoretical one. These alternatives are linear and say the same thing more plainly.
+ */
+const CSS_URL_PATTERN = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^"')\s]*))\s*\)/g;
 
 /**
  * Chromium never falls back past woff2, so the parallel `.ttf`/`.woff`/`.eot` sets in a
@@ -119,7 +127,8 @@ export function computeStyleClosure(sheets) {
   for (const [memberName, buffer] of sheets) {
     const text = buffer.toString('utf8');
     for (const match of text.matchAll(CSS_URL_PATTERN)) {
-      const member = resolveCssReference(memberName, match[2]);
+      // Exactly one alternative matches per `url()`: double-quoted, single-quoted, or bare.
+      const member = resolveCssReference(memberName, match[1] ?? match[2] ?? match[3]);
       if (!member) continue;
       if (REDUNDANT_FONT_PATTERN.test(member)) {
         skipped.push(member);
@@ -181,8 +190,12 @@ export function resolveChromeCache(repoRoot, version) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .filter((name) => (version ? name === version : /^\d+\.\d+/.test(name)))
-    // Newest first, so a maintainer holding two harvested builds gets the current one.
-    .sort((left, right) => compareVersions(right, left));
+    // Newest first, so a maintainer holding two harvested builds gets the current one. Written as
+    // ascending-then-reverse rather than by swapping the comparator's arguments: a comparator
+    // called with its parameters transposed is indistinguishable from a bug at a glance, and is
+    // reported as one.
+    .sort(compareVersions)
+    .toReversed();
   for (const candidate of versions) {
     const dir = join(root, candidate);
     const manifestPath = join(dir, 'harvest-manifest.json');

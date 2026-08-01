@@ -142,7 +142,8 @@ function applyDialogPosition(element, position) {
   // `ApplicationV2.parseCSSDimension(style, parentDimension)` (application.mjs:1657-1663).
   const parseCssDimension = (value, parentDimension) => {
     if (value.includes('px')) return Number.parseInt(value.replace('px', ''), 10);
-    if (value.includes('%')) return (Number.parseInt(value.replace('%', ''), 10) / 100) * parentDimension;
+    if (value.includes('%'))
+      return (Number.parseInt(value.replace('%', ''), 10) / 100) * parentDimension;
     return undefined;
   };
   const clamp = (value, low, high) => Math.min(Math.max(value, low), high);
@@ -150,7 +151,8 @@ function applyDialogPosition(element, position) {
   const computed = globalThis.getComputedStyle(element);
   const parent = element.parentElement;
   let minWidth = parseCssDimension(computed.minWidth, parent.offsetWidth) || 0;
-  let maxWidth = parseCssDimension(computed.maxWidth, parent.offsetWidth) || Number.POSITIVE_INFINITY;
+  let maxWidth =
+    parseCssDimension(computed.maxWidth, parent.offsetWidth) || Number.POSITIVE_INFINITY;
   let { width, height } = position;
   let bounds = element.getBoundingClientRect();
   const { clientWidth, clientHeight } = document.documentElement;
@@ -229,7 +231,8 @@ export function createLabDialogV2({ localize }) {
 
   function nextZIndex() {
     maxZ ??=
-      Number(globalThis.getComputedStyle(document.body).getPropertyValue('--z-index-window')) || 100;
+      Number(globalThis.getComputedStyle(document.body).getPropertyValue('--z-index-window')) ||
+      100;
     maxZ += 1;
     return maxZ;
   }
@@ -402,13 +405,13 @@ export function createLabDialogV2({ localize }) {
         dialog.addEventListener(
           'close',
           (event) => {
-            const result = close instanceof Function ? close(event, dialog) : undefined;
+            const result = typeof close === 'function' ? close(event, dialog) : undefined;
             if (rejectClose) reject(new Error('Dialog was dismissed without pressing a button.'));
             else resolve(result ?? null);
           },
           { once: true }
         );
-        if (render instanceof Function) {
+        if (typeof render === 'function') {
           dialog.addEventListener('render', (event) => render(event, dialog));
         }
         // Foundry lets a render failure surface as an unhandled rejection while `wait` hangs. The
