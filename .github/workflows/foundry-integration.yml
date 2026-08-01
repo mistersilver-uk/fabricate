@@ -86,7 +86,7 @@ jobs:
 
       - name: Install dependencies
         if: env.SKIP_SMOKE != 'true'
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Cache the Playwright Chromium download keyed on package-lock so the
       # ~30 MB install only runs when playwright itself bumps. Saves

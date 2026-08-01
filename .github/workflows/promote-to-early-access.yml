@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Configure AWS credentials (OIDC)
         # Needed to read the private beta manifests (they are not anonymously readable).

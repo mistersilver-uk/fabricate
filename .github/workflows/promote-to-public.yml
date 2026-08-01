@@ -122,7 +122,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Configure AWS credentials via OIDC
         # The guard reads private S3 heads (source channel + the registry-lead heads of beta and
@@ -374,7 +374,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
         if: ${{ !inputs.dry_run }}
 
       - name: Configure AWS credentials via OIDC
@@ -427,7 +427,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: mkdir -p /tmp/promote
 
       - name: Configure AWS credentials via OIDC

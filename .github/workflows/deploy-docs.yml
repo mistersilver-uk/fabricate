@@ -7,13 +7,12 @@ on:
     paths:
       - 'docs/**'
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   build:
+    # Job-level rather than workflow-level (SonarCloud S8233/S8264). The build job only READS
+    # the repository; the write scopes Pages deployment needs belong to the job that deploys.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -30,6 +29,11 @@ jobs:
 
   deploy:
     needs: build
+    # Only this job publishes, so only this job carries the write scopes.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

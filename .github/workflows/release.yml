@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@v6
       # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
       - uses: ./.github/actions/release-setup
-      - run: npx playwright install chromium --with-deps
+      - run: ./node_modules/.bin/playwright install chromium --with-deps
       - run: npm test
       - run: npm run build
 
