@@ -40,6 +40,26 @@ const BOOLEAN_FLAGS = Object.freeze({ force: 'force', 'write-provenance': 'write
  */
 const VALUE_FLAGS = Object.freeze({ 'foundry-version': 'version', 'from-dir': 'fromDir' });
 
+/**
+ * Apply one `--flag` argument.
+ *
+ * @param {object} args The accumulating argument object, mutated in place.
+ * @param {string} raw The argv entry, `--flag` or `--flag=value`.
+ * @returns {string|null} The flag still awaiting a value from the next argv entry, or null.
+ * @throws {Error} On an unrecognised flag, rather than silently ignoring it.
+ */
+function applyFlag(args, raw) {
+  const [flag, value] = raw.slice(2).split(/=(.*)/s);
+  if (flag in BOOLEAN_FLAGS) {
+    args[BOOLEAN_FLAGS[flag]] = true;
+    return null;
+  }
+  if (!(flag in VALUE_FLAGS)) throw new Error(`unknown flag --${flag}`);
+  if (value === undefined) return flag;
+  args[VALUE_FLAGS[flag]] = value;
+  return null;
+}
+
 function parseArgs(argv) {
   const args = {
     command: 'status',
@@ -54,12 +74,7 @@ function parseArgs(argv) {
       args[VALUE_FLAGS[pending]] = raw;
       pending = null;
     } else if (raw.startsWith('--')) {
-      const [flag, value] = raw.slice(2).split(/=(.*)/s);
-      if (flag in BOOLEAN_FLAGS) args[BOOLEAN_FLAGS[flag]] = true;
-      else if (flag in VALUE_FLAGS) {
-        if (value === undefined) pending = flag;
-        else args[VALUE_FLAGS[flag]] = value;
-      } else throw new Error(`unknown flag --${flag}`);
+      pending = applyFlag(args, raw);
     } else {
       args.command = raw;
     }

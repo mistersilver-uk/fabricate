@@ -40,6 +40,33 @@ const SYSTEMS = [
   },
 ];
 
+/** Where `unzip` lives on the platforms this runs on. Fixed paths, never `$PATH`. */
+const UNZIP_PATHS = Object.freeze(['/usr/bin/unzip', '/bin/unzip', '/usr/local/bin/unzip']);
+
+/**
+ * Resolve an extractor to an absolute path, refusing to fall back to `$PATH`.
+ *
+ * Two reasons, one security and one correctness. `$PATH` is attacker-influenced on a shared or CI
+ * machine, so resolving a spawned binary through it is a real exposure (SonarCloud S4036). And on
+ * Windows it is not even correct: an MSYS or Git-Bash shell puts GNU tar ahead of bsdtar, and GNU
+ * tar reads the `C:\...` destination as a remote host spec and dies with "Cannot connect to C" —
+ * which is the failure the absolute path exists to avoid in the first place.
+ *
+ * @param {string} name Human-readable tool name, for the error.
+ * @param {readonly string[]} candidates Fixed absolute paths, in preference order.
+ * @param {string} id The system being extracted, for the error.
+ * @returns {string} The first candidate that exists.
+ * @throws {Error} When none does — louder and more fixable than a mystery spawn failure.
+ */
+function requireExecutable(name, candidates, id) {
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (found) return found;
+  throw new Error(
+    `cannot extract ${id}: no ${name} found at ${candidates.join(', ')}. ` +
+      'Install it, or extract the release archive by hand into .foundry-e2e/systems/.'
+  );
+}
+
 /**
  * Read the version out of an installed system manifest.
  *
@@ -116,24 +143,23 @@ async function fetchSystem({ id, version, url }) {
     const fileStream = createWriteStream(tmpZip);
     await pipeline(response.body, fileStream);
 
-    // Extract — unzip into staging, stripping top-level dir if present.
-    // Windows ships bsdtar at C:\Windows\System32\tar.exe (build 17063+) which
-    // transparently reads zip archives. Ubuntu keeps the existing unzip path so
-    // the CI command line is byte-identical. `tar` is resolved by absolute path on Windows
-    // because an MSYS/Git-Bash shell puts GNU tar first, and GNU tar reads the `C:\...`
-    // destination as a remote host spec and fails with "Cannot connect to C".
+    // Extract into staging, stripping the top-level dir if present. Windows uses the bsdtar that
+    // ships at System32\tar.exe (build 17063+) and reads zip archives transparently; everything
+    // else keeps unzip, so the CI command line is unchanged.
     if (process.platform === 'win32') {
-      // Absolute path, with no PATH fallback on purpose. An MSYS or Git-Bash shell puts GNU tar
-      // ahead of bsdtar, and GNU tar reads the `C:\...` destination as a remote host spec and dies
-      // with "Cannot connect to C" — so falling back to whatever `tar` resolves to reintroduces
-      // exactly the failure this line exists to avoid.
       const bsdtar = join(process.env.SystemRoot ?? String.raw`C:\Windows`, 'System32', 'tar.exe');
-      if (!existsSync(bsdtar)) {
-        throw new Error(`cannot extract ${id}: ${bsdtar} is missing (Windows 10 build 17063+ ships it)`);
-      }
-      execFileSync(bsdtar, ['-xf', tmpZip, '-C', staging], { cwd: ROOT, stdio: 'inherit' });
+      execFileSync(requireExecutable(bsdtar, [bsdtar], id), ['-xf', tmpZip, '-C', staging], {
+        cwd: ROOT,
+        stdio: 'inherit',
+      });
     } else {
-      execFileSync('unzip', ['-o', '-q', tmpZip, '-d', staging], { cwd: ROOT });
+      execFileSync(
+        requireExecutable('unzip', UNZIP_PATHS, id),
+        ['-o', '-q', tmpZip, '-d', staging],
+        {
+          cwd: ROOT,
+        }
+      );
     }
 
     // Some zips nest inside a subdirectory; detect and flatten
@@ -170,7 +196,7 @@ async function main() {
   process.stdout.write('All systems ready.\n');
 }
 
-main().catch(err => {
+main().catch((err) => {
   process.stderr.write(`foundry-fetch-systems failed: ${err.message}\n`);
   process.exit(1);
 });
