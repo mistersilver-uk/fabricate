@@ -12,7 +12,8 @@
  * Commands:
  *   chrome    capture the empty window chrome for every app - the fidelity baseline
  */
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -355,6 +356,62 @@ async function commandChrome() {
 /** Lab fixture system id -> the smoke system that carries the same capability. */
 const APP_CASES = publishableCases();
 
+/**
+ * The commit each frame was captured at, so a stale one is identifiable.
+ *
+ * Accumulation trades "the directory matches one run" for "the directory keeps what is still
+ * accurate". That trade is only honest if staleness is visible, and a head sha is more useful than a
+ * timestamp: it says WHICH code drew the frame, which is the question a reviewer actually has.
+ *
+ * @returns {string|null} Short head sha, or null outside a repository.
+ */
+function currentHead() {
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The manifest already on disk, or an empty one.
+ *
+ * @param {string} outputDir Capture directory.
+ * @returns {{frames: object[]}} Previous manifest.
+ */
+function readManifest(outputDir) {
+  const path = join(outputDir, 'manifest.json');
+  if (!existsSync(path)) return { frames: [] };
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    return { frames: Array.isArray(parsed.frames) ? parsed.frames : [] };
+  } catch {
+    // A truncated manifest means an interrupted run. Treat it as absent rather than half-trusting
+    // it — the PNGs are still on disk and the next full capture rebuilds the record.
+    return { frames: [] };
+  }
+}
+
+/**
+ * Merge this run's frames over the previous set, keeping only frames whose PNG exists.
+ *
+ * @param {object} options Options.
+ * @param {{frames: object[]}} options.existing Previous manifest.
+ * @param {object[]} options.rendered Frames from this run.
+ * @param {string} options.outputDir Capture directory, for existence checks.
+ * @returns {object[]} Merged frames, id-sorted.
+ */
+function mergeManifest({ existing, rendered, outputDir }) {
+  const byId = new Map(existing.frames.map((frame) => [frame.id, frame]));
+  for (const frame of rendered) byId.set(frame.id, frame);
+  return [...byId.values()]
+    .filter((frame) => existsSync(join(outputDir, `${frame.id}.png`)))
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
 async function commandApps() {
   const cache = ensureChrome();
   assertViewportFits();
@@ -362,7 +419,16 @@ async function commandApps() {
   const positional = process.argv.slice(3).find((a) => !a.startsWith('--'));
 
   const outputDir = join(ARTIFACT_DIR, 'apps');
-  rmSync(outputDir, { recursive: true, force: true });
+  // ACCUMULATE. A targeted capture used to wipe the directory first, so rendering one case left you
+  // with one PNG and destroyed the other 149. That is defensible only if a subset run is always a
+  // fresh start — and it is not: the whole point of the changed-file mapping is that frames the
+  // change cannot affect stay accurate, so re-rendering the affected subset over an existing set is
+  // the normal case, not an anomaly.
+  //
+  // What accumulation costs is the guarantee that the directory matches one run. That is paid for by
+  // recording the head each frame was captured at, so a stale frame is identifiable rather than
+  // merely undetectable. `--clean` restores the old behaviour when a full reset is what you want.
+  if (process.argv.includes('--clean')) rmSync(outputDir, { recursive: true, force: true });
   mkdirSync(outputDir, { recursive: true });
 
   const only = positional ? new Set(positional.split(',')) : null;
@@ -439,23 +505,33 @@ async function commandApps() {
     await server.close();
   }
 
+  // Merge into whatever was already captured, so a subset run updates its frames and leaves the
+  // rest listed. Frames whose PNG has since been deleted are dropped, so the manifest can never
+  // describe a file that is not there.
+  const head = currentHead();
+  const merged = mergeManifest({
+    existing: readManifest(outputDir),
+    rendered: rendered.map((frame) => ({ ...frame, head })),
+    outputDir,
+  });
+
   writeFileSync(
     join(outputDir, 'manifest.json'),
-    `${JSON.stringify({ foundryVersion: cache.version, frames: rendered, failures }, null, 2)}\n`
+    `${JSON.stringify({ foundryVersion: cache.version, head, frames: merged, failures }, null, 2)}\n`
   );
-  // The index is written from the manifest just produced, so the page and the PNGs beside it can
-  // never disagree. Generated here rather than left to a separate command because an index someone
-  // has to remember to refresh is an index that is quietly wrong most of the time.
-  if (rendered.length > 0) {
-    writeFileSync(
-      join(outputDir, 'index.html'),
-      renderIndexHtml({
-        sections: groupFrames(rendered, APP_CASES),
-        counts: summarise(rendered, APP_CASES),
-        foundryVersion: cache.version,
-      })
-    );
-  }
+
+  // The index is written from the MERGED manifest, so the page always describes the whole directory
+  // rather than just the last run. Generated here rather than left to a separate command because an
+  // index someone has to remember to refresh is one that is quietly wrong most of the time.
+  writeFileSync(
+    join(outputDir, 'index.html'),
+    renderIndexHtml({
+      sections: groupFrames(merged, APP_CASES),
+      counts: summarise(merged, APP_CASES),
+      foundryVersion: cache.version,
+      head,
+    })
+  );
 
   console.log(
     `\n${rendered.length}/${cases.length} frames captured to ui-screenshot-artifact/apps/` +

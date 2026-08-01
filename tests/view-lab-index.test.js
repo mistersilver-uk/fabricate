@@ -112,3 +112,31 @@ test('an unrecorded chrome version says so rather than omitting the line', () =>
   const html = renderIndexHtml({ sections: [], counts: summarise([], []) });
   assert.ok(html.includes('chrome version unrecorded'));
 });
+
+test('a frame captured at an earlier head is marked stale', () => {
+  // Accumulation means one directory can hold frames drawn by different code. Without this,
+  // "the screenshots are all there" and "the screenshots are all current" look identical.
+  const frames = [
+    { id: 'a-manager-recipes', head: 'aaaaaaa' },
+    { id: 'b-manager-tools', head: 'bbbbbbb' },
+  ];
+  const html = renderIndexHtml({
+    sections: groupFrames(frames, CASES),
+    counts: summarise(frames, CASES),
+    head: 'bbbbbbb',
+  });
+  assert.ok(html.includes('captured at aaaaaaa'), 'the older frame is flagged');
+  assert.ok(!html.includes('captured at bbbbbbb'), 'the current frame is not');
+});
+
+test('frames with no recorded head are not falsely flagged stale', () => {
+  // A manifest predating head recording carries no `head`. Marking those would cry wolf on every
+  // frame in an older directory, which is how a staleness signal stops being read.
+  const frames = [{ id: 'a-manager-recipes' }];
+  const html = renderIndexHtml({
+    sections: groupFrames(frames, CASES),
+    counts: summarise(frames, CASES),
+    head: 'bbbbbbb',
+  });
+  assert.ok(!html.includes('captured at'));
+});

@@ -74,6 +74,7 @@ export function groupFrames(frames, cases) {
       smokeLabels: viewCase?.smokeLabels ?? [],
       width: frame.width ?? null,
       height: frame.height ?? null,
+      head: frame.head ?? null,
     });
   }
 
@@ -108,8 +109,15 @@ export function summarise(frames, cases) {
   return counts;
 }
 
-function renderFrame(frame) {
+function renderFrame(frame, head) {
   const dimensions = frame.width && frame.height ? `${frame.width}×${frame.height}` : '';
+  // Frames accumulate across runs, so a directory can hold frames drawn by different code. Marking
+  // the ones from an earlier head is what keeps that honest: without it, "the screenshots are all
+  // there" and "the screenshots are all current" become indistinguishable.
+  const stale =
+    head && frame.head && frame.head !== head
+      ? `<p class="stale">captured at ${escapeHtml(frame.head)}, not the current ${escapeHtml(head)}</p>`
+      : '';
   const smoke =
     frame.smokeLabels.length > 0
       ? `<p class="smoke">smoke: ${escapeHtml(frame.smokeLabels.join(', '))}</p>`
@@ -120,7 +128,7 @@ function renderFrame(frame) {
         <figcaption>
           <p class="label">${escapeHtml(frame.label)}</p>
           <p class="meta"><code>${escapeHtml(frame.id)}</code>${dimensions ? ` · ${dimensions}` : ''}${frame.reach ? ` · <span class="reach reach-${escapeHtml(frame.reach)}">${escapeHtml(frame.reach)}</span>` : ''}</p>
-          ${note}${smoke}
+          ${note}${stale}${smoke}
         </figcaption>
       </figure>`;
 }
@@ -136,9 +144,10 @@ function renderFrame(frame) {
  * @param {Array<object>} model.sections Output of {@link groupFrames}.
  * @param {object} model.counts Output of {@link summarise}.
  * @param {string|null} [model.foundryVersion] Chrome version the frames were drawn with.
+ * @param {string|null} [model.head] Current head sha, so frames from an earlier one are marked.
  * @returns {string} A complete HTML document.
  */
-export function renderIndexHtml({ sections, counts, foundryVersion = null }) {
+export function renderIndexHtml({ sections, counts, foundryVersion = null, head = null }) {
   const body = sections
     .map(
       (section) => `  <section>
@@ -149,7 +158,7 @@ ${section.areas
       area
     ) => `    <h3>${escapeHtml(area.area)} <span class="count">${area.frames.length}</span></h3>
     <div class="grid">
-${area.frames.map((frame) => renderFrame(frame)).join('\n')}
+${area.frames.map((frame) => renderFrame(frame, head)).join('\n')}
     </div>`
   )
   .join('\n')}
@@ -184,6 +193,7 @@ ${area.frames.map((frame) => renderFrame(frame)).join('\n')}
   code { font-family: ui-monospace, monospace; font-size: .72rem; }
   .note, .smoke { margin: .35rem 0 0; font-size: .72rem; }
   .note { color: #d2a679; }
+  .stale { color: #d98c6a; }
   .smoke { color: #7f8f99; }
   .reach { padding: 0 .35rem; border-radius: 3px; font-size: .7rem; }
   .reach-exact { background: #24402c; color: #a8e0b4; }
