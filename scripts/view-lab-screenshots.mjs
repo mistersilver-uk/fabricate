@@ -21,6 +21,7 @@ import { chromium } from 'playwright';
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
 import { publishableCases } from './lib/viewLabCases.js';
+import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACT_DIR = join(ROOT, 'ui-screenshot-artifact');
@@ -442,8 +443,23 @@ async function commandApps() {
     join(outputDir, 'manifest.json'),
     `${JSON.stringify({ foundryVersion: cache.version, frames: rendered, failures }, null, 2)}\n`
   );
+  // The index is written from the manifest just produced, so the page and the PNGs beside it can
+  // never disagree. Generated here rather than left to a separate command because an index someone
+  // has to remember to refresh is an index that is quietly wrong most of the time.
+  if (rendered.length > 0) {
+    writeFileSync(
+      join(outputDir, 'index.html'),
+      renderIndexHtml({
+        sections: groupFrames(rendered, APP_CASES),
+        counts: summarise(rendered, APP_CASES),
+        foundryVersion: cache.version,
+      })
+    );
+  }
+
   console.log(
-    `\n${rendered.length}/${cases.length} frames captured to ui-screenshot-artifact/apps/`
+    `\n${rendered.length}/${cases.length} frames captured to ui-screenshot-artifact/apps/` +
+      (rendered.length > 0 ? '\nopen ui-screenshot-artifact/apps/index.html to browse them' : '')
   );
   if (failures.length > 0) {
     console.log('\nfailures:');
