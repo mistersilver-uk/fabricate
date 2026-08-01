@@ -2312,12 +2312,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     // body for the `routedNoFormula` reason, where the smoke's counterpart renders it for
     // `simpleMultiGroup`. The body dispatches on that reason and its copy differs.
     //
-    // The Simple reason is unreachable from persisted data by construction:
-    // `_normalizeSalvage`'s Simple success-first retain-one clamp runs on every save AND inside
-    // `initialize()`, so a planted multi-group Simple config self-heals before anything renders
-    // it. The smoke reproduces it with an in-memory post-init push onto the live normalized
-    // system, which needs a hook in the lab's boot sequence (`world/labWorld.js`) rather than a
-    // fixture. Until then this proves the panel's misconfigured PATH, not the smoke's reason.
+    // The Simple reason is unreachable from FIXTURE DATA twice over, which is why no amount of
+    // authoring closes it:
+    //
+    //   1. `_normalizeSalvage`'s Simple success-first retain-one clamp runs on every save AND
+    //      inside `initialize()`, so a planted multi-group Simple config self-heals before
+    //      anything can render it.
+    //   2. Even past the clamp, `InventoryListingBuilder` hard-hides a `simpleMultiGroup`
+    //      component from a NON-GM viewer through `hiddenEntityIds` — and every player frame
+    //      renders as a non-GM viewer by design.
+    //
+    // The smoke reaches it by pushing a surplus result group onto the live, already-normalized
+    // system in memory after boot and remounting the tab. That is a `call`-style hook in the lab's
+    // boot sequence (`tests/view-lab/world/labWorld.js`), not a fixture. Until then this proves
+    // the panel's misconfigured PATH — and `routedNoFormula` is the one misconfiguration a
+    // persisted world can actually hold.
     reaches: 'window',
     query: { tab: 'inventory' },
     steps: [
@@ -2342,9 +2351,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering events',
     app: PLAYER,
     smokeLabels: ['player-gathering-events'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'gathering' },
-    steps: [],
+    // The counterpart's own sequence — select an environment, open the Events tab, wait on
+    // `[data-gathering-event-section]` — on the world's only environment that HAS an Events tab.
+    // The tab is mounted only at the `full` event-visibility tier, which smithing alone carries
+    // (see `systemRules` in `world/labContent.js`): the fixture previously authored an invalid
+    // `'gm'` tier that resolved to the restrictive default, so the tab existed nowhere.
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
+      { selector: '[data-gathering-detail-tab="events"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2377,24 +2394,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering after success',
     app: PLAYER,
     smokeLabels: ['player-gathering-after-success'],
-    // WINDOW, blocked by the Foundry shim rather than by the fixture. The attempt itself works
-    // end to end in the lab (verified: `hb-task-ridgemoss` resolves, awards, and writes the run),
-    // but a succeeded gather posts its result card through `ChatMessage.create`, and the lab's
-    // shim (`tests/view-lab/foundry/installFoundryShim.js`) defines no `ChatMessage` global. The
-    // engine catches the ReferenceError and `console.error`s it, which the capture driver treats
-    // as a failed render — correctly, since it IS a missing seam. A `ChatMessage` stub in the
-    // shim closes this case with the two steps below plus a click on
-    // `.gathering-task-detail-attempt`; suppressing the system's `chatOutput` feature to dodge it
-    // would hide the seam instead of supplying it.
+    // The gather runs end to end and the frame SAYS SO: "Nodes available: 2/3" against the ready
+    // state's 3/3, from a run the manager recorded as `succeeded`. Verified live.
     //
-    // Steps stay EMPTY on purpose. Borrowing `player-gathering-task-ready`'s two steps would
-    // publish a byte-identical frame under a second name — closing the entry while adding no
-    // evidence, which is worse than an honest window-reach frame.
-    reaches: 'window',
+    // Old Karrun Mine rather than the ridge every other gathering case uses, and that is the
+    // substance of this entry rather than a detail. A resolved, non-timed gather leaves NO mark on
+    // the gathering surface unless the system runs a resource economy — no node pool and no
+    // stamina means the same environment, the same rows and the same inspector before and after,
+    // so the frame would be a duplicate of `player-gathering-task-ready` under a second name,
+    // which is worse than an honest window-reach frame. The mine is the one gathering environment
+    // that carries a live pool, because it is the one no other captured frame reads: switching
+    // herbalism's economy on would have put a node line into all five herbalism gathering frames.
+    //
+    // The pool depletes `onSuccess`, so the count is evidence of the SUCCESS and not merely of the
+    // attempt. See `sm-task-prospect` in `world/labContent.js`.
+    reaches: 'exact',
     query: { tab: 'gathering' },
     steps: [
-      { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
-      { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
+      { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
+      { selector: '.gathering-task-row[data-task-id="sm-task-prospect"] .gathering-task-summary' },
       { selector: '.gathering-task-detail-attempt' },
     ],
     position: { width: 1280, height: 860 },
@@ -2573,9 +2591,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting run summary',
     app: PLAYER,
     smokeLabels: ['player-crafting-run-summary'],
-    reaches: 'window',
+    // The counterpart's condition is the right column having SWAPPED to the run summary —
+    // `[data-crafting-run-summary]`, which `CraftingView` renders only once `lastRollResult`
+    // carries an entry for the selected recipe. A craft that returns `success: false` notifies and
+    // records nothing, so the frame is reached by a craft that actually completes.
+    //
+    // Smelt Iron Ingot, and a CHECKED recipe on purpose: the shim's `Roll` is an object, not a
+    // constructor, so `evaluateCheckRoll` short-circuits on its own `typeof !== 'function'` guard
+    // and returns `engine: false` — the documented headless path, which passes the check without
+    // rolling. What the lab therefore cannot reach is the smoke's ROUTED craft, which needs a real
+    // total to land on an outcome tier and otherwise aborts with "does not satisfy current
+    // resolution mode requirements". A `Roll` class in the shim would close that;
+    // `tests/view-lab/foundry/installFoundryShim.js` is where it would go.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Smelt Iron' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-iron-ingot"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2590,9 +2624,28 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting roll result',
     app: PLAYER,
     smokeLabels: ['player-crafting-roll-result'],
-    reaches: 'window',
+    // The counterpart's condition is the RollResultBox inside the run summary, scrolled into
+    // frame: `[data-crafting-run-summary] [data-recipe-section="roll-result"]`.
+    //
+    // A different recipe from `player-crafting-run-summary`, so the pair is two crafts rather than
+    // one craft photographed twice — and the scroll brings the DETAIL column's own copy of the box
+    // into frame beside the summary's, which is the whole point of a case named for the box rather
+    // than for the panel.
+    //
+    // The box carries no rolled total in either frame, and that is production's shape rather than
+    // a lab gap: `CraftingEngine`'s success return is `{success, results, message}`, and
+    // `RollResultBox` reads `result.total`/`result.checkResult.total`/`items`/`awardedResults`,
+    // none of which that return carries. The smoke's counterpart shows the same header and message.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-horseshoe"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+      {
+        selector: '[data-crafting-run-summary] [data-recipe-section="roll-result"]',
+        scroll: true,
+      },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2607,9 +2660,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting essence alternative',
     app: PLAYER,
     smokeLabels: ['player-crafting-essence-alternative'],
-    reaches: 'window',
+    // The counterpart's condition is an OPEN alternatives radiogroup — `.crafting-alt-option` rows
+    // under `[data-recipe-section="alternatives"]` — one of whose options is an ESSENCE, so the
+    // option card draws a `CraftingEssenceThumb` rather than an item image.
+    //
+    // It previously borrowed `player-crafting-essence-ingredient`'s recipe and published a
+    // byte-identical frame under a second name. That recipe cannot reach this state: its essence
+    // requirement is its own single-option group, and `IngredientOptionSelector` branches on the
+    // OPTION's `isEssence`, so an essence in a group of its own renders a rail tile and opens the
+    // essence pool instead. Quench in Fire-Bearing Stock puts the component and the essence in ONE
+    // group, which is the only arrangement that puts an essence inside the chooser.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-emberbrand"]' }],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Quench in Fire' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-quenchoil"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2649,6 +2715,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     // group, so the frame shows the requirement rail rather than the legacy rows. The smoke's
     // counterpart escapes the migration only because it is authored through `createRecipe` after
     // initialize; reproducing that needs a post-init authoring hook in `world/labWorld.js`.
+    //
+    // Re-verified against the current tree: `migrateEssencesToIngredientGroups` runs over the
+    // persisted `recipes` setting and is guarded only on the map being non-empty, so there is no
+    // authored shape that both carries a set-level essence map and survives boot. Fixture work
+    // cannot close this one; a post-init `createRecipe` in the lab's boot sequence can.
     reaches: 'window',
     query: { tab: 'crafting' },
     steps: [],
@@ -2683,9 +2754,24 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting essence shopping',
     app: PLAYER,
     smokeLabels: ['player-crafting-essence-shopping'],
-    reaches: 'window',
+    // The counterpart's condition is an essence thumb inside the shopping list's acquire card:
+    // `[data-shopping-acquire-components] .crafting-essence-thumb`, reached by pressing a recipe
+    // row's cart button.
+    //
+    // Rivet Chainmail Shirt rather than the previously-selected Deepbind, because the card lists
+    // what is MISSING and Deepbind's essences are fully fundable — adding it produced "0 missing
+    // components" and no acquire card at all. Chainmail's Fire requirement can never be funded
+    // (60 needed against 46 held across every carrier), so the card renders both an item row and
+    // the essence row this frame exists for.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' }],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Rivet Chainmail' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"]' },
+      {
+        selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"] .crafting-recipe-row-add',
+      },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2700,9 +2786,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting slot rail',
     app: PLAYER,
     smokeLabels: ['player-crafting-slot-rail'],
-    reaches: 'window',
+    // The counterpart's three programmatic assertions, all reproduced: the rail's slot states are
+    // exactly `['choice:partial', 'essence:short', 'fixed:met']` and exactly ONE chooser is open.
+    // Verified live against this recipe.
+    //
+    // The rail's three states cannot co-occur by accident — each needs its own engineering, which
+    // is why this is an authored recipe rather than a re-selection of an existing one. See
+    // `sm-r-tidebound` in `world/labContent.js` for what each group is doing and why `partial`
+    // needs an unsatisfiable choice and `short` needs an essence with no carrier at all.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [{ selector: '.crafting-recipe-row[data-recipe-id="sm-r-pattern-blade"]' }],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Temper a Tidebound' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-tidebound"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2870,9 +2967,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting progressive',
     app: PLAYER,
     smokeLabels: ['player-crafting-progressive'],
-    reaches: 'window',
+    // The reorderable stage list at rest — `[data-recipe-section="progressive-stages"]` with its
+    // grips, ordinals, per-stage difficulty and "Reached at ≥N" thresholds, and the chevron box
+    // rendered whether or not anything has moved. Verified live: 3 rows, 3 grips, 3 move controls,
+    // thresholds ≥1 / ≥3 / ≥7 ascending.
+    //
+    // Progressive is a per-SYSTEM resolution mode, so this needs a progressive system the PLAYER
+    // can see. Herbalism is the world's progressive system and it is knowledge-gated; the crafting
+    // actor learns exactly the two recipes below and nothing else. See `LEARNED_RECIPES` in
+    // `world/labActors.js` for why a sixth crafting system was rejected instead.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2887,9 +2996,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting progressive reordered',
     app: PLAYER,
     smokeLabels: ['player-crafting-progressive-reordered'],
-    reaches: 'window',
+    // The SAME list after one downward move, which is the counterpart's own sequence and the only
+    // state in which two of its invariants stop being vacuous: the live region is empty until a
+    // move announces, and the authored thresholds ascend by construction until one is re-derived.
+    // Verified live — the region reads "Empty Vial moved to position 2 of 3" and the thresholds
+    // re-rank to ≥2 / ≥3 / ≥7 rather than carrying their old values with the rows.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+      { selector: '[data-progressive-stage-move-down]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2904,9 +3022,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting progressive fixed',
     app: PLAYER,
     smokeLabels: ['player-crafting-progressive-fixed'],
-    reaches: 'window',
+    // The GM-ordered variant, on its own recipe because the state is a RECIPE flag:
+    // `allowPlayerResultReorder` defaults true, so an explicit false has to be authored to reach
+    // it at all. Verified live against the counterpart's whole report — 3 fixed rows, 0 grips,
+    // 0 move controls, 3 ordinals, 3 difficulty chips, the "Order set by the GM" line present,
+    // and no live region for an order that cannot change.
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Set the Drying Kiln' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-kiln"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2921,9 +3047,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting progressive stacked',
     app: PLAYER,
     smokeLabels: ['player-crafting-progressive-stacked'],
+    // WINDOW, and the blocker is a WIDTH the lab cannot reach rather than a fixture gap.
+    //
+    // The counterpart shrinks `#fabricate-app` to 780px by writing `min-width: 0` inline, which
+    // takes the grid under its 900px container breakpoint so the three columns STACK and the stage
+    // rows get the full width. The lab cannot do that: `assertWindowGeometry` requires the applied
+    // box to equal the declared one, and production's `.fabricate-app { min-width: 1024px }` is
+    // therefore the floor — which is why every `responsive` case in this registry is 1024.
+    //
+    // At 1024 the grid does NOT stack; the centre column lands at ~290px, and the counterpart's
+    // own assertions fail there. Measured: `rowOverflow: 3` where the counterpart demands 0, and
+    // all three stage names compute to zero width rather than ellipsing. That is a real finding
+    // about the un-stacked narrow band — the smoke never renders this width — and the frame is
+    // published as evidence of it, not as the counterpart's state.
     reaches: 'window',
     query: { tab: 'crafting' },
-    steps: [],
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Reduce a Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+    ],
     position: { width: 1024, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2955,9 +3097,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Alchemy chooser',
     app: PLAYER,
     smokeLabels: ['player-alchemy-chooser'],
-    reaches: 'window',
+    // The discipline chooser, reached exactly as the counterpart reaches it: the world remembers a
+    // chosen discipline, so the tab opens on the workbench and "Switch discipline"
+    // (`[data-alchemy-switch]`) is what returns to the chooser.
+    //
+    // It needed a SECOND alchemy-mode system to exist at all — `needsChooser` is
+    // `systems.length > 1 && !activeSystemId`, so with one discipline this is not a state the app
+    // can be driven into. `lab-tidewrack` supplies it, and the same `systems.length > 1` also
+    // flips `canSwitch`, which is what puts the control this case clicks on the workbench frames.
+    reaches: 'exact',
     query: { tab: 'alchemy' },
-    steps: [],
+    steps: [{ selector: '[data-alchemy-switch]' }],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -3011,9 +3161,24 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Journal craft detail',
     app: PLAYER,
     smokeLabels: ['fabricate-journal-craft-detail'],
-    reaches: 'window',
+    // The counterpart's condition is a HISTORY crafting run selected, so the run-detail
+    // requirements card (`[data-journal-card="step-details"]`) is on screen — a different article
+    // from the one `fabricate-journal` shows, which is the default ACTIVE run. With empty steps
+    // this case published that same default frame under a second name.
+    //
+    // The multi-step succeeded run rather than the single-step one: its detail carries the step
+    // rail as well as the requirements card, so the two journal frames differ in structure and not
+    // only in which row is lit.
+    reaches: 'exact',
     query: { tab: 'journal' },
-    steps: [],
+    steps: [
+      { selector: '.journal-history-row[data-history-run-id="lab-run-succeeded-multi"]' },
+      {
+        selector:
+          '[data-journal-detail][data-run-type="crafting"] [data-journal-card="step-details"]',
+        scroll: true,
+      },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,

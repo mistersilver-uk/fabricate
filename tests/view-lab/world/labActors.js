@@ -18,6 +18,36 @@ import { installUpdateSemantics, makeGetFlag, makeSetFlag, seedFabricateFlag } f
 const PORTRAIT_BASE = '/@foundry-chrome/icons';
 
 /**
+ * Foundry's `Document#toObject()`: a deep clone of the document's own source data.
+ *
+ * Load-bearing, not decoration. `CraftingEngine._createResultItem` and
+ * `_restoreComponentItem` build a crafted output by cloning the component's REGISTERED
+ * source item — `itemData = sourceItem.toObject()` — and `fromUuid` hands them a lab index
+ * document. Without this the craft threw `sourceItem.toObject is not a function`, which the
+ * engine swallowed into a generic "Something went wrong while crafting" notification: the
+ * Craft button appeared to work, the right column never swapped to the run summary, and the
+ * frame documented a UI that does nothing.
+ *
+ * The clone is what makes it safe as well as present. The engine mutates the returned data
+ * (`itemData.system.quantity`, then `stampCraftedComponentIdentity`'s role flags), so handing
+ * back the live index entry would let one craft rewrite the world's canonical item.
+ *
+ * @param {object} document The lab document to equip.
+ * @returns {object} The same document.
+ */
+function installToObject(document) {
+  document.toObject = () => ({
+    _id: document.id,
+    name: document.name,
+    img: document.img ?? null,
+    type: document.type ?? 'loot',
+    system: structuredClone(document.system ?? {}),
+    flags: structuredClone(document.flags ?? {}),
+  });
+  return document;
+}
+
+/**
  * One owned item. `system.quantity` is where dnd5e keeps stack size, which is what Fabricate reads.
  *
  * @param {string} componentId Component this stack is an instance of.
@@ -50,6 +80,7 @@ function ownedItem(componentId, component, quantity, index) {
   item.getFlag = makeGetFlag(item);
   item.setFlag = makeSetFlag(item);
   installUpdateSemantics(item);
+  installToObject(item);
   return item;
 }
 
@@ -80,6 +111,7 @@ function recipeItemCopy({ id, uuid, name, icon, usage = null }) {
   // "2 of 3 remaining", "Spent" or "Inert" at all: with the flag absent the projection sees zero
   // uses on every copy and the whole chip vocabulary collapses to one face.
   if (usage) seedFabricateFlag(item, ['fabricate', 'recipeItemUsage'], { ...usage });
+  installToObject(item);
   return item;
 }
 
@@ -185,10 +217,12 @@ const INVENTORIES = {
  * - Vosk holds the `total`-scope party codex that is STILL the source of a learned entry, which is
  *   the one arrangement that raises the ordering-hazard band.
  *
- * Deliberately none on the crafting actor's LEARNED side: `lastCraftingActor` is Brenna, and the
- * player's recipe visibility for the knowledge-gated herbalism system is evaluated against her
- * learned set — so teaching her anything would reveal those recipes in the player's crafting
- * listing and re-point every already-captured player crafting and journal frame.
+ * The crafting actor's LEARNED side is deliberately narrow rather than empty: `lastCraftingActor`
+ * is Brenna, and the player's recipe visibility for the knowledge-gated herbalism system is
+ * evaluated against her learned set, so anything she learns appears in the player's crafting
+ * listing. She learns exactly the two progressive recipes and nothing else — see
+ * {@link LEARNED_RECIPES} for why the general prohibition was too coarse and what keeps the
+ * already-captured crafting and journal frames unmoved.
  *
  * A COPY reveals for the same reason, which is why every copy here is a copy of a book carrying no
  * authored membership: `hasMatchedItem` is computed over the crafting actor plus every
@@ -247,6 +281,29 @@ const RECIPE_ITEM_COPIES = {
  * (`lostCopy`), and no uuid at all reads as an auto-learn.
  */
 const LEARNED_RECIPES = {
+  // The crafting actor learns EXACTLY the two progressive recipes and nothing else.
+  //
+  // This reverses an earlier blanket "never teach Brenna anything" rule, and the reason it was
+  // written still holds — it was just too coarse. Herbalism is the world's only progressive system
+  // and it is knowledge-gated, so the four progressive player frames are unreachable while the
+  // crafting actor knows nothing; and `progressive` is a per-SYSTEM resolution mode, so no
+  // globally-visible system can carry a progressive recipe without being a sixth system.
+  //
+  // What the old rule was protecting against was REFLOW: the player recipe browser sorts A→Z and
+  // pages at twelve, so revealing a recipe named earlier than "Inscribe a Runeblade" pushes a row
+  // off page one and breaks the eight cases that select a row by id with no search filter. Both
+  // recipes named here sort after it, so page one is byte-identical and each is reached by its own
+  // case's search step.
+  //
+  // `sourceItemUuid: null` is an AUTO-LEARN — the bottom rung of the source ladder, and the only
+  // rung that adds no book. A learned entry sourced from a definition would also have to be
+  // reachable from a held copy, which would add a row to the Books & Scrolls library and a second
+  // one to Brenna's Knowledge recipe-items tab. This moves one thing: the learned-recipes tab
+  // badge on the three frames that open the Knowledge surface on Brenna.
+  'lab-actor-brenna': {
+    'hb-r-stillroom': { sourceItemUuid: null, learnedAt: 1_190_000 },
+    'hb-r-kiln': { sourceItemUuid: null, learnedAt: 1_195_000 },
+  },
   'lab-actor-idrin': {
     // Both name a book Idrin no longer carries, which is the `lostCopy` rung — and, because the
     // source is not owned, erasing either frees no learn budget, which is the no-refund clause the
@@ -340,6 +397,7 @@ export function buildLabActors(content) {
           item.getFlag = makeGetFlag(item);
           item.setFlag = makeSetFlag(item);
           installUpdateSemantics(item);
+          installToObject(item);
           return item;
         });
         items.push(...created);
@@ -397,6 +455,9 @@ export function buildDocumentIndex(content, actors) {
     // than the flag tier production reaches first.
     document.getFlag = makeGetFlag(document);
     document.setFlag = makeSetFlag(document);
+    // A crafted output is a CLONE of the registered source item, taken through
+    // `sourceItem.toObject()`. See {@link installToObject}.
+    installToObject(document);
     documents.set(uuid, document);
   }
 

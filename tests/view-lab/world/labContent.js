@@ -42,6 +42,14 @@ export const LAB_SYSTEM_IDS = Object.freeze({
   ALCHEMY: 'lab-alchemy',
   JEWELRY: 'lab-jewelry',
   RUNEWORK: 'lab-runework',
+  // A SECOND alchemy-mode system, and the only reason it exists is that the player's discipline
+  // chooser cannot render without one: `alchemyStore`'s `needsChooser` is
+  // `systems.length > 1 && !activeSystemId`, so with a single discipline the chooser is not a
+  // state the app can be driven into — it is a screen that does not exist. Its cost is disclosed
+  // rather than hidden: a sixth system adds a row to the manager's system library and moves the
+  // rail's system count, and `canSwitch` flips true, which adds a "Switch discipline" control to
+  // the two already-shipped alchemy workbench frames.
+  TIDEWRACK: 'lab-tidewrack',
 });
 
 /**
@@ -527,6 +535,48 @@ const ALCHEMY_COMPONENTS = [
     'Elixir of Vigour',
     'consumables/potions/bottle-bulb-corked-labeled-blue.webp',
     { categories: ['Products'], tags: ['elixir'], difficulty: 8 }
+  ),
+];
+
+/**
+ * The second alchemy discipline's components.
+ *
+ * Deliberately owned by NOBODY. A component only reaches the player's Inventory when an actor
+ * holds a stack whose uuid matches its `originItemUuid`, and pointing these at items the roster
+ * already carries would re-parameterise those cards with a second system claim — the multi-system
+ * selector the Air Shard frames exist to prove. The chooser card this system exists for reads
+ * system identity and recipe counts only, so an unstocked discipline photographs it exactly.
+ */
+const TIDEWRACK_COMPONENTS = [
+  component('tw-kelp-ash', 'Kelp Ash', 'commodities/materials/bowl-powder-grey.webp', {
+    categories: ['Reagents'],
+    tags: ['mineral'],
+    difficulty: 3,
+    essences: { water: 2 },
+  }),
+  component('tw-brine-salt', 'Brine Salt', 'commodities/materials/bowl-powder-blue.webp', {
+    categories: ['Reagents'],
+    tags: ['mineral'],
+    difficulty: 2,
+    essences: { water: 1, air: 1 },
+  }),
+  component('tw-pearl-dust', 'Pearl Dust', 'commodities/gems/pearl-water.webp', {
+    categories: ['Reagents'],
+    tags: ['exotic'],
+    difficulty: 7,
+    essences: { water: 3 },
+  }),
+  component(
+    'tw-tidewater',
+    'Bottled Tidewater',
+    'consumables/potions/bottle-round-corked-blue.webp',
+    { categories: ['Products'], tags: ['elixir'], difficulty: 5 }
+  ),
+  component(
+    'tw-fogdraught',
+    'Fogdraught',
+    'consumables/potions/bottle-conical-bubbling-blue.webp',
+    { categories: ['Products'], tags: ['elixir'], difficulty: 6 }
   ),
 ];
 
@@ -1060,6 +1110,105 @@ const SMITHING_RECIPES = [
       check: { enabled: true, rollFormula: '1d20 + @prof', thresholds: { success: 15 } },
     }
   ),
+
+  // ── Requirement-rail states ────────────────────────────────────────────────────────────────────
+  // BOTH recipes below are named to sort AFTER "Inscribe a Runeblade", and that is load-bearing
+  // rather than flavour. The player recipe browser sorts A→Z by display name and pages at twelve, so
+  // page one currently ends exactly there. A new recipe named earlier in the alphabet would push a
+  // row onto page two — and eight already-captured crafting cases select their row by
+  // `data-recipe-id` with no search filter, so each of them would fail outright. Anything sorting
+  // after "Inscribe" lands on page two, leaves page one byte-identical, and is reached by its own
+  // case's search step exactly as `sm-r-silver-ingot` and `sm-r-chainmail` already are.
+
+  recipe(
+    'sm-r-tidebound',
+    'Temper a Tidebound Edge',
+    LAB_SYSTEM_IDS.SMITHING,
+    'weapons/swords/sword-guard-blue.webp',
+    {
+      description: 'Sea-quenched work: the stock is easy, the choice is yours, the water is not.',
+      categories: ['Weaponsmithing'],
+      // The requirement rail's THREE states in one set, which is the whole reason this recipe
+      // exists — the counterpart frame asserts exactly `['choice:partial', 'essence:short',
+      // 'fixed:met']` with exactly one chooser open. Each group is engineered for its state:
+      //
+      // - `fixed:met`    — a single-option group Brenna covers outright (9 coal against 2).
+      // - `choice:partial` — a two-option group she has NOT picked from AND cannot currently
+      //   satisfy. Both halves are required: `choiceState` short-circuits to `met` the moment the
+      //   resolver's default pick is satisfiable, whatever the player has or has not chosen, so a
+      //   choice between two components she holds renders `met` and the to-do state is
+      //   unreachable. She owns no silver ore and no sapphire, so the group stays unsatisfied, and
+      //   because she has not picked either it reads `partial` — a to-do, never an error, which is
+      //   the state a two-state rail could not express and this frame exists to show.
+      // - `essence:short` — WATER, and water specifically: `essenceState` reads `delivered`, and a
+      //   short slot only reads `short` rather than `partial` when the resolver can allocate
+      //   NOTHING. No smithing component any of the three source actors holds carries water
+      //   (silver ore and sapphire do, and nobody owns either), so the pool delivers zero. Fire or
+      //   earth would auto-allocate and render `partial`.
+      //
+      // The rail auto-advances to the first unsatisfied OPENABLE slot, which is the choice — so the
+      // alternatives chooser is the one open chooser and the essence pool stays closed.
+      complex: true,
+      ingredientSets: [
+        {
+          id: 'sm-set-tidebound',
+          name: 'Tidebound stock',
+          ingredientGroups: [
+            { id: 'sm-set-tidebound-g1', options: [{ componentId: 'sm-coal', quantity: 2 }] },
+            {
+              id: 'sm-set-tidebound-g2',
+              name: 'Bright stock',
+              options: [
+                { componentId: 'sm-silver-ore', quantity: 2 },
+                { componentId: 'sm-sapphire', quantity: 1 },
+              ],
+            },
+            {
+              id: 'sm-set-tidebound-g3',
+              name: 'Water essence',
+              options: [{ match: { type: 'essence', essenceId: 'water', amount: 4 } }],
+            },
+          ],
+        },
+      ],
+      resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-dagger', quantity: 1 }] }],
+      check: { enabled: true, rollFormula: '1d20 + @prof', thresholds: { success: 15 } },
+      toolIds: ['sm-tool-hammer'],
+    }
+  ),
+  recipe(
+    'sm-r-quenchoil',
+    'Quench in Fire-Bearing Stock',
+    LAB_SYSTEM_IDS.SMITHING,
+    'consumables/potions/bottle-conical-corked-yellow.webp',
+    {
+      description: 'Either burn the coal or spend the fire you are already carrying.',
+      categories: ['Weaponsmithing'],
+      // ONE group offering a COMPONENT or an ESSENCE, which is the only arrangement that draws an
+      // alternatives radiogroup carrying a `CraftingEssenceThumb`: `IngredientOptionSelector`
+      // branches on the OPTION's `isEssence`, so an essence requirement in its own group renders a
+      // rail tile instead and never reaches the chooser. Both options are affordable, so the
+      // radiogroup shows two selectable rows rather than one flagged as short.
+      ingredientSets: [
+        {
+          id: 'sm-set-quench',
+          name: 'Quenching stock',
+          ingredientGroups: [
+            {
+              id: 'sm-set-quench-g1',
+              name: 'Fire source',
+              options: [
+                { componentId: 'sm-coal', quantity: 2 },
+                { match: { type: 'essence', essenceId: 'fire', amount: 4 } },
+              ],
+            },
+          ],
+        },
+      ],
+      resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-whetstone', quantity: 1 }] }],
+      check: { enabled: true, rollFormula: '1d20 + 2', thresholds: { success: 12 } },
+    }
+  ),
 ];
 
 const HERBALISM_RECIPES = [
@@ -1244,6 +1393,77 @@ const HERBALISM_RECIPES = [
             { componentId: 'hb-empty-vial', quantity: 1 },
             { componentId: 'hb-mortar-dust', quantity: 2 },
             { componentId: 'hb-frostcap', quantity: 1 },
+          ],
+        },
+      ],
+      toolIds: ['hb-tool-mortar'],
+    }
+  ),
+
+  // ── The player-VISIBLE progressive pair ────────────────────────────────────────────────────────
+  // Progressive is a per-SYSTEM resolution mode (`CraftingListingBuilder._buildRecipeModel` reads
+  // `system.resolutionMode`), so a progressive player body can only be photographed on a
+  // progressive system the player can see. Herbalism is the world's progressive system and it is
+  // knowledge-gated, which is what made the four progressive frames unreachable: a player who has
+  // learned nothing sees none of it.
+  //
+  // The alternative was a SIXTH crafting system in progressive mode with global visibility. That
+  // was rejected: a new system row moves the manager's system library and its rail count across
+  // every manager frame, where two learned entries on the crafting actor move one badge on three.
+  // Brenna learns exactly these two (see `LEARNED_RECIPES` in `labActors.js`) and nothing else, so
+  // no other herbalism recipe reaches the player's listing.
+  //
+  // Both are named to sort after "Inscribe a Runeblade" for the page-one reason documented on the
+  // smithing pair above.
+  recipe(
+    'hb-r-stillroom',
+    'Reduce a Stillroom Batch',
+    LAB_SYSTEM_IDS.HERBALISM,
+    'consumables/potions/bottle-conical-corked-green.webp',
+    {
+      description: 'One long reduction; how far down the ladder you get is how well it went.',
+      categories: ['Preparation'],
+      ingredientSets: [simpleSet('s1', { 'hb-moonleaf': 2, 'hb-spring-water': 2 })],
+      // THREE ordered stages, REORDERABLE — `allowPlayerResultReorder` defaults true, so this is
+      // the recipe the reorder chevrons and the move announcement are photographed on. Stage DCs
+      // are the result components' own difficulties (1, 2, 4), so they rank low → high and a
+      // downward move genuinely re-derives the thresholds rather than merely swapping two labels.
+      resultGroups: [
+        {
+          id: 'rg',
+          results: [
+            { componentId: 'hb-empty-vial', quantity: 2 },
+            { componentId: 'hb-mortar-dust', quantity: 1 },
+            { componentId: 'hb-frostcap', quantity: 1 },
+          ],
+        },
+      ],
+      toolIds: ['hb-tool-mortar'],
+    }
+  ),
+  recipe(
+    'hb-r-kiln',
+    'Set the Drying Kiln',
+    LAB_SYSTEM_IDS.HERBALISM,
+    'consumables/plants/dried-bundle-stems-sticks-roots-brown.webp',
+    {
+      description: 'The kiln takes what it takes, in the order the wardens set.',
+      categories: ['Preparation'],
+      ingredientSets: [simpleSet('s1', { 'hb-sunroot': 2, 'hb-bitterbark': 1 })],
+      // The FIXED counterpart: `allowPlayerResultReorder: false` is what removes the grips, the
+      // move buttons and the live region while keeping the ordinals and the difficulty chips, and
+      // adds the muted "order set by the GM" line. It has to be authored explicitly — the flag
+      // defaults to TRUE, so the fixed state is unreachable from an unauthored recipe. Different
+      // result components from its sibling (difficulties 1, 3, 5) so the two frames are not the
+      // same list photographed twice.
+      allowPlayerResultReorder: false,
+      resultGroups: [
+        {
+          id: 'rg',
+          results: [
+            { componentId: 'hb-spring-water', quantity: 2 },
+            { componentId: 'hb-salve', quantity: 1 },
+            { componentId: 'hb-antitoxin', quantity: 1 },
           ],
         },
       ],
@@ -1798,6 +2018,20 @@ const GATHERING_TASKS = [
     enabled: true,
     craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
     img: `${ICON_BASE}/commodities/stone/ore-chunk-brown.webp`,
+    // The world's only resource-NODE task, and the pool is declared HERE rather than on the
+    // environment: `_runtimeTask` reads `environment.nodeRuntime[taskId]` only when the library
+    // task carries a `nodes` config, and treats the library config as authoritative for
+    // everything except the live count. Without this the environment entry is never consulted.
+    //
+    // `onSuccess`, not the `onStart` default, and that is the whole point: with `onStart` the
+    // pool falls whether the gather succeeded or not, so a post-attempt count would evidence an
+    // ATTEMPT rather than a SUCCESS — and the frame it feeds is named for the success.
+    //
+    // No `respawn` block, which `normalizeRespawn` resolves to `{policy: 'manual'}` — a
+    // GM-restocked pool. Deliberate over `overTime`: an interval-driven pool would re-anchor and
+    // regrow on a world-time pass, and the count is only evidence of the gather if nothing else
+    // can move it between the attempt and the shutter.
+    nodes: { enabled: true, max: 3, depletionTiming: 'onSuccess' },
     dropRows: [
       { id: 'row-1', componentId: 'sm-iron-ore', quantity: 3, dropRate: 50, enabled: true },
       { id: 'row-2', componentId: 'sm-copper-ore', quantity: 2, dropRate: 30, enabled: true },
@@ -1826,6 +2060,17 @@ const GATHERING_EVENTS = [
     img: `${ICON_BASE}/magic/air/wind-tornado-funnel-blue.webp`,
     weight: 20,
   },
+  // ── Smithing's event roster, and why it is three rows rather than one ───────────────────────────
+  // Smithing is the world's only `full`-event-visibility system (see `systemRules`), so Old Karrun
+  // Mine is the only environment whose player Events TAB exists — and therefore the only place the
+  // individual event list, its search box and its pagination can be photographed at all. A
+  // one-row list renders that surface in its emptiest legible state: no ordering, nothing for the
+  // search box to filter, and a pagination bar summarising a single item.
+  //
+  // Three is what the environment composes: `enabledEventIds` on `sm-env-mine` names all three, and
+  // the weights differ so the per-row chance column shows three distinct values rather than one
+  // repeated. Herbalism keeps its own two events untouched — every already-captured herbalism
+  // gathering frame and both manager event frames read those.
   {
     id: 'sm-event-collapse',
     name: 'Partial Collapse',
@@ -1834,6 +2079,24 @@ const GATHERING_EVENTS = [
     craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
     img: `${ICON_BASE}/environment/wilderness/cave-entrance-mountain.webp`,
     weight: 10,
+  },
+  {
+    id: 'sm-event-firedamp',
+    name: 'Firedamp',
+    description: 'The lamps gutter blue. Everyone out, and nobody strikes a light.',
+    enabled: true,
+    craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
+    img: `${ICON_BASE}/magic/fire/flame-burning-campfire-yellow-blue.webp`,
+    weight: 6,
+  },
+  {
+    id: 'sm-event-floodwater',
+    name: 'Rising Water',
+    description: 'The lower gallery is taking water faster than the pumps can lift it.',
+    enabled: true,
+    craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
+    img: `${ICON_BASE}/magic/water/water-drop-swirl-blue.webp`,
+    weight: 14,
   },
 ];
 
@@ -1898,7 +2161,14 @@ const ENVIRONMENTS = [
     taskOrder: ['hb-task-forage', 'hb-task-spring'],
     taskDropRateAdjustments: {},
     conditions: { weather: 'clear', timeOfDay: 'day', visibility: '', notes: '' },
-    nodeRuntime: { 'hb-task-forage': { remaining: 3, respawnAt: null } },
+    // NO node runtime, where there used to be `{'hb-task-forage': {remaining: 3, respawnAt: null}}`.
+    // That entry configured nothing, twice over: `normalizeNodeConfig` reads `max ?? maxCount` and
+    // `current ?? availableCount`, so neither key resolved and `normalizeNodeRuntime` dropped it —
+    // and even in the right shape a per-environment entry is only READ when the library TASK
+    // carries a `nodes` config, which no herbalism task does. Removed rather than re-shaped:
+    // herbalism's `economy.nodes` is off, so a pool here could never render, and the world's live
+    // pool belongs where a frame can photograph it (`sm-env-mine`).
+    nodeRuntime: {},
   },
   {
     id: 'hb-env-thicket',
@@ -1934,7 +2204,8 @@ const ENVIRONMENTS = [
     enabledEventIds: ['hb-event-storm'],
     taskOrder: ['hb-task-fungi'],
     conditions: { weather: 'snow', timeOfDay: 'day', visibility: '', notes: '' },
-    nodeRuntime: { 'hb-task-fungi': { remaining: 0, respawnAt: 1_209_600 } },
+    // Empty for the same reason as the grove's — see `hb-env-grove`.
+    nodeRuntime: {},
   },
   {
     id: 'sm-env-mine',
@@ -1949,10 +2220,28 @@ const ENVIRONMENTS = [
     dangerTags: ['hazardous'],
     includedRealmIds: [],
     enabledTaskIds: ['sm-task-prospect'],
-    enabledEventIds: ['sm-event-collapse'],
+    enabledEventIds: ['sm-event-collapse', 'sm-event-firedamp', 'sm-event-floodwater'],
     taskOrder: ['sm-task-prospect'],
     conditions: { weather: 'clear', timeOfDay: 'day', visibility: '', notes: '' },
-    nodeRuntime: {},
+    // The world's only LIVE node pool, and the reason the after-a-successful-gather frame is a
+    // different photograph from the ready one at all.
+    //
+    // A resolved, non-timed gather changes nothing on the gathering surface unless the system runs
+    // a resource economy: no node pool and no stamina means the same environment, the same task
+    // rows and the same inspector before and after, so the two frames would differ only by
+    // accident. A pool makes the outcome legible — "Nodes available 2/3" where the ready frame
+    // reads 3/3.
+    //
+    // On SMITHING because smithing is the one gathering system no captured task frame reads: the
+    // five herbalism gathering frames all select herbalism environments, and enabling the economy
+    // there would put a node line into every one of them.
+    //
+    // The POOL ITSELF is declared on the library task (`sm-task-prospect.nodes`), because
+    // `_runtimeTask` only consults `environment.nodeRuntime[taskId]` when the library task carries
+    // a `nodes` config — "library config is authoritative; the per-environment entry contributes
+    // only runtime state". This entry is that runtime state: a full pool, stated rather than
+    // implied, so the ready and post-gather frames are 3/3 and 2/3 rather than seeded-on-first-read.
+    nodeRuntime: { 'sm-task-prospect': { current: 3 } },
   },
   {
     id: 'sm-env-deepvault',
@@ -1997,7 +2286,24 @@ const GATHERING_VOCABULARIES = {
   ],
 };
 
-function systemRules() {
+/**
+ * The per-system gathering rules.
+ *
+ * `eventVisibility` is the one field a caller varies, and it is a THREE-value enum —
+ * `dangerLevelOnly` | `encounterChance` | `full` (`GATHERING_EVENT_VISIBILITIES`). Only `full`
+ * mounts the player's Events tab and lists individual events; the other two collapse to a band in
+ * the Tasks panel.
+ *
+ * It was authored `'gm'`, which is not one of the three. `_resolveEventVisibility` answers an
+ * unrecognised value with the RESTRICTIVE default (`encounterChance`) rather than throwing — the
+ * tenth instance on this branch of a fixture shape `src/` does not read, degrading to a default
+ * that renders cleanly. The Events tab was therefore unreachable for every environment in the
+ * world while the fixture claimed to be configuring event visibility at all.
+ *
+ * @param {'dangerLevelOnly'|'encounterChance'|'full'} eventVisibility The player-facing tier.
+ * @returns {object} The rules block.
+ */
+function systemRules(eventVisibility) {
   return {
     rewardSelectionMode: 'highestRankedDrop',
     rewardLimit: 1,
@@ -2009,7 +2315,7 @@ function systemRules() {
     blindCandidateGate: 'discovered',
     revealPolicy: 'onSuccess',
     revealScope: 'party',
-    eventVisibility: 'gm',
+    eventVisibility,
     dropModifierMode: 'character',
   };
 }
@@ -2204,6 +2510,35 @@ const RUNEWORK_RECIPES = [
         // routed result set — so a group claiming a failure tier renders its raw outcome ID and
         // raises a validation issue. That is the UI being right, and the fixture being wrong.
       ],
+    }
+  ),
+];
+
+/** The second alchemy discipline's recipes — two, because `_enabledAlchemySystems` only offers a
+ * system that owns at least one, and one row makes a chooser card that reads as a stub. */
+const TIDEWRACK_RECIPES = [
+  recipe(
+    'tw-r-tidewater',
+    'Bottled Tidewater',
+    LAB_SYSTEM_IDS.TIDEWRACK,
+    'consumables/potions/bottle-round-corked-blue.webp',
+    {
+      description: 'Draw the salt back out and what is left keeps its memory of the sea.',
+      categories: ['Elixirs'],
+      ingredientSets: [simpleSet('tw-set-tidewater', { 'tw-kelp-ash': 2, 'tw-brine-salt': 1 })],
+      resultGroups: [{ id: 'rg', results: [{ componentId: 'tw-tidewater', quantity: 1 }] }],
+    }
+  ),
+  recipe(
+    'tw-r-fogdraught',
+    'Fogdraught',
+    LAB_SYSTEM_IDS.TIDEWRACK,
+    'consumables/potions/bottle-conical-bubbling-blue.webp',
+    {
+      description: 'Pearl dust and a long cold steep.',
+      categories: ['Elixirs'],
+      ingredientSets: [simpleSet('tw-set-fogdraught', { 'tw-pearl-dust': 1, 'tw-brine-salt': 2 })],
+      resultGroups: [{ id: 'rg', results: [{ componentId: 'tw-fogdraught', quantity: 1 }] }],
     }
   ),
 ];
@@ -2576,6 +2911,45 @@ export function buildLabContent() {
         currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS },
       },
     },
+    // LAST in the array on purpose. `RecipeManager.getRecipes()` returns recipes in persisted
+    // order, and the lab's journal runs are pinned to positional picks over the player-visible
+    // slice of that list — so a system inserted mid-array would re-point which recipes the
+    // already-captured journal frames describe, for no reason beyond where it was written.
+    {
+      id: LAB_SYSTEM_IDS.TIDEWRACK,
+      name: 'Tidewrack Distillation',
+      description: 'The coastal discipline: everything the tide leaves, reduced and re-bottled.',
+      img: `${ICON_BASE}/consumables/potions/bottle-round-corked-blue.webp`,
+      enabled: true,
+      // `restricted`, mirroring `lab-alchemy`. Alchemy visibility is decided by the alchemy reveal
+      // path rather than by `visibilityMode`, so a restricted system still reaches the discipline
+      // chooser and the workbench — while its recipes stay out of the CRAFTING browser, whose
+      // twelve-row page boundary every player crafting case depends on.
+      visibilityMode: 'restricted',
+      resolutionMode: 'alchemy',
+      craftingCheck: SIMPLE_CHECK,
+      // `none` rather than `simple`, deliberately: `lab-alchemy` carries the Simple two-slot
+      // Results editor and its reserved failure group, and a second system repeating that would
+      // photograph the same shape twice. `none` is the default check mode and the ordinary
+      // single-group editor, so the pair covers both.
+      alchemy: { checkMode: 'none' },
+      features: {
+        essences: true,
+        recipeCategories: true,
+        itemTags: true,
+        gathering: false,
+        alchemy: true,
+      },
+      essenceDefinitions: ESSENCES,
+      categories: ['Elixirs'],
+      itemTags: ['mineral', 'exotic', 'elixir'],
+      components: TIDEWRACK_COMPONENTS,
+      componentCategories: componentCategoryVocabulary(TIDEWRACK_COMPONENTS),
+      recipeItemDefinitions: [],
+      tools: [],
+      gatheringRealms: [],
+      gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+    },
   ];
 
   const gatheringConfig = {
@@ -2585,7 +2959,11 @@ export function buildLabContent() {
     events: GATHERING_EVENTS,
     systems: {
       [LAB_SYSTEM_IDS.HERBALISM]: {
-        rules: systemRules(),
+        // `encounterChance`, which is exactly what the previous invalid `'gm'` resolved to — so
+        // every already-captured herbalism gathering frame (grove, thicket, ridge, blind,
+        // stacked) renders unchanged, and the Events tab stays off here. The `full` tier lives
+        // on smithing alone; see below.
+        rules: systemRules('encounterChance'),
         tasks: GATHERING_TASKS.filter((task) => task.craftingSystemId === LAB_SYSTEM_IDS.HERBALISM),
         events: GATHERING_EVENTS.filter(
           (event) => event.craftingSystemId === LAB_SYSTEM_IDS.HERBALISM
@@ -2622,7 +3000,17 @@ export function buildLabContent() {
         ],
       },
       [LAB_SYSTEM_IDS.SMITHING]: {
-        rules: systemRules(),
+        // The world's ONLY `full` event tier, and it is on smithing precisely because no captured
+        // frame selects a smithing environment: `full` is what mounts the player's Events tab
+        // (`GatheringDetail.showEventsTab`) and lists individual event rows, and switching it on
+        // for herbalism would move the five herbalism gathering frames. Old Karrun Mine carries
+        // one event, which is what the events frame photographs.
+        rules: systemRules('full'),
+        // The world's only enabled resource economy. `nodesEnabled` is read off
+        // `systems[<id>].economy.nodes.enabled`, and with it off a per-environment `nodeRuntime`
+        // is inert however it is authored — which is why Old Karrun Mine's pool is the one that
+        // renders. See that environment for why smithing carries it and herbalism does not.
+        economy: { nodes: { enabled: true } },
         tasks: GATHERING_TASKS.filter((task) => task.craftingSystemId === LAB_SYSTEM_IDS.SMITHING),
         events: GATHERING_EVENTS.filter(
           (event) => event.craftingSystemId === LAB_SYSTEM_IDS.SMITHING
@@ -2644,6 +3032,7 @@ export function buildLabContent() {
       ...ALCHEMY_RECIPES,
       ...JEWELRY_RECIPES,
       ...RUNEWORK_RECIPES,
+      ...TIDEWRACK_RECIPES,
     ],
     environments: ENVIRONMENTS,
     gatheringConfig,
@@ -2654,6 +3043,7 @@ export function buildLabContent() {
       ...ALCHEMY_COMPONENTS,
       ...JEWELRY_COMPONENTS,
       ...RUNEWORK_COMPONENTS,
+      ...TIDEWRACK_COMPONENTS,
     ],
     tools: [...SMITHING_TOOLS, ...HERBALISM_TOOLS, ...RUNEWORK_TOOLS],
     // Exposed so the uuid index can resolve an owned recipe-item copy back to the book it is a
