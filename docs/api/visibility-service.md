@@ -57,7 +57,9 @@ Possible `reason` values:
 For a system whose `resolutionMode` is `"alchemy"`, `visible` reflects only whether the recipe is revealed in the player's Known list, and `craftable` is always `true` for a non-GM regardless of reveal state.
 Brewing is gated solely by a matched ingredient signature, never by visibility.
 The system's `visibilityMode` selects the reveal source: `global` reveals brew-discovered recipes, `item` reveals a linked book or scroll held on the crafting actor or a component source, `knowledge` reveals a learned recipe, and `restricted` (surfaced as "Manual" in the alchemy manager) reveals a recipe granted on the Access tab.
-Brew-discovery (`alchemy.learnOnCraft`) reveal is unioned across every mode, and `learnOnCraft` governs only whether a matched brew records that discovery, never whether a recipe is craftable.
+Brew-discovery (`alchemy.learnOnCraft`, on by default) reveal is unioned across every mode, and `learnOnCraft` governs only whether a matched brew records that discovery, never whether a recipe is craftable.
+Because `global` reveals from brew-discovery alone, turning `learnOnCraft` off under that mode reveals nothing to any player; the system-validation report flags the pairing as an `alchemyGlobalNoDiscovery` warning.
+A time-gated brew records its discovery when the gate matures and the run is finished, not when it is started.
 For non-alchemy modes `craftable` still follows the mode's gating rules, and `guardCraftStart` re-runs the same evaluation before a run starts.
 
 ### evaluateKnowledgeAccess(params)

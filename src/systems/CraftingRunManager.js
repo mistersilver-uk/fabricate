@@ -1,4 +1,5 @@
 import { RunContainerManagerBase } from './runContainerStore.js';
+import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -461,8 +462,17 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }
   }
 
+  /**
+   * Startup maintenance: drop active runs and history entries naming a deleted
+   * recipe or crafting system.
+   *
+   * Scoped to the actors THIS client may write (issue 970). It runs on every client
+   * at `initialize()`, and a player owns only their own characters, so an
+   * un-filtered walk made a single stale entry on someone else's character reject
+   * the whole startup sequence.
+   */
   async cleanupInvalidRuns(validRecipeIds = new Set(), validSystemIds = new Set()) {
-    for (const actor of game.actors || []) {
+    for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
       let dirty = false;
 
@@ -503,13 +513,16 @@ export class CraftingRunManager extends RunContainerManagerBase {
    *
    * Unknown recipes are left alone here — {@link cleanupInvalidRuns} owns those.
    *
+   * Scoped to the actors THIS client may write, for the reason given on
+   * {@link cleanupInvalidRuns} (issue 970).
+   *
    * @param {(recipeId: string) => (object|null)} resolveRecipe
    * @returns {Promise<number>} the number of phantom runs pruned
    */
   async pruneInstantaneousActiveRuns(resolveRecipe) {
     if (typeof resolveRecipe !== 'function') return 0;
     let pruned = 0;
-    for (const actor of game.actors || []) {
+    for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
       let dirty = false;
 
