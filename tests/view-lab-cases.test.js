@@ -142,17 +142,37 @@ test('every interaction step names text that exists in the manager UI', () => {
         }
         continue;
       }
-      // A `{selector}` step targets a stable hook. Two other shapes exist:
-      //   - `#manager-crafting-nav-<id>` is BUILT from a nav item's id, so the literal never appears
-      //     in source; the id stem is what a rename would move.
-      //   - a class or attribute selector appears as its class name in the markup.
-      const navId = /^#manager-crafting-nav-(.+)$/.exec(step.selector);
-      const token = navId ? `id: '${navId[1]}'` : /^\.([a-z0-9-]+)/i.exec(step.selector)?.[1];
-      if (!token) {
+      // The two rail groups build their subitem ids from a nav item's id
+      // (`manager-crafting-nav-${id}` / `manager-gathering-nav-${id}`), so the literal selector
+      // never appears in source; the id stem is what a rename would move.
+      const navId = /^#manager-(?:crafting|gathering)-nav-(.+)$/.exec(step.selector);
+      if (navId) {
+        const token = `id: '${navId[1]}'`;
+        if (!haystack.includes(token)) {
+          missing.push(
+            `${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`
+          );
+        }
+        continue;
+      }
+      // Everything else is a compound of stable hooks: literal element ids, class names, and
+      // `data-*` attribute names. EVERY hook in the selector is checked, not just the first —
+      // a compound whose leading class survives a rename of its trailing attribute would
+      // otherwise match a broader element and capture the wrong row. Attribute VALUES are not
+      // hooks: they are fixture ids, which live in `tests/view-lab/world/`, not in `src/`.
+      // Values are stripped BEFORE extraction, not filtered afterwards: a quoted uuid such as
+      // `[data-essence-carrier="Item.sm-coal"]` otherwise reads `.sm-coal` as a class name and
+      // fails against a tree that was never supposed to contain it.
+      const withoutValues = step.selector.replaceAll(/=\s*("[^"]*"|'[^']*')/g, '');
+      const tokens = [
+        ...withoutValues.matchAll(/#([a-z][\w-]*)|\.([a-z][\w-]*)|\[([a-z-]+)/gi),
+      ].map((match) => match[1] ?? match[2] ?? match[3]);
+      if (tokens.length === 0) {
         missing.push(`${viewCase.id}: selector "${step.selector}" has no verifiable token`);
         continue;
       }
-      if (!haystack.includes(token)) {
+      for (const token of tokens) {
+        if (haystack.includes(token)) continue;
         missing.push(
           `${viewCase.id}: selector "${step.selector}" (nothing in src matches "${token}")`
         );

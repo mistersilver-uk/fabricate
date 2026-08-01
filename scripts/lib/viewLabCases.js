@@ -221,9 +221,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — System edit dirty',
     app: MANAGER,
     smokeLabels: ['manager-system-edit-dirty'],
-    reaches: 'window',
+    reaches: 'exact',
     query: {},
-    steps: ['System Overview', { selector: '#system-tab-settings' }],
+    // `data-system-details-dirty` appears on an `input` event, so no amount of clicking or
+    // seeding reaches it — a typed value is the only route to the lit "Unsaved" chip.
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '#manager-system-name', fill: 'Karrun Forgecraft (unsaved edit)' },
+    ],
     expectView: 'system-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -251,9 +257,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Currency actor property',
     app: MANAGER,
     smokeLabels: ['currency-actor-property'],
-    reaches: 'window',
-    query: {},
-    steps: ['System Overview', { selector: '#system-tab-settings' }],
+    reaches: 'exact',
+    // The Currency Units card renders only for a system with `requirements.currency.enabled`, and
+    // the lab authors that on Runework alone — see the fixture note there for why not the default
+    // system. `scroll` is load-bearing and not a convenience: the card sits below the settings
+    // panel's own fold, and `frame.screenshot()` on the outer `.application` does not scroll
+    // nested overflow containers, so without it every assertion passes and the card is simply
+    // absent from the PNG.
+    query: { system: 'lab-runework' },
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '[data-system-currency-units]', scroll: true },
+    ],
     expectView: 'system-edit',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',
@@ -266,9 +282,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Currency macro',
     app: MANAGER,
     smokeLabels: ['currency-macro'],
-    reaches: 'window',
-    query: {},
-    steps: ['System Overview', { selector: '#system-tab-settings' }],
+    reaches: 'exact',
+    query: { system: 'lab-runework' },
+    // The macro branch is a `<select>` value, so `select` is the only verb that reaches it.
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '[data-system-currency-strategy-select]', select: 'macro' },
+      { selector: '[data-system-currency-units]', scroll: true },
+    ],
     expectView: 'system-edit',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',
@@ -281,9 +303,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Currency actor inventory',
     app: MANAGER,
     smokeLabels: ['currency-actor-inventory'],
-    reaches: 'window',
-    query: {},
-    steps: ['System Overview', { selector: '#system-tab-settings' }],
+    reaches: 'exact',
+    query: { system: 'lab-runework' },
+    // dnd5e registers no inventory currency provider, so this strategy resolves to the
+    // no-provider callout steering the GM to macro mode — which is the state the smoke's
+    // counterpart photographs too, for the same reason.
+    steps: [
+      'System Overview',
+      { selector: '#system-tab-settings' },
+      { selector: '[data-system-currency-strategy-select]', select: 'actorInventory' },
+      { selector: '[data-system-currency-units]', scroll: true },
+    ],
     expectView: 'system-edit',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',
@@ -777,9 +807,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk edit',
     app: MANAGER,
     smokeLabels: ['manager-components-bulk-edit'],
-    reaches: 'window',
+    reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    // The STAGED face. `data-component-select` sits on a visually hidden input, so the click
+    // target is its wrapping `<label>`; two rows, because a one-row selection reads as an
+    // accident. Then the three axes the smoke stages: a category, the tag tri-state at BOTH its
+    // non-default faces (one click = add, two = remove), and one essence increment, which is what
+    // arms the destructive-overwrite warning.
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
+      { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
+      { selector: '[data-component-bulk-category]', select: 'Refined' },
+      { selector: '[data-bulk-tag="ore"]' },
+      { selector: '[data-bulk-tag="ingot"]' },
+      { selector: '[data-bulk-tag="ingot"]' },
+      { selector: '[data-component-bulk-essences] [data-stepper-increment]' },
+    ],
     expectView: 'components',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -795,9 +839,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk edit unstaged',
     app: MANAGER,
     smokeLabels: ['manager-components-bulk-edit-unstaged'],
-    reaches: 'window',
+    reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    // The pristine face of the same panel: a selection and nothing staged, which is the only
+    // evidence of the "leave unchanged" chips and the inert Apply.
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
+      { selector: 'label:has(input[data-component-select="sm-copper-ore"])' },
+    ],
     expectView: 'components',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -813,9 +863,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components description before',
     app: MANAGER,
     smokeLabels: ['manager-components-description-before'],
-    reaches: 'window',
+    reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    steps: [
+      'Components',
+      { selector: '.manager-component-toolbar input[type="search"]', fill: 'Ember Quenching Oil' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="sm-desc-raw"] .manager-component-identity',
+      },
+    ],
     expectView: 'components',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -831,9 +888,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components description repaired',
     app: MANAGER,
     smokeLabels: ['manager-components-description-repaired'],
-    reaches: 'window',
+    reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    steps: [
+      'Components',
+      {
+        selector: '.manager-component-toolbar input[type="search"]',
+        fill: 'Rimefrost Quenching Oil',
+      },
+      {
+        selector:
+          '.manager-component-row[data-component-id="sm-desc-repaired"] .manager-component-identity',
+      },
+    ],
     expectView: 'components',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -849,9 +916,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components description ingested',
     app: MANAGER,
     smokeLabels: ['manager-components-description-ingested'],
-    reaches: 'window',
+    reaches: 'exact',
     query: {},
-    steps: ['Components'],
+    steps: [
+      'Components',
+      { selector: '.manager-component-toolbar input[type="search"]', fill: 'Ashfall Reagent Case' },
+      {
+        selector:
+          '.manager-component-row[data-component-id="sm-desc-ingested"] .manager-component-identity',
+      },
+    ],
     expectView: 'components',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -1183,10 +1257,22 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Gathering task editor normal',
     app: MANAGER,
     smokeLabels: ['manager-gathering-task-editor-normal'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Gathering'],
-    expectView: 'environments',
+    // The rail's gathering group is a SUBMENU, so reaching the task library is two clicks:
+    // `Gathering` opens the group on Environments, then the `tasks` subitem switches the
+    // section. The row's own Edit control is what routes to `gathering-task-edit`; the task is
+    // named by `data-gathering-task-id` rather than taken as `.first()` so the frame does not
+    // silently follow a re-ordered library.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+    ],
+    expectView: 'gathering-task-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
@@ -1201,11 +1287,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Gathering task editor stacked',
     app: MANAGER,
     smokeLabels: ['manager-gathering-task-editor-stacked'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Gathering'],
-    expectView: 'environments',
-    position: { width: 1280, height: 820 },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      // At 1000px the task library stacks, so Playwright has to scroll the panel to reach the
+      // row's Edit control — and the editor then mounts into a container that KEPT that scroll
+      // offset, framing "Required Tools" instead of the identity card. Scrolling the first card
+      // back into view is what makes the stacked frame the same screen as the normal one.
+      { selector: '[data-gathering-task-core-editor]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    // 1000x720, the width its smoke counterpart stacks at — the previous 1280x820 was the
+    // NORMAL geometry, so the two cases differed in nothing at all.
+    position: { width: 1000, height: 720 },
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'environments', 'responsive', 'window-only'],
@@ -1234,9 +1334,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Gathering events normal',
     app: MANAGER,
     smokeLabels: ['manager-gathering-events-normal'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Gathering'],
+    // `encounters`, not `events`: the nav item's id is the route key, and the label is the only
+    // place the word "Events" appears.
+    steps: ['Gathering', { selector: '#manager-gathering-nav-encounters' }],
+    // The events library is a SECTION of the environments route, so the route key is unchanged;
+    // the section is what the second step moves.
     expectView: 'environments',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -1252,10 +1356,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Gathering event editor normal',
     app: MANAGER,
     smokeLabels: ['manager-gathering-event-editor-normal'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Gathering'],
-    expectView: 'environments',
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-encounters' },
+      {
+        selector:
+          '[data-gathering-event-id="hb-event-wolves"] .manager-icon-button[aria-label^="Edit"]',
+      },
+    ],
+    expectView: 'gathering-event-edit',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
     publish: true,
@@ -1270,9 +1381,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Gathering travel normal',
     app: MANAGER,
     smokeLabels: ['manager-gathering-travel-normal'],
+    // Still `window`, and the steps below are why it is now honestly so: the case lands on the
+    // real Travel and parties surface (parties/realms/map-region tabs, a party row, the selected-
+    // party inspector) instead of the environments browser it used to capture. What it cannot yet
+    // match is the smoke's POPULATED party: `labWorld.js` seeds `memberActorIds` and no
+    // `travelActorUuid`, while `GatheringPartyStore._normalizeParty` reads `memberActorUuids` and
+    // refuses to enable a party without a travel actor — so the card renders "Disabled, 0
+    // members". That seed is a one-line fix in `tests/view-lab/world/labWorld.js`.
     reaches: 'window',
-    query: { system: 'lab-herbalism' },
-    steps: ['Gathering'],
+    // SMITHING, not herbalism. The Travel subitem exists only while the owning system's
+    // `gatheringRealmSettings.enabled` is true, and switching that on for herbalism would
+    // realm-lock all three of its environments (every one names an included realm) and take the
+    // already-captured environments, blind and stacked frames with it. Smithing already runs the
+    // Travel/Realms subsystem for the realm-locked environment teaser.
+    query: { system: 'lab-smithing' },
+    steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
     expectView: 'environments',
     position: { width: 1280, height: 820 },
     readySelector: '.fabricate-manager',
@@ -1289,11 +1412,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Gathering travel stacked',
     app: MANAGER,
     smokeLabels: ['manager-gathering-travel-stacked'],
+    // `window` for the same reason as its normal-width twin above.
     reaches: 'window',
-    query: { system: 'lab-herbalism' },
-    steps: ['Gathering'],
+    query: { system: 'lab-smithing' },
+    steps: ['Gathering', { selector: '#manager-gathering-nav-travel' }],
     expectView: 'environments',
-    position: { width: 1280, height: 820 },
+    position: { width: 1000, height: 720 },
     readySelector: '.fabricate-manager',
     publish: true,
     kinds: ['manager', 'environments', 'responsive', 'window-only'],
@@ -1362,11 +1486,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool stress long name',
     app: MANAGER,
     smokeLabels: ['manager-tool-stress-long-name'],
-    reaches: 'window',
-    query: {},
+    reaches: 'exact',
+    // The Tool Studio stress states live on the Runework fixture system — see the tool library
+    // note in labContent.js for why not the default system.
+    query: { system: 'lab-runework' },
+    // A long DISPLAY LABEL, authored on the fixture rather than typed: the field is the one
+    // the smoke fills, and an authored value reaches the same overflow without a keystroke.
     steps: [
       'Tools',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-stylus"] .manager-icon-button[aria-label^="Edit"]',
+      },
       { selector: '#tool-tab-overview' },
     ],
     expectView: 'tool-edit',
@@ -1400,12 +1531,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool stress repair',
     app: MANAGER,
     smokeLabels: ['manager-tool-stress-repair'],
-    reaches: 'window',
-    query: {},
+    reaches: 'exact',
+    // The Tool Studio stress states live on the Runework fixture system — see the tool library
+    // note in labContent.js for why not the default system.
+    query: { system: 'lab-runework' },
+    // The flag-broken tool, whose two populated repair-requirement groups are the frame.
     steps: [
       'Tools',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-mallet"] .manager-icon-button[aria-label^="Edit"]',
+      },
       { selector: '#tool-tab-breakage' },
+      // The repair editor sits below the breakage tab's own fold; without this the frame shows
+      // the mode cards and none of the two populated requirement groups the case exists for.
+      { selector: '[data-tool-repair-requirements]', scroll: true },
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 820 },
@@ -1419,12 +1559,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool stress replacement',
     app: MANAGER,
     smokeLabels: ['manager-tool-stress-replacement'],
-    reaches: 'window',
-    query: {},
+    reaches: 'exact',
+    // The Tool Studio stress states live on the Runework fixture system — see the tool library
+    // note in labContent.js for why not the default system.
+    query: { system: 'lab-runework' },
+    // The replace-with tool, with its replacement component already chosen.
     steps: [
       'Tools',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-punch"] .manager-icon-button[aria-label^="Edit"]',
+      },
       { selector: '#tool-tab-breakage' },
+      { selector: '[data-tool-replacement-target]', scroll: true },
     ],
     expectView: 'tool-edit',
     position: { width: 1280, height: 820 },
@@ -1438,11 +1585,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool stress immune',
     app: MANAGER,
     smokeLabels: ['manager-tool-stress-immune'],
-    reaches: 'window',
-    query: {},
+    reaches: 'exact',
+    // The Tool Studio stress states live on the Runework fixture system — see the tool library
+    // note in labContent.js for why not the default system.
+    query: { system: 'lab-runework' },
+    // Immune is a CHECK-DRIVEN state, and the authority is a per-system radio pair on the tools
+    // browser — so the segment is clicked before the tool is opened, exactly as the smoke does
+    // it, rather than pinning the whole fixture system to check-driven breakage.
     steps: [
       'Tools',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-tool-authority-segment="checkDriven"]' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-anvilstone"] .manager-icon-button[aria-label^="Edit"]',
+      },
       { selector: '#tool-tab-breakage' },
     ],
     expectView: 'tool-edit',
@@ -1495,11 +1651,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool stress invalid validation',
     app: MANAGER,
     smokeLabels: ['manager-tool-stress-invalid-validation'],
-    reaches: 'window',
-    query: {},
+    reaches: 'exact',
+    // The Tool Studio stress states live on the Runework fixture system — see the tool library
+    // note in labContent.js for why not the default system.
+    query: { system: 'lab-runework' },
+    // The blocking Validation state. Un-checking the tool's single prerequisite leaves
+    // prerequisites ENABLED with nothing chosen, which persistence can never hold (the
+    // normalizer clamps `enabled` off on an empty id list) and only the editor draft can.
     steps: [
       'Tools',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      {
+        selector:
+          '.manager-tools-row[data-manager-tool-id="rw-tool-caliper"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#tool-tab-requirements' },
+      { selector: '.manager-checklist-card-row:has(input[value="rw-prereq-arcana"])' },
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
@@ -1566,9 +1732,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Knowledge empty tab',
     app: MANAGER,
     smokeLabels: ['manager-knowledge-empty-tab'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
+    // Idrin carries knowledge and no copies at all, which is the only route to the Recipe-items
+    // tab's dashed empty state — an empty ROSTER renders the same words for the opposite reason.
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-knowledge' },
+      { selector: '[data-knowledge-actor="lab-actor-idrin"]' },
+      { selector: '[data-knowledge-tab="recipeItems"]' },
+    ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',
@@ -1581,9 +1754,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Knowledge learned lost copy',
     app: MANAGER,
     smokeLabels: ['manager-knowledge-learned-lost-copy'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
+    // The same character on the other tab: her learned entries name a book she no longer holds,
+    // so each row falls to the DEFINITION-name rung and carries the no-refund clause.
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-knowledge' },
+      { selector: '[data-knowledge-actor="lab-actor-idrin"]' },
+      { selector: '[data-knowledge-tab="learnedRecipes"]' },
+    ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',
@@ -1596,9 +1776,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Knowledge party pool warning',
     app: MANAGER,
     smokeLabels: ['manager-knowledge-party-pool-warning'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
+    // Vosk holds the `total`-scope codex that is STILL the source of a learned entry, which is
+    // the one arrangement that raises the ordering-hazard band.
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-knowledge' },
+      { selector: '[data-knowledge-actor="lab-actor-vosk"]' },
+      { selector: '[data-knowledge-tab="recipeItems"]' },
+    ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',
@@ -1611,9 +1798,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Knowledge delete armed',
     app: MANAGER,
     smokeLabels: ['manager-knowledge-delete-armed'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Crafting', { selector: '#manager-crafting-nav-knowledge' }],
+    // Delete armed to its confirm face. This is Fabricate's own two-step arm, not a Foundry
+    // dialog, so one click reaches it — and the un-armed sibling rows in the same frame are the
+    // evidence, since exactly one arm token exists at a time.
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-knowledge' },
+      { selector: '[data-knowledge-tab="recipeItems"]' },
+      { selector: '[data-arm-token="delete:copy-primer-partial"]' },
+    ],
     expectView: 'knowledge',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',
@@ -1662,9 +1857,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk edit progressive',
     app: MANAGER,
     smokeLabels: ['manager-components-bulk-edit-progressive'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    steps: ['Components'],
+    // The fourth bulk-edit section — Progressive DC — renders only for a system whose component
+    // difficulty axis is progressive, which is why this case sits on herbalism rather than on the
+    // simple-mode default system the other two bulk frames use.
+    steps: [
+      'Components',
+      { selector: 'label:has(input[data-component-select="hb-moonleaf"])' },
+      { selector: 'label:has(input[data-component-select="hb-sunroot"])' },
+    ],
     expectView: 'components',
     position: { width: 1280, height: 900 },
     readySelector: '.fabricate-manager',

@@ -49,19 +49,42 @@ export const LAB_SYSTEM_IDS = Object.freeze({
  * system stores the component, and `fromUuid` has to resolve the origin or every thumbnail and
  * source name renders unresolved.
  */
-function component(id, name, icon, extra = {}) {
+function component(id, name, icon, { categories = [], ...extra } = {}) {
   return {
     id,
     name,
     originItemUuid: `Item.${id}`,
     img: `${ICON_BASE}/${icon}`,
-    categories: [],
+    // SINGULAR, and translated from the authored list here rather than at every call site.
+    // `CraftingSystemManager._normalizeComponent` reads `item.category`; a `categories` ARRAY is
+    // simply dropped, which is what this fixture used to hand it — so every component landed in
+    // the reserved `general` bucket and the browser's "Group by category" toggle grouped a single
+    // undifferentiated pile while claiming otherwise. The authored list stays the input because
+    // it reads as intent; only the first entry can survive, because a component HAS one category.
+    category: categories[0] ?? '',
     tags: [],
     difficulty: 1,
     essences: {},
     aliasItemUuids: [],
     ...extra,
   };
+}
+
+/**
+ * The system-owned component category vocabulary.
+ *
+ * A sibling of the recipe `categories` vocabulary and deliberately not an alias of it (see
+ * `CraftingSystemManager._normalizeSystem`): a component category is never offered as a recipe
+ * category. Derived from what the components themselves carry so the two cannot drift, in first-
+ * appearance order — the manager renders the vocabulary as an ASSIGNMENT target (the bulk-edit
+ * category picker offers every entry with no count), so an entry no component currently holds is
+ * still meaningful.
+ *
+ * @param {object[]} components Component definitions built by {@link component}.
+ * @returns {string[]} The de-duplicated category vocabulary.
+ */
+function componentCategoryVocabulary(components) {
+  return [...new Set(components.map((entry) => entry.category).filter(Boolean))];
 }
 
 const SMITHING_COMPONENTS = [
@@ -224,6 +247,44 @@ const SMITHING_COMPONENTS = [
         },
       ],
     },
+  }),
+  // ── Source-description resolution (issue 800), as three END STATES ─────────────────────────────
+  // The smoke reaches these three frames by RUNNING the two operations — `repairItemData` for the
+  // second and `addItemFromUuid` for the third — against a locked world compendium. Neither is
+  // reachable here: both live on `game.fabricate`, which the lab pins to `null` on purpose so that
+  // every player seam proves it never reaches around the service layer. What IS fixture-able is
+  // each operation's RESULT, so this is three components carrying the three stored descriptions,
+  // rather than one component driven through two writes.
+  //
+  // The strings are the whole point of the frames, so they are authored to the same contract the
+  // smoke asserts: the un-repaired one still carries raw `@UUID[...]` / `[[...]]` directives; the
+  // repaired one carries resolved document NAMES and rendered roll text, has dropped the broken
+  // reference WITH its separator (a stranded ", ." is the reported defect), and carries no
+  // GM-gated span at all — a `data-visibility="gm"` fragment must never survive into a stored,
+  // player-visible description.
+  component('sm-desc-raw', 'Ember Quenching Oil', 'consumables/potions/bottle-conical-corked-yellow.webp', {
+    categories: ['Reagents'],
+    tags: ['reagent'],
+    difficulty: 5,
+    description:
+      'Quench with: @UUID[Compendium.dnd5e.items.Item.6BgAoYuMzpUuGaFB], ' +
+      '@UUID[Compendium.dnd5e.items.Item.SFI4b4wJhg5aSJqL]{Flask of Oil}, ' +
+      '@UUID[Compendium.dnd5e.items.Item.doesnotexist0000]. ' +
+      'Burns for [[/r 1d4]]{1d4 rounds} dealing [[2d6]] fire damage.',
+  }),
+  component('sm-desc-repaired', 'Rimefrost Quenching Oil', 'consumables/potions/bottle-conical-corked-green.webp', {
+    categories: ['Reagents'],
+    tags: ['reagent'],
+    difficulty: 5,
+    description:
+      'Quench with: Acid, Flask of Oil. Burns for 1d4 rounds dealing 2d6 fire damage.',
+  }),
+  component('sm-desc-ingested', 'Ashfall Reagent Case', 'containers/chest/chest-worn-oak-tan.webp', {
+    categories: ['Reagents'],
+    tags: ['reagent'],
+    difficulty: 3,
+    description:
+      'Contains: Acid, Flask of Oil. Each vial keeps for [[/r 2d6]]{2d6 days} once the seal is broken.',
   }),
   // Half of the multi-system stack (issue 766). ONE physical item, registered as a component in
   // TWO systems, must collapse to a single inventory card carrying a system selector. The
@@ -1205,6 +1266,217 @@ const HERBALISM_TOOLS = [
   },
 ];
 
+/**
+ * Herbalism's recipe-item library, and the caps the GM Knowledge surface is photographed against.
+ *
+ * Four definitions rather than one, because the Knowledge frames need four DIFFERENT shapes in one
+ * roster: a capped book (so a copy can read "1 of 3 uses spent", "Spent", or "Inert"), an uncapped
+ * scroll (whose Expend control must be disabled — writing nothing is not a silent no-op), a
+ * `total`-scope party codex, which is the only shape that raises the Recipe-items tab's
+ * ordering-hazard band, and a book with authored MEMBERSHIP.
+ *
+ * `registeredItemUuid` is what makes an owned copy resolve at all: `matchRecipeItemDefinition`
+ * tests an owned item's uuid against the definition's union of source refs, and a definition with
+ * no refs and no `roles` claim matches nothing — which is why the lab's single previous definition
+ * produced an empty Knowledge roster while claiming to cover it.
+ *
+ * **Membership is confined to the ONE book nobody holds, and that is not tidiness — it is the only
+ * arrangement that leaves the player frames alone.** `RecipeVisibilityService.evaluateRecipeAccess`
+ * resolves a knowledge-gated recipe as `visible = granted || hasMatchedItem`, and `hasMatchedItem`
+ * is computed over the crafting actor PLUS every component-source actor. The lab's
+ * `lastComponentSources` is every actor in the world, so a held book with membership reveals its
+ * member recipes in the player's crafting listing — six extra rows, which pushes the recipes the
+ * player cases select onto page 2 and fails them. `hb-book` therefore carries the membership and
+ * is deliberately unheld; it is the book Idrin's learned entries name, which is exactly the
+ * `lostCopy` rung (the definition NAME is what survives when the copy is gone). The three HELD
+ * definitions carry none, so each owned copy reads as the Type column's third face, `Incomplete` —
+ * a book registered but not yet wired to its recipes, which is a real GM state and precisely what
+ * this surface exists to audit.
+ */
+const HERBALISM_RECIPE_ITEMS = [
+  {
+    id: 'hb-book',
+    name: 'Greenwarden Field Notes',
+    registeredItemUuid: 'Item.hb-book',
+    originItemUuid: 'Item.hb-book',
+    img: `${ICON_BASE}/sundries/books/book-embossed-bound-brown.webp`,
+    // The world's only authored membership. See the note above for why no HELD book has one.
+    recipeIds: ['hb-r-healing', 'hb-r-salve', 'hb-r-grind'],
+    caps: {
+      item: { limitUses: true, maxUses: 3, whenSpent: 'inert' },
+      learn: { limitLearning: true, learnsAllowed: 2, learnScope: 'perInstance' },
+    },
+  },
+  {
+    id: 'hb-primer',
+    name: "Warden's Primer",
+    registeredItemUuid: 'Item.hb-primer',
+    originItemUuid: 'Item.hb-primer',
+    img: `${ICON_BASE}/sundries/books/book-embossed-steel-green.webp`,
+    recipeIds: [],
+    caps: {
+      // `inert` rather than `destroyed`: a spent copy that deletes itself cannot be photographed.
+      item: { limitUses: true, maxUses: 3, whenSpent: 'inert' },
+      learn: { limitLearning: true, learnsAllowed: 2, learnScope: 'perInstance' },
+    },
+  },
+  {
+    id: 'hb-scroll',
+    name: 'Frostcap Scroll',
+    registeredItemUuid: 'Item.hb-scroll',
+    originItemUuid: 'Item.hb-scroll',
+    img: `${ICON_BASE}/sundries/scrolls/scroll-bound-leather-tan.webp`,
+    recipeIds: [],
+    caps: { item: { limitUses: false }, learn: { limitLearning: false } },
+  },
+  {
+    id: 'hb-codex',
+    name: 'Warden Party Codex',
+    registeredItemUuid: 'Item.hb-codex',
+    originItemUuid: 'Item.hb-codex',
+    img: `${ICON_BASE}/sundries/books/book-embossed-gold-red.webp`,
+    recipeIds: [],
+    caps: {
+      item: { limitUses: true, maxUses: 2, whenSpent: 'inert' },
+      // `total` is the party POOL: the budget is shared across every copy in the world, so
+      // deleting a copy before erasing the memory it sourced strands a slot permanently. That is
+      // the hazard the Recipe-items tab raises its warning band for.
+      learn: { limitLearning: true, learnsAllowed: 2, learnScope: 'total' },
+    },
+  },
+];
+
+/**
+ * The Tool Studio STRESS library, and why it lives on Runework.
+ *
+ * Five tools, one per state the smoke drives the Tool Studio into by hand: a long display label,
+ * a flag-broken tool with populated repair requirements, a replace-with tool with its replacement
+ * chosen, a check-immune tool, and a tool whose only prerequisite can be un-picked to reach the
+ * blocking Validation state. Each is selected by `data-manager-tool-id`, so the frames do not
+ * depend on library order.
+ *
+ * They are NOT added to Smithing, whose three tools the six `manager-tool-parity-*` frames already
+ * photograph: five more rows would move the tools library frames, and the rail's "Tools" count
+ * rides in every one of the ~60 default-system manager frames. Runework has no tools at all and is
+ * rendered by two `beyond` coverage frames that never open the Tool Studio.
+ */
+const RUNEWORK_PREREQUISITES = [
+  {
+    id: 'rw-prereq-arcana',
+    name: 'Trained in Arcana',
+    icon: 'fas fa-hat-wizard',
+    path: 'system.skills.arc.value',
+    op: 'gte',
+    value: 1,
+  },
+  {
+    id: 'rw-prereq-int',
+    name: 'Intelligence 13 or higher',
+    icon: 'fas fa-brain',
+    path: 'system.abilities.int.value',
+    op: 'gte',
+    value: 13,
+  },
+  {
+    id: 'rw-prereq-attuned',
+    name: 'Attuned to the Weave',
+    icon: 'fas fa-wand-sparkles',
+    path: 'system.attributes.attuned',
+    op: 'isTrue',
+  },
+];
+
+const RUNEWORK_TOOLS = [
+  {
+    id: 'rw-tool-stylus',
+    name: 'Rune Stylus',
+    // `label` is the user-authored DISPLAY override, and it is what the smoke types a long value
+    // into. Authoring it here reaches the same overflow state without a keystroke.
+    label: 'Masterwork Ashfall Rune Stylus of the Fifth Circle, Conclave Issue',
+    componentId: null,
+    registeredItemUuid: 'Item.rw-tool-stylus',
+    originItemUuid: 'Item.rw-tool-stylus',
+    img: `${ICON_BASE}/tools/scribal/pen-stylus-pencil.webp`,
+    aliasItemUuids: [],
+    breakage: { mode: 'breakageChance', breakageChance: 12 },
+    onBreak: { mode: 'destroy' },
+    bonus: { enabled: true, expression: '+2' },
+  },
+  {
+    id: 'rw-tool-mallet',
+    name: 'Chasing Mallet',
+    componentId: null,
+    registeredItemUuid: 'Item.rw-tool-mallet',
+    originItemUuid: 'Item.rw-tool-mallet',
+    img: `${ICON_BASE}/tools/smithing/hammer-sledge-steel-grey.webp`,
+    aliasItemUuids: [],
+    breakage: { mode: 'limitedUses', maxUses: 6 },
+    // `flagBroken` is the ONLY on-break action that leaves a copy to repair, so it is what makes
+    // the repair-requirements editor render its populated state rather than its empty one.
+    onBreak: { mode: 'flagBroken' },
+    repairRequirements: [
+      {
+        id: 'rw-repair-stock',
+        name: 'Replacement head',
+        options: [
+          { componentId: 'rw-bar', quantity: 1 },
+          { componentId: 'rw-slag', quantity: 2 },
+        ],
+      },
+      {
+        id: 'rw-repair-binding',
+        name: 'Binding',
+        options: [{ componentId: 'rw-chalk', quantity: 3 }],
+      },
+    ],
+  },
+  {
+    id: 'rw-tool-punch',
+    name: 'Rune Punch',
+    componentId: null,
+    registeredItemUuid: 'Item.rw-tool-punch',
+    originItemUuid: 'Item.rw-tool-punch',
+    img: `${ICON_BASE}/tools/smithing/tongs-steel-grey.webp`,
+    aliasItemUuids: [],
+    breakage: { mode: 'diceExpression', formula: '1d20', threshold: 3 },
+    // A CHOSEN replacement target: an unchosen one renders the picker in its empty state and
+    // fails the editor's own `onBreak` validity check, which is a different frame entirely.
+    onBreak: { mode: 'replaceWith', replacementTarget: { type: 'component', componentId: 'rw-slag' } },
+  },
+  {
+    id: 'rw-tool-anvilstone',
+    name: 'Ashfall Anvilstone',
+    componentId: null,
+    registeredItemUuid: 'Item.rw-tool-anvilstone',
+    originItemUuid: 'Item.rw-tool-anvilstone',
+    img: `${ICON_BASE}/tools/smithing/anvil.webp`,
+    aliasItemUuids: [],
+    breakage: { mode: 'limitedUses', maxUses: null },
+    onBreak: { mode: 'destroy' },
+    // Read only while the SYSTEM's breakage authority is `checkDriven`, which is a per-system
+    // setting the tools browser exposes as a radio pair — so the immune frame's case clicks that
+    // segment before opening this tool rather than the fixture pinning the whole system to it.
+    checkBreakable: false,
+  },
+  {
+    id: 'rw-tool-caliper',
+    name: 'Conclave Caliper',
+    componentId: null,
+    registeredItemUuid: 'Item.rw-tool-caliper',
+    originItemUuid: 'Item.rw-tool-caliper',
+    img: `${ICON_BASE}/tools/scribal/spectacles-glasses.webp`,
+    aliasItemUuids: [],
+    breakage: { mode: 'limitedUses', maxUses: 3 },
+    onBreak: { mode: 'destroy' },
+    // ONE selected prerequisite, which is what makes the blocking Validation state reachable by a
+    // click: `_normalizeToolPrerequisites` clamps `enabled` off whenever `ids` is empty, so a
+    // persisted "enabled with nothing chosen" config self-heals and can never be photographed.
+    // Un-checking the single row in the editor DRAFT is the only route to it — the same route the
+    // smoke takes.
+    prerequisites: { enabled: true, ids: ['rw-prereq-arcana'], gateMode: 'usability' },
+  },
+];
+
 const GATHERING_TASKS = [
   {
     id: 'hb-task-forage',
@@ -1727,6 +1999,51 @@ const PROGRESSIVE_SALVAGE_CHECK = Object.freeze({
   },
 });
 
+/**
+ * The currency-unit ladder the Currency Units card is photographed against.
+ *
+ * Authored rather than seeded. `_normalizeCurrencyConfig` only falls back to a preset bundle for a
+ * LEGACY `provider: 'system'` config, so a system that merely switches the feature on comes back
+ * with an empty `units` array and an empty card — and the smoke reaches its own populated card by
+ * clicking "Seed presets", which writes. Values mirror `DND5E_CURRENCY_PRESETS` because the lab's
+ * `game.system.id` is `dnd5e`: the coins break down into their PARENT denomination rather than
+ * flattening to copper, which is what draws the card's nested sub-unit rows.
+ *
+ * Electrum is included for the same reason the real preset has it — it is the ladder's only
+ * side-branch, and a straight chain hides how a branch renders.
+ */
+const CURRENCY_UNITS = Object.freeze([
+  { id: 'cp', label: 'Copper', abbreviation: 'cp', actorPath: 'system.currency.cp', contains: [] },
+  {
+    id: 'sp',
+    label: 'Silver',
+    abbreviation: 'sp',
+    actorPath: 'system.currency.sp',
+    contains: [{ unitId: 'cp', amount: 10 }],
+  },
+  {
+    id: 'ep',
+    label: 'Electrum',
+    abbreviation: 'ep',
+    actorPath: 'system.currency.ep',
+    contains: [{ unitId: 'sp', amount: 5 }],
+  },
+  {
+    id: 'gp',
+    label: 'Gold',
+    abbreviation: 'gp',
+    actorPath: 'system.currency.gp',
+    contains: [{ unitId: 'sp', amount: 10 }],
+  },
+  {
+    id: 'pp',
+    label: 'Platinum',
+    abbreviation: 'pp',
+    actorPath: 'system.currency.pp',
+    contains: [{ unitId: 'gp', amount: 10 }],
+  },
+]);
+
 const PROGRESSIVE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
@@ -1775,6 +2092,7 @@ export function buildLabContent() {
         'runic',
       ],
       components: SMITHING_COMPONENTS,
+      componentCategories: componentCategoryVocabulary(SMITHING_COMPONENTS),
       recipeItemDefinitions: [{ id: 'sm-book', name: 'Forgecraft Folio' }],
       tools: SMITHING_TOOLS,
       gatheringRealms: SMITHING_REALMS,
@@ -1817,7 +2135,8 @@ export function buildLabContent() {
       categories: ['Potions', 'Salves', 'Oils', 'Preparation'],
       itemTags: ['reagent', 'fungus', 'solvent', 'vessel', 'prepared', 'potion', 'oil', 'salve'],
       components: HERBALISM_COMPONENTS,
-      recipeItemDefinitions: [{ id: 'hb-book', name: 'Greenwarden Field Notes' }],
+      componentCategories: componentCategoryVocabulary(HERBALISM_COMPONENTS),
+      recipeItemDefinitions: HERBALISM_RECIPE_ITEMS,
       tools: HERBALISM_TOOLS,
       gatheringRealms: REALMS,
       gatheringRealmSettings: { revealMode: 'onDiscovery', modifierVisibility: 'visible' },
@@ -1843,6 +2162,7 @@ export function buildLabContent() {
       categories: ['Bombs', 'Utility', 'Elixirs'],
       itemTags: ['metal', 'mineral', 'exotic', 'vessel', 'bomb', 'utility', 'elixir'],
       components: ALCHEMY_COMPONENTS,
+      componentCategories: componentCategoryVocabulary(ALCHEMY_COMPONENTS),
       recipeItemDefinitions: [],
       tools: [],
       gatheringRealms: [],
@@ -1873,6 +2193,7 @@ export function buildLabContent() {
       categories: ['Casting', 'Chasing'],
       itemTags: ['ingot', 'wire', 'jewellery'],
       components: JEWELRY_COMPONENTS,
+      componentCategories: componentCategoryVocabulary(JEWELRY_COMPONENTS),
       recipeItemDefinitions: [],
       tools: [],
       gatheringRealms: [],
@@ -1898,10 +2219,19 @@ export function buildLabContent() {
       categories: ['Inscription'],
       itemTags: ['ingot', 'reagent', 'weapon', 'scrap'],
       components: RUNEWORK_COMPONENTS,
+      componentCategories: componentCategoryVocabulary(RUNEWORK_COMPONENTS),
       recipeItemDefinitions: [],
-      tools: [],
+      tools: RUNEWORK_TOOLS,
+      characterPrerequisites: RUNEWORK_PREREQUISITES,
       gatheringRealms: [],
       gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+      // The world's CURRENCY system, and runework carries it because nothing else does.
+      // `requirements.currency.enabled` is not confined to the Currency Units card: it also
+      // un-disables the recipe editor's "Add cost" control and the Tool Studio's repair-cost
+      // rows, so switching it on for the default system would move the already-captured recipe
+      // and tool frames. Runework has no tools, and the two cases that render it are a recipe
+      // editor's Results tab and the Checks view, neither of which reads the flag.
+      requirements: { currency: { enabled: true, spendStrategy: 'actorProperty', units: CURRENCY_UNITS } },
     },
   ];
 
@@ -1972,6 +2302,11 @@ export function buildLabContent() {
       ...JEWELRY_COMPONENTS,
       ...RUNEWORK_COMPONENTS,
     ],
-    tools: [...SMITHING_TOOLS, ...HERBALISM_TOOLS],
+    tools: [...SMITHING_TOOLS, ...HERBALISM_TOOLS, ...RUNEWORK_TOOLS],
+    // Exposed so the uuid index can resolve an owned recipe-item copy back to the book it is a
+    // copy OF. Without an index entry the copy still matches its definition (matching is by uuid,
+    // not by document) but every surface that resolves the source through `fromUuid` renders it
+    // unresolved — the same "looks unpopulated" failure the component index exists to prevent.
+    recipeItems: [...HERBALISM_RECIPE_ITEMS],
   };
 }

@@ -13,7 +13,7 @@
  *   - unsatisfiable (nothing held).
  */
 
-import { makeGetFlag, makeSetFlag } from './labFlags.js';
+import { makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
 
 const PORTRAIT_BASE = '/@foundry-chrome/icons';
 
@@ -49,6 +49,36 @@ function ownedItem(componentId, component, quantity, index) {
   // default and renders a pristine, unworn, unbroken frame no matter what the fixture seeded.
   item.getFlag = makeGetFlag(item);
   item.setFlag = makeSetFlag(item);
+  return item;
+}
+
+/**
+ * One owned copy of a recipe item — a book or scroll in a character's pack.
+ *
+ * Its `uuid` is the DEFINITION's source ref, because that is the tier
+ * `matchRecipeItemDefinition` resolves on; its `id` is what every Knowledge row, arm token and
+ * mutation is keyed by, so sibling copies of one book differ only there.
+ *
+ * @param {{id: string, uuid: string, name: string, icon: string, usage?: object}} copy Fixture spec.
+ * @returns {object} A duck-typed owned item.
+ */
+function recipeItemCopy({ id, uuid, name, icon, usage = null }) {
+  const item = {
+    uuid,
+    id,
+    name,
+    img: `${PORTRAIT_BASE}/${icon}`,
+    type: 'loot',
+    system: { quantity: 1, description: { value: '' } },
+    flags: {},
+    isOwner: true,
+  };
+  item.getFlag = makeGetFlag(item);
+  item.setFlag = makeSetFlag(item);
+  // Same doubly-nested depth as every other Fabricate item flag, and the reason a copy can read
+  // "2 of 3 remaining", "Spent" or "Inert" at all: with the flag absent the projection sees zero
+  // uses on every copy and the whole chip vocabulary collapses to one face.
+  if (usage) seedFabricateFlag(item, ['fabricate', 'recipeItemUsage'], { ...usage });
   return item;
 }
 
@@ -135,6 +165,102 @@ const INVENTORIES = {
   },
 };
 
+/**
+ * Owned RECIPE-ITEM copies — the books and scrolls the GM Knowledge surface audits.
+ *
+ * Not part of {@link INVENTORIES}, because these are not components: a recipe item is matched to
+ * its definition by source uuid (`matchRecipeItemDefinition`), never by the component map, and it
+ * carries a `recipeItemUsage` flag no component has. Several copies deliberately share ONE uuid —
+ * three copies of the same book is the normal case, and the projection keys each row on the
+ * document ID, so a shared uuid is what makes "this copy is spent and that one is not" possible.
+ *
+ * The distribution is chosen, not incidental:
+ * - Brenna carries the FOUR uses-chip states in one list — a partly-used capped book, an uncapped
+ *   scroll (whose Expend control must be disabled), an inert copy, and a spent one. She is the
+ *   roster's first character, so this is what the Knowledge surface opens on.
+ * - Idrin carries knowledge and NO copies at all, which is the only way to reach the Recipe-items
+ *   tab's empty state, and her learned entries name a source she no longer holds — the `lostCopy`
+ *   rung of the learned-source ladder.
+ * - Vosk holds the `total`-scope party codex that is STILL the source of a learned entry, which is
+ *   the one arrangement that raises the ordering-hazard band.
+ *
+ * Deliberately none on the crafting actor's LEARNED side: `lastCraftingActor` is Brenna, and the
+ * player's recipe visibility for the knowledge-gated herbalism system is evaluated against her
+ * learned set — so teaching her anything would reveal those recipes in the player's crafting
+ * listing and re-point every already-captured player crafting and journal frame.
+ *
+ * A COPY reveals for the same reason, which is why every copy here is a copy of a book carrying no
+ * authored membership: `hasMatchedItem` is computed over the crafting actor plus every
+ * component-source actor, and the lab's component-source set is the whole roster, so there is no
+ * character a member-carrying book can be parked on. See `HERBALISM_RECIPE_ITEMS` in
+ * `labContent.js`, which owns that decision.
+ */
+const RECIPE_ITEM_COPIES = {
+  'lab-actor-brenna': [
+    {
+      id: 'copy-primer-partial',
+      uuid: 'Item.hb-primer',
+      name: "Warden's Primer",
+      icon: 'sundries/books/book-embossed-steel-green.webp',
+      usage: { timesUsed: 1 },
+    },
+    {
+      id: 'copy-scroll',
+      uuid: 'Item.hb-scroll',
+      name: 'Frostcap Scroll',
+      icon: 'sundries/scrolls/scroll-bound-leather-tan.webp',
+    },
+    {
+      id: 'copy-primer-inert',
+      uuid: 'Item.hb-primer',
+      name: "Warden's Primer",
+      icon: 'sundries/books/book-embossed-steel-green.webp',
+      // `inert` is an INDEPENDENT projected fact, never folded into `spent`: a copy can be inert
+      // with charges left, and the row renders both a remaining-uses chip and an Inert chip.
+      usage: { timesUsed: 0, inert: true },
+    },
+    {
+      id: 'copy-primer-spent',
+      uuid: 'Item.hb-primer',
+      name: "Warden's Primer",
+      icon: 'sundries/books/book-embossed-steel-green.webp',
+      usage: { timesUsed: 3 },
+    },
+  ],
+  'lab-actor-vosk': [
+    {
+      id: 'copy-codex',
+      uuid: 'Item.hb-codex',
+      name: 'Warden Party Codex',
+      icon: 'sundries/books/book-embossed-gold-red.webp',
+      usage: { timesUsed: 1 },
+    },
+  ],
+};
+
+/**
+ * Learned recipes per actor, keyed exactly as `flags.fabricate.fabricate.learnedRecipes` is.
+ *
+ * `sourceItemUuid` is what decides which rung of the source ladder a row renders on: a uuid the
+ * actor still owns reads as the owned copy, a uuid it does not reads as the book's DEFINITION name
+ * (`lostCopy`), and no uuid at all reads as an auto-learn.
+ */
+const LEARNED_RECIPES = {
+  'lab-actor-idrin': {
+    // Both name a book Idrin no longer carries, which is the `lostCopy` rung — and, because the
+    // source is not owned, erasing either frees no learn budget, which is the no-refund clause the
+    // row states positively rather than leaving the GM to infer.
+    'hb-r-healing': { sourceItemUuid: 'Item.hb-book', learnedAt: 1_036_800 },
+    'hb-r-salve': { sourceItemUuid: 'Item.hb-book', learnedAt: 1_123_200 },
+    // An auto-learn: no source at all, so the ladder falls to its bottom rung.
+    'hb-r-grind': { sourceItemUuid: null, learnedAt: 1_209_500 },
+  },
+  'lab-actor-vosk': {
+    // STILL sourced by an owned `total`-scope copy — the ordering hazard.
+    'hb-r-oil': { sourceItemUuid: 'Item.hb-codex', learnedAt: 1_180_000 },
+  },
+};
+
 const ACTOR_DEFINITIONS = [
   {
     id: 'lab-actor-brenna',
@@ -168,6 +294,9 @@ export function buildLabActors(content) {
     const items = Object.entries(stacks).map(([componentId, quantity], index) =>
       ownedItem(componentId, componentsById.get(componentId), quantity, index)
     );
+    for (const copy of RECIPE_ITEM_COPIES[definition.id] ?? []) {
+      items.push(recipeItemCopy(copy));
+    }
     const actor = {
       ...definition,
       uuid: `Actor.${definition.id}`,
@@ -223,6 +352,12 @@ export function buildLabActors(content) {
     };
     actor.getFlag = makeGetFlag(actor);
     actor.setFlag = makeSetFlag(actor);
+    const learned = LEARNED_RECIPES[definition.id];
+    // `flags.fabricate.fabricate.learnedRecipes`, which is where production's dotted-top-level-key
+    // `update` lands it after V13 expands the path — the same doubly-nested depth every Fabricate
+    // read normalises to. Seeded through the shared helper so the lab can never hold one key at
+    // two depths and answer a depth bug from whichever copy the reader happens to find.
+    if (learned) seedFabricateFlag(actor, ['fabricate', 'learnedRecipes'], structuredClone(learned));
     return actor;
   });
 }
@@ -242,7 +377,7 @@ export function buildLabActors(content) {
 export function buildDocumentIndex(content, actors) {
   const documents = new Map();
 
-  for (const component of [...content.components, ...content.tools]) {
+  for (const component of [...content.components, ...content.tools, ...content.recipeItems]) {
     const uuid = component.originItemUuid ?? `Item.${component.id}`;
     const document = {
       uuid,
