@@ -57,9 +57,9 @@
     craftingDefaultModifierIds = [],
     // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
     // already honours. Restored as live-persisting toggles below the alchemy check-mode
-    // selector. Defaults mirror the manager normalizer (learnOnCraft OFF; consumeOnFail and
-    // showAttemptHistoryToPlayers ON).
-    alchemyLearnOnCraft = false,
+    // selector. Defaults mirror the manager normalizer (all three ON; learnOnCraft
+    // joined them in issue 966).
+    alchemyLearnOnCraft = true,
     alchemyConsumeOnFail = true,
     alchemyShowAttemptHistory = true,
     salvageResolutionMode = 'simple',

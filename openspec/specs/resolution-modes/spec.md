@@ -317,6 +317,9 @@ This reserved failure-group mechanism is **shared** with plain `simple` resoluti
 Tiered has NO `role: 'failure'` group.
 - Multi-step recipes are not supported.
 - `consumeOnFail` defaults to true; a matched Simple fail consumes via `alchemy.consumeOnFail`, consistent with a no-match fizzle (NOT the crafting-check consumption policy).
+- An alchemy recipe MAY carry a time requirement, in which case the brew is TWO-PHASE: START consumes the submission and arms the world-time gate; FINISH runs the check and produces.
+A matured FINISH resolves through the SAME alchemy tail as an immediate brew — brew-discovery (`learnRecipeOnCraft`) and the reserved `role: 'failure'` group on a matched Simple failure — and both are keyed on the RECIPE'S OWN SYSTEM, never on a per-call submission flag (issue 966).
+The brew resumes through `advanceCraftingRun`, which knows only the run, so an `isAlchemyAttempt`-style option cannot reach it; gating on one silently dropped every matured brew's discovery and degraded its Simple failure to a generic fizzle.
 
 ### Signature Resolution
 
@@ -380,7 +383,9 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
 - **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
 It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
-- **Brew-result banner status enum.** A resolved brew reports one of four banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
+- **Brew-result banner status enum.** A brew reports one of five banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `brewing` (a TIME-GATED brew that STARTED — the signature matched, the inputs are consumed, and the run is live in the Journal awaiting world time; styled informationally, never as a failure, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
+A started time-gated brew is identified by the engine's `disposition: 'timed-start'`, NOT by `success` — which is `false` for it, because nothing has been produced yet (issue 966).
+Without that disposition the workbench read a successfully started brew as a no-signature fizzle and told the player it had failed while their ingredients were being consumed.
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).
 The same caveat applies to select-to-load auto-fill.
 - **Hidden dead-end rule.** Non-revealed recipes and never-tried dead-ends BOTH present as `untried`.

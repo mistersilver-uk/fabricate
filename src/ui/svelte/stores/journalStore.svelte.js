@@ -130,7 +130,13 @@ export function createJournalStore({ services } = {}) {
    *
    * Threads the loaded listing's `selectedActorId` (the world-actor `.id` the
    * runs are keyed to) so the Foundry edge can resolve the crafting actor via
-   * `game.actors.get` — without it the advance always returns NeedsOwner.
+   * `game.actors.get` — without it the advance always returns NeedsOwner. The
+   * recipe is resolved from the persisted run at the Foundry edge, so nothing is
+   * sent from here: a redacted run carries no `recipeId` to send (issue 966).
+   *
+   * A throw MUST be caught and surfaced (issue 966). Without it the rejection is
+   * unhandled inside the click handler: no notification, no refresh, no state
+   * change — a button that visibly does nothing. Mirrors craftingStore.craft.
    *
    * @param {object} run The crafting RunModel to advance.
    * @returns {Promise<void>}
@@ -142,7 +148,6 @@ export function createJournalStore({ services } = {}) {
       const result = await services?.advanceCraftingRun?.({
         actorId: listing?.selectedActorId ?? null,
         runId: run.id,
-        recipeId: run.recipeId,
         // A player-clicked "Trigger Next Step" is an interactive continuation:
         // prompt the roll dialog + post to chat (Dice So Nice).
         interactive: true,
@@ -156,6 +161,11 @@ export function createJournalStore({ services } = {}) {
       const message = result?.message;
       if (message) services?.notify?.(message);
       await load(true);
+    } catch (err) {
+      // The player gets the friendly toast; the real cause goes to the console,
+      // because the whole point of this catch is that the failure was invisible.
+      console.error('Fabricate | Error advancing a crafting run:', err);
+      services?.notify?.(services?.craftErrorMessage?.() ?? '');
     } finally {
       busyRunId = '';
     }
@@ -168,7 +178,7 @@ export function createJournalStore({ services } = {}) {
    * cancelled run was selected, then quietly re-fetches so the run leaves the active
    * list. Threads the loaded listing's `selectedActorId` so the Foundry edge resolves
    * the crafting actor (and its ownership guard) — without it the cancel returns
-   * NeedsOwner.
+   * NeedsOwner. Catches a throw for the same reason {@link advance} does.
    *
    * @param {object} run The crafting RunModel to cancel.
    * @returns {Promise<void>}
@@ -185,6 +195,9 @@ export function createJournalStore({ services } = {}) {
       if (message) services?.notify?.(message);
       if (selectedRunId === run.id) selectedRunId = '';
       await load(true);
+    } catch (err) {
+      console.error('Fabricate | Error cancelling a crafting run:', err);
+      services?.notify?.(services?.craftErrorMessage?.() ?? '');
     } finally {
       busyRunId = '';
     }

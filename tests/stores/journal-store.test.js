@@ -68,13 +68,16 @@ function makeServices(overrides = {}) {
     },
     advanceCraftingRun: async (args) => {
       calls.advance.push(args);
+      if (overrides.advanceThrows) throw new Error('boom');
       return overrides.advanceResult ?? { success: true, message: 'Done' };
     },
     cancelCraftingRun: async (args) => {
       calls.cancel.push(args);
+      if (overrides.cancelThrows) throw new Error('boom');
       return overrides.cancelResult ?? { success: true, cancelled: true, message: 'Craft cancelled.' };
     },
-    notify: (message) => calls.notify.push(message)
+    notify: (message) => calls.notify.push(message),
+    craftErrorMessage: () => 'Crafting failed.'
   };
   return { services, calls, state };
 }
@@ -167,7 +170,7 @@ describe('journalStore', () => {
     flushSync();
 
     assert.deepEqual(setup.calls.advance, [
-      { actorId: 'actor-1', runId: 'b', recipeId: 'r-b', interactive: true }
+      { actorId: 'actor-1', runId: 'b', interactive: true }
     ]);
     assert.deepEqual(setup.calls.notify, ['You must own the source character.']);
     assert.equal(setup.calls.list, 2, 'refetched after advance');
@@ -185,7 +188,7 @@ describe('journalStore', () => {
 
     // The continuation opts into the interactive roll dialog.
     assert.deepEqual(setup.calls.advance, [
-      { actorId: 'actor-1', runId: 'b', recipeId: 'r-b', interactive: true }
+      { actorId: 'actor-1', runId: 'b', interactive: true }
     ]);
     // A cancel is a user choice, not a failure: no error notification, no refetch.
     assert.deepEqual(setup.calls.notify, [], 'no notification on cancel');
@@ -208,6 +211,31 @@ describe('journalStore', () => {
     assert.equal(store.selectedRunId, '', 'the cancelled run is deselected');
     assert.equal(setup.calls.list, 2, 'refetched after cancel');
     assert.equal(store.busyRunId, '', 'busy flag cleared');
+  });
+
+  // Issue 966: without a catch, a throw from the Foundry edge became an unhandled
+  // rejection inside the click handler — no toast, no refresh, no state change, so
+  // the button visibly did nothing and the real cause was invisible.
+  it('advance surfaces a thrown error and clears busy instead of rejecting', async () => {
+    const setup = makeServices({ advanceThrows: true });
+    const store = await loadedStore(setup);
+
+    await assert.doesNotReject(() => store.advance({ id: 'b' }));
+    flushSync();
+
+    assert.deepEqual(setup.calls.notify, ['Crafting failed.']);
+    assert.equal(store.busyRunId, '', 'busy flag cleared so the run is not wedged');
+  });
+
+  it('cancel surfaces a thrown error and clears busy instead of rejecting', async () => {
+    const setup = makeServices({ cancelThrows: true });
+    const store = await loadedStore(setup);
+
+    await assert.doesNotReject(() => store.cancel({ id: 'b' }));
+    flushSync();
+
+    assert.deepEqual(setup.calls.notify, ['Crafting failed.']);
+    assert.equal(store.busyRunId, '', 'busy flag cleared so the run is not wedged');
   });
 
   it('breaks soonest-ready ties by ascending availableAt', async () => {

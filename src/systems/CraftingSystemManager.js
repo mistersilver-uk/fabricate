@@ -1900,7 +1900,12 @@ export class CraftingSystemManager {
     const checkMode = ['none', 'simple', 'tiered'].includes(c.checkMode) ? c.checkMode : 'none';
     return {
       checkMode,
-      learnOnCraft: c.learnOnCraft === true,
+      // Defaults ON (issue 966). Alchemy's `global` visibility mode reveals a recipe
+      // ONLY from `learnedRecipes`, which only this flag ever writes, so an absent
+      // flag left the most permissive-sounding visibility mode revealing nothing to
+      // any player, ever — the opposite of what its authoring copy promises. An
+      // explicitly stored `false` is still honoured.
+      learnOnCraft: c.learnOnCraft !== false,
       consumeOnFail: c.consumeOnFail !== false,
       showAttemptHistoryToPlayers: c.showAttemptHistoryToPlayers !== false,
     };
