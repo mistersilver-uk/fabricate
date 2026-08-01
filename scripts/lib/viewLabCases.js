@@ -1820,9 +1820,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Salvage',
     app: PLAYER,
     smokeLabels: ['player-salvage'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'inventory' },
-    steps: [],
+    // The PROGRESSIVE salvage body with its reorderable stage list — the counterpart's own
+    // condition (`[data-inventory-salvage-panel="progressive"]` +
+    // `[data-progressive-stage-reorderable]`). Filtered rather than paged to: the grid holds ~24
+    // cards per page and a fixture that adds one would silently move this card off page one.
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Cracked Alembic' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-herbalism:hb-cracked-alembic"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1837,9 +1848,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Salvage no check',
     app: PLAYER,
     smokeLabels: ['player-salvage-no-check'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'inventory' },
-    steps: [],
+    // `[data-inventory-salvage-body="no-check"]`: Simple salvage mode with no authored roll
+    // formula, so every result is recovered outright. Smithing authors no `salvageCraftingCheck`
+    // at all, which is exactly that pair — `(mode: 'simple', checkUsable: false)`.
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Longsword' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-longsword"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1854,9 +1875,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Salvage tools',
     app: PLAYER,
     smokeLabels: ['player-salvage-tools'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'inventory' },
-    steps: [],
+    // The pre-roll required-tool disclosure with BOTH states in one frame: the Forge Tongs the
+    // target actor holds (available) and the Anvil it does not (unavailable), which also disables
+    // the pre-roll action. Availability is scoped to the target salvage actor, so this card is
+    // stocked on the mule rather than on the smith who owns the whole toolset.
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Field Toolchest' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-toolchest"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1873,7 +1905,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-inventory-multi-system'],
     reaches: 'exact',
     query: { tab: 'inventory' },
-    steps: [],
+    // One physical stack registered as a component in TWO systems must collapse to a SINGLE card
+    // counted once, carrying the system-selector drop-down that re-scopes the whole detail body.
+    // Both halves of the Air Shard declare the same `originItemUuid`, which is the collapse key,
+    // and both are salvageable so each option carries its affordance suffix.
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Air Shard' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-smithing:sm-air-shard"] .inventory-card-button',
+      },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1888,9 +1930,26 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Salvage misconfigured',
     app: PLAYER,
     smokeLabels: ['player-salvage-misconfigured'],
+    // WINDOW, not exact, and the gap is specific: this frame renders the misconfigured salvage
+    // body for the `routedNoFormula` reason, where the smoke's counterpart renders it for
+    // `simpleMultiGroup`. The body dispatches on that reason and its copy differs.
+    //
+    // The Simple reason is unreachable from persisted data by construction:
+    // `_normalizeSalvage`'s Simple success-first retain-one clamp runs on every save AND inside
+    // `initialize()`, so a planted multi-group Simple config self-heals before anything renders
+    // it. The smoke reproduces it with an in-memory post-init push onto the live normalized
+    // system, which needs a hook in the lab's boot sequence (`world/labWorld.js`) rather than a
+    // fixture. Until then this proves the panel's misconfigured PATH, not the smoke's reason.
     reaches: 'window',
     query: { tab: 'inventory' },
-    steps: [],
+    steps: [
+      { selector: '.inventory-filters input', fill: 'Bent Clasp' },
+      {
+        selector:
+          '.inventory-card[data-inventory-card="lab-jewelry:jw-bent-clasp"] .inventory-card-button',
+      },
+      { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1919,9 +1978,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering task ready',
     app: PLAYER,
     smokeLabels: ['player-gathering-task-ready'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'gathering' },
-    steps: [],
+    // The counterpart's condition is a selected task whose attempt is NOT blocked
+    // (`[data-gathering-attempt-blocked="false"]`). Frostmark Ridge rather than the default
+    // Sunlit Grove: the grove links a scene, so every task there is SCENE_TOKEN_BLOCKED for an
+    // actor with no token on it.
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
+      { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1933,6 +1999,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering after success',
     app: PLAYER,
     smokeLabels: ['player-gathering-after-success'],
+    // WINDOW, blocked by the Foundry shim rather than by the fixture. The attempt itself works
+    // end to end in the lab (verified: `hb-task-ridgemoss` resolves, awards, and writes the run),
+    // but a succeeded gather posts its result card through `ChatMessage.create`, and the lab's
+    // shim (`tests/view-lab/foundry/installFoundryShim.js`) defines no `ChatMessage` global. The
+    // engine catches the ReferenceError and `console.error`s it, which the capture driver treats
+    // as a failed render — correctly, since it IS a missing seam. A `ChatMessage` stub in the
+    // shim closes this case with the two steps below plus a click on
+    // `.gathering-task-detail-attempt`; suppressing the system's `chatOutput` feature to dodge it
+    // would hide the seam instead of supplying it.
+    //
+    // Steps stay EMPTY on purpose. Borrowing `player-gathering-task-ready`'s two steps would
+    // publish a byte-identical frame under a second name — closing the entry while adding no
+    // evidence, which is worse than an honest window-reach frame.
     reaches: 'window',
     query: { tab: 'gathering' },
     steps: [],
@@ -1947,9 +2026,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering tool blocked',
     app: PLAYER,
     smokeLabels: ['player-gathering-tool-blocked'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'gathering' },
-    steps: [],
+    // A selected task whose attempt IS blocked, on the tool reason specifically: Cut Icecap
+    // Fronds requires the herbalist's glass alembic, and the gathering actor is the smith who
+    // carries none of Idrin's glassware. The row shows the missing-tools callout chip and the
+    // attempt renders `[data-gathering-attempt-blocked="true"]`.
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
+      { selector: '.gathering-task-row[data-task-id="hb-task-icecap"] .gathering-task-summary' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1961,9 +2047,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering timed ready',
     app: PLAYER,
     smokeLabels: ['player-gathering-timed-ready'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'gathering' },
-    steps: [],
+    // A TIMED task before it has been started: attempt unblocked, and the requirements panel
+    // names the six hours the attempt will wait rather than resolving on the spot. The pair with
+    // `player-gathering-timed-active` below is the whole point of the timed path.
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
+      { selector: '.gathering-task-row[data-task-id="hb-task-slowbloom"] .gathering-task-summary' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1975,9 +2067,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering timed active',
     app: PLAYER,
     smokeLabels: ['player-gathering-timed-active'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'gathering' },
-    steps: [],
+    // The SAME task after its attempt has been started. A timed attempt creates a waiting run
+    // instead of resolving, so the row flips to blocked on DUPLICATE_ACTIVE_RUN and the attempt
+    // reads `[data-gathering-attempt-blocked="true"]` — reached by actually pressing Attempt, as
+    // the counterpart does, not by planting a run. The timed start posts no chat card, so it
+    // clears the console-error gate that still holds `player-gathering-after-success`.
+    steps: [
+      { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
+      { selector: '.gathering-task-row[data-task-id="hb-task-slowbloom"] .gathering-task-summary' },
+      { selector: '.gathering-task-detail-attempt' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -1989,9 +2090,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering blind',
     app: PLAYER,
     smokeLabels: ['player-gathering-blind'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'gathering' },
-    steps: [],
+    // `[data-gathering-blind-card]`: a blind-selection environment redacts its task list entirely
+    // — one opaque attempt card instead of rows, with the mask chip on the environment card.
+    steps: [{ selector: '.gathering-env-card[data-environment-id="hb-env-thicket"]' }],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2003,9 +2106,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Gathering realm locked',
     app: PLAYER,
     smokeLabels: ['player-gathering-realm-locked'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'gathering' },
-    steps: [],
+    // The one environment-card state selection cannot reach: a locked teaser, greyed, with the
+    // lock overlay and the "not in current realm" header alert. The Deepvault requires a realm
+    // nobody is in, so the listing answers NO_CURRENT_REALM and returns identity only. It sorts
+    // last, so scroll it into view — `frame.screenshot()` does not scroll nested overflow
+    // containers, and a card that never scrolled in is simply absent from the frame while every
+    // assertion still passes.
+    steps: [{ selector: '.gathering-env-card.is-locked', scroll: true }],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2150,6 +2259,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting essence legacy',
     app: PLAYER,
     smokeLabels: ['player-crafting-essence-legacy'],
+    // WINDOW, and unreachable from fixture data. The legacy surface is the IoTable's own
+    // `[data-io-group="essences"]` group, which renders only from a set-level
+    // `ingredientSet.essences` map. The lab seeds raw recipes into `game.settings`, and
+    // `RecipeManager.initialize()` MIGRATES a stored set-level essence map into a first-class
+    // essence group — verified: the set comes back with `essences: {}` and a uuid-named essence
+    // group, so the frame shows the requirement rail rather than the legacy rows. The smoke's
+    // counterpart escapes the migration only because it is authored through `createRecipe` after
+    // initialize; reproducing that needs a post-init authoring hook in `world/labWorld.js`.
     reaches: 'window',
     query: { tab: 'crafting' },
     steps: [],
@@ -2218,9 +2335,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting tag unmatched',
     app: PLAYER,
     smokeLabels: ['player-crafting-tag-unmatched'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    // The counterpart's three assertions, all reproduced: a rail whose tag tile has no item image
+    // to borrow renders its own GLYPH and never Foundry's `item-bag.svg`; every group is fixed, so
+    // it is the world's only rail with no chooser open. Verified live —
+    // `glyphTiles: 1, bagImages: 0, openChoosers: 0`. The recipe is filtered to rather than paged
+    // to: the browser holds 12 rows a page and this one sorts onto page two.
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Refine Silver' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-silver-ingot"]' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2252,9 +2377,30 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting pick for me',
     app: PLAYER,
     smokeLabels: ['player-crafting-pick-for-me'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    // "Pick for me" restoring the resolver's suggestion after the player has trimmed it — the
+    // counterpart's own sequence. The two trims are the PRECONDITION, not decoration: with every
+    // carrier already at maximum the wand writes the allocation the panel is already showing, so
+    // pressing it would change nothing on screen.
+    //
+    // The recipe is the one whose Fire requirement can never be fully funded (60 needed, 46 held
+    // across every carrier). That is the only arrangement in which the wand is photographable at
+    // all: it renders while a requirement is short, so a fundable one makes the control vanish
+    // the instant it is pressed.
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Rivet Chainmail' },
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"]' },
+      {
+        selector: '.essence-pool-carrier[data-essence-carrier="Item.sm-coal"] .fab-stepper-input',
+        fill: '0',
+      },
+      {
+        selector: '.essence-pool-carrier[data-essence-carrier="Item.sm-ruby"] .fab-stepper-input',
+        fill: '0',
+      },
+      { selector: '.requirement-rail-wand' },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,
@@ -2269,9 +2415,31 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting essence pool shared',
     app: PLAYER,
     smokeLabels: ['player-crafting-essence-pool-shared'],
-    reaches: 'window',
+    reaches: 'exact',
     query: { tab: 'crafting' },
-    steps: [],
+    // The shared-pool proof: TWO essence requirements in one set, funded from ONE dual carrier.
+    // Zeroing the single-essence carriers and raising Steel Ingot (2 Earth + 2 Fire) to ×2 leaves
+    // Fire fully delivered and Earth short FROM THE SAME UNITS — which a per-group disjoint draw
+    // could not produce at all. Verified live: `met|partial` meters, one recap row, and two
+    // contribution chips on the dual carrier.
+    steps: [
+      { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
+      {
+        selector:
+          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ore"] .fab-stepper-input',
+        fill: '0',
+      },
+      {
+        selector:
+          '.essence-pool-carrier[data-essence-carrier="Item.sm-iron-ingot"] .fab-stepper-input',
+        fill: '0',
+      },
+      {
+        selector:
+          '.essence-pool-carrier[data-essence-carrier="Item.sm-steel-ingot"] .fab-stepper-input',
+        fill: '2',
+      },
+    ],
     position: { width: 1280, height: 860 },
     readySelector: '.fabricate-app-shell',
     publish: true,

@@ -27,6 +27,15 @@
 /** Foundry serves `public/` at the web root; the lab mounts the harvested cache here. */
 export const ICON_BASE = '/@foundry-chrome/icons';
 
+/**
+ * The origin item both Air Shard participations point at.
+ *
+ * `InventoryListingBuilder` collapses owned rows on `item.uuid` ALONE, so a stack that backs a
+ * component in two systems has to be ONE document with ONE uuid claimed by both component
+ * definitions. Naming it here keeps the two halves from drifting apart into two cards.
+ */
+export const SHARED_AIR_SHARD_UUID = 'Item.lab-air-shard';
+
 export const LAB_SYSTEM_IDS = Object.freeze({
   SMITHING: 'lab-smithing',
   HERBALISM: 'lab-herbalism',
@@ -191,6 +200,54 @@ const SMITHING_COMPONENTS = [
     tags: ['sundry'],
     difficulty: 2,
   }),
+  // The required-tool disclosure (issue 777). One tool the salvaging actor HOLDS and one it
+  // does not is the whole point: a config where every tool is available renders the section in
+  // one state and implies the other does not exist. Availability is scoped to the TARGET actor
+  // — `rowSources[0]`, crafting-actor-first — so this component is stocked on Vosk alone (who
+  // carries the tongs and no anvil) rather than on Brenna, who owns the entire smithy.
+  component('sm-toolchest', 'Field Toolchest', 'containers/chest/chest-worn-oak-tan.webp', {
+    categories: ['Finished Goods'],
+    tags: ['sundry'],
+    difficulty: 3,
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      toolIds: ['sm-tool-tongs', 'sm-tool-anvil'],
+      resultGroups: [
+        {
+          id: 'sm-salv-toolchest',
+          name: 'Stripped fittings',
+          results: [
+            { componentId: 'sm-iron-ingot', quantity: 1 },
+            { componentId: 'sm-oak-haft', quantity: 2 },
+          ],
+        },
+      ],
+    },
+  }),
+  // Half of the multi-system stack (issue 766). ONE physical item, registered as a component in
+  // TWO systems, must collapse to a single inventory card carrying a system selector. The
+  // collapse key is `item.uuid` ALONE, so both halves declare the SAME `originItemUuid` and the
+  // actor holds exactly one stack of it — a second stack would count the quantity twice, which
+  // is the defect the smoke's counterpart frame exists to disprove.
+  component('sm-air-shard', 'Air Shard', 'commodities/gems/gem-faceted-radiant-blue.webp', {
+    originItemUuid: SHARED_AIR_SHARD_UUID,
+    categories: ['Reagents'],
+    tags: ['gem'],
+    difficulty: 6,
+    essences: { air: 2 },
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      resultGroups: [
+        {
+          id: 'sm-salv-air-shard',
+          name: 'Shattered dust',
+          results: [{ componentId: 'sm-whetstone', quantity: 1 }],
+        },
+      ],
+    },
+  }),
 ];
 
 const HERBALISM_COMPONENTS = [
@@ -274,6 +331,66 @@ const HERBALISM_COMPONENTS = [
     'consumables/potions/bottle-round-corked-blue.webp',
     { categories: ['Potions'], tags: ['potion'], difficulty: 6 }
   ),
+  // PROGRESSIVE salvage, which is a different player body from Simple's: an ORDERED stage list
+  // the player may reorder before spending the roll. Herbalism carries it because salvage has
+  // its own resolution mode, authored per system — so a world with only a Simple-mode system
+  // leaves the whole progressive body, and its reorder affordance, unphotographed.
+  //
+  // ONE result group holding THREE ordered results, not three groups. Progressive salvage's
+  // stages ARE the single group's results, and `ResolutionModeService.validateSalvage` faults a
+  // multi-group progressive config as `blocks: 'visibility'` — which a non-GM viewer never sees
+  // as an error, only as a component with no salvage panel at all. Each result's component needs
+  // a difficulty ≥ 1 for the same reason (that is what ranks the stages).
+  component(
+    'hb-cracked-alembic',
+    'Cracked Alembic',
+    'tools/laboratory/alembic-glass-ball-blue.webp',
+    {
+      categories: ['Bases'],
+      tags: ['vessel'],
+      difficulty: 4,
+      salvage: {
+        enabled: true,
+        ingredientQuantity: 1,
+        resultGroups: [
+          {
+            id: 'hb-salv-alembic',
+            name: 'Stripped glassware',
+            results: [
+              { componentId: 'hb-empty-vial', quantity: 2 },
+              { componentId: 'hb-mortar-dust', quantity: 1 },
+              { componentId: 'hb-frostcap', quantity: 1 },
+            ],
+          },
+        ],
+      },
+    }
+  ),
+  // The other half of the multi-system stack. Salvageable in BOTH systems, so the selector's
+  // per-option affordance suffix ("<system> — Salvageable") is exercised on every option rather
+  // than on one, and switching participation re-parameterises the whole detail body — including
+  // swapping a Simple salvage panel for a progressive one.
+  component('hb-air-shard', 'Air Shard', 'commodities/gems/gem-faceted-radiant-blue.webp', {
+    originItemUuid: SHARED_AIR_SHARD_UUID,
+    categories: ['Herbs'],
+    tags: ['reagent'],
+    difficulty: 6,
+    essences: { air: 2 },
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      resultGroups: [
+        {
+          id: 'hb-salv-air-shard',
+          name: 'Condensed vapour',
+          results: [
+            { componentId: 'hb-spring-water', quantity: 2 },
+            { componentId: 'hb-mortar-dust', quantity: 1 },
+          ],
+        },
+      ],
+    },
+  }),
 ];
 
 const ALCHEMY_COMPONENTS = [
@@ -374,6 +491,32 @@ const JEWELRY_COMPONENTS = [
     categories: ['Finished Goods'],
     tags: ['jewellery'],
     difficulty: 9,
+  }),
+  // The MISCONFIGURED salvage cue. Jewelry resolves salvage by ROUTED outcome and authors no
+  // routed salvage roll formula, which is the state the engine aborts on: `_buildSalvage` sets
+  // `misconfigured` with `misconfiguredReason: 'routedNoFormula'` and the panel replaces its
+  // whole body with the GM-config cue, banner suppressed.
+  //
+  // NOT the Simple multi-group misconfig the live smoke photographs. That one is UNREACHABLE
+  // from persisted data: `_normalizeSalvage`'s Simple success-first retain-one clamp runs on
+  // every save AND on `initialize()`, so a planted multi-group Simple config self-heals before
+  // anything can render it. The smoke reproduces it with an in-memory post-init push, which the
+  // lab's fixture layer has no equivalent of — see the case's `reaches` note.
+  component('jw-bent-clasp', 'Bent Clasp', 'commodities/metal/chain-silver.webp', {
+    categories: ['Stock'],
+    tags: ['wire'],
+    difficulty: 2,
+    salvage: {
+      enabled: true,
+      ingredientQuantity: 1,
+      resultGroups: [
+        {
+          id: 'jw-salv-clasp',
+          name: 'Reclaimed wire',
+          results: [{ componentId: 'jw-wire', quantity: 1 }],
+        },
+      ],
+    },
   }),
 ];
 
@@ -529,7 +672,37 @@ const SMITHING_RECIPES = [
     {
       description: 'Cupel the ore until only bright metal remains.',
       categories: ['Refining'],
-      ingredientSets: [simpleSet('s1', { 'sm-silver-ore': 3, 'sm-coal': 1 })],
+      // An UNMATCHED TAG requirement, deliberately added to a recipe no other case selects and
+      // one that is already uncraftable (Brenna holds no silver ore), so the browser's
+      // craftable-first ordering — and therefore every other case's row position — is unmoved.
+      //
+      // Nothing in the world carries item tags as FLAGS, which is what `tags` matching reads, so
+      // this slot can never borrow an item image and must fall back to its own glyph. That is
+      // the acceptance criterion the smoke's counterpart frame proves: never Foundry's
+      // `item-bag.svg`. Every group here has exactly one option, so the rail is all-fixed and
+      // opens no chooser — the world's only rail in that state.
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            {
+              id: 's1-g1',
+              options: [{ componentId: 'sm-silver-ore', quantity: 3 }],
+            },
+            { id: 's1-g2', options: [{ componentId: 'sm-coal', quantity: 1 }] },
+            {
+              id: 's1-g3',
+              name: 'Rune-etched stock',
+              // `runic` is declared on the system and carried by NO component, which is the
+              // point: `expandToComponentIds` finds nothing to expand to, so the tile has no
+              // item image to borrow. A tag whose carriers merely happen to be unowned would
+              // still expand (verified: `abrasive` expands to the whetstone Brenna holds and
+              // the slot reads `met`), and the glyph fallback would never be exercised.
+              options: [{ match: { type: 'tags', tags: ['runic'], tagMatch: 'any' }, quantity: 1 }],
+            },
+          ],
+        },
+      ],
       resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-silver-ingot', quantity: 1 }] }],
       check: { enabled: true, rollFormula: '1d20', thresholds: { success: 12 } },
     }
@@ -574,6 +747,12 @@ const SMITHING_RECIPES = [
     {
       description: 'Small work, exacting work.',
       categories: ['Weaponsmithing'],
+      // No LEGACY set-level `essences` map here, and none anywhere in this fixture, though the
+      // live smoke's world has one. It cannot survive in a lab fixture: the lab seeds raw
+      // recipes into `game.settings` and `RecipeManager.initialize()` migrates a stored
+      // set-level essence map into a first-class essence GROUP (verified — the set comes back
+      // with `essences: {}` and a uuid-named essence group). The smoke's counterpart escapes
+      // that only because it is authored through `createRecipe` AFTER initialize.
       ingredientSets: [simpleSet('s1', { 'sm-steel-ingot': 1, 'sm-ruby': 1 })],
       resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-dagger', quantity: 1 }] }],
       check: { enabled: true, rollFormula: '1d20 + 2', thresholds: { success: 13 } },
@@ -602,7 +781,26 @@ const SMITHING_RECIPES = [
     {
       description: 'Ten thousand rings, each closed by hand.',
       categories: ['Armoursmithing'],
-      ingredientSets: [simpleSet('s1', { 'sm-iron-ingot': 6, 'sm-leather': 1 })],
+      // An essence requirement NO inventory can fully fund (Brenna's smithing carriers total 46
+      // Fire against 60 needed). That is the only arrangement in which "Pick for me" is
+      // photographable at all: the wand renders while a requirement is short, so a fundable
+      // requirement makes the control vanish the moment it is pressed. Placed on an
+      // already-uncraftable recipe no other case selects, so nothing reorders.
+      complex: true,
+      ingredientSets: [
+        {
+          id: 's1',
+          ingredientGroups: [
+            { id: 's1-g1', options: [{ componentId: 'sm-iron-ingot', quantity: 6 }] },
+            { id: 's1-g2', options: [{ componentId: 'sm-leather', quantity: 1 }] },
+            {
+              id: 's1-g3',
+              name: 'Fire essence',
+              options: [{ match: { type: 'essence', essenceId: 'fire', amount: 60 } }],
+            },
+          ],
+        },
+      ],
       resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-chainmail', quantity: 1 }] }],
       check: { enabled: true, rollFormula: '1d20 + @prof', thresholds: { success: 16 } },
       toolIds: ['sm-tool-hammer', 'sm-tool-tongs'],
@@ -1047,6 +1245,65 @@ const GATHERING_TASKS = [
       { id: 'row-2', componentId: 'hb-frostcap', quantity: 1, weight: 30 },
     ],
   },
+  // ── Attemptable tasks ────────────────────────────────────────────────────────────────────────
+  // The four tasks above browse correctly but cannot be ATTEMPTED: they carry the legacy
+  // `dropTable`/`weight` shape, and `validateTaskConfiguration` rejects a d100 task with no
+  // `dropRows` (verified live — the attempt returns `TASK_MISCONFIGURED`). Rather than restate
+  // them (which would change every already-captured task row), the attemptable states are three
+  // NEW tasks in the canonical `dropRows` shape the live smoke's library uses.
+  //
+  // `biomes: ['mountain']` is what keeps them contained. Composition is automatic and biome-
+  // matched, and the four legacy tasks declare no biome at all, so they compose into every
+  // environment; a biome-less new task would appear in Sunlit Grove and reflow the already-
+  // captured gathering frames. Frostmark Ridge is the world's only mountain environment.
+  {
+    id: 'hb-task-slowbloom',
+    name: 'Tend the Slow Bloom',
+    description: 'Bank the frost off the crown and come back when it has opened.',
+    enabled: true,
+    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
+    img: `${ICON_BASE}/commodities/flowers/blooms-pink.webp`,
+    biomes: ['mountain'],
+    itemSelectionMode: 'highestRankedDrop',
+    // TIMED. An attempt on this creates a waiting run instead of resolving, which is what makes
+    // the "timed, ready" and "timed, already running" pair two different screens rather than one.
+    timeRequirement: { hours: 6 },
+    dropRows: [
+      { id: 'hb-slowbloom-drop', componentId: 'hb-emberbloom', quantity: 1, dropRate: 85, enabled: true },
+    ],
+  },
+  {
+    id: 'hb-task-icecap',
+    name: 'Cut Icecap Fronds',
+    description: 'The fronds shatter unless they are drawn off cold, through glass.',
+    enabled: true,
+    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
+    img: `${ICON_BASE}/consumables/mushrooms/campanulate-bell-shiny-blue.webp`,
+    biomes: ['mountain'],
+    itemSelectionMode: 'highestRankedDrop',
+    // TOOL-BLOCKED for the gathering actor. Brenna is the smith: she carries the whole smithy
+    // and none of Idrin's glassware, so this task's required alembic is missing and the attempt
+    // is refused with TOOL_BLOCKED before any roll.
+    toolIds: ['hb-tool-alembic'],
+    dropRows: [
+      { id: 'hb-icecap-drop', componentId: 'hb-frostcap', quantity: 2, dropRate: 75, enabled: true },
+    ],
+  },
+  {
+    id: 'hb-task-ridgemoss',
+    name: 'Scrape Ridge Moss',
+    description: 'Slow, cold, certain work — the ridge always gives up its moss.',
+    enabled: true,
+    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
+    img: `${ICON_BASE}/commodities/wood/bark-tan.webp`,
+    biomes: ['mountain'],
+    itemSelectionMode: 'highestRankedDrop',
+    // dropRate 100: the "after a successful gather" frame has to be reached by actually
+    // gathering, and a probabilistic drop would make the frame depend on the seeded PRNG's mood.
+    dropRows: [
+      { id: 'hb-ridgemoss-drop', componentId: 'hb-bitterbark', quantity: 2, dropRate: 100, enabled: true },
+    ],
+  },
   {
     id: 'sm-task-prospect',
     name: 'Prospect the Seam',
@@ -1107,6 +1364,29 @@ const REALMS = [
     craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
     name: 'Frostmark Ridge',
     description: 'Above the treeline, below the snow.',
+    enabled: true,
+    sceneMappings: [],
+  },
+];
+
+/**
+ * Smithing's realm, and the reason it exists.
+ *
+ * A realm-LOCKED environment card is the only environment state the player list cannot reach by
+ * selection, and it needs three things at once: the Travel/Realms subsystem switched on for the
+ * owning system (`gatheringRealmSettings.enabled`), an environment that REQUIRES a realm, and no
+ * current realm resolving for the viewer. Turning realms on for herbalism would satisfy the first
+ * but lock all three herbalism environments — every one of them names an included realm — and
+ * take the already-captured environments, blind, and stacked frames with it. Smithing's only
+ * existing environment is realm-ungated, so switching realms on there locks the new environment
+ * below and nothing else.
+ */
+const SMITHING_REALMS = [
+  {
+    id: 'sm-realm-deep',
+    craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
+    name: 'The Underdeep',
+    description: 'Below the lowest worked gallery, where the old seams run.',
     enabled: true,
     sceneMappings: [],
   },
@@ -1184,6 +1464,28 @@ const ENVIRONMENTS = [
     enabledTaskIds: ['sm-task-prospect'],
     enabledEventIds: ['sm-event-collapse'],
     taskOrder: ['sm-task-prospect'],
+    conditions: { weather: 'clear', timeOfDay: 'day', visibility: '', notes: '' },
+    nodeRuntime: {},
+  },
+  {
+    id: 'sm-env-deepvault',
+    craftingSystemId: LAB_SYSTEM_IDS.SMITHING,
+    name: 'The Deepvault',
+    description: 'Named on the old charts and reached by nobody currently above ground.',
+    enabled: true,
+    selectionMode: 'targeted',
+    compositionMode: 'manual',
+    img: `${ICON_BASE}/environment/wilderness/cave-entrance-mountain-blue.webp`,
+    biomes: ['underground'],
+    dangerTags: ['extreme'],
+    // Realm-gated to a realm nobody is in. `evaluateLocationAvailability` answers
+    // NO_CURRENT_REALM (no party sets a current realm for this system), so the listing surfaces
+    // this as a LOCKED teaser — identity only, unselectable, with the "not in current realm"
+    // header alert and the travel guidance in its tooltip. That is the one environment card
+    // state selection cannot reach, and it sorts last, exactly as its smoke counterpart does.
+    includedRealmIds: ['sm-realm-deep'],
+    forcedTaskIds: ['sm-task-prospect'],
+    enabledEventIds: ['sm-event-collapse'],
     conditions: { weather: 'clear', timeOfDay: 'day', visibility: '', notes: '' },
     nodeRuntime: {},
   },
@@ -1408,6 +1710,23 @@ const ROUTED_CHECK = Object.freeze({
   },
 });
 
+/**
+ * Herbalism's SALVAGE check — a separate block from its crafting check.
+ *
+ * Progressive salvage REQUIRES an authored roll formula: without one `_buildSalvage` reports
+ * `misconfigured` and replaces the stage list with the GM-config cue, so the roll formula here is
+ * what makes the progressive body render at all.
+ */
+const PROGRESSIVE_SALVAGE_CHECK = Object.freeze({
+  enabled: true,
+  consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  progressive: {
+    rollFormula: '1d20 + @abilities.int.mod',
+    thresholds: { success: 10 },
+    awardMode: 'equal',
+  },
+});
+
 const PROGRESSIVE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
@@ -1452,12 +1771,22 @@ export function buildLabContent() {
         'armour',
         'sundry',
         'abrasive',
+        // Declared but deliberately carried by nothing — the unmatched-tag requirement's tag.
+        'runic',
       ],
       components: SMITHING_COMPONENTS,
       recipeItemDefinitions: [{ id: 'sm-book', name: 'Forgecraft Folio' }],
       tools: SMITHING_TOOLS,
-      gatheringRealms: [],
-      gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+      gatheringRealms: SMITHING_REALMS,
+      // `enabled` is what switches the Travel/Realms subsystem on, and it is what makes an
+      // environment's `includedRealmIds` bind at all: with it off, `_locationBlockedReasons`
+      // short-circuits and NO environment can be realm-locked. See SMITHING_REALMS for why this
+      // is smithing's flag and not herbalism's.
+      gatheringRealmSettings: {
+        enabled: true,
+        revealMode: 'alwaysVisible',
+        modifierVisibility: 'visible',
+      },
     },
     {
       id: LAB_SYSTEM_IDS.HERBALISM,
@@ -1471,6 +1800,12 @@ export function buildLabContent() {
       // entries exist at all (see buildCraftingNavItems).
       resolutionMode: 'progressive',
       craftingCheck: PROGRESSIVE_CHECK,
+      // Salvage resolves on its OWN mode and its OWN check block, authored independently of the
+      // crafting ones — `_buildSalvage` reads `salvageCraftingCheck`, never `craftingCheck`.
+      // Progressive here so the player's ordered, reorderable stage body exists somewhere in the
+      // world; smithing stays Simple-with-no-formula, which is the other body.
+      salvageResolutionMode: 'progressive',
+      salvageCraftingCheck: PROGRESSIVE_SALVAGE_CHECK,
       features: {
         essences: true,
         recipeCategories: true,
@@ -1523,6 +1858,10 @@ export function buildLabContent() {
       visibilityMode: 'global',
       resolutionMode: 'routedByIngredients',
       craftingCheck: SIMPLE_CHECK,
+      // ROUTED salvage with no `salvageCraftingCheck` at all. Routed and progressive salvage both
+      // require an authored formula to produce an outcome, so this is the misconfigured state —
+      // deliberately, and it is the only misconfigured salvage reachable from persisted data.
+      salvageResolutionMode: 'routed',
       features: {
         essences: true,
         recipeCategories: true,
@@ -1625,7 +1964,7 @@ export function buildLabContent() {
     ],
     environments: ENVIRONMENTS,
     gatheringConfig,
-    realms: REALMS,
+    realms: [...REALMS, ...SMITHING_REALMS],
     components: [
       ...SMITHING_COMPONENTS,
       ...HERBALISM_COMPONENTS,

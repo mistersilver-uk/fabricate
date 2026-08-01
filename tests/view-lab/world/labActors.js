@@ -28,8 +28,13 @@ const PORTRAIT_BASE = '/@foundry-chrome/icons';
  */
 function ownedItem(componentId, component, quantity, index) {
   const item = {
-    // The uuid is what `Ingredient.matches` compares against `originItemUuid`.
-    uuid: `Item.${componentId}`,
+    // The uuid is what `Ingredient.matches` compares against `originItemUuid`, so it must be the
+    // component's OWN declared origin rather than one derived from the id. Almost every component
+    // declares `Item.<id>` and this is the same string either way — but a stack that backs a
+    // component in two systems is ONE document claimed by both definitions, and
+    // `InventoryListingBuilder` collapses rows on `item.uuid` alone. Deriving the uuid from the
+    // id would give that one physical stack two uuids, two cards, and a doubled quantity.
+    uuid: component?.originItemUuid ?? `Item.${componentId}`,
     id: `item-${componentId}-${index}`,
     name: component?.name ?? componentId,
     img: component?.img ?? null,
@@ -81,6 +86,15 @@ const INVENTORIES = {
     'jw-wire': 2,
     'rw-bar': 2,
     'rw-chalk': 4,
+    // ONE stack, registered as a component in TWO systems (see SHARED_AIR_SHARD_UUID). ×1 on
+    // purpose: the collapse contract is a single card whose quantity is counted ONCE, and a ×2
+    // stack would hide a double-count rather than disprove it.
+    'sm-air-shard': 1,
+    // Progressive salvage lives on herbalism, so its salvageable component has to be held by
+    // the actor the inventory opens on — Brenna — or the panel is unreachable.
+    'hb-cracked-alembic': 1,
+    // The misconfigured (routed, no formula) salvage config.
+    'jw-bent-clasp': 1,
   },
   'lab-actor-idrin': {
     'hb-moonleaf': 8,
@@ -112,6 +126,12 @@ const INVENTORIES = {
     // reachable only through the multi-source picker.
     'jw-ingot-gold': 3,
     'rw-bar': 6,
+    // The required-tool disclosure needs ONE tool held and one missing, and availability is
+    // scoped to the target salvage actor (`rowSources[0]`, crafting-actor-first). Brenna owns the
+    // whole smithy, so the toolchest is stocked on the mule instead — who carries the tongs the
+    // salvage names and not the anvil it also names.
+    'sm-tool-tongs': 1,
+    'sm-toolchest': 1,
   },
 };
 
