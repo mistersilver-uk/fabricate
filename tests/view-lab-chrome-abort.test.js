@@ -19,6 +19,8 @@ import test from 'node:test';
 
 import {
   CHROME_CACHE_DIRNAME,
+  PROVENANCE_PATH,
+  assertProvenanceWritable,
   missingChromeMessage,
   resolveChromeCache,
   verifyChromeCache,
@@ -104,10 +106,61 @@ test('the missing-chrome message tells the operator what to do', () => {
   const root = scratchRoot();
   try {
     const message = missingChromeMessage(root);
-    assert.match(message, /viewlab:chrome:harvest/);
-    assert.match(message, /never downloads them for you/);
+    // Collapsed, because the message is hard-wrapped for a terminal and a promise that happens to
+    // straddle a line break is still the promise. Pinning the wrapping instead makes an editorial
+    // reflow look like a lost guarantee.
+    const flowed = message.replaceAll(/\s+/g, ' ');
+    assert.match(flowed, /viewlab:chrome:harvest/);
+    assert.match(flowed, /never downloads them for you/);
+    // Both sources must be named. The message used to claim it read the operator's desktop install
+    // while only ever reading the release archive; now it reads both, and says which is which.
+    assert.match(flowed, /release archive/);
+    assert.match(flowed, /--from-dir/);
     assert.ok(message.includes(CHROME_CACHE_DIRNAME), 'should name where it looked');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Provenance may only be recorded from the source CI can reproduce           */
+/* -------------------------------------------------------------------------- */
+
+test('provenance may be written from a release-archive harvest', () => {
+  assert.doesNotThrow(() =>
+    assertProvenanceWritable({
+      manifest: { source: { kind: 'release-archive' }, foundryVersion: '14.365' },
+    })
+  );
+});
+
+test('provenance is refused for a local-install harvest, and says why', () => {
+  // The two sources hold the same Foundry and different bytes: the Windows installer ships
+  // `application.mjs` with CRLF where the release archive uses LF (verified against 14.365 — 87904
+  // bytes with 2258 CRLF versus 85646 with none). CI harvests the archive and checks the recorded
+  // digests on the runner that draws, so an install-derived record would fail the drift gate on
+  // every later pull request, for a reason the failure message would not explain.
+  assert.throws(
+    () =>
+      assertProvenanceWritable({
+        manifest: { source: { kind: 'local-install' }, foundryVersion: '14.365' },
+      }),
+    (error) => {
+      const flowed = error.message.replaceAll(/\s+/g, ' ');
+      assert.match(flowed, /refusing to write/);
+      assert.ok(flowed.includes(PROVENANCE_PATH), 'names the file it refused to write');
+      assert.match(flowed, /line endings/, 'explains WHY, not just that it refused');
+      assert.match(flowed, /--force --write-provenance/, 'names the command that would work');
+      assert.match(flowed, /--from-dir remains fine for rendering/, 'does not overstate the limit');
+      return true;
+    }
+  );
+});
+
+test('an unrecognised harvest source is refused rather than assumed safe', () => {
+  // Fail closed on a kind nobody has thought about yet: a future source that turned out to be
+  // byte-divergent would otherwise quietly poison the record.
+  assert.throws(() =>
+    assertProvenanceWritable({ manifest: { source: { kind: 'container' }, foundryVersion: '14.365' } })
+  );
 });

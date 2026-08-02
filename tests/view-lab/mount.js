@@ -39,8 +39,26 @@ function installDeterminismStyles() {
       caret-color: transparent !important;
       scroll-behavior: auto !important;
     }
-    /* Scoped to window content: a document-wide gutter would shift the frame itself. */
-    .window-content, .window-content * { scrollbar-gutter: stable; }
+    /*
+      NO scrollbar-gutter. There used to be
+      \`.window-content, .window-content * { scrollbar-gutter: stable; }\` here, for capture
+      determinism, and it was the single worst thing in the page.
+
+      \`scrollbar-gutter: stable\` reserves gutter space on any element that is a SCROLL CONTAINER,
+      and \`overflow: hidden\` makes one. The \`*\` therefore carved ~10px out of the content box of
+      every clipping element under the window — \`.crafting-thumb\` measured a 44px box with a 34px
+      content box, so every item image in every published frame was drawn narrow, left-aligned and
+      needlessly cropped by its own \`object-fit: cover\`.
+
+      Narrowing it to \`.window-content\` alone is not enough either: when the content does not
+      overflow, production draws no scrollbar and uses the full width, while a reserved gutter
+      still takes 10px. That is the same lie at the top level, and \`assertNoLabInducedClipping\`
+      catches it.
+
+      So there is no gutter at all now, and scrollbars behave exactly as they do in production.
+      Determinism instead rests on what it should rest on: fixed fixtures, asserted-loaded fonts,
+      and decoded images — a scrollbar that appears here is one that appears for a real user.
+    */
   `;
   document.head.appendChild(style);
 }
@@ -233,6 +251,139 @@ async function settle(roots, services = null) {
 }
 
 /**
+ * The faces the chrome paints with, matched by PATTERN rather than by name.
+ *
+ * Foundry 14 moved Font Awesome from Pro 6 to Pro 7, which renames the CSS family from
+ * `Font Awesome 6 Pro` to `Font Awesome 7 Pro`. Nothing would have noticed: the stylesheet still
+ * returns 200, `document.fonts.ready` still resolves, and every `.fa-solid` element simply falls
+ * back to the default sans-serif — so the icons vanish and a blank-iconed PNG publishes as
+ * authoritative evidence. `await document.fonts.ready` is not a check; it resolves happily when
+ * zero faces loaded. So the family is discovered from the registered `@font-face` set (which keeps
+ * this from needing an edit on the next Font Awesome major) and then actually loaded.
+ */
+const REQUIRED_CHROME_FACES = [
+  {
+    // Foundry ships Pro; the header controls, the resize grip and every Fabricate icon are drawn
+    // with it. V14's stylesheet also declares `Font Awesome 5 Pro` as a back-compat alias, and
+    // either resolving proves the webfonts harvested.
+    family: /^Font Awesome \d+ Pro$/,
+    probes: ['900 1em', '400 1em'],
+    what: 'Font Awesome Pro — every icon in the chrome and in Fabricate',
+  },
+  {
+    // `--font-primary`. Only 400 and 700 are declared by `foundry2.css`.
+    family: /^Signika$/,
+    probes: ['400 1em', '700 1em'],
+    what: 'Signika — the body face of every window',
+  },
+  {
+    // `--font-h1`, which is what the window title is set in.
+    family: /^Modesto Condensed$/,
+    probes: ['1em'],
+    what: 'Modesto Condensed — the window title',
+  },
+];
+
+/**
+ * Fail the render when a face the chrome depends on did not load.
+ *
+ * Runs for chrome-only baselines too: the empty frame is precisely where a missing face is most
+ * visible and least excusable.
+ *
+ * @returns {Promise<void>}
+ * @throws {Error} Naming every missing family and probe, because "fonts did not load" is not
+ *   actionable and this is the one V14 breakage that is otherwise silent.
+ */
+async function assertChromeFontsLoaded() {
+  await document.fonts.ready;
+  const registered = [...document.fonts].map((face) => face.family.replaceAll('"', ''));
+  const problems = [];
+
+  for (const required of REQUIRED_CHROME_FACES) {
+    const family = registered.find((name) => required.family.test(name));
+    if (!family) {
+      problems.push(
+        `no @font-face family matching ${required.family} is registered (${required.what})`
+      );
+      continue;
+    }
+    for (const probe of required.probes) {
+      const specifier = `${probe} "${family}"`;
+      // `load()` is what pulls a lazily-fetched face; `check()` alone reports false for a face
+      // nothing has needed yet, which would fail every render rather than the broken ones.
+      await document.fonts.load(specifier).catch(() => {});
+      if (!document.fonts.check(specifier)) {
+        problems.push(`${specifier} did not load (${required.what})`);
+      }
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `view lab: harvested Foundry fonts are missing or renamed, so this frame would publish with ` +
+        `fallback glyphs:\n  ${problems.join('\n  ')}\n` +
+        `Registered families: ${[...new Set(registered)].sort((left, right) => left.localeCompare(right)).join(', ') || '(none)'}\n` +
+        'Re-harvest the chrome: npm run viewlab:chrome:harvest -- --force'
+    );
+  }
+}
+
+/**
+ * Fail the render when a lab-injected style has resized an element's content box.
+ *
+ * The determinism styles above are the lab's own, and they are the one thing in the page that
+ * production does not have — so when one of them changes layout, the frame lies and nothing else
+ * would notice. `scrollbar-gutter: stable` on every `.window-content` descendant did exactly that
+ * for months: it reserves gutter space on any scroll container, `overflow: hidden` makes one, and
+ * so every clipping element rendered ~10px narrower than its own box.
+ *
+ * The invariant is arithmetic and holds for any element that is not scrolling: content width ==
+ * border width - padding - border. A reserved gutter breaks it, and nothing legitimate does.
+ * Elements that genuinely scroll are exempt, because a real scrollbar breaks it too — and that is
+ * production behaviour, not a lab artefact.
+ *
+ * @param {HTMLElement} frame The application frame.
+ * @throws {Error} Naming the offending elements, because a silent 10px is exactly what shipped.
+ */
+function assertNoLabInducedClipping(frame) {
+  const offenders = [];
+  for (const element of frame.querySelectorAll('*')) {
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    if (box.width === 0) continue;
+    // `clientWidth` is defined only for elements that generate a CSS box with client geometry.
+    // A non-replaced INLINE box — every `span`, `strong`, `em` — reports 0, which read as "loses
+    // its whole width" and failed 106 of 150 frames the first time this guard ran.
+    if (style.display.startsWith('inline') && style.display !== 'inline-block') continue;
+    // A real scrollbar legitimately eats content width; only non-scrolling elements are pinned.
+    if (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth) {
+      continue;
+    }
+    const chrome =
+      Number.parseFloat(style.paddingLeft) +
+      Number.parseFloat(style.paddingRight) +
+      Number.parseFloat(style.borderLeftWidth) +
+      Number.parseFloat(style.borderRightWidth);
+    const expected = style.boxSizing === 'border-box' ? box.width - chrome : box.width;
+    const lost = expected - element.clientWidth;
+    // 1px of tolerance for sub-pixel rounding; a reserved gutter is an order of magnitude larger.
+    if (lost > 1) {
+      offenders.push(
+        `${element.tagName.toLowerCase()}.${[...element.classList].join('.') || '(no class)'} ` +
+          `loses ${lost.toFixed(1)}px of content width (box ${box.width.toFixed(1)}, client ${element.clientWidth})`
+      );
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(
+      'view lab: a lab-injected style is resizing content boxes, so this frame would not depict ' +
+        `production layout:\n  ${offenders.slice(0, 8).join('\n  ')}` +
+        (offenders.length > 8 ? `\n  ... and ${offenders.length - 8} more` : '')
+    );
+  }
+}
+
+/**
  * The subtrees a settle pass has to watch: the application window, plus any dialog standing over it.
  *
  * @param {HTMLElement} frame The application frame.
@@ -266,6 +417,9 @@ async function boot() {
   // Geometry BEFORE content: a clamped frame is wrong no matter what is inside it, and failing
   // here keeps the error about the window rather than about whatever failed to render in it.
   assertWindowGeometry(built);
+  // Same reasoning for the faces. A frame drawn in fallback glyphs is wrong whatever it contains,
+  // and this is the one way the chrome can be wrong without anything else complaining.
+  await assertChromeFontsLoaded();
 
   let mounted = null;
   if (!params.chromeOnly) {
@@ -279,6 +433,9 @@ async function boot() {
         ? await mountPlayerApp(built.content, params)
         : await mountManagerApp(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
+    // After settle, because the check needs the populated tree — an empty window has nothing
+    // clipped to measure.
+    assertNoLabInducedClipping(built.frame);
   } else {
     await document.fonts.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));

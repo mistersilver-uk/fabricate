@@ -63,7 +63,7 @@ node scripts/foundry-test-run.mjs
 | `FOUNDRY_URL` | `http://localhost:30100` | Base URL of the Foundry instance |
 | `FOUNDRY_HOST_PORT` | `30100` | Host port used by the Docker harness. The default is 30100 (not 30000) so the smoke test can coexist with a developer's local Foundry on 30000; override with a matching `FOUNDRY_URL` if 30100 is also occupied. |
 | `FOUNDRY_ADMIN_KEY` | `fabricate-test-admin` | Admin password for the setup/auth page |
-| `FOUNDRY_IMAGE` | `felddy/foundryvtt:13` | Docker image used by the compose harness. Defaults to Foundry V13 for the V13 smoke world. |
+| `FOUNDRY_IMAGE` | `felddy/foundryvtt:14.365` | Docker image used by the compose harness. Pinned to an exact build in `docker-compose.foundry.yml`, which `scripts/foundry-test-up.mjs` reads rather than restating: the CI archive cache key hashes that file, and the View Lab harvests whatever archive this image downloads. |
 | `FOUNDRY_RELEASE_URL` | unset | Optional explicit Foundry release URL. When unset, `test:foundry:up` uses a matching local cached zip if one exists. |
 | `FOUNDRY_RECREATE` | unset | Set to `1` before `npm run test:foundry:up` to discard and recreate the cached container. |
 
@@ -146,12 +146,12 @@ Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dra
 | `test-results/console.log` | Full browser console output |
 | `test-results/screenshot-*.png` | Screenshots at key checkpoints |
 
-### Foundry V13 API Patterns
+### Foundry API Patterns
 
 The smoke test uses `page.evaluate()` to interact with Foundry APIs.
-Key patterns for V13:
+Key patterns, verified against V13.351 and still current on the pinned V14.365:
 
-- **Document types are arrays, not Sets:** `game.documentTypes.Item` comes from `Object.keys(types)` in `Game#setupPackages` (V13.351), so `.includes()` works directly.
+- **Document types are arrays, not Sets:** `game.documentTypes.Item` comes from `Object.keys(types)` in `Game#setupPackages`, so `.includes()` works directly.
   The defensive `Array.from()` in this harness is harmless and stays; the note that called it a `Set` was wrong.
 - **Tab switching:** `actor.sheet.changeTab('inventory', 'primary')` — DOM clicks on `[data-tab]` don't trigger Foundry's tab management
 - **Embedded item source tracking:** Set `flags: { core: { sourceId: worldItem.uuid } }` on embedded copies so the crafting engine can match them to registered components
@@ -261,6 +261,41 @@ node scripts/view-lab-screenshots.mjs apps <id,id>    # a subset
 node scripts/view-lab-screenshots.mjs apps --clean    # wipe ui-screenshot-artifact/apps/ first
 npm run viewlab:index              # regenerate the index without a capture
 ```
+
+### Where the chrome comes from, and which source may attest
+
+Two sources, only one of them authoritative.
+
+```sh
+npm run viewlab:chrome:harvest                       # the release archive (default)
+npm run viewlab:chrome:harvest -- --from-dir "C:\Program Files\Foundry Virtual Tabletop"
+```
+
+The archive is what CI harvests, so it is the only source `--write-provenance` accepts.
+`--from-dir` reads an unpacked desktop installation instead, which needs neither Docker nor
+credentials and renders identical frames.
+It may not record provenance, because the two hold the same Foundry as different bytes: the Windows
+installer ships `client/applications/api/application.mjs` with CRLF line endings where the release
+archive uses LF, so their digests differ.
+A record written from an installation would pin digests CI could never reproduce, and the
+frame-builder drift gate would fail on every later pull request.
+The harvest refuses rather than letting that happen.
+
+### Keeping the smoke and the lab on one Foundry
+
+The lab has no Foundry of its own.
+It harvests whatever archive the smoke's container downloaded, which is the right coupling: the live
+smoke is the fidelity authority, and drawing from the same build is what makes a lab frame and a
+smoke frame comparable.
+`docker-compose.foundry.yml` pins an exact build, `scripts/foundry-test-up.mjs` reads that pin rather
+than restating it, and `tests/view-lab-chrome-version-lock.test.js` fails when the committed
+provenance names a different build from the pinned image.
+Bumping Foundry therefore means bumping the pin, the smoke world fixture, and the provenance record
+together.
+Re-recording provenance is deliberately a human act: someone re-reads
+`client/applications/api/application.mjs` and confirms `scripts/lib/foundryChromeSpec.js` still
+transcribes it.
+`tests/view-lab-chrome-drift.test.js` names anything that moved.
 
 Nothing harvested is ever committed.
 `tests/view-lab-chrome-license.test.js` enforces that against the whole tracked tree and never skips.

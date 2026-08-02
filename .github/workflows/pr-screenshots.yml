@@ -15,7 +15,7 @@ name: "PR Screenshots (View Lab)"
 # LICENSING — the constraint that shapes everything below.
 #
 # `.foundry-chrome/**` holds Foundry's proprietary client source, `foundry2.css`, and Font Awesome
-# 6 PRO webfonts. This repository is PUBLIC, and artifacts on a public repository are downloadable
+# PRO webfonts. This repository is PUBLIC, and artifacts on a public repository are downloadable
 # by anyone. So:
 #
 #   - no step uploads `.foundry-chrome/**`, or any parent of it, as an artifact;
@@ -137,19 +137,40 @@ jobs:
           path: .foundry-e2e/cache
           key: foundry-binary-${{ runner.os }}-${{ hashFiles('docker-compose.foundry.yml') }}
 
+      # BEFORE the archive step, not after the harvest. On a cold cache that step boots Foundry, and
+      # `foundry-test-up.mjs` refuses to assemble a data directory without `dist/`. Building later
+      # worked only for as long as the cache probe was a `foundryvtt-*.zip` glob that a stale entry
+      # could satisfy; the moment the probe became exact, the first genuinely cold run failed here.
+      - name: Build module
+        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
+        run: npm run build
+
       # The felddy image does NOT bundle Foundry; it authenticates and downloads on first boot. So
       # on a cold archive cache there is no way to obtain the chrome without a credentialed boot,
       # and the lab's "seconds, no Docker" property does not transfer to CI. This step pays that
       # cost only when the cache missed.
+      #
+      # The probe names the EXACT archive the pinned image will download, not `foundryvtt-*.zip`.
+      # A glob is satisfied by whatever the cache happens to hold, so a restored entry carrying the
+      # previous major reported "warm", skipped the boot, and harvested the wrong Foundry's chrome —
+      # caught only by the provenance gate below, a whole CI cycle later.
       - name: Obtain the Foundry release archive
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
         run: |
-          if ! ls .foundry-e2e/cache/foundryvtt-*.zip >/dev/null 2>&1; then
-            echo "Archive cache is cold — booting Foundry once to populate it."
+          VERSION=$(node --input-type=module -e "
+            import { readPinnedFoundryImage, foundryVersionFromTag } from './scripts/lib/foundryImagePin.js';
+            const { tag } = readPinnedFoundryImage('docker-compose.foundry.yml');
+            const version = foundryVersionFromTag(tag);
+            if (!version) throw new Error('the pinned image tag ' + tag + ' names no exact Foundry build');
+            process.stdout.write(version);
+          ")
+          ARCHIVE=".foundry-e2e/cache/foundryvtt-${VERSION}.zip"
+          if [ ! -f "$ARCHIVE" ]; then
+            echo "No cached $ARCHIVE — booting Foundry once to populate it."
             npm run test:foundry:up
             npm run test:foundry:down
           else
-            echo "Archive cache is warm; no boot required."
+            echo "Archive cache is warm for $ARCHIVE; no boot required."
           fi
 
       - name: Harvest window chrome
@@ -192,10 +213,6 @@ jobs:
         env:
           VIEWLAB_REQUIRE_CHROME: '1'
         run: node --test tests/view-lab-chrome-drift.test.js
-
-      - name: Build module
-        if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''
-        run: npm run build
 
       - name: Render the selected frames
         if: env.SKIP_CAPTURE != 'true' && steps.select.outputs.ids != ''

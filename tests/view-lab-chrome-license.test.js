@@ -1,6 +1,6 @@
 /**
  * The View Lab draws real Foundry window chrome, harvested from the maintainer's own licensed
- * installation. Those bytes are proprietary — Foundry's own, plus Font Awesome 6 Pro and Modesto
+ * Foundry. Those bytes are proprietary — Foundry's own, plus Font Awesome Pro and Modesto
  * Condensed, which Foundry licenses from third parties. This repository is public.
  *
  * So the rule is deliberately absolute and mechanically checked: NOTHING harvested is ever
@@ -33,7 +33,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  */
 const FORBIDDEN_TRACKED_PATTERNS = [
   { pattern: /(^|\/)foundry2(\.min)?\.css$/i, why: "Foundry core stylesheet" },
-  { pattern: /(^|\/)fa-[a-z0-9-]+\.(woff2?|ttf|eot|otf)$/i, why: 'Font Awesome 6 Pro webfont' },
+  { pattern: /(^|\/)fa-[a-z0-9-]+\.(woff2?|ttf|eot|otf)$/i, why: 'Font Awesome Pro webfont' },
   { pattern: /(^|\/)signika[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Foundry-bundled Signika' },
   { pattern: /(^|\/)modesto-condensed[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Modesto Condensed' },
   { pattern: /(^|\/)(amiri|bruno-ace)[a-z0-9-]*\.(woff2?|ttf|otf)$/i, why: 'Foundry-bundled face' },
@@ -104,7 +104,16 @@ test('the tracked provenance record carries metadata only, never licensed bytes'
   const provenance = JSON.parse(raw);
   assert.deepEqual(
     Object.keys(provenance).sort(),
-    ['assets', 'chromeMarkup', 'foundryVersion', 'harvestedAt', 'schemaVersion', 'source', 'trees'],
+    [
+      'assets',
+      'chromeMarkup',
+      'foundryVersion',
+      'harvestedAt',
+      'schemaVersion',
+      'source',
+      'trees',
+      'unresolvedReferences',
+    ],
     `${PROVENANCE_PATH} has unexpected top-level keys; the shape is pinned so a new one cannot ` +
       'quietly become a payload.'
   );
