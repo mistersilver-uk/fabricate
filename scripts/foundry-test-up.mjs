@@ -21,13 +21,18 @@ import {
   prepareFoundryData,
   startPreparedFoundryContainer,
 } from './lib/foundryDataPreparation.js';
+import { readPinnedFoundryImage } from './lib/foundryImagePin.js';
 import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const COMPOSE_FILE = join(ROOT, 'docker-compose.foundry.yml');
 const ENV_FILE = join(ROOT, '.env.foundry');
-const DEFAULT_FOUNDRY_IMAGE = 'felddy/foundryvtt:13';
+// Read from the compose file rather than restated here. This constant is the value that actually
+// boots (it is written into process.env below, before compose reads its own default), while the
+// compose file is what CI hashes into the `foundry-binary-*` cache key — so a second copy is wrong
+// in opposite directions depending on which one you edit. See scripts/lib/foundryImagePin.js.
+const DEFAULT_FOUNDRY_IMAGE = readPinnedFoundryImage(COMPOSE_FILE).image;
 
 // Per-worktree-stable container identity (issue #827). Derived deterministically from
 // the worktree root so it is unique across worktrees (no fixed-name collision) yet
@@ -304,12 +309,12 @@ export async function runFoundryLauncher({
   });
 
   // Set container user to match the host user so bind-mounted volumes are writable.
-  // The v13 felddy/foundryvtt image runs as 1000:1000 by default and no longer
+  // The felddy/foundryvtt image runs as 1000:1000 by default and no longer
   // supports FOUNDRY_UID/FOUNDRY_GID. We use Docker's native `user:` directive
   // via FOUNDRY_HOST_UID/FOUNDRY_HOST_GID env vars in docker-compose.foundry.yml.
   // On Windows, Docker Desktop bind mounts go through a translation layer that
-  // ignores the host UID; the felddy/foundryvtt:13 image's pre-created `foundry`
-  // user is uid 1000, which is what the daemon expects. Hardcoding skips the
+  // ignores the host UID; the image's pre-created `foundry` user is uid 1000,
+  // which is what the daemon expects. Hardcoding skips the
   // noisy "id not found" stderr from the previous try/catch path.
   if (!process.env.FOUNDRY_HOST_UID) {
     process.env.FOUNDRY_HOST_UID = process.platform === 'win32'

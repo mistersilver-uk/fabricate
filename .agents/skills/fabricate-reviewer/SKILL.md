@@ -101,8 +101,9 @@ PR-scoped screenshots should not be committed as repository assets.
 - Image UI tests or smoke screenshots prove linked-image priority, or the remaining screenshot gap is explicitly called out.
 - Smoke screenshot data uses Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be treated as a finding.
 
-## Foundry V13 checks
+## Foundry API checks
 
+These were verified against V13.351 and still hold on the pinned V14.365.
 When reviewing Foundry-facing code, verify:
 
 - `game.documentTypes.Item` is converted before array methods.

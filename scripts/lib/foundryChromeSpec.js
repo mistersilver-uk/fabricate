@@ -1,5 +1,5 @@
 /**
- * The Foundry V13 application-frame contract the View Lab reproduces, plus the Fabricate window
+ * The Foundry V14 application-frame contract the View Lab reproduces, plus the Fabricate window
  * descriptors it reproduces it for.
  *
  * This module is a TRANSCRIPTION, not an invention. Every value below is copied from Foundry's
@@ -16,8 +16,18 @@
  * `_renderFrame` (application.mjs) builds the header with a template literal, so the lab builds
  * the same string rather than assembling elements and hoping the shape matches.
  *
+ * V14 ENDS AT `</header>`. V13 appended a `<menu class="controls-dropdown"></menu>` that
+ * `_updateFrame` filled with `_renderHeaderControl` list items; V14 routes header controls through
+ * a context menu (`_headerControlContextEntries`) instead and emits no dropdown element at all.
+ * Keeping the old element would put a node in every captured frame that production no longer has.
+ *
+ * V14 also added `_renderFrameButtons` / `_getFrameButtons`, which insert extra buttons before the
+ * close button. `_getFrameButtons` returns `[]` on ApplicationV2 and neither Fabricate window
+ * overrides it, so nothing is inserted and `templates/generic/frame-buttons.hbs` is never fetched —
+ * which is why the harvest does not collect it.
+ *
  * @param {{toggleControls: string, close: string}} labels Localized control labels.
- * @returns {string} The frame's inner HTML, header and controls dropdown only.
+ * @returns {string} The frame's inner HTML, header only.
  */
 function frameInnerHtml(labels) {
   return `<header class="window-header">
@@ -28,8 +38,7 @@ function frameInnerHtml(labels) {
               data-action="toggleControls"></button>
       <button type="button" class="header-control icon fa-solid fa-xmark"
               data-tooltip="${labels.close}" aria-label="${labels.close}" data-action="close"></button>
-    </header>
-    <menu class="controls-dropdown"></menu>`;
+    </header>`;
 }
 
 /**
@@ -53,7 +62,7 @@ export function frameClassesFor(app) {
 
 export const FOUNDRY_CHROME_SPEC = Object.freeze({
   /** The Foundry major this transcription was taken from. */
-  coreMajor: 13,
+  coreMajor: 14,
   frameInnerHtml,
   frameClassesFor,
   /** `_updateFrame`: `this.#window.icon.className = \`window-icon fa-fw ${window.icon || "hidden"}\`` */
@@ -92,7 +101,7 @@ export const FOUNDRY_CHROME_SPEC = Object.freeze({
 });
 
 /**
- * Foundry V13's `DialogV2` (`client/applications/api/dialog.mjs`), transcribed exactly as
+ * Foundry V14's `DialogV2` (`client/applications/api/dialog.mjs`), transcribed exactly as
  * {@link FOUNDRY_CHROME_SPEC} transcribes the window frame.
  *
  * A confirmation dialog is Foundry's chrome, not Fabricate's: `foundryBridge.confirmDialog` hands
@@ -102,7 +111,7 @@ export const FOUNDRY_CHROME_SPEC = Object.freeze({
  * lookalike would be a facsimile, which this harness must never publish.
  *
  * The frame itself is inherited unchanged — `DialogV2` does not override `_renderFrame` — so the
- * header, title, controls dropdown and content element all come from {@link FOUNDRY_CHROME_SPEC}.
+ * header, title and content element all come from {@link FOUNDRY_CHROME_SPEC}.
  * What is new here is the `<dialog>` tag, the `dialog` class, and the form the dialog puts in the
  * `.window-content`.
  */
@@ -132,7 +141,9 @@ export const FOUNDRY_DIALOG_SPEC = Object.freeze({
     `,
   /**
    * `_renderButtons`' destructuring defaults:
-   * `const { action, label, icon, class: cls="", style={}, type="submit", disabled } = buttonOptions`.
+   * `const { action, label, icon, class: cls="", style={}, type="submit", disabled, tooltip } = buttonOptions`.
+   * `tooltip` is V14's addition and has no default; it gates a `data-tooltip`/`aria-label` pair
+   * emitted between the `disabled` and `autofocus` toggles.
    */
   buttonDefaults: Object.freeze({ class: '', type: 'submit' }),
   /**
@@ -171,11 +182,15 @@ export const FOUNDRY_DIALOG_SPEC = Object.freeze({
  */
 export function confirmDialogButtons({ yes = {}, no = {} } = {}) {
   return [
-    { action: 'yes', label: 'Yes', icon: 'fa-solid fa-check', callback: () => true, ...yes },
+    { action: 'yes', label: 'COMMON.Yes', icon: 'fa-solid fa-check', callback: () => true, ...yes },
     {
       action: 'no',
-      label: 'No',
+      label: 'COMMON.No',
       icon: 'fa-solid fa-xmark',
+      // V14 only. `_renderButtons` defaults `type` to "submit", so before this the No button
+      // submitted the dialog form; it now declines without one. Invisible in a screenshot, present
+      // in the captured markup.
+      type: 'button',
       default: true,
       callback: () => false,
       ...no,
@@ -196,7 +211,9 @@ export function confirmDialogButtons({ yes = {}, no = {} } = {}) {
  * @returns {Array<object>} The single ok descriptor.
  */
 export function promptDialogButtons(ok = {}) {
-  return [{ action: 'ok', label: 'Confirm', icon: 'fa-solid fa-check', default: true, ...ok }];
+  return [
+    { action: 'ok', label: 'COMMON.Confirm', icon: 'fa-solid fa-check', default: true, ...ok },
+  ];
 }
 
 /**

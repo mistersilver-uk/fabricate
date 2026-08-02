@@ -108,7 +108,8 @@ export function buildAppWindow({ appId, localize, position }) {
   const rawTitle = typeof localize === 'function' ? localize(app.window.title) : app.window.title;
   title.innerText = String(rawTitle).replace(/\s+/g, ' ').trim();
   frame.querySelector('.window-icon').className = FOUNDRY_CHROME_SPEC.windowIconClass(app.window.icon);
-  frame.querySelector('.controls-dropdown').replaceChildren();
+  // No `.controls-dropdown` to empty: V14 dropped that element from `_renderFrame` and routes
+  // header controls through a context menu instead.
   // Fabricate declares no header controls, so Foundry hides the ellipsis button. A frame that
   // shows one is visibly wrong against any real screenshot.
   frame

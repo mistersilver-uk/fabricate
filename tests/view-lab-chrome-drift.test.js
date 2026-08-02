@@ -180,13 +180,41 @@ test('_updateFrame still hides the controls button when there are no header cont
   const body = normalize(methodBody(source, '_updateFrame(options)'));
   assert.match(
     body,
-    /controls\.classList\.toggle\("hidden", !controls\.length\)/,
+    /controls\.classList\.toggle\("hidden", !Array\.from\(this\._headerControlButtons\(\)\)\.length\)/,
     'the header-controls visibility rule moved. Fabricate registers no header controls, so the lab ' +
       'hides that button; if Foundry stopped doing this, every captured frame is now missing a control.'
   );
   for (const [appId, app] of Object.entries(APP_CHROME)) {
     assert.equal(app.window.controls.length, 0, `${appId} is expected to declare no header controls`);
   }
+});
+
+test('_renderFrame still emits no controls dropdown', { skip }, () => {
+  // V13 appended `<menu class="controls-dropdown"></menu>` to the frame and filled it in
+  // `_updateFrame`; V14 removed it in favour of a context menu. The transcription follows, so this
+  // asserts the ABSENCE — a V15 that reinstated the element would otherwise be a silent omission
+  // from every captured frame rather than a failure.
+  const body = normalize(methodBody(source, 'async _renderFrame(options)'));
+  assert.ok(
+    !body.includes('controls-dropdown'),
+    'ApplicationV2 emits a controls-dropdown again. Restore it in FOUNDRY_CHROME_SPEC.frameInnerHtml ' +
+      'and in tests/view-lab/foundryFrame.js, or every captured frame is missing an element ' +
+      'production draws.'
+  );
+  assert.ok(!FOUNDRY_CHROME_SPEC.frameInnerHtml({ toggleControls: 'a', close: 'b' }).includes('controls-dropdown'));
+});
+
+test('_getFrameButtons is still empty, so no extra header button is drawn', { skip }, () => {
+  // V14 added `_renderFrameButtons`, which inserts `_getFrameButtons(options)` before the close
+  // button. ApplicationV2's returns nothing and neither Fabricate window overrides it — which is
+  // both why the frame has no extra button and why `templates/generic/frame-buttons.hbs` is not
+  // harvested. If core starts returning one by default, every frame gains a control the lab omits.
+  assert.match(
+    normalize(methodBody(source, '_getFrameButtons(options)')),
+    /^\{ return \[\]; \}$/,
+    'ApplicationV2._getFrameButtons no longer returns an empty list. The lab draws no frame buttons, ' +
+      'so a non-empty default means every captured frame is missing one.'
+  );
 });
 
 test('the application class is still unshifted onto framed windows', { skip }, () => {
@@ -302,9 +330,16 @@ test('_renderButtons still builds each button the same way', { skip: skipDialog 
     `type="${buttonDefaults.type}"`,
     'const isDefault = !!buttonOptions.default || ((i === 0) && !buttons.some(b => b.default));',
     'button.setAttribute("type", type); button.setAttribute("data-action", action); button.setAttribute("class", cls);',
-    'button.toggleAttribute("disabled", !!disabled); button.toggleAttribute("autofocus", isDefault);',
+    // V14 interposes the tooltip branch between the two toggles. Asserted as three fragments so a
+    // future reordering shows up as the specific line that moved, and so the branch itself is
+    // pinned — the lab transcribes it even though no Fabricate dialog passes a tooltip yet.
+    'button.toggleAttribute("disabled", !!disabled);',
+    'if ( tooltip ) { button.setAttribute("data-tooltip", ""); button.setAttribute("aria-label", _loc(tooltip)); }',
+    'button.toggleAttribute("autofocus", isDefault);',
     'i.className = icon;',
-    'span.innerText = game.i18n.localize(label);',
+    // V14 localizes through the module-local `_loc` helper rather than reaching for the `game`
+    // global. Same resolution; the lab's `renderButtons` passes its own localizer either way.
+    'span.innerText = _loc(label);',
     'return button.outerHTML;',
   ];
   for (const fragment of expected) {
@@ -329,7 +364,7 @@ test('confirm still unshifts the yes/no buttons the spec transcribes', { skip: s
   assert.ok(
     normalized.includes(
       `action: "${no.action}", label: "${no.label}", icon: "${no.icon}", ` +
-        `default: ${no.default}, callback: () => ${no.callback()}`
+        `type: "${no.type}", default: ${no.default}, callback: () => ${no.callback()}`
     ),
     `DialogV2.confirm's NO button moved. ${RETRANSCRIBE}`
   );

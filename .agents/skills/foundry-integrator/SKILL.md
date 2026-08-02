@@ -40,7 +40,7 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 - the change under review — the issue's `openspec-delta` block at design time, and the assigned target's diff against the supplied base SHA at implementation review.
 - the Foundry-facing code involved: `src/integrations/`, `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
 - the `FoundryVTT Notes` section of `AGENTS.md` and the Foundry deep-dives now consolidated in `AGENTS.md` and `CONTRIBUTING.md`.
-- the target Foundry version declared in `module.json` (currently V13) — every finding is pinned to that version.
+- the Foundry compatibility range declared in `module.json` (currently `minimum: "13"`, `verified: "14"`) and the exact build the smoke boots (pinned in `docker-compose.foundry.yml`) — every finding is pinned to a named version rather than to "current".
 
 ## Research method (strict order of preference)
 
