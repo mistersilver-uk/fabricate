@@ -262,6 +262,23 @@ const BASE_DEFINITIONS = Object.freeze({
 
 const keys = Object.values(SETTING_KEYS);
 
+/**
+ * The setting keys stored at `scope: 'world'`, derived from the definitions above
+ * rather than restated, so it cannot drift as settings are added or re-scoped.
+ *
+ * These are the keys Foundry lets ONLY a GM update (`BaseSetting.#canModify` requires
+ * the `SETTINGS_MODIFY` permission, whose `requiredRoles` is `[GAMEMASTER]`). A
+ * player-reachable code path that writes one of these fails at the server with
+ * `User <name> lacks permission to update Setting [...]`, so any such write must be
+ * routed to the active GM. Exported so tests can model that refusal instead of
+ * assuming an omnipotent settings seam.
+ *
+ * @type {ReadonlySet<string>}
+ */
+export const WORLD_SCOPED_SETTING_KEYS = Object.freeze(
+  new Set(keys.filter((key) => BASE_DEFINITIONS[key]?.scope === 'world'))
+);
+
 export function registerFabricateSettings() {
   for (const key of keys) {
     const definition = BASE_DEFINITIONS[key];

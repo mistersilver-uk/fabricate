@@ -1,9 +1,13 @@
 /**
  * The actors the CURRENT user is permitted to write to (issue 970).
  *
- * Fabricate has no socket-to-GM relay: every actor mutation is performed directly
- * by the acting client, so a pass that walks `game.actors` and writes is only
- * legal for the subset that client owns. Foundry refuses the rest, and
+ * ACTOR mutations are performed directly by the acting client — Fabricate's
+ * socket-to-GM relays cover shared documents a player can never own (Region
+ * Behaviours in `canvas/interactableSocket.js`, the environment node pool in
+ * `systems/gatheringNodeSocket.js`), NOT actors, which a player legitimately owns.
+ * So a pass that walks `game.actors` and writes is still only legal for the subset
+ * that client owns; do not infer from the relays that one exists here. Foundry
+ * refuses the rest, and
  * `setFabricateFlag` deliberately REJECTS on a refused update rather than
  * reporting a phantom success — so an un-filtered walk turns one stale entry on
  * someone else's character into an unhandled rejection on every player client.
