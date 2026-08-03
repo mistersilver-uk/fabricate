@@ -9,20 +9,26 @@
  * Two classes of assertion here, and they fail for different reasons:
  *
  * 1. SHAPE — `rolledDiceGroups` in `src/systems/checkRoll.js` reads `die.number`, `die.faces`,
- *    `die.total`, `die.results[].result` and `die.results[].active`, and treats an ABSENT `active`
- *    as kept. A shape drift here does not throw; it silently changes what a published frame shows.
- * 2. DETERMINISM — the published frames are a function of the seed. `player-crafting-run-summary`
- *    and `player-crafting-roll-result` now depend on the first d20 of a page being a 20, because
- *    that is what carries smithing's `1d20 + 3` over its threshold of 12. If that stops being true
- *    those frames change, so it is pinned here where the failure names itself, rather than being
- *    discovered as an unexplained pixel diff.
+ *    `die.total`, `die.results[].result` and `die.results[].active`. A shape drift here does not
+ *    throw; it silently changes what a published frame shows.
+ * 2. DETERMINISM — `player-crafting-run-summary` and `player-crafting-roll-result` are frames of a
+ *    craft that SUCCEEDS, and that success is a function of four fixture facts: the seed, the check
+ *    formula, the threshold and the crafter's roll data. All four are READ from the fixtures rather
+ *    than copied, so moving any one of them fails here by name instead of surfacing later as an
+ *    unexplained frame diff.
+ * 3. COMPOSITION — that the shim actually installs a constructor. Asserting the class in isolation
+ *    left the whole capability revertible with the suite green.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { createLabRoll } from './view-lab/foundry/labRoll.js';
 import { installLabRandom } from './view-lab/foundry/labRandom.js';
-import { rolledDiceGroups } from '../src/systems/checkRoll.js';
+import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
+import { buildLabContent } from './view-lab/world/labContent.js';
+import { buildLabActors } from './view-lab/world/labActors.js';
+import { rolledDiceGroups, evaluateCheckRoll } from '../src/systems/checkRoll.js';
 
 /** The two statics the shim hands through, reproduced verbatim from `installFoundryShim.js`. */
 const STATICS = {
@@ -45,7 +51,7 @@ const STATICS = {
  * @param {number} [seed] The seed; defaults to the lab's own.
  * @returns {Function} A `Roll` class.
  */
-function makeRoll(seed = 20_260_601) {
+function makeRoll(seed = LIVE_SEED) {
   const random = installLabRandom({ seed });
   // `installLabRandom` swaps the realm's `Math.random`/`Date.now`; restore immediately. Only the
   // generator function itself is wanted here, and leaking the swap would poison sibling tests.
@@ -57,17 +63,41 @@ function makeRoll(seed = 20_260_601) {
   });
 }
 
-test('the first d20 of a seeded page is a 20', async () => {
-  // Load-bearing for two published frames. `mulberry32(20260601)` yields 0.9666 first, so
-  // `floor(0.9666 * 20) + 1 === 20`. Smithing's SIMPLE_CHECK is `1d20 + @abilities.int.mod`
-  // against `thresholds.success: 12`; Brenna's int mod is 3. 23 >= 12, with margin.
+/**
+ * The seed the lab actually renders with, read out of `labWorld.js`'s own default rather than
+ * copied. A copy is what let the reviewer change `labWorld.js`'s seed with this whole file green.
+ */
+const LIVE_SEED = (() => {
+  const source = readFileSync(new URL('./view-lab/world/labWorld.js', import.meta.url), 'utf8');
+  const match = /seed\s*=\s*([\d_]+)/.exec(source);
+  assert.ok(match, 'labWorld.js no longer declares a default seed');
+  return Number(match[1].replaceAll('_', ''));
+})();
+
+test('the seeded smithing check clears its own threshold', () => {
+  // The COMPOSED invariant, not three copied literals. `player-crafting-run-summary` and
+  // `player-crafting-roll-result` are frames of a craft that SUCCEEDS, and that success is a
+  // function of four fixture facts: the seed, the check formula, the threshold and the crafter's
+  // roll data. Reading all four from the fixtures is what makes this fail by name when any one of
+  // them moves — the earlier version hardcoded 3, 23 and 12, so the seed, the threshold and the
+  // ability mod could each be changed with the suite green.
+  const content = buildLabContent();
+  const actors = buildLabActors(content);
+  const smithing = content.systems.find((system) => system.id === 'lab-smithing');
+  assert.ok(smithing, 'the smithing fixture system exists');
+  const { rollFormula, thresholds } = smithing.craftingCheck.simple;
+  const brenna = actors.find((actor) => actor.id === 'lab-actor-brenna');
+  assert.ok(brenna, 'Brenna exists');
+
   const Roll = makeRoll();
-  const roll = await new Roll('1d20 + @abilities.int.mod', {
-    abilities: { int: { mod: 3 } },
-  }).evaluate();
-  assert.equal(roll.dice[0].results[0].result, 20, 'the first d20 face');
-  assert.equal(roll.total, 23, 'the seeded smithing check total');
-  assert.ok(roll.total >= 12, 'the seeded smithing check clears its threshold');
+  const roll = new Roll(rollFormula, brenna.getRollData());
+  return roll.evaluate().then((evaluated) => {
+    assert.ok(
+      evaluated.total >= thresholds.success,
+      `the seeded smithing craft must clear its threshold, or the two craft frames stop showing a ` +
+        `successful craft: rolled ${evaluated.total} of ${rollFormula} against ${thresholds.success}`
+    );
+  });
 });
 
 test('the same seed replays the same faces', async () => {
@@ -98,12 +128,13 @@ test('the die shape is the one rolledDiceGroups reads', async () => {
   assert.equal(die.number, 3);
   assert.equal(die.faces, 6);
   assert.equal(die.results.length, 3);
-  // ABSENT, not `true`. Foundry omits `active` on a kept result, and `rolledDiceGroups` filters on
-  // `entry?.active !== false` precisely so that absence counts as kept. Asserting `true` here would
-  // let the lab drift into a shape production never produces.
+  // `active: true` on a kept result, matching every Foundry-shaped dice fixture in this repo
+  // (`check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-nat-stepping.test.js`).
+  // `rolledDiceGroups` filters on `!== false` so it would accept an absent key too, but the lab
+  // must emit the shape production emits — otherwise a later fidelity fix reads as a regression.
   assert.ok(
-    die.results.every((entry) => !Object.hasOwn(entry, 'active')),
-    'a kept result carries no `active` key'
+    die.results.every((entry) => entry.active === true),
+    'a kept result is explicitly active'
   );
   assert.equal(
     die.total,
@@ -208,4 +239,47 @@ test('the statics behave exactly as the object they replaced', () => {
   assert.equal(Roll.validate('1d20 + 3'), true);
   assert.equal(Roll.validate('1d20 + @x'), false);
   assert.equal(Roll.validate('1d20 + NaN'), false);
+});
+
+test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the prompt', async () => {
+  // COMPOSITION, and the reason this test exists: every other test here imports `createLabRoll`
+  // directly, so reverting `installFoundryShim.js` to the pre-change two-static object left the
+  // whole capability gone with the suite green. `evaluateCheckRoll` bails on
+  // `typeof globalThis.Roll !== 'function'` BEFORE it calls `options.prompt`, so an object here
+  // means no crafting, salvage or alchemy dialog can EVER open in the lab — which is exactly the
+  // state the roll-prompt frame was added to escape.
+  const content = buildLabContent();
+  const actors = buildLabActors(content);
+  const previous = { Roll: globalThis.Roll, game: globalThis.game, ui: globalThis.ui };
+  try {
+    installFoundryShim({
+      seed: LIVE_SEED,
+      actorList: actors,
+      scenes: [],
+      settings: new Map(),
+      i18n: { localize: (key) => key, format: (key) => key },
+      worldTime: 0,
+      documents: new Map(),
+    });
+    assert.equal(typeof globalThis.Roll, 'function', 'the shim installs a Roll constructor');
+
+    let prompted = false;
+    const result = await evaluateCheckRoll(
+      '1d20 + 3',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        prompt: async () => {
+          prompted = true;
+          return { confirmed: true };
+        },
+      }
+    );
+    assert.equal(result.engine, true, 'the check is engine-evaluated rather than short-circuited');
+    assert.ok(prompted, 'the interactive prompt is reached');
+  } finally {
+    globalThis.Roll = previous.Roll;
+    globalThis.game = previous.game;
+    globalThis.ui = previous.ui;
+  }
 });

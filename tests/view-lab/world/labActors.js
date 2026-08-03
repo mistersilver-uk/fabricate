@@ -141,13 +141,6 @@ const INVENTORIES = {
     'sm-tool-anvil': 1,
     'sm-tool-tongs': 1,
     'hb-healing-potion': 2,
-    // The single blocker on every herbalism craft, and therefore on the interactive roll prompt.
-    // Brenna has learned `hb-r-stillroom` and `hb-r-kiln`, and their ingredients are reachable
-    // through the multi-source picker (Vosk and Idrin both carry moonleaf and spring water) — but a
-    // required TOOL is matched against the CRAFTING actor's own items, and the mortar lived only on
-    // Idrin. Without it the Craft button stays blocked on the one system that has a check-modifier
-    // catalogue, so the `playerPicks` fieldset could never be photographed.
-    'hb-tool-mortar': 1,
     // Routed stock, deliberately ASYMMETRIC. Brenna holds the silver billet but not the gold one,
     // so `jw-r-cast` renders with one route satisfied and one short — which is the whole point of
     // a routedByIngredients frame. The wire is one under the three a circlet needs, for the same

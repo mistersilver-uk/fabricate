@@ -603,7 +603,12 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-inherit',
     label: 'Manager — Recipe edit crafting modifier inherit',
-    smokeLabels: ['manager-recipe-edit-normal'],
+    // BEYOND the smoke. Its Overview-tab frame (`manager-recipe-edit-normal`) opens Brew Healing
+    // Potion, which authors an override — so the smoke photographs this control OVERRIDDEN and has
+    // no counterpart for the inherit state. Claiming `exact` against it would be the overclaim the
+    // tuple test explicitly cannot catch: same screen, different state.
+    reaches: 'beyond',
+    smokeLabels: [],
     // The per-recipe check-modifier override AT REST. `RecipeOverviewTab` gates the whole control
     // on `craftingModifierOptions.length > 0`, so it exists on exactly one lab system — herbalism,
     // the only one carrying a catalogue — and every other recipe-editor frame in this registry runs
@@ -614,7 +619,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     // "Inherit system default (Pick highest)" — the label composed from the SYSTEM policy, which is
     // the half of the control a per-recipe frame cannot otherwise show, and the half that would
     // have silently read "(Add all)" had the label map not gained a `playerPicks` entry.
-    reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -632,10 +636,12 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-player-picks',
     label: 'Manager — Recipe edit crafting modifier Player picks',
-    // BEYOND the smoke: its one overriding recipe authors `byRecipe`, so no smoke frame shows the
-    // Phase-2 policy chosen per recipe.
-    reaches: 'beyond',
-    smokeLabels: [],
+    // Pairs the smoke's own Overview frame: `manager-recipe-edit-normal` opens Brew Healing Potion,
+    // whose seed this branch moved to a `playerPicks` override so the smoke's roll prompt would
+    // carry the fieldset too. Both frames therefore land on the same condition — the per-recipe
+    // control in its Phase-2 override state — which is what makes a side-by-side meaningful.
+    reaches: 'exact',
+    smokeLabels: ['manager-recipe-edit-normal'],
     // `hb-r-stillroom` authors `{ policy: 'playerPicks', modifierIds: [...three] }`, which is what
     // makes `hasModifierOverride` true — so this frame carries BOTH halves of the control at once:
     // the select on its new fourth option, and the eligible-modifier pill row that only an
@@ -2439,13 +2445,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     // carries an entry for the selected recipe. A craft that returns `success: false` notifies and
     // records nothing, so the frame is reached by a craft that actually completes.
     //
-    // Smelt Iron Ingot, and a CHECKED recipe on purpose: the shim's `Roll` is an object, not a
-    // constructor, so `evaluateCheckRoll` short-circuits on its own `typeof !== 'function'` guard
-    // and returns `engine: false` — the documented headless path, which passes the check without
-    // rolling. What the lab therefore cannot reach is the smoke's ROUTED craft, which needs a real
-    // total to land on an outcome tier and otherwise aborts with "does not satisfy current
-    // resolution mode requirements". A `Roll` class in the shim would close that;
-    // `tests/view-lab/foundry/installFoundryShim.js` is where it would go.
+    // Smelt Iron Ingot, and a CHECKED recipe on purpose: this craft now ROLLS. The shim used to
+    // install `Roll` as a plain object, so `evaluateCheckRoll` short-circuited on its own
+    // `typeof !== 'function'` guard and passed the check without rolling; since
+    // `tests/view-lab/foundry/labRoll.js` it evaluates `1d20 + @abilities.int.mod` off the seeded
+    // stream, whose first d20 on any page is a 20, for a total of 23 against a threshold of 12.
+    // The margin is a property of the FIXTURE and the seed, not a guarantee — see
+    // `tests/view-lab-roll.test.js`, which pins the composed invariant so a seed or threshold
+    // change fails there by name rather than surfacing here as a mystery frame diff.
+    // The smoke's ROUTED craft is reachable in principle now too, and remains uncaptured only
+    // because no case asks for it.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [

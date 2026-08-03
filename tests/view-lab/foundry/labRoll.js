@@ -34,11 +34,29 @@ import { evaluateNumericExpression } from '../../../src/systems/craftingModifier
  *
  * `kh`/`kl` are the only modifiers any production path emits: `applyD20Advantage` in
  * `src/utils/craftingCheckExpression.js` rewrites a plain `1d20` to `2d20kh1` / `2d20kl1` for
- * advantage and disadvantage, and nothing else in `src/` rewrites a formula. A term this pattern
- * does not understand is left in place for `evaluateNumericExpression` to reject, which surfaces
- * as a visibly wrong frame rather than as a silently plausible number.
+ * advantage and disadvantage, and nothing else in `src/` rewrites a formula.
+ *
+ * A term this pattern does NOT understand is thrown on, by the `UNPARSED_DIE` check below, and
+ * that check is load-bearing rather than belt-and-braces: `evaluateNumericExpression` returns its
+ * partial parse with no end-of-input assertion, so it truncates instead of rejecting. Measured,
+ * before the guard existed: `3d6dl1` evaluated to 9 (the drop-lowest silently ignored) and
+ * `1d20 + 1dF` to 21 (the fudge die silently contributing 1). Those are exactly the "silently
+ * plausible number" this harness must not produce.
  */
 const DIE_TERM = /(\d*)d(\d+)(?:(kh|kl)(\d*))?/gi;
+
+/**
+ * A Foundry flavour annotation, e.g. the `[Rune Stylus]` that `appendToolBonusTerms` emits.
+ *
+ * Foundry treats a bracketed span as inert label text. `DIE_TERM` does not, so a GM who names a
+ * tool "Anvil d20 of Power" would otherwise have an extra d20 rolled out of its own label and the
+ * label itself rewritten to the rolled face. Spans are lifted out before the die pass and put back
+ * after, which keeps them verbatim in `result` without letting them reach the dice.
+ */
+const FLAVOUR_SPAN = /\[[^\]]*\]/g;
+
+/** A die term that survived the substitution pass — i.e. one this parser does not understand. */
+const UNPARSED_DIE = /\dd\d/i;
 
 /**
  * Build the lab's `Roll` class over an injected entropy source.
@@ -90,42 +108,61 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
       // the same case and refuse to claim the formula resolved. That asymmetry is production's and
       // is preserved here rather than smoothed over.
       const substituted = replaceFormulaData(this.formula, this.data, { missing: '0' });
-      const arithmetic = substituted.replaceAll(
-        DIE_TERM,
-        (match, count, faces, keep, keepCount) => {
-          const number = count === '' ? 1 : Number(count);
-          const sides = Number(faces);
-          if (!Number.isInteger(number) || number < 1) return match;
-          if (!Number.isInteger(sides) || sides < 1) return match;
-          const rolls = Array.from({ length: number }, () => Math.floor(random() * sides) + 1);
-          const keepN = keep ? (keepCount === '' ? 1 : Number(keepCount)) : number;
-          const ranked = rolls
-            .map((result, index) => ({ result, index }))
-            .toSorted((left, right) =>
-              keep === 'kl' ? left.result - right.result : right.result - left.result
-            );
-          const kept = new Set(
-            ranked.slice(0, Math.max(0, Math.min(keepN, number))).map((entry) => entry.index)
+      // Strip flavour spans before the die pass. A span carries no value of its own —
+      // Foundry attaches it to the preceding term — and `DIE_TERM` would otherwise roll
+      // dice out of a GM's own label: measured, `1d20 + 2 [Anvil d20 of Power]` produced
+      // TWO die groups and rewrote the label to a rolled face. Spans are dropped rather
+      // than restored because nothing in `src/` reads `roll.result`; it is a diagnostic
+      // here, not a rendered string.
+      const masked = substituted.replaceAll(FLAVOUR_SPAN, '');
+      const rolledOut = masked.replaceAll(DIE_TERM, (match, count, faces, keep, keepCount) => {
+        const number = count === '' ? 1 : Number(count);
+        const sides = Number(faces);
+        if (!Number.isInteger(number) || number < 1) return match;
+        if (!Number.isInteger(sides) || sides < 1) return match;
+        const rolls = Array.from({ length: number }, () => Math.floor(random() * sides) + 1);
+        const keepN = keep ? (keepCount === '' ? 1 : Number(keepCount)) : number;
+        const ranked = rolls
+          .map((result, index) => ({ result, index }))
+          .toSorted((left, right) =>
+            keep === 'kl' ? left.result - right.result : right.result - left.result
           );
-          // `active` is OMITTED on a kept die, exactly as Foundry omits it, so
-          // `rolledDiceGroups`' `entry?.active !== false` filter is exercised against its real
-          // shape rather than against an always-present boolean that would hide a regression.
-          const results = rolls.map((result, index) =>
-            keep && !kept.has(index) ? { result, active: false } : { result }
-          );
-          const total = rolls.reduce(
-            (sum, result, index) => (!keep || kept.has(index) ? sum + result : sum),
-            0
-          );
-          const die = { number, faces: sides, results, total };
-          this.dice.push(die);
-          this.terms.push(die);
-          return String(total);
-        }
-      );
-      const value = evaluateNumericExpression(arithmetic);
+        const kept = new Set(
+          ranked.slice(0, Math.max(0, Math.min(keepN, number))).map((entry) => entry.index)
+        );
+        // `active: true` on a kept die, matching every Foundry-shaped dice fixture in this repo
+        // (`tests/check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-nat-stepping.test.js`).
+        // `rolledDiceGroups` filters on `active !== false`, so it accepts an absent key too — but
+        // emitting a shape production does not produce would make a later fidelity fix read as a
+        // regression. The absent-key tolerance is production's contract and is covered there.
+        const results = rolls.map((result, index) => ({
+          result,
+          active: !keep || kept.has(index),
+        }));
+        const total = rolls.reduce(
+          (sum, result, index) => (!keep || kept.has(index) ? sum + result : sum),
+          0
+        );
+        const die = { number, faces: sides, results, total };
+        this.dice.push(die);
+        this.terms.push(die);
+        return String(total);
+      });
+      // Fail loudly on a die term this parser does not understand. `evaluateNumericExpression`
+      // would not: it returns its partial parse with no end-of-input assertion, so `3d6dl1` reads
+      // as 9 and `1d20 + 1dF` as 21 — a plausible number for a formula the lab did not actually
+      // evaluate. A thrown error surfaces through the driver's console-error gate as a named case
+      // failure instead.
+      if (UNPARSED_DIE.test(rolledOut)) {
+        throw new Error(
+          `View Lab Roll cannot evaluate "${this.formula}": the die term in "${rolledOut}" uses a ` +
+            'modifier this harness does not implement (only NdS with optional kh/kl). Extend ' +
+            'DIE_TERM in tests/view-lab/foundry/labRoll.js rather than letting it score partially.'
+        );
+      }
+      const value = evaluateNumericExpression(rolledOut);
       this.total = Number.isFinite(value) ? value : 0;
-      this.result = arithmetic;
+      this.result = rolledOut;
       this._evaluated = true;
       return this;
     }
