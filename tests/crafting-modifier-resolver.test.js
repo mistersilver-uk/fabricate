@@ -246,12 +246,45 @@ test('buildCraftingModifierChoice returns null when no modifier is eligible', ()
   );
 });
 
+// The two-option rule (#856): one eligible modifier renders a radio the player cannot
+// change, so it is suppressed and the deterministic `highest` scalar — which, over a
+// single value, is arithmetically IDENTICAL to picking it — resolves the token instead.
+test('buildCraftingModifierChoice returns null for a SINGLE eligible modifier (no choice-less radio)', () => {
+  const context = { catalogue: ICON_CATALOGUE, defaultModifierIds: ['med'] };
+  const evaluate = evaluatorFor({ '@med': 3, '@alch': 2, '@herb': 4 });
+  assert.equal(buildCraftingModifierChoice(context, evaluate), null, 'one option is not a choice');
+  // …and the value the deterministic fallback substitutes is the very same modifier.
+  assert.equal(
+    resolveCraftingModifierScalar({ ...context, systemPolicy: 'playerPicks' }, evaluate),
+    3,
+    'suppressing the single-option prompt changes no arithmetic'
+  );
+});
+
+test('buildCraftingModifierChoice builds a descriptor at exactly TWO eligible modifiers', () => {
+  const choice = buildCraftingModifierChoice(
+    { catalogue: ICON_CATALOGUE, defaultModifierIds: ['med', 'alch'] },
+    evaluatorFor({ '@med': 3, '@alch': 2 })
+  );
+  assert.ok(choice, 'two eligible modifiers is a real choice');
+  assert.deepEqual(
+    choice.modifiers.map((modifier) => modifier.id),
+    ['med', 'alch']
+  );
+});
+
 test('buildCraftingModifierChoice defaults absent label/icon to empty strings', () => {
   const choice = buildCraftingModifierChoice(
-    { catalogue: [{ id: 'bare', expression: '@bare' }], defaultModifierIds: ['bare'] },
-    evaluatorFor({ '@bare': 1 })
+    {
+      catalogue: [
+        { id: 'bare', expression: '@bare' },
+        { id: 'named', label: 'Named', icon: 'fa-named', expression: '@named' },
+      ],
+      defaultModifierIds: ['bare', 'named'],
+    },
+    evaluatorFor({ '@bare': 1, '@named': 0 })
   );
-  assert.deepEqual(choice.modifiers, [{ id: 'bare', label: '', icon: '', value: 1 }]);
+  assert.deepEqual(choice.modifiers[0], { id: 'bare', label: '', icon: '', value: 1 });
 });
 
 // ── token substitution ───────────────────────────────────────────────────────

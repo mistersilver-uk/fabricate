@@ -377,6 +377,135 @@ test('playerPicks: a cancelled prompt aborts with zero substitution and no roll'
   delete globalThis.Roll;
 });
 
+// eval == display is an acceptance criterion of #855, and the SITUATIONAL-BONUS branch
+// is where it can silently break: `effectiveFormula` gets the bonus appended, and only
+// the paired `resolved = resolveCheckFormulaDisplay(...)` recompute keeps the journal /
+// `resolvedFormula` in step. Without it a player who types `+2` sees `1d20 + (3)` while
+// `1d20 + (3) + (2)` actually rolls. Both tests assert the ROLLED string and the
+// DISPLAYED string are the same string.
+test('playerPicks: eval == display with a situational bonus (and advantage) composed on top', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  const rolled = await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async () => ({
+      confirmed: true,
+      chosenModifierId: 'med',
+      bonus: '2',
+      advantage: 'advantage',
+    }),
+  });
+  assert.equal(
+    rolledFormulas.at(-1),
+    '2d20kh1 + (3) + (2)',
+    'modifier, then advantage, then bonus'
+  );
+  assert.equal(
+    rolled.resolvedFormula,
+    '2d20kh1 + (3) + (2)',
+    'the journal/display formula equals the formula that actually evaluated'
+  );
+  delete globalThis.Roll;
+});
+
+test('interactive: eval == display when only a situational bonus is appended (no playerPicks)', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  const rolled = await evaluateCheckRoll('1d20 + 3', actor, {
+    interactive: true,
+    prompt: async () => ({ confirmed: true, bonus: '2', advantage: 'normal' }),
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + 3 + (2)');
+  assert.equal(rolled.resolvedFormula, '1d20 + 3 + (2)', 'display equals what evaluated');
+  delete globalThis.Roll;
+});
+
+// The chat-flavor thread: the chosen modifier's label rides the existing flavor so the
+// posted roll says WHICH modifier the player picked. `stubCraftingModRoll`'s evaluated
+// roll has no `toMessage`, and the post is wrapped in a swallow-everything try/catch, so
+// the append is only observable through a roll stub that records the payload.
+function stubCraftingModChatRoll() {
+  const posted = [];
+  stubCraftingModRoll();
+  const Base = globalThis.Roll;
+  // Static `replaceFormulaData` / `validate` are inherited through the class chain.
+  globalThis.Roll = class extends Base {
+    async evaluate(options) {
+      const rolled = await super.evaluate(options);
+      return {
+        ...rolled,
+        toMessage: async (data, messageOptions) => {
+          posted.push({ data, options: messageOptions });
+        },
+      };
+    }
+  };
+  return posted;
+}
+
+function withChatMessage(run) {
+  const previous = globalThis.ChatMessage;
+  globalThis.ChatMessage = { create: () => {} };
+  return run().finally(() => {
+    if (previous === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previous;
+  });
+}
+
+test('playerPicks: the chosen modifier label is appended to the chat flavor', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll('1d20 + @craftingmod', { getRollData: () => ({}) }, {
+      interactive: true,
+      modifierChoice: PICK_CHOICE,
+      flavor: 'Healing Salve — Crafting check (DC 10)',
+      prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
+    })
+  );
+  assert.equal(
+    posted.at(-1).data.flavor,
+    'Healing Salve — Crafting check (DC 10) · Medicine',
+    'the picked label rides the existing flavor behind a bullet'
+  );
+  delete globalThis.Roll;
+});
+
+test('playerPicks: an empty base flavor gets the label alone, never an orphan bullet', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll('1d20 + @craftingmod', { getRollData: () => ({}) }, {
+      interactive: true,
+      modifierChoice: PICK_CHOICE,
+      // No `flavor`: a direct caller / test path production never takes.
+      prompt: async () => ({ confirmed: true, chosenModifierId: 'herb', advantage: 'normal' }),
+    })
+  );
+  assert.equal(posted.at(-1).data.flavor, 'Herbalism', 'no leading "· " on an empty base');
+  delete globalThis.Roll;
+});
+
+test('playerPicks: an unlabelled chosen modifier leaves the flavor untouched', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll('1d20 + @craftingmod', { getRollData: () => ({}) }, {
+      interactive: true,
+      modifierChoice: {
+        token: '@craftingmod',
+        modifiers: [
+          { id: 'bare', label: '', icon: '', value: 3 },
+          { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
+        ],
+        defaultSelectedId: 'herb',
+      },
+      flavor: 'Crafting check',
+      prompt: async () => ({ confirmed: true, chosenModifierId: 'bare', advantage: 'normal' }),
+    })
+  );
+  assert.equal(posted.at(-1).data.flavor, 'Crafting check', 'no trailing "· " for a blank label');
+  delete globalThis.Roll;
+});
+
 test('playerPicks non-interactive: @craftingmod resolves deterministically as highest', async () => {
   const rolledFormulas = stubCraftingModRoll();
   const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };

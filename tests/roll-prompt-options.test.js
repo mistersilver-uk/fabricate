@@ -42,6 +42,27 @@ const PICK_DESCRIPTOR = {
   defaultSelectedId: 'herb',
 };
 
+// The catalogue editor creates a row with `label: ''` and never forces a value, and the
+// icon is only defaulted in the editor's own control — so a saved entry can reach the
+// prompt with BOTH empty. This descriptor is that entry, alongside a normal sibling.
+const BARE_DESCRIPTOR = {
+  modifiers: [
+    { id: 'bare', label: '', icon: '', value: 3 },
+    { id: 'herb', label: 'Herbalism', icon: 'fa-solid fa-herb', value: 5 },
+  ],
+  defaultSelectedId: 'herb',
+};
+
+/** Install a `game.i18n.localize` backed by `table`, returning a restore function. */
+function stubI18n(table) {
+  const original = globalThis.game;
+  globalThis.game = { i18n: { localize: (key) => table[key] ?? key } };
+  return () => {
+    if (original === undefined) delete globalThis.game;
+    else globalThis.game = original;
+  };
+}
+
 /**
  * `buildInteractiveRollOptions` threads the subject `name`/`activity`/`img` into
  * the options bag so the prompt can render its icon-first header. Guard that the
@@ -96,6 +117,25 @@ describe('buildInteractiveRollOptions', () => {
       activity: 'Crafting',
     });
     assert.equal('modifierChoice' in options, false, 'no stray key on non-playerPicks paths');
+  });
+
+  // The engine NEVER omits the key: `_buildInteractiveModifierChoice` returns `null` on
+  // every deterministic / non-interactive path, so `null` — not `undefined` — is the
+  // production shape the byte-identical-bag guard has to survive. Widening the builder's
+  // test to `modifierChoice !== undefined` would keep the case above green.
+  it('omits the modifierChoice key when the engine passes an explicit null', () => {
+    const options = buildInteractiveRollOptions({
+      interactive: true,
+      actor: null,
+      name: 'Iron Rivets',
+      activity: 'Crafting',
+      modifierChoice: null,
+    });
+    assert.equal(
+      'modifierChoice' in options,
+      false,
+      'a null descriptor (the engine default) must not add the key'
+    );
   });
 });
 
@@ -157,6 +197,131 @@ describe('promptCheckRoll: playerPicks radio fieldset', () => {
       });
       assert.doesNotMatch(captured.content, /craftingModifier/, 'no modifier fieldset');
       assert.equal('chosenModifierId' in choice, false, 'byte-identical choice object');
+    } finally {
+      captured.restore();
+    }
+  });
+
+  // A row can reach the prompt with an empty label AND an empty icon. Neither may be
+  // dropped: an unlabelled radio's only accessible name would be its value chip ("+3"),
+  // and a missing `<i>` collapses the flex row's icon gutter, starting that option's
+  // label ~1.1rem left of every sibling.
+  it('names an unlabelled modifier and still emits its icon and value chip', async () => {
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: { value: 'bare' },
+    });
+    try {
+      await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        modifierChoice: BARE_DESCRIPTOR,
+      });
+      assert.match(
+        captured.content,
+        /<span class="fabricate-roll-prompt__modifier-label">Unnamed modifier<\/span>/,
+        'an empty label falls back to a readable name, not a bare value chip'
+      );
+      assert.match(
+        captured.content,
+        /<i class="fabricate-roll-prompt__modifier-icon fa-solid fa-dice-d20"/,
+        'an icon-less option keeps its gutter via the catalogue default icon'
+      );
+      // Both options emit an icon, so the icon/label/chip columns line up.
+      assert.equal(
+        captured.content.match(/fabricate-roll-prompt__modifier-icon/g).length,
+        2,
+        'every option emits an icon slot'
+      );
+      assert.equal(
+        captured.content.match(/fabricate-roll-prompt__modifier-value/g).length,
+        2,
+        'every option emits a value chip'
+      );
+    } finally {
+      captured.restore();
+    }
+  });
+
+  // A non-finite value is the one case with two possible answers; the chip must still
+  // render (row alignment) and `formatSigned` owns the single fallback.
+  it('renders a chip for a non-finite modifier value rather than dropping it', async () => {
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: { value: 'broken' },
+    });
+    try {
+      await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        modifierChoice: {
+          modifiers: [
+            { id: 'broken', label: 'Broken', icon: 'fa-solid fa-x', value: undefined },
+            { id: 'herb', label: 'Herbalism', icon: 'fa-solid fa-herb', value: 5 },
+          ],
+          defaultSelectedId: 'herb',
+        },
+      });
+      assert.match(
+        captured.content,
+        /<span class="fabricate-roll-prompt__modifier-value">0<\/span>/,
+        'a non-finite value renders an unsigned 0 chip'
+      );
+      assert.equal(
+        captured.content.match(/fabricate-roll-prompt__modifier-value/g).length,
+        2,
+        'the chip is never omitted'
+      );
+    } finally {
+      captured.restore();
+    }
+  });
+
+  it('localizes the fieldset legend and the unnamed-modifier fallback', async () => {
+    const restoreI18n = stubI18n({
+      'FABRICATE.App.RollPrompt.CheckModifier': 'Modificateur',
+      'FABRICATE.App.RollPrompt.UnnamedModifier': 'Modificateur sans nom',
+    });
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: { value: 'bare' },
+    });
+    try {
+      await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        modifierChoice: BARE_DESCRIPTOR,
+      });
+      assert.match(
+        captured.content,
+        /<legend class="fabricate-roll-prompt__modifiers-legend">Modificateur<\/legend>/,
+        'the legend reads through game.i18n'
+      );
+      assert.match(captured.content, /Modificateur sans nom/, 'the fallback name is localized too');
+      assert.doesNotMatch(captured.content, /Check modifier/, 'no hard-coded English legend');
+    } finally {
+      captured.restore();
+      restoreI18n();
+    }
+  });
+
+  it('falls back to English copy when the key does not resolve', async () => {
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: { value: 'bare' },
+    });
+    try {
+      await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        modifierChoice: BARE_DESCRIPTOR,
+      });
+      assert.match(captured.content, /<legend[^>]*>Check modifier<\/legend>/);
+      assert.match(captured.content, /Unnamed modifier/);
     } finally {
       captured.restore();
     }
