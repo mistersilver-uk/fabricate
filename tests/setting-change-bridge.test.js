@@ -46,10 +46,48 @@ describe('handleFabricateSettingChange', () => {
     assert.deepEqual(emitted[0][1], { action: 'external', recipes: [{ id: 'r1' }] });
   });
 
+  it('reloads the gathering environment store and re-emits the change hook', () => {
+    // The reload alone is invisible: a player whose gather was applied BY THE GM has
+    // no other signal that their node counts moved, so open views must be told.
+    const emitted = [];
+    let loadCalls = 0;
+    const handled = handleFabricateSettingChange('fabricate.gatheringEnvironments', {
+      gatheringEnvironmentStore: {
+        load: () => {
+          loadCalls += 1;
+          return [];
+        },
+      },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    });
+    assert.equal(handled, true);
+    assert.equal(loadCalls, 1, 'the store re-reads the replicated setting');
+    assert.deepEqual(
+      emitted.map(([hook]) => hook),
+      ['fabricate.gatheringEnvironmentsChanged']
+    );
+  });
+
+  it('reloads the store BEFORE emitting, so subscribers read fresh environments', () => {
+    const order = [];
+    handleFabricateSettingChange('fabricate.gatheringEnvironments', {
+      gatheringEnvironmentStore: { load: () => order.push('load') },
+      callAll: () => order.push('emit'),
+    });
+    assert.deepEqual(order, ['load', 'emit']);
+  });
+
+  it('tolerates a missing gathering environment store', () => {
+    assert.equal(
+      handleFabricateSettingChange('fabricate.gatheringEnvironments', { callAll: () => {} }),
+      true
+    );
+  });
+
   it('ignores unrelated settings without touching the managers', () => {
     const emitted = [];
     let reloadCalls = 0;
-    const handled = handleFabricateSettingChange('fabricate.gatheringEnvironments', {
+    const handled = handleFabricateSettingChange('fabricate.theme', {
       craftingSystemManager: {
         reload: () => {
           reloadCalls += 1;

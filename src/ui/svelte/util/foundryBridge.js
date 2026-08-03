@@ -24,13 +24,13 @@ function normalizeDialogOptions(options = {}) {
   // Respect an explicit caller width.
   normalized.position = {
     ...(normalized.position || {}),
-    width: normalized.position?.width ?? FABRICATE_DIALOG_DEFAULT_WIDTH
+    width: normalized.position?.width ?? FABRICATE_DIALOG_DEFAULT_WIDTH,
   };
 
   if (normalized.title && !normalized.window?.title) {
     normalized.window = {
       ...(normalized.window || {}),
-      title: normalized.title
+      title: normalized.title,
     };
   }
 
@@ -52,7 +52,7 @@ function normalizeDialogOptions(options = {}) {
           const element = dialog?.element ?? null;
           const html = typeof jq === 'function' && element ? jq(element) : element;
           return callback(html);
-        }
+        },
       };
     });
   }
@@ -139,13 +139,13 @@ export function choiceDialog({ title, content, choices = [], defaultAction } = {
       label: choice.label ?? choice.action,
       icon: choice.icon,
       default: defaultAction ? choice.action === defaultAction : index === 0,
-      callback: () => settle(choice.action)
+      callback: () => settle(choice.action),
     }));
     const dialog = renderDialog({
       window: { title },
       content,
       buttons,
-      close: () => settle('cancel')
+      close: () => settle('cancel'),
     });
     if (!dialog) settle('cancel');
   });
@@ -176,7 +176,9 @@ export function subscribeSceneChange(handler) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
   const id = hooks.on('canvasReady', () => handler());
-  return () => { hooks.off?.('canvasReady', id); };
+  return () => {
+    hooks.off?.('canvasReady', id);
+  };
 }
 
 /**
@@ -195,7 +197,9 @@ export function subscribeWorldTime(handler) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
   const id = hooks.on('updateWorldTime', () => handler());
-  return () => { hooks.off?.('updateWorldTime', id); };
+  return () => {
+    hooks.off?.('updateWorldTime', id);
+  };
 }
 
 /**
@@ -229,10 +233,13 @@ export function subscribeInventoryChange(handler, { isRelevantActor, debounceMs 
     // Trailing debounce: the first fire arms the timer; subsequent fires within the
     // window are absorbed, so a burst yields exactly one handler() call.
     if (timer !== null) return;
-    timer = setTimeout(() => {
-      timer = null;
-      handler();
-    }, Math.max(0, debounceMs));
+    timer = setTimeout(
+      () => {
+        timer = null;
+        handler();
+      },
+      Math.max(0, debounceMs)
+    );
   };
   const onItemChange = (item) => {
     // Embedded/owned items only: an owned item's `actor` (or `parent`) is the owning
@@ -279,6 +286,29 @@ export function subscribeCraftingDataChange(handler) {
 }
 
 /**
+ * Subscribe to Fabricate gathering-environment changes so callers can reload
+ * environment-derived views — notably resource-node counts.
+ *
+ * Node depletion is applied by the active GM (a player may not write the world
+ * setting the pools live in), so the acting player's own post-attempt reload races
+ * ahead of the GM's write and nothing else re-runs it. `fabricate.gatheringEnvironmentsChanged`
+ * is re-emitted by main.js's `updateSetting` bridge once the replicated setting has
+ * reloaded the in-memory environment store, on EVERY client including the one whose
+ * attempt caused it. Without this subscription a player's node counts stay stale until
+ * they reopen the app, and the local `NODE_DEPLETED` gate keeps offering a pool the GM
+ * has already zeroed.
+ *
+ * @param {Function} handler Invoked (no args) on an environment change.
+ * @returns {Function} Unsubscribe callback.
+ */
+export function subscribeGatheringDataChange(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const id = hooks.on('fabricate.gatheringEnvironmentsChanged', () => handler());
+  return () => hooks.off?.('fabricate.gatheringEnvironmentsChanged', id);
+}
+
+/**
  * Subscribe to token movement (and token creation/removal) so callers can refresh
  * the live travel current-region view when a party's travel-marker token moves.
  * Fires `handler(actorUuid)` — the base Actor uuid of the moved token. `updateToken`
@@ -302,14 +332,22 @@ function awaitTokenMovementSettled(tokenDoc) {
   const obj = tokenDoc?.object;
   const CanvasAnimation = globalThis.CanvasAnimation;
   if (!obj || typeof CanvasAnimation?.getAnimation !== 'function') return Promise.resolve();
-  const nextFrame = () => new Promise((resolve) => {
-    if (typeof globalThis.requestAnimationFrame === 'function') globalThis.requestAnimationFrame(() => resolve());
-    else setTimeout(resolve, 16);
-  });
+  const nextFrame = () =>
+    new Promise((resolve) => {
+      if (typeof globalThis.requestAnimationFrame === 'function')
+        globalThis.requestAnimationFrame(() => resolve());
+      else setTimeout(resolve, 16);
+    });
   const settle = (async () => {
     await nextFrame();
     const anim = CanvasAnimation.getAnimation(obj.animationName);
-    if (anim?.promise) { try { await anim.promise; } catch { /* ignore */ } }
+    if (anim?.promise) {
+      try {
+        await anim.promise;
+      } catch {
+        /* ignore */
+      }
+    }
   })();
   const timeout = new Promise((resolve) => setTimeout(resolve, 1000));
   return Promise.race([settle, timeout]);
@@ -513,7 +551,9 @@ function groupUncachedCompendiumIds(rawTexts) {
   for (const raw of rawTexts ?? []) {
     if (typeof raw !== 'string' || raw.length === 0) continue;
     for (const match of raw.matchAll(COMPENDIUM_UUID_CANDIDATE)) {
-      const candidate = String(match[1] ?? match[2] ?? '').split('#')[0].trim();
+      const candidate = String(match[1] ?? match[2] ?? '')
+        .split('#')[0]
+        .trim();
       if (!candidate.startsWith('Compendium.')) continue;
       let parsed = null;
       try {
@@ -585,15 +625,13 @@ export function getDragEventData(event) {
 async function itemSourceDescription(item) {
   // Most UI consumers need only the lightweight Foundry wrappers; load the
   // description pipeline only when an Item snapshot actually requests it.
-  const {
-    descriptionTextCandidate,
-    plainTextDescription
-  } = await import('../../../utils/plainTextDescription.js');
+  const { descriptionTextCandidate, plainTextDescription } =
+    await import('../../../utils/plainTextDescription.js');
   const candidates = [
     item?.system?.description?.value,
     item?.system?.description,
     item?.description?.value,
-    item?.description
+    item?.description,
   ];
   for (const candidate of candidates) {
     const raw = descriptionTextCandidate(candidate);
