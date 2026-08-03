@@ -82,6 +82,7 @@ import {
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
 } from '../../../systems/currencyProfile.js';
+import { normalizeModifierPolicy } from '../../../systems/craftingModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
@@ -2368,11 +2369,14 @@ function _buildSelectedSystemViewData(
       checkModifiers: Array.isArray(selectedSystem.craftingCheck?.checkModifiers)
         ? selectedSystem.craftingCheck.checkModifiers.map((modifier) => _clonePlain(modifier))
         : [],
-      defaultModifierPolicy: ['addAll', 'highest', 'byRecipe'].includes(
-        selectedSystem.craftingCheck?.defaultModifierPolicy
-      )
-        ? selectedSystem.craftingCheck.defaultModifierPolicy
-        : 'addAll',
+      // Normalized through the resolver's OWN policy vocabulary rather than a local
+      // copy of it: this projection used to inline `['addAll','highest','byRecipe']`,
+      // which silently rewrote a stored `playerPicks` to `addAll` on the way out, so the
+      // GM's radio selection came back as "Add all" and the policy was unselectable
+      // (issue 855). A fifth hand-maintained allowlist is exactly the drift that caused
+      // that, so read the single source of truth instead. Unknown → `addAll`, unchanged.
+      defaultModifierPolicy:
+        normalizeModifierPolicy(selectedSystem.craftingCheck?.defaultModifierPolicy) ?? 'addAll',
       defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
         ? [...selectedSystem.craftingCheck.defaultModifierIds]
         : [],
