@@ -14,6 +14,10 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from 'svelte';
+import {
+  TOOL_DISPLAY_PRECEDENCE_CASES,
+  TOOL_PRECEDENCE_MANAGED_ITEMS,
+} from '../helpers/toolDisplayPrecedenceCases.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
@@ -691,7 +695,10 @@ function createStore(calls = [], options = {}) {
       salvageCraftingCheck: options.salvageCraftingCheck,
       gatheringCraftingCheck: options.gatheringCraftingCheck,
       features: selectedFeatures,
-      managedItemOptions: alchemyManagedItemOptions,
+      // Overridable so a test can supply its own component set (the Tool display
+      // precedence cases resolve `componentId` against their own fixtures); defaults to
+      // the alchemy list every other test relies on.
+      managedItemOptions: options.managedItemOptions ?? alchemyManagedItemOptions,
       // System-level recipe visibility config (issue 511). The Books & Scrolls
       // surface reads the shared use/learn caps from here; left undefined unless a
       // test supplies one (the visibility card then falls back to its defaults).
@@ -14709,6 +14716,72 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       `expected Save to persist toolIds: ['tool-lantern'], got ${JSON.stringify(calls.filter((c) => c[0] === 'updateGatheringLibraryTask'))}`
     );
+  });
+
+  // Issue 976. The gathering task editor carried the same defect as the recipe editor:
+  // it resolved a tool's name, image and description ONLY through `managedItem(componentId)`,
+  // so a first-class item-sourced tool (`componentId: null`) rendered "Unnamed tool", the
+  // item-bag sentinel and "No description has been added." Pinned against the SAME shared
+  // precedence table as `toolStudio.js` and `RecipeToolsSection`, so the three cannot drift.
+  it('resolves every tool-display precedence case in the gathering task tool picker', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          managedItemOptions: TOOL_PRECEDENCE_MANAGED_ITEMS,
+          gatheringLibraryTools: TOOL_DISPLAY_PRECEDENCE_CASES.map((testCase) => ({
+            ...testCase.tool,
+            enabled: true,
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' },
+          })),
+          taskInitialToolIds: [],
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target
+      .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+      .click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    assert.ok(section, 'the required tools section renders');
+
+    for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
+      const card = section.querySelector(
+        `[data-gathering-task-required-tools-card="${testCase.tool.id}"]`
+      );
+      assert.ok(card, `${testCase.id}: a picker card renders`);
+      assert.equal(
+        card.querySelector('strong').textContent.trim(),
+        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName,
+        `${testCase.id}: ${testCase.summary}`
+      );
+      assert.equal(
+        card.querySelector('img').getAttribute('src'),
+        testCase.expectedImg,
+        `${testCase.id}: the card renders the expected image`
+      );
+      assert.equal(
+        card.querySelector('.manager-task-component-card-copy span').textContent.trim(),
+        testCase.expectedDescription || 'No description has been added.',
+        `${testCase.id}: the card renders the expected description`
+      );
+    }
   });
 
   it('renders a stale chip for task toolIds whose library entry is missing and lets the user clear it', async () => {

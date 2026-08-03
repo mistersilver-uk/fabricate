@@ -1197,6 +1197,7 @@ The recipe editor's Tools tab authors Tool references only.
 Recipe-wide Tools are available in every resolution mode, and explicit multi-step recipes may author additional Tool references per step.
 Named ingredient sets receive their own Tool card only when the Crafting System uses `routedByIngredients`; unnamed sets and every other resolution mode expose no per-set Tool authoring.
 The per-set card reuses the Results tab's result-set outer card, header, and static-label hierarchy.
+A row and the add-a-tool picker both resolve the Tool's name and image through the single precedence in `data-models/spec.md` `## Tool` requirement 13, so an item-sourced Tool renders its own snapshot rather than a placeholder.
 Rows contain Tool identity and removal only: Recipe data exposes no breakage, consumption, prerequisite, or bonus policy control because those behaviors belong to Tool Studio and Crafting System check settings.
 
 ### Ingredients tab
