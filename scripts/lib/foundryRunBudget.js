@@ -42,21 +42,34 @@ export function resolveSmokeProfile(raw) {
 export const FINALIZATION_GRACE_MS = 4 * 60_000;
 
 /**
- * Expected walk-only duration per profile (excludes finalization grace). `rc` matches
- * the observed ~870-930s CI walk with margin; `full`/`screenshots` share the long walk.
+ * Expected walk-only duration per profile (excludes finalization grace).
+ *
+ * `rc` is MEASURED, not estimated: beta run #144 walked 1344.3s on a hosted runner
+ * (issue #987) and was SIGTERM-killed after printing "Smoke test PASSED." — the
+ * previous 14-minute figure, and the "~870-930s observed" comment that justified it,
+ * were both overtaken by what the walk now costs. 24 minutes carries ~1.6 minutes over
+ * that measurement.
+ *
+ * `full`/`screenshots` are still UNMEASURED (issue #973 owns that). They are set above
+ * `rc` by inference rather than guesswork: the long walk is the `rc` walk PLUS phases
+ * D0 and F, so it cannot be shorter than a measured `rc`. #973 separately records a
+ * `full` walk SIGTERM-killed at the 26-minute budget, which is consistent with a walk
+ * beyond the old 22-minute figure.
  */
 export const EXPECTED_WALK_MS_BY_PROFILE = {
-  full: 22 * 60_000,
-  screenshots: 22 * 60_000,
-  rc: 14 * 60_000,
+  full: 32 * 60_000,
+  screenshots: 32 * 60_000,
+  rc: 24 * 60_000,
 };
 
 /**
  * Default run-timeout budget for a profile: expected walk + finalization grace. An
  * unknown profile (including the empty-string case) falls back to the `full` budget,
- * the safe upper bound. Yields `rc` = 18 min (unchanged from the old flat default, so
- * no CI regression) and `full`/`screenshots` ≈ 26 min (≥ the proven 1_500_000 ms
- * workaround), so the full walk no longer needs a manual override.
+ * the safe upper bound. Yields `rc` = 28 min and `full`/`screenshots` = 36 min, so
+ * neither walk needs a manual override — `.github/workflows/foundry-integration.yml`
+ * pinned `FOUNDRY_RUN_TIMEOUT_MS` while this default was too low, and that pin is gone
+ * (issue #987). Keep it that way: a second place to record the budget is a second place
+ * to be wrong, and the env override below remains for a genuine one-off.
  * @param {string} profile
  * @returns {number}
  */
