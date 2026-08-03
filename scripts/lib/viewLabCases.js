@@ -3002,7 +3002,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-runework' },
-    steps: ['Checks', { selector: '#checks-tab-crafting' }],
+    // Scrolls to its own named subject. Issue 975 gave Runework's check two authored
+    // triggers, and a populated trigger card is tall enough to push the outcome-tier
+    // table off the unscrolled fold — so without this anchor the case kept passing every
+    // assertion while photographing a panel that no longer contained the table it is
+    // named for. Anchored on `[data-routed-tiers]`, not the trigger card: the sibling
+    // `manager-checks-crafting-tier-step` owns that subject.
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-routed-tiers]', scroll: true },
+    ],
     expectView: 'checks',
     kinds: ['manager', 'checks', 'resolution-mode'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
