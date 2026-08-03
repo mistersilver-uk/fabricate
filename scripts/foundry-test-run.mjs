@@ -6161,13 +6161,47 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await page.locator('.fabricate-manager .manager-nav-button:has-text("Checks")').first().click();
   await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('[data-checks-tab-button="crafting"]').first().click();
-  const natToggle = page.locator('[data-check-nat-stepping] input[type="checkbox"]').first();
-  await natToggle.waitFor({ state: 'visible', timeout: 5_000 });
-  await assertPointerTarget(page, natToggle, '[data-check-nat-stepping]', 'relative natural stepping');
-  const natBefore = await natToggle.isChecked();
-  await natToggle.click();
-  await natToggle.click();
-  if (await natToggle.isChecked() !== natBefore) throw new Error('Natural stepping toggle did not restore');
+  // Tier stepping is a per-trigger EFFECT (issue 975), not the check-wide
+  // `[data-check-nat-stepping]` toggle this walk used to round-trip, so exercising it
+  // means AUTHORING a trigger. Add one, drive its tier-step row, then remove it: the
+  // block returns to `{ triggers: [] }`, so the Checks draft is left exactly as clean as
+  // the old toggle round trip left it and the next navigation raises no discard prompt.
+  const checksSave = page.locator('.fabricate-manager [data-checks-save]').first();
+  const triggerCard = page.locator('.fabricate-manager [data-check-triggers]').first();
+  await triggerCard.waitFor({ state: 'visible', timeout: 5_000 });
+  if (await triggerCard.locator('[data-trigger]').count() !== 0) {
+    throw new Error('Crafting check triggers must start empty for the tier-step walk to restore them');
+  }
+  await triggerCard.locator('[data-add-trigger]').click();
+  const tierStepRow = triggerCard.locator('[data-trigger] [data-trigger-tier-step]').first();
+  await tierStepRow.waitFor({ state: 'visible', timeout: 5_000 });
+  // The mode control's radios are visually hidden by design, so the LABEL segment is what
+  // a GM points at and therefore what the hit test must reach.
+  const stepUpSegment = tierStepRow.locator('[data-trigger-tier-step-mode="up"]');
+  await assertPointerTarget(page, stepUpSegment, '[data-trigger-tier-step]', 'routed tier-step mode');
+  await stepUpSegment.click();
+  const stepCount = tierStepRow.locator('[data-trigger-tier-step-steps]');
+  await stepCount.waitFor({ state: 'visible', timeout: 5_000 });
+  await stepCount.fill('2');
+  if (await stepCount.inputValue() !== '2') throw new Error('Tier-step count did not accept a step magnitude');
+  await tierStepRow.locator('[data-trigger-tier-step-mode="target"]').click();
+  const stepTarget = tierStepRow.locator('[data-trigger-tier-step-target]');
+  await stepTarget.waitFor({ state: 'visible', timeout: 5_000 });
+  // The operand slot SWAPS its contents rather than growing a second control, so the step
+  // count must be gone the moment the tier select is up.
+  if (await tierStepRow.locator('[data-trigger-tier-step-steps]').count() !== 0) {
+    throw new Error('Tier-step operand slot kept the step count after switching to target');
+  }
+  // Index 1 is the first real tier: index 0 is the disabled "Choose a tier…" placeholder
+  // that keeps a null tierId from rendering as a tier the check never persisted.
+  await stepTarget.selectOption({ index: 1 });
+  if (!(await stepTarget.inputValue())) throw new Error('Tier-step target select persisted no tier');
+  if (!(await checksSave.isEnabled())) {
+    throw new Error('Authoring a tier-step trigger left the Checks draft undirtied');
+  }
+  await triggerCard.locator('[data-trigger] [data-remove-trigger]').first().click();
+  await triggerCard.locator('[data-triggers-empty]').waitFor({ state: 'visible', timeout: 5_000 });
+  if (await checksSave.isEnabled()) throw new Error('Tier-step trigger round trip left the Checks draft dirty');
   await page.evaluate(async (id) => {
     await game.settings.set('fabricate', 'lastManagedCraftingSystem', id);
   }, systemId);
