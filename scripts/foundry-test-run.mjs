@@ -50,6 +50,11 @@ import {
 } from './lib/managerLayoutGuards.js';
 import { isPhaseNeededForTargets, isD0SectionNeededForTargets } from './lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from './lib/smokeSectionFixture.js';
+import {
+  CORE_TOUR_IDS,
+  TOUR_PROGRESS_STORAGE_KEY,
+  SUPPRESSED_STEP_INDEX,
+} from './lib/foundryTourSuppression.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
@@ -718,6 +723,77 @@ async function authenticateIfRequired(page, results) {
 
   await screenshot(page, 'auth-complete');
   results.steps.push({ step: 'admin-auth-page', passed: true });
+}
+
+/**
+ * Stop Foundry's New User Experience tours ever starting, for the whole browser
+ * context.
+ *
+ * WHY this is seeded pre-boot rather than dismissed reactively. `NewUserExperienceManager
+ * #initialize()` is called by `Game#setupGame()` on the line AFTER `Hooks.callAll("ready")`,
+ * and its `#showNewWorldTour()` starts `core.welcome` whenever the world looks new and the
+ * tour's status is UNSTARTED. That start is delayed by an async chain — a scene-creation
+ * round trip, a hardcoded 1s `setTimeout`, then a 1s `canvas.animatePan` — so the tour opens
+ * a couple of seconds AFTER `ready`, which is past every one-shot `Tour.activeTour.exit()`
+ * the harness performs. It then sits there, modal, for the rest of the run.
+ *
+ * That is not cosmetic. Playwright's `click({ force: true })` skips actionability CHECKS but
+ * still dispatches at the element's coordinates, so the tour overlay swallows the click: the
+ * Items sidebar tab never activates and the injected `button[data-fabricate-action="craft"]`
+ * stays hidden, failing Phase E with a message that reads like a Fabricate UI defect. Beta
+ * runs #141 and #149 both died this way; #144 did not, because the timing differed (issue
+ * #993).
+ *
+ * `core.tourProgress` is registered `{scope: "client"}`, so `ClientSettings` writes it
+ * straight to `window.localStorage` under the dotted setting id, `JSON.stringify`d
+ * (`#setClient` -> `#cleanJSON`, which for a plain `Object`-typed setting is just
+ * `JSON.stringify`). Seeding it in an init script therefore lands before any Foundry code
+ * runs, and `ToursCollection#register` calls `tour._reloadProgress()` as it registers each
+ * tour, so the seeded index is picked up at construction with no hook ordering to get right.
+ * `addInitScript` re-runs on every navigation in the context, so it survives the
+ * module-activation `page.reload()` too.
+ *
+ * Any `stepIndex` other than `-1` defeats the UNSTARTED check. `0` is used rather than
+ * `Tour#complete()` deliberately: `complete()` persists progress but can also open the
+ * "suggested next tour" `DialogV2.confirm` — `core.welcome` suggests `core.uiOverview` — which
+ * would replace one blocking overlay with another.
+ *
+ * Verified against `client/nue/nue-manager.mjs`, `client/nue/tour.mjs`,
+ * `client/nue/tours-collection.mjs` and `client/helpers/client-settings.mjs` in both the
+ * 13.351 and 14.365 builds; this subsystem is unchanged between them.
+ *
+ * @param {import('playwright').BrowserContext} context
+ */
+async function suppressFoundryTours(context) {
+  // The body is inlined rather than passed by reference because `addInitScript` serializes
+  // the function to run in the page, where this module's imports do not exist. The shape it
+  // writes is `withSuppressedTours` in scripts/lib/foundryTourSuppression.js, which IS unit
+  // tested — `tests/foundry-tour-suppression.test.js` pins the two against each other so this
+  // copy cannot drift silently.
+  await context.addInitScript(
+    ({ key, tourIds, stepIndex }) => {
+      try {
+        const raw = window.localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : null;
+        const base = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        const core =
+          base.core && typeof base.core === 'object' && !Array.isArray(base.core)
+            ? { ...base.core }
+            : {};
+        // Merge, never lower: a tour the run legitimately advanced keeps its real progress.
+        for (const id of tourIds) if (typeof core[id] !== 'number') core[id] = stepIndex;
+        window.localStorage.setItem(key, JSON.stringify({ ...base, core }));
+      } catch {
+        // A malformed or unavailable localStorage must not stop the run booting; the
+        // reactive Tour.activeTour.exit() calls remain as defence in depth.
+      }
+    },
+    {
+      key: TOUR_PROGRESS_STORAGE_KEY,
+      tourIds: [...CORE_TOUR_IDS],
+      stepIndex: SUPPRESSED_STEP_INDEX,
+    }
+  );
 }
 
 /**
@@ -6533,6 +6609,7 @@ async function main() {
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 }
   });
+  await suppressFoundryTours(context);
   const page = await context.newPage();
 
   // Known non-Fabricate error patterns to ignore (keep narrow — real 404s should be caught).
@@ -11118,6 +11195,21 @@ async function main() {
         await closeOpenApplications(page);
         const sidebarItemsTab = page.locator('#sidebar [data-tab="items"]').first();
         await sidebarItemsTab.click({ force: true });
+        // Assert the tab ACTUALLY activated before waiting on anything inside it.
+        // `force: true` skips actionability checks but still dispatches at the element's
+        // coordinates, so a modal overlay silently swallows the click and the panel never
+        // opens — the craft button then times out "resolved to hidden", which reads like a
+        // Fabricate UI defect rather than a blocked click (issue #993). Failing here names
+        // the real cause instead.
+        await page
+          .locator('#sidebar [data-tab="items"][aria-selected="true"], #sidebar [data-application-part="items"]')
+          .first()
+          .waitFor({ state: 'visible', timeout: 10_000 })
+          .catch(() => {
+            throw new Error(
+              'Items sidebar tab did not activate after clicking it — a modal overlay (e.g. a Foundry NUE tour) is most likely intercepting the click.'
+            );
+          });
         const craftButton = page.locator('button[data-fabricate-action="craft"]').first();
         await craftButton.waitFor({ state: 'visible', timeout: 10_000 });
         await craftButton.evaluate(button => button.click());
