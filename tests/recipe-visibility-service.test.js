@@ -4291,3 +4291,37 @@ for (const budgetCase of D7_BUDGET_CASES) {
     assert.deepEqual(pool.decrements, [], 'a perInstance book never touches the shared pool');
   });
 }
+
+test('LEARN.scope=total - a player is told a GM is required, NOT that the budget is spent', async () => {
+  // The shared budget lives in a world setting, so a player cannot reserve a slot. That
+  // refusal used to be reported as `LearnBudgetSpent` — telling players their budget was
+  // gone while it sat untouched, which reads as a data bug and silently made every
+  // `total`-scope book unusable rather than pointing at the actual requirement.
+  const system = buildLearnModeSystem({ learnScope: 'total', learnsAllowed: 2 });
+  const recipes = [buildCappedRecipe({ id: 'r-a' })];
+  const pool = { ...makeFakePartyPool(), writable: () => false };
+  const service = new RecipeVisibilityService({ getRecipes: () => recipes }, { getSystem: () => system }, pool);
+
+  const copy = new FakeItem({ uuid: 'Actor.a.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'actor-a', items: [copy] });
+
+  const result = await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: copy, actor });
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'FABRICATE.Knowledge.LearnRequiresGm');
+  assert.equal(pool.get('system-1::book'), 0, 'the shared budget was not touched');
+});
+
+test('LEARN.scope=total - a writable pool still reports a genuinely spent budget', async () => {
+  const system = buildLearnModeSystem({ learnScope: 'total', learnsAllowed: 1 });
+  const recipes = [buildCappedRecipe({ id: 'r-a' }), buildCappedRecipe({ id: 'r-b' })];
+  const pool = { ...makeFakePartyPool(), writable: () => true };
+  const service = new RecipeVisibilityService({ getRecipes: () => recipes }, { getSystem: () => system }, pool);
+
+  const copy = new FakeItem({ uuid: 'Actor.a.Item.book', sourceId: 'Compendium.world.items.book' });
+  const actor = new FakeActor({ id: 'actor-a', items: [copy] });
+
+  assert.equal((await service.learnOneRecipeFromItem({ recipe: recipes[0], ownedItem: copy, actor })).success, true);
+  const refused = await service.learnOneRecipeFromItem({ recipe: recipes[1], ownedItem: copy, actor });
+  assert.equal(refused.message, 'FABRICATE.Knowledge.LearnBudgetSpent', 'spent is still spent');
+});

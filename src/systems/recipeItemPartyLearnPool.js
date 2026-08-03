@@ -63,6 +63,16 @@ export function createDefaultPartyLearnPool() {
       const pool = _readPool();
       return Number(pool?.[key] || 0);
     },
+    /**
+     * Whether THIS client may mutate the shared pool at all. Distinct from a failed
+     * increment: a non-GM is REFUSED, which is not the same as the budget being
+     * spent, and callers previously collapsed the two into "no learning uses left" —
+     * telling a player their budget was gone when it was untouched. Exposed so the
+     * caller can report the real reason.
+     *
+     * @returns {boolean}
+     */
+    writable: () => _isGM(),
     async increment(key) {
       // GM-authoritative: a world-setting write requires a GM, and letting a
       // non-GM client "increment" locally would fork the shared budget. Degrade
