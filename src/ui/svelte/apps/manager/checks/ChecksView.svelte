@@ -411,7 +411,6 @@
             <CraftingCheckEditor
               value={craftingCheck}
               {resolutionMode}
-              allowNatStepping
               breakageAuthority={craftingBreakageAuthority}
               onChange={onUpdateCraftingCheck}
             />
@@ -449,7 +448,6 @@
             <CraftingCheckEditor
               value={craftingCheck}
               {resolutionMode}
-              allowNatStepping
               breakageAuthority={craftingBreakageAuthority}
               onChange={onUpdateCraftingCheck}
             />
@@ -538,7 +536,6 @@
           <CraftingCheckEditor
             value={salvageCheckRouted}
             showTiers={false}
-            allowNatStepping
             breakageAuthority={salvageBreakageAuthority}
             onChange={onUpdateSalvageCheckRouted}
           />

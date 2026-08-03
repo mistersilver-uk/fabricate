@@ -3,7 +3,7 @@
   Unified per-check trigger editor (issue 419 recombine).
 
   One trigger list per check, ALWAYS rendered. Each trigger pairs an expressive
-  dice-matching CONDITION with two effects:
+  dice-matching CONDITION with three effects:
     - `outcome` — force the check to an Automatic success / Automatic failure, or
       leave it (No effect). For a progressive check the success/failure labels read
       Award all / Award none. Forcing applies under BOTH tool-breakage authorities.
@@ -11,11 +11,16 @@
       ONLY under `checkDriven` authority: the per-trigger break pill is shown/enabled
       only when `showBreakTools` is true, and under `toolSpecific` a check never breaks
       tools.
+    - `tierStep` (issue 975) — move the rolled outcome tier: target a named tier, or
+      step it up/down by N. Routed only (there are no tiers to step otherwise), and
+      deliberately NOT gated on `showBreakTools`: stepping is not a breakage concept
+      and does not belong to the tool-breakage authority.
 
   An `outcomeTier` condition (routed only) cannot force an outcome — the routed tier
-  is resolved AFTER the forced outcome would run, so the outcome select is pinned to
+  is resolved AFTER the forced outcome would run, so the outcome segments are pinned to
   No effect and disabled for it (such a trigger may still break tools, evaluated at
-  the engine seam where the tier is known).
+  the engine seam where the tier is known). It CAN step, though: a step reads the
+  rolled tier and produces the final one, so there is no circularity to prevent.
 
   Controlled component mirroring the prior editors' `{ value, rollFormula, onChange }`
   pattern: reads the `{ triggers[] }` block + the roll formula and emits the next
@@ -30,6 +35,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
+  import SegmentedControl from '../SegmentedControl.svelte';
 
   let {
     value = null,
@@ -149,19 +155,19 @@
       ? [
           {
             value: 'success',
-            variant: 'is-success',
+            variant: 'success',
             labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardAll',
             fallback: 'Award all',
           },
           {
             value: 'none',
-            variant: 'is-neutral',
+            variant: 'neutral',
             labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
             fallback: 'No effect',
           },
           {
             value: 'failure',
-            variant: 'is-danger',
+            variant: 'danger',
             labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardNone',
             fallback: 'Award none',
           },
@@ -169,23 +175,65 @@
       : [
           {
             value: 'success',
-            variant: 'is-success',
+            variant: 'success',
             labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceSuccess',
             fallback: 'Automatic success',
           },
           {
             value: 'none',
-            variant: 'is-neutral',
+            variant: 'neutral',
             labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceNone',
             fallback: 'No effect',
           },
           {
             value: 'failure',
-            variant: 'is-danger',
+            variant: 'danger',
             labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.OutcomeForceFailure',
             fallback: 'Automatic failure',
           },
         ]
+  );
+
+  // The forcing segments are DISABLED (on the radio itself, not merely dimmed) for an
+  // outcomeTier condition — that pin is what keeps forcing non-circular.
+  function outcomeSegments(isOutcomeTier) {
+    return outcomeChoices.map((option) => ({
+      ...option,
+      disabled: isOutcomeTier && option.value !== 'none',
+    }));
+  }
+
+  // The tier-step effect's four modes. `none` is inert; `up`/`down` take a count;
+  // `target` names a tier. Rendered for routed checks only — there is nothing to
+  // step on a simple or progressive check.
+  const TIER_STEP_MODES = [
+    {
+      value: 'none',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeNone',
+      fallback: 'No step',
+    },
+    {
+      value: 'up',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeUp',
+      fallback: 'Step up',
+    },
+    {
+      value: 'down',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeDown',
+      fallback: 'Step down',
+    },
+    {
+      value: 'target',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Breakage.TierStepModeTarget',
+      fallback: 'Target tier',
+    },
+  ];
+
+  const tierStepLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Breakage.TierStep', 'Tier step')
+  );
+  const tierStepModeLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepMode', 'Tier step mode')
   );
 
   const breakOnLabel = $derived(
@@ -222,6 +270,10 @@
         outcome: 'none',
         // Default a new trigger to breaking tools only where that effect is reachable.
         breakTools: showBreakTools === true,
+        // Authored here rather than left to the normalizer so a freshly added trigger
+        // and a saved-then-reloaded one are the same object — no round trip needed for
+        // the editor and the normalizer to agree.
+        tierStep: { mode: 'none', steps: 1, tierId: null },
       },
     ]);
   }
@@ -264,6 +316,33 @@
 
   function isOutcomeSelected(condition, id) {
     return Array.isArray(condition?.tierIds) && condition.tierIds.includes(id);
+  }
+
+  // The trigger's tierStep effect, read defensively: a trigger authored before issue
+  // 975 (or hand-edited) may carry none at all. Flat rather than a discriminated
+  // union so switching mode never destroys the other mode's operand.
+  function tierStepFor(trigger) {
+    const source =
+      trigger?.tierStep && typeof trigger.tierStep === 'object' ? trigger.tierStep : {};
+    const steps = Number(source.steps);
+    const tierId = typeof source.tierId === 'string' ? source.tierId.trim() : '';
+    return {
+      mode: ['none', 'target', 'up', 'down'].includes(source.mode) ? source.mode : 'none',
+      steps: Number.isFinite(steps) ? Math.max(1, Math.trunc(steps)) : 1,
+      tierId: tierId || null,
+    };
+  }
+
+  function updateTierStep(id, patch) {
+    const trigger = triggers.find((entry) => entry.id === id);
+    updateTrigger(id, { tierStep: { ...tierStepFor(trigger), ...patch } });
+  }
+
+  // A target naming no tier on the ACTIVE list. Reachable by design and not only by
+  // import: the relative↔fixed type switch swaps the whole tier list, dangling every
+  // authored tierId at once.
+  function isDanglingTarget(step) {
+    return Boolean(step.tierId) && !outcomeOptions.some((option) => option.id === step.tierId);
   }
 
   function toggleOutcomeTier(id, optionId) {
@@ -430,24 +509,14 @@
         <div class="manager-checks-trigger-bottom">
           <div class="manager-field manager-checks-trigger-outcome">
             <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.OutcomeColumn', 'Outcome')}</span>
-            <div
-              class="manager-checks-outcome-toggle"
-              role="group"
-              aria-label={text('FABRICATE.Admin.Manager.Checks.Breakage.OutcomeColumn', 'Outcome')}
-            >
-              {#each outcomeChoices as option (option.value)}
-                <button
-                  type="button"
-                  class={`manager-checks-outcome-option ${option.variant}`}
-                  class:is-selected={selectedOutcome === option.value}
-                  data-trigger-outcome={option.value}
-                  aria-pressed={selectedOutcome === option.value}
-                  disabled={isOutcomeTier && option.value !== 'none'}
-                  onclick={() => updateTrigger(trigger.id, { outcome: option.value })}
-                  >{text(option.labelKey, option.fallback)}</button
-                >
-              {/each}
-            </div>
+            <SegmentedControl
+              options={outcomeSegments(isOutcomeTier)}
+              value={selectedOutcome}
+              groupName={`outcome-${trigger.id}`}
+              ariaLabel={text('FABRICATE.Admin.Manager.Checks.Breakage.OutcomeColumn', 'Outcome')}
+              optionDataAttr="data-trigger-outcome"
+              onChange={(next) => updateTrigger(trigger.id, { outcome: next })}
+            />
           </div>
 
           {#if showBreakTools}
@@ -472,6 +541,104 @@
             </div>
           {/if}
         </div>
+
+        {#if kind === 'routed'}
+          {@const step = tierStepFor(trigger)}
+          {@const dangling = isDanglingTarget(step)}
+          <!-- Its OWN row, not a third field in the bottom row: at the pinned 1280
+               manager geometry the outcome toggle plus the break pill already spend
+               most of the trigger card's width, and a four-segment control plus an
+               operand does not fit what is left. -->
+          <div class="manager-checks-trigger-step-row" data-trigger-tier-step>
+            <div class="manager-field manager-checks-trigger-step-mode">
+              <span>{tierStepLabel}</span>
+              <SegmentedControl
+                options={TIER_STEP_MODES}
+                value={step.mode}
+                groupName={`tierstep-${trigger.id}`}
+                ariaLabel={tierStepModeLabel}
+                optionDataAttr="data-trigger-tier-step-mode"
+                onChange={(mode) => updateTierStep(trigger.id, { mode })}
+              />
+            </div>
+
+            <!-- The operand slot is ALWAYS present at one pinned width and only its
+                 contents swap, so changing mode never moves the control out from
+                 under the pointer in this wrapping row. -->
+            <div
+              class={`manager-field manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
+            >
+              {#if step.mode === 'up' || step.mode === 'down'}
+                <input
+                  type="number"
+                  min="1"
+                  data-trigger-tier-step-steps
+                  aria-label={step.mode === 'up'
+                    ? text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsUp', 'Steps up')
+                    : text(
+                        'FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsDown',
+                        'Steps down'
+                      )}
+                  value={step.steps}
+                  oninput={(event) =>
+                    updateTierStep(trigger.id, {
+                      steps: Math.max(1, Math.trunc(numeric(event.currentTarget.value))),
+                    })}
+                />
+              {:else if step.mode === 'target' && outcomeOptions.length > 0}
+                <!-- A <select> whose value matches no option renders its FIRST option as
+                     selected, so a null tierId would show a real tier the check has not
+                     persisted. The disabled placeholder is what makes "nothing chosen"
+                     read as nothing chosen. -->
+                <select
+                  data-trigger-tier-step-target
+                  aria-label={text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepTier', 'Tier')}
+                  value={step.tierId ?? ''}
+                  onchange={(event) =>
+                    updateTierStep(trigger.id, { tierId: event.currentTarget.value || null })}
+                >
+                  <option value="" disabled
+                    >{text(
+                      'FABRICATE.Admin.Manager.Checks.Breakage.TierStepChoose',
+                      'Choose a tier…'
+                    )}</option
+                  >
+                  {#each outcomeOptions as option (option.id)}
+                    <option value={option.id}
+                      >{option.name ||
+                        text(
+                          'FABRICATE.Admin.Manager.Checks.Breakage.UnnamedTier',
+                          'Unnamed tier'
+                        )}</option
+                    >
+                  {/each}
+                  {#if dangling}
+                    <option value={step.tierId} disabled
+                      >{text(
+                        'FABRICATE.Admin.Manager.Checks.Breakage.TierStepMissingTier',
+                        'Missing tier'
+                      )}</option
+                    >
+                  {/if}
+                </select>
+              {:else}
+                <input type="text" value="" disabled aria-hidden="true" tabindex="-1" />
+              {/if}
+            </div>
+
+            {#if step.mode === 'target' && outcomeOptions.length === 0}
+              <!-- Its own hook, distinct from the outcomeTier condition's: a trigger that
+                   is both outcomeTier-conditioned and target-stepping on a tier-less check
+                   would otherwise carry two identically-hooked nodes in one card. -->
+              <p class="manager-muted manager-checks-trigger-step-hint" data-trigger-step-no-tiers>
+                {text(
+                  'FABRICATE.Admin.Manager.Checks.Breakage.TierStepNoTiers',
+                  'Add named outcome tiers to step to one.'
+                )}
+              </p>
+            {/if}
+          </div>
+        {/if}
       </div>
     {/each}
   {/if}

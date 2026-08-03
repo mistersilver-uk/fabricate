@@ -1114,6 +1114,64 @@ test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group
   }
 });
 
+test('_resolveRoutedFormulaOutcome: a tier-step trigger moves the gathering tier and reroutes by the FINAL name', async () => {
+  // Acceptance criterion 5, "gathering routed checks step" (issue 975). Tier stepping is a
+  // per-trigger effect on the unified trigger list, so it reaches gathering through the same
+  // `routed.checkBreakage.triggers` the engine already forwards to `runFormulaRouted` —
+  // there is no gathering-specific opt-in, which is the point of retiring `natStepping`.
+  //
+  // Two tiers, two same-named result groups. A total of 5 matches 'Dust' (threshold
+  // dc-10 = 5), a FAILURE tier — the exact configuration the sibling test above pins as a
+  // terminal failure. The only difference here is one `up 1` trigger, so anything that
+  // stopped the step from applying would put this test back on that test's outcome.
+  //
+  // What it proves beyond "the step ran": gathering routes by the tier NAME, so a step
+  // changes which result group a gather produces, and with no forced outcome `success`
+  // follows the final tier — a failure tier stepped up onto a success tier succeeds.
+  const task = routedTask({
+    resultGroups: [
+      { id: 'group-dust', name: 'Dust', results: [{ id: 'result-dust', componentId: 'comp-a', quantity: 1 }] },
+      { id: 'group-iron', name: 'Iron', results: [{ id: 'result-iron', componentId: 'comp-b', quantity: 1 }] }
+    ]
+  });
+  // A `rollTotal` condition rather than a `diceGroup` one: it reads only `total`, which the
+  // roll stub supplies unconditionally, so the test cannot pass or fail on dice-group shape.
+  const routed = routedSystemCheck({
+    failureTierName: 'Dust',
+    triggers: [{
+      id: 'gather-step-up',
+      condition: { type: 'rollTotal', operator: '<=', value: 5 },
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode: 'up', steps: 1, tierId: null }
+    }]
+  }).routed;
+  stubRoll(5, [{ number: 1, faces: 20, total: 5 }]); // matches Dust (threshold 5) → steps up to Iron
+  try {
+    const engine = makeEngine({ task });
+    const outcome = await engine._resolveRoutedFormulaOutcome({
+      routed,
+      rollFormula: routed.rollFormula,
+      actor,
+      task
+    });
+    assert.equal(outcome.status, 'succeeded');
+    assert.equal(outcome.checkResult.outcome, 'Iron', 'the FINAL tier name is the routing key');
+    assert.equal(outcome.checkResult.success, true, 'success follows the final tier');
+    assert.deepEqual(outcome.resultGroups.map(group => group.id), ['group-iron']);
+    assert.deepEqual(outcome.checkResult.data.tierStepApplied, {
+      mode: 'up',
+      steps: 1,
+      fromOutcomeId: 'tier-Dust',
+      toOutcomeId: 'tier-Iron',
+      stepClamped: false,
+      triggerIds: ['gather-step-up']
+    });
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
 test('_resolveRoutedOutcome: no system roll formula reports a MISSING_ROUTED_CHECK diagnostic', async () => {
   const task = routedTask();
   const engine = makeEngine({ task, gatheringCraftingCheck: false });

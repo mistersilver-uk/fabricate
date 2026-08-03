@@ -129,9 +129,14 @@ export function rollTotalForCard(checkResult) {
   return checkResult?.data?.total ?? checkResult?.value ?? null;
 }
 
-/** Actual routed natural-step evidence for result chat, or null when unchanged. */
-function natStepForCard(checkResult) {
-  return checkResult?.data?.natStep ?? null;
+/**
+ * Realized routed tier-step evidence for result chat, or null when the roll's tier
+ * was never moved. `runFormulaRouted` emits `data.tierStepApplied` only on an actual
+ * tier change (issue 975), so an absent key is the "nothing moved" case and the card
+ * renders no note.
+ */
+function tierStepForCard(checkResult) {
+  return checkResult?.data?.tierStepApplied ?? null;
 }
 
 /**
@@ -847,7 +852,7 @@ export class CraftingEngine {
           createdResults: [],
           failureReason: checkResult.message || 'Crafting check failed',
           rollValue: rollTotalForCard(checkResult),
-          natStep: natStepForCard(checkResult),
+          tierStep: tierStepForCard(checkResult),
         });
         return {
           success: false,
@@ -917,7 +922,7 @@ export class CraftingEngine {
           createdResults: [],
           failureReason: message,
           rollValue: rollTotalForCard(checkResult),
-          natStep: natStepForCard(checkResult),
+          tierStep: tierStepForCard(checkResult),
         });
         return {
           success: false,
@@ -970,7 +975,7 @@ export class CraftingEngine {
             createdResults: [],
             failureReason: message,
             rollValue: rollTotalForCard(checkResult),
-            natStep: natStepForCard(checkResult),
+            tierStep: tierStepForCard(checkResult),
           });
           return {
             success: false,
@@ -1076,7 +1081,7 @@ export class CraftingEngine {
         tools: toolValidation.tools,
         createdResults: resultItems,
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
 
       // Collapsed chain (issue 710): a non-final step just succeeded and the run is
@@ -1493,7 +1498,7 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
       return { resolved: true, result: { success: false, results: null, message } };
     };
@@ -1597,7 +1602,7 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
       return {
         resolved: true,
@@ -1655,7 +1660,7 @@ export class CraftingEngine {
       tools: toolItems,
       createdResults: resultItems,
       rollValue: rollTotalForCard(checkResult),
-      natStep: natStepForCard(checkResult),
+      tierStep: tierStepForCard(checkResult),
     });
 
     const stepLabel = step.name || `step ${stepIndex + 1}`;
@@ -1781,7 +1786,7 @@ export class CraftingEngine {
       createdResults: resultItems,
       failureReason: checkResult.message || 'Crafting check failed',
       rollValue: rollTotalForCard(checkResult),
-      natStep: natStepForCard(checkResult),
+      tierStep: tierStepForCard(checkResult),
     });
 
     return {
@@ -3878,7 +3883,6 @@ export class CraftingEngine {
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
       triggers: routed.checkBreakage?.triggers,
-      natStepping: routed.natStepping === true,
       actor: craftingActor,
       label: 'Crafting',
       craftingModifier,
@@ -4301,7 +4305,8 @@ export class CraftingEngine {
    * @param {string}  [params.failureReason]     - Human-readable failure reason (failure only).
    * @param {number|null} [params.rollValue]      - The crafting check total (`checkResult.value`),
    *   or null when no check ran; the card renders it only when finite.
-   * @param {object|null} [params.natStep]         - Actual routed natural-step evidence.
+   * @param {object|null} [params.tierStep]        - Realized routed tier-step evidence
+   *   (`data.tierStepApplied`), or null when the rolled tier was never moved.
    * @private
    */
   async _postCraftChatMessage({
@@ -4313,7 +4318,7 @@ export class CraftingEngine {
     createdResults,
     failureReason,
     rollValue = null,
-    natStep = null,
+    tierStep = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
@@ -4342,7 +4347,7 @@ export class CraftingEngine {
         })),
         tools: toolEntries,
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
-        natStep,
+        tierStep,
         failureReason: failureReason || '',
       },
       localize
@@ -4442,7 +4447,8 @@ export class CraftingEngine {
    * @param {string}  [params.failureReason] - Human-readable reason (failure only).
    * @param {number|null} [params.rollValue]  - The salvage check total (`checkResult.value`),
    *   or null when no check ran; the card renders it only when finite.
-   * @param {object|null} [params.natStep]     - Actual routed natural-step evidence.
+   * @param {object|null} [params.tierStep]    - Realized routed tier-step evidence
+   *   (`data.tierStepApplied`), or null when the rolled tier was never moved.
    * @private
    */
   async _postSalvageChatMessage({
@@ -4455,7 +4461,7 @@ export class CraftingEngine {
     usedTools,
     failureReason,
     rollValue = null,
-    natStep = null,
+    tierStep = null,
   }) {
     if (!system || system.features?.chatOutput !== true) return;
 
@@ -4484,7 +4490,7 @@ export class CraftingEngine {
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
-        natStep,
+        tierStep,
         failureReason: failureReason || '',
       },
       localize
@@ -5037,7 +5043,7 @@ export class CraftingEngine {
         usedTools,
         failureReason: checkResult.message || 'Salvage check failed',
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
 
       return {
@@ -5142,7 +5148,7 @@ export class CraftingEngine {
       usedTools,
       failureReason: '',
       rollValue: rollTotalForCard(checkResult),
-      natStep: natStepForCard(checkResult),
+      tierStep: tierStepForCard(checkResult),
     });
 
     return {
@@ -5487,7 +5493,6 @@ export class CraftingEngine {
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
       triggers: routed.checkBreakage?.triggers,
-      natStepping: routed.natStepping === true,
       actor,
       label: 'Salvage',
       // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-

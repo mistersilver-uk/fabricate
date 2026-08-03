@@ -569,7 +569,7 @@ export class CraftingSystemManager {
       },
       progressive: this._normalizeProgressiveCraftingCheck(check?.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
-      routed: this._normalizeRoutedCraftingCheck(check?.routed, { allowNatStepping: true }),
+      routed: this._normalizeRoutedCraftingCheck(check?.routed),
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
       // Per-recipe check-modifier catalogue + default policy (issue 770). A crafting-
       // owned aggregate (NOT gathering's `characterModifiers`), feeding the
@@ -736,6 +736,9 @@ export class CraftingSystemManager {
           // state), so the disposition maps directly.
           outcome: crit.success === true ? 'success' : 'failure',
           breakTools: crit.breakTools === true,
+          // A legacy crit had no stepping effect, but the key must be present so a
+          // converted trigger re-normalizes to itself (issue 975).
+          tierStep: this._normalizeTierStep(),
         };
       })
       .filter(Boolean);
@@ -780,7 +783,7 @@ export class CraftingSystemManager {
   // deleting a tier in one mode never affects the other. Kept alongside the
   // legacy `outcomes` string list rather than replacing it, so the existing
   // routing engine is untouched.
-  _normalizeRoutedCraftingCheck(routed = {}, { allowNatStepping = false } = {}) {
+  _normalizeRoutedCraftingCheck(routed = {}) {
     const source = !routed || typeof routed !== 'object' ? {} : routed;
     const relative = Array.isArray(source.relativeOutcomes) ? source.relativeOutcomes : [];
     const fixed = Array.isArray(source.fixedOutcomes) ? source.fixedOutcomes : [];
@@ -795,9 +798,9 @@ export class CraftingSystemManager {
     } else if (typeof source.rollExpression === 'string') {
       rollFormula = source.rollExpression;
     }
+    const type = source.type === 'fixed' ? 'fixed' : 'relative';
     return {
-      type: source.type === 'fixed' ? 'fixed' : 'relative',
-      ...(allowNatStepping && { natStepping: source.natStepping === true }),
+      type,
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
@@ -808,10 +811,14 @@ export class CraftingSystemManager {
       fixedOutcomes: fixed
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'fixed'))
         .filter(Boolean),
+      // The legacy `natStepping` boolean (issue 975) converts to a pair of
+      // tier-stepping triggers on read and is dropped from the output, so the
+      // conversion runs once and the key never round-trips.
       checkBreakage: this._normalizeUnifiedTriggers(
         rollFormula,
         source.diceCrits,
-        source.checkBreakage
+        source.checkBreakage,
+        { natStepping: source.natStepping, type }
       ),
     };
   }
@@ -841,21 +848,82 @@ export class CraftingSystemManager {
    * Normalize the unified per-check trigger list (issue 419 recombine) carried by
    * each crafting/salvage/gathering check sub-object (simple/routed/progressive).
    * Migrates legacy data on read (no versioned migration): any legacy `diceCrits`
-   * are converted to `diceGroup` triggers and concatenated ahead of the normalized
-   * `checkBreakage.triggers`. Idempotent — a re-normalized block carries no
-   * `diceCrits` and its triggers already hold `outcome`/`breakTools`, so the second
-   * pass converts nothing and re-normalizes the triggers to themselves.
+   * are converted to `diceGroup` triggers and, for a routed check, a legacy
+   * `natStepping: true` is converted to the tier-stepping trigger pair (issue 975).
+   * Both conversions are concatenated ahead of the normalized
+   * `checkBreakage.triggers`, in the order `[...crits, ...natStep, ...authored]`.
+   * Idempotent — a re-normalized block carries neither `diceCrits` nor
+   * `natStepping` and its triggers already hold `outcome`/`breakTools`/`tierStep`,
+   * so the second pass converts nothing and re-normalizes the triggers to themselves.
    *
    * @param {string} rollFormula     Formula used to resolve a converted crit's groupId.
    * @param {Array<object>} [diceCrits]   Legacy per-die crit list (pre-recombine).
    * @param {object} [checkBreakage]      Existing `{ triggers }` block.
+   * @param {object} [legacyRouted]       Routed-only legacy fields; defaulted so the
+   *   simple and progressive call sites (which have neither) need not pass it.
+   * @param {boolean} [legacyRouted.natStepping] Legacy natural-stepping boolean.
+   * @param {string} [legacyRouted.type]  Normalized routed type (`relative`/`fixed`).
    * @returns {{ triggers: Array<object> }}
    * @private
    */
-  _normalizeUnifiedTriggers(rollFormula, diceCrits, checkBreakage) {
+  _normalizeUnifiedTriggers(rollFormula, diceCrits, checkBreakage, legacyRouted = {}) {
     const converted = this._convertDiceCritsToTriggers(diceCrits, rollFormula);
+    const convertedNatStep = this._convertNatSteppingToTriggers(
+      legacyRouted?.natStepping,
+      rollFormula,
+      legacyRouted?.type
+    );
     const { triggers } = this._normalizeCheckBreakage(checkBreakage);
-    return { triggers: [...converted, ...triggers] };
+    return { triggers: [...converted, ...convertedNatStep, ...triggers] };
+  }
+
+  /**
+   * Convert a routed check's legacy `natStepping: true` boolean into the pair of
+   * tier-stepping triggers that reproduce it (issue 975): a natural 20 steps the
+   * matched tier up one, a natural 1 steps it down one.
+   *
+   * Emitted only when stepping was actually live at conversion time — the boolean
+   * is `true`, the check is not `fixed` (the old runtime was relative-only, so a
+   * fixed check's flag was already inert), and the formula carries a d20 group.
+   * A formula with no d20 group synthesises nothing for the same reason.
+   *
+   * Notes on the shape, each of which is load-bearing:
+   * - The ids are stable literals rather than `randomID()`, because this conversion
+   *   has no source id and would otherwise re-mint ids on every read until a save
+   *   drops `natStepping` — and a trigger id reaches chat and captured result data.
+   * - `outcome` and `breakTools` are written EXPLICITLY so
+   *   {@link _normalizeUnifiedTrigger}'s legacy break-only test cannot mistake a
+   *   synthesised trigger for a pre-recombine one and start breaking tools on a
+   *   natural 20.
+   * - `allDice` rather than `anyDie`/`highestDie`: a non-`total` aggregate with no
+   *   per-die faces aggregates to `null` and the condition fails open (no match),
+   *   so a headless or stubbed roll cannot fire these triggers.
+   * - The {@link parsePlainDiceGroups} filter used by the crit conversion is
+   *   deliberately NOT applied: `2d20kh1` was the design target of the old
+   *   kept-face rule and must survive here even though it is crit-ineligible.
+   * - A duplicate-d20 formula (`1d20 + 1d20`) targets the first group only — the
+   *   accepted caveat the crit conversion already carries.
+   * @private
+   */
+  _convertNatSteppingToTriggers(natStepping, rollFormula, type) {
+    if (natStepping !== true || type === 'fixed') return [];
+    const d20GroupId = parseDiceGroups(rollFormula).findIndex((group) => group.sides === 20);
+    // -1 → natStepping was already inert; synthesise nothing.
+    if (d20GroupId === -1) return [];
+    const natStepTrigger = (id, face, mode) => ({
+      id,
+      condition: {
+        type: 'diceGroup',
+        groupId: d20GroupId,
+        aggregate: 'allDice',
+        operator: '==',
+        value: face,
+      },
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode, steps: 1, tierId: null },
+    });
+    return [natStepTrigger('natstep-up', 20, 'up'), natStepTrigger('natstep-down', 1, 'down')];
   }
 
   /**
@@ -878,8 +946,8 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize a single unified trigger `{ id, condition, outcome, breakTools }`,
-   * dropping it (returning null) when its condition shape is malformed.
+   * Normalize a single unified trigger `{ id, condition, outcome, breakTools,
+   * tierStep }`, dropping it (returning null) when its condition shape is malformed.
    *
    * - `outcome` is one of `'success' | 'failure' | 'none'` (default `'none'`);
    *   pinned to `'none'` for an `outcomeTier` condition, whose match is resolved
@@ -887,6 +955,14 @@ export class CraftingSystemManager {
    * - `breakTools` defaults to `false`, EXCEPT a legacy break-only trigger (one
    *   carrying neither an `outcome` nor a `breakTools` prop, as authored before the
    *   recombine) is migrated to `breakTools: true` so it keeps breaking tools.
+   *   `tierStep` is deliberately absent from that test: adding it would flip every
+   *   pre-recombine break-only trigger into a non-breaking one.
+   * - `tierStep` is always present (issue 975), defaulting to the inert
+   *   `{ mode: 'none', steps: 1, tierId: null }`. Unlike `outcome` it is NOT pinned
+   *   to its inert value for an `outcomeTier` condition: that pin is the
+   *   circularity fix for FORCING an outcome, whereas a step reads the rolled tier
+   *   and produces the final one, so stepping on an `outcomeTier` condition is
+   *   deliberately allowed.
    * - The free-text `label` is dropped.
    * @private
    */
@@ -904,6 +980,40 @@ export class CraftingSystemManager {
       condition,
       outcome,
       breakTools: isLegacyBreakOnly ? true : trigger.breakTools === true,
+      tierStep: this._normalizeTierStep(trigger.tierStep),
+    };
+  }
+
+  /**
+   * Normalize a trigger's `tierStep` effect (issue 975) — the third effect a
+   * unified trigger carries, alongside `outcome` and `breakTools`.
+   *
+   * Shape: `{ mode: 'none'|'target'|'up'|'down', steps: number, tierId: string|null }`.
+   * Flat rather than a discriminated union so switching mode in the editor never
+   * destroys the other mode's operand, mirroring the retention `_normalizeRoutedOutcome`
+   * already gives `dc` and `start`/`end` across a `type` switch.
+   *
+   * - An unknown or absent `mode` collapses to `'none'` (inert).
+   * - `steps` is the step MAGNITUDE (never a comparand — `condition.value` owns
+   *   that word), clamped to an integer `>= 1`: non-finite, zero, negative and
+   *   fractional values all resolve to a usable count.
+   * - `tierId` is a trimmed non-empty string or `null`, and is preserved VERBATIM
+   *   even when it names no tier: this normalizer cannot see the outcome lists
+   *   (simple and progressive checks have none at all), so a dangling id is left
+   *   for the editor to display and the runtime to no-op on, the same graceful
+   *   treatment `minOutcomeId` already documents.
+   * @param {object} [input] Raw `tierStep` sub-record.
+   * @returns {{ mode: string, steps: number, tierId: string|null }}
+   * @private
+   */
+  _normalizeTierStep(input) {
+    const source = !input || typeof input !== 'object' ? {} : input;
+    const steps = Number(source.steps);
+    const tierId = typeof source.tierId === 'string' ? source.tierId.trim() : '';
+    return {
+      mode: ['none', 'target', 'up', 'down'].includes(source.mode) ? source.mode : 'none',
+      steps: Number.isFinite(steps) ? Math.max(1, Math.trunc(steps)) : 1,
+      tierId: tierId || null,
     };
   }
 
@@ -974,9 +1084,7 @@ export class CraftingSystemManager {
       // the dynamic-DC macro are stored but hidden by the salvage editors (salvage
       // has no recipes to pick a tier from).
       simple: this._normalizeSimpleCraftingCheck(normalizedCheck.simple),
-      routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed, {
-        allowNatStepping: true,
-      }),
+      routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed),
       progressive: this._normalizeProgressiveCraftingCheck(normalizedCheck.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
     };

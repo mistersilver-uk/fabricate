@@ -11,6 +11,7 @@ globalThis.foundry = globalThis.foundry || {
 globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
+const { salvageForChatCard } = await import('./helpers/routedCheckEngine.js');
 
 function makeEngine() {
   return new CraftingEngine({}, null, {});
@@ -348,4 +349,79 @@ test('toolSpecific salvage: a breakTools trigger never force-breaks (either-or a
   const decision = engine._resolveSalvageBreakageDecision(system, r);
   assert.equal(decision.authority, 'toolSpecific');
   assert.equal(decision.forceBreak, false, 'a check never breaks tools under toolSpecific');
+});
+
+// ── Tier-step evidence reaches the salvage result card (issue 975) ───────────
+
+// Base dc 15 → thresholds 25 / 15 / 10, so a total of 16 matches "Success" and one
+// step lands on "Critical" (up) or "Failure" (down) — one fixture reaching both of
+// `_postSalvageChatMessage`'s call sites from the same roll.
+const tierStepSalvageCheck = (mode) => ({
+  routed: {
+    type: 'relative',
+    rollFormula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    relativeOutcomes: ROUTED_RELATIVE,
+    checkBreakage: {
+      triggers: [
+        {
+          id: `step-${mode}`,
+          condition: {
+            type: 'diceGroup',
+            groupId: 0,
+            aggregate: 'total',
+            operator: '==',
+            value: 16,
+          },
+          outcome: 'none',
+          breakTools: false,
+          tierStep: { mode, steps: 1, tierId: null },
+        },
+      ],
+    },
+  },
+});
+
+const stubStepRoll = () =>
+  stubRoll(16, [{ number: 1, faces: 20, total: 16, results: [{ result: 16, active: true }] }]);
+
+test('salvage routed: a tier-step trigger surfaces data.tierStepApplied on the check result', async () => {
+  const engine = makeEngine();
+  stubStepRoll();
+  const r = await run(engine, sys(tierStepSalvageCheck('down'), 'routed'));
+  assert.equal(r.outcome, 'Failure', 'the step moved the matched tier down one rank');
+  assert.equal(r.data.tierStepApplied.mode, 'down');
+  assert.equal(r.data.tierStepApplied.steps, 1, 'the REALIZED magnitude');
+});
+
+// The two below drive the REAL `salvage()` pipeline rather than calling
+// `_postSalvageChatMessage` with a hand-supplied `tierStep:`. That direct call
+// exercised the card, not the JOIN: both engine call sites pass
+// `tierStep: tierStepForCard(checkResult)`, and deleting either argument shipped green
+// (issue 975 review). Crafting is covered end to end by `craftForChatCard`; these are
+// its salvage twins, one per call site.
+
+test('salvage routed: the FAILURE path threads the runtime tier-step evidence into the card', async () => {
+  stubStepRoll();
+  const { result, chatMessages } = await salvageForChatCard(tierStepSalvageCheck('down'));
+  assert.equal(result.success, false, 'the step moved a success tier onto a failing one');
+  assert.equal(chatMessages.length, 1, 'one salvage card posted');
+  assert.ok(
+    chatMessages[0].content.includes('fabricate-craft-chat__tier-step'),
+    'the failure call site reached the card model'
+  );
+  assert.ok(chatMessages[0].content.includes('FABRICATE.Chat.TierStepDown'), 'the down key');
+});
+
+test('salvage routed: the SUCCESS path threads the runtime tier-step evidence into the card', async () => {
+  stubStepRoll();
+  const { result, chatMessages } = await salvageForChatCard(tierStepSalvageCheck('up'));
+  assert.equal(result.success, true, 'the step moved onto a higher success tier');
+  assert.equal(chatMessages.length, 1, 'one salvage card posted');
+  assert.ok(
+    chatMessages[0].content.includes('fabricate-craft-chat__tier-step'),
+    'the success call site reached the card model'
+  );
+  assert.ok(chatMessages[0].content.includes('FABRICATE.Chat.TierStepUp'), 'the up key');
 });

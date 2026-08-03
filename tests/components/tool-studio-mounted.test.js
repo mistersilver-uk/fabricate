@@ -48,6 +48,10 @@ const harness = createMountedComponentHarness({
     // throws for a shared-harness suite that omits it.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // The shipped segmented primitive (issue 975): `RecipeIngredientOption` below
+    // renders it for the tag-match Any/All control, so it is in this tree's static
+    // import graph and the closure validator throws without it.
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',

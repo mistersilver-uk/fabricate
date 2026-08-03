@@ -972,7 +972,10 @@ test('runFormulaRouted fixed: a roll below the recipe minimum tier fails outrigh
   assert.equal(r.data.outcomeId, null);
   assert.equal(r.data.breakTools, false);
   assert.equal(r.data.minTierFailed, true);
-  assert.equal(r.data.rolledOutcomeId, 'mid', 'the rolled tier is surfaced for explanation');
+  // Issue 975 renamed this from `rolledOutcomeId`: with stepping placed before the
+  // gate, the tier the gate blocked is the FINAL (post-step) one, while "rolled" is
+  // now a term of art for the pre-step tier.
+  assert.equal(r.data.blockedOutcomeId, 'mid', 'the blocked tier is surfaced for explanation');
   assert.equal(r.value, 8);
 });
 
@@ -1082,7 +1085,7 @@ test('runFormulaRouted fixed: a min-tier failure drops the rolled tier breakTool
   assert.equal(r.success, false);
   assert.equal(r.data.breakTools, false, 'no tier routes → the rolled tier breakTools is dropped');
   assert.equal(r.data.minTierFailed, true);
-  assert.equal(r.data.rolledOutcomeId, 'low');
+  assert.equal(r.data.blockedOutcomeId, 'low');
 });
 
 // ── interactive prompt DC seam (the fixed-check "no DC" contract) ────────────

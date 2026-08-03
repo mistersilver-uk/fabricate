@@ -441,6 +441,208 @@ test('_normalizeUnifiedTriggers drops a crit keyed to a modified pool, and is id
   assert.deepEqual(twice, once, 'normalization is idempotent');
 });
 
+// ---------------------------------------------------------------------------
+// issue 975: `tierStep`, the third trigger effect alongside outcome + breakTools
+// ---------------------------------------------------------------------------
+
+const INERT_TIER_STEP = Object.freeze({ mode: 'none', steps: 1, tierId: null });
+
+test('_normalizeTierStep defaults an absent or malformed record to the inert step', () => {
+  const manager = makeManager();
+  assert.deepEqual(manager._normalizeTierStep(), INERT_TIER_STEP);
+  assert.deepEqual(manager._normalizeTierStep(null), INERT_TIER_STEP);
+  assert.deepEqual(manager._normalizeTierStep('up'), INERT_TIER_STEP);
+  assert.deepEqual(manager._normalizeTierStep(7), INERT_TIER_STEP);
+  assert.deepEqual(manager._normalizeTierStep({}), INERT_TIER_STEP);
+});
+
+test('_normalizeTierStep keeps the four valid modes and collapses anything else to none', () => {
+  const manager = makeManager();
+  for (const mode of ['none', 'target', 'up', 'down']) {
+    assert.equal(manager._normalizeTierStep({ mode }).mode, mode);
+  }
+  for (const mode of ['set', 'UP', '', 0, null, undefined, { mode: 'up' }]) {
+    assert.equal(manager._normalizeTierStep({ mode }).mode, 'none', `${String(mode)} is not a mode`);
+  }
+});
+
+test('_normalizeTierStep clamps steps to an integer of at least one', () => {
+  const manager = makeManager();
+  const steps = (value) => manager._normalizeTierStep({ mode: 'up', steps: value }).steps;
+  assert.equal(steps(undefined), 1, 'absent defaults to one step');
+  assert.equal(steps('nope'), 1, 'a non-numeric value defaults to one step');
+  assert.equal(steps(Number.NaN), 1);
+  assert.equal(steps(Number.POSITIVE_INFINITY), 1, 'a non-finite value defaults to one step');
+  assert.equal(steps(0), 1, 'zero steps would be an inert step, so it clamps up');
+  assert.equal(steps(-3), 1, 'a negative magnitude clamps up rather than reversing direction');
+  assert.equal(steps(2.7), 2, 'a fractional magnitude truncates');
+  assert.equal(steps(0.5), 1, 'a fraction truncating to zero still clamps up');
+  assert.equal(steps('4'), 4, 'a numeric string coerces');
+  assert.equal(steps(3), 3, 'a valid magnitude is untouched');
+});
+
+test('_normalizeTierStep trims tierId and coerces anything non-string to null', () => {
+  const manager = makeManager();
+  const tierId = (value) => manager._normalizeTierStep({ mode: 'target', tierId: value }).tierId;
+  assert.equal(tierId('  tier-a  '), 'tier-a', 'a tier id is trimmed');
+  assert.equal(tierId('   '), null, 'a blank id is null');
+  assert.equal(tierId(''), null);
+  assert.equal(tierId(undefined), null);
+  assert.equal(tierId(null), null);
+  assert.equal(tierId(42), null, 'a non-string id is not coerced to its string form');
+  assert.equal(tierId(true), null);
+  assert.equal(tierId({ id: 'x' }), null);
+});
+
+test('_normalizeTierStep preserves a dangling tierId verbatim', () => {
+  const manager = makeManager();
+  // This normalizer cannot see the outcome lists — a simple or progressive check has
+  // none at all — so a target naming no tier is kept for the editor to display and
+  // the runtime to no-op on, rather than being silently discarded here.
+  assert.equal(manager._normalizeTierStep({ mode: 'target', tierId: 'no-such-tier' }).tierId, 'no-such-tier');
+});
+
+test('_normalizeTierStep retains the other mode operands across a mode switch', () => {
+  const manager = makeManager();
+  // Flat rather than a discriminated union: switching mode in the editor must never
+  // destroy the operand the other mode was using.
+  assert.deepEqual(manager._normalizeTierStep({ mode: 'up', steps: 3, tierId: 'tier-a' }), {
+    mode: 'up',
+    steps: 3,
+    tierId: 'tier-a',
+  });
+  assert.deepEqual(manager._normalizeTierStep({ mode: 'target', steps: 3, tierId: 'tier-a' }), {
+    mode: 'target',
+    steps: 3,
+    tierId: 'tier-a',
+  });
+});
+
+test('_normalizeTierStep is a fixpoint', () => {
+  const manager = makeManager();
+  const once = manager._normalizeTierStep({ mode: 'down', steps: '2.9', tierId: ' t ' });
+  assert.deepEqual(manager._normalizeTierStep(once), once);
+});
+
+test('every normalized trigger carries a tierStep, defaulting to the inert step', () => {
+  const manager = makeManager();
+  const block = manager._normalizeCheckBreakage({
+    triggers: [
+      { id: 'plain', outcome: 'failure', breakTools: false, condition: { type: 'rollTotal', operator: '<=', value: 5 } },
+      {
+        id: 'stepping',
+        outcome: 'none',
+        breakTools: false,
+        tierStep: { mode: 'up', steps: '2', tierId: '  ' },
+        condition: { type: 'rollTotal', operator: '>=', value: 18 },
+      },
+    ],
+  });
+  assert.deepEqual(block.triggers[0].tierStep, INERT_TIER_STEP);
+  assert.deepEqual(block.triggers[1].tierStep, { mode: 'up', steps: 2, tierId: null });
+});
+
+test('tierStep is NOT pinned to none for an outcomeTier condition, unlike outcome', () => {
+  const manager = makeManager();
+  const [trigger] = manager._normalizeCheckBreakage({
+    triggers: [
+      {
+        id: 'tier-driven-step',
+        outcome: 'success',
+        tierStep: { mode: 'up', steps: 1 },
+        condition: { type: 'outcomeTier', tierIds: ['ruined'] },
+      },
+    ],
+  }).triggers;
+  // The `outcome` pin is the circularity fix for FORCING an outcome; a step reads
+  // the rolled tier and produces the final one, so stepping stays available here.
+  assert.equal(trigger.outcome, 'none', 'an outcomeTier condition can never force an outcome');
+  assert.deepEqual(trigger.tierStep, { mode: 'up', steps: 1, tierId: null });
+});
+
+test('a tierStep alone does not stop a legacy break-only trigger migrating to breakTools true', () => {
+  const manager = makeManager();
+  // `isLegacyBreakOnly` keys on `outcome === undefined && breakTools === undefined`.
+  // Adding tierStep to that test would silently flip every pre-recombine break-only
+  // trigger into a NON-breaking one.
+  const [legacy] = manager._normalizeCheckBreakage({
+    triggers: [{ id: 'legacy', condition: { type: 'rollTotal', operator: '<=', value: 3 } }],
+  }).triggers;
+  assert.equal(legacy.breakTools, true, 'a pre-recombine break-only trigger still breaks tools');
+  assert.deepEqual(legacy.tierStep, INERT_TIER_STEP);
+
+  const [withStep] = manager._normalizeCheckBreakage({
+    triggers: [
+      {
+        id: 'legacy-with-step',
+        tierStep: { mode: 'down', steps: 1 },
+        condition: { type: 'rollTotal', operator: '<=', value: 3 },
+      },
+    ],
+  }).triggers;
+  assert.equal(withStep.breakTools, true, 'a tierStep is not an outcome or a breakTools prop');
+});
+
+test('_convertNatSteppingToTriggers synthesises the stable-id stepping pair', () => {
+  const manager = makeManager();
+  const pair = manager._convertNatSteppingToTriggers(true, '1d20+4', 'relative');
+  assert.deepEqual(pair, [
+    {
+      id: 'natstep-up',
+      condition: { type: 'diceGroup', groupId: 0, aggregate: 'allDice', operator: '==', value: 20 },
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode: 'up', steps: 1, tierId: null },
+    },
+    {
+      id: 'natstep-down',
+      condition: { type: 'diceGroup', groupId: 0, aggregate: 'allDice', operator: '==', value: 1 },
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode: 'down', steps: 1, tierId: null },
+    },
+  ]);
+  // Stable literals, not randomID(): the ids reach chat and captured result data, so
+  // re-minting them on every read until a save drops `natStepping` is not acceptable.
+  const again = manager._convertNatSteppingToTriggers(true, '1d20+4', 'relative');
+  assert.deepEqual(again.map((trigger) => trigger.id), ['natstep-up', 'natstep-down']);
+});
+
+test('_convertNatSteppingToTriggers synthesises nothing for an inert flag', () => {
+  const manager = makeManager();
+  assert.deepEqual(manager._convertNatSteppingToTriggers(false, '1d20', 'relative'), []);
+  assert.deepEqual(manager._convertNatSteppingToTriggers(undefined, '1d20', 'relative'), []);
+  assert.deepEqual(manager._convertNatSteppingToTriggers('true', '1d20', 'relative'), []);
+  assert.deepEqual(manager._convertNatSteppingToTriggers(true, '1d20', 'fixed'), []);
+  assert.deepEqual(manager._convertNatSteppingToTriggers(true, '', 'relative'), []);
+  assert.deepEqual(manager._convertNatSteppingToTriggers(true, '3d6+2', 'relative'), []);
+});
+
+test('_normalizeUnifiedTriggers orders converted crits, converted nat-stepping, then authored', () => {
+  const manager = makeManager();
+  const block = manager._normalizeUnifiedTriggers(
+    '1d20',
+    [{ id: 'crit', die: '1d20', raw: 20, success: true }],
+    { triggers: [{ id: 'authored', outcome: 'none', breakTools: false, condition: { type: 'rollTotal', operator: '>=', value: 18 } }] },
+    { natStepping: true, type: 'relative' }
+  );
+  assert.deepEqual(block.triggers.map((trigger) => trigger.id), [
+    'crit',
+    'natstep-up',
+    'natstep-down',
+    'authored',
+  ]);
+  assert.deepEqual(block.triggers[0].tierStep, INERT_TIER_STEP, 'a converted crit steps nothing');
+});
+
+test('_normalizeUnifiedTriggers defaults the legacy-routed argument so simple/progressive are unchanged', () => {
+  const manager = makeManager();
+  // The simple and progressive normalizers pass three arguments; a routed-only
+  // legacy field must not leak into them.
+  assert.deepEqual(manager._normalizeUnifiedTriggers('1d20', undefined, undefined), { triggers: [] });
+  assert.deepEqual(manager._normalizeUnifiedTriggers('1d20', undefined, undefined, {}), { triggers: [] });
+});
+
 test('_normalizeSimpleCraftingCheck carries a unified checkBreakage block and drops diceCrits', () => {
   const manager = makeManager();
   const simple = manager._normalizeSimpleCraftingCheck({

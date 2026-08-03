@@ -3002,10 +3002,54 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-runework' },
-    steps: ['Checks', { selector: '#checks-tab-crafting' }],
+    // Scrolls to its own named subject. Issue 975 gave Runework's check two authored
+    // triggers, and a populated trigger card is tall enough to push the outcome-tier
+    // table towards the fold — so without an anchor this case would drift into
+    // photographing a panel that no longer contains the table it is named for.
+    //
+    // The anchor is a ROW OF THAT TABLE, not `[data-routed-tiers]`: that attribute
+    // wraps `CheckRecipeTiers` — the recipe-tiers card — while the outcome-tier table
+    // is the following unhooked section, so anchoring there would frame a card this
+    // case is not photographing and would break the moment that fixture gains content.
+    // `rw-ruined` is the LAST tier in Runework's `relativeOutcomes`, and
+    // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so the whole
+    // table sits above it in frame.
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-outcome-row="rw-ruined"]', scroll: true },
+    ],
     expectView: 'checks',
     kinds: ['manager', 'checks', 'resolution-mode'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-tier-step',
+    label: 'Manager — Checks crafting tier-step triggers',
+    // BEYOND the smoke. The capture walk never AUTHORS a trigger — it adds one, drives the
+    // controls and removes it again to leave the Checks draft clean — so there is no
+    // counterpart frame of a populated trigger list to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Runework is the only fixture check carrying authored triggers, and the only crafting
+    // check with named outcome tiers — which is what makes the `target` mode's tier select
+    // renderable at all. A second case rather than a scroll step on the sibling above: that
+    // one is named for the outcome-tier TABLE and photographs the top of the same panel, so
+    // scrolling it down to the trigger card would move it off its own subject.
+    query: { system: 'lab-runework' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      // Anchored on a NAMED trigger's own tier-step row, never on "the row's last control":
+      // which control that is depends on the mode, so a mode change would silently move the
+      // anchor. `scrollIntoViewIfNeeded` lands it near the bottom edge, so anchoring the
+      // second (and last) authored trigger frames both cards — the `target` tier select
+      // above and this one's step count — rather than one card and a fold.
+      { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
+    ],
+    expectView: 'checks',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
   }),
   // Player recipe detail, one per resolution mode. Each mode draws a DIFFERENT body — the routed
   // ones a route rail, progressive a stage rail, simple a plain ingredient list — so the four

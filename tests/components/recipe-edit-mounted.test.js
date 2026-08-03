@@ -2477,10 +2477,17 @@ describe('RecipeEditView (mounted)', () => {
     const tagReq = set.querySelector('[data-recipe-group-id="grp-2"]');
     assert.ok(tagReq, 'the tag requirement renders');
     assert.ok(tagReq.querySelector('[data-recipe-tag="liquid"]'), 'the tag chip renders');
-    assert.equal(
-      tagReq.querySelector('[data-recipe-tag-match="any"]').getAttribute('aria-pressed'),
-      'true',
+    // The tag-match control is a SegmentedControl (issue 975): active state is the
+    // `.is-active` segment class and the checked state of its visually hidden radio,
+    // not an `aria-pressed` toggle button.
+    assert.ok(
+      tagReq.querySelector('[data-recipe-tag-match="any"]').classList.contains('is-active'),
       'tag match defaults to Any'
+    );
+    assert.equal(
+      tagReq.querySelector('[data-recipe-tag-match="any"] input[type="radio"]').checked,
+      true,
+      'and its radio is the checked one'
     );
 
     // §B7: the invented "AND" hairline dividers between requirements are gone — the
@@ -3165,8 +3172,11 @@ describe('RecipeEditView (mounted)', () => {
       { type: 'tags', tags: ['herbal'], tagMatch: 'any' },
       'adding a tag records it on the tags match'
     );
-    // The any/all toggle writes tagMatch.
-    tagTarget.querySelector('[data-recipe-option] [data-recipe-tag-match="all"]').click();
+    // The any/all toggle writes tagMatch. The real control is the visually hidden
+    // radio — the label is only the styled surface.
+    tagTarget
+      .querySelector('[data-recipe-option] [data-recipe-tag-match="all"] input[type="radio"]')
+      .click();
     await flushRender();
     assert.equal(
       next.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.tagMatch,
@@ -3183,9 +3193,14 @@ describe('RecipeEditView (mounted)', () => {
     );
     const option = tagTarget.querySelector('[data-recipe-option]');
     // The controls row leads with the Any/All toggle, then the Add tag control.
-    const controls = option.querySelector('.manager-recipe-option-tags-controls').innerHTML;
-    const toggleAt = controls.indexOf('manager-recipe-tag-match-toggle');
-    const triggerAt = controls.indexOf('manager-recipe-tag-trigger');
+    // Ordering asserted over the rendered NODES rather than an innerHTML substring
+    // scan: the toggle is now the shared SegmentedControl, whose track class is not
+    // recipe-specific, so a substring search would be ambiguous.
+    const controls = option.querySelector('.manager-recipe-option-tags-controls');
+    const kids = [...controls.children];
+    const has = (node, selector) => node.matches(selector) || Boolean(node.querySelector(selector));
+    const toggleAt = kids.findIndex((node) => has(node, '[data-recipe-tag-match]'));
+    const triggerAt = kids.findIndex((node) => has(node, '.manager-recipe-tag-trigger'));
     assert.ok(
       toggleAt !== -1 && triggerAt !== -1 && toggleAt < triggerAt,
       'the Any/All toggle precedes the Add tag control'

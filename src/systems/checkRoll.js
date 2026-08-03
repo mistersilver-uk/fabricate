@@ -75,8 +75,10 @@ export function rolledDiceGroups(roll) {
  * restricted to the outcome-independent condition types (`rollTotal` /
  * `progressiveValue` / `diceGroup`). `outcomeTier` conditions are ignored here: the
  * routed tier is resolved AFTER the forced outcome, so matching on it would be
- * circular (such triggers still break tools at the engine seam where the tier is
- * known).
+ * circular. Such a trigger stays live at the two later seams where a tier IS known —
+ * it can drive a tier STEP against the rolled tier (see
+ * {@link applyTierStepTriggers}, issue 975) and it still breaks tools at the engine
+ * seam — so this is one of three call sites of the shared evaluator, not two.
  *
  * @param {Array<object>} triggers
  * @param {{ total?: number, value?: number, diceGroups?: Array<object> }} roll
@@ -570,78 +572,279 @@ function matchRoutedOutcome({
   return best;
 }
 
-/**
- * Route a forced-crit disposition to a tier of the matching success flag. A forced
- * FAILURE (`forcedSuccess === false`) routes to the LOWEST-threshold failing tier
- * (relative: smallest `dc`; fixed: smallest `start`); a forced SUCCESS routes to
- * the HIGHEST-threshold succeeding tier. Returns the chosen tier, or null when no
- * tier of that disposition exists.
- */
-function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes }) {
-  const wantSuccess = forcedSuccess === true;
-  const key = type === 'fixed' ? 'start' : 'dc';
-  const outcomes =
-    type === 'fixed'
-      ? Array.isArray(fixedOutcomes)
-        ? fixedOutcomes
-        : []
-      : Array.isArray(relativeOutcomes)
-        ? relativeOutcomes
-        : [];
-  let chosen = null;
-  let chosenRank = null;
-  for (const outcome of outcomes) {
-    if (!outcome || (outcome.success === true) !== wantSuccess) continue;
-    const rank = Number(outcome[key]);
-    if (!Number.isFinite(rank)) continue;
-    // Forced success → highest-threshold tier; forced failure → lowest-threshold.
-    const better = chosen === null || (wantSuccess ? rank > chosenRank : rank < chosenRank);
-    if (better) {
-      chosen = outcome;
-      chosenRank = rank;
-    }
-  }
-  return chosen;
+/** The per-type ranking key: a relative tier ranks by DC delta, a fixed one by
+ * range start. */
+function routedRankKey(type) {
+  return type === 'fixed' ? 'start' : 'dc';
 }
 
 /**
- * Step a naturally matched relative tier once for an active natural 20/1.
+ * The SINGLE derivation of routed tier ORDER (issue 975). Ranks a routed check's
+ * tiers ascending by `dc` (relative) / `start` (fixed) — worst first, best last — so
+ * {@link routeCritOutcome}, the `minOutcomeId` gate and {@link applyTierStepTriggers}
+ * all read one ordering instead of deriving three independently.
  *
- * Dice groups already contain active-only raw faces, so advantage/disadvantage
- * pools expose only their kept face. A group with multiple active faces has no
- * single kept face and is deliberately ineligible. Returns no evidence unless a
- * neighbouring tier actually exists.
+ * Two properties are load-bearing, and losing either is a silent behaviour flip:
+ *
+ * - **Non-finite ranks are dropped.** A tier whose `dc`/`start` does not coerce to a
+ *   finite number has no place in the order (both pre-975 derivations filtered it).
+ * - **Ties keep AUTHOR order.** `routeCritOutcome` compared with strict `>` / `<`, so
+ *   among tiers of equal rank it kept the FIRST authored one for BOTH dispositions.
+ *   The secondary comparator on the author index reproduces that — and the sort takes
+ *   an explicit comparator regardless, since `unicorn/require-array-sort-compare` is
+ *   active.
+ *
+ * Callers locate a tier in the result by ID (`findIndex((o) => o.id === …)`, first
+ * match wins), never by object identity: this is a copy, and a step composing on a
+ * forced reroute would otherwise search it for an object it never contained.
+ *
+ * @returns {Array<object>} The rankable tiers, lowest rank first. Never null.
  */
-function stepNaturalRoutedOutcome({ matched, type, natStepping, diceGroups, relativeOutcomes }) {
-  if (natStepping !== true || type !== 'relative' || !matched) {
-    return { matched, natStep: null };
-  }
-  const d20Group = (Array.isArray(diceGroups) ? diceGroups : []).find((group) =>
-    /^\d+d20$/i.test(String(group?.group || ''))
+function rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes }) {
+  const key = routedRankKey(type);
+  const source = type === 'fixed' ? fixedOutcomes : relativeOutcomes;
+  return (Array.isArray(source) ? source : [])
+    .map((outcome, authorIndex) => ({ outcome, authorIndex, rank: Number(outcome?.[key]) }))
+    .filter((entry) => Boolean(entry.outcome) && Number.isFinite(entry.rank))
+    .toSorted((left, right) => left.rank - right.rank || left.authorIndex - right.authorIndex)
+    .map((entry) => entry.outcome);
+}
+
+/**
+ * The ranked tiers sharing one success disposition — the subset a forced outcome
+ * routes into and, from issue 975, the only subset a step may move within.
+ */
+function dispositionSubset(ranked, disposition) {
+  const wantSuccess = disposition === 'success';
+  return ranked.filter((outcome) => (outcome.success === true) === wantSuccess);
+}
+
+/**
+ * Route a forced-crit disposition to a tier of the matching success flag. A forced
+ * FAILURE (`forcedSuccess === false`) routes to the LOWEST-ranked failing tier
+ * (relative: smallest `dc`; fixed: smallest `start`); a forced SUCCESS routes to the
+ * HIGHEST-ranked succeeding tier. Among tiers of EQUAL rank the first authored one
+ * wins in both directions. Returns the chosen tier, or null when no tier of that
+ * disposition exists.
+ */
+function routeCritOutcome({ type, forcedSuccess, relativeOutcomes, fixedOutcomes }) {
+  const wantSuccess = forcedSuccess === true;
+  const ranked = dispositionSubset(
+    rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes }),
+    wantSuccess ? 'success' : 'failure'
   );
-  const activeFaces = Array.isArray(d20Group?.results) ? d20Group.results : [];
-  if (activeFaces.length !== 1 || (activeFaces[0] !== 1 && activeFaces[0] !== 20)) {
-    return { matched, natStep: null };
+  if (ranked.length === 0) return null;
+  // Ascending order: index 0 already IS the lowest-ranked, author-first tier.
+  if (!wantSuccess) return ranked[0];
+  // The highest rank sits at the end, but equal-rank tiers must resolve to the FIRST
+  // authored one, so seek the START of the top-rank run rather than reading `at(-1)`.
+  const key = routedRankKey(type);
+  const topRank = Number(ranked.at(-1)[key]);
+  return ranked[ranked.findIndex((outcome) => Number(outcome[key]) === topRank)];
+}
+
+/** The `tierStep.mode` values that ask for a real move; `'none'` (and anything
+ * unrecognised) is inert. */
+const TIER_STEP_MODES = new Set(['target', 'up', 'down']);
+
+/**
+ * The frozen ROLLED-tier snapshot every step condition is evaluated against — once,
+ * and never again against the stepped tier.
+ *
+ * This is what makes an `outcomeTier`-conditioned step non-circular and terminating:
+ * the pass is a pure function of `(rolled tier, triggers, roll)` with no feedback
+ * edge, so the obvious cycle ("land on Poor, step down" / "land on Terrible, step
+ * up") cannot iterate and no iteration order can leak into the result. Stated as a
+ * domain rule: a step condition asks about the tier the dice landed on, never about
+ * the tier the step produces.
+ *
+ * `value` is left `undefined` so `progressiveValue` stays invisible here, matching
+ * the existing {@link resolveForcedOutcome} call.
+ */
+function rolledTierSnapshot(rolled, total, diceGroups) {
+  return Object.freeze({
+    value: undefined,
+    outcome: rolled?.name ?? null,
+    data: Object.freeze({
+      total,
+      diceGroups: Array.isArray(diceGroups) ? diceGroups : [],
+      outcomeId: rolled?.id ?? null,
+    }),
+  });
+}
+
+/** Every trigger whose condition matches the rolled tier AND whose `tierStep` asks
+ * for a real move, in author order. */
+function matchedTierStepTriggers(triggers, snapshot) {
+  return (Array.isArray(triggers) ? triggers : []).filter((trigger) => {
+    if (!TIER_STEP_MODES.has(trigger?.tierStep?.mode)) return false;
+    return evaluateCheckBreakageCondition(trigger.condition, snapshot);
+  });
+}
+
+/**
+ * A `tierStep.steps` magnitude: an integer `>= 1`, the same clamp
+ * `_normalizeTierStep` applies on the way in.
+ *
+ * Clamped HERE as well so the runtime does not depend on the normalizer having run.
+ * A magnitude is a MAGNITUDE — the direction lives in `mode` — so a raw `steps: -2`
+ * on an `up` trigger must not silently step DOWN two, inverting the effect the GM
+ * authored. Unreachable through the normalizer today; independent of it by
+ * construction now.
+ */
+function tierStepMagnitude(steps) {
+  const value = Math.trunc(Number(steps));
+  return Number.isFinite(value) && value >= 1 ? value : 1;
+}
+
+/**
+ * Resolve the winning `target` trigger against the array in play — FILTER, then
+ * CHOOSE.
+ *
+ * A target is ELIGIBLE only when its `tierId` resolves to a tier present in that
+ * array. An ineligible one — a dangling id, or (under a forced outcome) a target
+ * naming the opposite disposition — is discarded BEFORE the comparison, so it can
+ * never beat a valid competitor and then no-op. Among the eligible ones the
+ * LOWEST-RANKED tier wins: order-independent and pessimistic, mirroring
+ * {@link resolveForcedOutcome}'s "a matched failure beats a matched success
+ * regardless of position".
+ *
+ * @returns {{ index: number, trigger: object|null }} `index` is -1 when no eligible
+ *   target survives, in which case the rolled (or forced) tier is the step base.
+ */
+function resolveTierStepTarget(stepping, inPlay) {
+  let index = -1;
+  let trigger = null;
+  for (const candidate of stepping) {
+    if (candidate.tierStep.mode !== 'target') continue;
+    const tierId = candidate.tierStep.tierId;
+    if (typeof tierId !== 'string' || tierId === '') continue;
+    const found = inPlay.findIndex((outcome) => outcome.id === tierId);
+    if (found === -1) continue;
+    if (index === -1 || found < index) {
+      index = found;
+      trigger = candidate;
+    }
   }
+  return { index, trigger };
+}
 
-  const ranked = (Array.isArray(relativeOutcomes) ? relativeOutcomes : [])
-    .filter((outcome) => outcome && Number.isFinite(Number(outcome.dc)))
-    .toSorted((left, right) => Number(left.dc) - Number(right.dc));
-  const matchedIndex = ranked.indexOf(matched);
-  const direction = activeFaces[0] === 20 ? 'up' : 'down';
-  const steppedIndex = matchedIndex + (direction === 'up' ? 1 : -1);
-  const stepped = ranked[steppedIndex];
-  if (matchedIndex < 0 || !stepped) return { matched, natStep: null };
+/** The signed net of the relative steps: `Σ up.steps − Σ down.steps`. Summation is
+ * the only commutative composition, so two `up 1` triggers make `up 2` and
+ * `up 1` + `down 1` is a deliberate no-op rather than an order-dependent coin flip. */
+function netTierSteps(stepping) {
+  return stepping.reduce((net, trigger) => {
+    const { mode, steps } = trigger.tierStep;
+    if (mode === 'up') return net + tierStepMagnitude(steps);
+    if (mode === 'down') return net - tierStepMagnitude(steps);
+    return net;
+  }, 0);
+}
 
+/** The ids credited with the applied step: the winning target plus every matched
+ * relative trigger, in author order. A losing or ineligible target contributed
+ * nothing to the move and is not credited. */
+function appliedTierStepTriggerIds(stepping, winningTarget) {
+  return stepping
+    .filter((trigger) => trigger.tierStep.mode !== 'target' || trigger === winningTarget)
+    .map((trigger) => trigger.id)
+    .filter((id) => typeof id === 'string' && id !== '');
+}
+
+/**
+ * Apply the `tierStep` effect of every matching unified trigger to the rolled tier
+ * (issue 975), replacing the old `natStepping` boolean's hard-coded d20/±1 rule.
+ *
+ * **Stepping is disposition-preserving.** The ARRAY IN PLAY is the ranked subset of
+ * tiers sharing the forced disposition when a forced outcome is present, and the
+ * whole ranked list otherwise. Every index, "lowest-ranked" and the clamp are
+ * computed over that array, so a forced outcome can never step across into the
+ * opposite disposition and `data.success` can never disagree with the final tier's
+ * own `success`.
+ *
+ * Composition, in order: the winning eligible `target` (if any) sets the base index,
+ * the net relative offset applies from there, and the result CLAMPS to
+ * `[0, length - 1]` of the array in play. That clamp is unrelated to
+ * `clampToNearest`, which decides whether a tier matched at all; this one decides
+ * where an out-of-range step lands, and the evidence names it `stepClamped` so the
+ * two never read as one concept.
+ *
+ * @param {object|null} params.rolled The tier `matchRoutedOutcome` produced, after
+ *   any forced reroute. `null` steps nothing — `target` included, since a check that
+ *   matched no tier is the deliberate "no route" path.
+ * @param {'success'|'failure'|null} params.forcedDisposition
+ * @returns {{ matched: object|null, tierStepApplied: object|null }} `tierStepApplied`
+ *   is present only on a REAL tier change.
+ */
+function applyTierStepTriggers({
+  rolled,
+  type,
+  forcedDisposition = null,
+  triggers,
+  relativeOutcomes,
+  fixedOutcomes,
+  total,
+  diceGroups,
+}) {
+  if (!rolled) return { matched: null, tierStepApplied: null };
+
+  const stepping = matchedTierStepTriggers(triggers, rolledTierSnapshot(rolled, total, diceGroups));
+  if (stepping.length === 0) return { matched: rolled, tierStepApplied: null };
+
+  const ranked = rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes });
+  const inPlay = forcedDisposition === null ? ranked : dispositionSubset(ranked, forcedDisposition);
+  const fromIndex = inPlay.findIndex((outcome) => outcome.id === rolled.id);
+  if (fromIndex === -1) return { matched: rolled, tierStepApplied: null };
+
+  const target = resolveTierStepTarget(stepping, inPlay);
+  const base = target.index === -1 ? fromIndex : target.index;
+  const requestedIndex = base + netTierSteps(stepping);
+  const toIndex = Math.min(Math.max(requestedIndex, 0), inPlay.length - 1);
+  // Present only on a real tier change: a fully clamped no-op and a cancelling
+  // `up 1` + `down 1` both leave the rolled tier standing with no evidence.
+  if (toIndex === fromIndex) return { matched: rolled, tierStepApplied: null };
+
+  const stepped = inPlay[toIndex];
+  // `target` whenever a target won, whatever the index delta — "you were placed on
+  // Masterwork" has no direction.
+  let mode = 'target';
+  if (target.index === -1) mode = toIndex > fromIndex ? 'up' : 'down';
   return {
     matched: stepped,
-    natStep: {
-      face: activeFaces[0],
-      direction,
-      fromOutcomeId: matched.id ?? null,
+    tierStepApplied: {
+      mode,
+      // The REALIZED magnitude, not the requested one: evidence describes the effect,
+      // and the chat card's step notice renders this count straight to the player.
+      // `stepClamped` carries the fact that the author asked for more.
+      steps: Math.abs(toIndex - fromIndex),
+      fromOutcomeId: rolled.id ?? null,
       toOutcomeId: stepped.id ?? null,
+      stepClamped: requestedIndex !== toIndex,
+      triggerIds: appliedTierStepTriggerIds(stepping, target.trigger),
     },
   };
+}
+
+/**
+ * Decide whether the FIXED-type recipe minimum-success-tier gate blocks the final
+ * (post-step) tier.
+ *
+ * It consumes {@link rankedRoutedOutcomes} to LOCATE the required tier but keeps
+ * comparing threshold VALUES rather than rank indices, which is load-bearing:
+ * `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without
+ * complaint (non-overlap is only a `rangeOverlap` readiness warning, never an
+ * enforcement), so two fixed tiers sharing a `start` compare EQUAL by value and the
+ * craft passes, where an index comparison would strictly fail it.
+ */
+function minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes }) {
+  if (type !== 'fixed' || !minOutcomeId) return false;
+  const ranked = rankedRoutedOutcomes({ type, relativeOutcomes, fixedOutcomes });
+  const requiredIndex = ranked.findIndex((outcome) => outcome.id === minOutcomeId);
+  const requiredStart = Number(ranked[requiredIndex]?.start);
+  // A stale/unknown `minOutcomeId` no-ops gracefully, like `checkTierId`.
+  if (!Number.isFinite(requiredStart)) return false;
+  const matchedStart = Number(matched?.start);
+  return !Number.isFinite(matchedStart) || matchedStart < requiredStart;
 }
 
 /**
@@ -650,10 +853,11 @@ function stepNaturalRoutedOutcome({ matched, type, natStepping, diceGroups, rela
  * the matched tier's NAME as `outcome` for the activity's outcome→result-group
  * routing. A unified trigger's forced outcome overrides the disposition: a forced
  * SUCCESS routes to the best succeeding tier, a forced FAILURE to the worst failing
- * tier. The surfaced `data.breakTools` is the matched (or rerouted) tier's own flag
- * (the routed per-tier legacy bridge). When no tier matches (and no forced outcome
- * reroutes), `outcome` is null and `success` reflects the forced outcome (when any)
- * or `false`.
+ * tier. A unified trigger's `tierStep` effect then moves that ROLLED tier to the
+ * FINAL tier (issue 975), within the forced disposition when one is in play. The
+ * surfaced `data.breakTools` is the final tier's own flag (the routed per-tier legacy
+ * bridge). When no tier matches (and no forced outcome reroutes), `outcome` is null
+ * and `success` reflects the forced outcome (when any) or `false`.
  *
  * HEADLESS: with no dice engine the routed check cannot simulate a tier, so it
  * returns a non-blocking `{ success: true, outcome: null, value: null }` rather
@@ -666,19 +870,19 @@ function stepNaturalRoutedOutcome({ matched, type, natStepping, diceGroups, rela
  *   aborts with zero mutation. Omit it (the default) for a silent roll.
  * @param {boolean} [params.clampToNearest] Relative-mode only: when a total meets no
  *   tier threshold, route to the lowest (closest) tier instead of returning a null
- *   outcome. Opted into by the crafting + salvage callers; gathering leaves it off to
- *   preserve its "no tier name → failure" path.
+ *   outcome. Every routed caller opts in today — crafting, salvage AND gathering
+ *   (`GatheringEngine._resolveRoutedFormulaOutcome` passes `clampToNearest: true`) —
+ *   so a rolled-but-unrouted check is only reachable by a caller that omits it.
+ *   Unrelated to the tier-step clamp: this one decides whether a tier matched at all,
+ *   that one decides where an out-of-range step lands (`data.tierStepApplied.stepClamped`).
  * @param {?string} [params.minOutcomeId] FIXED-type only: a recipe's minimum success
- *   tier id. When the naturally-rolled tier ranks below it (by `start`) — or the
+ *   tier id. When the FINAL (post-step) tier ranks below it (by `start`) — or the
  *   total lands outside every fixed range, so no tier matched at all — the check
  *   fails outright: `success:false`, no outcome routes, and the matched tier's
  *   `breakTools` is dropped (nothing routes, so the per-tier breakage bridge does
  *   not fire). Optional and no-op by default — only the crafting routedByCheck caller
  *   threads it, so salvage/gathering are unaffected. Ignored for relative type and
  *   bypassed by a forced (crit) outcome.
- * @param {boolean} [params.natStepping] Relative-mode only: the active kept face of
- *   the first d20 group steps a naturally matched tier once on a natural 20/1.
- *   Forced outcomes win and no evidence is emitted at the tier cap/floor.
  * @returns {Promise<{success: boolean, outcome: string|null, value: number|null, data: object, message: string|null}>}
  */
 export async function runFormulaRouted({
@@ -695,7 +899,6 @@ export async function runFormulaRouted({
   clampToNearest = false,
   minOutcomeId = null,
   craftingModifier = null,
-  natStepping = false,
 }) {
   const formula = String(rawFormula || '').trim();
   let total = 0;
@@ -772,36 +975,31 @@ export async function runFormulaRouted({
     });
   }
 
-  const naturalStep = forced
-    ? { matched, natStep: null }
-    : stepNaturalRoutedOutcome({
-        matched,
-        type,
-        natStepping,
-        diceGroups,
-        relativeOutcomes,
-      });
-  matched = naturalStep.matched;
+  // Tier stepping (issue 975) sits between the forced reroute and the minimum-tier
+  // gate: forcing picks an EXTREME tier while a step is RELATIVE, so stepping first
+  // would be silently discarded, and the gate asks whether the craft reached the
+  // recipe's minimum, so it must judge the FINAL tier. There is no forced bypass —
+  // `natStepping` was a check-wide policy the GM could not scope, whereas a `tierStep`
+  // trigger is something the GM opted into on that trigger.
+  const tierStep = applyTierStepTriggers({
+    rolled: matched,
+    type,
+    forcedDisposition: forced ? forced.disposition : null,
+    triggers,
+    relativeOutcomes,
+    fixedOutcomes,
+    total,
+    diceGroups,
+  });
+  matched = tierStep.matched;
 
-  // Recipe minimum-success-tier gate (FIXED type only): when the naturally-rolled
+  // Recipe minimum-success-tier gate (FIXED type only): when the FINAL (post-step)
   // tier ranks below the recipe's required tier (by `start`), the craft fails
   // outright. A forced (crit) outcome BYPASSES the gate — a natural crit must not be
-  // downgraded by a recipe minimum. A stale/unknown `minOutcomeId` no-ops (graceful,
-  // like `checkTierId`); relative type is out of scope and ignored.
-  let minTierFailed = false;
-  if (!forced && type === 'fixed' && minOutcomeId) {
-    const required = (Array.isArray(fixedOutcomes) ? fixedOutcomes : []).find(
-      (outcome) => outcome?.id === minOutcomeId
-    );
-    const requiredStart = Number(required?.start);
-    const matchedStart = Number(matched?.start);
-    if (
-      Number.isFinite(requiredStart) &&
-      (!Number.isFinite(matchedStart) || matchedStart < requiredStart)
-    ) {
-      minTierFailed = true;
-    }
-  }
+  // downgraded by a recipe minimum. Relative type is out of scope and ignored.
+  const minTierFailed =
+    !forced &&
+    minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes });
   // Below the required minimum: drop the matched tier so nothing routes and the craft
   // takes its normal failure/consumption path (no success result).
   const effectiveMatched = minTierFailed ? null : matched;
@@ -832,10 +1030,14 @@ export async function runFormulaRouted({
       success,
       breakTools,
       diceGroups,
-      ...(naturalStep.natStep && { natStep: naturalStep.natStep }),
-      // Additive on a min-tier failure only: the tier that WAS rolled, for a richer
-      // chat/journal explanation later. Absent on a normal route.
-      ...(minTierFailed && { minTierFailed: true, rolledOutcomeId: matched?.id ?? null }),
+      // Additive on a real tier change only (issue 975): the resolved NET effect, the
+      // REALIZED magnitude, and the ids that produced it.
+      ...(tierStep.tierStepApplied && { tierStepApplied: tierStep.tierStepApplied }),
+      // Additive on a min-tier failure only: the tier the recipe minimum BLOCKED —
+      // post-step, pre-gate — for a richer chat/journal explanation later. Named for
+      // what the gate did to it rather than "rolled", which issue 975 mints as a term
+      // of art for the PRE-step tier. Absent on a normal route.
+      ...(minTierFailed && { minTierFailed: true, blockedOutcomeId: matched?.id ?? null }),
     },
     message: success ? null : `${label} check failed`,
   };

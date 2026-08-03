@@ -911,6 +911,60 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
   );
 });
 
+// ── The Phase-D0 tier-step walk (issue 975) ────────────────────────────────────
+
+const CHECK_TRIGGERS_SRC = readFileSync(
+  'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
+  'utf8',
+);
+
+test('the Phase D0 tier-step walk drives hooks the trigger component still emits', () => {
+  // `scripts/foundry-test-run.mjs` is entry #4 in `KNOWN_UNGATED_SCRIPTS`, so neither
+  // `npm run lint` nor `npm run format:check` reads it and this file is the walk's only
+  // gate. Issue 975 deleted the `[data-check-nat-stepping]` card the walk used to
+  // round-trip and replaced it with a trigger-authoring walk over the tier-step row, so
+  // these selectors are a hand-maintained mirror of `CheckTriggers.svelte`.
+  //
+  // BOTH sides are asserted, not just the harness: a harness-only pin stays green
+  // through a rename in the component, which is exactly the drift that would surface as
+  // a post-merge beta smoke break rather than a red PR.
+  for (const hook of [
+    'data-trigger-tier-step',
+    'data-trigger-tier-step-steps',
+    'data-trigger-tier-step-target',
+    'data-triggers-empty',
+  ]) {
+    assert.ok(HARNESS.includes(hook), `the Phase D0 walk no longer drives [${hook}]`);
+    assert.ok(
+      CHECK_TRIGGERS_SRC.includes(hook),
+      `CheckTriggers.svelte no longer emits [${hook}], so the walk points at nothing`,
+    );
+  }
+
+  // The mode segments are stamped by `SegmentedControl`'s `optionDataAttr`, so the
+  // attribute NAME and the option VALUE are authored apart and only the harness pairs
+  // them into one selector — which is the pairing that can rot silently.
+  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="up"]'), 'the up segment');
+  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="target"]'), 'the target segment');
+  assert.match(CHECK_TRIGGERS_SRC, /optionDataAttr="data-trigger-tier-step-mode"/);
+  const tierStepModes = CHECK_TRIGGERS_SRC.match(/const TIER_STEP_MODES = \[[\s\S]*?\n {2}\];/)?.[0];
+  assert.ok(tierStepModes, 'the TIER_STEP_MODES declaration was not found');
+  for (const mode of ['up', 'target']) {
+    assert.ok(
+      tierStepModes.includes(`value: '${mode}'`),
+      `TIER_STEP_MODES no longer offers a '${mode}' segment for the walk to click`,
+    );
+  }
+
+  // The walk AUTHORS a trigger, so it must remove it again: a left-behind trigger
+  // dirties the Checks draft and the next navigation raises a discard prompt mid-phase.
+  assert.ok(HARNESS.includes('[data-add-trigger]'), 'the walk must add a trigger');
+  assert.ok(
+    HARNESS.includes('[data-trigger] [data-remove-trigger]'),
+    'the walk must remove the trigger it authored',
+  );
+});
+
 // ── The shared fixtured-section lifecycle (issues #784 / 785) ──────────────────
 
 test('the shared fixtured-section helper always restores, even when setup or the walk throws', async () => {

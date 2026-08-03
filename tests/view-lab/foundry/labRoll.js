@@ -131,7 +131,7 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
           ranked.slice(0, Math.max(0, Math.min(keepN, number))).map((entry) => entry.index)
         );
         // `active: true` on a kept die, matching every Foundry-shaped dice fixture in this repo
-        // (`tests/check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-nat-stepping.test.js`).
+        // (`tests/check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-tier-step.test.js`).
         // `rolledDiceGroups` filters on `active !== false`, so it accepts an absent key too — but
         // emitting a shape production does not produce would make a later fidelity fix read as a
         // regression. The absent-key tolerance is production's contract and is covered there.

@@ -28,6 +28,48 @@ function routedOutcomes(check) {
 }
 
 /**
+ * Readiness of a routed check's tier-STEP targets (issue 975), reported only once at
+ * least one trigger sets `tierStep.mode === 'target'` — mirroring the outcome-tier
+ * rules, which stay silent until a tier is authored.
+ *
+ * Two rules share one green tick, because both say the same thing to a GM: the
+ * targets on this check name exactly one existing tier.
+ *
+ * - A DANGLING target (including one that has chosen no tier at all) no-ops at
+ *   runtime; the relative↔fixed type switch dangles every `tierId` at once, so this
+ *   is reachable by ordinary authoring and not only by import.
+ * - MULTIPLE targets are guidance, not breakage. This is a static authoring count:
+ *   it cannot know which conditions will match, or whether a roll will be forced, so
+ *   it reports what happens if more than one does rather than calling the check broken.
+ *
+ * Extracted rather than inlined so the tier-step rules do not add branches to the
+ * already-branchy `evaluateCheckReadiness`.
+ *
+ * @param {object} check    Plain check draft.
+ * @param {object[]} outcomes The ACTIVE outcome-tier list (relative or fixed).
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
+ */
+function tierStepTargetReadiness(check, outcomes) {
+  const triggers = Array.isArray(check?.checkBreakage?.triggers)
+    ? check.checkBreakage.triggers
+    : [];
+  const targets = triggers.filter((trigger) => trigger?.tierStep?.mode === 'target');
+  if (targets.length === 0) return { checks: [], issues: [] };
+
+  const tierIds = new Set(outcomes.map((outcome) => outcome?.id));
+  const dangling = targets.some((trigger) => !tierIds.has(trigger?.tierStep?.tierId));
+  const ambiguous = targets.length > 1;
+
+  const issues = [];
+  if (dangling) issues.push({ id: 'danglingTierStepTarget', severity: 'warning' });
+  if (ambiguous) issues.push({ id: 'multipleTierStepTargets', severity: 'warning' });
+  return {
+    checks: [{ id: 'tierStepTargetsResolve', satisfied: !dangling && !ambiguous }],
+    issues,
+  };
+}
+
+/**
  * Evaluate one subsystem check's readiness.
  *
  * @param {object} check Plain check draft (the active draft for its mode).
@@ -89,6 +131,12 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
         }
       }
     }
+
+    // Outside the tier-count gate on purpose: a target authored before any tier
+    // exists is exactly the dangling case a GM most needs told about.
+    const tierStep = tierStepTargetReadiness(check, outcomes);
+    checks.push(...tierStep.checks);
+    issues.push(...tierStep.issues);
   }
 
   return { checks, issues };

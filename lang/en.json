@@ -1165,8 +1165,9 @@
       "SalvageRecovered": "Recovered",
       "SalvageConsumed": "Broken Down",
       "SalvageTools": "Tools Broken",
-      "NaturalStepUp": "Natural 20 - stepped up one tier",
-      "NaturalStepDown": "Natural 1 - stepped down one tier"
+      "TierStepUp": "Stepped up {steps} tier(s)",
+      "TierStepDown": "Stepped down {steps} tier(s)",
+      "TierStepTarget": "Stepped to a target tier"
     },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",
@@ -2116,7 +2117,7 @@
           "CheckTierDefault": "Default DC",
           "CheckTierUnnamed": "Unnamed tier",
           "MinSuccessTier": "Minimum success tier",
-          "MinSuccessTierNone": "No override (use rolled tier)",
+          "MinSuccessTierNone": "No override (use final tier)",
           "MinSuccessTierHint": "Fail the craft outright when the roll lands below this tier.",
           "CraftingModifier": "Check modifiers",
           "CraftingModifierInherit": "Inherit system default",
@@ -4259,9 +4260,6 @@
             "TypeRelativeDesc": "Tier thresholds are relative to the recipe DC, e.g. DC -5 or DC +10.",
             "TypeFixed": "Fixed",
             "TypeFixedDesc": "Each tier owns a non-overlapping segment of the roll value range. Recipes do not have a DC in this mode.",
-            "NatSteppingTitle": "Natural tier stepping",
-            "NatSteppingHint": "A natural 20 steps the matched tier up once; a natural 1 steps it down once.",
-            "NatSteppingToggle": "Enable natural tier stepping",
             "ExpressionTitle": "Roll expression",
             "ExpressionLabel": "Expression",
             "DiceGroups": "Dice groups",
@@ -4368,11 +4366,14 @@
             "CheckHasSuccessOutcome": "At least one outcome is a Success",
             "CheckRangesValid": "Every tier range is valid",
             "CheckRangesNoOverlap": "No tier ranges overlap",
+            "CheckTierStepTargetsResolve": "Tier-step targets name exactly one existing tier",
             "IssueNoRollFormula": "This check has no roll formula; it will not resolve until one is set.",
             "IssueUnnamedOutcome": "Name every outcome tier — an unnamed tier cannot be routed to a result group.",
             "IssueNoSuccessOutcome": "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
             "IssueRangeInvalid": "Some tiers have a start greater than their end.",
-            "IssueRangeOverlap": "Some tier ranges overlap. Each value range must be unique."
+            "IssueRangeOverlap": "Some tier ranges overlap. Each value range must be unique.",
+            "IssueDanglingTierStepTarget": "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
+            "IssueMultipleTierStepTargets": "Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins."
           },
           "Breakage": {
             "Title": "Check triggers",
@@ -4402,7 +4403,19 @@
             "OutcomeForceFailure": "Automatic failure",
             "Tiers": "Outcome tiers",
             "NoTiers": "Add named outcome tiers to target them.",
-            "UnnamedTier": "Unnamed tier"
+            "UnnamedTier": "Unnamed tier",
+            "TierStep": "Tier step",
+            "TierStepMode": "Tier step mode",
+            "TierStepModeNone": "No step",
+            "TierStepModeUp": "Step up",
+            "TierStepModeDown": "Step down",
+            "TierStepModeTarget": "Target tier",
+            "TierStepStepsUp": "Steps up",
+            "TierStepStepsDown": "Steps down",
+            "TierStepTier": "Tier",
+            "TierStepChoose": "Choose a tier…",
+            "TierStepMissingTier": "Missing tier",
+            "TierStepNoTiers": "Add named outcome tiers to step to one."
           }
         },
         "Access": {

@@ -182,9 +182,6 @@ CraftingSystem = {
   //   }
   //   RoutedCheck = {
   //     type: "relative" | "fixed",                // default "relative"
-  //     natStepping?: boolean,                      // default false; persisted for crafting/
-  //                                                // salvage routed checks, but affects only
-  //                                                // relative outcome matching
   //     rollFormula: string, dc: number, thresholdMode: "meet" | "exceed",
   //     tiers: { id, name, dc }[],                 // recipe-DC overrides (crafting only)
   //     relativeOutcomes: { id, name, success, breakTools, dc }[],
@@ -194,9 +191,10 @@ CraftingSystem = {
   //   // (The progressive check sub-object likewise carries a checkBreakage block.)
   //
   //   // Unified per-check trigger list (issue 419 recombine). Each trigger pairs an
-  //   // expressive dice-matching condition with two effects: force an outcome and/or
-  //   // break tools. It is the single mechanism that subsumes the former per-die
-  //   // `DiceCrit` table and the separate tool-breakage trigger list.
+  //   // expressive dice-matching condition with three effects: force an outcome,
+  //   // step the routed outcome tier, and/or break tools. It is the single mechanism
+  //   // that subsumes the former per-die `DiceCrit` table, the separate tool-breakage
+  //   // trigger list, and the retired routed `natStepping` boolean.
   //   CheckBreakage = {
   //     triggers: CheckBreakageTrigger[],          // empty list = inert; ORed for breakage
   //   }
@@ -208,9 +206,34 @@ CraftingSystem = {
   //                                                // Pinned to "none" for an outcomeTier
   //                                                // condition (the routed tier is resolved
   //                                                // AFTER the forced outcome — circular).
+  //     tierStep: TierStep,                        // issue 975; ALWAYS present, defaulting
+  //                                                // to the inert record. Routed-only in
+  //                                                // effect (simple/progressive have no
+  //                                                // tiers) but persisted uniformly, and
+  //                                                // NOT pinned for an outcomeTier
+  //                                                // condition — a step reads the rolled
+  //                                                // tier, so it is not circular.
   //     breakTools: boolean,                       // default false; breaks every required
   //                                                // tool. Authored + applied ONLY under
   //                                                // checkDriven authority.
+  //   }
+  //   // The third trigger effect (issue 975): move the ROLLED outcome tier to the
+  //   // FINAL tier. Flat rather than a discriminated union, so switching mode in the
+  //   // editor never destroys the other mode's operand — the retention precedent
+  //   // `_normalizeRoutedOutcome` sets by keeping both `dc` and `start`/`end` across a
+  //   // `type` switch.
+  //   TierStep = {
+  //     mode: "none" | "target" | "up" | "down",   // default "none" (inert); an unknown
+  //                                                // value collapses to "none"
+  //     steps: number,                             // default 1; clamped to an integer >= 1.
+  //                                                // A MAGNITUDE, never a comparand —
+  //                                                // `condition.value` owns that word.
+  //     tierId: string | null,                     // default null; `target` operand.
+  //                                                // Preserved VERBATIM but UNVALIDATED at
+  //                                                // normalize time (the normalizer cannot
+  //                                                // see the outcome lists) and no-ops at
+  //                                                // runtime, the graceful treatment
+  //                                                // `minOutcomeId` already documents.
   //   }
   //     // Legacy migration (on read, no versioned migration): an old `DiceCrit`
   //     // { die, raw, success, breakTools } becomes a `diceGroup`/"total"/"==" trigger
@@ -220,6 +243,30 @@ CraftingSystem = {
   //     // dropped. A routed outcome's `breakTools` remains the only `data.breakTools`
   //     // source (the routed per-tier legacy bridge), honoured by the shared evaluator
   //     // as an implicit always-on trigger under checkDriven only.
+  //     // Also on read (issue 975): a routed check's legacy `natStepping: true` becomes
+  //     // the trigger PAIR that reproduced it — `natstep-up` (allDice == 20, tierStep
+  //     // up 1) and `natstep-down` (allDice == 1, tierStep down 1) — both conditioned on
+  //     // the FIRST d20 group in the formula. Emitted only when the boolean is true, the
+  //     // check is not `fixed` (a fixed check's flag was already inert, so this is a
+  //     // conversion-TIME snapshot; the converted triggers are type-agnostic thereafter
+  //     // and a later relative→fixed switch carries the step across by design), and the
+  //     // formula carries a d20 group. A duplicate-d20 formula (`1d20 + 1d20`) targets
+  //     // the first group only — the caveat the crit conversion already carries — and
+  //     // the crit conversion's plain-die filter is deliberately NOT applied, because
+  //     // `2d20kh1` was the design target of the old kept-face rule. The ids are STABLE
+  //     // LITERALS rather than randomID(), since this conversion has no source id and a
+  //     // trigger id reaches chat and captured result data. `outcome` and `breakTools`
+  //     // are written EXPLICITLY so the legacy break-only test cannot mistake a
+  //     // synthesised trigger for a pre-recombine one and break tools on a natural 20.
+  //     // The `allDice` aggregate fails open (no match) when no per-die faces exist, so
+  //     // a headless or stubbed roll cannot fire these triggers; against the old
+  //     // one-kept-face rule this WIDENS the match on an un-kept multi-die d20 pool (a
+  //     // plain `2d20` now fires when every active die shows 20), which the condition
+  //     // DSL cannot express otherwise. Ordering is [...crits, ...natStep, ...authored],
+  //     // the key is stripped from the output, and the conversion is idempotent.
+  //     // Gathering converts identically — no gathering check has ever persisted the
+  //     // field, but a hand-edited or imported stray key converts on the same pass that
+  //     // strips it, which is intended now that stepping is not activity-scoped.
   //   CheckBreakageCondition =
   //     | { type: "rollTotal",        operator: "==" | "<=" | ">=" | "<" | ">", value: number }   // raw roll total (data.total)
   //     | { type: "progressiveValue", operator: "==" | "<=" | ">=" | "<" | ">", value: number }   // awarding value (absent on non-progressive -> never matches)
@@ -387,6 +434,10 @@ CraftingSystem = {
     The `rollTotal` condition targets the raw roll total (`data.total`); `progressiveValue` targets the awarding `value` and is meaningful only on progressive checks (absent → never matches); these are distinct sources because a forced-outcome trigger can overwrite `value` while `data.total` keeps the raw roll.
     The `diceGroup` `groupId` is the index into the evaluated `roll.dice` term order (not re-parsed from the formula string), so duplicate `NdS` groups are disambiguated deterministically; per-die aggregates read active-only raw faces and fail open (no break) when no per-die data is available.
     The `outcomeTier` condition matches when the resolved tier/outcome is in `tierIds[]` or `outcomeKeys[]`; both are honoured by the engine and the normalizer, but the editor UI authors only `tierIds[]` in v1 (`outcomeKeys[]` is an engine-level capability with no editor surface) — **acknowledged limit (issue 419)**.
+    An `outcomeTier` condition is evaluated at **three** seams by the one shared evaluator, each seeing progressively more of the result: it is IGNORED at the forcing seam (the routed tier is resolved after forcing, so matching on it would be circular, which is why the normalizer pins such a trigger's `outcome` to `"none"`), it IS evaluated in the tier-step pass against the **rolled** tier, and it IS evaluated for breakage at the engine seam against the **final** tier.
+    So an `outcomeTier` trigger can drive a step even though it can never force an outcome (issue 975), and `tierStep` is deliberately NOT pinned the way `outcome` is.
+    **Acknowledged limit (issue 975):** the two later seams read different tiers — stepping reads the rolled tier and breakage reads the final one — so a single trigger carrying an `outcomeTier` condition, a `tierStep` and `breakTools: true` may step without breaking, because the step moved the tier out from under its own breakage condition.
+    There is no second breakage pass; the asymmetry is pinned by a characterization test rather than "fixed".
 25. **`consumeCatalystsOnFail` interaction on the failure path** (issue 419): breakage on a FAILED attempt runs only when `consumption.consumeCatalystsOnFail === true` — identical to how the legacy `breakTools` force-break is gated today.
     A matched `checkDriven` trigger on a failed attempt therefore breaks tools only when `consumeCatalystsOnFail === true`.
     On the SUCCESS path breakage always applies (no such gate exists there).
@@ -415,6 +466,27 @@ CraftingSystem = {
     The historical `checkSource` discriminator (with its `"builtIn"` value) and the `builtIn: { ability, skill, dc, advantage }` game-system adapter sub-object are **NOT** part of the model: that adapter, together with the macro-as-check-source fields (`macroUuid`, `successMacroUuid`, `failureMacroUuid`), was removed in the 1.8.0 migration (`migrateRemoveLegacyCheckSources`).
     Normalization never emits `checkSource` or `builtIn`, and any persisted values are stripped on migration.
     The distinct `craftingCheck.simple.macroUuid` (the optional dynamic-DC macro) is a separate, retained feature and is not a check source.
+
+31. **Tier stepping is the third trigger effect (issue 975).**
+    A trigger's `tierStep` moves the routed check's **rolled** tier to its **final** tier, on every routed check (crafting, salvage AND gathering) in both the `relative` and `fixed` tier types; it is inert on `simple` and `progressive` checks, which have no tiers, and it is not gated on the tool-breakage authority.
+    The effect is applied after any forced reroute and before the fixed-only `minOutcomeId` gate, so the gate judges the final tier.
+    Composition over the matching triggers: relative steps sum as signed integers (`Σ up.steps − Σ down.steps`); a `target` is eligible only when its `tierId` names a tier in the array in play and the eligible target naming the LOWEST-ranked tier wins; the winning target sets the base index and the net offset applies from there; and the result clamps to the extremes of the array in play rather than no-opping.
+    **Stepping is disposition-preserving:** under a forced outcome the array in play is the ranked SUBSET of tiers sharing the forced disposition, so `data.success` and the final tier's own `success` can never disagree; with no forced outcome it is the whole ranked list and both `success` and `breakTools` follow the final tier.
+    A `null` matched tier steps nothing, `target` included.
+    Tier order is derived in exactly ONE place (`rankedRoutedOutcomes` in `src/systems/checkRoll.js`), consumed by the forced reroute, the `minOutcomeId` gate and the step pass alike: ascending by `dc` (relative) or `start` (fixed), non-finite ranks dropped, and the FIRST authored tier kept among equal ranks; callers locate a tier in it by ID, never by object identity.
+    The `minOutcomeId` gate uses that ranking only to LOCATE the required tier and still compares threshold VALUES, because `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without complaint (non-overlap is only a `rangeOverlap` readiness warning), so two fixed tiers sharing a `start` compare equal and the craft passes.
+    Full semantics — including the acknowledged rolled-tier/final-tier asymmetry and the relationship to `clampToNearest` — are in `resolution-modes` § Routed Tier Stepping.
+
+32. **The persisted `tierStep` effect and the runtime `data.tierStepApplied` evidence are different shapes and deliberately different names**, exactly as `natStepping` and `data.natStep` were.
+    The persisted effect is the authored REQUEST, `{ mode: "none"|"target"|"up"|"down", steps: number, tierId: string|null }`, one per trigger.
+    The runtime evidence is the resolved NET result, `{ mode: "target"|"up"|"down", steps: number, fromOutcomeId: string|null, toOutcomeId: string|null, stepClamped: boolean, triggerIds: string[] }`, at most one per check result.
+    Its `mode` is `"target"` whenever a target trigger won, whatever the index delta ("you were placed on Masterwork" has no direction).
+    Its `steps` is the **realized** magnitude (`|toIndex − fromIndex|`), not the requested one: an `up 3` that moved one tier reports `1` with `stepClamped: true`, keeping the field consistent with `fromOutcomeId`/`toOutcomeId`, which already describe the realized move — and the chat card renders that count straight to the player.
+    `triggerIds` credits the winning target plus every matched relative trigger; a losing or ineligible target contributed nothing to the move and is not credited.
+    Evidence is present ONLY on a real tier change, so a fully clamped move and a cancelling `up 1` + `down 1` emit nothing and a relative mode can never report `steps: 0`.
+    Gathering emits it from the shared runner but threads it to no chat surface.
+    Separately, `data.blockedOutcomeId` (additive alongside `data.minTierFailed`, on a minimum-success-tier failure only) is the tier the recipe minimum BLOCKED — post-step and pre-gate.
+    It is named for what the gate did to it rather than "rolled", because issue 975 mints **rolled tier** as a term of art for the PRE-step tier; the former `data.rolledOutcomeId` name would overload that word in the same change that defines it.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -847,10 +919,10 @@ Recipe = {
   },
 
   // Optional minimum success tier for a fixed-type routed check: the id of a fixed
-  // success outcome tier. When set, a craft whose rolled tier ranks below it (fixed
-  // tiers rank by `start`) fails outright. Null/unset = no override (outcome = the
-  // rolled tier). Meaningful only for routedByCheck with a fixed-type check; ignored
-  // otherwise. Semantics in resolution-modes/spec.md.
+  // success outcome tier. When set, a craft whose FINAL (post-step) tier ranks below
+  // it (fixed tiers rank by `start`) fails outright. Null/unset = no override (outcome
+  // = that same final tier). Meaningful only for routedByCheck with a fixed-type
+  // check; ignored otherwise. Semantics in resolution-modes/spec.md.
   minSuccessOutcomeId?: string | null,
 
   // Optional per-recipe crafting-check modifier override (issue 770). Absent (null) =

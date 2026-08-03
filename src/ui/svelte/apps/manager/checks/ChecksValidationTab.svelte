@@ -41,6 +41,10 @@
     hasSuccessOutcome: ['CheckHasSuccessOutcome', 'At least one outcome is a Success'],
     rangesValid: ['CheckRangesValid', 'Every tier range is valid'],
     rangesNoOverlap: ['CheckRangesNoOverlap', 'No tier ranges overlap'],
+    tierStepTargetsResolve: [
+      'CheckTierStepTargetsResolve',
+      'Tier-step targets name exactly one existing tier',
+    ],
   };
   const ISSUE_LABELS = {
     noRollFormula: [
@@ -59,6 +63,14 @@
     rangeOverlap: [
       'IssueRangeOverlap',
       'Some tier ranges overlap. Each value range must be unique.',
+    ],
+    danglingTierStepTarget: [
+      'IssueDanglingTierStepTarget',
+      "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
+    ],
+    multipleTierStepTargets: [
+      'IssueMultipleTierStepTargets',
+      'Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins.',
     ],
   };
 

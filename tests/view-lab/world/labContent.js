@@ -2568,6 +2568,50 @@ const ROUTED_CHECK = Object.freeze({
       { id: 'rw-standard', name: 'Standard', success: true, breakTools: false, dc: 0 },
       { id: 'rw-ruined', name: 'Ruined', success: false, breakTools: true, dc: -5 },
     ],
+    // The ONLY authored trigger list in the fixture world (issue 975). Every other check
+    // leaves `checkBreakage` unset, so before this every frame of the trigger card drew
+    // `[data-triggers-empty]` and the tier-step row existed in no captured frame at all.
+    //
+    // Runework earns them because it is the only crafting check with NAMED tiers, which is
+    // what makes a `target` step renderable — the tier `<select>` has something to offer.
+    // The salvage and herbalism checks are deliberately left alone: seeding those would
+    // rewrite already-captured frames for no extra evidence.
+    //
+    // Shaped to survive `_normalizeUnifiedTrigger` verbatim: an explicit `outcome` and
+    // `breakTools` (absent BOTH, the normalizer reads the trigger as a pre-recombine
+    // break-only one and migrates it to `breakTools: true`), a condition carrying every
+    // operand its type requires, and a literal `id` so the lab renders the same
+    // `[data-trigger="…"]` on every run — the case's scroll anchor names one.
+    //
+    // ORDER IS LOAD-BEARING for the capture, not for the runtime (steps compose
+    // commutatively). `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so
+    // anchoring the case on the LAST tier-step row is what puts both populated cards —
+    // and therefore both operand shapes, the tier select and the step count — in one
+    // frame. The target trigger is authored first for that reason.
+    checkBreakage: {
+      triggers: [
+        {
+          id: 'rw-trig-step-target',
+          condition: { type: 'rollTotal', operator: '<=', value: 5 },
+          outcome: 'none',
+          breakTools: false,
+          tierStep: { mode: 'target', steps: 1, tierId: 'rw-ruined' },
+        },
+        {
+          id: 'rw-trig-step-up',
+          condition: {
+            type: 'diceGroup',
+            groupId: 0,
+            aggregate: 'anyDie',
+            operator: '==',
+            value: 20,
+          },
+          outcome: 'none',
+          breakTools: false,
+          tierStep: { mode: 'up', steps: 1, tierId: null },
+        },
+      ],
+    },
   },
 });
 

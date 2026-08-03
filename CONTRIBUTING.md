@@ -593,7 +593,7 @@ resolution modes, the visibility modes it does not visit, Foundry's light applic
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
 A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
 `scripts/README.md`, not by a per-case comment.
-As of this writing the registry holds 150 cases: 133 `exact`, 4 `window`, 13 `beyond`.
+As of this writing the registry holds 155 cases: 135 `exact`, 4 `window`, 16 `beyond`.
 
 Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
 `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:

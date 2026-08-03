@@ -27,8 +27,9 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
   consumed: 'FABRICATE.Chat.SalvageConsumed',
   tools: 'FABRICATE.Chat.SalvageTools',
   roll: 'FABRICATE.Chat.Roll',
-  natStepUp: 'FABRICATE.Chat.NaturalStepUp',
-  natStepDown: 'FABRICATE.Chat.NaturalStepDown',
+  tierStepUp: 'FABRICATE.Chat.TierStepUp',
+  tierStepDown: 'FABRICATE.Chat.TierStepDown',
+  tierStepTarget: 'FABRICATE.Chat.TierStepTarget',
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
 });
@@ -44,7 +45,8 @@ export const SALVAGE_CHAT_KEYS = Object.freeze({
  * @param {Array<{name:string,img:string,quantity:number}>} [model.consumed] - The source broken down.
  * @param {Array<{name:string,img:string}>}                 [model.tools]    - Tools that broke.
  * @param {number}  [model.rollValue] - The rolled check total; rendered only when finite.
- * @param {{direction:'up'|'down'}} [model.natStep] - Actual routed natural step evidence.
+ * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
+ *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
  * @param {string}  [model.failureReason]
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
  * @returns {string} HTML string suitable for ChatMessage content.
@@ -59,7 +61,7 @@ export function buildSalvageChatContent(model = {}, localize = (key) => key) {
       consumed: model.consumed,
       tools: model.tools,
       rollValue: model.rollValue,
-      natStep: model.natStep,
+      tierStep: model.tierStep,
       failureReason: model.failureReason,
     },
     SALVAGE_CHAT_KEYS,
