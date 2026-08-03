@@ -349,3 +349,74 @@ test('toolSpecific salvage: a breakTools trigger never force-breaks (either-or a
   assert.equal(decision.authority, 'toolSpecific');
   assert.equal(decision.forceBreak, false, 'a check never breaks tools under toolSpecific');
 });
+
+// ── Tier-step evidence reaches the salvage result card (issue 975) ───────────
+
+test('salvage routed: a tier-step trigger surfaces data.tierStepApplied, which the salvage card renders', async () => {
+  const engine = makeEngine();
+  // base dc 15 → thresholds 25 / 15 / 10. 16 matches "Success"; the trigger steps it
+  // down one rank onto "Failure", so the evidence below is the RUNTIME's own, not a
+  // fixture of it — the salvage card had no coverage joining the two.
+  stubRoll(16, [{ number: 1, faces: 20, total: 16, results: [{ result: 16, active: true }] }]);
+  const r = await run(
+    engine,
+    sys(
+      {
+        routed: {
+          type: 'relative',
+          rollFormula: '1d20',
+          dc: 15,
+          thresholdMode: 'meet',
+          relativeOutcomes: ROUTED_RELATIVE,
+          checkBreakage: {
+            triggers: [
+              {
+                id: 'step-down',
+                condition: {
+                  type: 'diceGroup',
+                  groupId: 0,
+                  aggregate: 'total',
+                  operator: '==',
+                  value: 16,
+                },
+                outcome: 'none',
+                breakTools: false,
+                tierStep: { mode: 'down', steps: 1, tierId: null },
+              },
+            ],
+          },
+        },
+      },
+      'routed'
+    )
+  );
+  assert.equal(r.outcome, 'Failure', 'the step moved the matched tier down one rank');
+  assert.equal(r.data.tierStepApplied.mode, 'down');
+  assert.equal(r.data.tierStepApplied.steps, 1, 'the REALIZED magnitude');
+
+  const posted = [];
+  const system = { features: { chatOutput: true }, components: [] };
+  globalThis.game = { i18n: { localize: (key) => key }, user: { id: 'u1' } };
+  globalThis.ChatMessage = {
+    create: (payload) => posted.push(payload),
+    getSpeaker: () => ({ alias: 'Salvager' }),
+  };
+  await engine._postSalvageChatMessage({
+    success: false,
+    actor: ACTOR,
+    system,
+    component: { name: 'Iron Ore', img: '' },
+    consumedQuantity: 1,
+    results: [],
+    usedTools: [],
+    failureReason: 'Salvage check failed',
+    rollValue: r.value,
+    tierStep: r.data.tierStepApplied,
+  });
+  assert.equal(posted.length, 1, 'one salvage card posted');
+  assert.ok(
+    posted[0].content.includes('fabricate-craft-chat__tier-step'),
+    'the renamed parameter reaches the salvage card model'
+  );
+  assert.ok(posted[0].content.includes('FABRICATE.Chat.TierStepDown'), 'the down key');
+});

@@ -1165,8 +1165,9 @@
       "SalvageRecovered": "Recovered",
       "SalvageConsumed": "Broken Down",
       "SalvageTools": "Tools Broken",
-      "NaturalStepUp": "Natural 20 - stepped up one tier",
-      "NaturalStepDown": "Natural 1 - stepped down one tier"
+      "TierStepUp": "Stepped up {steps} tier(s)",
+      "TierStepDown": "Stepped down {steps} tier(s)",
+      "TierStepTarget": "Stepped to a target tier"
     },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",

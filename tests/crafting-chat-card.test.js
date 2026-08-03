@@ -22,6 +22,16 @@ function successModel(overrides = {}) {
   };
 }
 
+/**
+ * The text inside the rendered tier-step notice, or null when no note rendered.
+ * Reading the note in isolation keeps a "carries no count" assertion from being
+ * satisfied (or defeated) by an unrelated quantity elsewhere in the card.
+ */
+function tierStepNoteOf(content) {
+  const match = /fabricate-craft-chat__tier-step">([^<]*)</.exec(content);
+  return match ? match[1] : null;
+}
+
 function failureModel(overrides = {}) {
   return {
     status: 'failed',
@@ -122,13 +132,73 @@ test('omits the roll row when no check ran (null / absent / non-finite value)', 
   );
 });
 
-test('renders a localized natural-step note only for an actual tier change', () => {
-  const stepped = buildCraftingChatContent(successModel({ natStep: { direction: 'up' } }));
-  assert.ok(stepped.includes('fabricate-craft-chat__nat-step'));
-  assert.ok(stepped.includes('FABRICATE.Chat.NaturalStepUp'));
+test('renders a localized tier-step note only for a realized tier change', () => {
+  const stepped = buildCraftingChatContent(successModel({ tierStep: { mode: 'up', steps: 1 } }));
+  assert.ok(stepped.includes('fabricate-craft-chat__tier-step'), 'semantic tier-step hook');
+  assert.ok(stepped.includes('FABRICATE.Chat.TierStepUp'), 'the up key (identity localize)');
 
-  const notStepped = buildCraftingChatContent(successModel({ natStep: null }));
-  assert.ok(!notStepped.includes('fabricate-craft-chat__nat-step'));
+  // `tierStepApplied` is absent unless the tier actually moved, so no note renders.
+  const notStepped = buildCraftingChatContent(successModel({ tierStep: null }));
+  assert.ok(!notStepped.includes('fabricate-craft-chat__tier-step'), 'no note when nothing moved');
+  assert.ok(
+    !buildCraftingChatContent(successModel()).includes('fabricate-craft-chat__tier-step'),
+    'no note when the field is absent'
+  );
+});
+
+test('a down step renders the down key; a target step is directionless and countless', () => {
+  const down = buildCraftingChatContent(successModel({ tierStep: { mode: 'down', steps: 2 } }));
+  assert.ok(down.includes('FABRICATE.Chat.TierStepDown'), 'the down key');
+  assert.ok(!down.includes('FABRICATE.Chat.TierStepUp'), 'never the up key');
+
+  // "you were placed on Masterwork" has no direction and no magnitude, so `steps` is
+  // never rendered for `target` — even when the realized move spanned several tiers.
+  const target = buildCraftingChatContent(
+    successModel({ tierStep: { mode: 'target', steps: 3 } })
+  );
+  assert.equal(
+    tierStepNoteOf(target),
+    'FABRICATE.Chat.TierStepTarget',
+    'the target note is the directionless key alone — no direction, no count'
+  );
+});
+
+test('substitutes the realized {steps} magnitude into the localized relative note', () => {
+  // Both card modules take `localize` as a key-only `(key) => string`, so the card
+  // itself performs the substitution; a live localization returns the real sentence.
+  const localize = (key) =>
+    key === 'FABRICATE.Chat.TierStepUp' ? 'Stepped up {steps} tier(s)' : key;
+  const content = buildCraftingChatContent(
+    successModel({ tierStep: { mode: 'up', steps: 2 } }),
+    localize
+  );
+  assert.ok(content.includes('Stepped up 2 tier(s)'), 'placeholder replaced with the magnitude');
+  assert.ok(!content.includes('{steps}'), 'no unsubstituted placeholder reaches chat');
+});
+
+test('renders no note for a mode of none, an unknown mode, or a missing magnitude', () => {
+  for (const tierStep of [
+    { mode: 'none' },
+    { mode: 'sideways', steps: 1 },
+    { mode: 'up' },
+    { mode: 'down', steps: 0 },
+    {},
+  ]) {
+    const content = buildCraftingChatContent(successModel({ tierStep }));
+    assert.ok(
+      !content.includes('fabricate-craft-chat__tier-step'),
+      `no note for ${JSON.stringify(tierStep)}`
+    );
+  }
+});
+
+test('the retired natural-step model key and CSS hook are gone', () => {
+  // The old `data.natStep` shape must not keep rendering a note through the renamed
+  // renderer — a silent passthrough would leave the migration half-done.
+  const content = buildCraftingChatContent(successModel({ natStep: { direction: 'up' } }));
+  assert.ok(!content.includes('fabricate-craft-chat__nat-step'), 'the old hook is retired');
+  assert.ok(!content.includes('fabricate-craft-chat__tier-step'), 'the old key drives nothing');
+  assert.ok(!content.includes('NaturalStep'), 'the retired lang keys are unreferenced');
 });
 
 test('escapes HTML in user-authored names', () => {

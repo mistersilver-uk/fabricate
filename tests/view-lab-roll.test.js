@@ -129,7 +129,7 @@ test('the die shape is the one rolledDiceGroups reads', async () => {
   assert.equal(die.faces, 6);
   assert.equal(die.results.length, 3);
   // `active: true` on a kept result, matching every Foundry-shaped dice fixture in this repo
-  // (`check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-nat-stepping.test.js`).
+  // (`check-roll.test.js`, `check-roll-dice.test.js`, `check-roll-tier-step.test.js`).
   // `rolledDiceGroups` filters on `!== false` so it would accept an absent key too, but the lab
   // must emit the shape production emits — otherwise a later fidelity fix reads as a regression.
   assert.ok(

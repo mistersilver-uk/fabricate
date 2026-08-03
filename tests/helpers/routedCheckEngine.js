@@ -173,3 +173,66 @@ const DEFAULT_ROUTED_RECIPE = Object.freeze({ craftingSystemId: 'sys-1' });
 export function runRoutedCheck(engine, recipe = DEFAULT_ROUTED_RECIPE, ingredientSet = null) {
   return engine._runCraftingCheck(recipe, ROUTED_ACTOR, [ROUTED_ACTOR], ingredientSet);
 }
+
+/**
+ * A recipe with no ingredients, results or tools, so a `craft()` resolves on the
+ * CHECK alone and the posted result card is the only observable. `validate` is the
+ * one method `craft()` calls on it before the check runs.
+ */
+const CHAT_CRAFT_RECIPE = Object.freeze({
+  id: 'r-chat',
+  name: 'Iron Sword',
+  craftingSystemId: 'sys-1',
+  ingredientSets: [],
+  resultGroups: [],
+  toolIds: [],
+  outcomeRouting: null,
+  validate: () => ({ valid: true, errors: [] }),
+});
+
+/**
+ * Drive a whole `craft()` through the REAL routed check to the posted result chat
+ * card, and return the `ChatMessage.create` payloads it produced.
+ *
+ * This exists because the engine's chat-model mapping had no coverage at all: every
+ * `_postCraftChatMessage` call site could drop its routed check evidence and still
+ * ship green, since the chat-card suites feed the presentation model directly and the
+ * routed-check suites stop at the check result. Driving the real check means the
+ * evidence asserted on is the runtime's own `data.tierStepApplied`, not a fixture of
+ * it (issue 975).
+ *
+ * @param {object} routed - The routed crafting-check config (see {@link defaultRouted}).
+ * @returns {Promise<{result: object, chatMessages: Array<object>}>}
+ */
+export async function craftForChatCard(routed) {
+  const { engine } = makeRoutedEngine({ routed, features: { chatOutput: true } });
+  // `_runCraftingCheck` needs only the mode/selection stubs `makeRoutedEngine` installs;
+  // the surrounding `craft()` additionally asks the same service to validate.
+  Object.assign(engine.resolutionModeService, {
+    validateRecipe: () => ({ valid: true, errors: [] }),
+    validateCheckResult: () => true,
+    resolveResultGroups: () => ({ groups: [], meta: {} }),
+  });
+  engine.recipeManager = {
+    canCraft: () => ({
+      canCraft: true,
+      satisfiableSet: { id: 'set-1', matchIngredients: () => [] },
+      missing: { ingredients: [], essences: [], tools: [] },
+    }),
+    ingredientMatchesItem: () => false,
+    getToolsForSet: () => [],
+  };
+  const chatMessages = [];
+  globalThis.ChatMessage = {
+    create(payload) {
+      chatMessages.push(payload);
+      return Promise.resolve({ id: `msg-${chatMessages.length}` });
+    },
+    getSpeaker: () => ({ alias: ROUTED_ACTOR.name }),
+  };
+  globalThis.game.i18n = { localize: (key) => key, format: (key) => key };
+  globalThis.game.user = { id: 'user-1' };
+  const craftingActor = { ...ROUTED_ACTOR, items: { contents: [] } };
+  const result = await engine.craft(craftingActor, [ROUTED_ACTOR], CHAT_CRAFT_RECIPE, null, {});
+  return { result, chatMessages };
+}

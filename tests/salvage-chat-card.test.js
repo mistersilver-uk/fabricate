@@ -113,13 +113,41 @@ test('omits the roll row for a guaranteed no-check salvage (null / absent value)
   );
 });
 
-test('renders a localized natural-step note only for an actual tier change', () => {
-  const stepped = buildSalvageChatContent(successModel({ natStep: { direction: 'down' } }));
-  assert.ok(stepped.includes('fabricate-craft-chat__nat-step'));
-  assert.ok(stepped.includes('FABRICATE.Chat.NaturalStepDown'));
+test('renders a localized tier-step note only for a realized tier change', () => {
+  const stepped = buildSalvageChatContent(successModel({ tierStep: { mode: 'down', steps: 1 } }));
+  assert.ok(stepped.includes('fabricate-craft-chat__tier-step'), 'shared tier-step hook');
+  assert.ok(stepped.includes('FABRICATE.Chat.TierStepDown'), 'the down key (identity localize)');
 
-  const notStepped = buildSalvageChatContent(successModel({ natStep: {} }));
-  assert.ok(!notStepped.includes('fabricate-craft-chat__nat-step'));
+  // `tierStepApplied` is absent unless the tier actually moved, so no note renders.
+  const notStepped = buildSalvageChatContent(successModel({ tierStep: {} }));
+  assert.ok(!notStepped.includes('fabricate-craft-chat__tier-step'), 'no note when nothing moved');
+});
+
+test('salvage renders the same three tier-step modes as crafting', () => {
+  const up = buildSalvageChatContent(successModel({ tierStep: { mode: 'up', steps: 2 } }));
+  assert.ok(up.includes('FABRICATE.Chat.TierStepUp'), 'the salvage key map carries the up key');
+
+  // A `target` step is directionless and countless, so its note is the key alone.
+  const target = buildSalvageChatContent(successModel({ tierStep: { mode: 'target', steps: 2 } }));
+  const note = /fabricate-craft-chat__tier-step">([^<]*)</.exec(target);
+  assert.ok(Boolean(note), 'a target step still renders a note');
+  assert.equal(note[1], 'FABRICATE.Chat.TierStepTarget', 'no direction and no count');
+});
+
+test('substitutes the realized {steps} magnitude into the localized relative note', () => {
+  const content = buildSalvageChatContent(
+    successModel({ tierStep: { mode: 'down', steps: 2 } }),
+    (key) => (key === 'FABRICATE.Chat.TierStepDown' ? 'Stepped down {steps} tier(s)' : key)
+  );
+  assert.ok(content.includes('Stepped down 2 tier(s)'), 'placeholder replaced with the magnitude');
+  assert.ok(!content.includes('{steps}'), 'no unsubstituted placeholder reaches chat');
+});
+
+test('the retired natural-step model key and CSS hook are gone', () => {
+  const content = buildSalvageChatContent(successModel({ natStep: { direction: 'down' } }));
+  assert.ok(!content.includes('fabricate-craft-chat__nat-step'), 'the old hook is retired');
+  assert.ok(!content.includes('fabricate-craft-chat__tier-step'), 'the old key drives nothing');
+  assert.ok(!content.includes('NaturalStep'), 'the retired lang keys are unreferenced');
 });
 
 test('escapes HTML in user-authored names', () => {
