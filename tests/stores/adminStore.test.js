@@ -2419,6 +2419,118 @@ describe('createAdminStore', () => {
       );
     });
 
+    // Issue 978. `_buildRecipeList` DERIVES `recipeItemId` from `containingDefinitions[0]`
+    // — definition order, an authoring accident. The editor seeds its draft from a whole
+    // projected row and Save posts the whole draft, so before this fix that derived
+    // scalar was persisted onto the model, arming the four legacy `src/systems` image
+    // resolvers (issue 887) for the ordinary cohort and not just the alchemy one.
+    it('updateRecipe strips the derived recipe-item projection fields from the save payload', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.recipeItemDefinitions = [
+        { id: 'def-tome', name: 'Tome', img: '', originItemUuid: '', recipeIds: ['r1'] },
+        { id: 'def-scroll', name: 'Scroll', img: '', originItemUuid: '', recipeIds: ['r1'] },
+      ];
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateArgs = { id, updates, options };
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // Non-vacuity guard: the row must actually carry a leak candidate, or the strip
+      // assertion below would pass against a projection that never derived one.
+      const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+      assert.equal(row.recipeItemId, 'def-tome', 'the projection derives the FIRST book id');
+
+      const ok = await store.updateRecipe('r1', { ...row, name: 'Renamed' });
+      assert.equal(ok, true);
+      assert.equal(updateArgs.updates.name, 'Renamed', 'authored fields still reach the manager');
+      for (const field of [
+        'recipeItemId',
+        'recipeItemIds',
+        'recipeItemName',
+        'recipeItemSourceUuid',
+      ]) {
+        assert.equal(
+          field in updateArgs.updates,
+          false,
+          `${field} is OMITTED, not nulled — an explicit null would destroy the scalar the alchemy cohort relies on`
+        );
+      }
+    });
+
+    it('updateRecipe strips the derived scalar in either membership order', async () => {
+      // The leaked value tracked definition order, so a single-order assertion cannot
+      // distinguish "stripped" from "happened to derive nothing". Flip the order, confirm
+      // the projection's derived scalar genuinely flips, and assert neither save carries it.
+      const captured = [];
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      const tome = { id: 'def-tome', name: 'Tome', img: '', originItemUuid: '', recipeIds: ['r1'] };
+      const scroll = {
+        id: 'def-scroll',
+        name: 'Scroll',
+        img: '',
+        originItemUuid: '',
+        recipeIds: ['r1'],
+      };
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          captured.push(updates);
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+
+      const derivedScalars = [];
+      for (const [order, definitions] of [
+        ['tome first', [tome, scroll]],
+        ['scroll first', [scroll, tome]],
+      ]) {
+        sys.recipeItemDefinitions = definitions;
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+        derivedScalars.push(row.recipeItemId);
+        await store.updateRecipe('r1', { ...row, name: `Renamed (${order})` });
+      }
+
+      assert.deepEqual(
+        derivedScalars,
+        ['def-tome', 'def-scroll'],
+        'the derived scalar tracks definition order, so the strip is doing real work'
+      );
+      assert.equal(captured.length, 2, 'both saves reached the manager');
+      for (const updates of captured) {
+        assert.equal('recipeItemId' in updates, false);
+        assert.equal('recipeItemIds' in updates, false);
+      }
+    });
+
+    it('updateRecipe is a no-op when the payload is derived fields only', async () => {
+      let called = false;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async () => {
+          called = true;
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const ok = await store.updateRecipe('r1', { recipeItemId: 'def-tome', recipeItemIds: [] });
+      assert.equal(ok, true, 'a derived-only payload succeeds rather than erroring');
+      assert.equal(called, false, 'nothing is authored, so the manager is never called');
+    });
+
     it('addRecipeItemFromUuid passes through the manager result', async () => {
       const passthrough = { item: { id: 'item-x' }, action: 'created' };
       const services = createMockServices();

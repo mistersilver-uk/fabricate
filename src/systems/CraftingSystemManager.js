@@ -2034,6 +2034,30 @@ export class CraftingSystemManager {
     });
   }
 
+  /**
+   * Reconcile a recipe's legacy `recipeItemId` scalar against the many-to-many book
+   * membership that superseded it. Runs un-gated on every `initialize()`, so both halves
+   * must be idempotent and must converge on the first pass.
+   *
+   * Two halves, deliberately sharing one walk over systems -> definitions -> recipes:
+   *
+   * 1. **Mint and stamp** (pre-existing). A recipe retaining a standalone
+   *    `linkedRecipeItemUuid` with no valid `recipeItemId` gets a definition minted from
+   *    that uuid and the scalar stamped. This is the alchemy formula-item cohort the
+   *    1.13.0 migration deliberately preserved.
+   * 2. **Clear a leaked scalar** (issue 978). Until that issue, saving a recipe from the
+   *    manager persisted `containingDefinitions[0]` — an authoring accident of definition
+   *    order — onto the model, because the editor seeds its draft from a whole projected
+   *    row and Save posted the whole draft. For a recipe that IS a book member through
+   *    `recipeIds[]`, the scalar is pure noise, and four legacy `src/systems` resolvers
+   *    read it AHEAD of an authored `recipe.img` (issue 887).
+   *
+   * Half 2 never fires for the cohort half 1 maintains, and is unreachable in a fully
+   * un-migrated system — no definition carries `recipeIds` there, so no recipe is a
+   * member and the scalar is still the membership source.
+   *
+   * @returns {Promise<boolean>} Whether anything was persisted.
+   */
   async _migrateLegacyRecipeItems() {
     if (!this.recipeManager?.getRecipes || !this.recipeManager?.save) return false;
 
@@ -2053,6 +2077,22 @@ export class CraftingSystemManager {
 
       const recipes = this.recipeManager.getRecipes({ craftingSystemId: system.id });
       for (const recipe of recipes) {
+        // Half 2 (issue 978), before the mint-and-stamp read below so a cleared recipe
+        // falls straight through: it has no `linkedRecipeItemUuid`, so it is not a
+        // re-stamp candidate and the repair converges on this pass.
+        if (
+          recipe?.recipeItemId &&
+          !String(recipe?.linkedRecipeItemUuid || '').trim() &&
+          definitions.some((def) =>
+            (Array.isArray(def.recipeIds) ? def.recipeIds : []).some(
+              (id) => String(id) === String(recipe.id)
+            )
+          )
+        ) {
+          recipe.recipeItemId = null;
+          recipesChanged = true;
+        }
+
         const hasValidRecipeItemId =
           recipe?.recipeItemId && definitions.some((def) => def.id === recipe.recipeItemId);
         if (hasValidRecipeItemId) continue;

@@ -1856,6 +1856,48 @@ async function _documentDescriptionCandidate(doc, enrichToHtml) {
 // of this module (issue 785). The Books & Scrolls Type pill and the Knowledge
 // surface's Type column read the SAME derivation, so the two cannot drift.
 
+/**
+ * Fields `_buildRecipeList` DERIVES onto a projected recipe row that are not authored
+ * recipe state (issue 978).
+ *
+ * They exist for display — the browser's book column, the editor's Books & Scrolls tab,
+ * and `handleRemoveRecipeItem`'s post-unlink refresh all read them — but the editor
+ * seeds its draft from a whole projected row and Save posts the whole draft, so without
+ * a strip at the write boundary `recipeItemId` (the only one of the four that is also a
+ * real `Recipe` field) is persisted onto the model. Its value is
+ * `containingDefinitions[0]`, i.e. definition order — an authoring accident.
+ *
+ * The other three are dropped today by `Recipe.fromJSON`, which reconstructs from named
+ * fields. That is a property of the model's current field list rather than a guarantee,
+ * so the whole derived set is stripped and named once here.
+ */
+export const DERIVED_RECIPE_PROJECTION_FIELDS = Object.freeze([
+  'recipeItemId',
+  'recipeItemIds',
+  'recipeItemName',
+  'recipeItemSourceUuid',
+]);
+
+/**
+ * Drop the derived projection fields from a recipe update payload.
+ *
+ * OMITS the keys rather than nulling them. `RecipeManager.updateRecipe` merges
+ * `{ ...recipe.toJSON(), ...updates }`, so an absent key preserves the persisted value
+ * while an explicit `null` would DESTROY the scalar that `_migrateLegacyRecipeItems`
+ * maintains for the standalone alchemy formula-item cohort the 1.13.0 migration
+ * deliberately preserved.
+ *
+ * @param {object} updates A recipe update payload, possibly a whole projected row.
+ * @returns {object} The payload without any derived projection field.
+ */
+export function withoutDerivedRecipeProjectionFields(updates) {
+  if (!updates || typeof updates !== 'object') return updates;
+  if (!DERIVED_RECIPE_PROJECTION_FIELDS.some((field) => field in updates)) return updates;
+  const stripped = { ...updates };
+  for (const field of DERIVED_RECIPE_PROJECTION_FIELDS) delete stripped[field];
+  return stripped;
+}
+
 // The recipe-item definitions of a system that CONTAIN a recipe (issue 511
 // many-to-many). Canonical read is each definition's `recipeIds[]`; only a system
 // with no membership authored yet falls back to the recipe's book-only `recipeItemId`.
@@ -8558,13 +8600,21 @@ export function createAdminStore(services) {
     if (!updates || typeof updates !== 'object') return false;
     if (Object.keys(updates).length === 0) return true;
 
+    // This store DERIVES the recipe-item fields onto every projected row, and the editor
+    // saves a whole row, so this store also strips them on the way back out (issue 978).
+    // Symmetric by design: the projection's producer owns its write boundary. Stripping
+    // here rather than in the editor keeps the draft carrying them for display.
+    const modelUpdates = withoutDerivedRecipeProjectionFields(updates);
+    // A payload that was ONLY derived fields has nothing left to author.
+    if (Object.keys(modelUpdates).length === 0) return true;
+
     try {
       // The recipe editor only edits identity + the linked recipe item; a shell's
       // ingredients/results may still be empty. allowIncomplete keeps those
       // identity-only saves from being blocked by completeness validation.
       // notify defaults on; step authoring passes notify:false to avoid a toast
       // per keystroke-committed edit / reorder.
-      await recipeManager.updateRecipe(recipeId, updates, {
+      await recipeManager.updateRecipe(recipeId, modelUpdates, {
         allowIncomplete: true,
         notify: options.notify !== false,
       });

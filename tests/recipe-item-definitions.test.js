@@ -515,6 +515,106 @@ test('migrateLegacyRecipeItems reuses one recipe item definition for shared lega
   assert.equal(recipesSaved, true);
 });
 
+// Issue 978. A manager save persisted `containingDefinitions[0]` onto the recipe. Book
+// membership lives on the definition, so for a recipe that IS a member through
+// `recipeIds[]` the scalar is noise that arms the four legacy image resolvers (issue 887).
+// The same un-gated pass that mints-and-stamps the alchemy cohort now clears it.
+test('migrateLegacyRecipeItems clears a leaked recipeItemId but spares the alchemy cohort', async () => {
+  let recipesSaved = false;
+  const recipes = [
+    {
+      // Leaked: a book member through `recipeIds[]`, no standalone formula link.
+      id: 'recipe-leaked',
+      name: 'Kite Shield',
+      img: 'icons/shield.webp',
+      description: '',
+      craftingSystemId: 'sys-1',
+      recipeItemId: 'book-1',
+      linkedRecipeItemUuid: '',
+      toJSON() {
+        return { ...this };
+      },
+    },
+    {
+      // The alchemy cohort: a standalone formula-item link the 1.13.0 migration
+      // deliberately preserved, and which the mint-and-stamp half maintains.
+      id: 'recipe-formula',
+      name: 'Potion of Healing',
+      img: 'icons/potion.webp',
+      description: '',
+      craftingSystemId: 'sys-1',
+      recipeItemId: 'book-1',
+      linkedRecipeItemUuid: 'Compendium.world.formulas.formula-1',
+      toJSON() {
+        return { ...this };
+      },
+    },
+    {
+      // Not a member of anything: nothing to reconcile against, so it is left alone.
+      id: 'recipe-unlinked',
+      name: 'Iron Sword',
+      img: 'icons/sword.webp',
+      description: '',
+      craftingSystemId: 'sys-1',
+      recipeItemId: 'book-1',
+      linkedRecipeItemUuid: '',
+      toJSON() {
+        return { ...this };
+      },
+    },
+  ];
+
+  const recipeManager = {
+    getRecipes: ({ craftingSystemId } = {}) =>
+      craftingSystemId
+        ? recipes.filter((recipe) => recipe.craftingSystemId === craftingSystemId)
+        : recipes,
+    save: async () => {
+      recipesSaved = true;
+    },
+  };
+
+  const manager = new CraftingSystemManager(recipeManager);
+  manager.save = async () => {};
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Smithing',
+      recipeItemDefinitions: [
+        {
+          id: 'book-1',
+          name: 'Forgecraft Handbook',
+          originItemUuid: 'Compendium.world.books.book-1',
+          recipeIds: ['recipe-leaked', 'recipe-formula'],
+        },
+      ],
+    })
+  );
+
+  await manager._migrateLegacyRecipeItems();
+
+  assert.equal(recipes[0].recipeItemId, null, 'the leaked scalar is cleared for a book member');
+  assert.equal(
+    recipes[1].recipeItemId,
+    'book-1',
+    'a recipe retaining a standalone formula link keeps its scalar'
+  );
+  assert.equal(
+    recipes[2].recipeItemId,
+    'book-1',
+    'a recipe that is a member of nothing is left untouched'
+  );
+  assert.equal(recipesSaved, true, 'the clear is persisted');
+
+  // Idempotent: a cleared recipe carries no `linkedRecipeItemUuid`, so it is not a
+  // re-stamp candidate and a second pass must not resurrect the scalar.
+  recipesSaved = false;
+  await manager._migrateLegacyRecipeItems();
+  assert.equal(recipes[0].recipeItemId, null, 'a second pass leaves the cleared recipe cleared');
+  assert.equal(recipesSaved, false, 'a converged pass persists nothing');
+});
+
 test('deleteRecipeItemDefinition removes the system recipe item and clears affected recipe references', async () => {
   let systemsSaved = false;
   let recipesSaved = false;
