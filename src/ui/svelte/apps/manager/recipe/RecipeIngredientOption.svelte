@@ -19,6 +19,14 @@
   by the parent for a BARE (single-alternative) requirement, so it sits INLINE at the
   row's right end; a multi-alternative box renders it at the box bottom instead.
 -->
+<script module>
+  // Alternatives carry no id (the parent keys them by index), so the tag-match radio
+  // group's `name` is minted per INSTANCE here. Two tag rows sharing one `name` would
+  // be one radio group to the browser, and choosing Any in the second would silently
+  // uncheck the first.
+  let tagMatchGroupSeq = 0;
+</script>
+
 <script>
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
@@ -29,7 +37,16 @@
     findCurrencyUnit,
   } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+
+  tagMatchGroupSeq += 1;
+  const tagMatchGroupId = tagMatchGroupSeq;
+
+  const TAG_MATCH_OPTIONS = [
+    { value: 'any', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAny', fallback: 'Any' },
+    { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAll', fallback: 'All' },
+  ];
 
   let {
     option = {},
@@ -480,30 +497,14 @@
          the chosen tags in a full-width bordered area (chips or "No tags set"). -->
     <div class="manager-recipe-option-tags-detail">
       <div class="manager-recipe-option-tags-controls">
-        <div
-          class="manager-recipe-tag-match-toggle"
-          role="group"
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
-        >
-          <button
-            type="button"
-            class="manager-recipe-tag-match-option"
-            class:is-selected={tagMatch === 'any'}
-            data-recipe-tag-match="any"
-            aria-pressed={tagMatch === 'any'}
-            onclick={() => setTagMatch('any')}
-            >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any')}</button
-          >
-          <button
-            type="button"
-            class="manager-recipe-tag-match-option"
-            class:is-selected={tagMatch === 'all'}
-            data-recipe-tag-match="all"
-            aria-pressed={tagMatch === 'all'}
-            onclick={() => setTagMatch('all')}
-            >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All')}</button
-          >
-        </div>
+        <SegmentedControl
+          options={TAG_MATCH_OPTIONS}
+          value={tagMatch}
+          groupName={`tag-match-${tagMatchGroupId}`}
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
+          optionDataAttr="data-recipe-tag-match"
+          onChange={(mode) => setTagMatch(mode)}
+        />
         <SearchablePopover
           options={tagPickerOptions}
           pickerClass="manager-recipe-tag-picker"

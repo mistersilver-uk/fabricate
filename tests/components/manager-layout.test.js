@@ -5449,9 +5449,14 @@ test('recipe tag list spans the full row width on its own line below the control
                 </div>
                 <div class="manager-recipe-option-tags-detail">
                   <div class="manager-recipe-option-tags-controls">
-                    <div class="manager-recipe-tag-match-toggle">
-                      <button type="button" class="manager-recipe-tag-match-option is-selected">Any</button>
-                      <button type="button" class="manager-recipe-tag-match-option">All</button>
+                    <!-- The Any/All control is the shared SegmentedControl (issue 975).
+                         Its track/segment styling lives in that component's SCOPED style
+                         block, not in fabricate.css, so this fixture reproduces only the
+                         markup shape; the assertions below are about the tag detail's own
+                         full-width line, which fabricate.css does own. -->
+                    <div class="manager-segmented" role="radiogroup" aria-label="Tag match">
+                      <label class="manager-segment is-active"><input type="radio" name="tag-match-1" checked><span class="manager-segment-label">Any</span></label>
+                      <label class="manager-segment"><input type="radio" name="tag-match-1"><span class="manager-segment-label">All</span></label>
                     </div>
                     <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
                   </div>
