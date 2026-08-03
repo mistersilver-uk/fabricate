@@ -25,6 +25,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -45,9 +46,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // The two icons are literally what the DC is: an authored number, or a script that
+  // returns one.
   const DC_MODE_OPTIONS = [
     {
       value: 'static',
+      icon: 'fas fa-hashtag',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcStatic',
       fallback: 'Static',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcStaticDesc',
@@ -55,6 +59,7 @@
     },
     {
       value: 'dynamic',
+      icon: 'fas fa-code',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcDynamic',
       fallback: 'Dynamic',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.DcDynamicDesc',
@@ -133,34 +138,16 @@
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}
       </h3>
-      <div
-        class="manager-checks-type-options"
-        role="radiogroup"
-        aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.DcTitle', 'DC source')}
-      >
-        {#each DC_MODE_OPTIONS as option (option.value)}
-          <label
-            class={`manager-resolution-option ${dcMode === option.value ? 'is-active' : ''}`}
-            data-dc-mode-option={option.value}
-          >
-            <input
-              type="radio"
-              name="crafting-check-dc-mode"
-              value={option.value}
-              checked={dcMode === option.value}
-              onchange={() => setDcMode(option.value)}
-            />
-            <span class="manager-resolution-option-body">
-              <span class="manager-resolution-option-name"
-                >{text(option.labelKey, option.fallback)}</span
-              >
-              <span class="manager-resolution-option-desc"
-                >{text(option.descKey, option.descFallback)}</span
-              >
-            </span>
-          </label>
-        {/each}
-      </div>
+      <RadioCardGroup
+        legendKey="FABRICATE.Admin.Manager.Checks.Crafting.DcTitle"
+        legend="DC source"
+        options={DC_MODE_OPTIONS}
+        selectedValue={dcMode}
+        groupName="crafting-check-dc-mode"
+        columns={2}
+        optionDataAttr="data-dc-mode-option"
+        onChange={setDcMode}
+      />
     </section>
 
     {#if dcMode === 'static'}

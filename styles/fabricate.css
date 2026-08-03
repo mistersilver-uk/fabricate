@@ -2009,15 +2009,10 @@
   margin-bottom: var(--fab-space-2);
 }
 
-/* The crafting check type selector reuses the resolution radio-option styling
-   but lays its two options side by side inside a normal inspector card (no
-   fieldset/legend), so it matches the other editor cards. */
-.fabricate-manager .manager-checks-type-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-2);
-}
+/* The checks editors' choice selectors (check type, DC source, award mode, alchemy
+   check mode, modifier policy) render through the shared `RadioCardGroup` primitive
+   (issue 855), so they carry the `manager-resolution-mode-card is-config-cards`
+   contract rather than a bespoke grid of their own. */
 
 .fabricate-manager .manager-checks-dice {
   display: grid;

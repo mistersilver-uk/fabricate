@@ -4082,6 +4082,94 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // Every choice group in the Checks editors now renders through the shared
+  // RadioCardGroup primitive (issue 855), which only draws the icon tile when the
+  // option supplies an `icon`. An option list that loses its icons still renders,
+  // still emits, and still passes every behavioural test above — the card just goes
+  // blank. Walk the four remaining groups and assert the tile per option.
+  it('checks view: every check choice group renders an icon tile per option (issue 855)', () => {
+    const groups = [
+      {
+        props: { resolutionMode: 'routedByCheck', craftingCheck: routedBreakageValue },
+        attr: 'data-check-type-option',
+        values: ['relative', 'fixed'],
+      },
+      {
+        props: { resolutionMode: 'simple', craftingCheckSimple: simpleBreakageValue },
+        attr: 'data-dc-mode-option',
+        values: ['static', 'dynamic'],
+      },
+      {
+        props: {
+          resolutionMode: 'progressive',
+          craftingCheckProgressive: { rollFormula: '1d20', awardMode: 'equal' },
+        },
+        attr: 'data-award-mode-option',
+        values: ['equal', 'partial', 'exceed'],
+      },
+      {
+        props: { resolutionMode: 'alchemy', alchemyCheckMode: 'none' },
+        attr: 'data-crafting-alchemy-checkmode-option',
+        values: ['none', 'simple', 'tiered'],
+      },
+    ];
+    for (const group of groups) {
+      mountChecksView(group.props);
+      const options = [...target.querySelectorAll(`[${group.attr}]`)];
+      assert.deepEqual(
+        options.map((option) => option.getAttribute(group.attr)),
+        group.values,
+        `${group.attr} still lists its options in authoring order`
+      );
+      for (const option of options) {
+        assert.ok(
+          Boolean(option.querySelector('[data-tool-choice-icon] i')),
+          `${group.attr}="${option.getAttribute(group.attr)}" renders an icon tile`
+        );
+      }
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+  });
+
+  // The check-modifier policy group is rendered through the shared RadioCardGroup
+  // primitive (issue 855), and its two hook attributes are a hand-maintained mirror:
+  // `scripts/foundry-test-run.mjs` scrolls to `[data-crafting-modifier-policy]` for the
+  // smoke frame and `scripts/lib/viewLabCases.js` clicks
+  // `[data-crafting-modifier-policy-option="playerPicks"] input`. Neither producer runs
+  // in `npm test`, so re-plumbing the group through a different primitive could drop
+  // either attribute with no unit failure at all. Pin both here.
+  it('checks view: the modifier policy group keeps its capture-harness hooks and shows an icon per policy (issue 855)', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'highest',
+    });
+    const group = target.querySelector(
+      '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
+    );
+    assert.ok(group, 'the policy group still resolves by [data-crafting-modifier-policy]');
+    const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
+    assert.deepEqual(
+      options.map((option) => option.getAttribute('data-crafting-modifier-policy-option')),
+      ['addAll', 'highest', 'byRecipe', 'playerPicks'],
+      'all four policies still carry the per-option hook, in authoring order'
+    );
+    for (const option of options) {
+      const value = option.getAttribute('data-crafting-modifier-policy-option');
+      assert.ok(
+        Boolean(option.querySelector('[data-tool-choice-icon] i')),
+        `the ${value} card renders an icon tile`
+      );
+      assert.ok(
+        Boolean(option.querySelector('input[type="radio"]')),
+        `the ${value} card is still driven by a real radio input`
+      );
+    }
+  });
+
   it('checks view: the modifier catalogue card is hidden when the crafting check has no formula (issue 770)', () => {
     mountChecksView({ resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } });
     assert.equal(

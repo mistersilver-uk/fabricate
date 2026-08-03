@@ -16,6 +16,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
   import ToggleCard from '../ToggleCard.svelte';
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
@@ -104,10 +105,12 @@
   // simple (the pass/fail editor), or tiered (the routed outcome-tier editor).
   // Selecting a mode persists live via `onSetAlchemyCheckMode` (spread + refresh
   // in the store), swapping the editor below. Labels/copy reuse the shared
-  // SystemSettings.Alchemy.CheckMode* strings.
+  // SystemSettings.Alchemy.CheckMode* strings. The icons read as "no roll at all",
+  // "one roll" and "a staircase of outcome tiers".
   const ALCHEMY_CHECK_MODE_OPTIONS = [
     {
       value: 'none',
+      icon: 'fas fa-ban',
       labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone',
       fallback: 'No check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNoneDesc',
@@ -116,6 +119,7 @@
     },
     {
       value: 'simple',
+      icon: 'fas fa-dice-d20',
       labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple',
       fallback: 'Simple check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
@@ -124,6 +128,7 @@
     },
     {
       value: 'tiered',
+      icon: 'fas fa-stairs',
       labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered',
       fallback: 'Tiered check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTieredDesc',
@@ -315,38 +320,17 @@
                 'Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.'
               )}
             </p>
-            <div
-              class="manager-checks-type-options"
-              role="radiogroup"
-              data-crafting-alchemy-checkmode
-              aria-label={text(
-                'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading',
-                'Alchemy check'
-              )}
-            >
-              {#each ALCHEMY_CHECK_MODE_OPTIONS as option (option.value)}
-                <label
-                  class={`manager-resolution-option ${alchemyCheckMode === option.value ? 'is-active' : ''}`}
-                  data-crafting-alchemy-checkmode-option={option.value}
-                >
-                  <input
-                    type="radio"
-                    name="crafting-alchemy-checkmode"
-                    value={option.value}
-                    checked={alchemyCheckMode === option.value}
-                    onchange={() => onSetAlchemyCheckMode(option.value)}
-                  />
-                  <span class="manager-resolution-option-body">
-                    <span class="manager-resolution-option-name"
-                      >{text(option.labelKey, option.fallback)}</span
-                    >
-                    <span class="manager-resolution-option-desc"
-                      >{text(option.descKey, option.descFallback)}</span
-                    >
-                  </span>
-                </label>
-              {/each}
-            </div>
+            <RadioCardGroup
+              legendKey="FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading"
+              legend="Alchemy check"
+              options={ALCHEMY_CHECK_MODE_OPTIONS}
+              selectedValue={alchemyCheckMode}
+              groupName="crafting-alchemy-checkmode"
+              columns={2}
+              dataAttr="data-crafting-alchemy-checkmode"
+              optionDataAttr="data-crafting-alchemy-checkmode-option"
+              onChange={(mode) => onSetAlchemyCheckMode(mode)}
+            />
           </section>
 
           <section class="manager-inspector-card" data-alchemy-behaviour>

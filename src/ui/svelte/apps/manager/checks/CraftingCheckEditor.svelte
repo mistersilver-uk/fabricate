@@ -23,6 +23,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -70,9 +71,12 @@
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
+  // Icons name what a tier threshold IS in each type: an offset from the recipe DC
+  // (the table's own "DC ±" column) versus a measured segment of the value range.
   const TYPE_OPTIONS = [
     {
       value: 'relative',
+      icon: 'fas fa-plus-minus',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelative',
       fallback: 'Relative',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeRelativeDesc',
@@ -80,6 +84,7 @@
     },
     {
       value: 'fixed',
+      icon: 'fas fa-ruler-horizontal',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixed',
       fallback: 'Fixed',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.TypeFixedDesc',
@@ -163,34 +168,16 @@
     <h3 class="manager-card-title">
       {text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}
     </h3>
-    <div
-      class="manager-checks-type-options"
-      role="radiogroup"
-      aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle', 'Check type')}
-    >
-      {#each TYPE_OPTIONS as option (option.value)}
-        <label
-          class={`manager-resolution-option ${type === option.value ? 'is-active' : ''}`}
-          data-check-type-option={option.value}
-        >
-          <input
-            type="radio"
-            name="crafting-check-type"
-            value={option.value}
-            checked={type === option.value}
-            onchange={() => setType(option.value)}
-          />
-          <span class="manager-resolution-option-body">
-            <span class="manager-resolution-option-name"
-              >{text(option.labelKey, option.fallback)}</span
-            >
-            <span class="manager-resolution-option-desc"
-              >{text(option.descKey, option.descFallback)}</span
-            >
-          </span>
-        </label>
-      {/each}
-    </div>
+    <RadioCardGroup
+      legendKey="FABRICATE.Admin.Manager.Checks.Crafting.TypeTitle"
+      legend="Check type"
+      options={TYPE_OPTIONS}
+      selectedValue={type}
+      groupName="crafting-check-type"
+      columns={2}
+      optionDataAttr="data-check-type-option"
+      onChange={setType}
+    />
   </section>
 
   {#if allowNatStepping && type === 'relative'}
