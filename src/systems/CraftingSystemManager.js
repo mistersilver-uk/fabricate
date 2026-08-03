@@ -68,6 +68,15 @@ export class CraftingSystemManager {
     this.initialized = false;
     this._enrichToHtml = seams.enrichToHtml ?? ((text) => text);
     this._primeEnricherCache = seams.primeEnricherCache ?? (async () => {});
+    // Active-GM gate for the un-versioned legacy recipe-item backfill run from
+    // `initialize()`. Defaults to a globals probe so a real player client is gated
+    // without any wiring, while unit fixtures (no `game`) keep migrating: `activeGM`
+    // is undefined there, and `undefined === undefined` is true. See
+    // `_migrateLegacyRecipeItems` for why persistence — not the in-memory pass — is
+    // what must be gated.
+    this._isActiveGM =
+      seams.isActiveGM ??
+      (() => globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id);
   }
 
   async initialize() {
@@ -2134,6 +2143,17 @@ export class CraftingSystemManager {
       }
     }
 
+    // `save()` / `recipeManager.save()` write the `craftingSystems` and `recipes`
+    // WORLD settings, which Foundry lets only a GM update. This pass runs from
+    // `initialize()` — BEFORE `runStartupMaintenance`'s error isolation and before
+    // `ready` is set — so on a player client the rejection escapes `initialize()`,
+    // `this.initialized` never flips, and every facade method throws through
+    // `_requireReady()` for the rest of that session (the issue-970 failure mode).
+    // The versioned `MigrationRunner` is already active-GM gated; this un-versioned
+    // sibling was not. The in-memory pass above is deliberately left ungated so a
+    // player's loaded systems/recipes stay self-consistent for this session; the
+    // GM's write replicates the durable fix to them via the `updateSetting` bridge.
+    if (!this._isActiveGM()) return false;
     if (systemsChanged) await this.save();
     if (recipesChanged) await this.recipeManager.save();
     return systemsChanged || recipesChanged;
