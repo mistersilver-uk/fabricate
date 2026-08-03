@@ -93,6 +93,67 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  it('tints only the ACTIVE segment with its per-option variant', async () => {
+    const options = [
+      { value: 'success', variant: 'success', fallback: 'Automatic success' },
+      { value: 'none', variant: 'neutral', fallback: 'No effect' },
+      { value: 'failure', variant: 'danger', fallback: 'Automatic failure' }
+    ];
+    const root = await harness.mount({ options, value: 'failure', groupName: 'g' });
+    const seg = (value) =>
+      [...root.querySelectorAll('.manager-segment')].find(
+        (node) => node.querySelector('input').value === value
+      );
+    assert.ok(seg('failure').classList.contains('is-danger'), 'the active segment is tinted');
+    assert.equal(
+      seg('success').classList.contains('is-success'),
+      false,
+      'an INACTIVE segment carries no variant class — it stays the muted track colour'
+    );
+    assert.equal(
+      seg('none').classList.contains('is-neutral'),
+      false,
+      'and the neutral variant is likewise inactive-clean'
+    );
+  });
+
+  it('leaves a variant-free consumer’s markup unchanged', async () => {
+    // The three shipped consumers (whenSpent, learning scope, recipe step mode) set no
+    // variant, so the conversion must not add a class to their segments.
+    const root = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
+    const active = root.querySelector('.manager-segment.is-active');
+    // The scoped-style hash class is compiler output, not authored markup.
+    const authored = [...active.classList].filter((name) => !name.startsWith('svelte-')).sort();
+    assert.deepEqual(authored, ['is-active', 'manager-segment']);
+  });
+
+  it('carries `disabled` onto the RADIO, not merely onto a class', async () => {
+    const calls = [];
+    const options = [
+      { value: 'a', fallback: 'A' },
+      { value: 'b', fallback: 'B', disabled: true }
+    ];
+    const root = await harness.mount({
+      options,
+      value: 'a',
+      groupName: 'g',
+      optionDataAttr: 'data-seg',
+      onChange: (v) => calls.push(v)
+    });
+    const disabledSegment = root.querySelector('[data-seg="b"]');
+    assert.ok(disabledSegment.classList.contains('is-disabled'), 'the segment is marked disabled');
+    const radio = disabledSegment.querySelector('input[type="radio"]');
+    assert.equal(radio.disabled, true, 'the radio itself is disabled');
+    // A dimmed-but-live radio would still fire: `select()` only guards `next !== value`.
+    radio.click();
+    assert.deepEqual(calls, [], 'a disabled segment cannot change the selection');
+    assert.equal(
+      root.querySelector('[data-seg="a"] input[type="radio"]').disabled,
+      false,
+      'its sibling stays interactive'
+    );
+  });
+
   it('stamps dataAttr and optionDataAttr hooks', async () => {
     const root = await harness.mount({
       options: OPTIONS,
