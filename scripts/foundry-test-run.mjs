@@ -6162,7 +6162,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await page.locator('[data-checks-editor]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('[data-checks-tab-button="crafting"]').first().click();
   // Tier stepping is a per-trigger EFFECT (issue 975), not the check-wide
-  // `[data-check-nat-stepping]` toggle this walk used to round-trip, so exercising it
+  // natural-stepping toggle this walk used to round-trip, so exercising it
   // means AUTHORING a trigger. Add one, drive its tier-step row, then remove it: the
   // block returns to `{ triggers: [] }`, so the Checks draft is left exactly as clean as
   // the old toggle round trip left it and the next navigation raises no discard prompt.
