@@ -24,17 +24,19 @@
 /** Foundry's generic "no image" sentinel, and the last resort for a Tool image. */
 export const TOOL_IMAGE_SENTINEL = 'icons/svg/item-bag.svg';
 
+const HAMMER_IMG = 'icons/tools/smith-hammer.webp';
+const TONGS_IMG = 'icons/tools/tongs.webp';
+const RUNED_WHETSTONE_IMG = 'icons/tools/runed-whetstone.webp';
+const HAMMER_DESC = 'A well-balanced forging hammer.';
+const TONGS_DESC = 'A pair of blacksmith tongs.';
+const WHETSTONE_DESC = 'A whetstone cut with sharpening runes.';
+
 /**
  * The managed components the cases below resolve `componentId` against. Shaped like
  * `selectedSystem.managedItemOptions`.
  */
 export const TOOL_PRECEDENCE_MANAGED_ITEMS = Object.freeze([
-  Object.freeze({
-    id: 'cmp-tongs',
-    name: 'Iron Tongs',
-    img: 'icons/tools/tongs.webp',
-    description: 'A pair of blacksmith tongs.',
-  }),
+  Object.freeze({ id: 'cmp-tongs', name: 'Iron Tongs', img: TONGS_IMG, description: TONGS_DESC }),
   Object.freeze({
     id: 'cmp-whetstone',
     name: 'Plain Whetstone',
@@ -44,117 +46,113 @@ export const TOOL_PRECEDENCE_MANAGED_ITEMS = Object.freeze([
 ]);
 
 /**
+ * Build one case.
+ *
+ * Every field of `tool` that a case does not set takes the EMPTY value a real
+ * `Tool.toJSON()` emits, so each case states only what it is about. That is also why the
+ * table does not repeat a six-key literal per case: doing so tripped SonarCloud's
+ * `new_duplicated_lines_density` gate, which counts `tests/**` in full because
+ * `sonar.cpd.exclusions` is inert under Automatic Analysis.
+ *
+ * `expected` defaults to the tool's OWN snapshot, because "the tool's own identity wins"
+ * IS the rule under test. A case whose point is that something ELSE wins — the authored
+ * label, the linked component, or the fallback — states that expectation explicitly, so
+ * the interesting cases are never satisfied by the default.
+ *
+ * @param {string} id Stable case key, used in assertion messages.
+ * @param {string} summary What the case proves.
+ * @param {object} tool Partial tool; unset fields default to a real tool's empty values.
+ * @param {{name?: string|null, img?: string, description?: string}} [expected]
+ * @returns {object}
+ */
+function precedenceCase(id, summary, tool, expected = {}) {
+  const merged = {
+    label: '',
+    componentId: null,
+    name: null,
+    img: null,
+    description: '',
+    ...tool,
+  };
+  return Object.freeze({
+    id,
+    summary,
+    tool: Object.freeze(merged),
+    expectedName: 'name' in expected ? expected.name : merged.name,
+    expectedImg: 'img' in expected ? expected.img : merged.img || TOOL_IMAGE_SENTINEL,
+    expectedDescription:
+      'description' in expected ? expected.description : merged.description || '',
+  });
+}
+
+/**
  * @typedef {object} ToolDisplayPrecedenceCase
- * @property {string} id            stable case key, used in assertion messages
- * @property {string} summary       what the case proves
- * @property {object} tool          the library tool, in its persisted `Tool.toJSON()` shape
- * @property {string|null} expectedName        expected display name, or null when the
- *                                             surface's own localized fallback is expected
- * @property {string} expectedImg              expected image path
- * @property {string} expectedDescription      expected description ('' when none resolves)
+ * @property {string} id
+ * @property {string} summary
+ * @property {object} tool                 the library tool, in persisted `Tool.toJSON()` shape
+ * @property {string|null} expectedName    expected display name, or null when the surface's
+ *                                         own localized fallback is expected
+ * @property {string} expectedImg
+ * @property {string} expectedDescription  '' when none resolves
  */
 
 /** @type {ReadonlyArray<ToolDisplayPrecedenceCase>} */
 export const TOOL_DISPLAY_PRECEDENCE_CASES = Object.freeze([
-  Object.freeze({
-    id: 'item-sourced-unlabelled',
-    summary:
-      'the issue-976 defect: a first-class item-sourced tool carries componentId null, so a ' +
+  precedenceCase(
+    'item-sourced-unlabelled',
+    'the issue-976 defect: a first-class item-sourced tool carries componentId null, so a ' +
       'component-only resolver renders the fallback name and the item-bag sentinel',
-    tool: Object.freeze({
-      id: 'tool-smith-hammer',
-      label: '',
-      componentId: null,
-      name: "Smith's Hammer",
-      img: 'icons/tools/smith-hammer.webp',
-      description: 'A well-balanced forging hammer.',
-    }),
-    expectedName: "Smith's Hammer",
-    expectedImg: 'icons/tools/smith-hammer.webp',
-    expectedDescription: 'A well-balanced forging hammer.',
-  }),
-  Object.freeze({
-    id: 'authored-label-wins',
-    summary: 'an authored label outranks the snapshot it was authored alongside',
-    tool: Object.freeze({
+    { id: 'tool-smith-hammer', name: "Smith's Hammer", img: HAMMER_IMG, description: HAMMER_DESC }
+  ),
+
+  precedenceCase(
+    'authored-label-wins',
+    'an authored label outranks the snapshot NAME it was authored alongside, and nothing else — ' +
+      'the image still comes from the snapshot',
+    {
       id: 'tool-masterwork',
       label: 'Masterwork Hammer',
-      componentId: null,
       name: "Smith's Hammer",
-      img: 'icons/tools/smith-hammer.webp',
-      description: 'A well-balanced forging hammer.',
-    }),
-    expectedName: 'Masterwork Hammer',
-    // The label overrides the NAME only; the image still comes from the snapshot.
-    expectedImg: 'icons/tools/smith-hammer.webp',
-    expectedDescription: 'A well-balanced forging hammer.',
-  }),
-  Object.freeze({
-    id: 'whitespace-label-falls-through',
-    summary: 'a whitespace-only label is not a label, so the snapshot still wins',
-    tool: Object.freeze({
-      id: 'tool-whitespace',
-      label: '   ',
-      componentId: null,
-      name: "Smith's Hammer",
-      img: 'icons/tools/smith-hammer.webp',
-      description: '',
-    }),
-    expectedName: "Smith's Hammer",
-    expectedImg: 'icons/tools/smith-hammer.webp',
-    expectedDescription: '',
-  }),
-  Object.freeze({
-    id: 'component-linked-unlabelled',
-    summary:
-      'a component-linked tool with no snapshot still resolves through its component — this ' +
-      'case fails if the component rung is dropped while adding the snapshot rung',
-    tool: Object.freeze({
-      id: 'tool-tongs',
-      label: '',
-      componentId: 'cmp-tongs',
-      name: null,
-      img: null,
-      description: '',
-    }),
-    expectedName: 'Iron Tongs',
-    expectedImg: 'icons/tools/tongs.webp',
-    expectedDescription: 'A pair of blacksmith tongs.',
-  }),
-  Object.freeze({
-    id: 'snapshot-outranks-component',
-    summary:
-      'a whetstone that is ALSO a managed component keeps componentId populated, and its own ' +
+      img: HAMMER_IMG,
+      description: HAMMER_DESC,
+    },
+    { name: 'Masterwork Hammer' }
+  ),
+
+  precedenceCase(
+    'whitespace-label-falls-through',
+    'a whitespace-only label is not a label, so the snapshot still wins',
+    { id: 'tool-whitespace', label: '   ', name: "Smith's Hammer", img: HAMMER_IMG }
+  ),
+
+  precedenceCase(
+    'component-linked-unlabelled',
+    'a component-linked tool with no snapshot resolves through its component — this case ' +
+      'fails if the component rung is dropped while adding the snapshot rung',
+    { id: 'tool-tongs', componentId: 'cmp-tongs' },
+    { name: 'Iron Tongs', img: TONGS_IMG, description: TONGS_DESC }
+  ),
+
+  precedenceCase(
+    'snapshot-outranks-component',
+    'a whetstone that is ALSO a managed component keeps componentId populated, and its own ' +
       'snapshot is the more specific identity — this case fails if the two rungs are swapped',
-    tool: Object.freeze({
+    {
       id: 'tool-whetstone',
-      label: '',
       componentId: 'cmp-whetstone',
       name: 'Runed Whetstone',
-      img: 'icons/tools/runed-whetstone.webp',
-      description: 'A whetstone cut with sharpening runes.',
-    }),
-    expectedName: 'Runed Whetstone',
-    expectedImg: 'icons/tools/runed-whetstone.webp',
-    expectedDescription: 'A whetstone cut with sharpening runes.',
-  }),
-  Object.freeze({
-    id: 'orphan-falls-back',
-    summary:
-      'no label, no snapshot and an unresolvable componentId is the ONLY case that reaches the ' +
+      img: RUNED_WHETSTONE_IMG,
+      description: WHETSTONE_DESC,
+    }
+  ),
+
+  precedenceCase(
+    'orphan-falls-back',
+    'no label, no snapshot and an unresolvable componentId is the ONLY case that reaches the ' +
       'localized fallback and the item-bag sentinel',
-    tool: Object.freeze({
-      id: 'tool-orphan',
-      label: '',
-      componentId: 'cmp-missing',
-      name: null,
-      img: null,
-      description: '',
-    }),
-    expectedName: null,
-    expectedImg: TOOL_IMAGE_SENTINEL,
-    expectedDescription: '',
-  }),
+    { id: 'tool-orphan', componentId: 'cmp-missing' },
+    { name: null, img: TOOL_IMAGE_SENTINEL, description: '' }
+  ),
 ]);
 
 /**
