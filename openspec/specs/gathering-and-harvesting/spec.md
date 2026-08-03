@@ -887,6 +887,8 @@ GatheringNodeConfig = {
 5. Node availability is evaluated after environment/task visibility and before terminal resolution.
 6. Node depletion occurs only after an attempt is accepted according to the configured depletion timing.
 7. Supported depletion timing includes at least `onStart` and `onSuccess`.
+Depletion timing selects WHEN in a run the single unit is consumed, not how many are consumed: a run consumes at most one unit regardless of how many times its outcome is committed.
+A timed run commits twice — once when the wait starts and once when it matures — so `onStart` consumes at the start commit and `onSuccess` at the maturity commit; an immediate attempt has one commit and consumes there.
 8. If a task is blind, node count display to non-GM users uses generic availability copy unless revealing the count is explicitly safe for that environment.
 9. GM users can inspect and manually adjust node availability.
 10. A respawn policy may be `manual`, `overTime`, or `nonRegenerating`. `manual` means only a GM restock action changes available node count; `overTime` restores nodes once per elapsed world-time interval; `nonRegenerating` is a permanently depletable pool that never regrows over world time AND cannot be restocked, so once its `current` reaches 0 it is permanently exhausted (model a larger starting reserve with a bigger authored `max`, since `current` seeds to `max`).
@@ -914,6 +916,10 @@ The per-task node mechanics above are otherwise unchanged.
 A `nonRegenerating` node config normalizes to a bare `{ policy: "nonRegenerating" }`: the respawn-timing/gain fields (`gainMode`, `intervalUnit`/`intervalAmount`/`intervalSeconds`, `chance`, `amountExpression`, and the `lastEvaluatedWorldTime`/`nextEvaluationWorldTime`/`lastRoll` timing fields) are never persisted for it, since a pool that never regrows needs none of them.
 22. A permanently-exhausted `nonRegenerating` pool (`current <= 0`) blocks non-GM start attempts like any depleted pool, but surfaces a distinct *exhausted* state (a derived player-safe flag and a dedicated blocked reason/copy) rather than the "depleted — replenishes over time" copy, since it will never come back.
 23. Because a `nonRegenerating` pool can never be restocked, the GM admin UI REMOVES (does not merely disable) the restock/step controls for it and shows a read-only `current / max` count with a permanence hint; the regenerating policies keep the step controls.
+24. Environment node runtime state is world-scoped shared state that a non-GM client cannot write, so an accepted depletion from a player is applied by the active GM rather than by the acting client.
+The applier recomputes the single unit from its own stored state instead of accepting a node count from the requesting client, so concurrent gatherers are additive rather than last-write-wins, and a forged request can consume at most one unit of the pool it names.
+A client that did not apply the write must not report the resulting count as authoritative, since its own view can be stale.
+Where no GM is connected to apply it, the depletion is reported as unapplied rather than silently dropped.
 The player-facing detail UI surfaces a permanence line ("This resource will not replenish.") for a `nonRegenerating` pool BEFORE exhaustion (scarcity messaging while `current > 0`), and the exhausted permanence copy ("Exhausted — this resource will not replenish.") at `current <= 0`, kept visually distinct from the regenerating "depleted — replenishes over time" treatment and carrying no respawn ETA.
 Neither line repeats the node count, which is already shown on the available-nodes line.
 The rich-state listing payload exposes a player-safe `nonRegenerating` policy flag (no extra counts beyond the existing current/max) to drive this copy.
@@ -1624,7 +1630,7 @@ There is no multi-step gathering state in this phase.
 - do not create gathered result items when the outcome is `failed`,
 - apply tool usage/breakage for the terminal attempt after the outcome is known, terminal history persists, and only against the selected actor,
 - apply configured or default failure feedback on failed outcomes after terminal history persists,
-- apply accepted node depletion and encounter reporting only after the relevant state transition is persisted enough to avoid duplicate or uncommitted output,
+- apply accepted node depletion and encounter reporting only after the relevant state transition is persisted enough to avoid duplicate or uncommitted output; where the depletion is applied by the active GM on the acting client's behalf, "persisted enough" is satisfied by the terminal history write, and the relayed depletion is not awaited for the attempt to complete,
 - for non-GM blind attempts, redact task identity, result details, tool details, provider diagnostics, check internals, and sensitive encounter details from player-facing responses and persisted terminal history.
 
 1. If `task.timeRequirement` is present after all start guards and task validation pass:
@@ -1663,6 +1669,11 @@ Live Foundry validation remains conditional for future runtime-specific or scree
 ### Completion Flow
 
 When world time advances to or past a run's `timeGate.availableAt`, the backend gathering runtime resumes matured `waitingTime` runs through `GatheringEngine.processWorldTime(worldTime)`:
+
+0. Resume matured runs on exactly one client.
+`updateWorldTime` is a synced hook that fires everywhere and the matured-run scan is not restricted to the acting client's own actors, so resumption is gated to the primary GM.
+Resumption is not a read: it writes run flags, creates gathered result items, applies tool usage, posts chat, and depletes nodes, and a terminal-history write returning "already completed" is a race against a server round-trip rather than a lock, so an ungated scan double-applies every one of those effects.
+Where no GM is connected, matured runs stay waiting and resolve when one joins and world time next advances.
 
 1. Re-resolve the environment, task, crafting system, and actor.
 2. If required references are missing, cancel the run and move it to history with a terminal status, with blind redaction where an opaque blind environment can still be resolved.
@@ -1748,7 +1759,8 @@ It complements `Integrations` (`openspec/specs/integrations/spec.md`), which gov
 8. The published hook names and payload shape are a public, backwards-compatible contract within a major version; the payload carries `schemaVersion` to signal future evolution.
 The payload exposes a public projection of gathered items and used tools and does not leak internal breakage diagnostics (`evidence`, `mode`).
 Under `checkDriven` authority a tool-breakage entry may carry a human-readable `reason` (e.g. "1d20 group rolled 1"); the `reason` is public-safe and may surface in run/chat output, but `evidence` and `mode` stay stripped from the public projection.
-9. Publication occurs on the client that resolved the attempt: immediate attempts publish on the acting client, while matured timed runs — processed on every client via the synced `updateWorldTime` hook — publish exactly once, on the primary GM client, to avoid multi-client duplication.
+9. Publication occurs on the client that resolved the attempt: immediate attempts publish on the acting client, while matured timed runs publish exactly once, on the primary GM client, to avoid multi-client duplication.
+Matured runs are themselves resolved only on the primary GM (see "Completion Flow"), so this is defence in depth rather than the sole guard.
 
 ## Gathering Chat Messages
 
