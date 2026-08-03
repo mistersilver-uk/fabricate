@@ -90,7 +90,6 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   const result = mgr._normalizeCraftingCheck({});
   assert.deepEqual(result.routed, {
     type: 'relative',
-    natStepping: false,
     rollFormula: '',
     dc: 15,
     thresholdMode: 'meet',
@@ -101,34 +100,207 @@ test('_normalizeCraftingCheck defaults the routed config when absent', () => {
   });
 });
 
-test('_normalizeCraftingCheck and salvage default routed natural stepping off', () => {
-  const mgr = makeManager();
+// ───────────────────────────────────────────────────────────
+// Issue 975 — the legacy routed `natStepping` boolean converts on READ into the
+// pair of tier-stepping triggers that reproduce it. No versioned migration, and
+// the boolean itself is dropped from the normalized output.
+// ───────────────────────────────────────────────────────────
 
-  assert.equal(mgr._normalizeCraftingCheck({}).routed.natStepping, false);
-  assert.equal(mgr._normalizeSalvageCraftingCheck({}).routed.natStepping, false);
-  assert.equal(
-    mgr._normalizeCraftingCheck({ routed: { natStepping: true } }).routed.natStepping,
-    true
+/**
+ * The exact trigger pair `_convertNatSteppingToTriggers` synthesises for a
+ * `natStepping: true` routed check whose d20 group sits at `groupId`.
+ */
+function natStepPair(groupId = 0) {
+  const condition = (value) => ({
+    type: 'diceGroup',
+    groupId,
+    aggregate: 'allDice',
+    operator: '==',
+    value,
+  });
+  return [
+    {
+      id: 'natstep-up',
+      condition: condition(20),
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode: 'up', steps: 1, tierId: null },
+    },
+    {
+      id: 'natstep-down',
+      condition: condition(1),
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode: 'down', steps: 1, tierId: null },
+    },
+  ];
+}
+
+test('_normalizeCraftingCheck converts a routed natStepping boolean into a trigger pair', () => {
+  const mgr = makeManager();
+  const routed = mgr._normalizeCraftingCheck({
+    routed: { rollFormula: '1d20+@abilities.int.mod', natStepping: true },
+  }).routed;
+
+  assert.equal(routed.natStepping, undefined, 'the legacy boolean is dropped from the output');
+  assert.deepEqual(routed.checkBreakage.triggers, natStepPair(0));
+});
+
+test('_normalizeSalvageCraftingCheck migrates routed natStepping identically', () => {
+  const mgr = makeManager();
+  const routed = mgr._normalizeSalvageCraftingCheck({
+    routed: { rollFormula: '1d20', natStepping: true },
+  }).routed;
+
+  assert.equal(routed.natStepping, undefined);
+  assert.deepEqual(routed.checkBreakage.triggers, natStepPair(0));
+});
+
+test('_normalizeGatheringCraftingCheck converts a stray routed natStepping identically', () => {
+  const mgr = makeManager();
+  // No gathering check has ever persisted `natStepping` — the old `allowNatStepping`
+  // spread never re-emitted it here — so nothing converts in practice. But a
+  // hand-edited world or an import payload carrying the stray key converts the same
+  // way any other routed check does: stepping is no longer activity-scoped.
+  const routed = mgr._normalizeGatheringCraftingCheck({
+    routed: { rollFormula: '1d20', natStepping: true },
+  }).routed;
+
+  assert.equal(routed.natStepping, undefined);
+  assert.deepEqual(routed.checkBreakage.triggers, natStepPair(0));
+});
+
+test('routed natStepping conversion targets the first d20 group in the formula', () => {
+  const mgr = makeManager();
+  const routed = mgr._normalizeCraftingCheck({
+    routed: { rollFormula: '2d6+1d20+1d20', natStepping: true },
+  }).routed;
+
+  // Group 0 is the 2d6; the first d20 is group 1. A duplicate-d20 formula targets
+  // that first group only — the accepted caveat the crit conversion already carries.
+  assert.deepEqual(routed.checkBreakage.triggers, natStepPair(1));
+});
+
+test('routed natStepping conversion survives a modified d20 pool', () => {
+  const mgr = makeManager();
+  // `2d20kh1` is crit-INELIGIBLE, so the crit conversion's plain-dice filter would
+  // drop it. It is deliberately not applied here: the modified pool was explicitly
+  // the design target of the old kept-face stepping rule.
+  const routed = mgr._normalizeCraftingCheck({
+    routed: { rollFormula: '2d20kh1+5', natStepping: true },
+  }).routed;
+
+  assert.deepEqual(routed.checkBreakage.triggers, natStepPair(0));
+});
+
+test('routed natStepping synthesises nothing when it was already inert', () => {
+  const mgr = makeManager();
+  const triggersFor = (routed) =>
+    mgr._normalizeCraftingCheck({ routed }).routed.checkBreakage.triggers;
+
+  assert.deepEqual(
+    triggersFor({ rollFormula: '1d20', type: 'fixed', natStepping: true }),
+    [],
+    'a fixed check never stepped, so its flag was already inert'
   );
-  assert.equal(
-    mgr._normalizeSalvageCraftingCheck({ routed: { natStepping: true } }).routed.natStepping,
-    true
+  assert.deepEqual(
+    triggersFor({ rollFormula: '1d20', natStepping: false }),
+    [],
+    'an explicit false converts nothing'
+  );
+  assert.deepEqual(
+    triggersFor({ rollFormula: '1d20' }),
+    [],
+    'an absent natStepping converts nothing'
+  );
+  assert.deepEqual(
+    triggersFor({ rollFormula: '', natStepping: true }),
+    [],
+    'an empty formula has no d20 group'
+  );
+  assert.deepEqual(
+    triggersFor({ rollFormula: '2d6+3', natStepping: true }),
+    [],
+    'a formula with no d20 group has nothing to step on'
+  );
+  assert.deepEqual(
+    triggersFor({ rollFormula: '1d20', natStepping: 'true' }),
+    [],
+    'only a literal boolean true converts'
   );
 });
 
-test('natural stepping is ignored by non-routed and gathering check shapes', () => {
+test('routed natStepping conversion is idempotent across a second normalize pass', () => {
   const mgr = makeManager();
-  const crafting = mgr._normalizeCraftingCheck({
-    simple: { natStepping: true },
-    progressive: { natStepping: true },
+  const once = mgr._normalizeCraftingCheck({
+    routed: { rollFormula: '1d20', natStepping: true },
   });
-  const gathering = mgr._normalizeGatheringCraftingCheck({
-    routed: { natStepping: true },
+  const twice = mgr._normalizeCraftingCheck(once);
+
+  assert.deepEqual(
+    twice.routed.checkBreakage.triggers,
+    once.routed.checkBreakage.triggers,
+    'a second pass converts nothing and duplicates nothing'
+  );
+  assert.deepEqual(twice.routed, once.routed, 'the whole routed block is a fixpoint');
+});
+
+test('a converted nat-step trigger re-normalized still carries breakTools false', () => {
+  const mgr = makeManager();
+  // The `isLegacyBreakOnly` trap: that test keys on `outcome === undefined &&
+  // breakTools === undefined`, so a synthesised trigger MUST write both explicitly.
+  // Its failure mode is every migrated system breaking tools on a natural 20.
+  const once = mgr._normalizeCraftingCheck({
+    routed: { rollFormula: '1d20', natStepping: true },
+  });
+  const twice = mgr._normalizeCraftingCheck(once);
+
+  for (const trigger of twice.routed.checkBreakage.triggers) {
+    assert.equal(trigger.breakTools, false, `${trigger.id} must not break tools`);
+    assert.equal(trigger.outcome, 'none', `${trigger.id} must not force an outcome`);
+  }
+});
+
+test('converted crits, converted nat-stepping and authored triggers keep that order', () => {
+  const mgr = makeManager();
+  const triggers = mgr._normalizeCraftingCheck({
+    routed: {
+      rollFormula: '1d20',
+      natStepping: true,
+      diceCrits: [{ id: 'crit', die: '1d20', raw: 20, success: true }],
+      checkBreakage: {
+        triggers: [
+          {
+            id: 'authored',
+            outcome: 'none',
+            breakTools: false,
+            condition: { type: 'rollTotal', operator: '>=', value: 18 },
+          },
+        ],
+      },
+    },
+  }).routed.checkBreakage.triggers;
+
+  assert.deepEqual(
+    triggers.map((trigger) => trigger.id),
+    ['crit', 'natstep-up', 'natstep-down', 'authored']
+  );
+});
+
+test('natStepping on non-routed check shapes converts nothing', () => {
+  const mgr = makeManager();
+  // Only the routed normalizer forwards the legacy field; the simple and progressive
+  // call sites pass no legacy-routed argument at all, so the key is simply unknown
+  // to them and is stripped by the allowlist.
+  const crafting = mgr._normalizeCraftingCheck({
+    simple: { rollFormula: '1d20', natStepping: true },
+    progressive: { rollFormula: '1d20', natStepping: true },
   });
 
   assert.equal(crafting.simple.natStepping, undefined);
   assert.equal(crafting.progressive.natStepping, undefined);
-  assert.equal(gathering.routed.natStepping, undefined);
+  assert.deepEqual(crafting.simple.checkBreakage.triggers, []);
+  assert.deepEqual(crafting.progressive.checkBreakage.triggers, []);
 });
 
 test('_normalizeCraftingCheck routed migrates legacy crits into unified triggers', () => {
