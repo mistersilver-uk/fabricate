@@ -9,6 +9,7 @@
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
+  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
@@ -148,13 +149,13 @@
   let biomeCustomColorInput = $state('');
   let openBiomeColorPickerId = $state('');
   let biomeColorTriggerButton = $state(null);
-  // Unfinished dismissal wiring, not a dead ref. The sibling ManagerColorPicker feeds its
-  // equivalent node to dismissOnOutsideClick via `additionalNodes`; this one is registered
-  // (see registerBiomeColorPopoverNode and the registerPopoverNode attribute on the biome
-  // ManagerColorPopover) and then never read, so the biome popover cannot be toggled shut
-  // from its own trigger. Keep BOTH this state and the registerPopoverNode attribute: that
-  // attribute is the seam the fix in issue 921 will use.
-  // eslint-disable-next-line no-unused-vars
+  // The portaled popover root, registered via registerBiomeColorPopoverNode. It is fed as
+  // an `additionalNodes` entry to the dismissOnOutsideClick wrapping the trigger below, the
+  // same pattern ManagerColorPicker uses for its own portaled popover. ManagerColorPopover's
+  // own internal dismissal is disabled here (`manageDismiss={false}`) so this is the single
+  // outside-click authority; without it, a mousedown on the trigger itself would count as
+  // "outside" (the trigger is not inside the portaled popover), dismiss on mousedown, then
+  // the trigger's own contextmenu handler would reopen it in the same gesture.
   let biomeColorPopoverRoot = $state(null);
   let biomeColorPopoverStyle = $state('');
 
@@ -1518,7 +1519,14 @@
                 data-gathering-vocabulary-value={valueId}
               >
                 {#if vocabulary.kind === 'biomes'}
-                  <span class="manager-biome-combined-picker">
+                  <span
+                    class="manager-biome-combined-picker"
+                    use:dismissOnOutsideClick={{
+                      enabled: openBiomeColorPickerId === valueId,
+                      onDismiss: closeBiomeColorPicker,
+                      additionalNodes: () => [biomeColorPopoverRoot],
+                    }}
+                  >
                     <IconPicker
                       value={biomeIcon(option)}
                       iconOnly={true}
@@ -1561,6 +1569,7 @@
                         popoverStyle={biomeColorPopoverStyle}
                         portalTarget={() => getBiomeColorPopoverHost()}
                         registerPopoverNode={registerBiomeColorPopoverNode}
+                        manageDismiss={false}
                       />
                     {/if}
                   </span>
