@@ -512,9 +512,13 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.deepEqual(rowByComponent(listing, 'c1').usedBy, []);
   });
 
-  it('resolves the used-by recipe image from the linked recipe item (GM parity), not the raw recipe.img', () => {
-    // A recipe whose icon lives on its linked recipe item: the raw recipe.img is a
-    // generic bag, but the GM/crafting UI shows the linked item's image.
+  it('resolves the used-by recipe image to the recipe own image, never the linked recipe item', () => {
+    // Inverted with issue 887. This asserted the borrow: a bag-valued recipe rendered its
+    // linked recipe item's artwork. A recipe's icon is its OWN image
+    // (`data-models/spec.md` `## Recipe` requirement 16), and the bag is the "no image"
+    // sentinel, so this resolves to the blueprint. The definition still returns DISTINCT
+    // artwork below, so re-adding the borrow fails here rather than passing vacuously.
+    // This index now shares the class's ONE resolver, `_resolveRecipeImg`.
     const linkedRecipe = {
       id: 'r2',
       name: 'Smelt Iron Ingot',
@@ -546,7 +550,7 @@ describe('InventoryListingBuilder — used-by index', () => {
     });
     assert.equal(
       rowByComponent(listing, 'c1').usedBy[0].recipeImg,
-      'icons/commodities/metal/ingot-iron.webp'
+      'icons/sundries/documents/blueprint-recipe-alchemical.webp'
     );
   });
 

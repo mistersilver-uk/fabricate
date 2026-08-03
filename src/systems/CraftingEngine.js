@@ -1,6 +1,5 @@
 import { getFabricateFlag, setFabricateFlag, stampItemDataRoleIdentity } from '../config/flags.js';
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
-import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
 import {
   applyToolUsageAndBreakage,
@@ -8,6 +7,7 @@ import {
   evaluateCheckBreakage,
 } from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
@@ -3972,24 +3972,22 @@ export class CraftingEngine {
   }
 
   /**
-   * Resolve the recipe icon for the interactive roll prompt with the SAME
-   * precedence the GM editor and player listings use — the recipe-item
-   * definition's image wins over the recipe's own `img` (which is itself
-   * model-defaulted to `DEFAULT_RECIPE_IMAGE`, so it already supplies the trailing
-   * default). Raw `recipe.img` alone shows the generic blueprint for a
-   * recipe-item-backed recipe; mirror `CraftingListingBuilder`'s precedence here.
+   * Resolve the recipe icon for the interactive roll prompt: the recipe's OWN `img`,
+   * per `data-models/spec.md` `## Recipe` requirement 16.
+   *
+   * This previously preferred the linked recipe-item definition's image, keyed on the
+   * legacy `recipe.recipeItemId` scalar. Book membership is many-to-many, so "the
+   * containing book" tracked definition order rather than anything the GM authored, and
+   * the borrow outranked an authored `recipe.img` (issue 887).
+   *
+   * `resolveRecipeImage` treats Foundry's generic item-bag as "no image", so the prompt
+   * icon still never falls back to the bag — the explicit product requirement recorded
+   * in the header of `tests/recipe-prompt-img.test.js`.
+   *
    * @private
    */
   _resolveRecipePromptImg(recipe) {
-    const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
-    const recipeItemImg = recipe?.recipeItemId
-      ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)
-          ?.img || ''
-      : '';
-    // The final fallback is ALWAYS the recipe default (blueprint), matching the GM
-    // editor — never a generic item bag. `recipe.img` is itself model-defaulted to
-    // DEFAULT_RECIPE_IMAGE, so this is belt-and-braces for a plain-object recipe.
-    return recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
+    return resolveRecipeImage(recipe);
   }
 
   /**

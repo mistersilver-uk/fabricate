@@ -25,6 +25,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/utils/recipeCategories.js',
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
+    // knowledgeStudio resolves a learned recipe's image through the shared chokepoint
+    // (issue 887). It is an import-free leaf, so this one entry suffices — but omitting
+    // it HANGS this suite (`# cancelled`) rather than failing it.
+    'src/ui/svelte/util/craftingImageDefaults.js',
   ],
   // `Medallion.svelte` is NOT in the shared CRAFTING_APP_COMPILED_MODULES list, and
   // a `.svelte` the tree renders but the allowlist omits HANGS this file (reported

@@ -13,6 +13,11 @@
  * Type pill and the Knowledge Type column cannot drift apart.
  */
 
+// The shared recipe-image chokepoint (`data-models` `## Recipe` requirement 16). An
+// import-free leaf, so it keeps this module pure and adds no mounted-harness edge
+// beyond the one raw-module entry each Knowledge suite lists.
+import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
+
 /** The two inner tabs of the Knowledge surface. */
 export const KNOWLEDGE_TAB_RECIPE_ITEMS = 'recipeItems';
 export const KNOWLEDGE_TAB_LEARNED_RECIPES = 'learnedRecipes';
@@ -277,7 +282,11 @@ export function projectLearnedRecipeRow(raw = {}) {
   return {
     recipeId: String(raw.recipeId || ''),
     name: String(raw.recipeName || '') || String(raw.recipeId || ''),
-    img: String(raw.recipeImg || '') || DEFAULT_RECIPE_ITEM_IMAGE,
+    // A learned RECIPE, not a recipe item: it resolves through the shared chokepoint, so
+    // an image-less recipe renders the blueprint rather than the generic item bag
+    // (`data-models/spec.md` `## Recipe` requirement 16). The bag default above is
+    // correct for an owned recipe-ITEM copy, which really is an Item (issue 887).
+    img: resolveRecipeImage({ img: raw.recipeImg }),
     category: String(raw.recipeCategory || ''),
     craftingSystemId: String(raw.craftingSystemId || ''),
     learnedAt: Number(raw.learnedAt) || 0,
