@@ -601,6 +601,60 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipe-edit-crafting-modifier-inherit',
+    label: 'Manager — Recipe edit crafting modifier inherit',
+    smokeLabels: ['manager-recipe-edit-normal'],
+    // The per-recipe check-modifier override AT REST. `RecipeOverviewTab` gates the whole control
+    // on `craftingModifierOptions.length > 0`, so it exists on exactly one lab system — herbalism,
+    // the only one carrying a catalogue — and every other recipe-editor frame in this registry runs
+    // on smithing or jewelry. The one herbalism recipe-editor case that did exist opens the Books &
+    // Scrolls tab, so before this entry NO frame showed the Overview modifier row at all.
+    //
+    // `hb-r-kiln` authors no `craftingModifier`, so the select sits on its blank option and reads
+    // "Inherit system default (Pick highest)" — the label composed from the SYSTEM policy, which is
+    // the half of the control a per-recipe frame cannot otherwise show, and the half that would
+    // have silently read "(Add all)" had the label map not gained a `playerPicks` entry.
+    reaches: 'exact',
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-kiln"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-crafting-modifier]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-crafting-modifier-player-picks',
+    label: 'Manager — Recipe edit crafting modifier Player picks',
+    // BEYOND the smoke: its one overriding recipe authors `byRecipe`, so no smoke frame shows the
+    // Phase-2 policy chosen per recipe.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `hb-r-stillroom` authors `{ policy: 'playerPicks', modifierIds: [...three] }`, which is what
+    // makes `hasModifierOverride` true — so this frame carries BOTH halves of the control at once:
+    // the select on its new fourth option, and the eligible-modifier pill row that only an
+    // overriding recipe draws.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-stillroom"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
     id: 'manager-recipe-edit-books-scrolls',
     label: 'Manager — Recipe edit books scrolls',
     smokeLabels: ['manager-recipe-edit-books-scrolls'],
@@ -1131,6 +1185,34 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The card is taller than the window, so `scrollIntoViewIfNeeded` on the card itself lands
       // the frame above the default-modifier pill select. Anchoring on the LAST thing the card
       // draws is what puts the whole policy block — radios and pills — inside the frame.
+      { selector: '[data-crafting-modifier-defaults]', scroll: true },
+    ],
+    expectView: 'checks',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-modifiers-player-picks',
+    label: 'Manager — Checks crafting modifiers, Player picks selected',
+    // BEYOND the smoke. Its catalogue is authored `highest` and its walk never presses a policy
+    // radio, so there is no counterpart frame of a SELECTED fourth option to fall short of — only
+    // of the card at rest, which the sibling case above already pairs with.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The selection is made by CLICKING, not by authoring. `selectPolicy` emits
+    // `{ defaultModifierPolicy }` through `onChange` -> `adminStore` -> `game.settings.set`, and the
+    // lab's settings Map persists it for the life of the page, so the card re-renders with
+    // `is-active` on the new option — which is the state this frame is named for. Authoring it into
+    // the fixture instead would have rewritten the at-rest frame that is the other half of the
+    // evidence, leaving two names for one picture.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
       { selector: '[data-crafting-modifier-defaults]', scroll: true },
     ],
     expectView: 'checks',
@@ -2402,6 +2484,51 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE, /^src\/ui\/svelte\/stores\/craftingStore/],
+  }),
+  playerCase({
+    id: 'player-crafting-roll-prompt',
+    label: 'Player app — Crafting roll prompt with modifier choice',
+    smokeLabels: ['player-crafting-roll-prompt'],
+    // The interactive check roll prompt, standing and unanswered, with the `playerPicks` modifier
+    // fieldset issue 855 adds.
+    //
+    // Unreachable until the shim grew a real `Roll` CLASS: `evaluateCheckRoll` returns
+    // `engine: false` on `typeof globalThis.Roll !== 'function'` BEFORE it calls `options.prompt`,
+    // so with the old two-static object installed no crafting, salvage or alchemy prompt could open
+    // in this harness at all. See `tests/view-lab/foundry/labRoll.js`.
+    //
+    // `dialog: 'open'` leaves it unanswered, which is the only way to photograph one — the lab's
+    // default `enter` presses the footer's default button and the dialog closes long before the
+    // capture. The craft's promise therefore never settles, and the frame is the prompt over a
+    // mid-craft crafting tab, which is the honest picture of this state rather than a contrivance.
+    //
+    // `hb-r-stillroom` is the world's only recipe whose EFFECTIVE policy is `playerPicks` (a
+    // per-recipe override over herbalism's `highest` default) on a formula that actually spends
+    // `@craftingmod` — `CraftingEngine._buildInteractiveModifierChoice` requires all of interactive,
+    // token-present, playerPicks and a two-or-more eligible set, so no other fixture reaches the
+    // fieldset. The formula line reads `1d20 + 3 + (modifier)`: the deferred branch substitutes a
+    // neutral placeholder rather than a number, because the value is the radio nobody has pressed.
+    reaches: 'exact',
+    query: { tab: 'crafting', dialog: 'open' },
+    steps: [
+      { selector: '.crafting-browser-search input', fill: 'Stillroom' },
+      { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
+      { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
+    ],
+    // The dialog is a SIBLING of the application window, so the app's own route is satisfied by the
+    // crafting tab with nothing over it — precisely the screen a prompt that never opened would
+    // publish. The FIELDSET is what this case is named for, so that is what it is held to, not
+    // merely `.application.dialog`.
+    expectSelector: '.application.dialog .fabricate-roll-prompt__modifiers',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      // Narrow rather than `CRAFTING_SHARED`: `rollPrompt.js` builds this dialog end to end and
+      // nothing else under that folder contributes a pixel of it, so a change elsewhere in
+      // `crafting/` should not conscript a frame of a modal that would not show it.
+      /^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/,
+      CRAFTING_PROGRESSIVE,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+    ],
   }),
   playerCase({
     id: 'player-crafting-essence-alternative',

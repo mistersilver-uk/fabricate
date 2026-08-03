@@ -17,6 +17,7 @@
  *   enough, and using the real seam builder is what removes any chance of the lab's service bag
  *   drifting from production's.
  */
+import { createLabRoll } from './labRoll.js';
 import { installLabRandom } from './labRandom.js';
 import { createLabDialogV2 } from '../foundryDialog.js';
 import { installUpdateSemantics, makeGetFlag, makeSetFlag } from '../world/labFlags.js';
@@ -320,11 +321,12 @@ const LAB_CALENDAR = Object.freeze({
  * `1d20 + 3`. That is an under-show rather than a lie, but it is a visible content difference across
  * roughly fifteen recipes, and the fidelity register never disclosed it.
  *
- * Both methods are pure string work — no dice engine is involved in resolving a formula for DISPLAY,
- * which is all the lab ever needs. Rolling is not implemented and must not be: a lab that could roll
- * would invite fixtures whose frames depend on an outcome this harness does not actually compute.
+ * Both methods are pure string work — no dice engine is involved in resolving a formula for DISPLAY.
+ * They are kept here, byte-identical, and handed to `createLabRoll` as the statics of the real `Roll`
+ * class installed below; `labRoll.js` explains why rolling — once refused on this very spot — is now
+ * computed from the seeded stream instead.
  */
-const LAB_ROLL = {
+const LAB_ROLL_STATICS = {
   replaceFormulaData(formula, data = {}, { missing = 'NaN' } = {}) {
     return String(formula).replaceAll(/@([\w.]+)/g, (_match, path) => {
       const value = String(path)
@@ -522,6 +524,17 @@ export function installFoundryShim(world) {
     },
   };
 
+  // A CONSTRUCTOR, not the old two-static object. `evaluateCheckRoll` bails on
+  // `typeof globalThis.Roll !== 'function'` before it ever calls `options.prompt`, so an object
+  // here made every crafting/salvage/alchemy roll prompt unreachable — including issue 855's new
+  // check-modifier fieldset. See `labRoll.js` for why rolling is now computed rather than refused.
+  // The two statics keep their original bodies; only the constructor is new.
+  globalThis.Roll = createLabRoll({
+    random: random.random,
+    replaceFormulaData: LAB_ROLL_STATICS.replaceFormulaData,
+    validate: LAB_ROLL_STATICS.validate,
+  });
+
   // A run that SUCCEEDS posts a chat card. Without this the engine's `ChatMessage.create` throws,
   // the engine catches it and logs, and the driver's console-error gate fails the whole case — so
   // the lab could photograph a gather that was blocked, in progress, or missing a tool, but never
@@ -532,8 +545,6 @@ export function installFoundryShim(world) {
   // Nothing renders the returned document — the chat log is Foundry's, not Fabricate's, and is one
   // of the disclosed gaps — so this is a sink with a realistic shape, not a stub pretending to be a
   // chat log.
-  globalThis.Roll = LAB_ROLL;
-
   globalThis.ChatMessage = {
     async create(data = {}) {
       return makeDocument({ ...data, _id: `lab-chat-${chatMessageSequence++}` }, 'ChatMessage');
