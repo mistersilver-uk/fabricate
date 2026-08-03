@@ -299,23 +299,46 @@ describe('CraftingListingBuilder — category projection (issue 514)', () => {
   });
 });
 
-describe('CraftingListingBuilder — recipe image (matches GM Manager precedence)', () => {
-  it('resolves a linked recipe item image when img is the default placeholder', () => {
-    // The reported bug: a recipe whose icon lives on a linked item keeps the default
-    // `recipe.img`, so the row showed the blueprint placeholder. Mirror the Manager and
-    // resolve the linked recipe-item definition's image.
+// Inverted with issue 887. This block previously asserted the BORROW — that a linked
+// recipe-item definition's image outranked `recipe.img`. A recipe's icon is its OWN
+// image and nothing else (`data-models/spec.md` `## Recipe` requirement 16): book
+// membership is many-to-many, so "the containing book" tracked definition order rather
+// than anything the GM authored.
+//
+// Every case keeps `recipeItemId` and a `recipeItemDefinition` with DISTINCT artwork on
+// the fixture. Removing them would make these pass vacuously; retaining them fails the
+// moment anyone re-adds the borrow.
+describe('CraftingListingBuilder — recipe image (own image, never a containing book)', () => {
+  const BOOK_IMG = 'icons/weapons/club.webp';
+
+  it('renders the recipe own image, not a linked recipe item image', () => {
+    const recipe = makeRecipe({ img: 'icons/sword.webp', recipeItemId: 'ri-1' });
+    const { recipe: model } = buildOne({
+      entries: [{ recipe, access: { reason: 'ok' } }],
+      recipeItemDefinition: { img: BOOK_IMG },
+    });
+    assert.equal(model.img, 'icons/sword.webp');
+  });
+
+  it('falls back to the blueprint for an image-less recipe, even when linked to a book', () => {
     const recipe = makeRecipe({ img: DEFAULT_RECIPE_IMAGE, recipeItemId: 'ri-1' });
     const { recipe: model } = buildOne({
       entries: [{ recipe, access: { reason: 'ok' } }],
-      recipeItemDefinition: { img: 'icons/weapons/club.webp' },
+      recipeItemDefinition: { img: BOOK_IMG },
     });
-    assert.equal(model.img, 'icons/weapons/club.webp');
+    assert.equal(model.img, DEFAULT_RECIPE_IMAGE);
   });
 
-  it('falls back to the default placeholder for an unlinked, image-less recipe', () => {
-    const recipe = makeRecipe({ img: DEFAULT_RECIPE_IMAGE, recipeItemId: null });
-    const { recipe: model } = buildOne({ entries: [{ recipe, access: { reason: 'ok' } }] });
+  it('treats the generic item bag as "no image" and renders the blueprint, never the bag', () => {
+    // The reason this routes through `resolveRecipeImage` rather than collapsing to
+    // `recipe.img || DEFAULT`: a bag-valued recipe would otherwise render the bag.
+    const recipe = makeRecipe({ img: 'icons/svg/item-bag.svg', recipeItemId: 'ri-1' });
+    const { recipe: model } = buildOne({
+      entries: [{ recipe, access: { reason: 'ok' } }],
+      recipeItemDefinition: { img: BOOK_IMG },
+    });
     assert.equal(model.img, DEFAULT_RECIPE_IMAGE);
+    assert.notEqual(model.img, 'icons/svg/item-bag.svg');
   });
 
   it('passes through a custom recipe img when there is no linked item', () => {
@@ -323,7 +346,7 @@ describe('CraftingListingBuilder — recipe image (matches GM Manager precedence
     assert.equal(recipe.img, 'icons/sword.webp');
   });
 
-  it('does not leak a linked item image through a redacted teaser', () => {
+  it('resolves a redacted teaser the same way, with no linked item image to leak', () => {
     const recipe = makeRecipe({ img: DEFAULT_RECIPE_IMAGE, recipeItemId: 'ri-1' });
     const { recipe: model } = buildOne({
       entries: [
@@ -332,10 +355,10 @@ describe('CraftingListingBuilder — recipe image (matches GM Manager precedence
           access: { reason: 'teaser', teaserState: { hiddenFields: ['ingredients'] } },
         },
       ],
-      recipeItemDefinition: { img: 'icons/weapons/club.webp' },
+      recipeItemDefinition: { img: BOOK_IMG },
     });
     assert.equal(model.redaction.redacted, true);
-    assert.notEqual(model.img, 'icons/weapons/club.webp', 'the linked item icon must not leak');
+    assert.notEqual(model.img, BOOK_IMG, 'the linked item icon must not leak');
     assert.equal(model.img, DEFAULT_RECIPE_IMAGE);
   });
 });

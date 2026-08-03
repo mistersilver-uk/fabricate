@@ -1728,8 +1728,17 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * Resolve a recipe's display image the way the GM Manager / Crafting tab do:
-   * the linked recipe-item image when present, else the recipe's own image.
+   * Resolve a recipe's display image: its OWN `img`, and nothing else.
+   *
+   * The canonical rule is `data-models/spec.md` `## Recipe` requirement 16. This method
+   * is one of that requirement's two mirrored chokepoints (the other is
+   * `resolveRecipeImage` in `src/ui/svelte/util/craftingImageDefaults.js`), so every
+   * player-surface recipe image resolves here rather than re-deriving the rule.
+   *
+   * The JSDoc previously claimed this preferred "the linked recipe-item image when
+   * present", contradicting its own body, which has always resolved the recipe's own
+   * image. Corrected with issue 887 rather than left as ubiquitous-language drift.
+   *
    * @private
    */
   _resolveRecipeImg(recipe) {
@@ -1862,7 +1871,10 @@ export class InventoryListingBuilder {
     recipe,
     { system, toolComponentById, componentUsedBy, essenceUsedBy, addProduced, addRequiredFor }
   ) {
-    const recipeImg = this._resolveIndexedRecipeImg(recipe, system);
+    // ONE recipe-image resolver for this class (issue 887). The used-by/produced-by index
+    // previously had its own, which borrowed the containing book's artwork ahead of an
+    // authored `recipe.img`; a recipe's icon is its own and never a containing book's.
+    const recipeImg = stringOrNull(this._resolveRecipeImg(recipe));
     const recipeEntry = {
       recipeId: stringOrNull(recipe?.id),
       recipeName: stringOrEmpty(recipe?.name),
@@ -1913,22 +1925,6 @@ export class InventoryListingBuilder {
         ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
       }
     }
-  }
-
-  /**
-   * Resolve a recipe's used-by/produced-by image the way the GM Manager / player
-   * Crafting tab do (recipeItemImg || recipe.img): a recipe whose icon lives on its
-   * linked recipe item keeps the model default `recipe.img` otherwise. `recipe.img` is
-   * itself model-defaulted to the alchemical blueprint, so the trailing fallback is the
-   * blueprint — never the generic component item-bag.
-   * @private
-   */
-  _resolveIndexedRecipeImg(recipe, system) {
-    const recipeItemImg = recipe?.recipeItemId
-      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
-          ?.img || ''
-      : '';
-    return stringOrNull(recipeItemImg || recipe?.img);
   }
 
   /**

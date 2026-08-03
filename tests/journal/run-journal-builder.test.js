@@ -137,7 +137,6 @@ function makeBuilder({
   recipe = RECIPE,
   getGatheringTask = null,
   getResultItem = null,
-  getRecipeItemImg = null,
   getComponent = null,
 } = {}) {
   return new RunJournalBuilder({
@@ -164,7 +163,6 @@ function makeBuilder({
     },
     getGatheringTask,
     getResultItem,
-    getRecipeItemImg,
     getComponent,
     localize,
     nowWorldTime: () => worldTime,
@@ -1016,23 +1014,29 @@ test('a dynamic-DC check surfaces the formula without a DC number', () => {
 const BLUEPRINT_IMG = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 const ITEM_BAG = 'icons/svg/item-bag.svg';
 
-test('a recipe-item crafting run resolves the recipe-item definition image (never the item bag)', () => {
-  const recipeItemRecipe = { ...RECIPE, img: BLUEPRINT_IMG, recipeItemId: 'ri-1' };
+// Inverted with issue 887. This case previously asserted the BORROW — that a linked
+// recipe-item definition's image outranked the recipe's own. A recipe's icon is its own
+// `img` and nothing else (`data-models/spec.md` `## Recipe` requirement 16), so the
+// legacy `recipeItemId` scalar is no longer an input and the injected port that resolved
+// it is gone.
+test('a crafting run resolves the recipe OWN image, never a containing book/scroll', () => {
+  const AUTHORED = 'icons/consumables/potions/bottle-round-corked-red.webp';
 
-  // The recipe-item definition image wins over recipe.img.
+  // A recipe carrying the legacy scalar still renders its authored image. The scalar is
+  // retained on the fixture deliberately: deleting it would make this pass vacuously,
+  // whereas keeping it fails the moment anyone re-adds the borrow.
   let run = makeBuilder({
     active: [activeCraftingRun()],
-    recipe: recipeItemRecipe,
-    getRecipeItemImg: (systemId, recipeItemId) =>
-      systemId === 'sys-1' && recipeItemId === 'ri-1' ? 'icons/tools/smithing/anvil.webp' : null,
+    recipe: { ...RECIPE, img: AUTHORED, recipeItemId: 'ri-1' },
   }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
-  assert.equal(run.img, 'icons/tools/smithing/anvil.webp');
+  assert.equal(run.img, AUTHORED, 'an authored image is never outranked by a containing book');
 
-  // No definition image → recipe.img (blueprint), NEVER the item bag.
+  // A bag-valued recipe resolves the blueprint, NEVER the bag — the sentinel handling
+  // that made routing through `resolveRecipeImage` mandatory rather than collapsing to
+  // `recipe.img || DEFAULT`.
   run = makeBuilder({
     active: [activeCraftingRun()],
-    recipe: recipeItemRecipe,
-    getRecipeItemImg: () => null,
+    recipe: { ...RECIPE, img: ITEM_BAG, recipeItemId: 'ri-1' },
   }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
   assert.equal(run.img, BLUEPRINT_IMG);
   assert.notEqual(run.img, ITEM_BAG);

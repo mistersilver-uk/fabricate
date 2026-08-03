@@ -19,6 +19,7 @@
  * browse status so no ingredient/result/check detail leaks.
  */
 
+import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
 
@@ -234,24 +235,25 @@ export class CraftingListingBuilder {
       : [];
     const hidden = new Set(hiddenFields);
 
-    // Match the GM Manager's icon precedence (recipeItemImg || img || default): a recipe
-    // whose icon lives on a linked recipe item keeps the default `recipe.img`, so resolve
-    // the linked item definition's image the same way adminStore does. `recipe.img` is
-    // itself model-defaulted to DEFAULT_RECIPE_IMAGE, so it already supplies the Manager's
-    // trailing default fallback without importing the heavy models/Recipe.js graph here.
-    // Skip the resolved item image for a redacted teaser so an undiscovered recipe's item
-    // icon never leaks.
-    const recipeItemImg = recipe.recipeItemId
-      ? this.craftingSystemManager?.getRecipeItemDefinition?.(
-          recipe.craftingSystemId,
-          recipe.recipeItemId
-        )?.img || ''
-      : '';
-
     const base = {
       id: stringOrNull(recipe.id),
       name: stringOrEmpty(recipe.name),
-      img: stringOrNull(redacted ? recipe.img : recipeItemImg || recipe.img),
+      // A recipe's icon is its OWN `img` and nothing else — `data-models/spec.md`
+      // `## Recipe` requirement 16. This previously borrowed the containing book's
+      // artwork ahead of an authored image, keyed on the legacy `recipe.recipeItemId`
+      // scalar; book membership is many-to-many, so "the containing book" tracked
+      // definition order rather than anything the GM authored (issue 887).
+      //
+      // `resolveRecipeImage` rather than `recipe.img` directly: Foundry's generic
+      // item-bag is the "no image" sentinel, and collapsing without it would render the
+      // BAG for a bag-valued recipe — which `tests/recipe-prompt-img.test.js` records as
+      // an explicit product requirement never to do. The helper is an import-free leaf
+      // already in `CRAFTING_APP_RAW_MODULES`, so this import adds no harness edge; do
+      // NOT reach for `models/Recipe.js` here, which would.
+      //
+      // Redaction no longer needs a branch: with no borrowed item image there is nothing
+      // for an undiscovered recipe's teaser to leak.
+      img: stringOrNull(resolveRecipeImage(recipe)),
       systemId: stringOrNull(recipe.craftingSystemId),
       systemName: stringOrEmpty(system?.name),
       // GM-authored grouping metadata. `category` is the raw normalized token

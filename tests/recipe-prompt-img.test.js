@@ -27,7 +27,11 @@ describe('CraftingEngine._resolveRecipePromptImg', () => {
     delete globalThis.game;
   });
 
-  it('prefers the recipe-item definition image over recipe.img', () => {
+  // Inverted with issue 887: this asserted the borrow. The prompt shows the recipe's own
+  // image and never a containing book's (`data-models/spec.md` `## Recipe` requirement
+  // 16). The definition image is still stubbed with DISTINCT artwork so re-adding the
+  // borrow fails here rather than passing vacuously.
+  it('renders the recipe own image, never the recipe-item definition image', () => {
     stubGame({ 'ri-1': { img: 'icons/tools/smithing/anvil.webp' } });
     const engine = new CraftingEngine({});
     const img = engine._resolveRecipePromptImg({
@@ -35,7 +39,7 @@ describe('CraftingEngine._resolveRecipePromptImg', () => {
       recipeItemId: 'ri-1',
       img: 'icons/sundries/scrolls/scroll-plain.webp',
     });
-    assert.equal(img, 'icons/tools/smithing/anvil.webp');
+    assert.equal(img, 'icons/sundries/scrolls/scroll-plain.webp');
   });
 
   it('falls back to recipe.img when there is no recipe-item definition image', () => {

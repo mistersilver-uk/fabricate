@@ -1,4 +1,4 @@
-import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
+import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 
 import {
   actorToOption,
@@ -143,7 +143,6 @@ export class RunJournalBuilder {
     getSystem = null,
     getTool = null,
     getGatheringTask = null,
-    getRecipeItemImg = null,
     getResultItem = null,
     getComponent = null,
     getViewer = null,
@@ -159,7 +158,6 @@ export class RunJournalBuilder {
     this._getSystem = typeof getSystem === 'function' ? getSystem : () => null;
     this._getTool = typeof getTool === 'function' ? getTool : () => null;
     this._getGatheringTask = typeof getGatheringTask === 'function' ? getGatheringTask : () => null;
-    this._getRecipeItemImg = typeof getRecipeItemImg === 'function' ? getRecipeItemImg : () => null;
     this._getResultItem = typeof getResultItem === 'function' ? getResultItem : () => null;
     this._getComponent = typeof getComponent === 'function' ? getComponent : () => null;
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
@@ -246,19 +244,21 @@ export class RunJournalBuilder {
   // ---------------------------------------------------------------------------
 
   /**
-   * Resolve a crafting run's icon with the SAME precedence the GM editor / player
-   * listings / roll prompt use — the recipe-item definition image wins over the
-   * recipe's own `img`, and the final fallback is the recipe default (blueprint),
-   * NEVER the generic item bag. A recipe-item-backed recipe's `recipe.img` is the
-   * model default blueprint, so without the recipe-item lookup the run showed the
-   * bag / blueprint instead of the authored item image.
+   * Resolve a crafting run's icon: the recipe's OWN `img`, per `data-models/spec.md`
+   * `## Recipe` requirement 16.
+   *
+   * This previously preferred the linked recipe-item definition's image, keyed on the
+   * legacy `recipe.recipeItemId` scalar, which outranked an authored `recipe.img` and
+   * tracked definition order rather than anything the GM authored (issue 887). The
+   * injected `getRecipeItemImg` port existed solely for that lookup and is gone with it.
+   *
+   * `resolveRecipeImage` keeps the item-bag sentinel treated as "no image", so a run
+   * still falls back to the blueprint and never to the bag.
+   *
    * @private
    */
   _resolveCraftingRunImg(recipe) {
-    const recipeItemImg = recipe?.recipeItemId
-      ? this._getRecipeItemImg(recipe.craftingSystemId, recipe.recipeItemId) || ''
-      : '';
-    return recipeItemImg || stringOrNull(recipe?.img) || DEFAULT_RECIPE_IMAGE;
+    return stringOrNull(resolveRecipeImage(recipe));
   }
 
   _craftingRunModel({ run, actor, viewer, worldTime, terminal }) {
