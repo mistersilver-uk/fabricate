@@ -682,11 +682,19 @@ function matchedTierStepTriggers(triggers, snapshot) {
   });
 }
 
-/** A `tierStep.steps` magnitude. The normalizer already clamps it to an integer
- * `>= 1`; a hand-authored value is coerced, defaulting to the normalizer's own 1. */
+/**
+ * A `tierStep.steps` magnitude: an integer `>= 1`, the same clamp
+ * `_normalizeTierStep` applies on the way in.
+ *
+ * Clamped HERE as well so the runtime does not depend on the normalizer having run.
+ * A magnitude is a MAGNITUDE — the direction lives in `mode` — so a raw `steps: -2`
+ * on an `up` trigger must not silently step DOWN two, inverting the effect the GM
+ * authored. Unreachable through the normalizer today; independent of it by
+ * construction now.
+ */
 function tierStepMagnitude(steps) {
-  const value = Number(steps);
-  return Number.isFinite(value) ? Math.trunc(value) : 1;
+  const value = Math.trunc(Number(steps));
+  return Number.isFinite(value) && value >= 1 ? value : 1;
 }
 
 /**

@@ -187,6 +187,61 @@ tierStepTable([
     },
   },
   {
+    // `steps` is a MAGNITUDE — the direction lives in `mode` — so a raw negative can
+    // never invert the effect the GM authored. `_normalizeTierStep` clamps it to an
+    // integer >= 1 on the way in, but the runner clamps too, so a hand-edited world or
+    // a caller that skipped the normalizer cannot make an `up` trigger step DOWN.
+    name: 'a negative steps magnitude cannot invert an up trigger into a down step',
+    total: ROLLS_FAIR,
+    triggers: [tierStepTrigger({ id: 'up-negative', mode: 'up', steps: -2 })],
+    expect: {
+      outcome: 'Good',
+      outcomeId: 'good',
+      success: true,
+      tierStepApplied: stepEvidence({
+        mode: 'up',
+        steps: 1,
+        from: 'fair',
+        to: 'good',
+        triggerIds: ['up-negative'],
+      }),
+    },
+  },
+  {
+    name: 'a zero steps magnitude falls back to one rather than making the trigger inert',
+    total: ROLLS_FAIR,
+    triggers: [tierStepTrigger({ id: 'down-zero', mode: 'down', steps: 0 })],
+    expect: {
+      outcome: 'Poor',
+      outcomeId: 'poor',
+      success: false,
+      tierStepApplied: stepEvidence({
+        mode: 'down',
+        steps: 1,
+        from: 'fair',
+        to: 'poor',
+        triggerIds: ['down-zero'],
+      }),
+    },
+  },
+  {
+    name: 'a fractional steps magnitude truncates rather than rounding up',
+    total: ROLLS_FAIR,
+    triggers: [tierStepTrigger({ id: 'up-fractional', mode: 'up', steps: 2.9 })],
+    expect: {
+      outcome: 'Superb',
+      outcomeId: 'superb',
+      success: true,
+      tierStepApplied: stepEvidence({
+        mode: 'up',
+        steps: 2,
+        from: 'fair',
+        to: 'superb',
+        triggerIds: ['up-fractional'],
+      }),
+    },
+  },
+  {
     name: 'a target applies BEFORE the net offset, and the mode stays target',
     total: ROLLS_FAIR,
     triggers: [
