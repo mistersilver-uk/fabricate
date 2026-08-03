@@ -32,18 +32,27 @@
   );
 
   // Per-environment resource-node pool for the selected task. Tasks only (events
-  // have no nodes); the section is gated on a configured capacity (`max > 0`). The
-  // available `current` count falls back to the library config seed (current = max)
-  // when this environment has no stored runtime entry yet.
+  // have no nodes); the section is gated on a configured capacity (`max > 0`). Per
+  // GatheringNodeService._mergeNodeConfigState, the library config is authoritative
+  // for capacity (`max`), while the per-environment runtime entry contributes only
+  // state: the live count (clamped to the library cap), and respawn timers.
   const nodeConfig = $derived(kind === 'task' ? record?.nodes || null : null);
   const nodeRuntimeEntry = $derived(environment?.nodeRuntime?.[entry?.id] || null);
-  const nodeMax = $derived(Number(nodeRuntimeEntry?.max ?? nodeConfig?.max ?? 0));
+  const nodeMax = $derived(Number(nodeConfig?.max ?? nodeRuntimeEntry?.max ?? 0));
   const hasNodes = $derived(kind === 'task' && Number.isFinite(nodeMax) && nodeMax > 0);
   const nodeCurrent = $derived(
     (() => {
-      const stored = Number(nodeRuntimeEntry?.current);
-      const value = Number.isFinite(stored) ? stored : nodeMax;
-      return Math.max(0, Math.min(nodeMax, value));
+      const storedCurrent = Number(nodeRuntimeEntry?.current);
+      // Mirror _mergeNodeConfigState: clamp stored current to max only when
+      // max is finite; fall back to library current without additional clamping.
+      const value = Number.isFinite(storedCurrent)
+        ? Number.isFinite(nodeMax)
+          ? Math.min(storedCurrent, nodeMax)
+          : storedCurrent
+        : Number.isFinite(Number(nodeConfig?.current))
+          ? Number(nodeConfig?.current)
+          : nodeMax;
+      return Math.max(0, value);
     })()
   );
   // A `nonRegenerating` pool is permanently depletable: it can never be restocked
