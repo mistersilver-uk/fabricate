@@ -1414,6 +1414,12 @@ Tool = {
     The upsert rejects non-Item Documents, stages the description/name/image/source snapshots, clears only a changed old Tool role leaf, stamps the new leaf, and persists one normalized Tool atomically.
 12. Tool **presence** matching resolves the owned item against the system Tools library by the tool's own source references (durable `roles[systemId].toolId` first, then source-ref intersection including the transitive `_stats.duplicateSource`, then the tool's snapshot-name fallback), not through a managed component.
     Tool **usage/breakage** selection matches by durable identity against the Tool's own identity per requirement 10.
+13. A Tool's displayed name and image resolve by ONE precedence at every surface: the user-authored `label` (trimmed) when non-empty, then the registration display snapshot (`name` / `img`), then the linked managed component's `name` / `img` when `componentId` resolves, then a localized fallback name and the generic `icons/svg/item-bag.svg` sentinel.
+    The snapshot outranks the linked component deliberately, because a Tool that is also a managed component keeps `componentId` populated (requirement 1) and its own snapshot is the more specific identity.
+    Consulting `componentId` alone is invalid: a first-class item-sourced Tool carries `componentId: null`, so a component-only resolver renders the fallback name and the item-bag sentinel for a Tool whose identity is fully populated (issue 976).
+    A surface that renders the Tool's description resolves it the same way — the snapshot `description` first, then the linked component's — because the same omission blanks a populated description.
+    `label` is never substituted into the snapshot and the snapshot is never written back to `label`; they are distinct fields per requirement 1.
+    The reference implementation is `toolDisplayName` / `toolDisplayImage` / `toolDescription` (`src/ui/svelte/apps/manager/tools/toolStudio.js`); a surface that receives the component lookup pre-flattened may re-derive the same ordering, but must not reorder or drop a rung.
 
 ### Validation Matrix
 

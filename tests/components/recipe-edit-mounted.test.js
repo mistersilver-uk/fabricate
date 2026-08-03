@@ -7,6 +7,10 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { Recipe } from '../../src/models/Recipe.js';
+import {
+  TOOL_DISPLAY_PRECEDENCE_CASES,
+  flattenToolForRecipeLibrary,
+} from '../helpers/toolDisplayPrecedenceCases.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -2259,6 +2263,74 @@ describe('RecipeEditView (mounted)', () => {
       false,
       'an orphaned tool never shows a raw id'
     );
+    editHarness.remount();
+  });
+
+  // Issue 976. `RecipeToolsSection` resolved a tool's identity ONLY through its linked
+  // managed component, so a first-class item-sourced tool (`componentId: null`, identity
+  // in the `name`/`img` snapshot) rendered "Unnamed tool" and the item-bag sentinel in
+  // BOTH the added row and the add-a-tool picker. The library entries are flattened
+  // exactly as `CraftingSystemManagerRoot.recipeToolsLibrary` flattens them, so the
+  // fixture is the real wire shape rather than a hand-tuned one.
+  const precedenceLibrary = TOOL_DISPLAY_PRECEDENCE_CASES.map((testCase) =>
+    flattenToolForRecipeLibrary(testCase.tool)
+  );
+
+  it('resolves every tool-display precedence case in the selected-tool rows', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, toolIds: precedenceLibrary.map((tool) => tool.id) },
+        toolsLibrary: precedenceLibrary,
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+
+    for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
+      const row = target.querySelector(`[data-recipe-tool-id="${testCase.tool.id}"]`);
+      assert.ok(row, `${testCase.id}: a row renders`);
+      assert.equal(
+        row.querySelector('.manager-recipe-tool-name').textContent.trim(),
+        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName,
+        `${testCase.id}: ${testCase.summary}`
+      );
+      assert.equal(
+        row.querySelector('img').getAttribute('src'),
+        testCase.expectedImg,
+        `${testCase.id}: the row renders the expected image`
+      );
+    }
+    editHarness.remount();
+  });
+
+  it('resolves every tool-display precedence case in the add-a-tool picker', async () => {
+    // The reporter saw the placeholders "when adding them to recipes", so the picker
+    // is a distinct assertion, not a corollary of the row one.
+    const target = await editHarness.mount(
+      identityProps({ recipe: { ...RECIPE, toolIds: [] }, toolsLibrary: precedenceLibrary })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    target.querySelector('[data-recipe-section="tools"] .manager-recipe-tools-trigger').click();
+    await flushRender();
+
+    const options = [...document.querySelectorAll('.manager-travel-option')];
+    assert.equal(
+      options.length,
+      precedenceLibrary.length,
+      'the popover lists every unattached library tool'
+    );
+    for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
+      const expectedName =
+        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName;
+      const option = options.find((node) => node.textContent.includes(expectedName));
+      assert.ok(option, `${testCase.id}: the picker option shows "${expectedName}"`);
+      assert.equal(
+        option.querySelector('img')?.getAttribute('src'),
+        testCase.expectedImg,
+        `${testCase.id}: the picker option renders the expected image`
+      );
+    }
     editHarness.remount();
   });
 

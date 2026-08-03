@@ -208,11 +208,19 @@
     return String(item?.description || '').trim();
   }
 
+  // Display precedence, per `data-models` `## Tool` requirement 13 and mirroring
+  // `toolStudio.js`: authored label, then the registration display SNAPSHOT
+  // (`name`/`img`/`description`), then the linked managed component, then the fallback.
+  // The snapshot rung is load-bearing — a first-class item-sourced tool carries
+  // `componentId: null` (issue 561), so the component-only resolver this replaced
+  // rendered "Unnamed tool" and the item-bag sentinel for a fully-populated tool
+  // (issue 976).
   function toolDisplayLabel(tool) {
     const label = String(tool?.label || '').trim();
     if (label) return label;
     const component = managedItem(tool?.componentId);
     return (
+      tool?.name ||
       component?.name ||
       text('FABRICATE.Admin.Manager.Environment.Tasks.UnnamedTool', 'Unnamed tool')
     );
@@ -220,12 +228,18 @@
 
   function toolDisplayImage(tool) {
     const component = managedItem(tool?.componentId);
-    return component?.img || 'icons/svg/item-bag.svg';
+    return tool?.img || component?.img || 'icons/svg/item-bag.svg';
   }
 
+  // Renders where a description belongs (it falls back to "No description has been
+  // added."), so the tool's own snapshot description outranks the linked component.
+  // The trailing component-name rung preserves the pre-976 behaviour for a
+  // component-linked tool that carries no description at all.
   function toolSummary(tool) {
     const component = managedItem(tool?.componentId);
-    return component?.name || '';
+    return (
+      String(tool?.description || '').trim() || component?.description || component?.name || ''
+    );
   }
 
   function onToolSearchInput(event) {

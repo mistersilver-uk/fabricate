@@ -38,9 +38,19 @@
     emptyLabel || text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyPanel', 'No tools required.')
   );
 
+  // Display precedence, per `data-models` `## Tool` requirement 13 and mirroring
+  // `toolStudio.js`'s `toolDisplayName`/`toolDisplayImage`: authored label, then the
+  // registration display SNAPSHOT (`name`/`img`), then the linked managed component,
+  // then the fallback. The snapshot rung is load-bearing — a first-class item-sourced
+  // tool carries `componentId: null` (issue 561), so a component-only resolver renders
+  // "Unnamed tool" and the item-bag sentinel for a fully-populated tool (issue 976).
+  // `componentName`/`componentImg` arrive pre-flattened from `recipeToolsLibrary`, so
+  // this re-derives the canonical ordering rather than importing the helper; the shared
+  // precedence table in `tests/helpers/toolDisplayPrecedenceCases.js` pins them equal.
   function toolDisplayLabel(tool) {
     return (
-      tool?.label ||
+      String(tool?.label || '').trim() ||
+      tool?.name ||
       tool?.componentName ||
       text('FABRICATE.Admin.Manager.Recipe.UnnamedTool', 'Unnamed tool')
     );
@@ -52,7 +62,7 @@
   }
 
   function toolImage(tool) {
-    return tool?.componentImg || 'icons/svg/item-bag.svg';
+    return tool?.img || tool?.componentImg || 'icons/svg/item-bag.svg';
   }
 
   function toolImageById(toolId) {
