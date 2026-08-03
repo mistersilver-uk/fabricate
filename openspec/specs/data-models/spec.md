@@ -919,10 +919,10 @@ Recipe = {
   },
 
   // Optional minimum success tier for a fixed-type routed check: the id of a fixed
-  // success outcome tier. When set, a craft whose rolled tier ranks below it (fixed
-  // tiers rank by `start`) fails outright. Null/unset = no override (outcome = the
-  // rolled tier). Meaningful only for routedByCheck with a fixed-type check; ignored
-  // otherwise. Semantics in resolution-modes/spec.md.
+  // success outcome tier. When set, a craft whose FINAL (post-step) tier ranks below
+  // it (fixed tiers rank by `start`) fails outright. Null/unset = no override (outcome
+  // = that same final tier). Meaningful only for routedByCheck with a fixed-type
+  // check; ignored otherwise. Semantics in resolution-modes/spec.md.
   minSuccessOutcomeId?: string | null,
 
   // Optional per-recipe crafting-check modifier override (issue 770). Absent (null) =

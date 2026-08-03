@@ -319,7 +319,7 @@
           <option value=""
             >{text(
               'FABRICATE.Admin.Manager.Recipe.MinSuccessTierNone',
-              'No override (use rolled tier)'
+              'No override (use final tier)'
             )}</option
           >
           {#each minSuccessTierOptions as tier (tier.id)}

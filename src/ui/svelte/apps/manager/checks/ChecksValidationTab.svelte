@@ -43,7 +43,7 @@
     rangesNoOverlap: ['CheckRangesNoOverlap', 'No tier ranges overlap'],
     tierStepTargetsResolve: [
       'CheckTierStepTargetsResolve',
-      'Every tier-step target names one existing tier',
+      'Tier-step targets name exactly one existing tier',
     ],
   };
   const ISSUE_LABELS = {
@@ -66,7 +66,7 @@
     ],
     danglingTierStepTarget: [
       'IssueDanglingTierStepTarget',
-      'A trigger targets a tier this check does not have; that step will do nothing until you pick one of its outcome tiers.',
+      "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
     ],
     multipleTierStepTargets: [
       'IssueMultipleTierStepTargets',
