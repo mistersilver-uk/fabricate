@@ -1457,6 +1457,13 @@ A check-bearing execution accepts a per-call `interactive` flag (default `false`
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
+- **Crafting-only "Check modifier" pick-one group.**
+When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one **radio** per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
+The highest-valued option is pre-checked, and the confirmed choice returns the checked radio's id as `chosenModifierId` (falling back to the descriptor's `defaultSelectedId` when the field is absent, as on the headless no-`DialogV2` path).
+It is a pick-one control (radios, never checkboxes), so the player selects exactly one modifier and cannot sum a subset.
+This group is only the presentation of the crafting-check `playerPicks` modifier policy: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the pick substitutes `@craftingmod` are normative in `resolution-modes/spec.md` §Check Source, not here.
+Only crafting ever supplies `modifierChoice`; salvage and gathering never author `@craftingmod` and never pass it, so their dialog is unchanged, as is a crafting roll under any other modifier policy — no `modifierChoice`, no fieldset.
+
 ### Result Chat Cards
 
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
