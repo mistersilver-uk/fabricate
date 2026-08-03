@@ -3004,14 +3004,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-runework' },
     // Scrolls to its own named subject. Issue 975 gave Runework's check two authored
     // triggers, and a populated trigger card is tall enough to push the outcome-tier
-    // table off the unscrolled fold — so without this anchor the case kept passing every
-    // assertion while photographing a panel that no longer contained the table it is
-    // named for. Anchored on `[data-routed-tiers]`, not the trigger card: the sibling
-    // `manager-checks-crafting-tier-step` owns that subject.
+    // table towards the fold — so without an anchor this case would drift into
+    // photographing a panel that no longer contains the table it is named for.
+    //
+    // The anchor is a ROW OF THAT TABLE, not `[data-routed-tiers]`: that attribute
+    // wraps `CheckRecipeTiers` — the recipe-tiers card — while the outcome-tier table
+    // is the following unhooked section, so anchoring there would frame a card this
+    // case is not photographing and would break the moment that fixture gains content.
+    // `rw-ruined` is the LAST tier in Runework's `relativeOutcomes`, and
+    // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so the whole
+    // table sits above it in frame.
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-routed-tiers]', scroll: true },
+      { selector: '[data-outcome-row="rw-ruined"]', scroll: true },
     ],
     expectView: 'checks',
     kinds: ['manager', 'checks', 'resolution-mode'],
