@@ -158,7 +158,7 @@ test('_normalizeSalvageCraftingCheck migrates routed natStepping identically', (
 
 test('_normalizeGatheringCraftingCheck converts a stray routed natStepping identically', () => {
   const mgr = makeManager();
-  // No gathering check has ever persisted `natStepping` — the old `allowNatStepping`
+  // No gathering check has ever persisted `natStepping` — the retired opt-in
   // spread never re-emitted it here — so nothing converts in practice. But a
   // hand-edited world or an import payload carrying the stray key converts the same
   // way any other routed check does: stepping is no longer activity-scoped.
