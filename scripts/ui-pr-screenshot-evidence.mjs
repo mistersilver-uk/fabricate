@@ -730,6 +730,16 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/crafting\//],
   },
   {
+    id: 'player-crafting-roll-prompt',
+    label: 'Player crafting — interactive check roll prompt',
+    // Issue 855: `rollPrompt.js` renders the whole dialog, so a change to it is only
+    // evidenced by the dialog frame itself. The broader `player-crafting` recipe above
+    // also matches this path, but its labels all show the crafting tab BEHIND the
+    // prompt — publishing one of those would be a frame that does not show the change.
+    smokeLabels: ['player-crafting-roll-prompt'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+  },
+  {
     id: 'player-crafting-essence-legacy',
     label: 'Player crafting — legacy set-level essence authored icon',
     smokeLabels: ['player-crafting-essence-legacy'],

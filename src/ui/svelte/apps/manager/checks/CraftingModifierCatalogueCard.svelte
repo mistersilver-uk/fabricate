@@ -1,14 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Crafting check-modifier catalogue editor (issue 770, Phase 1).
+  Crafting check-modifier catalogue editor (issue 770).
 
   A crafting system may define a named catalogue of check modifiers — e.g. Medicine,
   Alchemy, Herbalism for a DC20 healing salve — each an authored roll-data expression
   (`@abilities.med.mod`). A resolution policy decides how the eligible modifiers combine
   into the `@craftingmod` formula placeholder:
     - Add all:   sum every eligible modifier.
-    - Pick highest: use the single largest modifier (a deterministic max, not a dice pool).
+    - Highest: use the single largest modifier (a deterministic max, not a dice pool).
     - By recipe: each recipe supplies its own modifier set (summed).
+    - Player picks: the player selects exactly one at roll time (Phase 2). The only
+      non-deterministic policy, and the only one that needs an interactive craft — every
+      other path resolves it as Highest.
   A default eligible set names which catalogue entries apply when a recipe does not
   override them.
 
@@ -22,6 +25,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
 
   const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
@@ -38,9 +42,14 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // Icon vocabulary for the four policies: which modifiers apply, and who decides.
+  // Add all stacks the whole eligible set; Highest sorts and takes the top one; By
+  // recipe hands the choice to the recipe (the manager's recipe glyph); Player picks
+  // hands it to the player at roll time (the manager's "manual choice" glyph).
   const POLICY_OPTIONS = [
     {
       value: 'addAll',
+      icon: 'fas fa-layer-group',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll',
       fallback: 'Add all',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAllDesc',
@@ -48,23 +57,34 @@
     },
     {
       value: 'highest',
+      icon: 'fas fa-arrow-up-wide-short',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest',
-      fallback: 'Pick highest',
+      fallback: 'Highest',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighestDesc',
       descFallback: 'Use only the single largest eligible modifier (a deterministic maximum).',
     },
     {
       value: 'byRecipe',
+      icon: 'fas fa-scroll',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe',
       fallback: 'By recipe',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipeDesc',
       descFallback: 'Each recipe chooses its own modifier set; the chosen set is summed.',
     },
+    {
+      value: 'playerPicks',
+      icon: 'fas fa-hand-pointer',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicks',
+      fallback: 'Player picks',
+      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicksDesc',
+      descFallback:
+        'On an interactive craft whose formula uses @craftingmod, the player picks one eligible modifier at roll time (highest pre-selected); other crafts use the highest.',
+    },
   ];
 
   const modifiers = $derived(Array.isArray(checkModifiers) ? checkModifiers : []);
   const selectedPolicy = $derived(
-    ['addAll', 'highest', 'byRecipe'].includes(defaultModifierPolicy)
+    ['addAll', 'highest', 'byRecipe', 'playerPicks'].includes(defaultModifierPolicy)
       ? defaultModifierPolicy
       : 'addAll'
   );
@@ -213,38 +233,17 @@
   <h4 class="manager-modifier-subheading">
     {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'Default combination')}
   </h4>
-  <div
-    class="manager-checks-type-options"
-    role="radiogroup"
-    data-crafting-modifier-policy
-    aria-label={text(
-      'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading',
-      'Default combination'
-    )}
-  >
-    {#each POLICY_OPTIONS as option (option.value)}
-      <label
-        class={`manager-resolution-option ${selectedPolicy === option.value ? 'is-active' : ''}`}
-        data-crafting-modifier-policy-option={option.value}
-      >
-        <input
-          type="radio"
-          name="crafting-modifier-policy"
-          value={option.value}
-          checked={selectedPolicy === option.value}
-          onchange={() => selectPolicy(option.value)}
-        />
-        <span class="manager-resolution-option-body">
-          <span class="manager-resolution-option-name"
-            >{text(option.labelKey, option.fallback)}</span
-          >
-          <span class="manager-resolution-option-desc"
-            >{text(option.descKey, option.descFallback)}</span
-          >
-        </span>
-      </label>
-    {/each}
-  </div>
+  <RadioCardGroup
+    legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
+    legend="Default combination"
+    options={POLICY_OPTIONS}
+    selectedValue={selectedPolicy}
+    groupName="crafting-modifier-policy"
+    columns={2}
+    dataAttr="data-crafting-modifier-policy"
+    optionDataAttr="data-crafting-modifier-policy-option"
+    onChange={selectPolicy}
+  />
 
   {#if modifiers.length > 0}
     <h4 class="manager-modifier-subheading">
@@ -292,13 +291,6 @@
      manager-prerequisite-path-input classes (styles/fabricate.css) so the Checks-tab
      catalogue reads as the same design language as the System-tab modifier list. Only
      the expression + delete line needs a local rule. */
-  .manager-modifier-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-  }
-
   .manager-modifier-expression-row {
     display: flex;
     align-items: flex-end;

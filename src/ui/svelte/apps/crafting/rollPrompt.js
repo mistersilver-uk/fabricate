@@ -31,6 +31,15 @@ const ROLL_MODE_CHOICES = Object.freeze([
 ]);
 
 /**
+ * The check-modifier catalogue's own default icon class (mirrors
+ * `CraftingModifierCatalogueCard.svelte`'s `DEFAULT_MODIFIER_ICON`). An option whose
+ * catalogue entry carries no icon still renders an `<i>` with this class: the modifier
+ * row is a flex row, so omitting the element would collapse the icon gutter and start
+ * that option's label ~1.1rem left of its siblings.
+ */
+const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
+
+/**
  * Localize a Foundry i18n key, falling back to an English default when the
  * runtime (or a test harness) cannot resolve it (echoes the key or is absent).
  * @param {string} key
@@ -56,8 +65,15 @@ function localize(key, fallback) {
  * @param {string} [args.img] Optional subject icon shown in the header.
  * @param {boolean} [args.allowAdvantage] When true, offer Advantage/Normal/
  *   Disadvantage buttons (the formula has a plain `1d20`); else a single Roll.
+ * @param {{modifiers: Array<{id:string,label:string,icon:string,value:number}>,
+ *   defaultSelectedId: string}} [args.modifierChoice] The interactive `playerPicks`
+ *   descriptor (issue 770 Phase 2). When present, a "Check modifier" radio fieldset is
+ *   rendered (icon + label + value chip per option, `defaultSelectedId` pre-checked) and
+ *   `readChoice` returns the selected `chosenModifierId`. Absent → no fieldset renders
+ *   (byte-identical dialog).
  * @returns {Promise<{confirmed: true, bonus: string|null, rollMode: string|undefined,
- *   advantage: 'advantage'|'normal'|'disadvantage'} | {confirmed: false}>}
+ *   advantage: 'advantage'|'normal'|'disadvantage', chosenModifierId?: string}
+ *   | {confirmed: false}>}
  *   `{ confirmed: true, … }` when the player rolls; `{ confirmed: false }` on
  *   Cancel (window close / Escape) or dismissal.
  */
@@ -69,10 +85,17 @@ export async function promptCheckRoll({
   activity,
   img,
   allowAdvantage,
+  modifierChoice,
 } = {}) {
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
-  // Headless / no dialog API (tests): do not block the roll.
-  if (!DialogV2?.wait) return { confirmed: true };
+  // Headless / no dialog API (tests): do not block the roll. When a `playerPicks`
+  // choice was offered, confirm with the pre-selected default so `@craftingmod` still
+  // resolves to a concrete value (never leaks unresolved to Foundry's Roll).
+  if (!DialogV2?.wait) {
+    return modifierChoice
+      ? { confirmed: true, chosenModifierId: modifierChoice.defaultSelectedId }
+      : { confirmed: true };
+  }
 
   // `?? ''` so this types as a string rather than possibly-undefined: SonarCloud's
   // inference otherwise reads the `value === defaultRollMode` comparison below as
@@ -115,6 +138,48 @@ export async function promptCheckRoll({
     formulaHtml = `<div class="fabricate-roll-prompt__formula fabricate-roll-prompt__formula--dc-only">${dcChip}</div>`;
   }
 
+  // Interactive `playerPicks` (issue 770 Phase 2): a PICK-ONE radio fieldset of the
+  // eligible modifiers (icon + label + signed value chip), the highest-valued option
+  // pre-checked. Only rendered when a `modifierChoice` descriptor is supplied — every
+  // other roll leaves this empty, so the dialog is byte-identical. The formula line
+  // shows a NEUTRAL `(modifier)` placeholder in the `@craftingmod` slot (substituted by
+  // `evaluateCheckRoll`), not a default number a non-default pick would contradict; the
+  // per-radio chips carry each option's value and the posted roll reflects the player's
+  // final selection.
+  let modifierChoiceHtml = '';
+  const modifierOptions =
+    modifierChoice && Array.isArray(modifierChoice.modifiers) ? modifierChoice.modifiers : [];
+  if (modifierOptions.length > 0) {
+    const unnamedLabel = localize('FABRICATE.App.RollPrompt.UnnamedModifier', 'Unnamed modifier');
+    const optionsHtml = modifierOptions
+      .map((modifier) => {
+        const id = escapeHtml(modifier?.id ?? '');
+        const checked = modifier?.id === modifierChoice.defaultSelectedId ? ' checked' : '';
+        // The icon slot is ALWAYS emitted (see DEFAULT_MODIFIER_ICON): an icon-less
+        // catalogue entry must not collapse the gutter and misalign its row.
+        const iconClass = modifier?.icon || DEFAULT_MODIFIER_ICON;
+        const iconHtml = `<i class="fabricate-roll-prompt__modifier-icon ${escapeHtml(iconClass)}" aria-hidden="true"></i>`;
+        // The catalogue editor creates entries with an empty label and never forces a
+        // value, so an unnamed modifier would otherwise render as icon + chip only and
+        // announce as bare "+3". Fall back to a localized placeholder name.
+        const label = modifier?.label || unnamedLabel;
+        // The chip is ALWAYS emitted too, for the same row-alignment reason;
+        // `formatSigned` owns the non-finite fallback so there is one behaviour.
+        const chip = `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(formatSigned(modifier?.value))}</span>`;
+        return (
+          `<label class="fabricate-roll-prompt__modifier-option">` +
+          `<input type="radio" name="craftingModifier" value="${id}"${checked} />` +
+          `${iconHtml}<span class="fabricate-roll-prompt__modifier-label">${escapeHtml(label)}</span>${chip}</label>`
+        );
+      })
+      .join('');
+    const legend = escapeHtml(localize('FABRICATE.App.RollPrompt.CheckModifier', 'Check modifier'));
+    modifierChoiceHtml =
+      `<fieldset class="fabricate-roll-prompt__modifiers">` +
+      `<legend class="fabricate-roll-prompt__modifiers-legend">${legend}</legend>` +
+      `${optionsHtml}</fieldset>`;
+  }
+
   const bonusHtml =
     `<input class="fabricate-roll-prompt__bonus" type="text" name="situationalBonus" ` +
     `inputmode="text" aria-label="Situational Bonus" placeholder="Situational Bonus?" autofocus />`;
@@ -133,7 +198,7 @@ export async function promptCheckRoll({
   // situational bonus, and configuration.
   const content =
     `<div class="fabricate-roll-prompt">` +
-    `${dieHtml}${headerHtml}${formulaHtml}${bonusHtml}${configHtml}</div>`;
+    `${dieHtml}${headerHtml}${formulaHtml}${modifierChoiceHtml}${bonusHtml}${configHtml}</div>`;
 
   // Read the form on a button click: normalize the situational bonus (strip one
   // leading `+`, trim, empty → null), read the chosen roll mode, and tag the
@@ -144,12 +209,21 @@ export async function promptCheckRoll({
       .replace(/^\s*\+/, '')
       .trim();
     const rollModeValue = button?.form?.elements?.rollMode?.value;
-    return {
+    const choice = {
       confirmed: true,
       bonus: bonus === '' ? null : bonus,
       rollMode: rollModeValue || defaultRollMode || undefined,
       advantage,
     };
+    // Interactive `playerPicks`: the checked radio's value is the chosen modifier id;
+    // fall back to the pre-selected default when the field is absent (headless). Only
+    // added when a modifier choice was offered, so the non-`playerPicks` choice object
+    // is byte-identical.
+    if (modifierOptions.length > 0) {
+      const field = button?.form?.elements?.craftingModifier;
+      choice.chosenModifierId = field?.value || modifierChoice.defaultSelectedId;
+    }
+    return choice;
   };
 
   const buttons =
@@ -211,12 +285,24 @@ export async function promptCheckRoll({
  * @param {string} args.activity Human-readable activity label ("Crafting" / "Salvage" / "Gathering").
  * @param {number} [args.dc] The DC surfaced to the prompt + flavor when finite.
  * @param {string} [args.img] The subject icon shown in the dialog header.
+ * @param {{modifiers: Array, defaultSelectedId: string}} [args.modifierChoice] The
+ *   deferred interactive `playerPicks` descriptor (issue 770 Phase 2); forwarded to
+ *   `evaluateCheckRoll` → the prompt. Omitted from the bag when absent, so every
+ *   non-`playerPicks` path builds a byte-identical rollOptions object.
  * @returns {object} rollOptions for `evaluateCheckRoll`.
  */
-export function buildInteractiveRollOptions({ interactive, actor, name, activity, dc, img }) {
+export function buildInteractiveRollOptions({
+  interactive,
+  actor,
+  name,
+  activity,
+  dc,
+  img,
+  modifierChoice,
+}) {
   const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
   const flavor = `${name ? `${name} — ` : ''}${activity} check${dcLabel}`;
-  return {
+  const rollOptions = {
     interactive: interactive === true,
     prompt: promptCheckRoll,
     rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
@@ -227,6 +313,24 @@ export function buildInteractiveRollOptions({ interactive, actor, name, activity
     activity,
     img,
   };
+  // Only attach the choice when a `playerPicks` descriptor exists, so a non-playerPicks
+  // craft's rollOptions bag stays byte-identical (no stray `modifierChoice` key).
+  if (modifierChoice) rollOptions.modifierChoice = modifierChoice;
+  return rollOptions;
+}
+
+/**
+ * Format a modifier value as a signed chip label (`+3`, `+0`, `-2`) — zero renders as
+ * `+0`, matching the sign every other non-negative value carries. A missing or
+ * non-finite value renders as an unsigned `0`; this is the ONLY fallback for that case
+ * (the caller always renders a chip, so the row's icon/label/chip columns stay aligned).
+ * @param {unknown} value
+ * @returns {string}
+ */
+function formatSigned(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '0';
+  return num >= 0 ? `+${num}` : String(num);
 }
 
 /**

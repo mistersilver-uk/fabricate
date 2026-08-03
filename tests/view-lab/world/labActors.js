@@ -364,6 +364,14 @@ export function buildLabActors(content) {
       system: {
         currency: { gp: 45, sp: 12, cp: 30 },
         abilities: { int: { mod: 3 }, str: { mod: 2 } },
+        // `.mod` ONLY, and only these two keys. Herbalism's check-modifier catalogue resolves
+        // `@skills.med.mod` and `@skills.nat.mod`, and without them both fall to 0 — so the
+        // `playerPicks` fieldset would photograph three interchangeable "+0" chips and prove
+        // nothing about picking. Deliberately NOT `.value` and NOT `.total`: `skills.nat.value` is
+        // what `hb-prereq-nature` gates on and `@skills.nat.total` / `@skills.sur.total` are the
+        // gathering character modifiers, so adding either would flip a prerequisite chip or a
+        // gathering modifier row on frames that have nothing to do with this.
+        skills: { med: { mod: 4 }, nat: { mod: 2 } },
       },
       flags: {},
       isOwner: true,

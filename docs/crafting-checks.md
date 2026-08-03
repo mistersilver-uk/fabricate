@@ -55,6 +55,55 @@ Some rolls never prompt:
 
 Macros and automation that call Fabricate directly keep the original silent behaviour and never prompt.
 
+## Check modifiers
+
+A crafting check's roll formula can add in a named modifier from the crafter through the `@craftingmod` placeholder, the same way it can use `@abilities.str.mod` or any other roll-data path your game system exposes.
+The **Check modifiers** card on the **Crafting check** page defines the catalogue of modifiers a system's checks can draw on.
+The card only appears when the active crafting check has an authored roll formula, the same rule the failure-consumption toggles follow.
+Check modifiers are a crafting-only feature.
+Salvage and gathering checks do not use them.
+
+### Defining check modifiers
+
+On the **Check modifiers** card, choose **Add modifier** to add an entry.
+Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**, a roll-data path resolved against the crafter, for example `abilities.med.mod`.
+Reference `@craftingmod` in the check's roll formula wherever you want the resolved value to apply.
+A roll formula with no `@craftingmod` placeholder ignores the catalogue entirely.
+
+### The default eligible set
+
+Not every modifier in the catalogue has to count on every recipe.
+The **Default modifiers** picker, below the catalogue, sets which modifiers are on by default for the whole system.
+A recipe can override this default set on its own **Overview** tab, under **Check modifiers**.
+Choose **Eligible modifiers** there to pick a different set for that recipe alone, or leave it inheriting the system default.
+The recipe-level **Check modifiers** control only appears when the system has at least one modifier in its catalogue.
+
+### Combining modifiers
+
+The **Default combination** setting on the **Check modifiers** card decides how the eligible modifiers combine into `@craftingmod`.
+A recipe can also override the combination on its own **Overview** tab, alongside its eligible-set override.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Combination | What it does | When you would want it |
+|:------------|:-------------|:------------------------|
+| **Add all** | Sums every eligible modifier. | The recipe rewards stacking every relevant skill or tool bonus at once. |
+| **Highest** | Uses only the single largest eligible modifier, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
+| **By recipe** | Sums whichever modifiers the recipe itself has selected as eligible. | Different recipes in the same system need different modifiers to matter, with no player choice involved. |
+| **Player picks** | The player chooses exactly one eligible modifier at roll time. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+### Player picks
+
+**Player picks** is the only combination that is not fully decided ahead of the roll.
+It only prompts the player when all of the following are true for that attempt: the roll happens through the interactive dialog described above, the check's roll formula contains `@craftingmod`, the effective combination (the recipe's own override, or otherwise the system default) is **Player picks**, and at least two modifiers are eligible for that recipe.
+When any of those is not true, for example a recipe with only one eligible modifier, or a Macro rolling the check directly, the check resolves exactly as **Highest** instead, with no prompt.
+
+When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon, label, and its resolved value.
+The highest-valued modifier is pre-selected, so a player who just clicks **Roll** without changing the selection gets the same result as **Highest** would have given.
+Because the chosen value is not known until the player picks it, the formula preview shows **(modifier)** in that spot instead of a number, until the player confirms a choice.
+
 ## How a routed check is rolled
 
 In a Routed by check system, the crafting check rolls its configured expression at the moment of crafting and maps the total onto one of the outcome tiers you defined.

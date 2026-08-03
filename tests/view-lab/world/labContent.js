@@ -1439,6 +1439,17 @@ const HERBALISM_RECIPES = [
         },
       ],
       toolIds: ['hb-tool-mortar'],
+      // The world's only per-recipe check-modifier override, and the only route to the interactive
+      // `playerPicks` prompt: `resolveModifierPolicy` prefers the recipe's policy over the system's
+      // `highest`. The id subset is widened to all three catalogue entries so the prompt's fieldset
+      // offers three options with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2)
+      // rather than a row of identical chips — a pick-one control photographed against equal
+      // options shows nothing about picking. Three also clears the two-option floor below which the
+      // engine suppresses the descriptor entirely.
+      craftingModifier: {
+        policy: 'playerPicks',
+        modifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools'],
+      },
     }
   ),
   recipe(
@@ -2690,11 +2701,20 @@ const PROGRESSIVE_CHECK = Object.freeze({
   enabled: true,
   consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
   progressive: {
-    rollFormula: '1d20 + @abilities.int.mod',
+    // `@craftingmod` (issue 770) is the world's ONLY reference to the placeholder, and it is
+    // load-bearing rather than decorative: `CraftingEngine._buildInteractiveModifierChoice` gates
+    // the `playerPicks` prompt on the token being PRESENT in the rolled formula, so without it the
+    // modifier fieldset is unreachable no matter what the policy says.
+    rollFormula: '1d20 + @abilities.int.mod + @craftingmod',
     thresholds: { success: 12 },
     stageAdvanceOnSuccess: 1,
   },
   checkModifiers: HERBALISM_CHECK_MODIFIERS,
+  // LEFT at `highest`, deliberately. Flipping the system default to `playerPicks` would rewrite
+  // `manager-checks-crafting-modifiers` — the frame that is this change's evidence for the
+  // catalogue card AT REST — so the at-rest and selected-state frames would stop being two
+  // different pictures. The Phase-2 policy is reached through a per-RECIPE override on
+  // `hb-r-stillroom` instead, which also exercises `Recipe._normalizeCraftingModifier`'s new value.
   defaultModifierPolicy: 'highest',
   defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature'],
 });

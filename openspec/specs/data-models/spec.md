@@ -162,7 +162,10 @@ CraftingSystem = {
     // fragment evaluated against the crafter (missing/failed → 0). Absent = empty
     // catalogue + addAll policy = a no-op for a single-formula check (back-compat).
     checkModifiers?: { id: string, label: string, icon?: string, expression: string }[], // default []
-    defaultModifierPolicy?: "addAll" | "highest" | "byRecipe",  // default "addAll"
+    // An unrecognized value falls back to "addAll" HERE (system level only); a bad
+    // recipe-level policy instead inherits this one. playerPicks resolves as highest
+    // whenever the deferred pick-one prompt is not offered (resolution-modes/spec.md).
+    defaultModifierPolicy?: "addAll" | "highest" | "byRecipe" | "playerPicks",  // default "addAll"
     defaultModifierIds?: string[],  // default []; catalogue entries applied by default
   },
 
@@ -857,7 +860,7 @@ Recipe = {
   // catalogue). `byRecipe` at recipe level means "use exactly this recipe's modifierIds".
   // The normalizer drops a malformed value to null and a policy-less + id-less object to
   // null (nothing to override). Semantics in resolution-modes/spec.md §Check Source.
-  craftingModifier?: { policy?: "addAll" | "highest" | "byRecipe", modifierIds?: string[] } | null,
+  craftingModifier?: { policy?: "addAll" | "highest" | "byRecipe" | "playerPicks", modifierIds?: string[] } | null,
 
   // Per-recipe access grants for the `restricted` visibility mode (issue 511, PR-B).
   // Which specific player-characters and players may see/read this recipe. Each is a
@@ -940,7 +943,11 @@ Recipe = {
     It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
     An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
     13a. `craftingModifier` is an optional per-recipe crafting-check modifier override (issue 770): `{ policy?, modifierIds? } | null`, defaulting to `null` (inherit the system default policy + `defaultModifierIds`).
-    The normalizer keeps only a known `policy` (`addAll`/`highest`/`byRecipe`) and a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object with neither a valid policy nor a non-empty id list, round-trips to `null`.
+    The normalizer keeps only a known `policy` (`addAll`/`highest`/`byRecipe`/`playerPicks`) and a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object with neither a valid policy nor a non-empty id list, round-trips to `null`.
+    An unrecognized policy is dropped at BOTH levels but to DIFFERENT defaults, and the two must not be conflated.
+    At recipe level (`Recipe._normalizeCraftingModifier`, the normalizer this requirement governs) an unrecognized `policy` becomes `null`, and a null recipe policy means _inherit the system's effective policy_ — which may be `highest`, `byRecipe` or `playerPicks`, not necessarily `addAll` — so a recipe carrying a bad policy plus a valid `modifierIds` list still resolves under the system's `defaultModifierPolicy` over its own id subset.
+    Only at system level (`craftingCheck.defaultModifierPolicy`, normalized by `CraftingSystemManager._normalizeCheckModifierConfig`) does an unrecognized policy fall back to `addAll`, because there is no further level to inherit from.
+    `playerPicks` needs no new per-recipe fields (the eligible-set model is unchanged; the policy only changes how the eligible set combines at roll time).
     Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.

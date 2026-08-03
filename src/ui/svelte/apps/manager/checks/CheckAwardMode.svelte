@@ -11,20 +11,20 @@
   salvage, and gathering progressive check editors so the vocabulary stays one.
 
   Controlled: renders `value` (the award mode) and emits the next mode via onChange.
+  Rendered through the shared `RadioCardGroup` primitive (issue 855) so the three
+  modes read as the same icon-tile radio cards as every other manager choice.
 -->
 <script>
-  import { localize } from '../../../util/foundryBridge.js';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
 
   let { value = 'equal', name = 'progressive-award-mode', onChange = () => {} } = $props();
 
-  function text(key, fallback) {
-    const translated = localize(key);
-    return translated && translated !== key ? translated : fallback;
-  }
-
+  // The icons are the comparison each mode makes against a result's difficulty:
+  // equal spends up to it, partial overshoots into one result, exceed must clear it.
   const OPTIONS = [
     {
       value: 'equal',
+      icon: 'fas fa-equals',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardEqual',
       fallback: 'Equal',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardEqualDesc',
@@ -32,6 +32,7 @@
     },
     {
       value: 'partial',
+      icon: 'fas fa-circle-half-stroke',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardPartial',
       fallback: 'Partial',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardPartialDesc',
@@ -40,6 +41,7 @@
     },
     {
       value: 'exceed',
+      icon: 'fas fa-greater-than',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardExceed',
       fallback: 'Exceed',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.AwardExceedDesc',
@@ -56,29 +58,13 @@
   }
 </script>
 
-<div
-  class="manager-checks-type-options"
-  role="radiogroup"
-  aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}
->
-  {#each OPTIONS as option (option.value)}
-    <label
-      class={`manager-resolution-option ${selected === option.value ? 'is-active' : ''}`}
-      data-award-mode-option={option.value}
-    >
-      <input
-        type="radio"
-        {name}
-        value={option.value}
-        checked={selected === option.value}
-        onchange={() => select(option.value)}
-      />
-      <span class="manager-resolution-option-body">
-        <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
-        <span class="manager-resolution-option-desc"
-          >{text(option.descKey, option.descFallback)}</span
-        >
-      </span>
-    </label>
-  {/each}
-</div>
+<RadioCardGroup
+  legendKey="FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle"
+  legend="Award mode"
+  options={OPTIONS}
+  selectedValue={selected}
+  groupName={name}
+  columns={2}
+  optionDataAttr="data-award-mode-option"
+  onChange={select}
+/>

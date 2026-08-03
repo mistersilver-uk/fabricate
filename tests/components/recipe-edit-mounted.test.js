@@ -503,8 +503,15 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(select.value, 'byRecipe', 'reflects the recipe override policy');
     assert.deepEqual(
       [...select.querySelectorAll('option')].map((o) => o.value),
-      ['', 'addAll', 'highest', 'byRecipe']
+      ['', 'addAll', 'highest', 'byRecipe', 'playerPicks']
     );
+    // The Phase-2 "Player picks" override round-trips through the wrapper (issue 770 P2).
+    select.value = 'playerPicks';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(patches.at(-1), {
+      craftingModifier: { policy: 'playerPicks', modifierIds: ['med'] },
+    });
     // The per-modifier picker shows the catalogue as cancellable pills, with the
     // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');

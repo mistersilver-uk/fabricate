@@ -105,10 +105,11 @@
   // per-modifier picker shows. Writing null clears the override entirely (inherit).
   const MODIFIER_POLICY_LABELS = {
     addAll: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll', 'Add all'),
-    highest: () =>
-      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Pick highest'),
+    highest: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Highest'),
     byRecipe: () =>
       text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe', 'By recipe'),
+    playerPicks: () =>
+      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicks', 'Player picks'),
   };
   const overridePolicy = $derived(recipe?.craftingModifier?.policy || '');
   const overrideModifierIds = $derived(recipe?.craftingModifier?.modifierIds || []);
@@ -350,6 +351,7 @@
           <option value="addAll">{MODIFIER_POLICY_LABELS.addAll()}</option>
           <option value="highest">{MODIFIER_POLICY_LABELS.highest()}</option>
           <option value="byRecipe">{MODIFIER_POLICY_LABELS.byRecipe()}</option>
+          <option value="playerPicks">{MODIFIER_POLICY_LABELS.playerPicks()}</option>
         </select>
       </label>
       {#if hasModifierOverride}

@@ -7343,12 +7343,18 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
-          // Per-recipe check-modifier override (issue 770): this recipe overrides the
-          // system's `highest` default policy with `byRecipe`, drawing only the `alch`
-          // catalogue modifier into `@craftingmod`. It renders the recipe editor's
-          // Overview modifier control in its OVERRIDE (not inherit) state — the
-          // screenshot evidence for the per-recipe override half of #770.
-          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
+          // Per-recipe check-modifier override (issue 856): this recipe overrides the
+          // system's `highest` default policy with `playerPicks`, rendering the Phase-E
+          // interactive roll prompt's modifier selection fieldset. The eligible modifiers
+          // ('med', 'herb') are the system defaults, matching WIS (Medicine) and DEX
+          // (Herbalism), which resolve to different ability scores on the smoke's dnd5e
+          // Starter Hero so the frame shows a real choice with two distinct radio chips.
+          // The `1d20 + 20 + @craftingmod` formula has large margin vs dc 5 Masterwork,
+          // so the craft succeeds regardless of which modifier the player selects. This
+          // recipe is the one selected by Phase-E's `selectCraftingRecipeByMode('routedByCheck')`
+          // (first in DOM order, alphabetically before Forge Iron Sword), making this
+          // the evidence frame for the playerPicks policy (issue 856).
+          craftingModifier: { policy: 'playerPicks', modifierIds: ['med', 'herb'] },
           // Single result group → produced on any non-failure outcome. The Phase-E
           // craft rolls `1d20 + 20 + @craftingmod` (always Masterwork), so this craft
           // deterministically succeeds and yields the single "Brewed Potion" group.
@@ -9693,7 +9699,7 @@ async function main() {
 
         // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
         // 770). The seed authors a populated catalogue (Medicine / Alchemy / Herbalism)
-        // with a "Pick highest" default policy on the crafting check, so the frame shows
+        // with a "Highest" default policy on the crafting check, so the frame shows
         // the redesigned rows — IconPicker + label + the `@`-adorned expression field —
         // plus the default-modifier pill multi-select. A DEDICATED frame (not the
         // failure-consumption one above, which the same tab scrolls elsewhere for) so
@@ -9703,7 +9709,13 @@ async function main() {
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
             .first();
           await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
-          await modifierCard.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          // Scroll to the "Default combination" policy radio-group rather than the card
+          // top: the four policy options — Add all / Highest / By recipe / Player
+          // picks (issue 770 Phase 2, #855) — are the changed surface, and they sit
+          // below the (stable) IconPicker/label/@-expression rows. This keeps the bottom
+          // rows in view above the policy cards for context.
+          const policyGroup = modifierCard.locator('[data-crafting-modifier-policy]').first();
+          await policyGroup.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-checks-crafting-modifiers');
           process.stdout.write('  D0: checks crafting modifiers screenshotted\n');

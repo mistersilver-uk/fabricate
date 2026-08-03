@@ -436,6 +436,28 @@ describe('createAdminStore', () => {
       assert.deepEqual(check.defaultModifierIds, ['med']);
     });
 
+    it('projects every policy the manager accepts, including playerPicks (issue 855)', async () => {
+      // The projection normalized the policy through a LOCAL allowlist that predated
+      // `playerPicks`, so a stored `playerPicks` came back out as `addAll`: the GM
+      // clicked "Player picks", the card re-rendered on "Add all", and the system-level
+      // policy was unselectable through the UI even though the write itself was correct.
+      // Drive every accepted value, plus an unknown one, through the real projection.
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      const store = createAdminStore(services);
+      const projectPolicy = async (defaultModifierPolicy) => {
+        sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy };
+        await store.refresh();
+        return get(store.viewState).selectedSystem.craftingCheck.defaultModifierPolicy;
+      };
+
+      for (const policy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+        assert.equal(await projectPolicy(policy), policy, `${policy} survives the projection`);
+      }
+      assert.equal(await projectPolicy('bogus'), 'addAll', 'an unknown policy still falls back');
+      assert.equal(await projectPolicy(undefined), 'addAll', 'an absent policy still defaults');
+    });
+
     it('saveCraftingCheckModifiers preserves sibling check fields and replaces the catalogue array (issue 770 persistence trap)', async () => {
       // updateSystem shallow-merges only the top level, so a checkModifiers-only patch
       // that failed to spread `...existing` would drop every sibling check field. Capture
