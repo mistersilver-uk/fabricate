@@ -18,6 +18,7 @@ const LEARN_RECIPE_MESSAGES = {
   alreadyLearned: 'FABRICATE.Knowledge.AlreadyLearned',
   noMatchingItem: 'FABRICATE.Knowledge.NoMatchingItem',
   learnBudgetSpent: 'FABRICATE.Knowledge.LearnBudgetSpent',
+  learnRequiresGm: 'FABRICATE.Knowledge.LearnRequiresGm',
   prerequisiteNotMet: 'FABRICATE.Knowledge.PrerequisiteNotMet',
   characterPrerequisiteNotMet: 'FABRICATE.Knowledge.CharacterPrerequisiteNotMet',
   learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe',
@@ -1561,6 +1562,19 @@ export class RecipeVisibilityService {
     const remainingBudget = Number.isFinite(maxRecipes) ? maxRecipes - count : 0;
     if (remainingBudget <= 0) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learnBudgetSpent };
+    }
+
+    // A `total`-scope budget lives in a WORLD setting, so only a GM can reserve a
+    // slot. Report that as its own reason: the increment failing because this client
+    // is a player is NOT the budget being spent, and reporting "no learning uses
+    // left" told players their shared budget was gone while it sat untouched — a
+    // silent, permanent block on every `total`-scope book. `writable` is optional so
+    // injected test doubles (and any store that cannot refuse) behave as before.
+    if (
+      typeof this._partyLearnPool.writable === 'function' &&
+      this._partyLearnPool.writable() !== true
+    ) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.learnRequiresGm };
     }
 
     const reserved = await this._partyLearnPool.increment(key);

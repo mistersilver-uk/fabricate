@@ -35,6 +35,45 @@ test('Fabricate bridges replicated crafting-data setting changes into local refr
   );
 });
 
+test('Fabricate routes gathering node depletion to the active GM', () => {
+  // A player cannot write the world setting the environment node pools live in, so
+  // the decrement MUST be relayed. These pin the wiring: the pure routing module is
+  // unit-tested elsewhere, but every one of those tests stays green if main.js never
+  // injects the seam or never registers the inbound route.
+  assert.ok(
+    mainSource.includes('createGatheringNodeDepletionWriter') &&
+      mainSource.includes('routeGatheringNodeDepleteMessage') &&
+      mainSource.includes("from './systems/gatheringNodeSocket.js'"),
+    'main.js should import the gathering node depletion writer and router'
+  );
+  assert.ok(
+    mainSource.includes('allowSender: gatheringDepletionRateLimiter'),
+    'the inbound route should be rate limited per sender'
+  );
+  assert.ok(
+    mainSource.includes('depleteEnvironmentNode: (payload) => this.gatheringNodeDepletionWriter.deplete(payload)'),
+    'the rich-state service should receive the GM-routed depletion seam'
+  );
+  assert.ok(
+    mainSource.includes('routeGatheringNodeDepleteMessage(payload, {'),
+    'the module socket handler should route inbound depletion messages'
+  );
+  assert.ok(
+    mainSource.includes('gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore'),
+    'the setting-change bridge should receive the environment store so clients reload node counts'
+  );
+});
+
+test('Fabricate gates matured timed gathering runs to the primary GM', () => {
+  // `resumeTimedRuns` defaults to `() => true` so unit fixtures resume, which makes
+  // this wiring load-bearing: without it EVERY connected client resolves the same
+  // matured run and double-applies its items, tool wear and node depletion.
+  assert.ok(
+    mainSource.includes('resumeTimedRuns: isPrimaryGM'),
+    'the gathering engine should receive the real primary-GM check for timed resumption'
+  );
+});
+
 test('Fabricate wires RecipeManager to the live crafting-system manager', () => {
   assert.match(
     mainSource,

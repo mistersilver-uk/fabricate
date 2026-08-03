@@ -2,6 +2,7 @@ import { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS } from './settings.js';
 
 const CRAFTING_SYSTEMS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CRAFTING_SYSTEMS}`;
 const RECIPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPES}`;
+const GATHERING_ENVIRONMENTS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`;
 
 /**
  * Bridge a replicated Fabricate world-setting change into the local change hooks the
@@ -23,12 +24,17 @@ const RECIPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPES}`;
  * @param {object} deps
  * @param {{ reload: () => boolean, getSystems: () => any[] }} [deps.craftingSystemManager]
  * @param {{ reload: () => boolean, getRecipes: () => any[] }} [deps.recipeManager]
+ * @param {{ load: () => any[] }} [deps.gatheringEnvironmentStore] Gathering environment
+ *   store, reloaded so replicated `nodeRuntime` changes (a GM-applied gather
+ *   depletion, a restock, a world-time respawn) are visible on every client. The
+ *   store caches `environments` in memory and otherwise only re-reads at startup, so
+ *   without this a client's node counts silently diverge from the world.
  * @param {(hook: string, payload: any) => void} deps.callAll Bound `Hooks.callAll`.
  * @returns {boolean} `true` when `settingKey` was a handled Fabricate data setting.
  */
 export function handleFabricateSettingChange(
   settingKey,
-  { craftingSystemManager, recipeManager, callAll } = {}
+  { craftingSystemManager, recipeManager, gatheringEnvironmentStore, callAll } = {}
 ) {
   if (settingKey === CRAFTING_SYSTEMS_KEY) {
     if (craftingSystemManager?.reload?.()) {
@@ -43,6 +49,17 @@ export function handleFabricateSettingChange(
         recipes: recipeManager.getRecipes(),
       });
     }
+    return true;
+  }
+  if (settingKey === GATHERING_ENVIRONMENTS_KEY) {
+    // `load()` re-reads the setting into the store's in-memory list; it only reads,
+    // so there is no write → `updateSetting` → write loop. The hook then tells open
+    // views to re-project — without it the reload is invisible, since a player whose
+    // gather was applied BY THE GM has no other signal that their node counts moved.
+    // Unlike the manager reloads above there is no "unchanged" short-circuit to gate
+    // on: the store's `load()` returns the list, not a changed flag.
+    gatheringEnvironmentStore?.load?.();
+    callAll?.('fabricate.gatheringEnvironmentsChanged');
     return true;
   }
   return false;

@@ -175,6 +175,50 @@ export function normalizeNodeConfig(data = null) {
 }
 
 /**
+ * Consume ONE unit from a resource-node pool, returning the next node object
+ * (config + runtime state) without mutating the input. `current` is clamped into
+ * `[0, max]` so a pool whose stored count drifted above its cap cannot persist an
+ * out-of-range value. A missing or non-finite `max` means "no cap" — NOT a cap of
+ * zero, which would silently empty the pool in one call.
+ *
+ * The upper clamp is inert on the environment path (`_mergeNodeConfigState` has
+ * already clamped `current` to the library `max`) but is NOT inert on the
+ * interactable-scoped path, whose node is read verbatim with no library merge: a
+ * scoped pool whose stored `current` exceeded its own `max` used to decrement by one
+ * and now settles to `max`. That is the intended invariant, called out here because
+ * it is a behaviour change on a path this extraction otherwise leaves alone.
+ *
+ * The respawn anchor is seeded here when an `overTime` pool is depleted for the
+ * first time: a freshly-seeded pool carries `lastEvaluatedWorldTime: null`, and
+ * without an anchor the FIRST world-time advance past the interval is spent
+ * re-anchoring instead of producing a gain (mirrors stamina pool anchor seeding).
+ *
+ * Extracted from the rich-state commit path so the acting client and the active GM
+ * — which recomputes the decrement from its own authoritative stored state when a
+ * player routes the write (see `gatheringNodeSocket.js`) — share one implementation
+ * and can never drift.
+ *
+ * @param {object|null} node The current node object.
+ * @param {object} [options]
+ * @param {number} [options.worldTime=0] Current world time, used to seed the anchor.
+ * @returns {object|null} The next node object, or null when there is no node.
+ */
+export function depleteNodeOnce(node, { worldTime = 0 } = {}) {
+  if (!node || typeof node !== 'object') return null;
+  const max = numberOrNull(node.max);
+  const decremented = Math.max(0, Number(node.current || 0) - 1);
+  const current = max === null ? decremented : Math.min(max, decremented);
+  const next = { ...cloneJson(node), current };
+  if (next.respawn?.policy === 'overTime' && next.respawn.lastEvaluatedWorldTime == null) {
+    next.respawn = {
+      ...next.respawn,
+      lastEvaluatedWorldTime: Number(worldTime) || 0,
+    };
+  }
+  return next;
+}
+
+/**
  * Normalize a per-environment node runtime map (taskId → node object). Drops
  * entries that don't resolve to a node config.
  *

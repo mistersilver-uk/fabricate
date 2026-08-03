@@ -26,6 +26,7 @@ import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
+import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGatheringNodeDepleteMessage } from './systems/gatheringNodeSocket.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
@@ -125,6 +126,11 @@ import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
 
 let gatheringEngine = null;
+
+// Per-sender throttle for inbound gathering node depletions, held at module scope so
+// the window survives across socket messages (a per-message limiter would never
+// refuse anything). Only the active GM ever consults it.
+const gatheringDepletionRateLimiter = createDepletionRateLimiter();
 
 // The GM-only crafting system manager app is deferred to a lazy chunk so
 // non-GM players never download/parse its subtree at module init. The dynamic
@@ -399,6 +405,7 @@ class Fabricate {
     this.salvageRunManager = null;
     this._runJournalBuilder = null;
     this.gatheringEnvironmentStore = null;
+    this.gatheringNodeDepletionWriter = null;
     this.gatheringRichStateService = null;
     this.gatheringRunManager = null;
     this.gatheringGateAndCheckEvaluator = null;
@@ -458,9 +465,10 @@ class Fabricate {
       primeEnricherCache: (rawTexts) => primeEnricherCache(rawTexts)
     });
     // Wire the real primary-GM check into the timed world-time resume paths (issue
-    // 656). Both managers default `isPrimaryGM` to `() => true` (fail-open, so unit
-    // fixtures resume), so passing the real `activeGM` check here is load-bearing —
-    // it gates the synced-hook `setFlag` writes to exactly one client.
+    // 656). Both managers — and the gathering engine's `resumeTimedRuns` below —
+    // default this to `() => true` (fail-open, so unit fixtures resume), so passing
+    // the real `activeGM` check here is load-bearing: it gates the synced-hook
+    // `setFlag` writes, item creation and node depletion to exactly one client.
     const isPrimaryGM = () => game.users?.activeGM?.id === game.user?.id;
     this.craftingRunManager = new CraftingRunManager({ isPrimaryGM });
     this.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
@@ -569,8 +577,30 @@ class Fabricate {
         return uuids;
       }
     });
+    // Environment resource-node pools live in `environment.nodeRuntime[taskId]`,
+    // persisted in the `gatheringEnvironments` WORLD setting — and Foundry lets only
+    // a GM update a world Setting document. A player who gathers from a node-backed
+    // task therefore cannot write their own decrement; without this relay the write
+    // rejects with "User <name> lacks permission to update Setting [...]" and the
+    // pool never depletes. Route it to the active GM over the same `module.fabricate`
+    // channel issue 302 already uses for interactable-scoped pools. On a GM client
+    // the writer applies locally (a socket emit never reaches the emitter).
+    this.gatheringNodeDepletionWriter = createGatheringNodeDepletionWriter({
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      // `Users#activeGM` is null when no GM is connected, so nobody would apply the
+      // relayed write. Report it rather than emitting into the void: the gather still
+      // succeeds (it never gated on this write), the pool just does not deplete.
+      hasActiveGM: () => !!game.users?.activeGM,
+      onUnroutable: ({ environmentId, taskId }) => console.warn(
+        'Fabricate | Gathering node depletion was not applied: no active GM is connected to write the world setting',
+        { environmentId, taskId }
+      ),
+      emitDeplete: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+      applyDeplete: (payload) => this.gatheringRichStateService?.applyEnvironmentNodeDepletion(payload)
+    });
     this.gatheringRichStateService = new GatheringRichStateService({
       environmentStore: this.gatheringEnvironmentStore,
+      depleteEnvironmentNode: (payload) => this.gatheringNodeDepletionWriter.deplete(payload),
       getSetting,
       setSetting,
       settingKey: SETTING_KEYS.GATHERING_CONFIG,
@@ -588,6 +618,9 @@ class Fabricate {
       writeInteractableBehavior: (ref, patch) => writeInteractableBehaviorNode(ref, patch)
     });
     gatheringEngine = new GatheringEngine({
+      // Load-bearing: without it every connected client resumes the same matured
+      // timed run and double-applies its items, tool wear and node depletion.
+      resumeTimedRuns: isPrimaryGM,
       environmentStore: this.gatheringEnvironmentStore,
       runManager: this.gatheringRunManager,
       richState: this.gatheringRichStateService,
@@ -2763,6 +2796,30 @@ Hooks.once('ready', async () => {
       // Defensive: an event-route throw must never block the Interactable payload
       // from reaching handleInteractableSocketMessage below.
     }
+    // Same channel carries the gathering ENVIRONMENT node depletion a player emits
+    // when they gather from a node-backed task: only the active GM may write the
+    // `gatheringEnvironments` world setting, so it applies the single-unit decrement
+    // here, recomputed from its own stored state. Guarded for the same reason as the
+    // event route above — a throw must not starve the Interactable payload.
+    try {
+      routeGatheringNodeDepleteMessage(payload, {
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+        senderId,
+        // Bounds the residual denial-of-resource surface: the applier re-checks the
+        // node economy but not whether the sender could actually reach that task, so
+        // throttle each sender to human gathering speed.
+        allowSender: gatheringDepletionRateLimiter,
+        applyDeplete: (args) => {
+          // The apply is async and nothing awaits a socket handler, so a failed
+          // world-setting write must be caught here or it lands as an unhandled
+          // rejection on the GM's client.
+          Promise.resolve(fabricate.gatheringRichStateService?.applyEnvironmentNodeDepletion(args))
+            .catch(error => console.warn('Fabricate | Gathering node depletion failed', error));
+        }
+      });
+    } catch (_error) {
+      // Defensive: never block the Interactable payload below.
+    }
     // Same `module.fabricate` channel also carries the canvas Interactable
     // node-update action (player → active GM token-flag write) AND the region-first
     // activation round-trip. Only the active GM applies node/behaviour writes +
@@ -2803,6 +2860,7 @@ Hooks.once('ready', async () => {
     handleFabricateSettingChange(key, {
       craftingSystemManager: fabricate.craftingSystemManager,
       recipeManager: fabricate.recipeManager,
+      gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
       callAll: (hook, payload) => Hooks.callAll(hook, payload),
     });
   });

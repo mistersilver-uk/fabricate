@@ -17,6 +17,7 @@
     subscribeTravelMarkerMove,
     subscribeInventoryChange,
     subscribeCraftingDataChange,
+    subscribeGatheringDataChange,
   } from '../../util/foundryBridge.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
@@ -292,6 +293,13 @@
   // drop tables surfaced here; quietly re-fetch. Cross-client via the updateSetting
   // bridge (see subscribeCraftingDataChange).
   $effect(() => subscribeCraftingDataChange(() => load(true)));
+
+  // Resource-node counts live on the environment and are written by the active GM —
+  // including the depletion caused by THIS player's own attempt, which lands after
+  // the post-attempt `load()` above has already run. Quietly re-fetch when the
+  // replicated environment setting reloads, so counts and the depleted-pool gate
+  // reflect the world instead of a stale local snapshot.
+  $effect(() => subscribeGatheringDataChange(() => load(true)));
 
   // Report the selected environment's stamina pool up to the shared store so the
   // header bar can render it; cleared when no environment is selected.
