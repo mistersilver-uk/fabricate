@@ -964,9 +964,18 @@ Recipe = {
     Shipped code does not yet meet that chokepoint rule everywhere, so the callers that still re-derive it are recorded here rather than left implicit.
     Four `src/systems` resolvers re-derive it and prefer the borrowed recipe-item image ahead of `recipe.img` — `InventoryListingBuilder._resolveIndexedRecipeImg`, the inline block in `CraftingListingBuilder`, `CraftingEngine._resolveRecipePromptImg`, and `RunJournalBuilder._resolveCraftingRunImg`.
     Closing that path is deferred to issue 887, and it is reachable in a migrated world because `CraftingSystemManager._migrateLegacyRecipeItems` runs un-gated on every `initialize()` and repopulates the scalar from a standalone alchemy `linkedRecipeItemUuid` that the 1.13.0 migration preserved.
+    Until issue 978 it was reachable for the ORDINARY cohort too, not only that alchemy one, because a manager save persisted a projection-derived scalar onto any recipe linked to a book (requirement 17), so the four resolvers were live for far more recipes than this requirement first recorded.
     `RecipeManager.resolveRecipeIcon` and `resolveRecipeIconAsync` also re-derive it under `src/systems`, but order it the other way — an authored non-default `img` wins outright and the borrow outranks only the default — and both are caller-less; issue 887 covers them too.
     The one re-derivation inside `src/ui` is `buildRecipeGraph` (`src/ui/svelte/util/recipeGraphBuilder.js`), which takes `recipe.img || DEFAULT_RECIPE_IMAGE` at the call site: it borrows nothing, but it does not treat the `icons/svg/item-bag.svg` sentinel (or a whitespace-only `img`) as "no image".
     It carries no user impact today, because the Graph surface is an unimplemented placeholder gated behind `fabricate.experimentalFeatures` (issue 442).
+17. A UI draft seeded from the recipe-browser projection carries DERIVED, non-model fields — `recipeItemId`, `recipeItemIds`, `recipeItemName` and `recipeItemSourceUuid` — for display only (issue 978).
+    A save must OMIT them from the update payload rather than writing them, and must never write them as `null`: `RecipeManager.updateRecipe` merges over the persisted record, so omission preserves the persisted value while an explicit `null` would destroy the scalar maintained for the standalone alchemy formula-item cohort.
+    The strip belongs to the store that derives them, so the projection's producer owns its own write boundary and the draft keeps carrying them for the editor's Books & Scrolls display.
+    Only `recipeItemId` reaches disk today, because `Recipe.fromJSON` reconstructs from named fields and drops the other three; that is a property of the model's current field list rather than a guarantee, so the whole derived set is stripped and named in one place.
+    `recipe.recipeItemId` is authored ONLY by migration and by `CraftingSystemManager._migrateLegacyRecipeItems`, never by the editor.
+    A recipe that is a book member through `RecipeItemDefinition.recipeIds[]` and carries no `linkedRecipeItemUuid` has its leaked scalar cleared by that same un-gated pass, which is idempotent because a cleared recipe is not a re-stamp candidate.
+    The repair is deliberately unreachable in a fully un-migrated system, where no definition carries `recipeIds` so no recipe is a member and the scalar is still the membership source for `getRecipeItemDefinitionsContaining` and `_getRecipeObjectsReferencingRecipeItemDefinition`.
+    Those two membership reads, and their `adminStore` mirror `_recipeItemDefinitionsContaining`, are each gated on no definition in the system carrying membership, so a leaked scalar never resurrected phantom book membership — its only live consequence was the image borrow in requirement 16.
 
 ### Validation Guidance
 
