@@ -161,6 +161,10 @@ Add a trigger that watches the d20 group for a 1 and set its **Tier step** to **
 A roll that would have landed on **Poor** now lands on **Ruined** instead.
 Add a second trigger watching that group for a 20 and set it to **Step up 1**, and a natural 20 that landed on Fine now produces Masterwork.
 
+A step does not have to key off the dice at all.
+Set a trigger's **When** to **Outcome tier**, tick **Poor**, and set its **Tier step** to **Step down 1**, and every roll that lands on Poor slides to Ruined whatever the dice showed.
+An outcome-tier trigger can step the tier even though it can never force the outcome; see [Tool breakage triggers](#tool-breakage-triggers) for the full **When** list.
+
 Several triggers can match the same roll, and their steps combine.
 Up and down steps add together, so two triggers each stepping up one move the tier up two, and one up and one down cancel out and change nothing.
 If more than one matching trigger sets a **Target tier**, the lowest of those tiers wins, so competing targets never depend on the order you added the triggers in.
@@ -188,7 +192,9 @@ See [Minimum success tier for fixed routed checks]({% link recipes/routed.md %}#
 If the roll matched no tier at all — a Fixed check whose total falls outside every range you authored — nothing steps, **Target tier** included.
 Author a range that covers those totals instead of relying on a step.
 
-When a step actually changes the tier, the crafting or salvage result explains the step in chat, including how many tiers it moved.
+When a step actually changes the tier, the crafting or salvage result explains the step in chat.
+A **Step up** or **Step down** note says how many tiers it moved.
+A **Target tier** note just says the roll was moved to the target tier.
 A step that changes nothing says nothing.
 Gathering checks step their tier the same way, but do not report the step in chat.
 
