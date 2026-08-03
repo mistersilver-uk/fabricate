@@ -31,6 +31,15 @@ const ROLL_MODE_CHOICES = Object.freeze([
 ]);
 
 /**
+ * The check-modifier catalogue's own default icon class (mirrors
+ * `CraftingModifierCatalogueCard.svelte`'s `DEFAULT_MODIFIER_ICON`). An option whose
+ * catalogue entry carries no icon still renders an `<i>` with this class: the modifier
+ * row is a flex row, so omitting the element would collapse the icon gutter and start
+ * that option's label ~1.1rem left of its siblings.
+ */
+const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
+
+/**
  * Localize a Foundry i18n key, falling back to an English default when the
  * runtime (or a test harness) cannot resolve it (echoes the key or is absent).
  * @param {string} key
@@ -133,33 +142,41 @@ export async function promptCheckRoll({
   // eligible modifiers (icon + label + signed value chip), the highest-valued option
   // pre-checked. Only rendered when a `modifierChoice` descriptor is supplied — every
   // other roll leaves this empty, so the dialog is byte-identical. The formula line
-  // already shows the default (highest) substitution; the posted roll reflects the
-  // player's final selection (resolved in `evaluateCheckRoll`).
+  // shows a NEUTRAL `(modifier)` placeholder in the `@craftingmod` slot (substituted by
+  // `evaluateCheckRoll`), not a default number a non-default pick would contradict; the
+  // per-radio chips carry each option's value and the posted roll reflects the player's
+  // final selection.
   let modifierChoiceHtml = '';
   const modifierOptions =
     modifierChoice && Array.isArray(modifierChoice.modifiers) ? modifierChoice.modifiers : [];
   if (modifierOptions.length > 0) {
+    const unnamedLabel = localize('FABRICATE.App.RollPrompt.UnnamedModifier', 'Unnamed modifier');
     const optionsHtml = modifierOptions
       .map((modifier) => {
         const id = escapeHtml(modifier?.id ?? '');
         const checked = modifier?.id === modifierChoice.defaultSelectedId ? ' checked' : '';
-        const iconHtml = modifier?.icon
-          ? `<i class="fabricate-roll-prompt__modifier-icon ${escapeHtml(modifier.icon)}" aria-hidden="true"></i>`
-          : '';
-        const numeric = Number(modifier?.value);
-        const chip = Number.isFinite(numeric)
-          ? `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(formatSigned(numeric))}</span>`
-          : '';
+        // The icon slot is ALWAYS emitted (see DEFAULT_MODIFIER_ICON): an icon-less
+        // catalogue entry must not collapse the gutter and misalign its row.
+        const iconClass = modifier?.icon || DEFAULT_MODIFIER_ICON;
+        const iconHtml = `<i class="fabricate-roll-prompt__modifier-icon ${escapeHtml(iconClass)}" aria-hidden="true"></i>`;
+        // The catalogue editor creates entries with an empty label and never forces a
+        // value, so an unnamed modifier would otherwise render as icon + chip only and
+        // announce as bare "+3". Fall back to a localized placeholder name.
+        const label = modifier?.label || unnamedLabel;
+        // The chip is ALWAYS emitted too, for the same row-alignment reason;
+        // `formatSigned` owns the non-finite fallback so there is one behaviour.
+        const chip = `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(formatSigned(modifier?.value))}</span>`;
         return (
           `<label class="fabricate-roll-prompt__modifier-option">` +
           `<input type="radio" name="craftingModifier" value="${id}"${checked} />` +
-          `${iconHtml}<span class="fabricate-roll-prompt__modifier-label">${escapeHtml(modifier?.label ?? '')}</span>${chip}</label>`
+          `${iconHtml}<span class="fabricate-roll-prompt__modifier-label">${escapeHtml(label)}</span>${chip}</label>`
         );
       })
       .join('');
+    const legend = escapeHtml(localize('FABRICATE.App.RollPrompt.CheckModifier', 'Check modifier'));
     modifierChoiceHtml =
       `<fieldset class="fabricate-roll-prompt__modifiers">` +
-      `<legend class="fabricate-roll-prompt__modifiers-legend">Check modifier</legend>` +
+      `<legend class="fabricate-roll-prompt__modifiers-legend">${legend}</legend>` +
       `${optionsHtml}</fieldset>`;
   }
 
@@ -303,9 +320,11 @@ export function buildInteractiveRollOptions({
 }
 
 /**
- * Format a modifier value as a signed chip label (`+3`, `0`, `-2`). A non-finite value
- * renders as `0`.
- * @param {number} value
+ * Format a modifier value as a signed chip label (`+3`, `+0`, `-2`) — zero renders as
+ * `+0`, matching the sign every other non-negative value carries. A missing or
+ * non-finite value renders as an unsigned `0`; this is the ONLY fallback for that case
+ * (the caller always renders a chip, so the row's icon/label/chip columns stay aligned).
+ * @param {unknown} value
  * @returns {string}
  */
 function formatSigned(value) {

@@ -3942,13 +3942,17 @@ export class CraftingEngine {
   /**
    * Build the deferred interactive `playerPicks` modifier-choice descriptor (issue 770
    * Phase 2) for an interactive craft. Returns the descriptor ONLY when the effective
-   * modifier policy is `playerPicks` AND this is an interactive roll AND the eligible
-   * set is non-empty; otherwise `undefined`, so every deterministic-policy and
-   * non-interactive craft threads a byte-identical `rollOptions` bag (no `modifierChoice`
-   * key). The descriptor is threaded onto `rollOptions.modifierChoice` and resolved to a
-   * single value inside the roll prompt — the non-interactive `playerPicks` path keeps
-   * resolving `@craftingmod` deterministically as `highest`.
+   * modifier policy is `playerPicks` AND this is an interactive roll AND the formula
+   * references `@craftingmod` AND at least TWO modifiers are eligible (the two-option
+   * rule is enforced by {@link buildCraftingModifierChoice}); otherwise `null`, so every
+   * deterministic-policy and non-interactive craft threads a byte-identical `rollOptions`
+   * bag (no `modifierChoice` key). The descriptor is threaded onto
+   * `rollOptions.modifierChoice` and resolved to a single value inside the roll prompt —
+   * the non-interactive `playerPicks` path keeps resolving `@craftingmod`
+   * deterministically as `highest`.
    * @private
+   * @returns {{token: string, modifiers: Array<{id: string, label: string, icon: string,
+   *   value: number}>, defaultSelectedId: string}|null}
    */
   _buildInteractiveModifierChoice(formula, craftingModifierContext, craftingActor, interactive) {
     if (interactive !== true) return null;
@@ -3957,7 +3961,9 @@ export class CraftingEngine {
     // deterministic policies silently no-op the same case). Gate on token presence.
     if (!String(formula ?? '').includes(CRAFTING_MOD_TOKEN)) return null;
     if (resolveModifierPolicy(craftingModifierContext) !== 'playerPicks') return null;
-    // Returns the descriptor, or null when no modifier is eligible;
+    // Returns the descriptor, or null when fewer than two modifiers are eligible (a
+    // one-option radio is not a choice — the deterministic `highest` scalar IS the only
+    // possible pick, so the prompt falls through to it);
     // `buildInteractiveRollOptions` omits the `modifierChoice` key for a falsy value.
     return buildCraftingModifierChoice(
       craftingModifierContext,

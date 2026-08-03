@@ -104,6 +104,21 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
 }
 
 /**
+ * Look up an interactive `playerPicks` modifier's numeric value by id, coercing a
+ * missing/non-finite value to 0.
+ * @param {{modifiers?: Array<{id: string, value: number}>}} modifierChoice
+ * @param {string} id
+ * @returns {number}
+ */
+function modifierChoiceValue(modifierChoice, id) {
+  const found = (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : []).find(
+    (modifier) => modifier?.id === id
+  );
+  const value = Number(found?.value);
+  return Number.isFinite(value) ? value : 0;
+}
+
+/**
  * Evaluate a check roll formula, returning `{ engine, total, diceGroups }`. Returns
  * `engine: false` when no dice engine is available (headless/non-Foundry). Throws on
  * a bad formula (callers wrap it).
@@ -136,21 +151,6 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
  * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
  *   resolvedFormula: string|null, cancelled?: boolean}>}
  */
-/**
- * Look up an interactive `playerPicks` modifier's numeric value by id, coercing a
- * missing/non-finite value to 0.
- * @param {{modifiers?: Array<{id: string, value: number}>}} modifierChoice
- * @param {string} id
- * @returns {number}
- */
-function modifierChoiceValue(modifierChoice, id) {
-  const found = (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : []).find(
-    (modifier) => modifier?.id === id
-  );
-  const value = Number(found?.value);
-  return Number.isFinite(value) ? value : 0;
-}
-
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };

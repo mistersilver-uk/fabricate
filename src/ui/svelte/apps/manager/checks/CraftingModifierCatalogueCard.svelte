@@ -66,7 +66,7 @@
       fallback: 'Player picks',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicksDesc',
       descFallback:
-        'The player picks one eligible modifier at roll time (highest pre-selected). A non-interactive craft uses the highest.',
+        'On an interactive craft whose formula uses @craftingmod, the player picks one eligible modifier at roll time (highest pre-selected); other crafts use the highest.',
     },
   ];
 
