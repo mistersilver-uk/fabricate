@@ -148,6 +148,15 @@ export class GatheringEngine {
         globalThis.game?.user?.isGM &&
         globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id
       ),
+    // Primary-GM gate for RESUMING matured timed runs, kept separate from
+    // `isPrimaryGM` above because the two have opposite safe defaults. Regen/respawn
+    // is maintenance: skipping it in a fixture is harmless, so that gate probes the
+    // Foundry globals and is false without a runtime. Resumption is the run's ONLY
+    // completion path, so a closed default would silently stop every unit fixture
+    // (which builds no `activeGM`) from resolving anything. This therefore fails
+    // OPEN and the real check is WIRED at construction in main.js — load-bearing,
+    // exactly as documented for CraftingRunManager/SalvageRunManager (issue 656).
+    resumeTimedRuns = () => true,
     getActors = () => [...(globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [])],
     // Scene graph + scoped-behaviour writer seams for interactable-scoped node
     // respawn (issue 302). `scenes` is scanned for `fabricate.interactable`
@@ -195,6 +204,7 @@ export class GatheringEngine {
     this.random = typeof random === 'function' ? random : Math.random;
     this.localize = localize;
     this.isPrimaryGM = typeof isPrimaryGM === 'function' ? isPrimaryGM : () => true;
+    this.resumeTimedRuns = typeof resumeTimedRuns === 'function' ? resumeTimedRuns : () => true;
     this.getActors = typeof getActors === 'function' ? getActors : () => [];
     this.scenes = typeof scenes === 'function' ? scenes : () => null;
     this.applyInteractableBehaviorUpdate =
@@ -261,7 +271,19 @@ export class GatheringEngine {
     const cancelled = [];
     const cleared = [];
     const errors = [];
-    const readyRuns = normalizeList(await this.runManager?.getMaturedWaitingRuns?.(worldTime));
+    // Primary-GM gate (mirrors the issue-656 fix in CraftingRunManager, whose
+    // constructor documents the identical hazard). `updateWorldTime` is synced, so
+    // this runs on EVERY connected client, and `getMaturedWaitingRuns` walks ALL of
+    // `game.actors` — not just the ones this client owns. Maturation is not a read:
+    // it writes run flags, CREATES the gathered items, burns tool durability, posts
+    // chat, and depletes the node pool. `completeRun` returning null for the loser is
+    // a race against a server round-trip, not a lock, so without this gate two clients
+    // can both carry a run past it and double-apply every one of those effects.
+    // Uses `resumeTimedRuns` (fail-open, wired in main.js) rather than the
+    // `isPrimaryGM` maintenance gate — see the constructor for why they differ.
+    const readyRuns = this.resumeTimedRuns()
+      ? normalizeList(await this.runManager?.getMaturedWaitingRuns?.(worldTime))
+      : [];
 
     for (const entry of readyRuns) {
       const actor = entry?.actor ?? null;
@@ -670,6 +692,9 @@ export class GatheringEngine {
       outcome,
       viewer,
       interactableRef,
+      // Second of this run's two commits: the node was already consumed at
+      // `waitingStart` unless the task defers it to `onSuccess`.
+      phase: 'timedMaturity',
     });
     const completedRunWithRichEvidence =
       richEvidence && typeof richEvidence === 'object'
@@ -1956,6 +1981,8 @@ export class GatheringEngine {
         outcome: { status: 'waitingTime' },
         viewer,
         interactableRef,
+        // First of this run's two commits; the maturity commit follows later.
+        phase: 'waitingStart',
       });
       const waitingRun =
         richEvidence && typeof richEvidence === 'object'
@@ -2299,6 +2326,12 @@ export class GatheringEngine {
     };
   }
 
+  /**
+   * @param {object} args
+   * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] Which
+   *   of a run's commits this is. A TIMED run commits twice (start + maturity); the
+   *   rich state uses this to consume the node exactly once per run.
+   */
   async _commitRichAttempt({
     actor,
     system,
@@ -2307,6 +2340,7 @@ export class GatheringEngine {
     outcome,
     viewer = null,
     interactableRef = null,
+    phase = 'immediate',
   }) {
     if (typeof this.richState?.commitAcceptedAttempt !== 'function') return null;
     return this.richState.commitAcceptedAttempt({
@@ -2317,6 +2351,7 @@ export class GatheringEngine {
       outcome,
       viewer,
       interactableRef,
+      phase,
     });
   }
 
@@ -2886,6 +2921,9 @@ export class GatheringEngine {
     // duplicate the broadcast across clients. Gate timed completions to the
     // primary GM (same rationale as the stamina/node-respawn guard) so they fire
     // exactly once; immediate completions resolve on the single acting client.
+    // `processWorldTime` now gates the whole maturation loop the same way, so a
+    // timed run no longer REACHES this on a non-primary GM. Kept as defence in
+    // depth: `_processMaturedWaitingRun` is also driven directly by tests.
     const timedOnNonPrimaryGM = initiatedBy === 'timed' && this.isPrimaryGM() !== true;
     if (!timedOnNonPrimaryGM) {
       this.hookPublisher?.publishAttemptCompleted({
@@ -2994,7 +3032,14 @@ export class GatheringEngine {
           events,
           brokenTools,
           staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
-          nodesRemaining: run?.economyEvidence?.node?.remaining ?? null,
+          // A chat message is a permanent world document, so never state a node count
+          // this client only guessed. When the depletion was relayed to the active GM
+          // the evidence is flagged non-authoritative and the stat is omitted rather
+          // than published wrong (`renderStat` drops a null value).
+          nodesRemaining:
+            run?.economyEvidence?.node?.authoritative === false
+              ? null
+              : (run?.economyEvidence?.node?.remaining ?? null),
         },
         this.localize
       );

@@ -377,7 +377,7 @@ function timedEnvironment() {
   };
 }
 
-function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM }) {
+function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM, resumeTimedRuns }) {
   const environments = [timedEnvironment()];
   const systems = [
     {
@@ -399,6 +399,7 @@ function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM })
     isActorSelectable: ({ actor: c }) => c?.id === timedActor.id || c?.uuid === timedActor.uuid,
     isGamePaused: () => false,
     isPrimaryGM,
+    resumeTimedRuns,
     hookPublisher,
     evaluator: {
       evaluateVisibility: async () => ({ visible: true, reasonCode: 'VISIBLE', diagnostic: null }),
@@ -418,7 +419,7 @@ function makeTimedEngine({ timedActor, runManager, hookPublisher, isPrimaryGM })
 
 // Build a matured timed-run scenario and run it through the real
 // `processWorldTime` path, returning the recorded hooks and the result.
-async function runMaturedTimedAttempt({ isPrimaryGM }) {
+async function runMaturedTimedAttempt({ isPrimaryGM, resumeTimedRuns = () => true }) {
   const timedActor = new FakeActor();
   const state = { worldTime: 1000 };
   const runManager = new GatheringRunManager({
@@ -440,6 +441,7 @@ async function runMaturedTimedAttempt({ isPrimaryGM }) {
     runManager,
     hookPublisher: new GatheringHookPublisher({ hooks, nowWorldTime: () => state.worldTime }),
     isPrimaryGM,
+    resumeTimedRuns,
   });
 
   routedRoll(true); // pass the routed dc 15 → 'Iron' tier routes to the matching group
@@ -464,9 +466,18 @@ test('processWorldTime publishes the completion hook with initiatedBy: timed on 
   ]);
 });
 
-test('processWorldTime does not publish a timed completion on a non-primary-GM client', async () => {
-  const { hooks, result } = await runMaturedTimedAttempt({ isPrimaryGM: () => false });
+test('processWorldTime does not resolve or publish a timed completion on a non-primary-GM client', async () => {
+  const { hooks, result } = await runMaturedTimedAttempt({
+    isPrimaryGM: () => false,
+    resumeTimedRuns: () => false,
+  });
 
-  assert.equal(result.completed.length, 1, 'the run still completes on this client');
-  assert.equal(completionOf(hooks), undefined, 'but no public hook is published');
+  // Previously the run completed on EVERY client and only the public hook was
+  // suppressed — so two clients raced to write run flags, create the gathered items,
+  // burn tool durability and deplete the node pool for one run. Maturation is now
+  // gated as a whole (mirroring CraftingRunManager's issue-656 fix), so a non-primary
+  // GM resolves nothing at all.
+  assert.equal(result.completed.length, 0, 'the run is left for the primary GM to resolve');
+  assert.equal(result.processed.length, 0, 'no side effects are applied on this client');
+  assert.equal(completionOf(hooks), undefined, 'and no public hook is published');
 });
