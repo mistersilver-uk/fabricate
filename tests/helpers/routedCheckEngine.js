@@ -191,6 +191,28 @@ const CHAT_CRAFT_RECIPE = Object.freeze({
 });
 
 /**
+ * Capture every `ChatMessage.create` payload and install the minimal `game` shims the
+ * chat posters read. Shared by {@link craftForChatCard} and
+ * {@link salvageForChatCard}: a second copy of this stub would be new test code
+ * duplicating new test code against SonarCloud's `new_duplicated_lines_density` gate.
+ *
+ * Assumes `globalThis.game` already exists (both callers build it first).
+ */
+function captureChatMessages(speakerAlias) {
+  const chatMessages = [];
+  globalThis.ChatMessage = {
+    create(payload) {
+      chatMessages.push(payload);
+      return Promise.resolve({ id: `msg-${chatMessages.length}` });
+    },
+    getSpeaker: () => ({ alias: speakerAlias }),
+  };
+  globalThis.game.i18n = { localize: (key) => key, format: (key) => key };
+  globalThis.game.user = { id: 'user-1' };
+  return chatMessages;
+}
+
+/**
  * Drive a whole `craft()` through the REAL routed check to the posted result chat
  * card, and return the `ChatMessage.create` payloads it produced.
  *
@@ -222,17 +244,92 @@ export async function craftForChatCard(routed) {
     ingredientMatchesItem: () => false,
     getToolsForSet: () => [],
   };
-  const chatMessages = [];
-  globalThis.ChatMessage = {
-    create(payload) {
-      chatMessages.push(payload);
-      return Promise.resolve({ id: `msg-${chatMessages.length}` });
-    },
-    getSpeaker: () => ({ alias: ROUTED_ACTOR.name }),
-  };
-  globalThis.game.i18n = { localize: (key) => key, format: (key) => key };
-  globalThis.game.user = { id: 'user-1' };
+  const chatMessages = captureChatMessages(ROUTED_ACTOR.name);
   const craftingActor = { ...ROUTED_ACTOR, items: { contents: [] } };
   const result = await engine.craft(craftingActor, [ROUTED_ACTOR], CHAT_CRAFT_RECIPE, null, {});
+  return { result, chatMessages };
+}
+
+/**
+ * The salvaged source. It requires no tools and routes to no result group, so the
+ * whole fixture is the CHECK and the card it produces — the same reduction
+ * {@link CHAT_CRAFT_RECIPE} makes on the crafting side. `_findComponentItems` reaches
+ * the owned item through the case-sensitive NAME fallback, so the item below carries
+ * this exact name.
+ */
+const CHAT_SALVAGE_COMPONENT = Object.freeze({
+  id: 'comp-ore',
+  name: 'Iron Ore',
+  img: 'icons/ore.png',
+  salvage: Object.freeze({
+    enabled: true,
+    ingredientQuantity: 1,
+    toolIds: [],
+    resultGroups: [],
+    // Routed salvage looks the FINAL tier name up here; an empty map routes to no
+    // group, so the success path awards nothing and needs no item-creation plumbing.
+    outcomeRouting: {},
+  }),
+});
+
+/**
+ * Drive a whole `salvage()` through the REAL routed salvage check to the posted chat
+ * card, and return the `ChatMessage.create` payloads it produced.
+ *
+ * The crafting twin above exists because the engine's chat-model mapping had no
+ * coverage; this is the salvage half of the same gap. `_postSalvageChatMessage` has
+ * TWO call sites — the rolled-failure path and the success path — each passing
+ * `tierStep: tierStepForCard(checkResult)`, and a suite that calls the poster directly
+ * with its own `tierStep:` argument exercises neither, so deleting either argument
+ * would ship green (issue 975 review).
+ *
+ * The caller stubs `Roll` first: which of the two call sites runs is decided by the
+ * tier the rolled total lands on.
+ *
+ * @param {object} salvageCraftingCheck - The system's salvage check config.
+ * @returns {Promise<{result: object, chatMessages: Array<object>}>}
+ */
+export async function salvageForChatCard(salvageCraftingCheck) {
+  const system = {
+    id: 'sys-1',
+    features: { salvage: true, chatOutput: true },
+    salvageResolutionMode: 'routed',
+    salvageCraftingCheck,
+    components: [CHAT_SALVAGE_COMPONENT],
+    tools: [],
+  };
+  const sourceItem = {
+    id: 'item-ore',
+    uuid: 'Item.item-ore',
+    name: CHAT_SALVAGE_COMPONENT.name,
+    system: { quantity: 1 },
+    flags: {},
+    async delete() {
+      this.deleted = true;
+    },
+    async update() {},
+  };
+  const actor = {
+    id: 'a-salvager',
+    uuid: 'Actor.a-salvager',
+    name: 'Salvager',
+    items: [sourceItem],
+  };
+  // No run manager and no tools: `salvage()` then reduces to check → consume → post,
+  // which is the seam under test.
+  const engine = new CraftingEngine({}, null, {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+  });
+  globalThis.fromUuid = async (uuid) => (uuid === actor.uuid ? actor : null);
+  globalThis.game = {
+    fabricate: {
+      getCraftingSystemManager: () => ({ getSystem: () => system }),
+      getResolutionModeService: () => null,
+      getSalvageRunManager: () => null,
+    },
+    time: { worldTime: 0 },
+  };
+  const chatMessages = captureChatMessages(actor.name);
+  const result = await engine.salvage(actor.uuid, system.id, CHAT_SALVAGE_COMPONENT.id);
   return { result, chatMessages };
 }
