@@ -3555,7 +3555,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Under toolSpecific authority the outcome toggle is available but the break pill is not.
     const c2 = triggers.querySelector('[data-trigger="c2"]');
     assert.ok(
-      c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-selected'),
+      c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger shows the Automatic success segment selected'
     );
     assert.equal(
@@ -3564,8 +3564,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no break pill under toolSpecific'
     );
 
-    // Clicking a segment emits the new outcome.
-    c2.querySelector('[data-trigger-outcome="none"]').click();
+    // Choosing a segment emits the new outcome.
+    chooseSegment(c2, 'data-trigger-outcome', 'none');
     assert.equal(emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c2').outcome, 'none');
 
     // Add appends a new trigger; remove drops one.
@@ -3678,9 +3678,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(triggers, 'the unified trigger editor renders');
     const c1Triggers = triggers.querySelector('[data-trigger="c1"]');
     assert.ok(
-      c1Triggers
-        .querySelector('[data-trigger-outcome="success"]')
-        .classList.contains('is-selected'),
+      c1Triggers.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger selects the award-all segment'
     );
     const optionLabels = [...c1Triggers.querySelectorAll('[data-trigger-outcome]')].map(
@@ -3712,12 +3710,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(emitted.at(-1).awardMode, 'partial', 'selecting an award mode emits it');
 
     // Editing a trigger outcome preserves the carried award settings.
-    c1Triggers.querySelector('[data-trigger-outcome="none"]').click();
-    flushSync();
+    chooseSegment(c1Triggers, 'data-trigger-outcome', 'none');
     assert.equal(
       emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c1').outcome,
       'none',
-      'clicking a segment emits the new outcome'
+      'choosing a segment emits the new outcome'
     );
     assert.equal(
       emitted.at(-1).awardMode,
@@ -3748,6 +3745,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     return emitted;
   }
 
+  // The outcome toggle and the tier-step mode control are SegmentedControls (issue
+  // 975): the real control is the visually hidden radio, the `<label>` segment is only
+  // the styled surface. Set `.checked`, then dispatch a bubbling `change`.
+  function chooseSegment(root, optionDataAttr, value) {
+    const radio = root.querySelector(`[${optionDataAttr}="${value}"] input[type="radio"]`);
+    assert.ok(radio, `a radio exists for ${optionDataAttr}="${value}"`);
+    radio.checked = true;
+    radio.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    flushSync();
+    return radio;
+  }
+
   const breakageTriggers = {
     triggers: [
       {
@@ -3755,6 +3764,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
         outcome: 'failure',
         breakTools: false,
+        tierStep: { mode: 'none', steps: 1, tierId: null },
       },
     ],
   };
@@ -3928,6 +3938,7 @@ describe('CraftingSystemManager mounted behavior', () => {
               condition: { type: 'outcomeTier', tierIds: ['o1'], outcomeKeys: [] },
               outcome: 'none',
               breakTools: true,
+              tierStep: { mode: 'none', steps: 1, tierId: null },
             },
           ],
         },
@@ -3938,8 +3949,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     const successSeg = tierTrigger.querySelector('[data-trigger-outcome="success"]');
     const noneSeg = tierTrigger.querySelector('[data-trigger-outcome="none"]');
     assert.ok(successSeg, 'the outcome toggle renders for an outcomeTier trigger');
-    assert.ok(successSeg.disabled, 'an outcomeTier condition disables the forcing segments');
-    assert.ok(noneSeg.classList.contains('is-selected'), 'the outcome is pinned to No effect');
+    // Disabled on the RADIO, which is what actually prevents the choice — the class
+    // alone would only dim it, and `select()` guards nothing but `next !== value`.
+    assert.ok(
+      successSeg.querySelector('input[type="radio"]').disabled,
+      'an outcomeTier condition disables the forcing segments'
+    );
+    assert.ok(noneSeg.classList.contains('is-active'), 'the outcome is pinned to No effect');
+    // Stepping is deliberately NOT pinned: it reads the rolled tier and produces the
+    // final one, so there is no circularity to prevent.
+    assert.equal(
+      tierTrigger.querySelector('[data-trigger-tier-step-mode="up"] input[type="radio"]').disabled,
+      false,
+      'an outcomeTier condition can still drive a tier step'
+    );
   });
 
   function mountChecksView(props) {
@@ -4186,18 +4209,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('natural tier stepping is default-off, persists from routed edits, and hides for fixed checks', () => {
-    const emitted = mountCheckEditor(
-      CraftingCheckEditorComponent,
-      routedBreakageValue,
-      'toolSpecific',
-      { allowNatStepping: true }
+  it('the routed editor renders the tier-step row in BOTH tier types', () => {
+    // The check-wide natural-stepping boolean and its card are gone (issue 975):
+    // stepping is a per-trigger effect now, and it is no longer relative-only.
+    mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
+    assert.ok(
+      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      'a relative routed check offers the per-trigger tier step'
     );
-    const toggle = target.querySelector('[data-check-nat-stepping] input[role="switch"]');
-    assert.ok(toggle, 'relative routed checks expose the natural stepping toggle');
-    assert.equal(toggle.checked, false, 'natural stepping defaults off');
-    toggle.click();
-    assert.equal(emitted.at(-1).natStepping, true, 'the routed draft retains the authored value');
 
     unmount(mounted);
     target.remove();
@@ -4205,42 +4224,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     target = null;
     mountCheckEditor(
       CraftingCheckEditorComponent,
-      { ...routedBreakageValue, type: 'fixed', natStepping: true },
-      'toolSpecific',
-      { allowNatStepping: true }
+      { ...routedBreakageValue, type: 'fixed' },
+      'toolSpecific'
     );
-    assert.equal(
-      target.querySelector('[data-check-nat-stepping]'),
-      null,
-      'fixed routed checks ignore the setting'
+    assert.ok(
+      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      'a FIXED routed check offers it too — stepping is no longer type-scoped'
     );
   });
 
-  it('shows natural tier stepping for routed crafting and salvage, never gathering', () => {
+  it('offers tier stepping on routed crafting, salvage AND gathering', () => {
+    // The old toggle was absent for gathering entirely; the per-trigger effect is not.
     mountChecksView({
       resolutionMode: 'routedByCheck',
-      craftingCheck: { ...routedBreakageValue, natStepping: true },
+      craftingCheck: routedBreakageValue,
       salvageResolutionMode: 'routed',
       salvageCheckRouted: routedBreakageValue,
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
       features: { salvage: true, gathering: true },
     });
-    assert.ok(target.querySelector('[data-checks-panel="crafting"] [data-check-nat-stepping]'));
+    assert.ok(target.querySelector('[data-checks-panel="crafting"] [data-trigger-tier-step]'));
 
     target.querySelector('[data-checks-tab-button="salvage"]').click();
     flushSync();
-    assert.ok(target.querySelector('[data-checks-panel="salvage"] [data-check-nat-stepping]'));
+    assert.ok(target.querySelector('[data-checks-panel="salvage"] [data-trigger-tier-step]'));
 
     target.querySelector('[data-checks-tab-button="gathering"]').click();
     flushSync();
-    assert.equal(
-      target.querySelector('[data-checks-panel="gathering"] [data-check-nat-stepping]'),
-      null
-    );
+    assert.ok(target.querySelector('[data-checks-panel="gathering"] [data-trigger-tier-step]'));
   });
 
-  it('preserves routed natural stepping through the root draft and Save flow', async () => {
+  it('carries an authored tierStep through the root draft and into the Save payload', async () => {
+    // The allowlist trap: `cloneCheckBreakage` rebuilds each trigger key by key, and
+    // `checkRoutedDirty` compares the JSON of two values that BOTH pass through it — so
+    // a dropped key makes the editor look CLEAN and persist nothing, with no error.
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -4249,7 +4267,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         store: createStore(calls, {
           alchemyResolutionMode: 'routedByCheck',
-          craftingCheck: { routed: { ...routedBreakageValue, natStepping: true } },
+          craftingCheck: {
+            routed: {
+              ...routedBreakageValue,
+              checkBreakage: {
+                triggers: [
+                  {
+                    ...breakageTriggers.triggers[0],
+                    tierStep: { mode: 'target', steps: 2, tierId: 'o1' },
+                  },
+                ],
+              },
+            },
+          },
         }),
         services: { openCurrentAdmin: () => {} },
       },
@@ -4259,9 +4289,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    const toggle = target.querySelector('[data-check-nat-stepping] input[role="switch"]');
-    assert.equal(toggle.checked, true, 'cloneRoutedCheck reads back the persisted value');
-    toggle.click();
+    const card = target.querySelector('[data-trigger="c1"]');
+    assert.ok(
+      card.querySelector('[data-trigger-tier-step-mode="target"]').classList.contains('is-active'),
+      'cloneCheckBreakage reads the persisted tierStep back into the draft'
+    );
+    assert.equal(
+      card.querySelector('[data-trigger-tier-step-target]').value,
+      'o1',
+      'and the authored target tier survives the clone'
+    );
+
+    chooseSegment(card, 'data-trigger-tier-step-mode', 'down');
     await tick();
     flushSync();
     target.querySelector('[data-checks-save]').click();
@@ -4270,7 +4309,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     const saved = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
-    assert.equal(saved?.[1]?.natStepping, false, 'Save persists the edited routed value');
+    assert.deepEqual(
+      saved?.[1]?.checkBreakage?.triggers?.[0]?.tierStep,
+      { mode: 'down', steps: 2, tierId: 'o1' },
+      'Save persists the edited tierStep, retaining the target operand'
+    );
+    assert.equal(
+      Object.hasOwn(saved?.[1] ?? {}, 'natStepping'),
+      false,
+      'and the retired natStepping key is not written back'
+    );
   });
 
   for (const mode of ['simple', 'alchemy']) {

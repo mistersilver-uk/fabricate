@@ -218,10 +218,14 @@
   let toolEditorActiveTab = $state('overview');
   let toolValidationFocusNonce = $state(0);
 
-  // Per-check tool-breakage trigger block (issue 419), carried on every check
-  // draft so authoring it under checkDriven authority persists. Deep-clone the
-  // persisted block (matching the engine's `{ enabled, triggers[] }` shape) or
-  // seed the empty default; triggers carry `{ id, label, condition }`.
+  // Per-check unified trigger block (issue 419), carried on every check draft so
+  // authoring it persists. Deep-clone the persisted block or seed the empty default.
+  //
+  // This is an ALLOWLIST, and that makes it the highest-consequence line in the
+  // editor's draft plumbing: a trigger key missing here is dropped on every editor
+  // load, so a GM authors the effect, sees it, saves — and it vanishes with no error.
+  // `checkRoutedDirty` compares the JSON of two values that BOTH pass through here,
+  // so the editor also looks clean. Every trigger key must be listed.
   function cloneCheckBreakage(checkBreakage) {
     const source = checkBreakage && typeof checkBreakage === 'object' ? checkBreakage : {};
     return {
@@ -236,6 +240,12 @@
               ? trigger.outcome
               : 'none',
             breakTools: trigger?.breakTools === true,
+            // The third effect (issue 975). Copied, not normalized: the draft holds
+            // what the GM authored and `_normalizeTierStep` clamps it on save.
+            tierStep:
+              trigger?.tierStep && typeof trigger.tierStep === 'object'
+                ? { ...trigger.tierStep }
+                : { mode: 'none', steps: 1, tierId: null },
           }))
         : [],
     };
@@ -256,7 +266,6 @@
           : '';
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
-      natStepping: source.natStepping === true,
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',

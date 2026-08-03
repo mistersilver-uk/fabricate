@@ -2105,59 +2105,52 @@
   flex: 0 0 auto;
 }
 
-/* Three-way Outcome toggle: a segmented control (success | no effect | failure)
-   mirroring `.manager-recipe-tag-match-toggle`, with the SELECTED segment carrying
-   a green / neutral / red tint so the forced outcome reads at a glance. */
-.fabricate-manager .manager-checks-outcome-toggle {
-  display: inline-flex;
+/* (The three-way Outcome toggle used to declare its own track and segment rules here,
+   a hand-rolled near-copy of the recipe tag-match toggle's. Both copies are gone: the
+   trigger card now renders the shipped `SegmentedControl` primitive, whose track,
+   segments and per-option success/danger tints live in that component's own scoped
+   styles.) */
+
+/* Tier-step row (issue 975): the trigger's third effect gets its OWN row below the
+   outcome/break row. At the pinned 1280 manager geometry the trigger card has roughly
+   651px, and the outcome toggle plus the break pill already spend about 476px of it —
+   a four-segment control plus an operand does not fit the remainder, and
+   `.manager-checks-trigger-bottom` wraps, so it would wrap at the DEFAULT width. */
+.fabricate-manager .manager-checks-trigger-step-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fab-space-3);
+}
+
+/* The four-segment mode control hugs its content and wraps as a unit rather than
+   being squeezed narrower than its labels. */
+.fabricate-manager .manager-checks-trigger-step-mode {
   flex: 0 0 auto;
-  gap: var(--fab-space-2xs);
-  padding: var(--fab-space-2xs);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-16);
 }
 
-.fabricate-manager .manager-checks-outcome-option {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: none;
-  border-radius: 4px;
-  background: none;
+/* The operand slot is pinned so the control under the pointer does not move when the
+   mode changes. `flex: 0 0 auto` would not do: a native `<select>` resolves to its
+   longest option's intrinsic width, so the slot would jump per tier list. */
+.fabricate-manager .manager-checks-trigger-step-operand {
+  flex: 0 0 160px;
+}
+
+.fabricate-manager .manager-checks-trigger-step-operand.is-invalid select {
+  border-color: var(--fab-mv2-danger);
+}
+
+.fabricate-manager .manager-checks-trigger-step-operand input:disabled {
   color: var(--fab-mv2-text-muted);
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-checks-outcome-option:hover:not(.is-selected):not(:disabled) {
-  color: var(--fab-mv2-text);
-}
-
-.fabricate-manager .manager-checks-outcome-option:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.fabricate-manager .manager-checks-outcome-option.is-selected.is-success {
-  color: var(--fab-success-text);
-  background: var(--fab-success-soft);
-  box-shadow: inset 0 0 0 1px var(--fab-success-border);
-}
-
-.fabricate-manager .manager-checks-outcome-option.is-selected.is-danger {
-  color: var(--fab-danger-text);
-  background: var(--fab-danger-soft);
-  box-shadow: inset 0 0 0 1px var(--fab-danger-border);
-}
-
-.fabricate-manager .manager-checks-outcome-option.is-selected.is-neutral {
-  color: var(--fab-mv2-text);
   background: var(--fab-overlay-light-04);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-border);
+  cursor: default;
+  opacity: 0.62;
+}
+
+/* The no-tiers cue takes the row's remaining width rather than the 160px slot. */
+.fabricate-manager .manager-checks-trigger-step-hint {
+  flex: 1 1 200px;
+  margin: 0;
 }
 
 .fabricate-manager .manager-checks-breakage-tiers {
@@ -9386,42 +9379,9 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-tag-match-toggle {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: var(--fab-space-2xs);
-  padding: var(--fab-space-2xs);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-16);
-}
-
-.fabricate-manager .manager-recipe-tag-match-option {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-chip);
-  height: auto;
-  min-height: 30px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: var(--fab-mv2-text-muted);
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-recipe-tag-match-option:hover:not(.is-selected) {
-  color: var(--fab-mv2-text);
-}
-
-.fabricate-manager .manager-recipe-tag-match-option.is-selected {
-  color: var(--fab-mv2-text);
-  background: var(--fab-overlay-light-04);
-  box-shadow: inset 0 0 0 1px var(--fab-mv2-accent);
-}
+/* (The Any/All tag-match toggle used to declare its own track and segment rules here.
+   It was a hand-rolled twin of the check-trigger outcome toggle's; both now render the
+   shipped `SegmentedControl` primitive, which carries its own scoped styles.) */
 
 /* (`.manager-button.manager-recipe-component-trigger` and `.manager-recipe-component-name`
    were declared here, sizing an image-only trigger and the loose name beside it. The name
@@ -14141,11 +14101,9 @@
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-tool-overview-fields .manager-toggle-field,
-.fabricate-manager .manager-tool-editor-card-heading .manager-toggle-field {
-  flex-direction: row;
-  align-items: center;
-}
+/* (Two row rules for a toggle-field class stood here. The routed check editor's
+   natural-tier-stepping card was the only element in the repository carrying that
+   class, and issue 975 deleted the card, so both rules were provably dead.) */
 
 .fabricate-manager .manager-tool-info-strip {
   display: flex;
