@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Crafting check-modifier catalogue editor (issue 770, Phase 1).
+  Crafting check-modifier catalogue editor (issue 770).
 
   A crafting system may define a named catalogue of check modifiers — e.g. Medicine,
   Alchemy, Herbalism for a DC20 healing salve — each an authored roll-data expression
@@ -9,6 +9,9 @@
     - Add all:   sum every eligible modifier.
     - Pick highest: use the single largest modifier (a deterministic max, not a dice pool).
     - By recipe: each recipe supplies its own modifier set (summed).
+    - Player picks: the player selects exactly one at roll time (Phase 2). The only
+      non-deterministic policy, and the only one that needs an interactive craft — every
+      other path resolves it as Pick highest.
   A default eligible set names which catalogue entries apply when a recipe does not
   override them.
 
