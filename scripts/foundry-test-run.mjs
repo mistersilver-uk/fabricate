@@ -7343,12 +7343,18 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
-          // Per-recipe check-modifier override (issue 770): this recipe overrides the
-          // system's `highest` default policy with `byRecipe`, drawing only the `alch`
-          // catalogue modifier into `@craftingmod`. It renders the recipe editor's
-          // Overview modifier control in its OVERRIDE (not inherit) state — the
-          // screenshot evidence for the per-recipe override half of #770.
-          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
+          // Per-recipe check-modifier override (issue 856): this recipe overrides the
+          // system's `highest` default policy with `playerPicks`, rendering the Phase-E
+          // interactive roll prompt's modifier selection fieldset. The eligible modifiers
+          // ('med', 'herb') are the system defaults, matching WIS (Medicine) and DEX
+          // (Herbalism), which resolve to different ability scores on the smoke's dnd5e
+          // Starter Hero so the frame shows a real choice with two distinct radio chips.
+          // The `1d20 + 20 + @craftingmod` formula has large margin vs dc 5 Masterwork,
+          // so the craft succeeds regardless of which modifier the player selects. This
+          // recipe is the one selected by Phase-E's `selectCraftingRecipeByMode('routedByCheck')`
+          // (first in DOM order, alphabetically before Forge Iron Sword), making this
+          // the evidence frame for the playerPicks policy (issue 856).
+          craftingModifier: { policy: 'playerPicks', modifierIds: ['med', 'herb'] },
           // Single result group → produced on any non-failure outcome. The Phase-E
           // craft rolls `1d20 + 20 + @craftingmod` (always Masterwork), so this craft
           // deterministically succeeds and yields the single "Brewed Potion" group.
