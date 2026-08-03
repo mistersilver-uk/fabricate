@@ -15,15 +15,22 @@
  *     files use Prettier code style!" and exits 0 — the exact failure mode this gate exists to
  *     eliminate, sailing straight through CI.
  *
- * So this test resolves the REAL `.prettierignore` (and `.gitignore`, which the Prettier 3 CLI
- * also honours by default) against every real component and asserts none of them is excluded.
- * It also pins the two `package.json` globs that must stay in step, because a scope that
- * `format` writes but `format:check` does not verify — or the reverse — is the same failure
- * wearing a different hat.
+ * Issue 946 found a THIRD, more general way back that the guards below used to miss entirely:
+ * appending `--ignore-path <a file that ignores *.svelte>` to the `format:check` SCRIPT ITSELF.
+ * The tests that proved the command's scope did so by reconstructing the question through the
+ * Prettier Node API with their OWN `ignorePath` array, never observing the argv the command
+ * actually runs with, and the only command-level check was a substring match
+ * (`command.includes(componentGlob)`) that a flag appended after the glob leaves untouched. So
+ * this file now closes both halves: `assertGateArgv` (`tests/helpers/gateScope.js`) pins the
+ * `format`/`format:check` scripts' PARSED argv by equality rather than substring, and a real,
+ * PATH-free execution of `format:check` (`runPrettierCheck`) proves the real command reaches the
+ * real component corpus, with a positive control proving Prettier actually reports an
+ * unformatted component rather than reporting clean by construction.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // Deep entry point on purpose. `npm test` runs Node with `--conditions=browser` (the mounted
@@ -33,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import * as prettier from 'prettier/index.mjs';
 // The same walker `scripts/compare-svelte-render.mjs` uses, so "every component" means one thing.
 import { listSvelteComponents } from '../scripts/lib/svelteComponentFiles.js';
+import { assertGateArgv, runPrettierCheck } from './helpers/gateScope.js';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const componentGlob = 'src/**/*.svelte';
@@ -44,6 +52,68 @@ const ignorePath = [path.join(repoRoot, '.gitignore'), path.join(repoRoot, '.pre
 
 const components = listSvelteComponents(path.join(repoRoot, 'src'));
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+
+// The full file scope `format`/`format:check` share, beyond the component glob. Both scripts are
+// pinned FROM this one list rather than as two separately-typed ~30-entry arrays, so the two
+// pins can never silently drift apart from each other by a copy-paste edit to only one of them.
+const GATE_TARGETS = [
+  componentGlob,
+  'src/{models,utils,integrations,config,migration,canvas,systems}/**/*.js',
+  'src/toolBreakageRuntime.js',
+  'scripts/lib/semver.js',
+  'scripts/lib/releaseTags.js',
+  'scripts/lib/publishGuard.js',
+  'scripts/lib/promoteGuards.js',
+  'scripts/lib/hotfixPreflight.js',
+  'scripts/lib/foundrySmokeSignal.js',
+  'scripts/lib/managerLayoutGuards.js',
+  'scripts/lib/screenshotCaptureMap.js',
+  'scripts/lib/foundryRunIdentity.js',
+  'scripts/lib/foundryRunBudget.js',
+  'scripts/lib/agentModelTiers.js',
+  'scripts/lib/foundryDataPreparation.js',
+  'scripts/lib/smokeSectionFixture.js',
+  'scripts/lib/svelteComponentFiles.js',
+  'scripts/lib/svelteCompilerWarnings.js',
+  'scripts/release-s3.js',
+  'scripts/validate-release-tag.mjs',
+  'scripts/hotfix-preflight.mjs',
+  'scripts/compare-svelte-render.mjs',
+  'scripts/check-svelte-warnings.mjs',
+  'scripts/lib/zipRead.js',
+  'scripts/lib/foundryImagePin.js',
+  'scripts/lib/foundryChromeCache.js',
+  'scripts/lib/foundryChromeSpec.js',
+  'scripts/lib/viewLabCases.js',
+  'scripts/view-lab-chrome.mjs',
+  'scripts/view-lab-screenshots.mjs',
+  'scripts/lib/viewLabIndex.js',
+  'scripts/view-lab-index.mjs',
+  'eslint.config.js',
+];
+const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
+const FORMAT_CHECK_ARGV = ['prettier', '--check', ...GATE_TARGETS];
+
+/** A throwaway directory holding one `Component.svelte`, and a disposer. */
+function withFixtureComponent(source, run) {
+  const root = mkdtempSync(path.join(tmpdir(), 'fabricate-prettier-svelte-'));
+  try {
+    writeFileSync(path.join(root, 'Component.svelte'), source, 'utf8');
+    return run(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// No repo `.prettierrc.json` is reachable from a fixture directory outside `src/`, so these two
+// flags stand in for it: `--plugin` supplies the Svelte parser directly (Prettier 3 does not
+// auto-load plugins) and `--no-config` stops cosmiconfig from searching upward and picking up
+// some unrelated config on the machine this happens to run on.
+const SVELTE_PLUGIN_PATH = path.join(repoRoot, 'node_modules/prettier-plugin-svelte/plugin.js');
+const FIXTURE_ARGV = ['--plugin', SVELTE_PLUGIN_PATH, '--no-config'];
+
+const UNFORMATTED_COMPONENT = '<script>\n  let x = 1\n</script>\n\n<div>{x}</div>\n';
+const FORMATTED_COMPONENT = '<script>\n  let x = 1;\n</script>\n\n<div>{x}</div>\n';
 
 describe('Prettier covers Svelte components', () => {
   // Without this the sweep below could pass by finding nothing to check — the same vacuity in a
@@ -121,15 +191,118 @@ describe('Prettier covers Svelte components', () => {
 
   // Both globs, not just the checked one: `format` writing a scope that `format:check` does not
   // verify lets an unformatted component through CI, and the reverse makes `npm run format`
-  // unable to fix what CI rejects.
-  it('names the component glob in both the format and format:check scripts', () => {
-    for (const script of ['format', 'format:check']) {
-      const command = packageJson.scripts?.[script];
-      assert.ok(command, `package.json must define the ${script} script`);
-      assert.ok(
-        command.includes(componentGlob),
-        `the ${script} script must cover "${componentGlob}", got: ${command}`
-      );
-    }
+  // unable to fix what CI rejects. Pinned by EQUALITY on the parsed argv, not by substring — see
+  // the header comment and issue 946: a `command.includes(componentGlob)` check is unmoved by a
+  // flag appended after the glob (e.g. a decoy `--ignore-path`), while an equality pin on the
+  // tokenized array sees the extra element immediately.
+  it('pins the format and format:check scripts by argv equality', () => {
+    assertGateArgv(packageJson, 'format', FORMAT_ARGV);
+    assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
+  });
+});
+
+describe('the argv pin actually fails on the reported hole', () => {
+  // Reproduces the issue 946 defect without touching the real package.json: appending a decoy
+  // --ignore-path leaves `command.includes(componentGlob)` true (the substring is untouched) but
+  // must break an equality pin on the parsed argv, because the appended flag is now an extra
+  // array element the expected argv does not have.
+  it('fails when a decoy --ignore-path is appended to the script', () => {
+    const withDecoyIgnorePath = {
+      scripts: {
+        'format:check': `${packageJson.scripts['format:check']} --ignore-path decoy-ignore.txt`,
+      },
+    };
+    assert.ok(
+      withDecoyIgnorePath.scripts['format:check'].includes(componentGlob),
+      'the decoy command must still contain the glob substring — that is exactly what the old' +
+        ' substring-only assertion could not see past'
+    );
+    assert.throws(
+      () => assertGateArgv(withDecoyIgnorePath, 'format:check', FORMAT_CHECK_ARGV),
+      /parsed argv must equal/,
+      'an appended --ignore-path must break the argv pin'
+    );
+  });
+
+  it('fails when the component glob is removed from the script', () => {
+    const withoutGlob = {
+      scripts: {
+        'format:check': packageJson.scripts['format:check'].replace(`"${componentGlob}" `, ''),
+      },
+    };
+    assert.notEqual(
+      withoutGlob.scripts['format:check'],
+      packageJson.scripts['format:check'],
+      'the replacement must actually have removed something, or this proves nothing'
+    );
+    assert.throws(
+      () => assertGateArgv(withoutGlob, 'format:check', FORMAT_CHECK_ARGV),
+      /parsed argv must equal/,
+      'removing the component glob must break the argv pin'
+    );
+  });
+});
+
+describe('format:check actually reaches the component corpus when executed', () => {
+  // The execution half of the fix: run the REAL, pinned `format:check` argv through Prettier's
+  // real CLI entry point (PATH-free — see `runPrettierCheck`), not a reconstruction through the
+  // Node API. `--log-level debug` is appended only to make Prettier log which files it resolved
+  // config for; it does not change which files match or are ignored (verified against a decoy
+  // --ignore-path while building this test: the debug log goes from ~250 `.svelte` lines to
+  // zero, with the exit code staying 0 either way — the exact silent failure issue 946 reports).
+  it('inspects the real component corpus, not a reconstruction of it', () => {
+    const argv = assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
+    const result = runPrettierCheck([...argv.slice(1), '--log-level', 'debug']);
+    assert.equal(
+      result.status,
+      0,
+      `expected the current repository to already satisfy format:check, got:\n${result.stdout}${result.stderr}`
+    );
+    const inspected = [
+      ...`${result.stdout}${result.stderr}`.matchAll(/resolve config from '([^']+\.svelte)'/g),
+    ].map((match) => match[1]);
+    assert.ok(
+      inspected.length > 100,
+      `expected the real command to actually inspect >100 components, saw ${inspected.length}` +
+        ' — a decoy --ignore-path (or a re-added *.svelte entry in .prettierignore) drives this' +
+        ' to zero while format:check still exits 0'
+    );
+    assert.ok(
+      inspected.some((file) => file.endsWith('ExplainerCard.svelte')),
+      'expected a known real component to appear among the files Prettier actually inspected'
+    );
+  });
+
+  // The positive control this gate never had: prove Prettier actually REPORTS an unformatted
+  // component, rather than every assertion in this file passing because nothing here has ever
+  // been checked against a source that fails.
+  it('fails when a component is not formatted (positive control)', () => {
+    const outcome = withFixtureComponent(UNFORMATTED_COMPONENT, (root) =>
+      runPrettierCheck(['--check', 'Component.svelte', ...FIXTURE_ARGV], { cwd: root })
+    );
+    assert.equal(
+      outcome.status,
+      1,
+      `expected an unformatted component to fail --check, got:\n${outcome.stdout}${outcome.stderr}`
+    );
+    assert.match(
+      outcome.stderr,
+      /Component\.svelte/,
+      'the failure must name the offending file, or it is not actionable'
+    );
+  });
+
+  // The counterpart to the control above: the same mechanism must also PASS on a properly
+  // formatted component, so "fails when unformatted" is not just the default outcome of a
+  // misconfigured fixture that fails on anything.
+  it('passes when the component is already formatted', () => {
+    const outcome = withFixtureComponent(FORMATTED_COMPONENT, (root) =>
+      runPrettierCheck(['--check', 'Component.svelte', ...FIXTURE_ARGV], { cwd: root })
+    );
+    assert.equal(
+      outcome.status,
+      0,
+      `expected a properly formatted component to pass --check, got:\n${outcome.stdout}${outcome.stderr}`
+    );
   });
 });
