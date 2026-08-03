@@ -1508,12 +1508,21 @@ threshold/outcome-tier configuration) drives resolution:
    lowest (closest) tier rather than yielding no tier name, so a `dcOverride` that
    raises the difficulty never leaves a rolled task unrouted.
    **Fixed** tiers keep the "outside every range → no tier name" behaviour.
-3. A failing tier, or no tier name, takes the failure path.
-4. A succeeding tier name must match exactly one `ResultGroup.name` under
+3. A trigger's `tierStep` effect may then move that rolled tier — routed gathering
+   checks step exactly as crafting and salvage do, in both tier types (issue 975).
+   See `resolution-modes/spec.md` § Routed Tier Stepping for the modes, the
+   composition rule and the disposition-preserving constraint.
+   The tier NAME that resolves the result group below is the **final** (post-step)
+   tier's name, and its `success` flag is the disposition, so a step changes which
+   result group a gather produces.
+   Stepping records `data.tierStepApplied` evidence on a real tier change; gathering
+   threads that evidence to no chat surface today.
+4. A failing tier, or no tier name, takes the failure path.
+5. A succeeding tier name must match exactly one `ResultGroup.name` under
    trim-normalized, case-insensitive comparison; the matched group is awarded.
-5. If a succeeding tier name matches no result group, the attempt resolves to a
+6. If a succeeding tier name matches no result group, the attempt resolves to a
    terminal failure (no group is awarded).
-6. A routed task with no system routed `rollFormula` reports a GM-fix-required
+7. A routed task with no system routed `rollFormula` reports a GM-fix-required
    misconfiguration diagnostic and does not resolve.
 
 ### Reserved Keywords

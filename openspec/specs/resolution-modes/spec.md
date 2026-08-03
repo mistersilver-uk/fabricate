@@ -1,16 +1,5 @@
 # Resolution Modes
 
-## Relative Routed Natural Stepping
-
-`craftingCheck.routed.natStepping` and `salvageCraftingCheck.routed.natStepping` are default-off booleans owned by their relative routed check configurations.
-Fixed routed checks ignore the setting, and gathering exposes and persists no corresponding setting.
-
-After relative-margin matching and before result delivery, the shared check runner inspects the kept active face of the first d20 dice group.
-A kept natural 20 steps the matched tier once toward the next higher tier, and a kept natural 1 steps it once toward the next lower tier.
-A forced outcome takes precedence and bypasses natural stepping.
-Fixed tiers never step, and a natural at the existing cap or floor is a no-op.
-Only an actual tier change records `data.natStep` evidence and produces the localized crafting or salvage chat note.
-
 ## Purpose
 
 Define semantics and validation rules for crafting-system resolution modes.
@@ -178,9 +167,10 @@ Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges an
 The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it — that DC now lives on its simple check, `craftingCheck.simple.dc`) and relative-type routed checks (which read `craftingCheck.routed.dc`); only `routedByCheck` with `type: "fixed"` drops it.
 - **Per-recipe minimum success tier (fixed only).**
 A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value.
-When set, a craft whose naturally-rolled tier ranks below the required tier — or whose total lands outside every fixed range, so no tier matched at all — fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
-Because no tier routes on this failure, the rolled tier's own `breakTools` flag is dropped (the per-tier breakage bridge fires only for a routed tier); independent dice-group / roll-total breakage triggers are unaffected.
-The default (null/unset) imposes no override, so the outcome is the tier actually rolled.
+When set, a craft whose **final (post-step) tier** ranks below the required tier — or whose total lands outside every fixed range, so no tier matched at all — fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
+The gate judges the final tier because tier stepping is applied before it (see *Routed Tier Stepping* below), so a `down` step can drop a craft below the recipe minimum and an `up` step can lift it over.
+Because no tier routes on this failure, the blocked tier's own `breakTools` flag is dropped (the per-tier breakage bridge fires only for a routed tier); independent dice-group / roll-total breakage triggers are unaffected.
+The default (null/unset) imposes no override, so the outcome is the final tier.
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
 The gate is fixed-type only; relative-type routed checks ignore it.
@@ -194,7 +184,9 @@ A persisted alchemy `minSuccessOutcomeId` is left inert by the dispatch guard ra
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
 - **Routing is success-disposition-gated.**
-A check result whose matched tier has `success: false` takes the failure/consumption path regardless of the tier's name — the engine short-circuits on `!checkResult.success` before routing runs.
+A check result whose final tier has `success: false` takes the failure/consumption path regardless of the tier's name — the engine short-circuits on `!checkResult.success` before routing runs.
+**Invariant:** `data.success` and the final tier's own `success` can never disagree.
+Without a forced outcome `data.success` simply IS the final tier's flag; under a forced outcome the disposition is authoritative and tier stepping is confined to that disposition's tier subset (see *Routed Tier Stepping* below), so a forced success can never surface a failing tier's name and a forced failure can never surface a succeeding tier's name.
 Routing via `checkOutcomeIds` resolves only `success === true` tiers (a `success: false` tier must never produce a `disposition: 'success'` result), and validation/authoring offer success tiers only for assignment.
 So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a GM or import placed in a group's `checkOutcomeIds` never routes and never produces a success result.
 - Resolution rules (applied per step/scope; "exactly one result group" is evaluated per step for multi-step recipes):
@@ -206,6 +198,53 @@ So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a G
      For an instant (non-timed) step this is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
      A resolved-but-unassigned outcome tier (`unrouted-tier`) is treated identically.
      Timed exception: a time-gated `routedByCheck` step consumes its inputs at START (the check outcome is unknowable until the gate matures), so a routing misconfiguration detected at FINISH cannot un-consume — it records a step FAILURE with no refund and still reports failure (never a false success with zero items), rather than a true zero-mutation abort.
+
+#### Routed Tier Stepping
+
+**Tier stepping** is a per-trigger EFFECT on the unified `checkBreakage.triggers[]` list (`tierStep`), not a check-wide policy.
+It is available on every routed check — crafting, salvage AND gathering — in both the `relative` and `fixed` tier types, and it is not gated on the tool-breakage authority (unlike a trigger's `breakTools` effect).
+It supersedes the retired `natStepping` boolean, which hard-coded the die (d20), the faces (1 and 20), the magnitude (±1) and the scope (relative crafting and salvage only); a persisted `natStepping: true` converts to an equivalent trigger pair on read (see `data-models`).
+
+**Two named tiers.**
+The **rolled tier** is what relative-margin or fixed-range matching produced, after any forced reroute; it is what step CONDITIONS read.
+The **final tier** is what remains after stepping; it is what routes to a result group, what the per-recipe minimum-success-tier gate judges, what tool-breakage conditions read, and whose `success` and `breakTools` apply.
+A step condition asks about the tier the dice landed on, never about the tier the step produces, so the pass is a pure function of (rolled tier, triggers, roll) with no feedback edge — an `outcomeTier`-conditioned step cannot iterate and no evaluation order can leak into the result.
+**Acknowledged limit:** stepping reads the rolled tier while tool breakage reads the final tier, so a single trigger carrying an `outcomeTier` condition, `breakTools: true` and a `tierStep` may step without breaking.
+
+**The three modes.**
+`target` names the tier id to land on; `up` and `down` move by `steps` tiers (an integer `>= 1`); `none` is inert.
+Composition runs over every trigger whose condition matched and whose mode is not `none`.
+Relative steps sum as signed integers (`Σ up.steps − Σ down.steps`), summation being the only commutative composition: two `up 1` triggers make `up 2`, and `up 1` plus `down 1` is a deliberate no-op rather than an order-dependent coin flip.
+A `target` trigger is ELIGIBLE only when its `tierId` names a tier present in the ranked array in play; an ineligible target — a dangling id, or one naming the opposite disposition under a forced outcome — is discarded BEFORE the comparison rather than winning and then no-opping, and is not a runtime misconfiguration.
+Among the eligible targets the one naming the LOWEST-ranked tier wins, which is order-independent and pessimistic (trigger array order is deliberately not load-bearing).
+The winning target sets the base index and the net relative offset applies from there.
+
+**Placement.**
+Stepping is applied AFTER any forced reroute and BEFORE the fixed-only minimum-success-tier gate.
+Forcing picks an extreme tier while a step is relative, so stepping first would be silently discarded; the gate asks whether the craft reached the recipe's minimum, so it must judge the final tier.
+There is no forced-outcome bypass — the retired boolean was a check-wide policy the GM could not scope, whereas a `tierStep` is something the GM opted into on one trigger.
+
+**Stepping is disposition-preserving.**
+When a forced outcome is in play, the array in play is the ranked SUBSET of tiers whose `success` matches the forced disposition — the same subset the forced reroute selects from — and every index, "lowest-ranked" and the clamp are computed over that subset.
+The forced disposition therefore stays authoritative and `data.success` can never disagree with the final tier's own `success`.
+With NO forced outcome the array in play is the whole ranked tier list, and both `success` and `breakTools` follow the final tier across it — including a step that crosses from a succeeding tier onto a failing one, which is the retired boolean's pre-existing behaviour.
+
+**Clamping.**
+An out-of-range step clamps to the extremes of the array in play rather than no-opping, so `up 3` from the second-highest tier lands on the highest.
+This clamp is explicitly unrelated to the **Relative tier clamp** above: `clampToNearest` decides WHETHER a tier matched at all, whereas the step clamp decides WHERE an out-of-range step lands, and the evidence field is named `stepClamped` so the two never read as one concept.
+
+**Evidence.**
+Only a REAL tier change records `data.tierStepApplied` evidence and produces the localized crafting or salvage chat note.
+A fully clamped move and a cancelling `up 1` plus `down 1` both leave the rolled tier standing and emit nothing.
+Gathering emits the same evidence from the shared runner but threads it to no chat surface.
+
+**No match, no step.**
+When no tier matched at all, nothing steps — `target` included — because a routed check that matched nothing is the deliberate "no route" path and a trigger must not conjure a tier there.
+On a fixed check whose total falls outside every authored range this is the ordinary outcome; a GM wanting a floor for un-ranged totals authors a covering range, not a step.
+
+**One ranking.**
+Tier order is derived in exactly one place (`rankedRoutedOutcomes`), shared by the forced reroute, the minimum-success-tier gate and the step pass: ascending by `dc` (relative) or `start` (fixed), dropping any tier whose rank is not a finite number, and keeping the FIRST authored tier among equal ranks in both directions.
+The minimum-success-tier gate consumes that ranking only to LOCATE the required tier and continues to compare threshold VALUES, so two fixed tiers sharing a `start` compare equal and the craft passes.
 
 ### Validation
 
