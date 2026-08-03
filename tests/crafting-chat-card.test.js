@@ -4,8 +4,17 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { buildCraftingChatContent } from '../src/systems/CraftingChatCard.js';
+
+/** The SHIPPED localization, so a placeholder assertion reads the real string. */
+const LANG = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'lang', 'en.json'), 'utf8')
+);
+const shippedLocalize = (key) => LANG.FABRICATE.Chat[key.replace('FABRICATE.Chat.', '')] ?? key;
 
 function successModel(overrides = {}) {
   return {
@@ -173,6 +182,34 @@ test('substitutes the realized {steps} magnitude into the localized relative not
     localize
   );
   assert.ok(content.includes('Stepped up 2 tier(s)'), 'placeholder replaced with the magnitude');
+  assert.ok(!content.includes('{steps}'), 'no unsubstituted placeholder reaches chat');
+});
+
+test('the SHIPPED relative note strings carry {steps}, and the card substitutes into them', () => {
+  // Every other assertion here (and in `tests/salvage-chat-card.test.js`) stubs
+  // `localize` with its own COPY of the sentence, so the substitution is exercised
+  // against a fixture of the string rather than against the string. Deleting `{steps}`
+  // from `lang/en.json` would render "Stepped up tier(s)" to every player with the
+  // whole suite green. This is the one place the real value is read; it covers the
+  // salvage suite's stub too, since both card modules render these same two keys.
+  for (const key of ['TierStepUp', 'TierStepDown']) {
+    const value = LANG.FABRICATE.Chat[key];
+    assert.equal(typeof value, 'string', `FABRICATE.Chat.${key} must be a string leaf`);
+    assert.ok(
+      value.includes('{steps}'),
+      `FABRICATE.Chat.${key} must carry the {steps} placeholder the card substitutes`
+    );
+  }
+
+  const content = buildCraftingChatContent(
+    successModel({ tierStep: { mode: 'up', steps: 2 } }),
+    shippedLocalize
+  );
+  assert.equal(
+    tierStepNoteOf(content),
+    LANG.FABRICATE.Chat.TierStepUp.replace('{steps}', '2'),
+    'the shipped sentence reaches chat with the realized magnitude in place'
+  );
   assert.ok(!content.includes('{steps}'), 'no unsubstituted placeholder reaches chat');
 });
 
