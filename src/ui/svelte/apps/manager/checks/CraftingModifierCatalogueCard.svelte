@@ -7,11 +7,11 @@
   (`@abilities.med.mod`). A resolution policy decides how the eligible modifiers combine
   into the `@craftingmod` formula placeholder:
     - Add all:   sum every eligible modifier.
-    - Pick highest: use the single largest modifier (a deterministic max, not a dice pool).
+    - Highest: use the single largest modifier (a deterministic max, not a dice pool).
     - By recipe: each recipe supplies its own modifier set (summed).
     - Player picks: the player selects exactly one at roll time (Phase 2). The only
       non-deterministic policy, and the only one that needs an interactive craft — every
-      other path resolves it as Pick highest.
+      other path resolves it as Highest.
   A default eligible set names which catalogue entries apply when a recipe does not
   override them.
 
@@ -52,7 +52,7 @@
     {
       value: 'highest',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest',
-      fallback: 'Pick highest',
+      fallback: 'Highest',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighestDesc',
       descFallback: 'Use only the single largest eligible modifier (a deterministic maximum).',
     },

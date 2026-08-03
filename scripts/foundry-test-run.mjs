@@ -9699,7 +9699,7 @@ async function main() {
 
         // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
         // 770). The seed authors a populated catalogue (Medicine / Alchemy / Herbalism)
-        // with a "Pick highest" default policy on the crafting check, so the frame shows
+        // with a "Highest" default policy on the crafting check, so the frame shows
         // the redesigned rows — IconPicker + label + the `@`-adorned expression field —
         // plus the default-modifier pill multi-select. A DEDICATED frame (not the
         // failure-consumption one above, which the same tab scrolls elsewhere for) so
@@ -9710,7 +9710,7 @@ async function main() {
             .first();
           await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
           // Scroll to the "Default combination" policy radio-group rather than the card
-          // top: the four policy options — Add all / Pick highest / By recipe / Player
+          // top: the four policy options — Add all / Highest / By recipe / Player
           // picks (issue 770 Phase 2, #855) — are the changed surface, and they sit
           // below the (stable) IconPicker/label/@-expression rows. This keeps the bottom
           // rows in view above the policy cards for context.

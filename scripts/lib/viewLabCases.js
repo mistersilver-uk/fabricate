@@ -616,7 +616,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // Scrolls tab, so before this entry NO frame showed the Overview modifier row at all.
     //
     // `hb-r-kiln` authors no `craftingModifier`, so the select sits on its blank option and reads
-    // "Inherit system default (Pick highest)" — the label composed from the SYSTEM policy, which is
+    // "Inherit system default (Highest)" — the label composed from the SYSTEM policy, which is
     // the half of the control a per-recipe frame cannot otherwise show, and the half that would
     // have silently read "(Add all)" had the label map not gained a `playerPicks` entry.
     query: { system: 'lab-herbalism' },

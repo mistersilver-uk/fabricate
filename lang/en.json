@@ -4239,7 +4239,7 @@
             "ModifierPolicyHeading": "Default combination",
             "ModifierPolicyAddAll": "Add all",
             "ModifierPolicyAddAllDesc": "Sum every eligible modifier into the crafting-check roll.",
-            "ModifierPolicyHighest": "Pick highest",
+            "ModifierPolicyHighest": "Highest",
             "ModifierPolicyHighestDesc": "Use only the single largest eligible modifier (a deterministic maximum).",
             "ModifierPolicyByRecipe": "By recipe",
             "ModifierPolicyByRecipeDesc": "Each recipe chooses its own modifier set; the chosen set is summed.",

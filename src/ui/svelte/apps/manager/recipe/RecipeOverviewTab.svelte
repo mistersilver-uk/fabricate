@@ -105,8 +105,7 @@
   // per-modifier picker shows. Writing null clears the override entirely (inherit).
   const MODIFIER_POLICY_LABELS = {
     addAll: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll', 'Add all'),
-    highest: () =>
-      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Pick highest'),
+    highest: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Highest'),
     byRecipe: () =>
       text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe', 'By recipe'),
     playerPicks: () =>

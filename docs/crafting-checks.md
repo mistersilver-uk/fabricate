@@ -88,7 +88,7 @@ A recipe can also override the combination on its own **Overview** tab, alongsid
 | Combination | What it does | When you would want it |
 |:------------|:-------------|:------------------------|
 | **Add all** | Sums every eligible modifier. | The recipe rewards stacking every relevant skill or tool bonus at once. |
-| **Pick highest** | Uses only the single largest eligible modifier, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
+| **Highest** | Uses only the single largest eligible modifier, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
 | **By recipe** | Sums whichever modifiers the recipe itself has selected as eligible. | Different recipes in the same system need different modifiers to matter, with no player choice involved. |
 | **Player picks** | The player chooses exactly one eligible modifier at roll time. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
@@ -98,10 +98,10 @@ A recipe can also override the combination on its own **Overview** tab, alongsid
 
 **Player picks** is the only combination that is not fully decided ahead of the roll.
 It only prompts the player when all of the following are true for that attempt: the roll happens through the interactive dialog described above, the check's roll formula contains `@craftingmod`, the effective combination (the recipe's own override, or otherwise the system default) is **Player picks**, and at least two modifiers are eligible for that recipe.
-When any of those is not true, for example a recipe with only one eligible modifier, or a Macro rolling the check directly, the check resolves exactly as **Pick highest** instead, with no prompt.
+When any of those is not true, for example a recipe with only one eligible modifier, or a Macro rolling the check directly, the check resolves exactly as **Highest** instead, with no prompt.
 
 When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon, label, and its resolved value.
-The highest-valued modifier is pre-selected, so a player who just clicks **Roll** without changing the selection gets the same result as **Pick highest** would have given.
+The highest-valued modifier is pre-selected, so a player who just clicks **Roll** without changing the selection gets the same result as **Highest** would have given.
 Because the chosen value is not known until the player picks it, the formula preview shows **(modifier)** in that spot instead of a number, until the player confirms a choice.
 
 ## How a routed check is rolled
