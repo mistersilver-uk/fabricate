@@ -909,6 +909,19 @@ const SMITHING_RECIPES = [
       resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-greatsword', quantity: 1 }] }],
       check: { enabled: true, rollFormula: '1d20 + @prof', thresholds: { success: 18 } },
       toolIds: ['sm-tool-hammer', 'sm-tool-anvil'],
+      // The world's only LEGACY-basis membership, and the bulk panel's book axis is why it
+      // exists (issue 1010). That axis's `Remove` is dead for a book holding none of the
+      // selected recipes, so the staged frame cannot photograph a removal without one — and
+      // reaching it through this SCALAR rather than through `sm-almanac.recipeIds` is the
+      // point: `_normalizeSystem` backfills `membershipResolvesByRecipeIds` from the
+      // definition ARRAYS, so smithing stays on the legacy basis (see the recipe-item note
+      // below) and the frame proves the panel's counts resolve through it. A count read off
+      // `definition.recipeIds` would report "holds none selected" here and disable the very
+      // control the frame is taken to show.
+      //
+      // Free of player-facing consequence: smithing is `visibilityMode: 'global'`, so book
+      // membership gates nothing a player sees.
+      recipeItemId: 'sm-almanac',
     }
   ),
   recipe(
@@ -2929,16 +2942,15 @@ export function buildLabContent() {
       ],
       components: SMITHING_COMPONENTS,
       componentCategories: componentCategoryVocabulary(SMITHING_COMPONENTS),
-      // TWO books, because the bulk panel's recipe-book axis is a tri-state chip RUN and one chip
-      // cannot show two states at once: the staged frame has to photograph one book at `add` and
-      // another at `remove` simultaneously, which a single-book system makes unreachable.
+      // TWO books, because the bulk panel's staged book list has to photograph one book at `add`
+      // and another at `remove` simultaneously, which a single-book system makes unreachable.
       //
       // Both keep an ABSENT `recipeIds`, exactly as the single book did. That is load-bearing for
       // the membership marker (issue 1011): `_normalizeSystem` backfills
       // `membershipResolvesByRecipeIds` from "any definition has a non-empty `recipeIds`", so
       // seeding membership here would flip smithing onto the array basis and change what every
-      // player-facing book reader resolves. The chips render their whole vocabulary regardless of
-      // membership, so the frames need none.
+      // player-facing book reader resolves. `sm-almanac`'s one member is therefore carried by
+      // `sm-r-greatsword`'s LEGACY scalar instead — see the note there.
       recipeItemDefinitions: [
         { id: 'sm-book', name: 'Forgecraft Folio' },
         { id: 'sm-almanac', name: 'Deepsmith Almanac' },

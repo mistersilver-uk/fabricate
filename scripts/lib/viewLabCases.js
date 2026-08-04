@@ -680,8 +680,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-recipes-bulk-edit'],
     // The STAGED face, over two ordinary Weaponsmithing recipes. Every axis the panel owns is
     // armed at once: a category, Status at `Enable`, Lock at `Lock`, a named check tier, and the
-    // book run showing BOTH of its non-default states (one click = add, two = remove) — which is
-    // why the lab world authors two smithing books rather than one.
+    // book axis's STAGED LIST holding one book at `add` beside another at `remove` — which is why
+    // the lab world authors two smithing books rather than one.
+    //
+    // The book axis is a search-and-pick control (issue 1010), so each staged book costs three
+    // steps: open the picker, choose the book, press the action. The pick then CLEARS, which is
+    // what returns the trigger and lets the second book be staged at all — the frame is therefore
+    // also the evidence that staging accumulates rather than replacing.
+    //
+    // The two actions are not interchangeable. `Add` is dead for a book that already holds every
+    // selected recipe and `Remove` is dead for one that holds none, so the Folio (which holds
+    // neither selected recipe) can only be added and the Almanac (which holds the greatsword,
+    // through the legacy scalar — see `labContent.js`) can only be removed.
     //
     // Enable is staged over two recipes that are already ON, so `countBlockedRecipeEnables` is 0
     // and the warning Callout stays absent. That is deliberate: the Callout is the blocked frame's
@@ -698,13 +708,18 @@ export const VIEW_LAB_CASES = Object.freeze([
       // Karrun Forgecraft is the only lab system that authors check tiers, so this select is the
       // only populated one in the world; every other system renders the info Callout instead.
       { selector: '[data-recipe-bulk-check-tier]', select: 'sm-tier-masterwork' },
-      { selector: '[data-bulk-book="sm-book"]' },
-      { selector: '[data-bulk-book="sm-almanac"]' },
-      { selector: '[data-bulk-book="sm-almanac"]' },
+      { selector: '.fab-bulk-book-trigger' },
+      { selector: '[data-popover-option="sm-book"]' },
+      { selector: '[data-recipe-bulk-book-add]' },
+      { selector: '.fab-bulk-book-trigger' },
+      { selector: '[data-popover-option="sm-almanac"]' },
+      { selector: '[data-recipe-bulk-book-remove]' },
     ],
     expectView: 'recipes',
-    // Both non-default chip states must be on screen, or the tri-state reads as a two-state
-    // toggle. A frame showing only `add` is the failure this assertion exists to refuse.
+    // Both staged states must be on screen at once, or a control that shows one book at a time
+    // reads as a control that stages one book at a time. A frame showing only `add` is the
+    // failure this assertion exists to refuse, and the staged list is what makes it satisfiable:
+    // the pick card can only ever hold the book it is composing.
     expectSelector:
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
