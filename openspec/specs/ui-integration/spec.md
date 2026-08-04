@@ -135,6 +135,10 @@ A host-supplied `<input type="checkbox">` rendered with Foundry's default contro
 A multi-select surface's SELECTION TOOLBAR — the tri-state control over the rendered rows, the selected-count readout, the select-all-results action and Clear — likewise renders through one shared toolbar primitive that every browser imports.
 Its test and screenshot hook names, its host row class and its labels are parameters of that primitive, not a reason to fork it.
 
+A bulk edit panel's CHROME renders through one shared panel-chrome primitive set that every studio imports: the panel container, its header eyebrow and Clear, the selected-count hero, the section headings with their inline-hint and standing sub-hint scales, the staged single-valued select, and the Apply action.
+The noun-bearing strings (the hero's count sentence, the Apply label), the axes a studio stages, and the test and screenshot hook names are parameters of those primitives — what a studio STAGES is its own, the chrome around it is not.
+A studio that hand-rolls its own header, hero, section scale or Apply is a second bulk-edit panel design and is not an acceptable rendering, however closely it copies the first.
+
 #### Segmented controls
 
 Every mutually-exclusive inline choice in the manager renders through one shared segmented-control primitive: real radios in a `role="radiogroup"`, visually hidden but focusable, with `<label>` segments as the visible surface.
@@ -716,14 +720,14 @@ The library does not render a page header of its own.
 
 Rows are **cards, not table columns**.
 A card row has no columns, so the list is a real list (`ul` / `li`, `role="list"`), not a table/row/cell structure with column headers.
-Each row shows the recipe's image medallion (the recipe's own image, resolved through `resolveRecipeImage`, falling back to `DEFAULT_RECIPE_IMAGE` — never a containing book's artwork), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle, and the Edit / Duplicate / Delete action group.
+Each row shows the recipe's image medallion (the recipe's own image, resolved through `resolveRecipeImage`, falling back to `DEFAULT_RECIPE_IMAGE` — never a containing book's artwork), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle, and an `Edit` pencil.
 
 The row's on/off toggle carries **no On/Off text**.
 The track colour is the state, its `aria-label` names the state for assistive tech, and the `Disabled` pill states it in words — a third copy on every row only crowds the description out.
 The label is retained on every other `manager-status-toggle` in the manager, where the switch has no pill beside it.
 
-The row's three actions are **borderless ghost icons** that take a background on hover.
-Delete and Duplicate are preserved capabilities, but three bordered buttons beside a bordered lock, a switch and a pill make the row read as a toolbar rather than as a recipe.
+The row's `Edit` pencil is a **borderless ghost icon** that takes a background on hover.
+Delete and Duplicate are preserved capabilities, but they are inspector-only rather than row actions: three bordered buttons beside a bordered lock, a switch and a pill make the row read as a toolbar rather than as a recipe.
 
 Row authoring-state pills — at most one authoring state applies to a row:
 
