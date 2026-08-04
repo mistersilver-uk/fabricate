@@ -2172,6 +2172,12 @@ Requirements:
    A freshly-created interactable behaviour **never inherits another interactable's linked visual**: an inherited `linkedVisual.uuid` (Foundry region-duplication) is neutralised at creation so two interactables never share one marker (the #334 neutralisation is retained).
    The pure decisions live in `src/canvas/regions/interactableCreationGuard.js` / `interactableRegionFlags.js` / `interactableConfigActions.js`; the `preCreateRegionBehavior` Foundry edge in `src/main.js` is a thin, no-throw adapter that allows creation, stamps the sentinel, and notifies the GM.
    Fabricate's own drag/drop placement paths are unchanged — they pre-build a complete `system` and never go through the unconfigured path.
+6. **Token-presence re-validation is canvas-independent.** `validateActivationRequest`'s containment re-check — confirming the activating token is still inside the interactable's region before granting — MUST be resolvable without the validating GM's rendered canvas, since the active GM may not be viewing the requester's scene.
+   It consults Foundry's authoritative token→region membership (`TokenDocument#regions`) first, then Foundry's own containment test, and only then a geometric test derived from the token document rather than its placeable.
+   An absent membership record is never by itself a negative, because an unpopulated record cannot be distinguished from a genuine absence.
+   Activation is denied `TOKEN_NOT_INSIDE` (`FABRICATE.Canvas.Interactable.Denied.NotInside`) only when the first source to return a determinate answer reports the token outside, and is admitted when no source returns one.
+   The seam is `regionContainsTokenDocument` in `src/canvas/regionHitTest.js`; `InteractableManager#_tokenInsideRegion` is a thin loop over it that keeps the pre-existing "any token of the requesting actor is inside" admission.
+7. **The controlled-token re-trigger honours elevation.** The `controlToken` / "interact here" re-prompt that re-offers the interact prompt for a token already inside an eligible region MUST test the token's own elevation against the region's elevation band rather than assuming elevation `0`, so an elevation-banded region can re-prompt a token standing in it.
 
 ### Region-level ownership & provenance-aware deletion (issue 533)
 

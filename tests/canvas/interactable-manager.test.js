@@ -20,6 +20,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { InteractableManager } from '../../src/canvas/InteractableManager.js';
+import { gridScene, tokenDoc as tokenDocFake } from '../helpers/regionContainmentFakes.js';
 
 const GLOBAL_KEYS = ['game', 'Hooks', 'canvas', 'foundry', 'CONFIG', 'ui'];
 
@@ -452,15 +453,30 @@ test('(d) dialog cancel → NO region created (abort)', async () => {
 
 // --- onRegionEnter prompt gate ----------------------------------------------
 
-function interactableBehavior({ system, sceneId = 'scene-1', regionId = 'region-1', behaviorId = 'beh-1', testPoint = () => true } = {}) {
+/**
+ * A `fabricate.interactable` behaviour on a region on a scene, wired the way real
+ * Foundry wires them: `behavior.parent` is the region, `region.parent` is the
+ * scene, and every token document in `scene.tokens` has that same scene as its
+ * `parent`. The scene carries `grid.size` because the containment re-check
+ * computes the token CENTRE from the document footprint and that grid — a
+ * grid-less scene degrades the centre to the document top-left, which reproduces
+ * the issue-999 defect instead of testing the fix.
+ */
+function interactableBehavior({ system, sceneId = 'scene-1', regionId = 'region-1', behaviorId = 'beh-1', testPoint = () => true, tokens = [], gridSize = 100 } = {}) {
+  const scene = gridScene({ id: sceneId, gridSize });
+  // `tokens` may be a factory so a token document can be parented to THIS scene
+  // (real Foundry guarantees `tokenDoc.parent === scene` for embedded tokens).
+  scene.tokens.contents.push(...(typeof tokens === 'function' ? tokens(scene) : tokens));
   const region = {
     id: regionId,
+    uuid: `Scene.${sceneId}.Region.${regionId}`,
     // V13 document-level testPoint takes a single ElevatedPoint { x, y, elevation }.
     testPoint,
-    parent: { id: sceneId, tokens: { contents: [] } }
+    parent: scene
   };
   const behavior = { id: behaviorId, type: 'fabricate.interactable', system, parent: region };
   region.behaviors = { get: (id) => (id === behaviorId ? behavior : null) };
+  scene.regions = { get: (id) => (id === regionId ? region : null) };
   return behavior;
 }
 
@@ -759,24 +775,62 @@ test('_requestActivation warns + aborts when NO active GM is connected', () => {
 
 // --- validateAndGrant (active GM) → grant emit/local open --------------------
 
+/**
+ * Shared harness for the validateAndGrant tests, mirroring `setupReprompt`.
+ *
+ * It installs the fake runtime with THIS client as the active GM, the requesting
+ * user, the actor-control verdict, and the behaviour the request ref resolves to
+ * — and critically resolves `game.scenes.get(sceneId)` to the SAME scene object
+ * that is `region.parent`, as real Foundry guarantees. `tokens` may be a factory
+ * `(scene) => tokenDocs` so token documents can be parented to that scene.
+ *
+ * Every validateAndGrant test previously repeated ~25 lines of this wiring, which
+ * is both a duplication-gate liability and how the containment collaborator went
+ * uncovered: the old scene stub carried no tokens, so the re-check short-circuited
+ * before it ever reached a containment call.
+ */
+function setupValidateAndGrant({
+  system = TOOL_SYSTEM,
+  tokens = [],
+  testPoint,
+  userId = 'u-1',
+  canControlActor = true,
+  ts = 7
+} = {}) {
+  const { warnings } = installFakeFoundry({
+    isGM: true,
+    tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }]
+  });
+  const emits = [];
+  const requester = userId === 'gm-1' ? { id: 'gm-1', isGM: true } : { id: userId, isGM: false };
+  globalThis.game.user = { id: 'gm-1', isGM: true };
+  globalThis.game.users = { activeGM: { id: 'gm-1' }, get: (id) => (String(id) === userId ? requester : null) };
+  globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
+  globalThis.game.actors = { get: (id) => (id === 'a1' ? { id: 'a1', testUserPermission: () => canControlActor } : null) };
+
+  const behavior = interactableBehavior({ system, tokens, ...(testPoint ? { testPoint } : {}) });
+  const region = behavior.parent;
+  const scene = region.parent;
+  globalThis.game.scenes = { get: (id) => (id === 'scene-1' ? scene : null) };
+
+  const manager = new InteractableManager();
+  const request = {
+    action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
+    interactableType: 'tool', actorId: 'a1', userId, ts
+  };
+  return { manager, behavior, region, scene, emits, warnings, request };
+}
+
+/** The denial reason routed to the requester, or null when none was routed. */
+function deniedReason(emits) {
+  const denied = emits.filter((e) => e.payload.action === 'interactableActivationDenied');
+  return denied.length === 1 ? denied[0].payload.reason : null;
+}
+
 test('validateAndGrant emits a tool grant (with activeCanvasTool) to the requesting player', async () => {
   const saved = snapshotGlobals();
   try {
-    installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }] });
-    const emits = [];
-    globalThis.game.user = { id: 'gm-1', isGM: true };
-    globalThis.game.users = { activeGM: { id: 'gm-1' }, get: (id) => (id === 'u-1' ? { id: 'u-1', isGM: false } : null) };
-    globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
-    globalThis.game.actors = { get: (id) => (id === 'a1' ? { id: 'a1', testUserPermission: () => true } : null) };
-    const behavior = interactableBehavior({ system: TOOL_SYSTEM });
-    globalThis.game.scenes = { get: () => ({ regions: { get: () => behavior.parent } }) };
-    behavior.parent.behaviors = { get: () => behavior };
-
-    const manager = new InteractableManager();
-    const request = {
-      action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
-      interactableType: 'tool', actorId: 'a1', userId: 'u-1', ts: 123
-    };
+    const { manager, emits, request } = setupValidateAndGrant({ ts: 123 });
     const ok = await manager.validateAndGrant(request);
 
     assert.equal(ok, true);
@@ -800,25 +854,11 @@ test('validateAndGrant REJECTS a non-GM requester who does NOT control the named
     // The validating client is the active GM, but the REQUESTER (u-1) is a
     // non-GM player who does NOT own actor a1 (testUserPermission → false).
     // The actor-control gate must reject before any grant is emitted/opened.
-    installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }] });
-    const emits = [];
-    globalThis.game.user = { id: 'gm-1', isGM: true };
-    globalThis.game.users = { activeGM: { id: 'gm-1' }, get: (id) => (id === 'u-1' ? { id: 'u-1', isGM: false } : null) };
-    globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
-    // A real, non-owning user: testUserPermission(OWNER) → false. NOT stubbed true.
-    globalThis.game.actors = { get: (id) => (id === 'a1' ? { id: 'a1', testUserPermission: () => false } : null) };
-    const behavior = interactableBehavior({ system: TOOL_SYSTEM });
-    globalThis.game.scenes = { get: () => ({ regions: { get: () => behavior.parent } }) };
-    behavior.parent.behaviors = { get: () => behavior };
-
+    const { manager, emits, request } = setupValidateAndGrant({ canControlActor: false });
     let opened = null;
-    const manager = new InteractableManager();
     manager.openGrant = (payload) => { opened = payload; };
 
-    const ok = await manager.validateAndGrant({
-      action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
-      interactableType: 'tool', actorId: 'a1', userId: 'u-1', ts: 7
-    });
+    const ok = await manager.validateAndGrant(request);
 
     assert.equal(ok, false, 'the request is rejected (CANNOT_CONTROL_ACTOR)');
     assert.equal(emits.filter((e) => e.payload.action === 'interactableActivationGranted').length, 0, 'no INTERACTABLE_ACTIVATION_GRANTED is emitted');
@@ -831,28 +871,14 @@ test('validateAndGrant REJECTS a non-GM requester who does NOT control the named
 test('validateAndGrant EMITS a denied notice (with reason) to a remote requesting player on rejection', async () => {
   const saved = snapshotGlobals();
   try {
-    installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }] });
-    const emits = [];
-    globalThis.game.user = { id: 'gm-1', isGM: true };
-    globalThis.game.users = { activeGM: { id: 'gm-1' }, get: (id) => (id === 'u-1' ? { id: 'u-1', isGM: false } : null) };
-    globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
-    // Non-owning player ⇒ CANNOT_CONTROL_ACTOR.
-    globalThis.game.actors = { get: (id) => (id === 'a1' ? { id: 'a1', testUserPermission: () => false } : null) };
-    const behavior = interactableBehavior({ system: TOOL_SYSTEM });
-    globalThis.game.scenes = { get: () => ({ regions: { get: () => behavior.parent } }) };
-    behavior.parent.behaviors = { get: () => behavior };
-
-    const manager = new InteractableManager();
-    const ok = await manager.validateAndGrant({
-      action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
-      interactableType: 'tool', actorId: 'a1', userId: 'u-1', ts: 7
-    });
+    const { manager, emits, request } = setupValidateAndGrant({ canControlActor: false });
+    const ok = await manager.validateAndGrant(request);
 
     assert.equal(ok, false);
     assert.equal(emits.length, 1, 'the requesting player is told WHY (denied notice emitted)');
     assert.equal(emits[0].payload.action, 'interactableActivationDenied');
     assert.equal(emits[0].payload.userId, 'u-1');
-    assert.equal(emits[0].payload.reason, 'CANNOT_CONTROL_ACTOR');
+    assert.equal(deniedReason(emits), 'CANNOT_CONTROL_ACTOR');
   } finally {
     restoreGlobals(saved);
   }
@@ -861,26 +887,151 @@ test('validateAndGrant EMITS a denied notice (with reason) to a remote requestin
 test('validateAndGrant notifies LOCALLY (no socket) when the GM requester is denied', async () => {
   const saved = snapshotGlobals();
   try {
-    const { warnings } = installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe' }] });
-    const emits = [];
-    globalThis.game.user = { id: 'gm-1', isGM: true };
-    globalThis.game.users = { activeGM: { id: 'gm-1' }, get: () => ({ id: 'gm-1', isGM: true }) };
-    globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
-    globalThis.game.actors = { get: () => ({ id: 'a1', testUserPermission: () => true }) };
     // A LOCKED interactable ⇒ rejection even for the GM requester.
-    const lockedBehavior = interactableBehavior({ system: { ...TOOL_SYSTEM, state: { ...TOOL_SYSTEM.state, locked: true } } });
-    globalThis.game.scenes = { get: () => ({ regions: { get: () => lockedBehavior.parent } }) };
-    lockedBehavior.parent.behaviors = { get: () => lockedBehavior };
-
-    const manager = new InteractableManager();
-    const ok = await manager.validateAndGrant({
-      action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
-      interactableType: 'tool', actorId: 'a1', userId: 'gm-1', ts: 1
+    const { manager, emits, warnings, request } = setupValidateAndGrant({
+      system: { ...TOOL_SYSTEM, state: { ...TOOL_SYSTEM.state, locked: true } },
+      userId: 'gm-1', ts: 1
     });
+    const ok = await manager.validateAndGrant(request);
 
     assert.equal(ok, false);
     assert.equal(emits.length, 0, 'no socket emit when the GM is the requester');
     assert.deepEqual(warnings, ['FABRICATE.Canvas.Interactable.Denied.Locked'], 'the GM is warned locally with the localized denial key');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+// --- validateAndGrant containment re-check (issue 999) -----------------------
+//
+// The re-check runs on the ACTIVE GM'S client, which may not be viewing the
+// requester's scene, so no token document here has a placeable (`object`). The
+// region rect covers 100..200 on both axes; on a 100px grid a 1x1 token document
+// at (60,60) has its top-left OUTSIDE and its centre (110,110) INSIDE.
+const CONTAINMENT_RECT = { x: 100, y: 100, w: 100, h: 100 };
+
+/** A region testPoint recording every submitted point on `calls`. */
+function recordingRectTestPoint(calls, rect = CONTAINMENT_RECT) {
+  return (point) => {
+    calls.push(point);
+    const px = Number(point?.x);
+    const py = Number(point?.y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return false;
+    return px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h;
+  };
+}
+
+test('validateAndGrant ADMITS a token whose CENTRE is inside on a GM client with no rendered canvas (issue 999)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    // The headline regression: the GM validating this request is not viewing the
+    // scene, so `tokenDoc.object` is null and the old code fell back to the
+    // token's top-left anchor — ~70px off-centre for a Medium token — and denied
+    // a player standing squarely in the region.
+    const points = [];
+    const { manager, emits, request } = setupValidateAndGrant({
+      testPoint: recordingRectTestPoint(points),
+      tokens: (scene) => [tokenDocFake({ x: 60, y: 60, scene, actorId: 'a1' })]
+    });
+
+    const ok = await manager.validateAndGrant(request);
+
+    assert.equal(ok, true, 'the token is inside; the activation is granted');
+    assert.equal(deniedReason(emits), null, 'no TOKEN_NOT_INSIDE denial is routed');
+    assert.deepEqual(points[0], { x: 110, y: 110, elevation: 0 }, 'the CENTRE is submitted, not the top-left anchor');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant DENIES TOKEN_NOT_INSIDE when the token is genuinely outside (issue 999)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { manager, emits, request } = setupValidateAndGrant({
+      testPoint: recordingRectTestPoint([]),
+      tokens: (scene) => [tokenDocFake({ x: 600, y: 600, scene, actorId: 'a1', insideRegion: false })]
+    });
+
+    const ok = await manager.validateAndGrant(request);
+
+    assert.equal(ok, false, 'a genuine miss still denies — the fix is not a blanket grant');
+    assert.equal(deniedReason(emits), 'TOKEN_NOT_INSIDE');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant DENIES when Foundry containment says outside even though the centre is inside (issue 999)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    // `TokenDocument#testInsideRegion` knows the footprint, the elevation band and
+    // (on V14) the scene level; the centre-point test is a strictly worse
+    // approximation and must never overturn it.
+    const points = [];
+    const { manager, emits, request } = setupValidateAndGrant({
+      testPoint: recordingRectTestPoint(points),
+      tokens: (scene) => [tokenDocFake({ x: 60, y: 60, scene, actorId: 'a1', insideRegion: false })]
+    });
+
+    const ok = await manager.validateAndGrant(request);
+
+    assert.equal(ok, false, 'Foundry’s own containment verdict is definitive');
+    assert.equal(deniedReason(emits), 'TOKEN_NOT_INSIDE');
+    assert.equal(points.length, 0, 'the weaker centre-point signal is never consulted');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant GRANTS when the actor has no token document in the scene (cannot locate ⇒ do not block)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { manager, request } = setupValidateAndGrant({
+      testPoint: () => false,
+      tokens: (scene) => [tokenDocFake({ x: 600, y: 600, scene, actorId: 'someone-else' })]
+    });
+
+    assert.equal(await manager.validateAndGrant(request), true, 'no token matches the actor ⇒ grant');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant GRANTS when ANY of the actor’s tokens is inside (issue 999)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    const { manager, request } = setupValidateAndGrant({
+      testPoint: recordingRectTestPoint([]),
+      tokens: (scene) => [
+        tokenDocFake({ x: 600, y: 600, scene, actorId: 'a1' }),
+        tokenDocFake({ x: 60, y: 60, scene, actorId: 'a1' })
+      ]
+    });
+
+    assert.equal(await manager.validateAndGrant(request), true, 'the second, in-region token admits');
+  } finally {
+    restoreGlobals(saved);
+  }
+});
+
+test('validateAndGrant never rejects when a containment signal THROWS (issue 999)', async () => {
+  const saved = snapshotGlobals();
+  try {
+    // A throw means "could not determine", not "outside", on either signal.
+    const throwingInside = setupValidateAndGrant({
+      testPoint: () => { throw new Error('testPoint exploded'); },
+      tokens: (scene) => [tokenDocFake({ x: 600, y: 600, scene, actorId: 'a1', insideRegion: 'throws' })]
+    });
+    assert.equal(await throwingInside.manager.validateAndGrant(throwingInside.request), true);
+    assert.equal(deniedReason(throwingInside.emits), null);
+
+    // A second, independent runtime (installFakeFoundry replaces the globals).
+    const throwingPoint = setupValidateAndGrant({
+      testPoint: () => { throw new Error('testPoint exploded'); },
+      tokens: (scene) => [tokenDocFake({ x: 600, y: 600, scene, actorId: 'a1' })]
+    });
+    assert.equal(await throwingPoint.manager.validateAndGrant(throwingPoint.request), true);
+    assert.equal(deniedReason(throwingPoint.emits), null);
   } finally {
     restoreGlobals(saved);
   }
@@ -909,24 +1060,11 @@ test('notifyActivationDenied warns with the mapped key; an unknown reason uses t
 test('validateAndGrant opens LOCALLY when the GM activated their own token (no socket emit)', async () => {
   const saved = snapshotGlobals();
   try {
-    installFakeFoundry({ isGM: true, tools: [{ id: 'tool-1', componentId: 'comp-axe', label: 'Forge Anvil' }] });
-    const emits = [];
-    globalThis.game.user = { id: 'gm-1', isGM: true };
-    globalThis.game.users = { activeGM: { id: 'gm-1' }, get: () => ({ id: 'gm-1', isGM: true }) };
-    globalThis.game.socket = { emit: (channel, payload) => emits.push({ channel, payload }) };
-    globalThis.game.actors = { get: () => ({ id: 'a1', testUserPermission: () => true }) };
-    const behavior = interactableBehavior({ system: TOOL_SYSTEM });
-    globalThis.game.scenes = { get: () => ({ regions: { get: () => behavior.parent } }) };
-    behavior.parent.behaviors = { get: () => behavior };
-
+    const { manager, emits, request } = setupValidateAndGrant({ userId: 'gm-1', ts: 1 });
     let opened = null;
-    const manager = new InteractableManager();
     manager.openGrant = (payload) => { opened = payload; };
 
-    await manager.validateAndGrant({
-      action: 'interactableActivate', sceneId: 'scene-1', regionId: 'region-1', behaviorId: 'beh-1',
-      interactableType: 'tool', actorId: 'a1', userId: 'gm-1', ts: 1
-    });
+    await manager.validateAndGrant(request);
 
     assert.equal(emits.length, 0, 'no socket emit when the GM is the requester');
     assert.ok(opened, 'the grant opens locally on the GM');
