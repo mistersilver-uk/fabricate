@@ -453,6 +453,32 @@ function _isRecipeIncomplete(recipe) {
   return _isRecipeIncompleteByCounts(recipe);
 }
 
+/**
+ * Derive whether ACTIVATION would refuse this recipe (issue 1010) — the ONE predicate
+ * behind the row's `Can't enable` pill, the bulk panel's pre-flight count and the bulk
+ * write's `blockedEnables`. `RecipeManager.canActivateRecipe` runs the same
+ * `_validateRecipeForActivation` the write runs, against a clone with `enabled: true`.
+ *
+ * It CANNOT be derived from {@link _isRecipeIncomplete}, which is
+ * `validate().valid === false && validateStructure().valid === true`. A STRUCTURALLY
+ * BROKEN recipe therefore reads `incomplete: false` while still being un-enableable, and
+ * none of the essence-reference, tag-placeholder, resolution-mode or alchemy-signature
+ * blockers move it either. Reading `incomplete` here would let the panel warn that three
+ * selected recipes will stay off while zero rows wear the pill — two contradicting
+ * statements about one fact, on one screen.
+ *
+ * The guard covers only a recipe manager that does not implement the predicate (an
+ * injected test seam); an invalid RESULT is never swallowed.
+ *
+ * @param {object} recipeManager
+ * @param {Recipe} recipe
+ * @returns {boolean}
+ */
+function _isRecipeEnableBlocked(recipeManager, recipe) {
+  if (typeof recipeManager?.canActivateRecipe !== 'function') return false;
+  return !recipeManager.canActivateRecipe(recipe).valid;
+}
+
 function _buildRecipeBrowserDisplay(recipe, craftingSystem = null) {
   const executionSteps = _getRecipeExecutionSteps(recipe);
   const isSimple =
@@ -1720,6 +1746,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),
+      // Derived (no stored flag): would ACTIVATION refuse this recipe? See
+      // `_isRecipeEnableBlocked` for why `incomplete` above could NOT have served — a
+      // structurally broken recipe reads `incomplete: false` and still cannot be enabled.
+      // This projection is a hand-built ALLOWLIST, so omitting the field would leave it
+      // invisible to the row pill and every downstream blocked-enable count silently zero.
+      enableBlocked: _isRecipeEnableBlocked(recipeManager, recipe),
       // Book membership: all books containing this recipe (many-to-many), plus the
       // first book's id/name/source for legacy single-link consumers. Deliberately no
       // book IMAGE among them (issue 884): the GM readers resolve `recipe.img` through
@@ -1900,6 +1932,45 @@ export function withoutDerivedRecipeProjectionFields(updates) {
   const stripped = { ...updates };
   for (const field of DERIVED_RECIPE_PROJECTION_FIELDS) delete stripped[field];
   return stripped;
+}
+
+/**
+ * The result shape of `CraftingSystemManager.applyBulkEditToRecipes` (issue 1010), split
+ * by kind so {@link _normalizeBulkRecipeEditResult} stays a two-line loop rather than an
+ * eight-way object literal of near-identical coercions.
+ */
+const BULK_RECIPE_EDIT_RESULT_COUNTS = Object.freeze([
+  'updated',
+  'blockedEnables',
+  'rejected',
+  'booksUpdated',
+]);
+const BULK_RECIPE_EDIT_RESULT_ID_LISTS = Object.freeze([
+  'recipeIds',
+  'blockedRecipeIds',
+  'rejectedRecipeIds',
+  'bookIds',
+]);
+
+/**
+ * Coerce the bulk-recipe write result into its full shape so the bulk panel's post-apply
+ * notification can read every count unconditionally.
+ *
+ * All four counts are distinct and none is derivable from another: `updated` counts
+ * recipes that genuinely changed, `blockedEnables` those activation refused (still off,
+ * other axes applied), `rejected` those a persistence failure excluded from the batch
+ * entirely, and `booksUpdated` the recipe-book definitions whose membership changed.
+ *
+ * @param {object} result
+ * @returns {object} every count as a number and every id list as an array.
+ */
+function _normalizeBulkRecipeEditResult(result) {
+  const normalized = {};
+  for (const key of BULK_RECIPE_EDIT_RESULT_COUNTS) normalized[key] = Number(result?.[key]) || 0;
+  for (const key of BULK_RECIPE_EDIT_RESULT_ID_LISTS) {
+    normalized[key] = Array.isArray(result?.[key]) ? result[key] : [];
+  }
+  return normalized;
 }
 
 // The recipe-item definitions of a system that CONTAIN a recipe (issue 511
@@ -8811,6 +8882,63 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * Apply one staged bulk edit to a SET of recipes in the selected system (issue 1010)
+   * through the manager's set-apply primitive: at most ONE `recipes` world write, at most
+   * ONE `craftingSystems` world write, and ONE refresh for the whole selection.
+   *
+   * `edit` carries only the STAGED axes — `category`, `enabled`, `locked`, `checkTierId`,
+   * `addBookIds`, `removeBookIds` — and is forwarded VERBATIM. Three of the six keys are
+   * falsy but REAL: `enabled: false` (disable), `locked: false` (unlock) and
+   * `checkTierId: null` (clear to the system default). Pruning "empty" keys would collapse
+   * a present `checkTierId: null` into an absent one, and those are different instructions
+   * — "clear the tier" versus "leave the tier alone". Everything downstream tests key
+   * presence, never truthiness.
+   *
+   * Deliberately NOT routed through {@link withoutDerivedRecipeProjectionFields}. That
+   * strip guards payloads built from a WHOLE projected recipe row, which carries
+   * `recipeItemId` and its derived siblings; this edit is a hand-built six-key allowlist
+   * emitted by `toBulkRecipeEdit` that can never carry one. A strip here would only
+   * suggest otherwise.
+   *
+   * Returns the write RESULT rather than a boolean: a blocked enable is a PARTIAL success
+   * — the recipe stays off while its other staged axes still land — which a boolean cannot
+   * express, and the panel's post-apply notification is the authority on both counts.
+   * `null` means nothing was written, for any reason: a bad or empty argument, no selected
+   * system, or a throw that has already been reported to the GM.
+   *
+   * @param {Iterable<string>} recipeIds
+   * @param {object} [edit]
+   * @returns {Promise<object|null>} the normalized write result, or `null` when no write
+   *   happened.
+   */
+  async function applyRecipeBulkEdit(recipeIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    const ids = Array.from(recipeIds || [], String).filter(Boolean);
+    if (ids.length === 0 || !sysId) return null;
+    if (!edit || typeof edit !== 'object') return null;
+    if (Object.keys(edit).length === 0) return null;
+
+    try {
+      const result = await systemManager.applyBulkEditToRecipes(sysId, ids, edit);
+      await refresh();
+      return _normalizeBulkRecipeEditResult(result);
+    } catch (err) {
+      console.error('Fabricate | Failed to apply recipe bulk edit:', err);
+      // The batch fails as a whole through the same two coded error classes the
+      // single-recipe writes raise, so reuse their localizers: the GM gets the coded,
+      // id-free copy rather than a raw English aggregate naming internal ids.
+      services.notify?.error?.(
+        localizeRecipeActivationError(err, services.localize) ||
+          localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to apply recipe bulk edit'
+      );
+      return null;
+    }
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
@@ -9050,6 +9178,7 @@ export function createAdminStore(services) {
     deleteComponent,
     updateComponent,
     applyComponentBulkEdit,
+    applyRecipeBulkEdit,
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,
