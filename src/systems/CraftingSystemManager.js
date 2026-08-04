@@ -2729,12 +2729,15 @@ export class CraftingSystemManager {
   /**
    * Coerce a book-membership id list to the canonical persisted shape: trimmed,
    * non-empty, deduped strings. Factored out of `updateRecipeItemDefinition` so every
-   * writer of `recipeItemDefinitions[].recipeIds` produces the same shape — the five
-   * membership readers compare with `String(id) === rid`, so a whitespace-padded id
+   * writer of `recipeItemDefinitions[].recipeIds` produces the same shape — the six
+   * membership readers all match by exact string equality (five compare
+   * `String(id) === rid` directly, and the book-side library enrichment in `adminStore`
+   * does the same through a `Map` keyed on the recipe id), so a whitespace-padded id
    * written by a second path would simply stop matching.
    *
-   * Deliberately NOT named `…IdList`: `_normalizeSelectionIds` coerces a SELECTION of
-   * recipe ids, and near-homographs on one class are invisible at a call site.
+   * Deliberately NOT named `…IdList`: the imported `normalizeSelectionIds` coerces a
+   * SELECTION of recipe ids, and near-homographs on one class are invisible at a call
+   * site.
    *
    * @param {unknown} recipeIds Raw membership ids from a patch.
    * @returns {string[]} Trimmed, deduped, non-empty ids.
@@ -4744,6 +4747,26 @@ export class CraftingSystemManager {
    * error and that is reachable without a bug — `_assertGM` is `game.user.isGM`
    * (`hasRole(ASSISTANT)`) while `SETTINGS_MODIFY` is revocable from assistants, so in a
    * world that has revoked it the client-side gate passes and the server refuses.
+   *
+   * **Two `save()` calls, one per world SETTING — not a redundant pair to collapse.**
+   * `CraftingSystemManager.save()` writes the `craftingSystems` setting and
+   * `RecipeManager.save()` writes the `recipes` setting, and the book axis lives on the
+   * system while the recipe axes live on the recipes. The batch's guarantee is therefore
+   * at most ONE write of EACH, never one write in total, and each is skipped outright
+   * when its own half changed nothing: a recipe-only edit issues no `craftingSystems`
+   * write, and a book-only edit issues no `recipes` write.
+   *
+   * **The activation gate runs INSIDE `updateRecipe`, per recipe, in batch order — not as
+   * a batched pre-check.** That is the CORRECT evaluation for a batch rather than a cost
+   * this accepts: {@link RecipeManager#_validateSignatures} substitutes the candidate into
+   * the LIVE recipe list, so enabling sequentially is what lets the second alchemy
+   * candidate see the first one already enabled, and be refused for the collision it
+   * really does create. Hoisting the gate into one pre-pass would evaluate every candidate
+   * against a world in which none of its peers had been enabled yet, and the batch would
+   * persist a signature collision the single-recipe write refuses.
+   * {@link RecipeManager#canActivateRecipe} IS that pre-batch evaluation, which is exactly
+   * why a pre-flight count derived from it is a LOWER BOUND while this loop's
+   * `blockedEnables` is the authority.
    *
    * **This method maintains the membership-basis marker itself.** It mutates definitions
    * directly and therefore BYPASSES the `updateRecipeItemDefinition` choke point, so it runs

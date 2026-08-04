@@ -8922,6 +8922,10 @@ export function createAdminStore(services) {
    * through the manager's set-apply primitive: at most ONE `recipes` world write, at most
    * ONE `craftingSystems` world write, and ONE refresh for the whole selection.
    *
+   * Those are TWO settings, not a redundant pair: recipe-book membership is persisted on
+   * the system and the recipe fields are persisted with the recipes, so a book axis and a
+   * recipe axis staged together genuinely cost one write each.
+   *
    * `edit` carries only the STAGED axes — `category`, `enabled`, `locked`, `checkTierId`,
    * `addBookIds`, `removeBookIds` — and is forwarded VERBATIM. Three of the six keys are
    * falsy but REAL: `enabled: false` (disable), `locked: false` (unlock) and
