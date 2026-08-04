@@ -64,10 +64,22 @@ export const RECIPE_DEFAULT_PAGE_SIZE = 25;
  * editor round-trip) is not misread as a system switch and does not wipe the page/filters
  * this object otherwise preserves. See the reset effect in each browser view.
  *
+ * `bulkSelectedRecipeIds` (issue 1010) is the bulk edit SELECTION, lifted for the same
+ * reason everything else here is: it must survive the editor round-trip. It is
+ * `bulkSelectedRecipeIds`, NOT `selectedRecipeIds` — `selectedRecipeId` (singular) already
+ * means *the row whose single-recipe inspector is open* and is user-visible copy, and two
+ * meanings one character apart threaded into the same component is a defect waiting to
+ * happen. Deliberately a bare `new Set()` literal and NOT an import from
+ * `recipeBulkEditModel.js`, exactly as `componentBrowserModel.js` records for its own twin:
+ * a new import in this module would force matching mount-harness allowlist edits in the
+ * suites that mount this tree, where an omission HANGS the suite as `# cancelled` rather
+ * than failing.
+ *
  * @returns {{
  *   statusFilter: string, lockFilter: string, categoryFilter: string,
  *   groupByCategory: boolean, sortKey: RecipeSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string
+ *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string,
+ *   bulkSelectedRecipeIds: Set<string>
  * }}
  */
 export function createRecipeBrowserState() {
@@ -82,6 +94,7 @@ export function createRecipeBrowserState() {
     pageSize: RECIPE_DEFAULT_PAGE_SIZE,
     collapsedCategories: new Set(),
     systemId: '',
+    bulkSelectedRecipeIds: new Set(),
   };
 }
 

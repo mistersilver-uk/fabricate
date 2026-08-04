@@ -15,6 +15,14 @@
  * and recipe axes have nothing in common, so those two models are mirrors of each other
  * rather than sharers of one thing. Only the selection is genuinely one concept.
  *
+ * The one exception is `cycleTriStateStaging`, which is here for the same duplication
+ * reason the selection helpers are. It is not a draft model: it is the leave → add →
+ * remove → leave MACHINE, parameterised on the two list keys it advances, and it knows
+ * nothing about what those lists stage. The Component Studio's tag run and the Recipe
+ * Studio's recipe-book run are the identical machine over different nouns, and a second
+ * literal copy of it is exactly the ~16 duplicated lines the Sonar new-code duplication
+ * gate exists to refuse.
+ *
  * Nothing in this module touches Foundry globals, the store, localization, or a DOM, and
  * it imports nothing at all. That leaf status is load-bearing beyond tidiness: every
  * mounted-Svelte suite naming `componentBulkEditModel.js` must now name this file too, and
@@ -128,4 +136,48 @@ export function setBulkSelection(selectedIds, ids, on = true) {
 export function pruneBulkSelection(selectedIds, knownIds) {
   const known = new Set(normalizeSelectionIds(knownIds));
   return new Set(normalizeSelectionIds(selectedIds).filter((id) => known.has(id)));
+}
+
+/**
+ * Advance one value through the tri-state staging machine `none -> add -> remove -> none`
+ * over a draft's two disjoint list fields.
+ *
+ * The one DRAFT-shaped thing the two studios genuinely share (see the header): the
+ * Component Studio stages tags on `tagAdd`/`tagRemove` and the Recipe Studio stages
+ * recipe-book membership on `bookAdd`/`bookRemove`, and the state machine between them is
+ * the same one. Parameterising it on the two key names keeps one implementation, so the
+ * two runs cannot drift and neither costs the Sonar duplication budget.
+ *
+ * The invariant this exists to hold is that a value is NEVER simultaneously staged for
+ * addition and for removal — which is what lets a write primitive apply its removals after
+ * its additions without the collision ever being reachable from the UI.
+ *
+ * It deliberately does NOT normalize the draft it is handed: each model owns its own
+ * `readDraft`, which knows the rest of that model's axes, and normalizes BEFORE calling
+ * here. This function reads only the two named lists, so it stays total over whatever else
+ * the draft carries and never has to know about it.
+ *
+ * @param {object} draft an ALREADY-normalized draft carrying both list fields.
+ * @param {string} value the value to advance; a blank one is a no-op.
+ * @param {{addKey: string, removeKey: string}} keys the draft's two list field names.
+ * @returns {object} a NEW draft; the input is not mutated.
+ */
+export function cycleTriStateStaging(draft, value, { addKey, removeKey }) {
+  const source = draft && typeof draft === 'object' ? draft : {};
+  const staged = Array.isArray(source[addKey]) ? source[addKey] : [];
+  const unstaged = Array.isArray(source[removeKey]) ? source[removeKey] : [];
+  const name = String(value ?? '');
+  if (!name) return { ...source };
+
+  if (staged.includes(name)) {
+    return {
+      ...source,
+      [addKey]: staged.filter((entry) => entry !== name),
+      [removeKey]: [...unstaged, name],
+    };
+  }
+  if (unstaged.includes(name)) {
+    return { ...source, [removeKey]: unstaged.filter((entry) => entry !== name) };
+  }
+  return { ...source, [addKey]: [...staged, name] };
 }
