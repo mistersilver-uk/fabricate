@@ -6562,13 +6562,19 @@ async function closeOpenApplications(page) {
  * one (issue #1010); `tests/foundry-canvas-readiness.test.js` pins both this call site count and
  * the predicate itself.
  *
- * Deliberately TOLERANT of the wait timing out, matching the pre-existing behaviour at the
- * interactables-manager call site. `canvas.ready` never latches if a draw aborts (a texture-load
- * failure returns from `Canvas##draw` at board.mjs:1199 with `ready` still false), and adding a
- * strictly harder predicate must not newly fail a capture step that used to pass. A swallow is
- * still OBSERVABLE: the timeout is bounded and writes a diagnostic naming the scene, so a run that
- * proceeds against an undrawn canvas says so rather than only manifesting as a downstream
- * assertion failure.
+ * Deliberately TOLERANT of the wait not resolving. `canvas.ready` never latches if a draw aborts
+ * (a texture-load failure returns from `Canvas##draw` with `ready` still false), and a strictly
+ * harder predicate must not newly fail a capture step that used to pass.
+ *
+ * That tolerance is exactly why callers must not depend on this for CORRECTNESS. It is a capture
+ * aid — it stops a panel scanning the previous scene — not a safety barrier. Anything that would
+ * be unsafe against a mid-draw canvas must be ordered so it cannot happen, not merely waited for;
+ * see the placeable seeding in the Manage Interactables block for the worked example.
+ *
+ * The default timeout is sized for the FIRST draw of a session, which is far more expensive than
+ * the ones after it: WebGL init, the BASIS transcoder, worker startup and a full asset load, on a
+ * headless software renderer that logs GPU stalls. At 15s a real run overran it, the swallow let
+ * the walk continue, and the resulting failure looked nothing like a timeout (issue #1010).
  *
  * @param {import('playwright').Page} page
  * @param {string} sceneId the scene to activate and draw
@@ -6576,16 +6582,18 @@ async function closeOpenApplications(page) {
  * @param {number} [options.timeout] milliseconds to wait for the draw to complete
  * @returns {Promise<void>}
  */
-async function activateSceneAndAwaitCanvasReady(page, sceneId, { timeout = 15_000 } = {}) {
+async function activateSceneAndAwaitCanvasReady(page, sceneId, { timeout = 90_000 } = {}) {
   if (!sceneId) return;
   await page.evaluate(async (id) => {
     const scene = game.scenes.get(id);
     if (scene && !scene.active) await scene.activate();
   }, sceneId).catch(() => {});
-  await page.waitForFunction(isCanvasReadyForScene, sceneId, { timeout }).catch(() => {
+  await page.waitForFunction(isCanvasReadyForScene, sceneId, { timeout }).catch(err => {
+    // Name the REASON, not just the fact. A timeout and a destroyed execution context both land
+    // here and mean different things, and the previous message asserted "timeout" for both.
     process.stderr.write(
-      `Canvas did not report ready for scene ${sceneId} within ${timeout}ms; ` +
-      'continuing against a possibly undrawn canvas.\n'
+      `Canvas never reported ready for scene ${sceneId} (waited up to ${timeout}ms): ` +
+      `${err?.message?.split('\n')[0] ?? err}. Continuing against a possibly undrawn canvas.\n`
     );
   });
 }
@@ -10843,19 +10851,34 @@ async function main() {
             .waitFor({ state: 'detached', timeout: 10_000 });
 
           const interactableRef = craftingSetup.interactable;
-          // Ensure the seeded interactable's scene is the active/viewed scene so the
-          // panel's scene-scan finds it in the list, and wait for the canvas to have
-          // FINISHED drawing it (activation → canvas redraw is async). The wait must
-          // clear before the placeable creates below: this is the FIRST real draw of
-          // the session, so it is the one draw whose pre-ticker window is open — see
-          // activateSceneAndAwaitCanvasReady and issue #1010.
-          await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
-          // Seed extra interactables on the active scene so the captured list shows
-          // MULTIPLE marker-status variants + a Tool-type row (not just the lone
-          // region-only gathering task). A REAL Tile is created and linked by uuid
-          // so that row resolves to a present "Tile" marker; another row points at
-          // a non-existent Tile uuid so it renders the danger "missing" badge.
+          // ORDER IS LOAD-BEARING: seed the placeables BEFORE the scene is viewed,
+          // then activate (issue #1010). Creating a placeable on a scene the canvas
+          // is CURRENTLY DRAWING throws out of core, un-awaited and un-caught, as a
+          // bare `pageerror` with no failing step:
+          //
+          //   Canvas##draw sets `scene._view` (board.mjs:1150) — which is what makes
+          //   `document.object` non-null — and only stands up the ticker queues at
+          //   `#activateTicker()` (1209), with `await #loadTextures()` (1191) in
+          //   between. A create landing in that gap reaches
+          //   `CanvasDocumentMixin#_onCreate`, which calls `object.draw()`; the draw
+          //   hits `canvas.pendingRenderFlags[priority]` while that field is still
+          //   the bare class declaration and throws `reading 'INTERFACE'`.
+          //
+          // Creating FIRST removes the race by construction rather than by timing: on
+          // a scene that has never been viewed, `_view` is null, so `_onCreate` finds
+          // no placeable and returns without drawing anything. The documents are then
+          // drawn by the LAYER pass (`Drawing the RegionLayer/TilesLayer canvas
+          // layer`), which core runs after `#activateTicker()`, so the queues exist.
+          // This is exactly why the interactables seeded during crafting setup have
+          // never thrown — they are created while their scene is inactive.
+          //
+          // Waiting for `canvas.ready` is NOT sufficient on its own here. The wait is
+          // bounded and tolerant, and the FIRST draw of a session is the expensive one
+          // (WebGL init, BASIS transcoder, 62 assets); when it overran the timeout the
+          // harness proceeded and created straight into the open window, which is what
+          // the readiness fix alone still failed on. Ordering does not depend on how
+          // long a draw takes.
           await page.evaluate(async ({ sceneId, systemId, toolId, taskId }) => {
             const scene = game.scenes.get(sceneId);
             if (!scene) return;
@@ -10905,6 +10928,13 @@ async function main() {
             toolId: 'smoke-herbalist-sickle',
             taskId: 'smoke-forage-library'
           }).catch(() => {});
+
+          // NOW view the scene, with every placeable already on it, so the panel's
+          // scene-scan finds them. The readiness wait is still required for the
+          // CAPTURE to be correct — the panel scans `canvas.scene`, so opening it
+          // mid-draw scans the previous scene — but it is no longer what stands
+          // between the run and a `pageerror`.
+          await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
           await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
 

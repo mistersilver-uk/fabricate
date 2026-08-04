@@ -160,6 +160,28 @@ test('the harness routes every scene activation through the readiness helper', (
   );
 });
 
+test('placeables are seeded BEFORE their scene is viewed, not after', () => {
+  // The ordering is what actually prevents the throw, and it is the half a readiness wait cannot
+  // provide: that wait is bounded and tolerant, so on a slow first draw it gives up and the walk
+  // creates straight into the open window anyway — observed, not hypothesised (issue #1010).
+  // On a scene that has never been viewed, `scene._view` is null, so `_onCreate` finds no
+  // placeable and never draws one; the layer pass draws them later, after the ticker exists.
+  const code = harnessCode();
+
+  const seedIndex = code.indexOf("createEmbeddedDocuments('Tile'");
+  const viewIndex = code.indexOf('activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId)');
+
+  assert.ok(seedIndex > 0, 'could not find the Tile seed in the harness — this guard is vacuous');
+  assert.ok(viewIndex > 0, 'could not find the scene activation — this guard is vacuous');
+  assert.ok(
+    seedIndex < viewIndex,
+    'the Manage Interactables block activates its scene BEFORE seeding placeables into it. That' +
+      ' order creates documents on a scene the canvas may be mid-draw on, which throws' +
+      " \"Cannot read properties of undefined (reading '<PRIORITY>')\" out of core as an" +
+      ' unhandled rejection — a pageerror with no failing step. Seed first, then activate.'
+  );
+});
+
 test('the harness carries no render-priority console-error waiver', () => {
   const code = harnessCode();
 

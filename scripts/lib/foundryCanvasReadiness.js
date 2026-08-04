@@ -30,6 +30,22 @@
  * un-caught, so the throw surfaces as an unhandled rejection — a bare `pageerror` with no failing
  * harness step, which is why this went undiagnosed behind a waiver for so long.
  *
+ * WHAT THIS PREDICATE DOES AND DOES NOT BUY
+ * ------------------------------------------
+ * It answers "has the canvas finished drawing this scene" correctly. It does NOT make a caller
+ * safe, because a wait is only as good as its timeout: the first draw of a session is by far the
+ * most expensive (WebGL init, BASIS transcoder, worker startup, a full asset load on a software
+ * renderer), and when a real run overran the original 15s bound the harness swallowed the timeout
+ * and created placeables into the open window regardless. Waiting longer is a mitigation; not
+ * writing a placeable to a scene the canvas is drawing is a fix. Order the work so the unsafe
+ * state is unreachable, and use this to keep a capture looking at the right scene.
+ *
+ * Note also which draws are exposed. Placeables the scene ALREADY carries are drawn by the layer
+ * pass, which core runs after `#activateTicker()`, so they are never at risk — a scene full of
+ * Regions and Tiles redraws cleanly. Only a document created DURING the window is, because that
+ * path goes through `_onCreate` instead. A document created while the scene is not viewed is safe
+ * too: `object` is null, so nothing is drawn at create time at all.
+ *
  * The compound predicate closes the window BY CONSTRUCTION, in both directions:
  *   - `#ready = false` at 1105 precedes `#scene = nextScene` at 1149, so the predicate can never
  *     pass on the previous scene's `ready` while the new scene id is already visible.
