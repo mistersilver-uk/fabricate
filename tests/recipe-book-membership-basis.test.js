@@ -425,6 +425,56 @@ describe('recipe-book membership basis — the first membership write', () => {
   });
 });
 
+describe('recipe-book membership basis — the dangling-id resolution order (issue 1010)', () => {
+  // `_resolveLegacyMembershipDefinition` (extracted from `_seedMembershipFromLegacyScalars`,
+  // issue 1010) deliberately does NOT fall through to the `linkedRecipeItemUuid` leg when
+  // `recipeItemId` is PRESENT but names no definition: only an ABSENT `recipeItemId` falls
+  // through. Pin BOTH directions through the real seeding write (`updateRecipeItemDefinition`,
+  // not the extracted helper in isolation, so a caller that stops consulting it is also
+  // caught): a fix that disabled the uuid branch entirely would satisfy the first half alone,
+  // and the second half is what proves the resolution can fire at all.
+  it('does NOT seed a recipe whose PRESENT recipeItemId is dangling, even with a matching uuid', async () => {
+    const fixture = await makeFixture({
+      recipes: [
+        makeRecipe({
+          id: 'r-dangling-with-uuid',
+          name: 'Ghost Bolt',
+          recipeItemId: 'book-ghost',
+          linkedRecipeItemUuid: BOOK_B_UUID,
+        }),
+      ],
+    });
+
+    await fixture.manager.updateRecipeItemDefinition(SYSTEM_ID, 'book-a', { recipeIds: [] });
+
+    assert.deepEqual(
+      persistedRecipeIds(fixture, 'book-b'),
+      [],
+      'a dangling recipeItemId must not fall through to the uuid branch'
+    );
+  });
+
+  it('SEEDS a recipe with an ABSENT recipeItemId against its matching linkedRecipeItemUuid', async () => {
+    const fixture = await makeFixture({
+      recipes: [
+        makeRecipe({
+          id: 'r-absent-with-uuid',
+          name: 'Mend Again',
+          linkedRecipeItemUuid: BOOK_B_UUID,
+        }),
+      ],
+    });
+
+    await fixture.manager.updateRecipeItemDefinition(SYSTEM_ID, 'book-a', { recipeIds: [] });
+
+    assert.deepEqual(
+      persistedRecipeIds(fixture, 'book-b'),
+      ['r-absent-with-uuid'],
+      'an absent recipeItemId falls through to the uuid leg, so the resolution actually fires'
+    );
+  });
+});
+
 describe('recipe-book membership basis — emptying every array', () => {
   forEachReader('leaves every book empty rather than reverting the system', async (reader) => {
     const fixture = await makeFixture({
