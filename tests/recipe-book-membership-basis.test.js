@@ -335,8 +335,15 @@ function forEachReader(title, body) {
   for (const reader of READERS) {
     it(`${title} — ${reader.name}`, async () => {
       const assertionCount = await body(reader);
+      // Split, because the two halves fail for different reasons and a composite would
+      // hide which: a non-integer means the body stopped returning its count (so this
+      // guard silently stopped guarding), while zero means it ran but asserted nothing.
       assert.ok(
-        Number.isInteger(assertionCount) && assertionCount > 0,
+        Number.isInteger(assertionCount),
+        'the reader body must return its assertMemberships count, or this guard is inert'
+      );
+      assert.ok(
+        assertionCount > 0,
         'the reader body performed at least one real assertion via assertMemberships'
       );
     });
