@@ -145,14 +145,35 @@ export function filterRecipes(recipes, filters = {}) {
 }
 
 /**
- * The attention rank a row sorts on: 2 = enabling is blocked, 1 = incomplete but
- * enabled, 0 = clear. Descending by default, so the rows needing work float up.
+ * The attention rank a row sorts on. It is `deriveRecipeStatuses`'s authoring-state
+ * branch, expressed as a number, and is deliberately written as the SAME two tests in
+ * the same order so the sort and the pill cannot name different sets:
  *
- * @param {object} recipe
+ *  - `2` — the row wears the red `Can't enable` pill: activation would refuse it AND it
+ *    is currently off.
+ *  - `1` — the row wears the amber `Incomplete` pill: the same activation blocker on a
+ *    recipe that is already ON. It stays BELOW 2 rather than joining it, because that is
+ *    what the two pills already say — nothing is being refused, since the activation gate
+ *    fires only on a transition into the enabled state — and a "blocked and already on"
+ *    fourth rank would be a state neither pill nor spec describes.
+ *  - `0` — the row wears neither.
+ *
+ * Descending by default, so the rows needing work float up.
+ *
+ * This reads `enableBlocked`, not `incomplete` (issue 1010). `incomplete` is
+ * `validate() === false && validateStructure() === true`, which does NOT capture
+ * blocked-ness: a structurally broken recipe reads `incomplete: false` and still cannot
+ * be enabled, and neither a dangling essence reference, a tag placeholder, an unmet
+ * resolution-mode requirement nor an alchemy signature conflict moves it. Both pills were
+ * repointed at `enableBlocked` for exactly that reason, so a rank left on `incomplete`
+ * sorted the reddest rows in the browser at 0 — below rows painted amber — under a sort
+ * key named "needs attention".
+ *
+ * @param {object} recipe a projected recipe row.
  * @returns {0 | 1 | 2}
  */
 export function attentionRank(recipe) {
-  if (recipe?.incomplete !== true) return 0;
+  if (recipe?.enableBlocked !== true) return 0;
   return recipe?.enabled === false ? 2 : 1;
 }
 

@@ -127,8 +127,8 @@ describe('recipeBrowserModel — sorting', () => {
   });
 
   it('ranks attention as blocked > incomplete > clear and tiebreaks by name', () => {
-    const blocked = makeRecipe({ name: 'Blocked', incomplete: true, enabled: false });
-    const incomplete = makeRecipe({ name: 'Incomplete', incomplete: true, enabled: true });
+    const blocked = makeRecipe({ name: 'Blocked', enableBlocked: true, enabled: false });
+    const incomplete = makeRecipe({ name: 'Incomplete', enableBlocked: true, enabled: true });
     const clear = makeRecipe({ name: 'Clear' });
 
     assert.equal(attentionRank(blocked), 2);
@@ -137,6 +137,66 @@ describe('recipeBrowserModel — sorting', () => {
     assert.deepEqual(
       names(sortRecipes([clear, incomplete, blocked], { key: 'attention', direction: 'desc' })),
       ['Blocked', 'Incomplete', 'Clear']
+    );
+  });
+
+  // The rank and the pill must name the SAME set (issue 1010). `incomplete` is
+  // `validate() === false && validateStructure() === true`, so a STRUCTURALLY BROKEN
+  // recipe reads `incomplete: false` — and so do a dangling essence reference, a tag
+  // placeholder, an unmet resolution-mode requirement and an alchemy signature conflict.
+  // Every one of them wears the red `Can't enable` pill and none of them moved
+  // `incomplete`, so the sort literally named "needs attention" ranked the reddest rows
+  // in the browser at 0, below the amber ones.
+  it('ranks a row the browser pills as blocked, not the narrower incomplete predicate', () => {
+    const structurallyBroken = makeRecipe({
+      name: 'Broken',
+      incomplete: false,
+      enableBlocked: true,
+      enabled: false
+    });
+    // The mirror case: `incomplete` alone can no longer promote a row the browser paints
+    // no pill on at all.
+    const incompleteOnly = makeRecipe({
+      name: 'PillLess',
+      incomplete: true,
+      enableBlocked: false,
+      enabled: false
+    });
+
+    assert.equal(attentionRank(structurallyBroken), 2, 'the row wearing the red pill sorts first');
+    assert.equal(attentionRank(incompleteOnly), 0, 'and a row wearing no pill sorts last');
+
+    // The rank IS the pill set, by construction: rank 2 iff `blocked`, 1 iff `incomplete`.
+    for (const row of [structurallyBroken, incompleteOnly]) {
+      const pill = deriveRecipeStatuses(row).find((entry) =>
+        ['blocked', 'incomplete'].includes(entry.id)
+      );
+      const expected = { blocked: 2, incomplete: 1 };
+      assert.equal(
+        attentionRank(row),
+        pill ? expected[pill.id] : 0,
+        `${row.name}: the attention rank and the authoring-state pill must not disagree`
+      );
+    }
+
+    assert.deepEqual(
+      names(
+        sortRecipes([incompleteOnly, structurallyBroken], { key: 'attention', direction: 'desc' })
+      ),
+      ['Broken', 'PillLess']
+    );
+  });
+
+  // An already-ON blocked recipe keeps rank 1, matching its amber `Incomplete` pill:
+  // nothing is being refused, because the activation gate fires only on a transition
+  // INTO the enabled state. Three ranks, three pill outcomes, no fourth rank.
+  it('keeps a blocked-but-already-enabled row at the amber rank its pill paints', () => {
+    const onAndBlocked = makeRecipe({ name: 'OnBlocked', enableBlocked: true, enabled: true });
+    assert.equal(attentionRank(onAndBlocked), 1);
+    assert.deepEqual(
+      deriveRecipeStatuses(onAndBlocked).map((pill) => pill.id),
+      ['incomplete'],
+      'the row is amber, so the rank is the amber one'
     );
   });
 
