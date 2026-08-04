@@ -21,7 +21,11 @@
  *   5. flip the viewer for player frames.
  */
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import { buildLabRunStates, installLabRunStates } from './labRunStates.js';
+import {
+  buildLabBlindRunSecret,
+  buildLabRunStates,
+  installLabRunStates,
+} from './labRunStates.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
@@ -194,8 +198,32 @@ export async function buildLabWorld({
   if (runRecipes.length > 0) {
     installLabRunStates(
       journalActor,
-      buildLabRunStates({ actor: journalActor, userId: 'user-lab-player', recipes: runRecipes })
+      buildLabRunStates({
+        actor: journalActor,
+        userId: 'user-lab-player',
+        recipes: runRecipes,
+        environments: content.environments,
+      })
     );
+    // The in-flight blind run's secret half (issue 901). It is NOT a flag: the drawn task, its
+    // start-time snapshot and its node reservation live in the `gatheringBlindRuns` WORLD setting,
+    // which only a GM may write — that is the integrity boundary the fix draws, and the reason a
+    // GM's Journal can preview the task while the acting player's cannot.
+    //
+    // Written HERE rather than in `seedSettings` because it has to name the journal actor, which is
+    // only resolved above; and after `installLabRunStates` so the run and its secret land together.
+    // The setting map is the same one the shim reads through, so a post-boot write is visible to
+    // `GatheringBlindRunStore` exactly as a GM's own `game.settings.set` would be — and nothing
+    // prunes it, because `prune()` has no caller in `main.js`.
+    const blindRunSecret = buildLabBlindRunSecret({
+      actor: journalActor,
+      environments: content.environments,
+      tasks: content.gatheringConfig.tasks,
+    });
+    // Keyed by run id, as `GatheringBlindRunStore` stores it (`SETTING_KEYS.GATHERING_BLIND_RUNS`).
+    world.settings.set(settingsKey(FABRICATE_NAMESPACE, 'gatheringBlindRuns'), {
+      [blindRunSecret.runId]: blindRunSecret,
+    });
     // The run managers memoise each actor's container the first time they read it, and
     // `initialize()` reads it — so a container written afterwards is invisible until the cache is
     // dropped. The symptom is a journal with runs on the actor and none on screen.

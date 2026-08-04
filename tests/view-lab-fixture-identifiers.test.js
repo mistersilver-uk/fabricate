@@ -31,14 +31,23 @@ const actors = buildLabActors(content);
 /**
  * The run ids `buildLabRunStates` authors, read from its source.
  *
- * @returns {string[]} Every `id: 'lab-run-…'` literal in the module.
+ * Every `lab-` run id, not only the `lab-run-` crafting ones. The gathering and salvage containers
+ * use their own prefixes, so a `lab-run-` regex left `[data-run-id="lab-gathering-blind-waiting"]`
+ * — the selector the two issue-901 blind Journal cases click — checked against nothing.
+ *
+ * The blind run's id is declared as an exported CONSTANT rather than inline, because its secret
+ * half lives in a world setting written by `labWorld.js`; the constant is matched here too.
+ *
+ * @returns {string[]} Every `lab-…` run id literal in the module.
  */
 function labRunIds() {
   const source = readFileSync(
     join(dirname(fileURLToPath(import.meta.url)), 'view-lab', 'world', 'labRunStates.js'),
     'utf8'
   );
-  return [...source.matchAll(/id: '(lab-run-[\w-]+)'/g)].map((match) => match[1]);
+  return [...source.matchAll(/(?:id|RUN_ID) = ?'(lab-[\w-]+)'|id: '(lab-[\w-]+)'/g)].map(
+    (match) => match[1] ?? match[2]
+  );
 }
 
 /** Attribute name -> the set of values the lab world actually contains. */
@@ -78,6 +87,9 @@ const IDENTITY_SOURCES = {
   // Run ids are literals inside `buildLabRunStates`, which needs a built actor to call. Reading
   // them out of the source text keeps the guard free of that setup while still failing on a rename.
   'data-history-run-id': new Set(labRunIds()),
+  // The ACTIVE-run counterpart, carried by `RunCard`. Unguarded until issue 901's blind Journal
+  // cases needed it, which is the same gap `labRunIds` above describes from the other end.
+  'data-run-id': new Set(labRunIds()),
   // Composite keys. The listing builds these itself, so the guard has to build them the same way
   // or it would reject the very values the DOM carries.
   'data-inventory-card': new Set(

@@ -20,6 +20,9 @@ import { buildLabWorld } from './world/labWorld.js';
 const READY_ATTRIBUTE = 'data-view-lab-ready';
 const ERROR_ATTRIBUTE = 'data-view-lab-error';
 
+/** The two roles `shim.setViewer` understands. An unknown `viewer=` falls back to the default. */
+const VIEWER_ROLES = new Set(['gm', 'player']);
+
 /**
  * Kill animations, transitions, the caret, and smooth scrolling document-wide.
  *
@@ -91,6 +94,12 @@ function readParams() {
         ? { width: Number(params.get('w')), height: Number(params.get('h')) }
         : null,
     chromeOnly: params.get('chromeOnly') === '1',
+    // Who is looking. Defaults below to the viewer each window is normally used by — player for the
+    // player app, GM for the manager — because that is what every existing case assumes. A case
+    // OVERRIDES it only when the difference between the two viewers IS the thing photographed: a
+    // GM opening the player app is an ordinary state (they own the same tabs), and issue 901's
+    // Journal redaction has no frame at all unless both halves can be captured.
+    viewer: VIEWER_ROLES.has(params.get('viewer')) ? params.get('viewer') : null,
     // How the lab answers a Foundry DialogV2: `open` to leave it standing for the screenshot,
     // `enter` (the default) to press whichever button Foundry marks default, or a button action by
     // name. A case that wants a dialog IN FRAME must ask for `dialog=open` — see `foundryDialog.js`
@@ -425,7 +434,9 @@ async function boot() {
   if (!params.chromeOnly) {
     // Player frames must render as a NON-GM viewer or redaction never engages; the world had to be
     // built as GM, so the flip happens here, after initialization and before the services are built.
-    world.shim.setViewer(params.appId === 'fabricate-app' ? 'player' : 'gm');
+    // A case may override with `viewer=` when the GM/player difference is what it photographs.
+    const defaultViewer = params.appId === 'fabricate-app' ? 'player' : 'gm';
+    world.shim.setViewer(params.viewer ?? defaultViewer);
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
     mounted =
