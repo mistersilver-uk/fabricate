@@ -18,6 +18,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
+import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -86,23 +87,6 @@ function manyGeneral(count) {
 
 function countTexts(root) {
   return [...root.querySelectorAll('.fab-group-count')].map((node) => node.textContent.trim());
-}
-
-/** The toolbar's `{N} selected` readout, or '' when nothing is selected (it is absent). */
-function selectionCountText(root) {
-  return root.querySelector('[data-component-selection-count]')?.textContent.trim() || '';
-}
-
-/** The ids of the rows currently rendered with a ticked selection box. */
-function bulkSelectedIds(root) {
-  return [...root.querySelectorAll('.manager-component-row.is-bulk-selected')].map(
-    (row) => row.dataset.componentId
-  );
-}
-
-function clickRowBox(root, id) {
-  root.querySelector(`[data-component-select="${id}"]`).click();
-  flushSync();
 }
 
 /** [category, countText] per rendered group, in DOM order, for the current page. */
@@ -333,172 +317,63 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
 });
 
 // Issue 772 — the multi-select. The rendered-rows control and the whole-results action are
-// DISTINCT operations and these tests keep them distinct, because conflating them is the
+// DISTINCT operations and these cases keep them distinct, because conflating them is the
 // defect: a collapsed group's rows are not rendered, so the page control must never reach
 // them while the results link must.
-describe('ComponentsBrowserView bulk selection (issue 772)', () => {
-  function twoCategoryLibrary() {
-    return [
-      makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
-      makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
-      makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
-      makeComponent({ id: 'h2', name: 'Thyme', category: 'Herb' })
-    ];
+//
+// Issue 1010 lifted the seven cases into `tests/helpers/browserBulkSelectionCases.js` and the
+// Recipe Studio joined them there. They are stated ONCE and instantiated per studio, because
+// both browsers render the same `BulkSelectionToolbar` over the same `bulkSelectionModel.js`
+// — one contract, two consumers. Keeping a literal copy here as well would leave the contract
+// single-sourced in name only: a case tightened on one studio and not the other is exactly the
+// per-studio drift the extraction exists to prevent, and it is also the near-identical
+// assertion block SonarCloud's new-code duplication gate counts (it analyses `tests/**` and
+// ignores `cpd.exclusions`).
+//
+// Issue 924's focus-ring contract used to be asserted here too, against this view's rendered
+// toolbar. It belongs to the primitive rather than to one of its two consumers, so it
+// RELOCATED — unchanged in substance and widened in strength — to
+// `tests/components/bulk-selection-toolbar-mounted.test.js`, which owns both the adjacency
+// case and the drift assertion over the class tokens inside the toolbar's `:global()`.
+// Do not re-add a per-studio copy of either; the primitive is what both studios render.
+describeBrowserBulkSelection({
+  label: 'ComponentsBrowserView',
+  prefix: 'component',
+  rowClass: 'manager-component-row',
+  rowIdKey: 'componentId',
+  selectionKey: 'bulkSelectedComponentIds',
+  rowsProp: 'itemCards',
+  harness: browser,
+  createBrowserState: createComponentBrowserState,
+  // `manyGeneral` zero-pads its names, so name-ascending order is also numeric order — which
+  // is what makes `flatId(1)` reliably the first row of page 1.
+  makeFlatRows: (count) => manyGeneral(count),
+  flatId: (index) => `g${index}`,
+  makeGroupedRows: () => [
+    makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
+    makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
+    makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
+    makeComponent({ id: 'h2', name: 'Thyme', category: 'Herb' })
+  ],
+  grouped: {
+    collapseHeader: 'Metal',
+    hiddenIds: ['m1', 'm2'],
+    visibleIds: ['h1', 'h2']
+  },
+  props: (itemCards, extra = {}) => ({
+    itemCards,
+    // Derived from the rows rather than hard-coded, because the same `props` builds both the
+    // flat fixtures (which carry no category and must land in the reserved `general` bucket,
+    // vocabulary empty) and the grouped one (which must offer both categories or the grouped
+    // branch of `pageIds` is never exercised).
+    categoryVocabulary: [...new Set(itemCards.map((item) => item.category).filter(Boolean))],
+    ...extra
+  }),
+  rowControls: {
+    scope: '.manager-action-group',
+    count: 1,
+    why: 'the row still carries exactly ONE button — the smoke walk reaches Edit through it'
   }
-
-  it('ticks a row from its own trailing box, and that box is not a button', async () => {
-    const root = await browser.mount({ itemCards: manyGeneral(3) });
-
-    const box = root.querySelector('[data-component-select="g1"]');
-    assert.equal(box.tagName, 'INPUT', 'the selection control is a real checkbox input');
-    assert.equal(
-      root.querySelectorAll('[data-component-id="g1"] .manager-action-group button').length,
-      1,
-      'the row still carries exactly ONE button — the smoke walk reaches Edit through it'
-    );
-
-    clickRowBox(root, 'g1');
-    assert.deepEqual(bulkSelectedIds(root), ['g1'], 'the ticked row carries is-bulk-selected');
-    assert.match(selectionCountText(root), /1 selected/);
-
-    clickRowBox(root, 'g1');
-    assert.deepEqual(bulkSelectedIds(root), [], 'ticking again clears the row');
-    assert.equal(selectionCountText(root), '', 'the readout disappears with an empty selection');
-  });
-
-  // Issue 924's focus-ring contract used to be asserted here, against this view's rendered
-  // toolbar. Issue 1010 extracted that toolbar into the shared `BulkSelectionToolbar`, so the
-  // contract belongs to the primitive rather than to one of its two consumers: it RELOCATED,
-  // unchanged in substance and widened in strength, to
-  // `tests/components/bulk-selection-toolbar-mounted.test.js`, which owns both the adjacency
-  // case and the drift assertion over the class tokens inside the toolbar's `:global()`.
-  // Do not re-add a per-studio copy of it; the primitive is what both studios render.
-
-  it('toggles ONLY the rendered rows from the page box, leaving a collapsed group alone', async () => {
-    const root = await browser.mount({
-      itemCards: twoCategoryLibrary(),
-      categoryVocabulary: ['Metal', 'Herb']
-    });
-
-    // Collapse Metal through its real header button, so its two rows stop being rendered.
-    root.querySelector('[data-group-header="Metal"]').click();
-    flushSync();
-    assert.equal(
-      root.querySelectorAll('.manager-component-row').length,
-      2,
-      'only the Herb rows are rendered once Metal is collapsed'
-    );
-
-    const pageBox = root.querySelector('[data-component-select-all-page]');
-    pageBox.click();
-    flushSync();
-
-    assert.deepEqual(
-      bulkSelectedIds(root).sort(),
-      ['h1', 'h2'],
-      'the page control must not reach rows the GM cannot see'
-    );
-    assert.match(selectionCountText(root), /2 selected/, 'and the count cannot exceed them');
-    assert.equal(pageBox.checked, true, 'every RENDERED row is selected, so the box reads all');
-
-    pageBox.click();
-    flushSync();
-    assert.deepEqual(bulkSelectedIds(root), [], 'clicking again clears the rendered rows');
-  });
-
-  it('reports the tri-state over the rendered rows', async () => {
-    const root = await browser.mount({ itemCards: manyGeneral(3) });
-    const pageBox = root.querySelector('[data-component-select-all-page]');
-
-    assert.equal(pageBox.checked, false, 'nothing selected reads unchecked');
-    assert.equal(pageBox.indeterminate, false, 'and NOT indeterminate');
-
-    clickRowBox(root, 'g1');
-    assert.equal(pageBox.indeterminate, true, 'part of the page selected reads indeterminate');
-
-    clickRowBox(root, 'g2');
-    clickRowBox(root, 'g3');
-    assert.equal(pageBox.checked, true, 'the whole page selected reads checked');
-    assert.equal(pageBox.indeterminate, false);
-  });
-
-  it('reaches the whole filtered set through "Select all N results"', async () => {
-    const root = await browser.mount({ itemCards: manyGeneral(30) });
-
-    assert.ok(
-      !root.querySelector('[data-component-select-all-results]'),
-      'the results link belongs to the selection cluster and is absent with nothing selected'
-    );
-
-    clickRowBox(root, 'g1');
-    const link = root.querySelector('[data-component-select-all-results]');
-    assert.match(link.textContent, /30/, 'the link names the whole filtered set, not the page');
-
-    link.click();
-    flushSync();
-    assert.match(selectionCountText(root), /30 selected/, 'all 30 filtered rows are selected');
-    assert.ok(
-      !root.querySelector('[data-component-select-all-results]'),
-      'the link disappears once the filtered set is fully selected'
-    );
-  });
-
-  it('keeps a selection made on page 1 when the GM pages away', async () => {
-    const root = await browser.mount({ itemCards: manyGeneral(30) });
-
-    clickRowBox(root, 'g1');
-    root.querySelector('[data-pagination-next]').click();
-    flushSync();
-
-    assert.ok(!root.querySelector('[data-component-select="g1"]'), 'page 2 does not render g1');
-    assert.match(
-      selectionCountText(root),
-      /1 selected/,
-      'the count is the WHOLE selection, not its intersection with the page'
-    );
-  });
-
-  it('drops a selected id that no longer resolves to a component', async () => {
-    const root = await browser.mount({ itemCards: manyGeneral(3) });
-
-    clickRowBox(root, 'g1');
-    clickRowBox(root, 'g2');
-    assert.match(selectionCountText(root), /2 selected/);
-
-    // A delete / unlink / refresh republishes `itemCards` without the row.
-    await browser.setProps({ itemCards: manyGeneral(3).filter((item) => item.id !== 'g1') });
-
-    assert.deepEqual(bulkSelectedIds(root), ['g2'], 'the surviving row stays selected');
-    assert.match(
-      selectionCountText(root),
-      /1 selected/,
-      'a phantom id must never survive in the count or in an Apply'
-    );
-  });
-
-  it('clears the selection on a genuine crafting-system switch', async () => {
-    const shared = createComponentBrowserState();
-    const itemCards = manyGeneral(3);
-
-    await browser.mount({ itemCards, selectedSystemId: 'sys-1', browserState: shared });
-    shared.bulkSelectedComponentIds = new Set(['g1', 'g2']);
-
-    browser.remount();
-    await browser.mount({ itemCards, selectedSystemId: 'sys-1', browserState: shared });
-    assert.equal(
-      shared.bulkSelectedComponentIds.size,
-      2,
-      'an editor round-trip is not a system switch and must not clear it'
-    );
-
-    browser.remount();
-    await browser.mount({ itemCards, selectedSystemId: 'sys-2', browserState: shared });
-    assert.equal(
-      shared.bulkSelectedComponentIds.size,
-      0,
-      'the selection names components the new system does not have'
-    );
-  });
 });
 
 // Issue 772, acceptance 13 (row half). The badge used to gate on the CRAFTING resolution

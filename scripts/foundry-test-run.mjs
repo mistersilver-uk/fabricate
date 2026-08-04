@@ -1473,70 +1473,153 @@ async function captureStableManagerView(page, { width, height, layout, label, se
 }
 
 /**
- * Issue 772 — capture ONE state of the components browser's BULK EDIT rail panel.
+ * The Component Studio's bulk-edit surface, as data (issues 772 / 1010).
  *
- * THREE frames share this scaffold, because the panel has four sections and no single
- * frame can hold them all. A STAGED axis chip and an UNSTAGED one are mutually exclusive
- * states of the same control, so "leave unchanged" — the only route to *clear essences on
- * every selected component*, since `Stepper` emits nothing at the zero boundary — can
- * never appear in the same photograph as "will overwrite". And the Progressive DC section
- * renders only where a system's crafting, salvage or gathering resolution is progressive,
- * which in this world is never the same system as the essence-bearing one. Only the
- * `stage` callback differs between the three, so the selection, the toolbar assertion, the
- * capture and the teardown live here once; a fresh sibling copy per frame would also trip
- * Sonar's new-code duplication gate, which counts `scripts/` and ignores `cpd.exclusions`.
+ * Every selector, the layout pin and the row-selection strategy live here rather than inside
+ * `captureBulkEditFrame`, which is what lets the Recipe Studio share that scaffold instead of
+ * copying it. `tests/screenshot-capture-scoping.test.js` pins each field PER STUDIO — under
+ * parameterisation an assertion made against the scaffold body alone would pass because the
+ * literal it looks for can no longer appear there, whatever the walk actually does.
  *
- * NET-ZERO by construction. `stage` drives the SHIPPED controls only — seeding the
- * selection or the draft through `page.evaluate` would touch `game.` / settings / flags,
- * the Foundry content-signal shape these frames deliberately avoid, and would photograph a
- * state no GM can actually reach. Apply is NEVER pressed, so not one component is written,
- * and the `finally` clears the selection so every following capture sees the
- * single-component inspector it expects.
+ * `selectRows` is POSITIONAL here, and that is a property of the fixture rather than a default:
+ * these frames need any two component rows, none of which carries state the walk must single
+ * out. The Recipe Studio's blocked frame does, and pins its rows by name instead.
  *
- * A failed CLEAR is recorded as its own failed step rather than swallowed: it leaves the
- * rail showing the bulk panel for every following components frame, which is silent
- * evidence corruption. It is RECORDED, not thrown, because throwing from this `finally`
- * would both mask an in-flight capture error and abort the rest of the section — and a
- * recorded failure is already fatal to the run (`evaluateSmokeOutcome` treats step
- * failures as non-waivable) while leaving the remaining frames to be captured.
+ * The selection control is an `<input type="checkbox">` whose real input is 1px and transparent
+ * behind a painted box, so the wrapping LABEL is the click target. It is deliberately NOT a
+ * `<button>` — which is why this walk's `.manager-component-row … button:has(i.fa-pen)` Edit
+ * selectors still resolve to exactly one control per row.
+ */
+const COMPONENT_BULK_EDIT_STUDIO = Object.freeze({
+  // The browser surface is unchanged by the selection — the list, the row and the row identity
+  // are all still on screen, and only the RAIL swapped the inspector for the panel — so this
+  // reuses the plain browser frame's pinned selectors rather than declaring a second layout.
+  layout: 'components normal',
+  noun: 'component',
+  rowSelector: '.fabricate-manager .manager-component-row',
+  selectedRowSelector: '.fabricate-manager .manager-component-row.is-bulk-selected',
+  rowBoxSelector: 'label:has(input[data-component-select])',
+  panelSelector: '.fabricate-manager [data-component-bulk-panel]',
+  displacedInspectorSelector: '.fabricate-manager [data-component-inspector]',
+  toolbarCountSelector:
+    '.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]',
+  clearSelector: '.fabricate-manager [data-component-clear-selection]',
+  selectRows: async (rows, studio) => {
+    for (const index of [0, 1]) {
+      await rows.nth(index).locator(studio.rowBoxSelector).first().click();
+    }
+  },
+});
+
+/**
+ * The Recipe Studio's bulk-edit surface (issue 1010) — the same shape, none of the same hooks.
+ *
+ * `selectRows` is supplied PER CALL rather than defaulted, because one of the three recipe
+ * frames is about a specific row: `manager-recipes-bulk-edit-blocked` must select the seeded
+ * off-and-un-enableable recipe, which is what makes the panel's blocked count non-zero and the
+ * warning Callout render at all. A positional pick would stage Enable over two ordinary recipes
+ * and publish a frame with no Callout in it — passing every guard the scaffold has, because two
+ * rows would still be selected and the count readout would still be visible.
+ */
+const RECIPE_BULK_EDIT_STUDIO = Object.freeze({
+  layout: 'recipes normal',
+  noun: 'recipe',
+  rowSelector: '.fabricate-manager .manager-recipe-row',
+  selectedRowSelector: '.fabricate-manager .manager-recipe-row.is-bulk-selected',
+  rowBoxSelector: 'label:has(input[data-recipe-select])',
+  panelSelector: '.fabricate-manager [data-recipe-bulk-panel]',
+  displacedInspectorSelector: '.fabricate-manager [data-recipe-inspector]',
+  toolbarCountSelector:
+    '.fabricate-manager [data-recipe-selection-toolbar] [data-recipe-selection-count]',
+  clearSelector: '.fabricate-manager [data-recipe-clear-selection]',
+});
+
+/**
+ * Tick the two rows whose NAMES are given, in order.
+ *
+ * The smoke's recipes are seeded by `createRecipe` and carry generated ids, so the id-pinning the
+ * View Lab's cases use is not available here; the authored name is the stable handle. Fails loudly
+ * on a name that matches no row rather than degrading to whatever happened to be first, which is
+ * the whole reason this exists as an alternative to the positional strategy.
+ *
+ * @param {...string} names Authored recipe names, in click order.
+ * @returns {(rows: import('playwright').Locator, studio: object) => Promise<void>}
+ */
+function selectRecipeRowsByName(...names) {
+  return async (rows, studio) => {
+    for (const name of names) {
+      const row = rows.filter({ hasText: name }).first();
+      if (await row.count() === 0) {
+        throw new Error(`Recipe browser rendered no row named "${name}" to bulk-select.`);
+      }
+      await row.locator(studio.rowBoxSelector).first().click();
+    }
+  };
+}
+
+/**
+ * Issue 772 / 1010 — capture ONE state of a manager browser's BULK EDIT rail panel.
+ *
+ * SIX frames share this scaffold — three per studio — because each panel has more axes than one
+ * photograph can hold. A STAGED axis control and its `Unchanged` face are mutually exclusive
+ * states of the same control, so the pristine draft can never appear in the same frame as a
+ * staged one; the Component Studio's Progressive DC section renders only on a progressive system,
+ * and the Recipe Studio's blocked-enable Callout only over a selection containing a refused
+ * recipe. Only `stage` and `selectRows` differ between them, so the selection, the panel/inspector
+ * assertions, the capture and the teardown live here once. A fresh sibling copy per frame — or
+ * per studio — would also trip Sonar's new-code duplication gate, which counts `scripts/` and
+ * ignores `cpd.exclusions`.
+ *
+ * NET-ZERO by construction. `stage` drives the SHIPPED controls only — seeding the selection or
+ * the draft through `page.evaluate` would touch `game.` / settings / flags, the Foundry
+ * content-signal shape these frames deliberately avoid, and would photograph a state no GM can
+ * actually reach. Apply is NEVER pressed, so not one component and not one recipe is written, and
+ * the `finally` clears the selection so every following capture sees the single-row inspector it
+ * expects.
+ *
+ * A failed CLEAR is recorded as its own failed step rather than swallowed: it leaves the rail
+ * showing the bulk panel for every following frame in the section, which is silent evidence
+ * corruption. It is RECORDED, not thrown, because throwing from this `finally` would both mask an
+ * in-flight capture error and abort the rest of the section — and a recorded failure is already
+ * fatal to the run (`evaluateSmokeOutcome` treats step failures as non-waivable) while leaving
+ * the remaining frames to be captured.
  *
  * @param {import('playwright').Page} page
  * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
  * @param {{
+ *   studio: object,
  *   stepName: string,
  *   label: string,
+ *   selectRows?: (rows: import('playwright').Locator, studio: object) => Promise<void>,
  *   stage: (bulkPanel: import('playwright').Locator) => Promise<void>
  * }} options
  */
-async function captureComponentBulkEditFrame(page, results, { stepName, label, stage }) {
+async function captureBulkEditFrame(page, results, { studio, stepName, label, selectRows, stage }) {
+  const pickRows = selectRows ?? studio.selectRows;
   try {
-    const componentRows = page.locator('.fabricate-manager .manager-component-row');
-    if (await componentRows.count() < 2) {
-      throw new Error('Components browser rendered fewer than two rows to bulk-select.');
+    const rows = page.locator(studio.rowSelector);
+    if (await rows.count() < 2) {
+      throw new Error(`Browser rendered fewer than two ${studio.noun} rows to bulk-select.`);
     }
-    // The selection control is an `<input type="checkbox">` whose real input is 1px and
-    // transparent behind a painted box, so the wrapping LABEL is the click target. It is
-    // deliberately NOT a `<button>` — which is why this walk's
-    // `.manager-component-row … button:has(i.fa-pen)` Edit selectors still resolve to
-    // exactly one control per row.
-    for (const index of [0, 1]) {
-      await componentRows.nth(index).locator('label:has(input[data-component-select])').first().click();
-    }
-    const bulkPanel = page.locator('.fabricate-manager [data-component-bulk-panel]').first();
+    await pickRows(rows, studio);
+    const bulkPanel = page.locator(studio.panelSelector).first();
     await bulkPanel.waitFor({ state: 'visible', timeout: 5_000 });
-    const bulkSelectedRows = await page.locator('.fabricate-manager .manager-component-row.is-bulk-selected').count();
-    if (bulkSelectedRows !== 2) {
-      throw new Error(`Expected two bulk-selected component rows, found ${bulkSelectedRows}.`);
+    // The panel REPLACES the single-row inspector rather than sitting beside it, so the
+    // inspector's absence is half of what the frame is evidence for. Without this a rail that
+    // rendered both would photograph as a success.
+    if (await page.locator(studio.displacedInspectorSelector).count() > 0) {
+      throw new Error(`The ${studio.noun} bulk panel mounted alongside the inspector it replaces.`);
     }
-    await page.locator('.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]')
+    const bulkSelectedRows = await page.locator(studio.selectedRowSelector).count();
+    if (bulkSelectedRows !== 2) {
+      throw new Error(`Expected two bulk-selected ${studio.noun} rows, found ${bulkSelectedRows}.`);
+    }
+    await page.locator(studio.toolbarCountSelector)
       .first().waitFor({ state: 'visible', timeout: 5_000 });
 
     await stage(bulkPanel);
 
-    // The browser surface is unchanged by the selection, so this reuses the `components
-    // normal` pinned selectors: the list, the row and the row identity are all still on
-    // screen, and only the RAIL swapped the inspector for the panel.
-    await captureStableManagerView(page, { layout: 'components normal', label });
+    await captureStableManagerView(page, { layout: studio.layout, label });
     process.stdout.write(`  D0: ${stepName} screenshotted\n`);
     results.steps.push({ step: stepName, passed: true });
   } catch (err) {
@@ -1545,9 +1628,9 @@ async function captureComponentBulkEditFrame(page, results, { stepName, label, s
   } finally {
     // Clear whether or not the capture succeeded: a live selection keeps the rail on the
     // bulk panel, and the count-to-zero transition is what discards the staged draft.
-    await softClick(page.locator('.fabricate-manager [data-component-clear-selection]'));
+    await softClick(page.locator(studio.clearSelector));
     try {
-      await page.locator('.fabricate-manager [data-component-bulk-panel]')
+      await page.locator(studio.panelSelector)
         .first().waitFor({ state: 'detached', timeout: 5_000 });
     } catch (err) {
       results.steps.push({ step: `${stepName}-cleared`, passed: false, error: err.message });
@@ -8852,6 +8935,89 @@ async function main() {
         await assertRecipeRowsHittable(page, 'recipes normal');
         await captureStableManagerView(page, { layout: 'recipes normal', label: 'manager-recipes-normal' });
 
+        // ---------------------------------------------------------------------
+        // Issue 1010 — the recipe browser's BULK EDIT rail panel, in its three frames. They
+        // sit here, immediately after the plain browser frame and BEFORE the narrow one, so
+        // `manager-recipes` keeps winning its own `candidates[0]` with
+        // `manager-recipes-normal` and every one of them is captured at the 1280x820 width
+        // the shared scaffold's `recipes normal` layout pin is measured against.
+        //
+        // See `captureBulkEditFrame` for the scaffold and `RECIPE_BULK_EDIT_STUDIO` for the
+        // hooks. Every frame clears its selection in a `finally`, so the narrow frame and
+        // the no-check frame below still measure the single-recipe rail they expect.
+        //
+        //  1. STAGED — a category and the Lock axis armed. Deliberately NOT the check tier
+        //     or the book run: Arcane Forge is `routedByCheck`, so whether it offers recipe
+        //     tiers at all is a property of its authored check rather than of this walk, and
+        //     a frame that asserts on a control the fixture may not render fails the walk
+        //     instead of photographing the panel. The View Lab's counterpart case stages all
+        //     five axes against a world authored for exactly that.
+        //  2. UNSTAGED — the pristine draft. Nothing is staged, so the ASSERTIONS are the
+        //     state: Apply inert, and the three `Unchanged` segments on their default face.
+        //  3. BLOCKED — Enable staged over a selection containing 'Temper a Blade', the
+        //     seeded off-and-incomplete recipe the activation gate refuses. This is the one
+        //     frame that shows the panel's pre-flight count and the row's own `Can't enable`
+        //     pill in one photograph, which is how the two are shown to read ONE predicate.
+        // ---------------------------------------------------------------------
+        await captureBulkEditFrame(page, results, {
+          studio: RECIPE_BULK_EDIT_STUDIO,
+          stepName: 'recipes-bulk-edit',
+          label: 'manager-recipes-bulk-edit',
+          selectRows: selectRecipeRowsByName('Brew Healing Potion', 'Quench a Blade'),
+          stage: async (bulkPanel) => {
+            // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
+            // category is staged whatever vocabulary this world has authored.
+            await bulkPanel.locator('[data-recipe-bulk-category]').first().selectOption({ index: 1 });
+            await bulkPanel.locator('[data-recipe-bulk-lock-option="lock"] input').first().click();
+
+            // Apply must be live with two axes staged — but it is never clicked: this
+            // capture writes nothing.
+            if (await bulkPanel.locator('[data-recipe-bulk-apply]').first().isDisabled()) {
+              throw new Error('Recipe bulk edit Apply stayed inert after a category and Lock were staged.');
+            }
+          },
+        });
+        await captureBulkEditFrame(page, results, {
+          studio: RECIPE_BULK_EDIT_STUDIO,
+          stepName: 'recipes-bulk-edit-unstaged',
+          label: 'manager-recipes-bulk-edit-unstaged',
+          selectRows: selectRecipeRowsByName('Brew Healing Potion', 'Quench a Blade'),
+          stage: async (bulkPanel) => {
+            // A pristine draft can write nothing, so Apply must be inert. Re-selecting from
+            // a cleared rail rather than un-staging also proves the discard-on-empty-selection
+            // effect in real Foundry.
+            if (!await bulkPanel.locator('[data-recipe-bulk-apply]').first().isDisabled()) {
+              throw new Error('Recipe bulk edit Apply was live on a pristine draft with nothing staged.');
+            }
+            // Both segmented axes on their sentinel face. `Unchanged` is a real segment
+            // rather than an absence, and this frame is its only evidence.
+            for (const axis of ['status', 'lock']) {
+              await bulkPanel.locator(`[data-recipe-bulk-${axis}-option="unchanged"] input:checked`)
+                .first().waitFor({ state: 'attached', timeout: 5_000 });
+            }
+          },
+        });
+        await captureBulkEditFrame(page, results, {
+          studio: RECIPE_BULK_EDIT_STUDIO,
+          stepName: 'recipes-bulk-edit-blocked',
+          label: 'manager-recipes-bulk-edit-blocked',
+          // Pinned BY NAME, not positionally. 'Temper a Blade' is the only seeded recipe
+          // that is both off and un-enableable, so it is what makes the blocked count
+          // non-zero; a positional pick would stage Enable over two ordinary recipes and
+          // publish this frame with no Callout in it, passing every other guard here.
+          selectRows: selectRecipeRowsByName('Temper a Blade', 'Quench a Blade'),
+          stage: async (bulkPanel) => {
+            await bulkPanel.locator('[data-recipe-bulk-status-option="enable"] input').first().click();
+            // BOTH halves of the claim, because either alone would publish a lie: a Callout
+            // with no pilled row says the panel invented a count, and a pilled row with no
+            // Callout is the plain browser frame under a step named for the warning.
+            await bulkPanel.locator('[data-recipe-bulk-blocked-warning]')
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
+            await page.locator('.fabricate-manager .manager-recipe-row:has-text("Temper a Blade") [data-status-pill="danger"]')
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
+          },
+        });
+
         // The rich recipe row (issue 643) is the highest horizontal-overflow risk in the
         // manager: identity + I/O readout + check pill + lock + toggle + three actions on
         // one line. Drive it at the narrow width too — assertManagerLayoutStable only
@@ -9379,7 +9545,8 @@ async function main() {
         //     nothing at the zero boundary). Re-selecting from a cleared rail rather than
         //     un-staging also proves the discard-on-empty-selection effect in real Foundry.
         // ---------------------------------------------------------------------
-        await captureComponentBulkEditFrame(page, results, {
+        await captureBulkEditFrame(page, results, {
+          studio: COMPONENT_BULK_EDIT_STUDIO,
           stepName: 'components-bulk-edit',
           label: 'manager-components-bulk-edit',
           stage: async (bulkPanel) => {
@@ -9416,7 +9583,8 @@ async function main() {
             }
           },
         });
-        await captureComponentBulkEditFrame(page, results, {
+        await captureBulkEditFrame(page, results, {
+          studio: COMPONENT_BULK_EDIT_STUDIO,
           stepName: 'components-bulk-edit-unstaged',
           label: 'manager-components-bulk-edit-unstaged',
           stage: async (bulkPanel) => {
@@ -10389,7 +10557,8 @@ async function main() {
             // system authors NO item tags, so the empty-tags line is evidenced, and it has
             // essences disabled, so the DC section sits above the fold instead of below a
             // six-card essence grid.
-            await captureComponentBulkEditFrame(page, results, {
+            await captureBulkEditFrame(page, results, {
+              studio: COMPONENT_BULK_EDIT_STUDIO,
               stepName: 'components-bulk-edit-progressive',
               label: 'manager-components-bulk-edit-progressive',
               stage: async (bulkPanel) => {

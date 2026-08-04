@@ -1209,6 +1209,100 @@ const SMITHING_RECIPES = [
       check: { enabled: true, rollFormula: '1d20 + 2', thresholds: { success: 12 } },
     }
   ),
+
+  // ── Activation-blocked rows (issue 1010) ───────────────────────────────────────────────────────
+  // The two rows the re-pointed authoring-state pill exists for. Before these, no lab recipe could
+  // wear EITHER branch: `recipe()` hardcodes `enabled: true` and the file's only `enabled: false`
+  // was a component's salvage config, so the `Can't enable` frame was unreachable and the widened
+  // `Incomplete` branch had no visual evidence at all.
+  //
+  // They are a PAIR because the branch split is the contract: `deriveRecipeStatuses` reads ONE
+  // predicate (`enableBlocked`) and differs only on whether the recipe is currently off. One
+  // fixture can only ever photograph one side of that.
+  //
+  // Both sit on smithing so the bulk-edit frames select them out of the same flagship library every
+  // other recipe frame photographs, rather than out of a throwaway system whose rows look nothing
+  // like the ones a GM sees.
+  recipe(
+    'sm-r-runeplate-draft',
+    'Draft: Runeplate Harness',
+    LAB_SYSTEM_IDS.SMITHING,
+    'equipment/chest/breastplate-scale-grey.webp',
+    {
+      description: 'Begun and not finished: the plan exists, the ingredients and outputs do not.',
+      categories: ['Armoursmithing'],
+      // OFF and un-enableable — the `Can't enable` (danger) row.
+      //
+      // `enabled: false` overrides the builder's hardcoded `true` because `recipe()` spreads
+      // `...config` AFTER it; that ordering is what makes this fixture expressible at all.
+      //
+      // An INCOMPLETE SHELL, not a broken one: no ingredient sets and no result groups, which is
+      // the completeness contract failing while structural integrity holds. So
+      // `validateStructure()` passes, `validate()` fails, and the activation gate refuses it —
+      // `incomplete: true` AND `enableBlocked: true`, with the pill reading `blocked` because the
+      // recipe is off.
+      //
+      // Safe on every player surface by construction: `InventoryListingBuilder` and the crafting
+      // listing drop `enabled === false` outright, so this row exists only for the GM.
+      enabled: false,
+    }
+  ),
+  recipe(
+    'sm-r-blade-offcuts',
+    'Reclaim Blade Offcuts',
+    LAB_SYSTEM_IDS.SMITHING,
+    'commodities/metal/fragments-steel-barbed.webp',
+    {
+      description: 'Sweep the day’s trimmings back into the crucible — if the tally were right.',
+      categories: ['Refining'],
+      // ON and STRUCTURALLY BROKEN — the `Incomplete` (warning) row, and the case that proves the
+      // widened predicate. Under the retired derivation this recipe wore NO pill at all:
+      // `incomplete` is `validate().valid === false && validateStructure().valid === true`, and a
+      // structurally broken recipe fails BOTH validators, so it read `incomplete: false` while the
+      // activation gate would still have refused it.
+      //
+      // The break is a NEGATIVE ingredient quantity. `Ingredient.validate` documents that the
+      // positive-quantity check "always fires" — it is not waived under `requireComplete: false` —
+      // so `validateStructure()` fails, which is precisely what `incomplete` cannot see. It also
+      // survives the model round-trip, which most candidate breaks do not: `Ingredient`'s
+      // constructor is `data.quantity || 1`, so `-1` is preserved where `0` would be coerced to 1,
+      // and `Recipe._normalizeTimeRequirement` clamps a negative duration to 0 (making the
+      // otherwise-obvious `timeRequirement` break unreachable from persisted data).
+      //
+      // Chosen over the other unconditional structural failures — a duplicate result-group id, a
+      // duplicate result id — because those collide with Svelte KEYED `{#each}` blocks over the
+      // same ids, which throws at render rather than rendering a broken recipe.
+      //
+      // This one IS enabled, so unlike its sibling above it reaches the player crafting listing:
+      // `InventoryListingBuilder` and the crafting listing filter `enabled === false` only. The
+      // second group is what keeps that contained. A negative need does NOT read as a shortfall:
+      // resolving the broken group on its own returns `success: true` with no missing groups
+      // (measured directly against this fixture), so the break alone would have put this row in
+      // the player listing's CRAFTABLE band — reordering a frame it has no business reordering,
+      // and advertising a craft that `CraftingEngine.craft` then refuses on `recipe.validate()`.
+      // The second group demands silver ore, which no lab actor's inventory contains, so the set
+      // is genuinely unsatisfiable and the row lands beside the other uncraftable smithing ones.
+      ingredientSets: [
+        {
+          id: 'sm-set-offcuts',
+          ingredientGroups: [
+            {
+              id: 'sm-set-offcuts-g1',
+              name: 'Trimmings',
+              options: [{ componentId: 'sm-steel-ingot', quantity: -1 }],
+            },
+            {
+              id: 'sm-set-offcuts-g2',
+              name: 'Bright stock',
+              options: [{ componentId: 'sm-silver-ore', quantity: 3 }],
+            },
+          ],
+        },
+      ],
+      resultGroups: [{ id: 'rg', results: [{ componentId: 'sm-iron-ingot', quantity: 1 }] }],
+      check: { enabled: true, rollFormula: '1d20', thresholds: { success: 12 } },
+    }
+  ),
 ];
 
 const HERBALISM_RECIPES = [
@@ -2353,6 +2447,39 @@ const SIMPLE_CHECK = Object.freeze({
 });
 
 /**
+ * Karrun Forgecraft's OWN crafting check — the world's only one that authors recipe TIERS.
+ *
+ * Not a variant of `SIMPLE_CHECK`, and deliberately not an edit to it: that object is frozen and
+ * shared by five systems, so authoring tiers on it would put the same two tiers on alchemy,
+ * runework and both simple-mode systems at once and move every frame that reads a DC.
+ *
+ * Tiers are what `resolveRecipeCheckTierOptions` returns for a simple-mode system whose `dcMode`
+ * is static (`routedOutcomeKeywords.js:206-213`), and they are the ONLY route to a populated
+ * "Check tier" picker anywhere in the lab world — no lab system authored `tiers` before, so the
+ * recipe editor's tier dropdown and the bulk panel's tier select both rendered their
+ * "this system authors no tiers" Callout instead of the control the frames are meant to show.
+ *
+ * Everything else is `SIMPLE_CHECK`'s values verbatim, including the omitted `dc` (which
+ * `_normalizeSimpleCraftingCheck` defaults to 15), so no recipe's DC pill moves: nothing in this
+ * world carries a `checkTierId`, and a tier only applies to a recipe that names it.
+ */
+const SMITHING_CHECK = Object.freeze({
+  enabled: true,
+  consumption: { consumeIngredientsOnFail: false, breakToolsOnFail: false },
+  simple: {
+    rollFormula: '1d20 + @abilities.int.mod',
+    thresholds: { success: 12 },
+    // TWO tiers, not one: a single-entry picker cannot show that the control is a CHOICE, and the
+    // bulk panel's select has to render "— Leave unchanged —", "Default DC" and more than one
+    // named tier for the three-meaning contract to be visible in one photograph.
+    tiers: [
+      { id: 'sm-tier-apprentice', name: 'Apprentice work', dc: 10 },
+      { id: 'sm-tier-masterwork', name: 'Masterwork', dc: 18 },
+    ],
+  },
+});
+
+/**
  * `routedByIngredients`: an ingredient set names the result group it produces, so the SAME recipe
  * yields a ring or an amulet depending on which billet the crafter had. The set/group shapes here
  * are the ones the live smoke seeds (`smokeSeed.js`, "Smoke Cast Jewelry") — `resultGroupId` on the
@@ -2776,7 +2903,7 @@ export function buildLabContent() {
       // Salvage has its OWN resolution mode, authored independently of the crafting one. Simple
       // keeps exactly the first success group; the `routed`/`progressive` modes keep every group.
       salvageResolutionMode: 'simple',
-      craftingCheck: SIMPLE_CHECK,
+      craftingCheck: SMITHING_CHECK,
       features: {
         essences: true,
         recipeCategories: true,
@@ -2802,7 +2929,20 @@ export function buildLabContent() {
       ],
       components: SMITHING_COMPONENTS,
       componentCategories: componentCategoryVocabulary(SMITHING_COMPONENTS),
-      recipeItemDefinitions: [{ id: 'sm-book', name: 'Forgecraft Folio' }],
+      // TWO books, because the bulk panel's recipe-book axis is a tri-state chip RUN and one chip
+      // cannot show two states at once: the staged frame has to photograph one book at `add` and
+      // another at `remove` simultaneously, which a single-book system makes unreachable.
+      //
+      // Both keep an ABSENT `recipeIds`, exactly as the single book did. That is load-bearing for
+      // the membership marker (issue 1011): `_normalizeSystem` backfills
+      // `membershipResolvesByRecipeIds` from "any definition has a non-empty `recipeIds`", so
+      // seeding membership here would flip smithing onto the array basis and change what every
+      // player-facing book reader resolves. The chips render their whole vocabulary regardless of
+      // membership, so the frames need none.
+      recipeItemDefinitions: [
+        { id: 'sm-book', name: 'Forgecraft Folio' },
+        { id: 'sm-almanac', name: 'Deepsmith Almanac' },
+      ],
       tools: SMITHING_TOOLS,
       gatheringRealms: SMITHING_REALMS,
       // `enabled` is what switches the Travel/Realms subsystem on, and it is what makes an

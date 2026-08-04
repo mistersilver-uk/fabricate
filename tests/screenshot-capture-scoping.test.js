@@ -473,11 +473,38 @@ const BULK_EDIT_LABELS = [
   'manager-components-bulk-edit-unstaged',
   'manager-components-bulk-edit-progressive',
 ];
-// The one shared scaffold all three route through. Every net-zero property is asserted
-// against THIS body, because it is where selection, capture and teardown now live.
+// Issue 1010 twins the surface in the Recipe Studio, whose panel has five axes and the same
+// impossibility: the pristine draft and a staged one are the same controls in exclusive
+// states, and the blocked-enable Callout exists only over a selection containing a refused
+// recipe. All three are recipes-section captures.
+const RECIPE_BULK_EDIT_LABELS = [
+  'manager-recipes-bulk-edit',
+  'manager-recipes-bulk-edit-unstaged',
+  'manager-recipes-bulk-edit-blocked',
+];
+// The ONE shared scaffold all six route through (issue 1010 generalised it). The properties
+// that survive parameterisation are asserted against THIS body; the ones that became studio
+// data are asserted against the studio descriptors below, per studio.
 const BULK_EDIT_SCAFFOLD = HARNESS.match(
-  /async function captureComponentBulkEditFrame\([\s\S]*?\n\}\n/,
+  /async function captureBulkEditFrame\([\s\S]*?\n\}\n/,
 )?.[0];
+
+/**
+ * One studio descriptor's source text.
+ *
+ * The selectors, the layout pin and the row-selection strategy moved OUT of the scaffold and
+ * into these objects, so an assertion left pointing at the scaffold would pass by construction
+ * — the literal it looks for can no longer appear there whatever the walk does. Each is
+ * re-pinned here against the studio that owns it instead.
+ *
+ * @param {string} name The exported const name.
+ * @returns {string|undefined} The `Object.freeze({ … })` body, or undefined when absent.
+ */
+const bulkEditStudio = (name) =>
+  HARNESS.match(new RegExp(String.raw`const ${name} = Object\.freeze\(\{[\s\S]*?\n\}\);\n`))?.[0];
+
+const COMPONENT_BULK_EDIT_STUDIO_SRC = bulkEditStudio('COMPONENT_BULK_EDIT_STUDIO');
+const RECIPE_BULK_EDIT_STUDIO_SRC = bulkEditStudio('RECIPE_BULK_EDIT_STUDIO');
 
 test('the issue-772 bulk-edit frames are scoped to the sections that can render them', () => {
   for (const label of BULK_EDIT_LABELS) {
@@ -521,16 +548,59 @@ test('the issue-772 bulk-edit frames are scoped to the sections that can render 
   );
 });
 
+test('the issue-1010 recipe bulk-edit frames are scoped to the recipes section', () => {
+  for (const label of RECIPE_BULK_EDIT_LABELS) {
+    assert.equal(isCapturableLabel(label), true, label);
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0, label);
+  }
+
+  assert.equal(isD0SectionNeededForTargets('recipes', RECIPE_BULK_EDIT_LABELS), true);
+  for (const name of ['components-checks', 'tags-essences', 'gathering', 'tools', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, RECIPE_BULK_EDIT_LABELS), false, name);
+  }
+
+  // Captured immediately after the plain browser frame and BEFORE the narrow one, so
+  // `manager-recipes` keeps winning its own `candidates[0]` with `manager-recipes-normal`
+  // (`collect` takes the lowest capture counter among a view's labels) and all three are
+  // taken at the width the shared scaffold's `recipes normal` layout pin is measured against.
+  assert.equal(
+    captureOrderIndex('manager-recipes-bulk-edit'),
+    captureOrderIndex('manager-recipes-normal') + 1,
+  );
+  for (let i = 1; i < RECIPE_BULK_EDIT_LABELS.length; i += 1) {
+    assert.equal(
+      captureOrderIndex(RECIPE_BULK_EDIT_LABELS[i]),
+      captureOrderIndex(RECIPE_BULK_EDIT_LABELS[i - 1]) + 1,
+      `${RECIPE_BULK_EDIT_LABELS[i]} must follow ${RECIPE_BULK_EDIT_LABELS[i - 1]}`,
+    );
+  }
+  assert.ok(
+    captureOrderIndex(RECIPE_BULK_EDIT_LABELS.at(-1)) < captureOrderIndex('manager-recipes-narrow'),
+    'the bulk frames precede the narrow frame, which re-measures the row at 900px',
+  );
+});
+
 test('the shared bulk-edit capture scaffold writes nothing and hands the rail back', () => {
   assert.ok(BULK_EDIT_SCAFFOLD, 'the bulk-edit capture scaffold was not found in the harness');
 
-  // NET-ZERO: the routine stages through the shipped controls and never presses Apply, so
-  // no component is written and no later frame in the section sees a mutated fixture.
-  assert.equal(
-    /data-component-bulk-apply'\]\)\.first\(\)\.click\(\)/.test(BULK_EDIT_SCAFFOLD),
-    false,
-    'the capture must never press Apply — it would rewrite the shared component fixtures',
-  );
+  // NET-ZERO: the walk stages through the shipped controls and never presses Apply, so no
+  // component and no recipe is written and no later frame in the section sees a mutated
+  // fixture.
+  //
+  // Asserted over the WHOLE harness, per studio, rather than over the scaffold body. Under
+  // issue 1010's parameterisation the scaffold no longer names either Apply hook at all, so
+  // the shipped scaffold-scoped assertion became one that cannot fail however the walk
+  // behaves — and an Apply click would in any case be written in a `stage` callback at a call
+  // site, which is outside the scaffold. Both hooks are named because a guard that forbade
+  // only the component one would let a recipe-studio Apply through, which is the same defect
+  // one studio later.
+  for (const applyHook of ['data-component-bulk-apply', 'data-recipe-bulk-apply']) {
+    assert.equal(
+      new RegExp(String.raw`${applyHook}\]'\)(?:\s*\.\w+\([^()]*\))*\s*\.click\(`).test(HARNESS),
+      false,
+      `the capture must never press Apply (${applyHook}) — it would rewrite the shared fixtures`,
+    );
+  }
   // Driven through the real controls, not seeded: `page.evaluate` here would touch
   // `game.` / settings / flags and photograph a state no GM can reach.
   assert.equal(
@@ -538,20 +608,21 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
     false,
     'the bulk-edit state must be driven through the UI',
   );
-  // It goes through `captureStableManagerView`, as the plain browser frame beside it does,
-  // so the overflow and overlay guards run on the bulk state too rather than only the bare
-  // `screenshot()` — and on the `components normal` pinned selectors, which the selection
-  // leaves untouched (only the RAIL swaps the inspector for the panel).
-  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(page, \{ layout: 'components normal', label \}\)/);
-  // The selection control is an input, so the walk's Edit-pen selectors still resolve.
-  assert.match(BULK_EDIT_SCAFFOLD, /label:has\(input\[data-component-select\]\)/);
+  // It goes through `captureStableManagerView`, as the plain browser frame beside it does, so
+  // the overflow and overlay guards run on the bulk state too rather than only the bare
+  // `screenshot()`. The layout itself is now the studio's, and is pinned per studio below.
+  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(page, \{ layout: studio\.layout, label \}\)/);
+  // The panel REPLACES the single-row inspector; a rail rendering both is a failure, not a
+  // frame. Nothing asserted this before it became shared, and it is the one property a
+  // second studio could plausibly get wrong.
+  assert.match(BULK_EDIT_SCAFFOLD, /studio\.displacedInspectorSelector\)\.count\(\) > 0/);
   // The selection is cleared in a `finally`, so a failed capture cannot leave the rail
-  // showing the bulk panel for every following components frame — and a failed CLEAR is
+  // showing the bulk panel for every following frame in the section — and a failed CLEAR is
   // recorded as its own failed step rather than swallowed, because that leak is silent
   // evidence corruption. It is recorded rather than thrown: throwing from this `finally`
   // would mask an in-flight capture error and abort the rest of the section, while a
   // recorded step failure is already fatal to the run.
-  assert.match(BULK_EDIT_SCAFFOLD, /\} finally \{[\s\S]*?data-component-clear-selection/);
+  assert.match(BULK_EDIT_SCAFFOLD, /\} finally \{[\s\S]*?studio\.clearSelector/);
   assert.match(
     BULK_EDIT_SCAFFOLD,
     /\} finally \{[\s\S]*?results\.steps\.push\(\{ step: `\$\{stepName\}-cleared`, passed: false/,
@@ -563,6 +634,84 @@ test('the shared bulk-edit capture scaffold writes nothing and hands the rail ba
   );
 });
 
+test('each bulk-edit studio pins its own layout, selection control and teardown hooks', () => {
+  // The three literals the shipped scaffold-scoped assertions pinned — the layout, the row
+  // box selector and the `finally` clear — are studio DATA now, so they are re-pinned here
+  // against the studio that owns each one. Stated as a table so neither studio can be
+  // dropped by an edit that only remembers the other.
+  const studios = [
+    {
+      name: 'COMPONENT_BULK_EDIT_STUDIO',
+      source: COMPONENT_BULK_EDIT_STUDIO_SRC,
+      layout: 'components normal',
+      rowBox: 'label:has(input[data-component-select])',
+      clear: 'data-component-clear-selection',
+      panel: 'data-component-bulk-panel',
+      inspector: 'data-component-inspector',
+    },
+    {
+      name: 'RECIPE_BULK_EDIT_STUDIO',
+      source: RECIPE_BULK_EDIT_STUDIO_SRC,
+      layout: 'recipes normal',
+      rowBox: 'label:has(input[data-recipe-select])',
+      clear: 'data-recipe-clear-selection',
+      panel: 'data-recipe-bulk-panel',
+      inspector: 'data-recipe-inspector',
+    },
+  ];
+
+  for (const studio of studios) {
+    assert.ok(studio.source, `${studio.name} was not found in the harness`);
+    // The bulk state reuses the plain browser frame's pinned selectors — only the RAIL swaps
+    // the inspector for the panel — so a layout name no guard knows would silently skip the
+    // overflow measurement this capture depends on.
+    assert.ok(
+      studio.source.includes(`layout: '${studio.layout}'`),
+      `${studio.name} must measure against the '${studio.layout}' layout pins`,
+    );
+    // The selection control is an `<input>` inside a `<label>`, never a `<button>`, which is
+    // what keeps this walk's row-action button selectors resolving to one control per row.
+    assert.ok(
+      studio.source.includes(studio.rowBox),
+      `${studio.name} must click the label wrapping its hidden selection input`,
+    );
+    for (const hook of [studio.clear, studio.panel, studio.inspector]) {
+      assert.ok(studio.source.includes(hook), `${studio.name} must name ${hook}`);
+      assert.ok(HARNESS.includes(hook), `${hook} is not reachable in the harness`);
+    }
+  }
+});
+
+test('the recipe bulk-edit frames pin their rows by NAME, not by position', () => {
+  // The failure this exists to refuse: `manager-recipes-bulk-edit-blocked` is about ONE row —
+  // the seeded off-and-un-enableable recipe that makes the panel's blocked count non-zero.
+  // Selecting positionally would stage Enable over two ordinary recipes and publish the frame
+  // with no Callout in it, while still satisfying every guard the scaffold has (two rows
+  // selected, a visible count readout, a mounted panel).
+  const blocked = HARNESS
+    .split('await captureBulkEditFrame(page, results, {')
+    .slice(1)
+    .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === 'manager-recipes-bulk-edit-blocked');
+  assert.ok(blocked, 'the blocked recipe bulk-edit call site was not found');
+  const body = blocked.slice(0, blocked.search(/\n *\}\);/));
+
+  assert.match(
+    body,
+    /selectRows: selectRecipeRowsByName\('Temper a Blade'/,
+    'the blocked frame must select the refused recipe by name, or it photographs no Callout',
+  );
+  // And it is held to what it claims: the panel's warning AND the row pill the warning is
+  // counting, in the frame. Either alone publishes a lie.
+  assert.match(body, /data-recipe-bulk-blocked-warning/);
+  assert.match(body, /Temper a Blade"\) \[data-status-pill="danger"\]/);
+
+  // `selectRecipeRowsByName` fails loudly on a name that matches no row rather than
+  // degrading to whatever happened to be first — the degradation IS the defect.
+  const strategy = HARNESS.match(/function selectRecipeRowsByName\([\s\S]*?\n\}\n/)?.[0];
+  assert.ok(strategy, 'the by-name row selection strategy was not found');
+  assert.match(strategy, /throw new Error\(`Recipe browser rendered no row named/);
+});
+
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
   // Split rather than one lazy regex per label: a `[\s\S]*?label: '<wanted>'` starts at the
   // EARLIEST call site and happily swallows the two before it, which would let a staging
@@ -571,7 +720,7 @@ test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () =
   // it that is nothing but indentation and the closer.
   const callOf = (label) => {
     const segment = HARNESS
-      .split('captureComponentBulkEditFrame(page, results, {')
+      .split('captureBulkEditFrame(page, results, {')
       .slice(1)
       .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === label);
     if (!segment) return null;

@@ -133,6 +133,32 @@ const MANAGER_PRIMITIVES = [
 const BULK_EDIT_CHROME_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
 
+/**
+ * The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010).
+ *
+ * The first two patterns are the recipe browser's own pair, exactly as every other recipe case
+ * declares them. The third is the shared chrome above, which sits directly under `apps/manager/`
+ * and therefore falls through BOTH — without it a change to the toolbar or the panel shell would
+ * select the Component Studio's bulk frames and none of the Recipe Studio's.
+ *
+ * The fourth is the pure staging model. Like `RunJournalBuilder.js` on the blind-run cases, it
+ * cannot SELECT a frame today (`mapChangedFilesToCases` filters to `isUiFile` first, and
+ * `src/utils/` is not a render path); it is declared because it is what these three frames are
+ * evidence ABOUT — every sentinel, every tri-state and the blocked count are computed there — and
+ * because the moment that filter widens, these are the cases that must answer for it.
+ *
+ * Hoisted rather than repeated three times: `scripts/**` is analysed by SonarCloud's Automatic
+ * Analysis, which counts repeated literals and ignores `cpd.exclusions`. It sits OUTSIDE every
+ * case region on purpose — `parseCaseLineRegions` maps only the lines inside a case literal, so a
+ * change here widens the capture selection instead of narrowing it to one arbitrary frame.
+ */
+const RECIPE_BULK_EDIT_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/Recipe/,
+  /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+  BULK_EDIT_CHROME_PATTERN,
+  /^src\/utils\/recipeBulkEditModel\.js$/,
+];
+
 export const BROAD_SIGNAL_PATTERN = new RegExp(
   [
     '^styles/',
@@ -635,6 +661,111 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
     ],
+  }),
+  // ── The Recipe Studio's bulk edit panel (issue 1010) ───────────────────────────────────────────
+  //
+  // THREE frames, because the panel's five axes cannot be photographed in one. A staged axis and
+  // its `Unchanged` face are mutually exclusive states of the same control, and the blocked-enable
+  // Callout only exists while Enable is staged over a selection that contains a refused recipe —
+  // so the pristine face and the warning face are each the sole evidence of what they show.
+  //
+  // Every row click is pinned BY ID rather than by position. `data-recipe-select` sits on a
+  // visually hidden input, so the click target is the wrapping `<label>` (the Component Studio's
+  // cases below do the same). Position would not do: the blocked frame needs one SPECIFIC row —
+  // the only one in the world that is both off and un-enableable — and an ordering change would
+  // silently stage Enable over two ordinary recipes and publish a frame with no Callout at all.
+  managerCase({
+    id: 'manager-recipes-bulk-edit',
+    label: 'Manager — Recipes bulk edit',
+    smokeLabels: ['manager-recipes-bulk-edit'],
+    // The STAGED face, over two ordinary Weaponsmithing recipes. Every axis the panel owns is
+    // armed at once: a category, Status at `Enable`, Lock at `Lock`, a named check tier, and the
+    // book run showing BOTH of its non-default states (one click = add, two = remove) — which is
+    // why the lab world authors two smithing books rather than one.
+    //
+    // Enable is staged over two recipes that are already ON, so `countBlockedRecipeEnables` is 0
+    // and the warning Callout stays absent. That is deliberate: the Callout is the blocked frame's
+    // subject, and a staged frame carrying it would make the two photographs the same picture.
+    reaches: 'exact',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-category]', select: 'Armoursmithing' },
+      { selector: '[data-recipe-bulk-status-option="enable"] input' },
+      { selector: '[data-recipe-bulk-lock-option="lock"] input' },
+      // Karrun Forgecraft is the only lab system that authors check tiers, so this select is the
+      // only populated one in the world; every other system renders the info Callout instead.
+      { selector: '[data-recipe-bulk-check-tier]', select: 'sm-tier-masterwork' },
+      { selector: '[data-bulk-book="sm-book"]' },
+      { selector: '[data-bulk-book="sm-almanac"]' },
+      { selector: '[data-bulk-book="sm-almanac"]' },
+    ],
+    expectView: 'recipes',
+    // Both non-default chip states must be on screen, or the tri-state reads as a two-state
+    // toggle. A frame showing only `add` is the failure this assertion exists to refuse.
+    expectSelector:
+      '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
+      '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-edit-unstaged',
+    label: 'Manager — Recipes bulk edit unstaged',
+    smokeLabels: ['manager-recipes-bulk-edit-unstaged'],
+    // The PRISTINE face: a selection and nothing staged. It is the only evidence of the three
+    // `Unchanged` segments, of BOTH check-tier sentinels — `— Leave unchanged —` and `Default DC`,
+    // which look alike and mean opposite things — and of the genuinely disabled Apply. None of
+    // those can appear in the staged frame, because staging is what replaces them.
+    reaches: 'exact',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+    ],
+    expectView: 'recipes',
+    expectSelector: '.fabricate-manager [data-recipe-bulk-apply][disabled]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-edit-blocked',
+    label: 'Manager — Recipes bulk edit blocked',
+    smokeLabels: ['manager-recipes-bulk-edit-blocked'],
+    // The BLOCKED face, and the frame acceptance criterion 6 is settled by: the panel's warning
+    // Callout counting the same rows the browser has pilled, in one photograph, so the two cannot
+    // be shown to disagree.
+    //
+    // `sm-r-runeplate-draft` is the world's only off-and-un-enableable recipe and is what makes
+    // the count non-zero; `sm-r-longsword` is an ordinary enabled row, so the Callout reads "at
+    // least 1 of 2" rather than a degenerate 1-of-1 and the LOWER-BOUND wording is legible.
+    reaches: 'exact',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-runeplate-draft"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: '[data-recipe-bulk-status-option="enable"] input' },
+    ],
+    expectView: 'recipes',
+    // BOTH halves of the claim, in one selector, because either alone would publish a lie: a
+    // Callout with no pilled row says the panel invented a count, and a pilled row with no Callout
+    // is the plain browser frame under a case named for the warning. `expectView` cannot see
+    // either — the route is `recipes` whether the panel staged anything or not.
+    //
+    // Written as manager-with-Callout DESCENDANT row-with-pill rather than as two `:has()`
+    // clauses on the root, so every `:has()` argument is a simple selector. Both forms are
+    // correct CSS and Chromium (which is what `document.querySelector` runs here) evaluates
+    // either; this one is additionally checkable outside a browser, and `:has(A B)` is where
+    // the DOM implementations disagree.
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-bulk-blocked-warning]) ' +
+      '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]:has([data-status-pill="danger"])',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
   managerCase({
     id: 'manager-crafting-group-expanded',
