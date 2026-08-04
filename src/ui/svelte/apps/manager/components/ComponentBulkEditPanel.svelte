@@ -200,27 +200,32 @@
   const TAG_TONES = { add: 'positive', remove: 'danger', none: 'neutral' };
   const TAG_ICONS = { add: 'fas fa-plus', remove: 'fas fa-minus', none: 'far fa-circle' };
 
-  // The accessible name states the STAGED ACTION, not the state: `aria-pressed` cannot
-  // honestly describe a control with three states, so the name carries it instead.
+  // The accessible name OPENS with the visible label and then states the STAGED ACTION:
+  // `aria-pressed` cannot honestly describe a control with three states, so the name
+  // carries it instead — but an action-FIRST name breaks WCAG 2.5.3 Label in Name, which
+  // is the rule the staged-essences chip above already states for this same panel. The em
+  // dash rather than a comma or a colon is what lets a lowercase tag vocabulary (`ore`,
+  // `ingot`) lead without opening a sentence on a lowercase word. Same shape as the Recipe
+  // Studio's book chips, which are the other tri-state run in the manager.
   function tagActionLabel(tag) {
     const state = tagState(tag);
     if (state === 'add') {
       return format(
         'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateAdd',
-        'Add {tag} to every selected component',
+        '{tag} — add to every selected component.',
         { tag }
       );
     }
     if (state === 'remove') {
       return format(
         'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateRemove',
-        'Remove {tag} from every selected component',
+        '{tag} — remove from every selected component.',
         { tag }
       );
     }
     return format(
       'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateNone',
-      'Leave {tag} unchanged',
+      '{tag} — leave unchanged.',
       { tag }
     );
   }

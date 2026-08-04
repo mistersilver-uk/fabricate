@@ -43,8 +43,9 @@
   ── THE BLOCKED-ENABLE FORECAST IS A LOWER BOUND ──────────────────────────────────
   `blockedCount` is counted from the SAME predicate the row's `Can't enable` pill reads, so
   the pilled rows and the counted rows are one set by construction. It cannot see collisions
-  the batch itself creates, so the copy says "At least", and the post-apply notification is
-  the authority.
+  the batch itself creates, so the copy says "At least" and names the post-apply notification
+  as the authority for the exact number. The bound is only honest while it is BELOW the
+  maximum, so the copy has three branches — see `blockedWarningText`.
 
   Props:
    - count: how many recipes the apply will write to.
@@ -236,18 +237,43 @@
   // that handed this panel a raw blocked tally would otherwise paint the hazard under
   // `Disable`, where nothing can be refused.
   const showBlockedWarning = $derived(stagedStatus === 'enable' && blockedCount > 0);
-  const blockedWarningText = $derived(
-    count === 1
-      ? text(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.BlockedWarningOne',
-          "The selected recipe can't be enabled yet and will stay off."
-        )
-      : format(
-          'FABRICATE.Admin.Manager.Recipe.BulkEdit.BlockedWarning',
-          "At least {count} of {total} selected recipes can't be enabled yet and will stay off.",
-          { count: blockedCount, total: count }
-        )
-  );
+
+  // THREE branches, because "at least {n} of {total}" is only honest while `n < total`.
+  // The forecast is a lower bound: it sees every recipe activation would refuse today, but
+  // not the collisions the batch itself creates, so the real figure can only be higher.
+  // Once the bound EQUALS the maximum there is no headroom left for it to be a bound of —
+  // "At least 3 of 3", reachable by selecting three drafts and staging Enable, reads as a
+  // copy bug rather than as a hedge. Each branch is exact or hedged as the arithmetic
+  // actually permits:
+  //
+  //  - one selected recipe        exact: a batch of one has no intra-batch collision;
+  //  - every selected one blocked exact: the bound is already the maximum, nothing the
+  //                               write does can improve it;
+  //  - otherwise                  a genuine lower bound, and it names the post-apply
+  //                               report as the authority for the exact number, which
+  //                               turns the hedge into a promise rather than a shrug.
+  //                               That authority already exists as `AppliedBlocked`.
+  const blockedWarningText = $derived.by(() => {
+    if (count === 1) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BlockedWarningOne',
+        "The selected recipe can't be enabled yet and will stay off."
+      );
+    }
+    if (blockedCount >= count) {
+      return format(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BlockedWarningAll',
+        'None of the {count} selected recipes can be enabled yet — they will all stay off.',
+        { count }
+      );
+    }
+    return format(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.BlockedWarning',
+      "At least {count} of {total} selected recipes can't be enabled yet and will stay off — " +
+        'applying reports the exact number.',
+      { count: blockedCount, total: count }
+    );
+  });
 
   // Tri-state colour maps onto the shipped chip tones, exactly as the Component Studio's
   // tag run does: add is the success family, remove the danger family, leave the neutral

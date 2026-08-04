@@ -342,8 +342,15 @@ describe('RecipeBulkEditPanel blocked-enable forecast (issue 1010)', () => {
     assert.ok(Boolean(warning), 'a staged Enable over blocked rows is exactly the hazard');
     assert.match(
       warning.textContent,
-      /At least 2 of 3 selected recipes can't be enabled yet and will stay off\./,
+      /At least 2 of 3 selected recipes can't be enabled yet and will stay off/,
       'both the blocked count and the selection size, and "At least" — it is a lower bound'
+    );
+    // A bound with no authority behind it is a shrug. The write reports the real figure
+    // (`AppliedBlocked`), so the strip says where the exact number comes from.
+    assert.match(
+      warning.textContent,
+      /applying reports the exact number\.$/,
+      'the hedge names the post-apply report as the authority, making it a promise'
     );
   });
 
@@ -359,6 +366,23 @@ describe('RecipeBulkEditPanel blocked-enable forecast (issue 1010)', () => {
     const warning = root.querySelector('[data-recipe-bulk-blocked-warning]');
     assert.match(warning.textContent.trim(), /^The selected recipe can't be enabled yet/);
     assert.ok(!/1 of 1/.test(warning.textContent), 'the plural string is unreachable at one');
+  });
+
+  // "At least 3 of 3" is degenerate: the lower bound equals the maximum, so "at least"
+  // states nothing and reads as a copy bug. It is reachable by the obvious route — select
+  // three drafts, stage Enable. The all-blocked forecast is EXACT, so it carries neither
+  // the hedge nor the authority clause the partial one needs.
+  it('drops the bound entirely when every selected recipe is blocked', async () => {
+    const { root } = await mountPanel({ count: 3, blockedCount: 3 });
+    chooseSegment(root, 'status', 'enable');
+    const warning = root.querySelector('[data-recipe-bulk-blocked-warning]');
+
+    assert.equal(
+      warning.textContent.trim(),
+      'None of the 3 selected recipes can be enabled yet — they will all stay off.'
+    );
+    assert.ok(!/At least/.test(warning.textContent), 'a bound at its maximum is not a bound');
+    assert.ok(!/3 of 3/.test(warning.textContent), 'and never the degenerate "n of n" form');
   });
 });
 

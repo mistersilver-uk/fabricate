@@ -141,10 +141,16 @@ describe('ComponentBulkEditPanel tag staging (issue 772)', () => {
 
     assert.equal(chip.tagName, 'BUTTON', 'a span could not be reached by keyboard');
     assert.equal(chip.getAttribute('type'), 'button', 'and an untyped button would submit');
+    // ANCHORED, exactly as the Recipe Studio's book-chip twin is. Unanchored, the previous
+    // action-first name ("Leave metal unchanged") satisfied this too, so the one property
+    // the assertion exists for — that the name OPENS with the visible label — was the one
+    // thing it could not see. The em-dash form is what carries a lowercase tag vocabulary
+    // (`ore`, `ingot`) without opening a sentence on a lowercase word.
     assert.match(
       chip.getAttribute('aria-label'),
-      /Leave metal unchanged/,
-      'the accessible name states the staged ACTION — aria-pressed cannot describe three states'
+      /^metal — leave unchanged\.$/,
+      'the name OPENS with the visible label (WCAG 2.5.3) then states the staged ACTION — '
+        + 'aria-pressed cannot describe three states'
     );
   });
 

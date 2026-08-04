@@ -97,6 +97,19 @@
 
   .fab-bulk-edit-label-row > .fab-bulk-edit-label {
     margin-top: 0;
+    /* The label holds ONE line. A two-word label (`RECIPE BOOKS`) otherwise wraps, which
+       does not merely look untidy — it narrows the hint column beside it until the hint
+       breaks as `…again to leave` / `unchanged`, severing the exact phrase that hint was
+       added to state. `nowrap` alone is sufficient and `flex: 0 0 auto` would be
+       redundant: a block-level flex item's automatic minimum size is its min-content
+       width, and with `nowrap` that IS the whole string, so the item already cannot
+       shrink below it.
+
+       Scoped to the label ROW rather than to `.fab-bulk-edit-label`, so the standalone
+       headings (`Category`, `Status`, `Lock`, `Check tier`) keep their existing wrapping
+       behaviour untouched. Costs the Component Studio nothing: its only two label rows are
+       `TAGS` and `ESSENCES`, both single words, which could not wrap either way. */
+    white-space: nowrap;
   }
 
   /* Two hint scales, deliberately. `-hint` is the INLINE aside that sits on a label row's
