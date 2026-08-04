@@ -86,12 +86,26 @@ jobs:
         run: |
           # The files endpoint, not `gh pr diff --name-only`: the diff endpoint caps at 20,000
           # lines and 406s beyond it, which under `bash -e` kills the step before selection runs.
-          gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' > changed-files.txt
+          #
+          # Each entry's `patch` comes along for the ride, because the selector uses it: a change
+          # confined to case-object literals in `viewLabCases.js` selects those cases instead of all
+          # of them, which is the difference between a two-minute capture and a twenty-minute one.
+          # The library never reads git itself — it is a pure function of what this step hands it —
+          # and it widens back to the full corpus for any patch it cannot verify, so a `patch` the
+          # API omits (it drops them for very large diffs) costs frames, never evidence.
+          gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" --paginate \
+            --jq '.[] | {filename: .filename, patch: (.patch // "")} | @json' > changed-files.jsonl
           IDS=$(node -e '
             const { readFileSync } = require("node:fs");
             import("./scripts/lib/viewLabCases.js").then(({ mapChangedFilesToCases }) => {
-              const files = readFileSync("changed-files.txt", "utf8").split("\n").filter(Boolean);
-              process.stdout.write(mapChangedFilesToCases(files).map((c) => c.id).join(","));
+              const entries = readFileSync("changed-files.jsonl", "utf8")
+                .split("\n")
+                .filter(Boolean)
+                .map((line) => JSON.parse(line));
+              const files = entries.map((entry) => entry.filename);
+              const patches = Object.fromEntries(entries.map((entry) => [entry.filename, entry.patch]));
+              const ids = mapChangedFilesToCases(files, { patches }).map((c) => c.id);
+              process.stdout.write(ids.join(","));
             });
           ')
           echo "ids=$IDS" >> "$GITHUB_OUTPUT"

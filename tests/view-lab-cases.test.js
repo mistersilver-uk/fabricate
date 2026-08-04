@@ -625,3 +625,279 @@ test('every case records the smoke labels it corresponds to', () => {
     assert.ok(viewCase.smokeLabels.length > 0, `case "${viewCase.id}" declares no smokeLabels`);
   }
 });
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// What a change to the lab's OWN inputs costs (issue 1000).
+//
+// Measured on PR #991: 157 frames, 20m29s, against a 25-minute job cap, re-run on every rebase —
+// because any path under `tests/view-lab/` or this registry selected the whole corpus. These tests
+// pin both halves of the narrowing that replaced it: the frames it is now allowed to skip, and the
+// far larger set of inputs for which skipping any frame is still forbidden.
+//
+// The fail-safe direction is towards MORE frames. An input nobody has attributed, a patch that does
+// not parse, a patch that does not describe this checkout — every one of them is an ALL, because
+// the failure this rule exists to prevent is a PR that invalidates the corpus and publishes no
+// evidence of it. `mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []` is the
+// regression, verified as real before the blanket rule existed.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
+const registrySource = readFileSync(resolve(ROOT, REGISTRY_PATH), 'utf8').split('\n');
+
+/** @returns {string[]} The ids a changed set selects, in registry order. */
+const selectedIds = (files, options) =>
+  mapChangedFilesToCases(files, options).map((viewCase) => viewCase.id);
+
+/**
+ * The 1-based registry line holding an exact piece of text, asserted present so that a rename fails
+ * the test loudly rather than quietly turning it into an assertion about line 0.
+ *
+ * @param {string} text The whole line.
+ * @returns {number} Its 1-based line number.
+ */
+function registryLineOf(text) {
+  const index = registrySource.indexOf(text);
+  assert.notEqual(index, -1, `the registry no longer contains the line: ${text}`);
+  return index + 1;
+}
+
+/**
+ * A unified diff claiming those 1-based registry lines were just ADDED, with the three lines of
+ * context either side that `git` emits, and contiguous lines grouped into one hunk as it groups
+ * them.
+ *
+ * The `+` lines carry the file's CURRENT text, which is exactly what a patch for a change that has
+ * landed looks like — and what the selector verifies each line against before trusting a single
+ * line number in it.
+ *
+ * @param {number[]} lineNumbers Lines to mark as added.
+ * @returns {string} The patch.
+ */
+function registryPatch(lineNumbers) {
+  const runs = [];
+  for (const line of [...new Set(lineNumbers)].sort((a, b) => a - b)) {
+    const last = runs.at(-1);
+    if (last && line === last.at(-1) + 1) last.push(line);
+    else runs.push([line]);
+  }
+
+  return runs
+    .map((run) => {
+      const from = Math.max(1, run[0] - 3);
+      const to = Math.min(registrySource.length, run.at(-1) + 3);
+      const body = [];
+      for (let number = from; number <= to; number += 1) {
+        body.push(`${run.includes(number) ? '+' : ' '}${registrySource[number - 1]}`);
+      }
+      return [`@@ -${from},${body.length - run.length} +${from},${body.length} @@`, ...body].join(
+        '\n'
+      );
+    })
+    .join('\n');
+}
+
+/** @returns {object} The `patches` option carrying one patch for this registry. */
+const registryPatches = (lineNumbers) => ({
+  patches: { [REGISTRY_PATH]: registryPatch(lineNumbers) },
+});
+
+/**
+ * The 1-based span of the case literal containing an id line, found the way a reader would: up to
+ * the factory call that opens it, down to the line that closes it.
+ *
+ * @param {string} id A case id declared inline in the array.
+ * @returns {number[]} Every line number of the literal.
+ */
+function caseLiteralLines(id) {
+  const idLine = registryLineOf(`    id: '${id}',`);
+  let start = idLine;
+  while (start > 1 && !/^ {2}[A-Za-z]\w*\(\{$/.test(registrySource[start - 1])) start -= 1;
+  let end = idLine;
+  while (end < registrySource.length && registrySource[end - 1] !== '  }),') end += 1;
+  assert.ok(start < idLine && end > idLine, `could not bound the case literal for "${id}"`);
+  return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
+}
+
+test('a labRunStates change selects the player windows that render runs — not none, not all', () => {
+  // Its whole output is the three actor run containers and the `gatheringBlindRuns` world setting,
+  // and only the player window reads either: the Journal in its entirety, the Crafting tab's run
+  // summary, the Gathering tab's in-flight rows. The manager renders `game.settings` definitions
+  // and touches no actor run flag.
+  const selected = selectedIds(['tests/view-lab/world/labRunStates.js']);
+  const everything = publishableCases();
+  const players = everything.filter((viewCase) => viewCase.app === 'fabricate-app');
+
+  assert.ok(selected.length > 0, 'a run-state change must select evidence, not none');
+  assert.ok(
+    selected.length < everything.length,
+    'a run-state change must not still select every frame'
+  );
+
+  // Derived, not listed: EVERY player case and ONLY player cases, so a player case added tomorrow
+  // is covered without anyone remembering to add its id anywhere.
+  assert.deepEqual(
+    selected,
+    players.map((viewCase) => viewCase.id)
+  );
+  assert.ok(
+    selected.includes('fabricate-journal'),
+    'the Journal is the run browser; it cannot be outside a run-state selection'
+  );
+});
+
+test('every lab input the registry cannot attribute still selects every publishable case', () => {
+  const everything = publishableCases().length;
+
+  // The genuinely global inputs, plus a file nobody has ever heard of: the fail-safe is the
+  // DEFAULT, so an input added under `tests/view-lab/` tomorrow is covered before anyone maps it.
+  for (const file of [
+    'tests/view-lab/world/labContent.js',
+    'tests/view-lab/world/labFlags.js',
+    'tests/view-lab/world/labActors.js',
+    'tests/view-lab/world/labWorld.js',
+    'tests/view-lab/foundry/installFoundryShim.js',
+    'tests/view-lab/mount.js',
+    'tests/view-lab/index.html',
+    'tests/view-lab/vite.config.js',
+    'tests/view-lab/foundryFrame.js',
+    'tests/view-lab/foundryDialog.js',
+    'tests/view-lab/labI18n.js',
+    'tests/view-lab/cascade.css',
+    'tests/view-lab/world/labNobodyHasAttributedThisYet.js',
+    'scripts/lib/foundryChromeSpec.js',
+    'scripts/view-lab-screenshots.mjs',
+  ]) {
+    assert.equal(selectedIds([file]).length, everything, `${file} must select every frame`);
+  }
+
+  // The regression the whole rule exists to prevent, asserted as itself.
+  assert.notDeepEqual(mapChangedFilesToCases(['tests/view-lab/world/labContent.js']), []);
+});
+
+test('a registry change with no usable patch selects every publishable case', () => {
+  const everything = publishableCases().length;
+
+  // No patch at all — including the one-argument call every other caller makes.
+  assert.equal(mapChangedFilesToCases([REGISTRY_PATH]).length, everything);
+  assert.equal(selectedIds([REGISTRY_PATH], {}).length, everything);
+  assert.equal(selectedIds([REGISTRY_PATH], { patches: {} }).length, everything);
+
+  const idLine = registryLineOf(`    id: '${FALLBACK_CASE_ID}',`);
+  const wrongRevision = registryPatch([idLine]).replace(
+    registrySource[idLine - 1],
+    "    id: 'a-line-this-file-does-not-have',"
+  );
+
+  for (const [patch, why] of [
+    ['', 'an empty patch'],
+    ['   ', 'a blank patch'],
+    ['not a diff at all', 'a patch with no hunk header'],
+    ['@@ this is not a hunk header @@\n+x', 'an unparseable hunk header'],
+    ['@@ -1,1 +1,1 @@\n?x', 'an unknown line marker'],
+    [wrongRevision, 'a patch whose lines do not match this checkout'],
+  ]) {
+    assert.equal(
+      selectedIds([REGISTRY_PATH], { patches: { [REGISTRY_PATH]: patch } }).length,
+      everything,
+      `${why} must select every frame`
+    );
+  }
+});
+
+test('a registry change confined to case literals selects only those cases', () => {
+  const inline = caseIds.filter((id) => registrySource.includes(`    id: '${id}',`));
+  assert.ok(inline.length > 100, 'expected most cases to be declared inline in the array');
+
+  // One case, sampled across the file so this is not an assertion about its first entry.
+  for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
+    const idLine = registryLineOf(`    id: '${id}',`);
+    assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches([idLine])), [id]);
+    // A line elsewhere in the same literal — the label, not the id — attributes the same way.
+    assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches([idLine + 1])), [id]);
+  }
+
+  // Two cases, two hunks: the honest answer is two frames, where it used to be 157.
+  const [first, second] = [inline[3], inline[40]];
+  const bothPatches = registryPatches([
+    registryLineOf(`    id: '${first}',`),
+    registryLineOf(`    id: '${second}',`),
+  ]);
+  assert.deepEqual(selectedIds([REGISTRY_PATH], bothPatches), [first, second]);
+});
+
+test('ADDING a case to the registry selects that one case', () => {
+  // The shape a diff has when a case is added: every line of the literal arrives as a `+`.
+  const id = 'coverage-experimental-off-player';
+  assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches(caseLiteralLines(id))), [id]);
+});
+
+test('a registry change OUTSIDE a case literal selects every publishable case', () => {
+  const everything = publishableCases().length;
+
+  // A shared helper, a pattern constant, the array's own spread of a case factory, and the mapping
+  // function itself. Each can move every frame, and none is inside a case literal.
+  for (const line of [
+    'function managerCase(entry) {',
+    "  'RadioCardGroup',",
+    '  ...journalBlindRunCases(),',
+    'export function mapChangedFilesToCases(files = [], { patches } = {}) {',
+  ]) {
+    assert.equal(
+      selectedIds([REGISTRY_PATH], registryPatches([registryLineOf(line)])).length,
+      everything,
+      `a change to \`${line.trim()}\` must select every frame`
+    );
+  }
+});
+
+test('a comment-only registry change selects one frame — not 157, and not none', () => {
+  // A comment cannot change a pixel, so widening to a twenty-minute capture for a typo fix is the
+  // cost this narrowing exists to remove. It still yields the fallback frame rather than nothing,
+  // so no changed set silently produces no evidence.
+  const commentLine = registryLineOf(
+    '    // Reached the way the smoke reaches it: by CLICKING the system row\'s identity, which is what'
+  );
+  assert.deepEqual(selectedIds([REGISTRY_PATH], registryPatches([commentLine])), [
+    FALLBACK_CASE_ID,
+  ]);
+});
+
+test('a lab input no longer swallows the render files it ships with', () => {
+  // The old blanket branch answered for the whole changed set and returned before the render files
+  // were consulted. That was invisible while the answer was "everything"; now that a lab input can
+  // select a subset, the selection is a UNION or those frames go missing.
+  const selected = selectedIds([
+    'tests/view-lab/world/labRunStates.js',
+    'src/ui/svelte/apps/manager/SystemEditView.svelte',
+  ]);
+  const fromRenderFileAlone = selectedIds(['src/ui/svelte/apps/manager/SystemEditView.svelte']);
+
+  assert.ok(fromRenderFileAlone.length > 0, 'the render file must select something on its own');
+  for (const id of fromRenderFileAlone) {
+    assert.ok(selected.includes(id), `the union dropped "${id}", which the render file selects`);
+  }
+  assert.ok(
+    selected.includes('fabricate-journal'),
+    'the union dropped the run-state selection it started from'
+  );
+  // A union of two subsets, not a capitulation to everything — which is what "keeps both" would
+  // trivially be satisfied by, and was, for as long as any lab input meant all 157 frames.
+  assert.ok(
+    selected.length < publishableCases().length,
+    'the union widened back to the whole corpus'
+  );
+});
+
+test('the capture workflow hands the selector the patches it can narrow on', () => {
+  // The library is pure — it never reads git — so the narrowing only happens if the workflow passes
+  // the `patch` field through. Without this guard the passthrough could be dropped and the only
+  // symptom would be a job that quietly went back to twenty minutes.
+  const workflow = readFileSync(resolve(ROOT, '.github/workflows/pr-screenshots.yml'), 'utf8');
+  assert.match(workflow, /pulls\/\$PR_NUMBER\/files/, 'the files endpoint is where the patch comes from');
+  assert.match(workflow, /patch: \(\.patch \/\/ ""\)/, 'the patch field must be requested');
+  assert.match(
+    workflow,
+    /mapChangedFilesToCases\(files, \{ patches \}\)/,
+    'the patches must reach the selector'
+  );
+});

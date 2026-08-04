@@ -12,6 +12,9 @@
  * See {@link mapChangedFilesToCases}.
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 const PLAYER = 'fabricate-app';
 const MANAGER = 'fabricate-crafting-system-manager';
 
@@ -29,6 +32,62 @@ const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
  */
 const LAB_INFRASTRUCTURE_PATTERN =
   /^(tests\/view-lab\/|scripts\/lib\/viewLabCases\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
+
+/** This registry's own path, as a diff names it. */
+const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
+
+/**
+ * "Every publishable case" as a value, so an attribution can say it without building the set.
+ *
+ * A Symbol rather than a sentinel array or `null`, because the two answers this machinery returns
+ * are a SET OF IDS and THE WHOLE CORPUS, and every caller has to tell them apart. `null` would make
+ * "I could not parse this" and "this selects nothing" the same value — and those must never be the
+ * same value here, since one has to widen to 157 frames and the other has to narrow to none.
+ */
+const EVERY_PUBLISHABLE_CASE = Symbol('every publishable case');
+
+/**
+ * Lab inputs whose blast radius is narrower than the whole corpus, with the predicate — over a
+ * case's OWN declared fields — that decides which frames can render them.
+ *
+ * The default for a lab input is still EVERYTHING (see {@link mapChangedFilesToCases}); this table
+ * is the exception list, and an entry earns its place only when the narrowing can be DERIVED. A
+ * hand-maintained list of case ids would drift the moment a case is added, and would drift silently
+ * — the failure being a PR that renders no evidence for the frames it moved.
+ *
+ * `labRunStates.js` qualifies. Its whole output lands in two places: the three per-actor run
+ * containers (`flags.fabricate.fabricate.craftingRuns`, `.salvageRuns`, `flags.fabricate.gatheringRuns`
+ * — see `labFlags.js` `RUN_CONTAINER_PATHS`) and the `gatheringBlindRuns` world setting that
+ * `labWorld.js` writes from `buildLabBlindRunSecret`. Both are read only by the PLAYER window: the
+ * Journal (`apps/journal/**` is the run browser in its entirety), the Crafting tab's
+ * `RunSummaryPanel` / `CraftingStatusBadge`, and the Gathering tab's in-flight task rows. The
+ * manager is the GM's system-configuration window — it renders systems, recipes, components, tools
+ * and environments out of `game.settings`, and reads no actor run flag anywhere in
+ * `src/ui/svelte/apps/manager/**`. So the predicate is `app === PLAYER`: a fact each case already
+ * states about itself, which a new player case inherits for free and a new manager case cannot
+ * accidentally claim.
+ *
+ * Three fixture modules were considered and DELIBERATELY left on everything:
+ *
+ *   - `labFlags.js` — not a fixture at all but Foundry's flag semantics, `getFlag` included. Every
+ *     Fabricate read normalises through it (see that file's own header), so `getProperty` returning
+ *     the wrong thing renders a pristine, unworn, un-learned, unbroken world on EVERY screen.
+ *   - `labActors.js` — it also builds `buildDocumentIndex`, the uuid table `fromUuid` resolves
+ *     against, and the manager resolves through it too (`BooksScrollsView`, `ItemPageInspector`,
+ *     `SystemEditView`, `EnvironmentSummaryInspector`, `GatheringEventEditView`,
+ *     `RecipeBooksScrollsTab`, `SimpleCraftingCheckEditor`, the knowledge studio). "Only cases that
+ *     show an actor" would therefore under-select the manager frames it can blank out.
+ *   - `labContent.js` — measured rather than assumed, and the suspicion holds: `buildLabContent`
+ *     seeds `craftingSystems`, `recipes`, `gatheringEnvironments` and `gatheringConfig`, which is
+ *     the definition set BOTH windows render, and it owns the five `lab-*` system ids that 51 cases
+ *     name in `query.system`. It is the broadest input the lab has.
+ */
+const ATTRIBUTED_LAB_INPUTS = Object.freeze([
+  Object.freeze({
+    path: 'tests/view-lab/world/labRunStates.js',
+    selects: (viewCase) => viewCase.app === PLAYER,
+  }),
+]);
 
 /**
  * Signals too broad to attribute to one window. A shared primitive or a global stylesheet can
@@ -3325,40 +3384,12 @@ export function fallbackCase() {
 }
 
 /**
- * Map a changed-file set onto the cases that should be captured.
+ * The cases a set of RENDER files selects, by the `sourceMatches` patterns each case declares.
  *
- * @param {string[]} files Changed paths.
- * @returns {object[]} Cases to capture, in registry order.
+ * @param {string[]} renderFiles Normalized paths that {@link isUiFile} accepts.
+ * @returns {Set<string>} Selected case ids. Empty when nothing matched.
  */
-export function mapChangedFilesToCases(files = []) {
-  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
-
-  // A change to the lab's own fixture world or to this registry selects EVERYTHING that publishes.
-  //
-  // This is the rule that stops the harness lying about its riskiest change. Every frame renders
-  // from one fixture world, so an edit to `labContent.js` can reflow all 150 — and none of those
-  // paths is a render file, so `isUiFile` rejects them and the selection came back EMPTY. The PRs
-  // most able to invalidate the whole corpus were precisely the PRs that selected no evidence and
-  // passed green. Verified before this rule existed:
-  //   mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []
-  if (normalized.some((file) => LAB_INFRASTRUCTURE_PATTERN.test(file))) {
-    return publishableCases();
-  }
-
-  const renderFiles = normalized.filter((file) => isUiFile(file));
-  if (renderFiles.length === 0) {
-    // Nothing here renders, so there is no frame to select — a lang-only change included. The
-    // MIXED case (a `lang/` edit shipping alongside render files) never reaches this branch at all,
-    // because those render files put `renderFiles.length` above zero and selection proceeds below;
-    // callers test `hasUiChanges` over the whole set for that distinction.
-    //
-    // This previously read `normalized.some(isLang) ? [] : []` — a ternary whose branches were
-    // identical, guarding a distinction that had already been made two lines above. It selected
-    // nothing either way, so it was dead, and the comment above it described a fallback return the
-    // code did not perform.
-    return [];
-  }
-
+function selectRenderFileCases(renderFiles) {
   const selected = new Set();
   let sawBroadSignal = false;
   for (const file of renderFiles) {
@@ -3372,6 +3403,367 @@ export function mapChangedFilesToCases(files = []) {
   }
 
   if (sawBroadSignal) for (const id of REPRESENTATIVE_CASE_IDS) selected.add(id);
+  return selected;
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Diff-aware selection for this registry file.
+//
+// Adding two cases used to select all 157, when the honest answer is those two. The selector had
+// the diff available and did not use it. It does now — but only for changes it can PROVE are
+// confined to case-object literals, and it proves that against this file's own text.
+//
+// The whole design is one question: when do we widen back to everything? The answer is "at the
+// first sign of anything we do not fully understand", which here means:
+//
+//   - no patch, an empty patch, or a patch that is not a unified diff;
+//   - a hunk header that does not parse, or a body line whose marker is not ` `, `+`, `-` or `\`;
+//   - a context or added line whose text does NOT equal the line at that position in this file —
+//     the patch describes a different revision than the one that will render, so its line numbers
+//     mean nothing here (see {@link consumeNewFileLine});
+//   - this file's own text not parsing into case regions;
+//   - a changed line outside every case literal — a shared helper, a pattern constant, a factory,
+//     or `mapChangedFilesToCases` itself, any of which can move every frame.
+//
+// The one thing DELIBERATELY not widened for is a blank or comment-only line. A comment cannot
+// change a pixel, and a 157-frame, twenty-minute capture to answer a typo fix is exactly the cost
+// this narrowing exists to remove.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** `  managerCase({` / `  playerCase({` — an element of the array, at Prettier's two-space indent. */
+const CASE_OPEN_PATTERN = /^ {2}[A-Za-z]\w*\(\{$/;
+/** The line that closes such an element. */
+const CASE_CLOSE_LINE = '  }),';
+/** A case's own id line, four spaces in. */
+const CASE_ID_PATTERN = /^ {4}id: '([^']+)',$/;
+const ARRAY_OPEN_PREFIX = 'export const VIEW_LAB_CASES';
+const ARRAY_CLOSE_LINE = ']);';
+/** `@@ -old,count +new,count @@` — only the new-file start is needed. */
+const HUNK_HEADER_PATTERN = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+/** A line that cannot change a rendered frame: blank, a `//` comment, or inside a block comment. */
+const INERT_LINE_PATTERN = /^\s*(\/\/|\/?\*)/;
+
+let cachedSourceLines;
+let cachedCaseRegions;
+
+/**
+ * This module's own source, by line, read once and only when a registry patch is supplied.
+ *
+ * Reading the file is the only way to know where each case literal SITS, and it is safe here for a
+ * reason worth stating: the read is not trusted. Every context and added line of the patch is
+ * checked against what is read back, so a mismatch between the patch's revision and the checkout's
+ * (a `pull_request` checkout is the MERGE commit, not the head — if main also edited this file, the
+ * positions shift) is detected and widens to everything rather than mis-attributing.
+ *
+ * This keeps the no-patch path free of I/O, so the ordinary selection stays a pure function of its
+ * arguments, and it never shells out to git.
+ *
+ * @returns {string[]} Source lines; empty when the file cannot be read.
+ */
+function registrySourceLines() {
+  if (cachedSourceLines) return cachedSourceLines;
+  try {
+    cachedSourceLines = readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n');
+  } catch {
+    cachedSourceLines = [];
+  }
+  return cachedSourceLines;
+}
+
+/**
+ * The `VIEW_LAB_CASES` array's body, with the file line number its first line has.
+ *
+ * @param {string[]} sourceLines This file, by line.
+ * @returns {{firstLineNumber: number, lines: string[]}|null} The body, or null when not found.
+ */
+function registryArrayBody(sourceLines) {
+  const start = sourceLines.findIndex((line) => line.startsWith(ARRAY_OPEN_PREFIX));
+  if (start === -1) return null;
+  const end = sourceLines.indexOf(ARRAY_CLOSE_LINE, start);
+  if (end === -1) return null;
+  return { firstLineNumber: start + 2, lines: sourceLines.slice(start + 1, end) };
+}
+
+/**
+ * The 1-based, inclusive line span of every case literal in the array.
+ *
+ * Line-level rather than a brace count, because a brace count over raw text is wrong here: this
+ * registry is full of regular-expression literals whose character classes and quantifiers carry
+ * unbalanced `[`, `]` and `{`, and tokenising JavaScript to avoid that is far more machinery than
+ * the question deserves. Prettier already guarantees the shape this reads — one element per
+ * `  factory({` line, closed by `  }),` — and the id it extracts is checked against {@link caseIds},
+ * so a file whose text stops matching what it exports parses to null and widens to everything.
+ *
+ * Lines BETWEEN elements (section banners, the `...journalBlindRunCases()` spread) belong to no
+ * region on purpose: the spread is a call to shared code, and a change to it must widen.
+ *
+ * @param {string[]} sourceLines This file, by line.
+ * @returns {{id: string, start: number, end: number}[]|null} Regions, or null when unparseable.
+ */
+function parseCaseLineRegions(sourceLines) {
+  const body = registryArrayBody(sourceLines);
+  if (!body) return null;
+
+  const regions = [];
+  let open = null;
+  for (const [offset, line] of body.lines.entries()) {
+    const lineNumber = body.firstLineNumber + offset;
+    if (open === null) {
+      if (CASE_OPEN_PATTERN.test(line)) open = { id: null, start: lineNumber };
+      continue;
+    }
+    open.id ??= line.match(CASE_ID_PATTERN)?.[1] ?? null;
+    if (line !== CASE_CLOSE_LINE) continue;
+    regions.push({ id: open.id, start: open.start, end: lineNumber });
+    open = null;
+  }
+
+  if (open || regions.length === 0) return null;
+  if (regions.some((region) => !caseIds.includes(region.id))) return null;
+  return regions;
+}
+
+/**
+ * @returns {{id: string, start: number, end: number}[]|null} Memoized case regions.
+ */
+function caseLineRegions() {
+  cachedCaseRegions ??= parseCaseLineRegions(registrySourceLines());
+  return cachedCaseRegions;
+}
+
+/**
+ * @param {string} text A source line.
+ * @returns {boolean} True when changing it cannot change a rendered frame.
+ */
+function isInertSourceLine(text) {
+  return text.trim() === '' || INERT_LINE_PATTERN.test(text);
+}
+
+/**
+ * Start a hunk, moving the cursor to its first new-file line.
+ *
+ * @param {object} state Walk state.
+ * @param {string} header The `@@` line.
+ * @returns {boolean} False when the header does not parse.
+ */
+function startHunk(state, header) {
+  const match = header.match(HUNK_HEADER_PATTERN);
+  if (!match) return false;
+  state.cursor = Number(match[1]);
+  state.started = true;
+  return true;
+}
+
+/**
+ * Record a removed line. It has no position in the new file, so it is attributed to the line that
+ * now occupies its place — which is inside the same case literal for any edit within one, and
+ * outside every region (so: everything) for a removal at a boundary.
+ *
+ * @param {object} state Walk state.
+ * @param {string} text The removed line.
+ * @returns {boolean} Always true; a removal cannot make a patch unparseable.
+ */
+function recordRemoval(state, text) {
+  if (!isInertSourceLine(text)) state.touched.add(state.cursor);
+  return true;
+}
+
+/**
+ * Consume a line that EXISTS in the new file — context or addition — and verify it.
+ *
+ * The verification is the load-bearing part. Line numbers from a patch are meaningless against a
+ * different revision, and a wrong line number here does not fail loudly: it silently attributes a
+ * change to whichever case happens to sit at that offset. So every line the patch claims is checked
+ * against the file that will actually render, and one mismatch abandons the narrowing entirely.
+ *
+ * @param {object} state Walk state.
+ * @param {string} marker ` ` or `+`.
+ * @param {string} text The line's content.
+ * @param {string[]} sourceLines This file, by line.
+ * @returns {boolean} False when the patch does not describe this file.
+ */
+function consumeNewFileLine(state, marker, text, sourceLines) {
+  if (sourceLines[state.cursor - 1] !== text) return false;
+  if (marker === '+' && !isInertSourceLine(text)) state.touched.add(state.cursor);
+  state.cursor += 1;
+  return true;
+}
+
+/**
+ * @param {object} state Walk state.
+ * @param {string} raw One patch line.
+ * @param {string[]} sourceLines This file, by line.
+ * @returns {boolean} False when the line cannot be interpreted.
+ */
+function consumePatchLine(state, raw, sourceLines) {
+  if (raw.startsWith('@@')) return startHunk(state, raw);
+  // Anything before the first hunk header is either a `diff --git` / `index` / `---` / `+++`
+  // preamble or not a diff at all. GitHub's `patch` field carries no preamble, so rather than
+  // guess which it is, refuse: an unparseable patch is a full capture, not a wrong one.
+  if (!state.started) return false;
+  if (raw.startsWith('\\')) return true; // `\ No newline at end of file`
+  // A blank context line is emitted as a bare space, but tools that strip trailing whitespace turn
+  // it into an empty string; both mean "an unchanged empty line".
+  const marker = raw === '' ? ' ' : raw[0];
+  const text = raw.slice(1);
+  if (marker === '-') return recordRemoval(state, text);
+  if (marker === ' ' || marker === '+') return consumeNewFileLine(state, marker, text, sourceLines);
+  return false;
+}
+
+/**
+ * @param {string} patch A unified diff.
+ * @returns {string[]} Its lines, without the trailing blank a final newline produces.
+ */
+function patchLines(patch) {
+  const lines = patch.split('\n');
+  while (lines.length > 0 && lines.at(-1) === '') lines.pop();
+  return lines;
+}
+
+/**
+ * The new-file line numbers a patch changes.
+ *
+ * @param {string} patch A unified diff of this file.
+ * @param {string[]} sourceLines This file, by line.
+ * @returns {Set<number>|null} Changed line numbers, or null when the patch cannot be trusted.
+ */
+function changedRegistryLines(patch, sourceLines) {
+  const state = { cursor: 0, started: false, touched: new Set() };
+  for (const raw of patchLines(patch)) {
+    if (!consumePatchLine(state, raw, sourceLines)) return null;
+  }
+  return state.started ? state.touched : null;
+}
+
+/**
+ * The cases a change to THIS FILE selects, given the PR's patch for it.
+ *
+ * @param {string|undefined} patch The unified diff for this file, if the caller supplied one.
+ * @returns {Set<string>|symbol} Selected ids, or {@link EVERY_PUBLISHABLE_CASE}.
+ */
+function casesFromRegistryPatch(patch) {
+  if (typeof patch !== 'string' || patch.trim() === '') return EVERY_PUBLISHABLE_CASE;
+
+  const regions = caseLineRegions();
+  if (!regions) return EVERY_PUBLISHABLE_CASE;
+
+  const touched = changedRegistryLines(patch, registrySourceLines());
+  if (!touched) return EVERY_PUBLISHABLE_CASE;
+
+  const ids = new Set();
+  for (const line of touched) {
+    const region = regions.find((candidate) => line >= candidate.start && line <= candidate.end);
+    if (!region) return EVERY_PUBLISHABLE_CASE;
+    ids.add(region.id);
+  }
+  return ids;
+}
+
+/**
+ * The cases ONE lab input selects.
+ *
+ * @param {string} file A normalized path matching {@link LAB_INFRASTRUCTURE_PATTERN}.
+ * @param {Map<string, string>} patchByPath Patches by path.
+ * @returns {Set<string>|symbol} Selected ids, or {@link EVERY_PUBLISHABLE_CASE}.
+ */
+function selectLabInputCases(file, patchByPath) {
+  if (file === REGISTRY_PATH) return casesFromRegistryPatch(patchByPath.get(file));
+  const attribution = ATTRIBUTED_LAB_INPUTS.find((entry) => entry.path === file);
+  // The DEFAULT, and the fail-safe: an input nobody has attributed — a new file under
+  // `tests/view-lab/`, the mount page, the fixture assembler, the Foundry shim — selects the whole
+  // corpus. See {@link mapChangedFilesToCases} for why that has to be the default.
+  if (!attribution) return EVERY_PUBLISHABLE_CASE;
+  return new Set(
+    publishableCases()
+      .filter((viewCase) => attribution.selects(viewCase))
+      .map((viewCase) => viewCase.id)
+  );
+}
+
+/**
+ * The union of what every lab input in a changed set selects.
+ *
+ * @param {string[]} labInputs Normalized lab-input paths.
+ * @param {Map<string, string>} patchByPath Patches by path.
+ * @returns {Set<string>|symbol} Selected ids, or {@link EVERY_PUBLISHABLE_CASE}.
+ */
+function selectAllLabInputCases(labInputs, patchByPath) {
+  const selected = new Set();
+  for (const file of labInputs) {
+    const ids = selectLabInputCases(file, patchByPath);
+    if (ids === EVERY_PUBLISHABLE_CASE) return EVERY_PUBLISHABLE_CASE;
+    for (const id of ids) selected.add(id);
+  }
+  return selected;
+}
+
+/**
+ * @param {object|undefined} patches Patches keyed by path, as the caller supplied them.
+ * @returns {Map<string, string>} The same, keyed by normalized path.
+ */
+function normalizePatches(patches) {
+  const byPath = new Map();
+  for (const [path, patch] of Object.entries(patches ?? {})) byPath.set(normalizePath(path), patch);
+  return byPath;
+}
+
+/**
+ * Map a changed-file set onto the cases that should be captured.
+ *
+ * A change to the lab's own inputs — the fixture world, the page that mounts it, the Foundry shim,
+ * this registry — selects EVERYTHING that publishes unless it is one of the few inputs whose reach
+ * can be derived (see {@link ATTRIBUTED_LAB_INPUTS} and {@link casesFromRegistryPatch}).
+ *
+ * That default is the rule that stops the harness lying about its riskiest change. Every frame
+ * renders from one fixture world, so an edit to `labContent.js` can reflow all of them — and none
+ * of those paths is a render file, so `isUiFile` rejects them and the selection came back EMPTY.
+ * The PRs most able to invalidate the whole corpus were precisely the PRs that selected no evidence
+ * and passed green. Verified before that rule existed:
+ *   mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []
+ *
+ * Narrowing it is therefore allowed in exactly one direction: an input may select FEWER frames only
+ * when the registry can show its work from what the cases declare about themselves, or from a diff
+ * it has checked against the file that will render. Everything unmapped, unparseable or ambiguous
+ * still selects all of them.
+ *
+ * @param {string[]} files Changed paths.
+ * @param {object} [options] Selection inputs beyond the file list.
+ * @param {Record<string, string>} [options.patches] Unified diffs by path, as GitHub's
+ *   `pulls/{n}/files` endpoint returns them in each entry's `patch` field. Only this file's patch
+ *   is read. Supplying none is always safe: it selects more frames, never fewer.
+ * @returns {object[]} Cases to capture, in registry order.
+ */
+export function mapChangedFilesToCases(files = [], { patches } = {}) {
+  const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
+  const labInputs = normalized.filter((file) => LAB_INFRASTRUCTURE_PATTERN.test(file));
+  // Disjoint from `labInputs` so each path is attributed exactly once: `tests/view-lab/cascade.css`
+  // is both a lab input and a `.css` file, and it is the lab input rule that governs it.
+  const renderFiles = normalized.filter(
+    (file) => isUiFile(file) && !LAB_INFRASTRUCTURE_PATTERN.test(file)
+  );
+
+  if (labInputs.length === 0 && renderFiles.length === 0) {
+    // Nothing here renders, so there is no frame to select — a lang-only change included. The
+    // MIXED case (a `lang/` edit shipping alongside render files) never reaches this branch at all,
+    // because those render files put `renderFiles.length` above zero and selection proceeds below;
+    // callers test `hasUiChanges` over the whole set for that distinction.
+    //
+    // This previously read `normalized.some(isLang) ? [] : []` — a ternary whose branches were
+    // identical, guarding a distinction that had already been made two lines above. It selected
+    // nothing either way, so it was dead, and the comment above it described a fallback return the
+    // code did not perform.
+    return [];
+  }
+
+  const labSelection = selectAllLabInputCases(labInputs, normalizePatches(patches));
+  if (labSelection === EVERY_PUBLISHABLE_CASE) return publishableCases();
+
+  // A UNION, not an early return. The lab-input branch used to answer for the whole changed set, so
+  // the render files shipping alongside it were never consulted — which was invisible while the
+  // answer was "everything" and would silently drop frames now that it is not.
+  const selected = selectRenderFileCases(renderFiles);
+  for (const id of labSelection) selected.add(id);
   if (selected.size === 0) selected.add(FALLBACK_CASE_ID);
 
   return VIEW_LAB_CASES.filter((viewCase) => selected.has(viewCase.id) && viewCase.publish);
