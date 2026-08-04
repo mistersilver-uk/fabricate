@@ -69,7 +69,10 @@ This is the only operation that creates a version number.
 - A **release promotion** takes an already-minted stable version and MOVES it to the next stage (early access, then public).
 It mints nothing and creates no tag; it changes only what each channel advertises and, as its final act, makes the release public.
 
-When a release-line version is promoted, the release line is merged back into the prerelease line first — the **forward-port** — so the prerelease line's next version always numbers above the one just released (the **Version authority and promotion mechanics** requirement).
+The **forward-port** — merging the release line back into the prerelease line — belongs to the *prerelease* promotion, not the release promotion.
+It runs as soon as the stable version that promotion minted has been **published** to its channel, so the prerelease line's next version always numbers above the one just released (the **Version authority and promotion mechanics** requirement).
+Deferring it to the release promotion is not a delay but a deadlock: while the prerelease line is numbered below a published stable version, every version that line mints is numbered below it too, so its channel head can never overtake the released version and the registry-lead guard refuses the very promotion whose forward-port would have fixed it (the **Prerelease line precedence** requirement).
+The release promotion still **confirms** the forward-port has happened and performs it if it has not, which is normally a no-op.
 
 ### Hotfixes
 
@@ -85,7 +88,7 @@ Nothing becomes publicly obtainable until the promotion completes — the **Prom
 ### The three-channel flow
 
 The prerelease line (`main`) feeds beta on every releasing push; a prerelease promotion mints the stable version on the release line and publishes early access; a release promotion moves that same version to public.
-The forward-port carries the release line back into `main`.
+The forward-port carries the release line back into `main` as soon as early access carries the new stable version — not later, at the public promotion.
 
 ```mermaid
 flowchart LR
@@ -93,7 +96,7 @@ flowchart LR
   main -->|"prerelease promotion: merge tested commit, mint stable"| release["release (release line)"]
   release -->|"publish stable"| ea["early-access channel (private patrons)"]
   ea -->|"release promotion: move the SAME version"| public["public channel + Foundry registry"]
-  release -. "forward-port merge" .-> main
+  release -. "forward-port merge, once early access carries the version" .-> main
 ```
 
 ### The hotfix path
@@ -115,11 +118,11 @@ flowchart TD
 ### The promotion job graph
 
 A public promotion is a four-job graph.
-The guard verifies the source channel and the private heads; the forward-port and the publish run in parallel; the final job reads everything back and only then performs the two irreversible steps — un-drafting the release and posting to the registry — LAST, so anything that can fail has already failed.
+The guard verifies the source channel and the private heads; the forward-port backstop calls the shared `forward-port.yml` and normally takes its already-forward-ported no-op; the publish re-stages the public targets; the final job reads everything back and only then performs the two irreversible steps — un-drafting the release and posting to the registry — LAST, so anything that can fail has already failed.
 
 ```mermaid
 flowchart TD
-  guard["guard: verify source channel + private heads"] --> fp["forward-port: merge release into main"]
+  guard["guard: verify source channel + private heads"] --> fp["forward-port BACKSTOP: call forward-port.yml (normally a no-op)"]
   guard --> publish["publish: re-stage public targets"]
   fp --> final["read back, download assets, aggregate notes, build + validate registry payload"]
   publish --> final
@@ -1020,6 +1023,56 @@ A hotfix line is semantic-release's `'maintenance'` branch *type*; in our vocabu
 
 A `workflow_dispatch(tag)` re-entry point exists because a push run can mint the tag and draft but then fail the S3 publish; without re-entry the channel would never carry the version and the promotion's guard would refuse it forever.
 
+**It also schedules the forward-port.**
+A final `forward-port` job calls the shared `.github/workflows/forward-port.yml`, gated on `if: always() && github.ref_name == 'release' && needs.verify-publish.result == 'success'`.
+Every conjunct is load-bearing.
+`always()` is required because `semantic-release` is *skipped* on the `workflow_dispatch(tag)` re-entry path and a skipped `need` fails the implicit `success()`; because `always()` disables that wrapping entirely, the `verify-publish` conjunct is the only thing preventing a forward-port after a **failed** publish.
+`github.ref_name == 'release'` is the hotfix exclusion — a hotfix leaves its line by cherry-pick, never a release-into-`main` merge.
+A job-level `if:` is safe here (unlike in `promote-to-public.yml`) because nothing in this workflow depends on this job's result.
+
+The job passes an `expected_tag`, and it is not decoration.
+This run's gate is on *its own* publish, but the merge acts on `origin/release`'s **current tip**, and on the re-entry path those differ: republishing an older tag successfully satisfies the gate while a newer commit on `release` still has a failing publish, and merging that tip would number `main` above a version no channel advertises.
+When `expected_tag` does not point at `origin/release`'s tip the callee **skips and reports success**, printing both the expected tag and the tags actually found.
+Nothing is stranded by that skip: the merge takes `origin/release`'s whole tip rather than one tag, and the re-run no-op compares branches rather than tags, so the next successful release-line publish carries everything the skipped run would have.
+
+### The forward-port workflow
+
+File: `.github/workflows/forward-port.yml`
+
+One implementation, three entry points (`workflow_call` and `workflow_dispatch` in one file, with **job-level** `concurrency` so it survives being called):
+
+1. `release.yml` calls it after `verify-publish`, on the `release` line only — the scheduling point that keeps the prerelease line numbered above what is published.
+2. `promote-to-public.yml` job 2 calls it as a **confirming backstop**; `release` is normally already an ancestor of `main` by then, so it takes the ancestry no-op.
+3. A manual `workflow_dispatch` is the standing recovery lever, and the only thing that can unjam a prerelease line that has already fallen below a published stable version — **without promoting anything to `public`**.
+
+It merges `origin/release` into `main` with `--no-ff` (never a squash: `release` carries semantic-release's tags and notes) under a `chore:` subject (which must not be a releasing Conventional Commit type), and pushes as the ruleset-bypass App installation token — never `GITHUB_TOKEN`, which is neither the bypass actor nor able to trigger the downstream `beta.yml` run.
+Two guards short-circuit it, both through step **outputs** and neither ever failing the job: `git merge-base --is-ancestor origin/release origin/main` (already forward-ported) and `git tag --points-at origin/release` (the `expected_tag` check above).
+A guard that failed the job would turn a legitimate no-op into a red release run, which is exactly what the `enabled` no-op design exists to avoid.
+
+The `enabled` input, not a job-level `if:`, is how a caller no-ops it.
+`promote-to-public.yml` job 4's `if:` requires `needs.forward-port.result == 'success'`, and a *skipped* job reports `skipped` — so job 2 carries no job-level `if:` and passes `enabled: ${{ inputs.source_channel == 'early-access' }}` instead.
+Every step after the skip notice is gated so it evaluates false when `enabled` is false, under either value of `dry_run`; `tests/forward-port-workflow.test.js` *evaluates* those conditions rather than string-matching them, because a hotfix promotion that silently merged `release` into `main` would be the repository's worst automated write.
+
+A dispatched forward-port defaults to `dry_run: true` (it is a hand-run lever pointed at `main`); a called one defaults to `false` (its caller states its intent).
+
+#### The content gate — a runbook, not a flag
+
+After the merge, `git diff --stat origin/main` must be **empty**, and the job **fails** when it is not.
+Today the merge is content-empty by construction: `release` carries only `--no-ff` merges of beta tags that `promote-to-early-access.yml` already proved were ancestors of `origin/main`, and `release.config.js` loads no `@semantic-release/git` plugin, so nothing else is ever committed to `release`.
+A failure therefore means something changed that assumption — a stray direct commit on `release`, or a newly added plugin that commits back — and this push bypasses branch protection, so it would be an **unreviewed code path onto the default branch**.
+
+What the check is: read the printed diff and **confirm that every file in it was authored through a reviewed pull request**.
+That is the whole check; it is not "does this look harmless".
+
+How to recover, from a promotion:
+
+1. Dispatch `.github/workflows/forward-port.yml` manually with `allow_content: true` (and `dry_run: false`) once you have confirmed the content.
+2. Re-run the promotion.
+It will then take the already-forward-ported no-op.
+
+`allow_content` is settable only on `forward-port.yml`'s own dispatch, and deliberately so: `promote-to-public.yml`'s inputs are `version` / `source_channel` / `dry_run` only, and it will not grow a content override.
+That is the same composition the `override_hint` inputs carry into the failure message, so the message and this manual never disagree.
+
 ### Prerelease promotion (promote to early access)
 
 File: `.github/workflows/promote-to-early-access.yml`
@@ -1030,6 +1083,13 @@ This is the **prerelease promotion**: it does the MERGE ONLY of a tested beta co
 It is a `git merge --no-ff` (**never a squash** — squashing collapses the Conventional Commit types semantic-release reads and mis-computes the version, per the **Version authority and promotion mechanics** requirement).
 Before merging it verifies the tag's shape, that it exists, that its commit is an ancestor of `origin/main`, and that **every** private `beta` target — the channel manifest AND every tester manifest — already advertises that version.
 Ancestry alone is not enough: the tag is pushed before the beta publish job, so a tag whose publish failed is still an ancestor of `main` yet leaves a stale head, which later turns a hotfix into a cohort defection (the **Registry lead prohibition** requirement).
+
+**The forward-port deliberately does NOT live here.**
+This workflow merges onto `release` and returns; it mints nothing.
+The stable tag is created asynchronously afterwards, by the `release.yml` run this push triggers.
+A forward-port here would push `main` *before* that tag exists, so the `beta.yml` run that push triggers would compute another version on the **old** line and publish it — re-arming the exact defect on the next cycle.
+It would also forward-port even when the mint or the early-access publish subsequently failed, advancing `main` past a version no channel carries.
+The seam is `release.yml`, after `verify-publish`, because that is where "a stable version was minted **and** published" is an established fact.
 
 ### Public promotion
 

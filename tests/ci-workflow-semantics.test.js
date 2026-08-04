@@ -2,36 +2,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-function entries(source) {
-  return source
-    .split(/\r?\n/)
-    .map((line) => ({
-      indent: line.length - line.trimStart().length,
-      text: line.trim(),
-    }))
-    .filter((entry) => entry.text && !entry.text.startsWith('#'));
-}
-
-function key(text) {
-  const separator = text.indexOf(':');
-  return separator < 0 ? '' : text.slice(0, separator);
-}
-
-function value(text) {
-  return text.slice(text.indexOf(':') + 1).trim();
-}
-
-function children(all, parentIndex) {
-  const parent = all[parentIndex];
-  let end = all.length;
-  for (let index = parentIndex + 1; index < all.length; index += 1) {
-    if (all[index].indent <= parent.indent) {
-      end = index;
-      break;
-    }
-  }
-  return all.slice(parentIndex + 1, end);
-}
+// The workflow-source walkers and the `if:` tokenizer/evaluator this file used to inline now live
+// in tests/helpers/workflow-source.js, shared with tests/forward-port-workflow.test.js (issue
+// #1001). The extraction is behaviour-preserving, and the proof is that the `test(...)` body below
+// is byte-identical to its pre-extraction form while `npm test` stays green: `parseJobs` still
+// indexes jobs by indentation, so a walker that stopped filtering comments would give ci.yml a
+// spurious job key and fail the `deepEqual` assertions loudly, and every `if:` in ci.yml is
+// single-line while its only block scalars are `run:` bodies this file never reads.
+import { children, entries, evaluate, key, parseJobs, value } from './helpers/workflow-source.js';
 
 function parseWorkflow(source) {
   const all = entries(source);
@@ -54,79 +32,7 @@ function parseWorkflow(source) {
   const concurrency = section('concurrency');
   const group = value(concurrency.find((entry) => key(entry.text) === 'group').text);
 
-  const jobEntries = section('jobs');
-  const jobs = {};
-  for (let index = 0; index < jobEntries.length; index += 1) {
-    const entry = jobEntries[index];
-    if (entry.indent !== 2) continue;
-    const condition = children(jobEntries, index).find(
-      (item) => item.indent === 4 && key(item.text) === 'if'
-    );
-    jobs[key(entry.text)] = { if: condition ? value(condition.text) : '' };
-  }
-  return { types, group, jobs };
-}
-
-function tokenize(expression) {
-  const result = [];
-  let source = expression.trim();
-  while (source) {
-    const match = source.match(
-      /^(?:\s+|(&&|\|\||==|!=|\(|\))|('(?:[^'\\]|\\.)*')|([A-Za-z_][A-Za-z0-9_.]*))/
-    );
-    assert.ok(match, `unsupported workflow expression near: ${source}`);
-    source = source.slice(match[0].length);
-    if (match[1]) result.push({ type: match[1], value: match[1] });
-    if (match[2]) result.push({ type: 'literal', value: match[2].slice(1, -1) });
-    if (match[3]) result.push({ type: 'path', value: match[3] });
-  }
-  return result;
-}
-
-function evaluate(expression, context) {
-  const tokens = tokenize(expression);
-  let position = 0;
-  const take = (type) => tokens[position]?.type === type && tokens[position++];
-  const primary = () => {
-    if (take('(')) {
-      const nested = or();
-      assert.ok(take(')'), 'missing closing parenthesis');
-      return nested;
-    }
-    const token = tokens[position++];
-    assert.ok(token, 'missing expression value');
-    if (token.type === 'literal') return token.value;
-    assert.equal(token.type, 'path');
-    return token.value.split('.').reduce((current, segment) => current?.[segment], context);
-  };
-  const equality = () => {
-    let current = primary();
-    while (tokens[position]?.type === '==' || tokens[position]?.type === '!=') {
-      const operator = tokens[position++].type;
-      const right = primary();
-      current = operator === '==' ? current === right : current !== right;
-    }
-    return current;
-  };
-  const and = () => {
-    let current = equality();
-    while (take('&&')) {
-      const right = equality();
-      current = current && right;
-    }
-    return current;
-  };
-  const or = () => {
-    let current = and();
-    while (take('||')) {
-      const right = and();
-      current = current || right;
-    }
-    return current;
-  };
-  const result = or();
-  assert.equal(position, tokens.length, 'unexpected trailing workflow expression tokens');
-  return result;
+  return { types, group, jobs: parseJobs(source) };
 }
 
 function contextFor(action) {

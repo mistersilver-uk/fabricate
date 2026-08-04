@@ -120,6 +120,33 @@ test('a beta head Foundry considers older than the promoted version is refused (
   assert.match(verdict.reason, /Advance beta first/);
 });
 
+test('the beta backwards refusal names a REACHABLE remedy: bring the release line back into the prerelease line', () => {
+  // Issue #1001. The old message named only "push the feature work to main so beta.yml mints a
+  // newer beta", which is unreachable in exactly the state that produces this refusal: while the
+  // prerelease line is itself numbered below v1.6.0, the next version it mints (1.4.0-beta.69) is
+  // below it too. The only operation that raises the line is the forward-port, and the refusal must
+  // say so — a refusal whose printed remedy cannot work is the defect this issue exists to remove.
+  const verdict = evaluateRegistryLeadTarget({
+    channel: 'beta',
+    sourceChannel: 'early-access',
+    label: 'channel-beta',
+    head: '1.4.0-beta.68',
+    version: '1.6.0',
+  });
+
+  // Verdict SHAPE is untouched — this is a message-only correction.
+  assert.equal(verdict.decision, 'refuse');
+  assert.equal(verdict.kind, 'backwards');
+
+  assert.match(verdict.reason, /Advance beta first/);
+  assert.match(verdict.reason, /prerelease line is itself numbered below/);
+  assert.match(verdict.reason, /bring the release line back into the prerelease line/);
+  assert.match(verdict.reason, /forward-port/);
+  // And it must be clear the remedy promotes nothing — no public promotion is available while the
+  // refusal stands.
+  assert.match(verdict.reason, /promotes nothing/);
+});
+
 test('an early-access head Foundry considers older than the promoted version is refused (backwards)', () => {
   const verdict = evaluateRegistryLeadTarget({
     channel: 'early-access',

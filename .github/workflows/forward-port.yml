@@ -1,0 +1,338 @@
+name: "Forward-port release into main"
+
+# The FORWARD-PORT (issue #1001): merge `release` back into `main` so the prerelease line's next
+# version is numbered ABOVE the stable version the release line just published. ONE implementation,
+# THREE entry points — the same factoring release-s3.yml uses (workflow_dispatch + workflow_call in
+# one file, with JOB-level concurrency so it survives being called):
+#
+#   1. `release.yml` calls it after `verify-publish`, on the `release` line only. That is the point
+#      where "a stable version was minted AND published to its channel" is an established fact, and
+#      it is the entry point that keeps the defect from recurring.
+#   2. `promote-to-public.yml` job 2 calls it as a CONFIRMING BACKSTOP. By the time a release
+#      promotion runs, `release` is normally already an ancestor of `main`, so it takes the
+#      ancestry no-op below.
+#   3. A manual `workflow_dispatch` is the standing recovery lever, and the one that can unjam a
+#      prerelease line that has already fallen below a published stable version — WITHOUT promoting
+#      anything to `public`.
+#
+# WHY NOT promote-to-early-access.yml: that workflow merges onto `release` and returns; it mints
+# nothing. The stable tag is created asynchronously afterwards by the `release.yml` run its push
+# triggers. A forward-port there would push `main` BEFORE the stable tag exists, so the `beta.yml`
+# run that push triggers would compute another version on the OLD line — re-arming the very defect
+# this workflow exists to remove.
+#
+# ── THE NO-OP MECHANISM IS SAFETY-CRITICAL ──────────────────────────────────────────────────────
+# `promote-to-public.yml` job 2 carries NO job-level `if:` (job 4's strict `if:` requires
+# `needs.forward-port.result == 'success'`, and a *skipped* job reports `skipped`). Its hotfix no-op
+# therefore runs through the `enabled` input instead, and EVERY step after the skip notice must
+# evaluate false when `enabled` is false, under EITHER value of `dry_run`. If that gate is omitted
+# or weakened anywhere, a hotfix promotion silently merges `release` into `main` on the repository's
+# highest-consequence path. A source-contract assertion in tests/forward-port-workflow.test.js
+# EVALUATES those conditions rather than string-matching them.
+#
+# ── GUARDS SHORT-CIRCUIT THROUGH STEP OUTPUTS, NEVER `exit 0` ───────────────────────────────────
+# Neither guard step ever exits non-zero, and neither ends the job: a guard that failed the job
+# would turn a legitimate no-op into a RED release run, which is exactly the failure mode the
+# `enabled` no-op design exists to avoid. Each guard writes an output and the later steps re-test
+# BOTH outputs in their own `if:`. Re-testing both matters: a SKIPPED step's outputs are the empty
+# string, so `steps.tipguard.outputs.mismatch != 'true'` is true when the tipguard step never ran.
+#
+# ── SONAR ───────────────────────────────────────────────────────────────────────────────────────
+# githubactions:S7630 — no `${{ inputs.* }}` or `${{ github.* }}` inside any `run:` BODY; every
+# value crosses into the shell through `env:`. githubactions:S8264 — job-level `permissions:`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      enabled:
+        description: "When false, every step after the skip notice is skipped and the job still reports success."
+        required: false
+        type: boolean
+        default: true
+      skip_reason:
+        description: "Printed as a ::notice:: when enabled is false."
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        # A DISPATCHED forward-port is a hand-run recovery lever pointed at `main`, so it defaults
+        # to a dry run. A CALLED forward-port is an automated step whose caller states its intent,
+        # so the workflow_call default below is false. Separate input blocks make that expressible.
+        description: "Dry run: do everything except the push to main."
+        required: false
+        type: boolean
+        default: true
+      reason:
+        description: "Folded into the merge-commit subject."
+        required: false
+        type: string
+        default: "manual forward-port"
+      expected_tag:
+        description: "When non-empty, forward-port only if this tag points at origin/release's tip (e.g. v1.6.0)."
+        required: false
+        type: string
+        default: ""
+      allow_content:
+        description: "Override the content gate. Only set this after confirming every file in the printed diff was authored through a reviewed pull request."
+        required: false
+        type: boolean
+        default: false
+      override_hint:
+        description: "The remedy clause appended to a content-gate failure."
+        required: false
+        type: string
+        default: "re-run this dispatch with allow_content: true once the content has been reviewed."
+  workflow_call:
+    inputs:
+      enabled:
+        description: "When false, every step after the skip notice is skipped and the job still reports success."
+        required: false
+        type: boolean
+        default: true
+      skip_reason:
+        description: "Printed as a ::notice:: when enabled is false."
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run: do everything except the push to main."
+        required: false
+        type: boolean
+        default: false
+      reason:
+        description: "Folded into the merge-commit subject."
+        required: false
+        type: string
+        default: "after a release-line publish"
+      expected_tag:
+        description: "When non-empty, forward-port only if this tag points at origin/release's tip (e.g. v1.6.0)."
+        required: false
+        type: string
+        default: ""
+      allow_content:
+        description: "Override the content gate. Only set this after confirming every file in the printed diff was authored through a reviewed pull request."
+        required: false
+        type: boolean
+        default: false
+      override_hint:
+        description: "The remedy clause appended to a content-gate failure."
+        required: false
+        type: string
+        default: "dispatch .github/workflows/forward-port.yml manually with allow_content: true once the content has been reviewed."
+    secrets:
+      RELEASE_BOT_KEY:
+        # Reusable workflows do NOT inherit repository secrets, so every caller passes this
+        # explicitly — the same rule and the same explicit style release-s3.yml uses, chosen over
+        # `secrets: inherit` because this workflow can push to `main`. `vars.APP_ID` needs no
+        # plumbing: the `vars` context is available to a called workflow in the same repository, and
+        # on the workflow_dispatch path the `secrets` context resolves against repository secrets
+        # directly (which is how release-s3.yml already works in both modes).
+        description: "Private key of the ruleset-bypass GitHub App that pushes the merge to main."
+        required: true
+
+jobs:
+  forward-port:
+    runs-on: ubuntu-latest
+    # A `uses:` job cannot carry timeout-minutes, so promote-to-public.yml job 2's existing 10-minute
+    # bound is LOST when that job becomes a call and must be re-established here. Without it this job
+    # inherits the 360-minute default while holding a `cancel-in-progress: false` concurrency group
+    # that gates pushes to `main`: one hung fetch would park that group for six hours and silently
+    # evict any queued request.
+    timeout-minutes: 10
+    permissions:
+      # `contents: read` is sufficient because the push authenticates as the App installation token,
+      # never as GITHUB_TOKEN. A called workflow can never exceed the caller job's grant anyway.
+      contents: read
+    concurrency:
+      # JOB level (not workflow level) so it survives `workflow_call`, and NEVER cancelling, so a
+      # second forward-port QUEUES behind an in-flight one rather than abandoning it mid-merge.
+      # KNOWN: a concurrency group holds at most one PENDING entry, so a third near-simultaneous
+      # request EVICTS the queued middle one rather than extending the queue. The practical loss is
+      # nil — the merge takes origin/release's whole tip rather than one tag, so the surviving
+      # request carries everything the evicted one would have — but a maintainer asking "where did
+      # my run go" needs that written down.
+      group: forward-port-main
+      cancel-in-progress: false
+    steps:
+      # ── STEP 1 ────────────────────────────────────────────────────────────────────────────────
+      - name: Explain the no-op
+        if: ${{ !inputs.enabled }}
+        env:
+          SKIP_REASON: ${{ inputs.skip_reason }}
+        run: |
+          echo "::notice::forward-port is disabled for this call — ${SKIP_REASON:-the caller passed enabled: false}"
+          echo "Every subsequent step is skipped and this job reports success."
+
+      # ── STEP 2 ────────────────────────────────────────────────────────────────────────────────
+      - uses: actions/checkout@v6
+        if: ${{ inputs.enabled }}
+        with:
+          fetch-depth: 0
+          ref: main
+          # The forward-port push authenticates as the bypass App, never as github-actions[bot].
+          # checkout stores its own credential as an http.extraheader, and an Authorization header
+          # BEATS the credential in a remote URL — so any persisted credential silently wins over
+          # the App token. Never persist it here. (checkout writes that header to a temp config
+          # file, not the local one, so a `git config --unset-all` in a later step cannot reach it.)
+          persist-credentials: false
+
+      # ── STEP 3 ────────────────────────────────────────────────────────────────────────────────
+      - name: Mint an App installation token (bypass actor + workflow trigger)
+        id: apptoken
+        if: ${{ inputs.enabled }}
+        # Minted BEFORE the fetch, because the checkout above persists no credential and origin's
+        # default URL would otherwise fetch anonymously — which happens to work while this repo is
+        # public and would break the day it is not. Minted on the dry-run path too: minting a token
+        # is not a mutation. The action fails closed when the private key resolves empty, so a
+        # missing/unforwarded RELEASE_BOT_KEY is a red job here rather than a silent anonymous push.
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_KEY }}
+
+      # ── STEP 4 ────────────────────────────────────────────────────────────────────────────────
+      - name: Point origin at the App token and fetch both lines
+        if: ${{ inputs.enabled }}
+        env:
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
+        run: |
+          # The push MUST use the App token, not the default GITHUB_TOKEN:
+          #   1. GITHUB_TOKEN pushes do not trigger downstream workflows (beta.yml on push:[main]).
+          #   2. The App token is the ruleset bypass actor, so required_linear_history on main
+          #      (which forbids the merge commit this creates) still lets it push.
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch origin main release --force --tags
+          git checkout -B main origin/main
+          git config user.name "fabricate-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+
+      # ── STEP 5: GUARD (ancestry) — output only, never a failure ────────────────────────────────
+      - name: Already forward-ported?
+        id: ancestry
+        if: ${{ inputs.enabled }}
+        run: |
+          if git merge-base --is-ancestor origin/release origin/main; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::origin/release is already an ancestor of origin/main — the forward-port has already happened. No-op."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+            echo "origin/release is not an ancestor of origin/main — this forward-port is required."
+          fi
+
+      # ── STEP 6: GUARD (expected tag) — output only, never a failure ────────────────────────────
+      - name: Does origin/release's tip carry the tag the caller verified?
+        id: tipguard
+        # The caller's own gate is on ITS run's publish; the merge acts on origin/release's CURRENT
+        # tip, and those are not the same thing. On the release.yml re-entry path an older tag can be
+        # republished successfully while a NEWER commit on `release` has a still-failing publish, and
+        # merging that tip would number `main` above a version no channel advertises — the mirror
+        # image of the defect this workflow fixes. A cheap tag comparison closes it; an S3 head read
+        # was priced and rejected (it would put AWS credentials, OIDC and `npm ci` into a workflow
+        # whose only job is a git merge). A mismatch SKIPS and reports SUCCESS: the merge takes
+        # origin/release's whole tip rather than a single tag, and the step-5 no-op compares BRANCHES
+        # rather than tags, so the next successful release-line publish carries everything a skipped
+        # run would have, and the unguarded manual dispatch is the standing recovery lever.
+        if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' }}
+        env:
+          EXPECTED_TAG: ${{ inputs.expected_tag }}
+        run: |
+          if [ -z "${EXPECTED_TAG:-}" ]; then
+            echo "mismatch=false" >> "$GITHUB_OUTPUT"
+            echo "No expected_tag was supplied — the caller established what it is forward-porting, so this guard does not apply."
+          else
+            FOUND=$(git tag --points-at origin/release | tr '\n' ' ')
+            if printf '%s' "$FOUND" | tr ' ' '\n' | grep -Fqx -- "$EXPECTED_TAG"; then
+              echo "mismatch=false" >> "$GITHUB_OUTPUT"
+              echo "origin/release's tip carries the expected tag $EXPECTED_TAG."
+            else
+              echo "mismatch=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::expected_tag '$EXPECTED_TAG' does not point at origin/release's tip; the tags found there are: ${FOUND:-(none)}. Skipping the forward-port and reporting success — the next successful release-line publish, or a manual forward-port.yml dispatch, will carry it."
+            fi
+          fi
+
+      # ── STEP 7 ────────────────────────────────────────────────────────────────────────────────
+      - name: Merge origin/release into main
+        if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' }}
+        env:
+          REASON: ${{ inputs.reason }}
+        run: |
+          # --no-ff, NEVER a squash: `release` carries semantic-release's tags and notes. The
+          # `chore:` subject is load-bearing — the merge message must not be a RELEASING
+          # Conventional Commit type, or landing it on main would itself mint a version.
+          git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"
+
+      # ── STEP 8 ────────────────────────────────────────────────────────────────────────────────
+      - name: Content gate
+        if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' }}
+        env:
+          ALLOW_CONTENT: ${{ inputs.allow_content }}
+          OVERRIDE_HINT: ${{ inputs.override_hint }}
+        run: |
+          # Today this merge is content-empty by construction: `release` carries only --no-ff merges
+          # of beta tags that promote-to-early-access.yml already proved were ancestors of
+          # origin/main, and release.config.js loads no @semantic-release/git plugin. A stray direct
+          # commit on `release`, or a future git plugin, would quietly turn this automated,
+          # ruleset-bypassing push into an UNREVIEWED code path onto the default branch. Printing the
+          # diff and continuing would detect nothing, so this fails the job.
+          CONTENT=$(git diff --stat origin/main)
+          if [ -z "$CONTENT" ]; then
+            echo "Content gate passed: this forward-port carries no file changes onto main."
+          elif [ "$ALLOW_CONTENT" = "true" ]; then
+            echo "::warning::allow_content was set, so the content gate is overridden. The forward-port carries these file changes onto main:"
+            echo "$CONTENT"
+          else
+            echo "::error::origin/release carries content origin/main does not, so this forward-port would push file changes to main:"
+            echo "$CONTENT"
+            echo "::error::Confirm that every file listed above was authored through a reviewed pull request. Then ${OVERRIDE_HINT}"
+            exit 1
+          fi
+
+      # ── STEP 9 ────────────────────────────────────────────────────────────────────────────────
+      - name: Dry run — report and stop
+        if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' && inputs.dry_run }}
+        run: |
+          echo "----- commits this forward-port would push to main -----"
+          git log --oneline origin/main..HEAD
+          echo "----- file changes it would carry (expected: none) -----"
+          git diff --stat origin/main
+          echo "::notice::DRY RUN — nothing was pushed. origin/main is unchanged."
+
+      # ── STEP 10 ───────────────────────────────────────────────────────────────────────────────
+      - name: Push the forward-port to main
+        if: ${{ inputs.enabled && steps.ancestry.outputs.already != 'true' && steps.tipguard.outputs.mismatch != 'true' && !inputs.dry_run }}
+        env:
+          ALLOW_CONTENT: ${{ inputs.allow_content }}
+          OVERRIDE_HINT: ${{ inputs.override_hint }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          if git push origin HEAD:main; then
+            echo "::notice::Forward-ported release into main and pushed it. This triggers beta.yml, which mints the next prerelease ABOVE the released version."
+            exit 0
+          fi
+          echo "::warning::The push was rejected — main moved while this run was merging. Retrying once against the fresh tip."
+          # Re-fetch ONLY origin/main and RE-PERFORM the merge: a bare re-push of the stale merge
+          # commit fails identically and would make this "retry" a no-op. Do NOT copy step 4's
+          # `git fetch origin main release --force --tags` here — freezing the `theirs` side to the
+          # ref the gate already validated is load-bearing, because re-fetching would import a tip
+          # nothing gated.
+          git fetch origin main --force
+          git checkout -B main origin/main
+          git merge --no-ff origin/release -m "chore: forward-port release into main (${REASON})"
+          # The gate is RE-RUN rather than assumed. "An advanced main can only make an empty diff
+          # more true" holds when `theirs` equals the merge base, which is today's situation, but an
+          # empty diff can also arise from a three-way RESOLUTION that landed on `ours` — and in that
+          # regime an advanced main can flip the resolution and carry content no gate saw onto the
+          # one code path that bypasses pull-request review. The window is seconds and the
+          # coincidence is remote, but the cost of re-checking is one `git diff --stat`.
+          RETRY_CONTENT=$(git diff --stat origin/main)
+          if [ -n "$RETRY_CONTENT" ] && [ "$ALLOW_CONTENT" != "true" ]; then
+            echo "::error::the re-merge against the advanced main carries file changes onto main:"
+            echo "$RETRY_CONTENT"
+            echo "::error::Confirm that every file listed above was authored through a reviewed pull request. Then ${OVERRIDE_HINT}"
+            exit 1
+          fi
+          if ! git push origin HEAD:main; then
+            echo "::error::The forward-port push was rejected twice. main is still numbered below the released version, so the prerelease line is jammed until this is completed: dispatch .github/workflows/forward-port.yml manually (dry_run: false) to finish it."
+            exit 1
+          fi
+          echo "::notice::Forward-ported release into main on the retry and pushed it. This triggers beta.yml."
