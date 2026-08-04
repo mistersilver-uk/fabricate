@@ -297,6 +297,12 @@ Loop until both approve.
 Before asking the maintainer to review a PR, the workflow driver completes a final delivery loop from the coordinator checkout.
 Draft-head checks are preflight evidence only because some CI workflows may run only on the `ready_for_review` event.
 
+**The driver runs this loop, including the ready transition, on its own initiative.**
+Marking a PR ready is a step the driver owns outright, not a decision to refer upward, so the driver never waits to be told to undraft.
+Delivery is only complete when the PR is ready and its exact-head checks are green; a green PR left in draft is unfinished work, not a cautious pause, because draft checks prove nothing about the workflows that run only on `ready_for_review`.
+The maintainer's decision point is reviewing and merging the ready PR, and asking them to authorise the transition into that state only moves work back to the person the loop exists to serve.
+Ask first only when the user has said to hold, when the change is one the user asked to inspect before it goes out, or when a delivery precondition below cannot be met.
+
 1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
 2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
 3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.

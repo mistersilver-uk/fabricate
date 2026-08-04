@@ -11,7 +11,7 @@ The workflow driver alone may:
 
 - mutate the coordinator checkout or integration branch;
 - create, remove, or prune agent worktrees;
-- update GitHub issue or PR state and managed blocks;
+- update GitHub issue or PR state and managed blocks, which includes marking a PR ready for review once the final delivery loop's preconditions hold;
 - push branches or open and update PRs;
 - choose integration order, cherry-pick lane commits, and record commit mappings;
 - run authoritative final gates; and
@@ -223,6 +223,11 @@ It runs the repository's unchanged gates against the pushed integrated commit.
 
 The workflow driver completes this loop before handing a PR to the maintainer for review.
 Checks observed while the PR is draft are preflight evidence only because a required workflow may run only after the `ready_for_review` event.
+
+The driver performs every step below on its own initiative, including step 7's ready transition.
+That transition is driver-owned authority, listed above under "update GitHub issue or PR state", so the driver does not pause to ask permission to undraft.
+A PR whose gates are green but which is still draft is incomplete delivery: its required exact-head checks have not run, so no one can yet act on it.
+Hold at draft only when the user has asked to hold, or when a precondition in this loop is unmet — and say which, rather than leaving the PR parked without a reason.
 
 1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final check run.
 2. Fetch `origin/main`, capture the expected remote SHA for the PR branch, and require a clean coordinator checkout with no active mutable lane.

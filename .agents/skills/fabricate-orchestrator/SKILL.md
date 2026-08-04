@@ -101,6 +101,7 @@ Hard cap: 3 docs revisions.
 1. Ensure the driver has integrated the completed lane commits into the coordinator branch and represented them with a draft PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.
 2. Run the final maintainer-handoff loop in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
 Finalize PR metadata before the final run, rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across metadata-only edits or a patch-equivalent rebase, push with the exact expected-head lease, mark the PR ready, and require all post-undraft exact-head checks including both SonarCloud checks.
+Marking the PR ready is part of that loop and needs no maintainer prompt: run it as soon as the loop's preconditions hold, and hold at draft only when the user asked to hold or a precondition is unmet.
 When the reviewed concern materially changed or a finding remains unresolved, obtain repeat review from a fresh detached lane pinned to the exact target with an immutable artifact before pushing.
 Return the PR to draft and repeat the mandatory delivery steps after any failure or movement of main or the PR head, repeating review only when its material-change rule applies.
 3. Surface a final summary including the resolved roster, completed loop iteration counts, reused approvals and their evidence basis, any repeated reviews, exact-head CI result, PR ready state, and any escalations to the user.
@@ -123,6 +124,7 @@ A second escalation in the same revision, or one from a lane already at the most
 - Parallelize only disjoint lanes with integrated dependencies, and serialize resource-heavy and authoritative gates in the coordinator checkout.
 - Preserve a valid approval across issue or PR metadata edits and patch-equivalent rebases; repeat a reviewer only for a materially changed owned concern or unresolved finding, using a fresh exact-target detached lane and immutable artifact when repetition is required.
 - Treat draft CI as preflight only and never hand a PR to the maintainer until post-undraft checks, both SonarCloud checks, exact-head identity, current-main ancestry, and ready state are simultaneously verified.
+- Drive that transition rather than requesting it: leaving a fully gated PR in draft awaiting permission to undraft is an incomplete handoff, because the checks that decide the handoff only run once the PR is ready.
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
 Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`), force-push, and let CI re-run, before merging it.
