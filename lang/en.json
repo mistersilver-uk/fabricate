@@ -1762,7 +1762,7 @@
           "SelectedHint": "Stage changes below, then apply to all at once.",
           "Unchanged": "Unchanged",
           "CategoryUnchanged": "Leave unchanged",
-          "TagsHint": "click to add · again to remove",
+          "TagsHint": "click to add · again to remove · again to leave unchanged",
           "StatusEnable": "Enable",
           "StatusDisable": "Disable",
           "Lock": "Lock",

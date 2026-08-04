@@ -55,6 +55,17 @@ console.warn = (message) => {
   consoleWarnings.push(String(message));
 };
 
+// The panel's own staging model, so the falsy-but-real payloads below are built by the
+// REAL producer rather than restated as literals the assertions cannot fail against.
+const {
+  RECIPE_CHECK_TIER_DEFAULT,
+  createRecipeBulkDraft,
+  setBulkRecipeCategory,
+  setBulkRecipeCheckTier,
+  setBulkRecipeLock,
+  setBulkRecipeStatus,
+  toBulkRecipeEdit,
+} = await import('../src/utils/recipeBulkEditModel.js');
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
@@ -352,8 +363,14 @@ describe('applyBulkEditToRecipes — the three falsy-but-real axes', () => {
   // panel's Disable, Unlock and Default DC — present if and only if staged. Each needs its
   // OWN case: a truthiness guard drops all three while every test that stages the truthy
   // side of the same axis keeps passing, so covering Enable does not cover Disable.
+  //
+  // Each payload below is built by the REAL producer rather than hand-written, so the
+  // precondition that documents why the case discriminates ("staged, and falsy") is an
+  // assertion about `toBulkRecipeEdit` and fails if the model stops emitting that shape.
+  // Asserting it against a literal declared two lines above documented the same intent and
+  // could not fail.
   it('a staged DISABLE turns an enabled recipe off', async () => {
-    const edit = { enabled: false };
+    const edit = toBulkRecipeEdit(setBulkRecipeStatus(createRecipeBulkDraft(), 'disable'));
     assert.ok(Object.hasOwn(edit, 'enabled') && !edit.enabled, 'staged, and falsy');
     const fixture = makeFixture({ recipes: [completeRecipe('r1', { enabled: true })] });
 
@@ -365,7 +382,7 @@ describe('applyBulkEditToRecipes — the three falsy-but-real axes', () => {
   });
 
   it('a staged UNLOCK unlocks a locked recipe', async () => {
-    const edit = { locked: false };
+    const edit = toBulkRecipeEdit(setBulkRecipeLock(createRecipeBulkDraft(), 'unlock'));
     assert.ok(Object.hasOwn(edit, 'locked') && !edit.locked, 'staged, and falsy');
     const fixture = makeFixture({ recipes: [completeRecipe('r1', { locked: true })] });
 
@@ -421,8 +438,13 @@ describe('applyBulkEditToRecipes — the cohort', () => {
 
 describe('applyBulkEditToRecipes — the check tier axis', () => {
   it('clears the tier for a PRESENT null while an ABSENT key leaves it alone', async () => {
-    const staged = { checkTierId: null };
-    const unstaged = { category: 'Potions' };
+    // Both payloads come from the REAL producer over the panel's own two drafts — Default
+    // DC staged, and the category axis alone — so this precondition asserts
+    // `toBulkRecipeEdit`'s presence contract rather than restating two literals.
+    const staged = toBulkRecipeEdit(
+      setBulkRecipeCheckTier(createRecipeBulkDraft(), RECIPE_CHECK_TIER_DEFAULT)
+    );
+    const unstaged = toBulkRecipeEdit(setBulkRecipeCategory(createRecipeBulkDraft(), 'Potions'));
     // The discriminator is PRESENCE, never truthiness: both payloads read falsy here.
     assert.equal(Object.hasOwn(staged, 'checkTierId'), true);
     assert.equal(Object.hasOwn(unstaged, 'checkTierId'), false);

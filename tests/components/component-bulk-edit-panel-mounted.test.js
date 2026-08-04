@@ -148,6 +148,28 @@ describe('ComponentBulkEditPanel tag staging (issue 772)', () => {
     );
   });
 
+  // The run is ONE axis, so it is exposed as one control rather than as a stray sequence of
+  // buttons, and the hint above it states all THREE stops of the cycle. Both facts are
+  // shared verbatim with the Recipe Studio's book run — see its twin case. The spec forbids
+  // the two studios diverging here, so the two cases assert the same two things.
+  it('exposes the chip run as a named group above an honest three-state hint', async () => {
+    const { root } = await mountPanel();
+    const run = root.querySelector('[data-component-bulk-tags]');
+
+    assert.equal(run.getAttribute('role'), 'group');
+    assert.equal(
+      run.getAttribute('aria-label'),
+      'Tags',
+      'the group name is the section heading a sighted GM reads, not a second string'
+    );
+    assert.match(
+      root.textContent,
+      /click to add · again to remove · again to leave unchanged/,
+      'the third stop is the one that UNDOES a staged remove; naming only two of three left '
+        + 'it discoverable only by clicking and watching'
+    );
+  });
+
   it('says the system defines no tags rather than rendering an empty run', async () => {
     const { root } = await mountPanel({ tags: [] });
     assert.ok(Boolean(root.querySelector('[data-component-bulk-tags-empty]')));

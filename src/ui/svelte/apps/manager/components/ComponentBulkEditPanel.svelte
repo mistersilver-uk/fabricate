@@ -169,6 +169,25 @@
   // (issue 1010) — moving one and not the other is exactly the drift this note guards.
   const unchangedLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.Unchanged', 'Unchanged'));
 
+  // The tri-state cycle stated in full. "click to add · again to remove" named only two of
+  // the three stops and left the third — the one that UNDOES a staged remove — undiscoverable
+  // except by clicking a third time and watching what happens. Shared verbatim with the
+  // Recipe Studio's book run, which cycles identically; the spec forbids the two studios
+  // diverging here, so one key serves both (issue 1010).
+  const chipCycleHint = $derived(
+    text(
+      'FABRICATE.Admin.Manager.BulkEdit.TagsHint',
+      'click to add · again to remove · again to leave unchanged'
+    )
+  );
+
+  // The chip run is a GROUP, not a stray sequence of buttons: it is one axis whose members
+  // are read together, and without the role a screen-reader user arrives at a `<button>`
+  // named "Add sundry to every selected component" with nothing saying which control they
+  // are inside. Named from the section's own visible label, so the group name and the
+  // heading a sighted GM reads are one string.
+  const tagsLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.Tags', 'Tags'));
+
   function tagState(tag) {
     if (stagedTagAdd.includes(tag)) return 'add';
     if (stagedTagRemove.includes(tag)) return 'remove';
@@ -272,8 +291,8 @@
   </BulkEditSelect>
 
   <BulkEditSection
-    label={text('FABRICATE.Admin.Manager.Component.BulkEdit.Tags', 'Tags')}
-    hint={text('FABRICATE.Admin.Manager.BulkEdit.TagsHint', 'click to add · again to remove')}
+    label={tagsLabel}
+    hint={chipCycleHint}
     subhint={tags.length === 0
       ? text(
           'FABRICATE.Admin.Manager.Component.BulkEdit.NoTags',
@@ -291,7 +310,7 @@
       Chip's rest spread onto the real `<button>`; the children carry NO internal
       whitespace, because `Chip` records that call sites assert exact `textContent`.
     -->
-    <div class="manager-chip-row" data-component-bulk-tags>
+    <div class="manager-chip-row" role="group" aria-label={tagsLabel} data-component-bulk-tags>
       {#each tags as tag (tag)}
         <Chip
           tag="button"

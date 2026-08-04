@@ -144,6 +144,27 @@
     text('FABRICATE.Admin.Manager.BulkEdit.CategoryUnchanged', 'Leave unchanged')
   );
 
+  // The tri-state cycle stated in full, and the SAME shared key the Component Studio's tag
+  // run renders — the two runs cycle identically (leave → add → remove → leave) and the
+  // spec forbids the two studios diverging, so one string serves both. It used to name only
+  // two of the three stops, which left the third — the one that UNDOES a staged remove —
+  // undiscoverable except by clicking a third time and watching what happened.
+  const chipCycleHint = $derived(
+    text(
+      'FABRICATE.Admin.Manager.BulkEdit.TagsHint',
+      'click to add · again to remove · again to leave unchanged'
+    )
+  );
+
+  // The chip run is a GROUP, not a stray sequence of buttons: it is one axis whose members
+  // are read together, and without the role a screen-reader user arrives at a `<button>`
+  // named "Forgecraft Folio — add to every selected recipe." with nothing saying which
+  // control they are inside. Named from the section's own visible label, so the group name
+  // and the heading a sighted GM reads are one string.
+  const booksLabel = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.BulkEdit.Books', 'Recipe books')
+  );
+
   // The two segmented axes are the same control with different words, so the segment table
   // is data and the option list is built once. `disabled` rides the option itself rather
   // than a class: `SegmentedControl.select()` guards only `next !== value`, so a
@@ -438,8 +459,8 @@
   {/if}
 
   <BulkEditSection
-    label={text('FABRICATE.Admin.Manager.Recipe.BulkEdit.Books', 'Recipe books')}
-    hint={text('FABRICATE.Admin.Manager.BulkEdit.TagsHint', 'click to add · again to remove')}
+    label={booksLabel}
+    hint={chipCycleHint}
     subhint={books.length === 0
       ? text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.NoBooks',
@@ -456,7 +477,7 @@
       non-focusable and, inside a form, a submit button. The children carry NO internal
       whitespace, because `Chip` records that call sites assert exact `textContent`.
     -->
-    <div class="manager-chip-row" data-recipe-bulk-books>
+    <div class="manager-chip-row" role="group" aria-label={booksLabel} data-recipe-bulk-books>
       {#each books as book (book.id)}
         <Chip
           tag="button"

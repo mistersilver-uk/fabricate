@@ -737,7 +737,6 @@
                     class={`manager-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''} ${recipe.enabled === false ? 'is-off' : ''}`}
                     class:is-bulk-selected={bulkSelectedIds.has(recipe.id)}
                     data-recipe-id={recipe.id}
-                    data-recipe-incomplete={recipe.incomplete === true}
                     data-recipe-bulk-selected={bulkSelectedIds.has(recipe.id)}
                     aria-current={isSelectedRecipe(recipe) ? 'true' : undefined}
                   >

@@ -235,6 +235,27 @@ describe('RecipeBulkEditPanel recipe-book staging (issue 1010)', () => {
     assert.equal(bookChip(root, 'sm-book').textContent, 'sm-book');
   });
 
+  // The run is ONE axis, so it is exposed as one control rather than as a stray sequence of
+  // buttons, and the hint above it states all THREE stops of the cycle. Both facts are
+  // shared verbatim with the Component Studio's tag run — see its twin case.
+  it('exposes the chip run as a named group above an honest three-state hint', async () => {
+    const { root } = await mountPanel();
+    const run = root.querySelector('[data-recipe-bulk-books]');
+
+    assert.equal(run.getAttribute('role'), 'group');
+    assert.equal(
+      run.getAttribute('aria-label'),
+      'Recipe books',
+      'the group name is the section heading a sighted GM reads, not a second string'
+    );
+    assert.match(
+      root.textContent,
+      /click to add · again to remove · again to leave unchanged/,
+      'the third stop is the one that UNDOES a staged remove; naming only two of three left '
+        + 'it discoverable only by clicking and watching'
+    );
+  });
+
   it('says the system defines no recipe books rather than rendering an empty run', async () => {
     const { root } = await mountPanel({ books: [] });
     assert.ok(Boolean(root.querySelector('[data-recipe-bulk-books-empty]')));

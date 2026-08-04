@@ -189,7 +189,7 @@ const FIXTURE = `
           <select class="fab-bulk-edit-select" data-m="bulk-select"><option>Leave unchanged</option></select>
           <div class="fab-bulk-edit-label-row">
             <p class="fab-bulk-edit-label">Tags</p>
-            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove</span>
+            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove · again to leave unchanged</span>
           </div>
           <div class="manager-chip-row">
             <button type="button" class="manager-chip is-positive" data-m="bulk-tag-chip"><i class="fas fa-tag"></i>metal<i class="fas fa-plus"></i></button>
@@ -433,8 +433,9 @@ const EXPECTED = {
   'bulk-hero-title': 14.72, // 0.92rem serif
   'bulk-hero-hint': 9.92, // 0.62rem
   'bulk-label': 9.28, // 0.58rem — identical to `inspector-label`
-  // The INLINE hint only ("click to add · again to remove"), which sits on a label row's
-  // baseline and must not out-weigh the label beside it.
+  // The INLINE hint only (the tri-state chip cycle, "click to add · again to remove ·
+  // again to leave unchanged"), which sits on a label row's baseline and must not
+  // out-weigh the label beside it.
   'bulk-hint': 9.28, // 0.58rem — sits WITH its label, not above the body scale
   // A STANDING SENTENCE addressed to the GM — the essence-overwrite warning, the DC's
   // meaning, the no-tags empty state. It is read rather than glanced at, and one of them

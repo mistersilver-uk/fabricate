@@ -184,7 +184,7 @@ const FIXTURE = `
           <p class="manager-callout is-warning" data-callout-tone="warning"><i class="fas fa-triangle-exclamation"></i><span data-m="bulk-callout">At least 2 of 3 selected recipes can't be enabled yet and will stay off.</span></p>
           <div class="fab-bulk-edit-label-row">
             <p class="fab-bulk-edit-label">Recipe books</p>
-            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove</span>
+            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove · again to leave unchanged</span>
           </div>
           <div class="manager-chip-row">
             <button type="button" class="manager-chip is-positive" data-m="bulk-book-chip"><i class="fas fa-book"></i>Alchemist Primer<i class="fas fa-plus"></i></button>
