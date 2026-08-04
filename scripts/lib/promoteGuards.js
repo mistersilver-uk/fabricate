@@ -181,10 +181,13 @@ export function evaluateRegistryLeadTarget({ channel, sourceChannel, label, head
     // The remedy is ordered by what is actually reachable. "Push more work to main" is the remedy
     // ONLY while main's own line is already numbered above v${version}; when the prerelease line is
     // itself numbered below it (main still computing prereleases of a version the release line has
-    // long since passed), every version main mints is below it too, so that advice cannot work — and
-    // the operation that fixes it, the forward-port, is scheduled inside the very promotion this
-    // refusal blocks. Naming the forward-port first is what makes this refusal escapable: it is
-    // runnable on its own and makes nothing publicly obtainable (issue #1001).
+    // long since passed), every version main mints is below it too, so that advice cannot work.
+    // The operation that fixes it is the forward-port, and it WAS scheduled inside the very
+    // promotion this refusal blocks — a deadlock. Since issue #1001 it runs at the PRERELEASE
+    // promotion instead (release.yml, once its early-access publish is verified), with the release
+    // promotion's own job 2 as a confirming backstop, and it is dispatchable on its own from
+    // .github/workflows/forward-port.yml. Naming the forward-port first is what makes this refusal
+    // escapable: it is runnable on its own and makes nothing publicly obtainable.
     return {
       decision: 'refuse',
       kind: 'backwards',
