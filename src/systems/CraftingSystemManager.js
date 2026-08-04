@@ -17,6 +17,7 @@ import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeCha
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
 import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
+import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
 import {
   normalizeComponentCategory,
@@ -24,7 +25,11 @@ import {
 } from '../utils/componentCategories.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
 import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
-import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
+import {
+  normalizeCustomRecipeCategories,
+  normalizeRecipeCategory,
+} from '../utils/recipeCategories.js';
+import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import {
   getCompendiumSourceUuid,
   getDuplicateSourceUuid,
@@ -38,6 +43,8 @@ import {
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
+import { RecipeActivationError } from './RecipeActivationError.js';
+import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
@@ -4707,6 +4714,388 @@ export class CraftingSystemManager {
 
     if (changedIds.length > 0) await this.save();
     return { updated: changedIds.length, componentIds: changedIds };
+  }
+
+  /**
+   * Apply a bulk edit — any of category, status, lock, check tier and recipe-book
+   * membership — to a SET of recipes in one `recipes` write and one `craftingSystems`
+   * write (issue 1010).
+   *
+   * The recipe twin of {@link CraftingSystemManager#applyBulkEditToComponents}, mirrored
+   * rather than shared because recipes are not stored on the system. It lives HERE and not
+   * on `RecipeManager` because the book axis writes `system.recipeItemDefinitions[].recipeIds`
+   * and `RecipeManager` has no `save()` for that setting. It never touches `Recipe`
+   * internals: every recipe-field write goes through `recipeManager.updateRecipe`, so
+   * normalization, persistence validation and the activation gate all stay put.
+   *
+   * The `edit` contract is `toBulkRecipeEdit`'s six keys, each present IF AND ONLY IF its
+   * axis is staged. Three of them are FALSY BUT REAL — `enabled: false`, `locked: false`
+   * and `checkTierId: null` (Default DC) — so the staging guard tests `Object.hasOwn` and
+   * never truthiness, exactly as the component primitive's `essences`/`difficulty` guard
+   * does. A truthiness test would silently drop Disable, Unlock and Default DC.
+   *
+   * **Write order: books first, then recipes.** The two axes are independent — no book
+   * operation touches a `Recipe` field — so at most ONE in-memory map is dirty across any
+   * I/O await, and a rejected `save()` cannot leave both mutated against stale world
+   * settings. Books rather than recipes first because the membership-basis marker write is
+   * what makes every subsequent membership read well-defined: if it fails, nothing else
+   * should have happened, whereas recipes-first would leave a window in which recipes are
+   * persisted against an unmarked system. `SocketInterface.dispatch` rejects on any server
+   * error and that is reachable without a bug — `_assertGM` is `game.user.isGM`
+   * (`hasRole(ASSISTANT)`) while `SETTINGS_MODIFY` is revocable from assistants, so in a
+   * world that has revoked it the client-side gate passes and the server refuses.
+   *
+   * **This method maintains the membership-basis marker itself.** It mutates definitions
+   * directly and therefore BYPASSES the `updateRecipeItemDefinition` choke point, so it runs
+   * the same seed-then-set pair that choke point runs (see
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}).
+   *
+   * @param {string} systemId
+   * @param {Iterable<string>} recipeIds ids of the recipes to mutate. A foreign or dangling
+   *   id is simply absent from the resolved cohort rather than an error.
+   * @param {{category?: string, enabled?: boolean, locked?: boolean, checkTierId?: ?string,
+   *   addBookIds?: string[], removeBookIds?: string[]}} [edit]
+   * @returns {Promise<{updated: number, recipeIds: string[], blockedEnables: number,
+   *   blockedRecipeIds: string[], rejected: number, rejectedRecipeIds: string[],
+   *   booksUpdated: number, bookIds: string[]}>}
+   *   `recipeIds` are the recipes actually changed; `blockedRecipeIds` those whose enable
+   *   the activation gate refused (their other staged axes still landed); `rejectedRecipeIds`
+   *   those a `RecipePersistenceError` excluded from the batch entirely — a data-integrity
+   *   signal, not an expected outcome. `bookIds` are the definitions the requested
+   *   add/remove changed, which does NOT include a definition touched only by the
+   *   legacy-scalar seed.
+   * @throws {Error} when the system does not resolve, or when `checkTierId` names a tier
+   *   this system's crafting check does not author — both BEFORE any write.
+   */
+  async applyBulkEditToRecipes(systemId, recipeIds, edit = {}) {
+    this._assertGM('apply a bulk edit to recipes');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const result = {
+      updated: 0,
+      recipeIds: [],
+      blockedEnables: 0,
+      blockedRecipeIds: [],
+      rejected: 0,
+      rejectedRecipeIds: [],
+      booksUpdated: 0,
+      bookIds: [],
+    };
+
+    // Resolves — and REJECTS — the staged check tier before anything is mutated.
+    const axes = this._resolveBulkRecipeAxes(system, edit);
+    if (!axes.staged) return result;
+
+    const targetIds = new Set(normalizeSelectionIds(recipeIds));
+    if (targetIds.size === 0) return result;
+
+    const cohort = (this.recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? []).filter(
+      (recipe) => targetIds.has(String(recipe?.id ?? ''))
+    );
+
+    // ---- Books first -------------------------------------------------------
+    const books = this._applyBulkRecipeBookMembership(system, cohort, axes);
+    result.bookIds = books.bookIds;
+    result.booksUpdated = books.bookIds.length;
+    if (books.changed) {
+      system.membershipResolvesByRecipeIds = true;
+      await this.save();
+    }
+
+    // ---- Then recipes ------------------------------------------------------
+    const outcome = await this._applyBulkRecipePatches(cohort, axes);
+    result.recipeIds = outcome.recipeIds;
+    result.updated = outcome.recipeIds.length;
+    result.blockedRecipeIds = outcome.blockedRecipeIds;
+    result.blockedEnables = outcome.blockedRecipeIds.length;
+    result.rejectedRecipeIds = outcome.rejectedRecipeIds;
+    result.rejected = outcome.rejectedRecipeIds.length;
+
+    if (result.updated > 0) await this.recipeManager.save();
+
+    // At most one of EACH change hook, matching the at-most-one-save-of-each guarantee,
+    // and both are needed. On the writing client `reload()` returns `false`, so the
+    // `updateSetting` socket bridge deliberately re-emits nothing locally — a book change
+    // announced only as `recipesChanged` would be invisible to the GM's own other windows.
+    if (books.changed) this._notifySystemsChanged();
+    if (result.updated > 0) {
+      this.recipeManager.notifyRecipesChanged?.({
+        action: 'bulkEdit',
+        recipeIds: result.recipeIds,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Read the six-key bulk recipe `edit` into a resolved axis descriptor, testing PRESENCE
+   * and never truthiness, and resolving the staged check tier against THIS system's
+   * authored tiers.
+   *
+   * The tier resolution throws here — before the caller has mutated anything — because a
+   * bulk write's blast radius justifies being stricter than the single-recipe editor write,
+   * which tolerates a dangling `checkTierId` and falls back to the default DC at resolution
+   * time.
+   *
+   * @param {object} system a live normalized system.
+   * @param {object} edit the `toBulkRecipeEdit` projection.
+   * @returns {{staged: boolean, hasCategory: boolean, category: string, hasEnabled: boolean,
+   *   enabled: boolean, hasLocked: boolean, locked: boolean, hasCheckTier: boolean,
+   *   checkTierId: ?string, addBookIds: Set<string>, removeBookIds: Set<string>}}
+   * @private
+   */
+  _resolveBulkRecipeAxes(system, edit) {
+    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
+    const axes = {
+      hasCategory: Object.hasOwn(bulkEdit, 'category'),
+      category: bulkEdit.category,
+      hasEnabled: Object.hasOwn(bulkEdit, 'enabled'),
+      enabled: bulkEdit.enabled === true,
+      hasLocked: Object.hasOwn(bulkEdit, 'locked'),
+      locked: bulkEdit.locked === true,
+      hasCheckTier: Object.hasOwn(bulkEdit, 'checkTierId'),
+      checkTierId: null,
+      // The chip run's two disjoint book-id lists. `normalizeSelectionIds` is the same
+      // coercion the selection itself goes through — a chip run IS a selection of books.
+      addBookIds: new Set(normalizeSelectionIds(bulkEdit.addBookIds)),
+      removeBookIds: new Set(normalizeSelectionIds(bulkEdit.removeBookIds)),
+    };
+    axes.staged =
+      axes.hasCategory ||
+      axes.hasEnabled ||
+      axes.hasLocked ||
+      axes.hasCheckTier ||
+      Object.hasOwn(bulkEdit, 'addBookIds') ||
+      Object.hasOwn(bulkEdit, 'removeBookIds');
+    if (axes.hasCheckTier)
+      axes.checkTierId = this._resolveBulkCheckTierId(system, bulkEdit.checkTierId);
+    return axes;
+  }
+
+  /**
+   * Resolve a staged bulk check-tier id against the tiers THIS system's crafting check
+   * actually authors, or throw.
+   *
+   * `null`/empty is the real instruction "Default DC" and resolves to `null`. Anything else
+   * must name a tier the panel could have offered, which is exactly
+   * `resolveRecipeCheckTierOptions` over the system's active crafting-check mode — the same
+   * helper the recipe editor's dropdown and the bulk panel's own gate read, so the three
+   * cannot disagree about which tiers exist.
+   *
+   * @param {object} system
+   * @param {?string} rawTierId
+   * @returns {?string} the trimmed tier id, or `null` for Default DC.
+   * @private
+   */
+  _resolveBulkCheckTierId(system, rawTierId) {
+    const tierId = typeof rawTierId === 'string' ? rawTierId.trim() : '';
+    if (!tierId) return null;
+
+    const options = resolveRecipeCheckTierOptions(
+      system?.craftingCheck,
+      this._craftingCheckModeFor(system)
+    );
+    const known = options.some((tier) => String(tier?.id ?? '') === tierId);
+    if (!known) {
+      throw new Error(`Check tier not authored by crafting system ${system?.id}: ${tierId}`);
+    }
+    return tierId;
+  }
+
+  /**
+   * The active CRAFTING-CHECK mode for a system's resolution mode — the manager-side twin
+   * of `CraftingSystemManagerRoot`'s `_craftingCheckMode`, kept structurally identical so
+   * the write and the panel that stages for it resolve the same tier list.
+   *
+   * `null` for an unrecognised mode is deliberately preserved from that original even
+   * though `_normalizeSystem` coerces every persisted `resolutionMode` to one of five
+   * tokens: `resolveRecipeCheckTierOptions(check, null)` is `[]`, so an unnormalized system
+   * offers no tier rather than silently accepting one.
+   *
+   * @param {object} system
+   * @returns {'simple'|'routed'|'progressive'|null}
+   * @private
+   */
+  _craftingCheckModeFor(system) {
+    const resolution = system?.resolutionMode || 'simple';
+    if (resolution === 'routedByCheck') return 'routed';
+    if (resolution === 'progressive') return 'progressive';
+    if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
+    return null;
+  }
+
+  /**
+   * Apply the book axis by iterating the DEFINITIONS rather than the recipes.
+   *
+   * `addBookIds` and `removeBookIds` are disjoint, so every touched definition takes exactly
+   * ONE operation — a union with the whole selection, or a difference against it — and is
+   * written exactly once. A definition named by neither list is left byte-identical (the
+   * legacy-scalar seed is the one exception, and it is a basis carry-across rather than a
+   * requested edit). A definition named by both would be a contract violation the tri-state
+   * chips make unreachable; the REMOVE wins, mirroring the component primitive's
+   * removals-after-the-union rule, so the operation stays single and defined.
+   *
+   * @param {object} system a live normalized system.
+   * @param {object[]} cohort the resolved recipes of this system named by the selection.
+   * @param {{addBookIds: Set<string>, removeBookIds: Set<string>}} axes
+   * @returns {{changed: boolean, bookIds: string[]}} `changed` is true when this call
+   *   mutated ANY definition — including one the seed alone touched, which must be
+   *   persisted rather than left diverging from the stored setting.
+   * @private
+   */
+  _applyBulkRecipeBookMembership(system, cohort, axes) {
+    const bookIds = [];
+    const touched = axes.addBookIds.size > 0 || axes.removeBookIds.size > 0;
+    const selectedIds = cohort.map((recipe) => String(recipe?.id ?? '')).filter(Boolean);
+    if (!touched || selectedIds.length === 0) return { changed: false, bookIds };
+
+    // Seed BEFORE any array is replaced, while the legacy resolution is still the live
+    // basis. Without it the marker set below would close the revert direction but make the
+    // ORPHANING direction permanent: every OTHER definition's scalar-only members would be
+    // stranded by this one write.
+    const seeded = this._seedMembershipFromLegacyScalars(system);
+    const selected = new Set(selectedIds);
+
+    for (const definition of system.recipeItemDefinitions || []) {
+      const definitionId = String(definition?.id ?? '');
+      const remove = axes.removeBookIds.has(definitionId);
+      const add = !remove && axes.addBookIds.has(definitionId);
+      if (!add && !remove) continue;
+
+      const current = this._normalizeMembershipRecipeIds(definition.recipeIds);
+      const next = remove
+        ? current.filter((id) => !selected.has(id))
+        : this._normalizeMembershipRecipeIds([...current, ...selectedIds]);
+      if (next.length === current.length && next.every((id, index) => id === current[index])) {
+        continue;
+      }
+
+      definition.recipeIds = next;
+      bookIds.push(definitionId);
+    }
+
+    return { changed: seeded || bookIds.length > 0, bookIds };
+  }
+
+  /**
+   * Run the per-recipe half of the batch.
+   *
+   * **Loop atomicity here is MICROTASK-ONLY, and that differs from the mirrored precedent.**
+   * `applyBulkEditToComponents`'s loop is LITERALLY synchronous; this one awaits once per
+   * iteration and merely BEHAVES atomically, because `updateRecipe` with `persist: false`
+   * performs no real I/O — all three of its validators are synchronous — so the loop drains
+   * as microtasks and a socket-delivered `updateSetting` cannot interleave. The moment
+   * anything awaiting real I/O enters this loop, `reload()` can replace the recipes map
+   * wholesale between iterations and silently discard every staged edit; there is no
+   * compare-and-set anywhere in the settings path to catch it.
+   *
+   * @param {object[]} cohort
+   * @param {object} axes
+   * @returns {Promise<{recipeIds: string[], blockedRecipeIds: string[],
+   *   rejectedRecipeIds: string[]}>}
+   * @private
+   */
+  async _applyBulkRecipePatches(cohort, axes) {
+    const recipeIds = [];
+    const blockedRecipeIds = [];
+    const rejectedRecipeIds = [];
+
+    for (const recipe of cohort) {
+      const updates = this._buildBulkRecipePatch(recipe, axes);
+      if (Object.keys(updates).length === 0) continue;
+
+      const recipeId = String(recipe.id);
+      const outcome = await this._writeBulkRecipePatch(recipeId, updates);
+      if (outcome.updated) recipeIds.push(recipeId);
+      if (outcome.blocked) blockedRecipeIds.push(recipeId);
+      if (outcome.rejected) rejectedRecipeIds.push(recipeId);
+    }
+
+    return { recipeIds, blockedRecipeIds, rejectedRecipeIds };
+  }
+
+  /**
+   * The MINIMAL patch for one recipe: only the staged fields whose value actually differs.
+   * A recipe every staged axis already agrees with contributes no `updateRecipe` call at
+   * all, which is what lets a resolved no-op issue zero writes.
+   *
+   * The category is normalized first because `Recipe` normalizes it on construction, so a
+   * raw comparison would report a difference for `'General'` against the stored `'general'`
+   * and re-write every recipe in the selection.
+   *
+   * @param {object} recipe
+   * @param {object} axes
+   * @returns {{category?: string, enabled?: boolean, locked?: boolean, checkTierId?: ?string}}
+   * @private
+   */
+  _buildBulkRecipePatch(recipe, axes) {
+    const updates = {};
+    if (axes.hasCategory) {
+      const category = normalizeRecipeCategory(axes.category);
+      if (category !== recipe.category) updates.category = category;
+    }
+    if (axes.hasEnabled && (recipe.enabled === true) !== axes.enabled) {
+      updates.enabled = axes.enabled;
+    }
+    if (axes.hasLocked && (recipe.locked === true) !== axes.locked) {
+      updates.locked = axes.locked;
+    }
+    if (axes.hasCheckTier && (recipe.checkTierId ?? null) !== axes.checkTierId) {
+      updates.checkTierId = axes.checkTierId;
+    }
+    return updates;
+  }
+
+  /**
+   * Write one recipe's minimal patch, resolving BOTH error branches — which are different
+   * failures and are reported separately.
+   *
+   * `RecipeActivationError` is a refused ENABLE. The id is recorded, `enabled` is dropped
+   * and the patch is retried so the ungated axes still land on a recipe that stays off:
+   * `updateRecipe` throws at its activation gate strictly BEFORE `this.recipes.set`, so
+   * nothing partial was written and the retry is clean. The retry cannot itself throw —
+   * persistence was already validated by the first attempt and is independent of `enabled`,
+   * and with `enabled` gone the activation gate no longer runs.
+   *
+   * `RecipePersistenceError` is a recipe that cannot be saved AT ALL: `updateRecipe`
+   * validates persistence FIRST, and with `allowIncomplete: true` that still runs
+   * `validateStructure()`, which a structurally broken recipe fails. That class is precisely
+   * the one this change makes newly visible and selectable, so an uncaught throw would abort
+   * the whole batch on the first such recipe — AFTER the books save has already committed —
+   * leaving the recipes map partially mutated and never saved. It is logged (the post-apply
+   * notification tells the GM to see the console) and the batch continues.
+   *
+   * @param {string} recipeId
+   * @param {object} updates the minimal patch; mutated in place on the blocked retry.
+   * @returns {Promise<{updated: boolean, blocked: boolean, rejected: boolean}>}
+   * @private
+   */
+  async _writeBulkRecipePatch(recipeId, updates) {
+    // `persist: false` is the compendium-importer batch idiom: mutate the in-memory map per
+    // recipe, then issue ONE trailing `save()`. `allowIncomplete` keeps an authoring shell
+    // editable, matching the single-recipe browser writes.
+    const options = { persist: false, notify: false, emitChange: false, allowIncomplete: true };
+    try {
+      await this.recipeManager.updateRecipe(recipeId, updates, options);
+      return { updated: true, blocked: false, rejected: false };
+    } catch (error) {
+      if (error instanceof RecipePersistenceError) {
+        console.warn(
+          `Fabricate | bulk recipe edit could not save recipe ${recipeId}: ${error.message}`
+        );
+        return { updated: false, blocked: false, rejected: true };
+      }
+      if (!(error instanceof RecipeActivationError)) throw error;
+
+      delete updates.enabled;
+      if (Object.keys(updates).length === 0) {
+        return { updated: false, blocked: true, rejected: false };
+      }
+      await this.recipeManager.updateRecipe(recipeId, updates, options);
+      return { updated: true, blocked: true, rejected: false };
+    }
   }
 
   async deleteItem(systemId, itemId) {

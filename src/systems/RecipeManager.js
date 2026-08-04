@@ -261,6 +261,57 @@ export class RecipeManager {
   }
 
   /**
+   * Whether the activation gate would ACCEPT this recipe — the ONE predicate behind the
+   * recipe browser's `Can't enable` pill, the bulk edit panel's pre-flight count, and the
+   * bulk write's own per-recipe gate (issue 1010).
+   *
+   * Three surfaces reading one predicate is the whole point of the method existing. The row
+   * previously derived its pill from `incomplete`
+   * (`validate().valid === false && validateStructure().valid === true`), so a STRUCTURALLY
+   * broken recipe wore no pill at all while still being un-enableable, and a second, wider
+   * predicate beside it would let the panel count recipes no row was marking.
+   *
+   * Evaluates a CLONE with `enabled: true`, never the stored recipe. That is load-bearing,
+   * not defensive: {@link RecipeManager#_validateSignatures} substitutes the candidate into
+   * the live recipe list, and `SignatureValidator.validateSystem` then scans
+   * `recipes.filter((r) => r?.enabled)` — so handing it a stored `enabled: false` recipe
+   * filters the candidate out of its OWN scan and answers "not blocked" for a recipe
+   * `updateRecipe` will refuse. The clone is built exactly as `updateRecipe` builds its
+   * candidate (`Recipe.fromJSON` over the stored JSON plus the patch), so the two cannot
+   * drift apart.
+   *
+   * Reads only: nothing is written to the map and nothing is persisted, so this is safe on
+   * a render path.
+   *
+   * EXACT for the persistence and completeness blockers — structure, completeness, essence
+   * references, tag placeholders and resolution-mode requirements. A LOWER BOUND for the
+   * alchemy signature collisions a BATCH itself creates: two recipes that collide only with
+   * EACH OTHER both answer `valid: true` here, because each is evaluated against the
+   * pre-batch list, while a batch enable accepts the first and refuses the second. That
+   * follows from the same order-dependence that makes the in-loop gate correct, so it is
+   * structural rather than a gap to close — a pre-flight count derived from this predicate
+   * is a lower bound and must be worded as one, and the post-apply `blockedEnables` count is
+   * the authority.
+   *
+   * @param {Recipe|string} recipeOrId a recipe, or the id of one held in this manager.
+   * @returns {{valid: boolean, errors: string[],
+   *   issues: {code: string|null, params: object, message: string}[]}}
+   *   An id (or object) that resolves to no recipe is INVALID rather than a throw, so a
+   *   render path and a stale selection never have to guard the call.
+   */
+  canActivateRecipe(recipeOrId) {
+    const stored = typeof recipeOrId === 'string' ? this.recipes.get(recipeOrId) : recipeOrId;
+    if (!stored) {
+      // Id-free (issue 595): a stale id names nothing a GM could act on anyway.
+      const message = 'Recipe not found';
+      return { valid: false, errors: [message], issues: [{ code: null, params: {}, message }] };
+    }
+
+    const source = typeof stored.toJSON === 'function' ? stored.toJSON() : stored;
+    return this._validateRecipeForActivation(Recipe.fromJSON({ ...source, enabled: true }));
+  }
+
+  /**
    * Delete a recipe
    * @param {string} recipeId - Recipe ID to delete
    * @param {{notify?: boolean, emitChange?: boolean, cleanupFlags?: boolean, persist?: boolean}} [options]
