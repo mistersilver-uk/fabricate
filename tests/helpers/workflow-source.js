@@ -15,6 +15,19 @@
  * be made against workflow STRUCTURE (a step's `if:`, its `env:` map, its shell body) rather than
  * against a substring of the file, because a substring match passes for code that is wrong in the
  * exact ways these contracts are supposed to catch.
+ *
+ * ── KNOWN GAP IN `evaluate`: NO FUNCTION CALLS, NO NUMERIC LITERALS ─────────────────────────────
+ * The expression grammar covers paths, single-quoted string literals, `!`, `==`, `!=`, `&&`, `||`
+ * and parentheses. It does NOT implement the GitHub Actions FUNCTIONS — `always()`, `success()`,
+ * `failure()`, `cancelled()`, `contains()`, `startsWith()`, `format()` — and it does NOT accept
+ * numeric literals. Both cases THROW rather than mis-evaluating: a call tokenizes as a path
+ * followed by unconsumed `(`/`)` tokens and trips the trailing-token assertion, and a number
+ * matches no alternation branch and trips `unsupported workflow expression near:`.
+ *
+ * A consumer that needs to evaluate a job `if:` containing `always()` must substitute it first
+ * (`raw.replaceAll('always()', "'x' == 'x'")` models its unconditional truth exactly). Do NOT fall
+ * back to substring-matching the gate instead: `&&` -> `||` and `!=` -> `==` both survive every
+ * substring check, and those are precisely the mutations these contracts exist to kill.
  */
 
 import assert from 'node:assert/strict';
@@ -288,6 +301,11 @@ export function tokenize(expression) {
 
 /**
  * Evaluate a GitHub Actions expression against a context object.
+ *
+ * Supports paths, single-quoted literals, `!`, `==`, `!=`, `&&`, `||` and parentheses ONLY. A
+ * function call (`always()`, `success()`, `contains()`, ...) or a numeric literal THROWS — see the
+ * file header for why that is deliberate and how to substitute `always()`.
+ *
  * @param {string} expression The bare expression.
  * @param {object} context The evaluation context (`inputs`, `steps`, `github`, ...).
  * @returns {unknown} The result.

@@ -9,17 +9,23 @@ import test from 'node:test';
 // indexes jobs by indentation, so a walker that stopped filtering comments would give ci.yml a
 // spurious job key and fail the `deepEqual` assertions loudly, and every `if:` in ci.yml is
 // single-line while its only block scalars are `run:` bodies this file never reads.
-import { children, entries, evaluate, key, parseJobs, value } from './helpers/workflow-source.js';
+//
+// `section` is imported rather than re-implemented as a local closure for the same duplication
+// reason. `parseWorkflow` sits OUTSIDE the `test(...)` body, so this does not touch the identity
+// that proves the extraction behaviour-preserving.
+import {
+  children,
+  entries,
+  evaluate,
+  key,
+  parseJobs,
+  section,
+  value,
+} from './helpers/workflow-source.js';
 
 function parseWorkflow(source) {
   const all = entries(source);
-  const section = (name) => {
-    const index = all.findIndex((entry) => entry.indent === 0 && key(entry.text) === name);
-    assert.notEqual(index, -1, `missing ${name} section`);
-    return children(all, index);
-  };
-
-  const on = section('on');
+  const on = section(all, 'on');
   const pullRequestIndex = on.findIndex(
     (entry) => entry.indent === 2 && key(entry.text) === 'pull_request'
   );
@@ -29,7 +35,7 @@ function parseWorkflow(source) {
     .split(',')
     .map((item) => item.trim().replace(/^['"]|['"]$/g, ''));
 
-  const concurrency = section('concurrency');
+  const concurrency = section(all, 'concurrency');
   const group = value(concurrency.find((entry) => key(entry.text) === 'group').text);
 
   return { types, group, jobs: parseJobs(source) };

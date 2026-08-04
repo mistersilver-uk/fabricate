@@ -37,7 +37,14 @@ const PROMOTE_TO_PUBLIC = `${WORKFLOW_DIR}/promote-to-public.yml`;
 
 // The load-bearing tokens of the merge, tolerant of quoting and intervening whitespace. NOT a
 // literal substring: the point is to find every implementation of the merge, however it is written.
-const MERGE_IMPLEMENTATION = /git\s+merge\s+--no-ff\s+['"]?origin\/release['"]?/;
+// Deliberately does NOT require the `chore:` subject, so that a duplicate implementation written
+// with any other message is still COUNTED by the single-implementation assertion.
+const MERGE_TOKENS = /git\s+merge\s+--no-ff\s+['"]?origin\/release['"]?/;
+
+// The full merge contract: the same tokens PLUS the non-releasing Conventional Commit subject. A
+// releasing type here would make the beta.yml run this push triggers mint an unjustified bump off a
+// commit that carries no file change at all.
+const MERGE_IMPLEMENTATION = new RegExp(`${MERGE_TOKENS.source}\\s+-m\\s+["']?chore:`);
 
 const INPUT_NAMES = [
   'enabled',
@@ -48,6 +55,12 @@ const INPUT_NAMES = [
   'allow_content',
   'override_hint',
 ];
+
+// The defaults each entry point must declare. `dry_run` diverges ON PURPOSE (see assertion 2).
+const EXPECTED_DEFAULTS = {
+  workflow_call: { enabled: 'true', dry_run: 'false', allow_content: 'false', expected_tag: '' },
+  workflow_dispatch: { enabled: 'true', dry_run: 'true', allow_content: 'false', expected_tag: '' },
+};
 
 function read(file) {
   return readFileSync(file, 'utf8');
@@ -98,6 +111,18 @@ function stepLabel(step, index) {
   return `step ${index + 1} (${step.name || step.uses || '(unnamed)'})`;
 }
 
+/**
+ * Evaluate a JOB-level `if:` that opens with `always()`.
+ *
+ * The shared evaluator implements no function calls and THROWS on one (see the helper's header), so
+ * `always()` is substituted with a tautology, which models its meaning exactly: it disables the
+ * implicit `success()` wrapping and contributes nothing else. Evaluating rather than
+ * substring-matching is the whole point — `&&` -> `||` leaves every conjunct present in the string.
+ */
+function gateValue(raw, context) {
+  return Boolean(evaluate(unwrap(raw).replaceAll('always()', "'x' == 'x'"), context));
+}
+
 // ── 1 ───────────────────────────────────────────────────────────────────────────────────────────
 
 test('forward-port.yml is reusable AND dispatchable, and declares RELEASE_BOT_KEY as a workflow_call secret', () => {
@@ -122,9 +147,28 @@ test('forward-port.yml declares every input on BOTH entry points, and bounds its
   const source = read(FORWARD_PORT);
 
   for (const trigger of ['workflow_call', 'workflow_dispatch']) {
-    const declared = scalars(nestedEntries(triggerOf(source, trigger), 'inputs'));
+    const inputs = nestedEntries(triggerOf(source, trigger), 'inputs');
+    const declared = scalars(inputs);
+    const defaultOf = (name) => unquote(scalars(nestedEntries(inputs, name)).default ?? '');
+
     for (const name of INPUT_NAMES) {
       assert.ok(Object.hasOwn(declared, name), `on.${trigger}.inputs declares '${name}'`);
+    }
+
+    // The DEFAULT VALUES are load-bearing, and each of these three flips silently:
+    //   * `enabled: false` would make every automated forward-port a permanent, success-reporting
+    //     no-op — the exact defect this change exists to remove, shipped inert and green.
+    //   * `allow_content: true` would degrade the content gate to a warning on BOTH entry points,
+    //     letting an unreviewed file change ride the one push that bypasses pull-request review.
+    //   * the workflow_dispatch `dry_run: true` is what makes the hand-run recovery lever safe to
+    //     point at `main`; flipped to false, a maintainer probing the workflow pushes for real. The
+    //     workflow_call default is deliberately the opposite: a caller states its own intent.
+    for (const [name, expected] of Object.entries(EXPECTED_DEFAULTS[trigger])) {
+      assert.equal(
+        defaultOf(name),
+        expected,
+        `on.${trigger}.inputs.${name} defaults to ${expected}`
+      );
     }
   }
 
@@ -134,6 +178,19 @@ test('forward-port.yml declares every input on BOTH entry points, and bounds its
   // main, and one hung fetch parks that group for six hours.
   const job = jobOf(FORWARD_PORT, 'forward-port');
   assert.ok(job['timeout-minutes'], 'the forward-port job declares a job-level timeout-minutes');
+
+  // BOUNDED, not merely present: `360` is exactly the value the comment above exists to exclude, so
+  // a truthy check passes for the very setting it is supposed to catch.
+  const timeout = Number(job['timeout-minutes']);
+  assert.ok(
+    Number.isFinite(timeout) && timeout > 0 && timeout <= 30,
+    `the forward-port job's timeout-minutes must be a small bound, got ${job['timeout-minutes']}`
+  );
+
+  // The concurrency group gates pushes to `main` and must NEVER cancel: a cancelled forward-port is
+  // abandoned mid-merge. It sits at JOB level (not workflow level) so it survives `workflow_call`.
+  assert.equal(job.concurrency.group, 'forward-port-main');
+  assert.equal(job.concurrency['cancel-in-progress'], 'false');
 });
 
 // ── 3 ───────────────────────────────────────────────────────────────────────────────────────────
@@ -193,6 +250,20 @@ test('release.yml calls the reusable forward-port only after a VERIFIED publish,
     assert.ok(job.if.includes(conjunct), `release.yml's forward-port if: contains \`${conjunct}\``);
   }
 
+  // ...and EVALUATED, because the presence check above is a substring match and `&&` -> `||`
+  // survives it intact — while turning this gate into "forward-port on a HOTFIX line, and after a
+  // FAILED publish", which is exactly the ordering this design forbids.
+  const ran = (refName, verifyPublish) =>
+    gateValue(job.if, {
+      github: { ref_name: refName },
+      needs: { 'verify-publish': { result: verifyPublish } },
+    });
+
+  assert.equal(ran('release', 'success'), true, 'the forward-port runs after a VERIFIED publish');
+  assert.equal(ran('1.4.x', 'success'), false, 'a hotfix line never forward-ports');
+  assert.equal(ran('release', 'failure'), false, 'a FAILED publish never forward-ports');
+  assert.equal(ran('release', 'skipped'), false, 'nothing minted means nothing to forward-port');
+
   assert.equal(job.secrets.RELEASE_BOT_KEY, '${{ secrets.RELEASE_BOT_KEY }}');
   assert.equal(unquote(job.with.dry_run), 'false');
 });
@@ -226,6 +297,17 @@ test('promote-to-public.yml job 2 delegates, never skips, and names a REACHABLE 
   // The single most fragile line in this change: workflow_call's dry_run default is FALSE, so if
   // this line is ever dropped a promotion run with dry_run: true would really push to main.
   assert.equal(job.with.dry_run, '${{ inputs.dry_run }}');
+
+  // Reusable workflows inherit NO repository secret, so a deleted `secrets:` block here does not
+  // fail at parse time — it fails at the callee's token mint, mid-promotion, on the one job the
+  // promotion's own job 4 requires to have succeeded.
+  assert.equal(job.secrets.RELEASE_BOT_KEY, '${{ secrets.RELEASE_BOT_KEY }}');
+
+  // Deliberately UNGUARDED: the `guard` job has already established, against the real channel
+  // heads, exactly what is being promoted. It must be present and EMPTY — a wrong-shaped value here
+  // would make the tipguard mismatch forever, skipping the backstop while reporting success.
+  assert.ok(Object.hasOwn(job.with, 'expected_tag'), 'job 2 passes an explicit expected_tag');
+  assert.equal(unquote(job.with.expected_tag), '');
 
   const hint = unquote(job.with.override_hint ?? '');
   assert.match(hint, /forward-port\.yml/, 'the override hint names the workflow to dispatch');
@@ -261,7 +343,10 @@ test('promote-to-public.yml still orders the forward-port before the publish and
   // Job 4's `if:` is a FOLDED block spanning five lines; the single-line reader would return only
   // the block indicator for it, so this also proves the helper folds block scalars.
   const gate = jobs['readback-preflight-undraft-register'].if;
-  assert.ok(!/^[|>]/.test(gate), "job 4's folded if: was read as an expression, not a block header");
+  assert.ok(
+    !/^[|>]/.test(gate),
+    "job 4's folded if: was read as an expression, not a block header"
+  );
   for (const conjunct of [
     'always()',
     "needs.guard.result == 'success'",
@@ -270,6 +355,29 @@ test('promote-to-public.yml still orders the forward-port before the publish and
   ]) {
     assert.ok(gate.includes(conjunct), `job 4's if: still requires \`${conjunct}\``);
   }
+
+  // ...and EVALUATED. Job 4 performs the two IRREVERSIBLE steps — `gh release edit --draft=false`
+  // and the registry POST. `&&` -> `||` keeps all four conjuncts in the string while making the
+  // un-draft reachable after a failed guard, a failed forward-port, or a failed publish; no
+  // substring check can tell the two apart.
+  const upstream = ['guard', 'forward-port', 'publish'];
+  const ran = (results) =>
+    gateValue(gate, {
+      needs: Object.fromEntries(upstream.map((name, index) => [name, { result: results[index] }])),
+    });
+
+  assert.equal(ran(['success', 'success', 'success']), true, 'job 4 runs when all three succeed');
+  for (let index = 0; index < upstream.length; index += 1) {
+    for (const result of ['failure', 'skipped', 'cancelled']) {
+      const results = ['success', 'success', 'success'];
+      results[index] = result;
+      assert.equal(
+        ran(results),
+        false,
+        `job 4 must NOT reach the un-draft when ${upstream[index]} is '${result}'`
+      );
+    }
+  }
 });
 
 // ── 8 ───────────────────────────────────────────────────────────────────────────────────────────
@@ -277,7 +385,7 @@ test('promote-to-public.yml still orders the forward-port before the publish and
 test('exactly ONE workflow implements the release-into-main merge', () => {
   const implementers = readdirSync(WORKFLOW_DIR)
     .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
-    .filter((file) => MERGE_IMPLEMENTATION.test(read(`${WORKFLOW_DIR}/${file}`)));
+    .filter((file) => MERGE_TOKENS.test(read(`${WORKFLOW_DIR}/${file}`)));
 
   // Two is the regression this change exists to prevent (a second copy of the App-token push to
   // main, which is how the two entry points drifted apart in the first place). Zero would make
@@ -285,11 +393,44 @@ test('exactly ONE workflow implements the release-into-main merge', () => {
   assert.deepEqual(implementers, ['forward-port.yml']);
 });
 
+// ── 8b ──────────────────────────────────────────────────────────────────────────────────────────
+
+test('EVERY merge in forward-port.yml carries the non-releasing `chore:` subject', () => {
+  const source = read(FORWARD_PORT);
+  const found = source.match(new RegExp(MERGE_TOKENS.source, 'g')) ?? [];
+  const withSubject = source.match(new RegExp(MERGE_IMPLEMENTATION.source, 'g')) ?? [];
+
+  // The merge is written TWICE — at the merge step and again in the push retry, which re-performs
+  // it against the freshly fetched tip. Both copies must carry the subject or they drift.
+  assert.ok(
+    found.length >= 2,
+    `expected the merge at the merge step AND in the push retry, found ${found.length}`
+  );
+  assert.equal(
+    withSubject.length,
+    found.length,
+    'a releasing Conventional Commit type here would make the beta.yml run this push triggers mint ' +
+      'an unjustified version bump off a commit that carries no file change at all'
+  );
+});
+
 // ── 9 ───────────────────────────────────────────────────────────────────────────────────────────
 
 test('the forward-port pushes as the App installation token, never as GITHUB_TOKEN', () => {
   const source = read(FORWARD_PORT);
   const steps = forwardPortSteps();
+
+  // checkout stores its own credential as an `http.extraheader` in a TEMP config file, and an
+  // Authorization header beats the credential in a remote URL — so a persisted credential silently
+  // wins over the App token, and no later `git config --unset-all` can reach it. The usual "it
+  // fails loudly at push time" reasoning is only half true: it holds while the ruleset rejects the
+  // github-actions[bot] merge commit, but if the ruleset ever permits that push, the merge LANDS
+  // and beta.yml never fires (a GITHUB_TOKEN push triggers no downstream workflow) — the run is
+  // green, the merge is in, and no prerelease is minted above the released version. Which is the
+  // defect, silently restored.
+  const checkoutIndex = steps.findIndex((step) => step.uses.startsWith('actions/checkout@'));
+  assert.notEqual(checkoutIndex, -1, 'forward-port.yml checks out main');
+  assert.equal(steps[checkoutIndex].with['persist-credentials'], 'false');
 
   const remoteIndex = stepIndex(
     steps,
@@ -342,9 +483,13 @@ test('no inputs or github context expression reaches a shell body (githubactions
 test('the content gate FAILS the job on a non-empty diff and names the caller-composed remedy', () => {
   const steps = forwardPortSteps();
   const mergeIndex = stepIndex(steps, MERGE_IMPLEMENTATION, 'merges origin/release');
-  const gate = steps[stepIndex(steps, /git diff --stat origin\/main/, 'gates on content', mergeIndex + 1)];
+  const gate =
+    steps[stepIndex(steps, /git diff --stat origin\/main/, 'gates on content', mergeIndex + 1)];
 
-  assert.ok(/\bALLOW_CONTENT\b/.test(gate.run), 'the content gate reads the allow_content override');
+  assert.ok(
+    /\bALLOW_CONTENT\b/.test(gate.run),
+    'the content gate reads the allow_content override'
+  );
   assert.equal(gate.env.ALLOW_CONTENT, '${{ inputs.allow_content }}');
 
   // Printing the diff and continuing detects nothing: a stray direct commit on `release`, or a
@@ -362,6 +507,46 @@ test('the content gate FAILS the job on a non-empty diff and names the caller-co
     /reviewed pull request/,
     'the failure message says what to CHECK, not only how to override'
   );
+});
+
+// ── 11b ─────────────────────────────────────────────────────────────────────────────────────────
+
+test('the push retry RE-GATES on content and never re-fetches origin/release', () => {
+  const steps = forwardPortSteps();
+  const push = steps[stepIndex(steps, /git push origin HEAD:main/, 'pushes to main')];
+
+  // The retry re-performs the merge against the freshly fetched tip (a bare re-push of the stale
+  // merge commit fails identically and would make the "retry" a no-op), so the retry is a SECOND
+  // merge that no gate has seen. "An advanced main can only make an empty diff more true" holds
+  // only when `theirs` equals the merge base; an empty diff can also come from a three-way
+  // RESOLUTION that landed on `ours`, and in that regime an advanced main can flip the resolution
+  // and carry content onto the one code path that bypasses pull-request review.
+  const diffAt = push.run.indexOf('git diff --stat origin/main');
+  assert.notEqual(diffAt, -1, "the push retry re-runs the content gate's diff against origin/main");
+  const afterDiff = push.run.slice(diffAt);
+  const rePushAt = afterDiff.indexOf('git push origin HEAD:main');
+  assert.notEqual(rePushAt, -1, 'the retry re-pushes after re-gating');
+  assert.match(
+    afterDiff.slice(0, rePushAt),
+    /\bexit 1\b/,
+    'the retry content gate must FAIL the job, not print and push anyway'
+  );
+
+  // Freezing the `theirs` side to the ref the first gate validated is load-bearing: re-fetching
+  // origin/release would import a tip nothing gated. Shell COMMENT lines are stripped first —
+  // step 10's own comment quotes step 4's `git fetch origin main release --force --tags` precisely
+  // to say "do not copy this here", and matching that would fail on correct code.
+  const fetches = push.run
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('#'))
+    .filter((line) => /\bgit fetch\b/.test(line));
+  assert.ok(fetches.length > 0, 'the retry re-fetches the advanced main');
+  for (const line of fetches) {
+    assert.ok(
+      !/\brelease\b/.test(line),
+      `the retry must not re-fetch origin/release, got: ${line.trim()}`
+    );
+  }
 });
 
 // ── 12 ──────────────────────────────────────────────────────────────────────────────────────────
@@ -383,15 +568,22 @@ test('both guards are present, ordered before the push, consumed, and never fail
     'is the content gate',
     mergeIndex + 1
   );
+  const dryRunIndex = stepIndex(
+    steps,
+    /git log --oneline origin\/main\.\.HEAD/,
+    'is the dry-run report',
+    gateIndex + 1
+  );
   const pushIndex = stepIndex(steps, /git push origin HEAD:main/, 'pushes to main');
 
   assert.ok(
     ancestryIndex < tipguardIndex &&
       tipguardIndex < mergeIndex &&
       mergeIndex < gateIndex &&
-      gateIndex < pushIndex,
-    `expected ancestry < tipguard < merge < content gate < push, got ${ancestryIndex}, ` +
-      `${tipguardIndex}, ${mergeIndex}, ${gateIndex}, ${pushIndex}`
+      gateIndex < dryRunIndex &&
+      dryRunIndex < pushIndex,
+    `expected ancestry < tipguard < merge < content gate < dry run < push, got ${ancestryIndex}, ` +
+      `${tipguardIndex}, ${mergeIndex}, ${gateIndex}, ${dryRunIndex}, ${pushIndex}`
   );
 
   // The tipguard's condition is read from its `env:` and tested as a SHELL variable. Asserting a
@@ -409,8 +601,6 @@ test('both guards are present, ordered before the push, consumed, and never fail
   // of them would leave the other unread.
   const ancestryOutput = `steps.${steps[ancestryIndex].id}.outputs.already`;
   const tipguardOutput = `steps.${tipguard.id}.outputs.mismatch`;
-  const dryRunIndex = steps.findIndex((step) => /&&\s*inputs\.dry_run\b/.test(step.if));
-  assert.notEqual(dryRunIndex, -1, 'forward-port.yml has a dry-run report step');
 
   for (const index of [mergeIndex, gateIndex, dryRunIndex, pushIndex]) {
     for (const output of [ancestryOutput, tipguardOutput]) {
@@ -418,6 +608,68 @@ test('both guards are present, ordered before the push, consumed, and never fail
         steps[index].if.includes(output),
         `${stepLabel(steps[index], index)} must re-test \`${output}\` in its own if:`
       );
+    }
+  }
+
+  // ...but PRESENCE is not CONSUMPTION. `steps.ancestry.outputs.already` reads identically in
+  // `!= 'true'` and in `== 'true'`, and the inverted form makes the merge run ONLY when the
+  // forward-port has already happened and never when it is needed — the remedy ships inert, every
+  // assertion green. `!= 'false'` inverts it the same way. So the guards' MEANING is evaluated as a
+  // truth table, and the dry-run/push pair is pinned by `dry_run` polarity in both directions:
+  // step 9 must run only on a dry run, step 10 only on a real one. (`!inputs.dry_run` ->
+  // `inputs.dry_run` on step 10 makes a `dry_run: true` public promotion really push to `main`.)
+  const context = (already, mismatch, dryRun) => ({
+    inputs: { enabled: true, dry_run: dryRun },
+    steps: { ancestry: { outputs: { already } }, tipguard: { outputs: { mismatch } } },
+  });
+  const ran = (index, ctx) => Boolean(evaluate(unwrap(steps[index].if), ctx));
+
+  for (const dryRun of [true, false]) {
+    for (const index of [mergeIndex, gateIndex]) {
+      assert.equal(
+        ran(index, context('false', 'false', dryRun)),
+        true,
+        `${stepLabel(steps[index], index)} must RUN when both guards are clear (dry_run: ${dryRun})`
+      );
+    }
+  }
+  assert.equal(
+    ran(pushIndex, context('false', 'false', false)),
+    true,
+    'the push must RUN when both guards are clear and this is not a dry run'
+  );
+  assert.equal(
+    ran(pushIndex, context('false', 'false', true)),
+    false,
+    'the push must NOT run on a dry run — this is the line that makes a dry run honest'
+  );
+  assert.equal(
+    ran(dryRunIndex, context('false', 'false', true)),
+    true,
+    'the dry-run report must RUN when both guards are clear and this is a dry run'
+  );
+  assert.equal(
+    ran(dryRunIndex, context('false', 'false', false)),
+    false,
+    'the dry-run report must NOT run on a real run'
+  );
+
+  // A blocked guard blocks EVERY consumer, under either dry_run value. `mismatch` is the empty
+  // string in the `already=true` row because the tipguard step is itself skipped there.
+  for (const [already, mismatch] of [
+    ['true', ''],
+    ['false', 'true'],
+    ['true', 'true'],
+  ]) {
+    for (const dryRun of [true, false]) {
+      for (const index of [mergeIndex, gateIndex, dryRunIndex, pushIndex]) {
+        assert.equal(
+          ran(index, context(already, mismatch, dryRun)),
+          false,
+          `${stepLabel(steps[index], index)} must NOT run ` +
+            `(already=${already} mismatch=${mismatch} dry_run=${dryRun})`
+        );
+      }
     }
   }
 
