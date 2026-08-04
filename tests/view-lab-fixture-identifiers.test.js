@@ -66,6 +66,11 @@ const IDENTITY_SOURCES = {
   // run on fork PRs, and which is the slowest possible place to learn about a typo.
   'data-recipe-edit': new Set(content.recipes.map((entry) => entry.id)),
   'data-component-select': new Set(content.components.map((entry) => entry.id)),
+  // The recipe browser's bulk selection control (issue 1010) — the exact mirror of
+  // `data-component-select` above, and unguarded until now: the three
+  // `manager-recipes-bulk-edit*` cases pin fixture ids in their row clicks, so a rename
+  // would otherwise surface only in a capture run.
+  'data-recipe-select': new Set(content.recipes.map((entry) => entry.id)),
   'data-system-id': new Set(content.systems.map((entry) => entry.id)),
   // From the SYSTEM's declared vocabulary, which is what `adminStore` builds the browser's rows
   // from and therefore what `EssenceBrowserView` writes into the attribute. Deriving these from the
