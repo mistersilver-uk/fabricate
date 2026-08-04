@@ -315,6 +315,14 @@ function tokenDocumentElevatedCenter(tokenDoc) {
  * carried (possibly none). Split out so {@link tokenDocumentElevatedCenter} can
  * normalize ONE elevation for BOTH sources.
  *
+ * This prefers `getCenterPoint()` FIRST, the opposite order from
+ * {@link tokenDocumentCenter}. That is deliberate, not a divergence to reconcile:
+ * `getCenterPoint()` is hex-aware, and the move-animation lag that makes
+ * {@link tokenDocumentCenter} avoid it (the placeable centre reporting the region
+ * the token just LEFT) is a property of the `updateToken` hook, not of
+ * `getCenterPoint()` itself. This function runs at Interact time, on a user
+ * click, never from inside `updateToken`, so that lag never applies here.
+ *
  * @param {object} tokenDoc
  * @returns {{ x: number, y: number, elevation?: unknown } | null}
  */

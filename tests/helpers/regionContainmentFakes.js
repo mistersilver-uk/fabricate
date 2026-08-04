@@ -33,8 +33,16 @@
  * @param {number} [options.w]  Rect width.
  * @param {number} [options.h]  Rect height.
  * @param {{ bottom?: number, top?: number }|null} [options.elevationBand]
- *   Absent ⇒ every elevation is admitted (Foundry normalizes an unset band to
- *   ∓Infinity); present ⇒ only a finite elevation inside the band is admitted.
+ *   Absent ⇒ THIS FAKE admits any elevation, including a non-finite one. That is
+ *   a simplification, not a model of Foundry: real `RegionDocument#testPoint`
+ *   still rejects a non-finite elevation even with no band configured, because
+ *   the elevation is compared against the band's bounds and every comparison
+ *   against a non-finite value reads false — this is the exact defect class
+ *   issue 999 fixes.
+ *   Present ⇒ only a finite elevation inside the band is admitted (see
+ *   {@link admitsElevation}), and `top` here is INCLUSIVE, where Foundry's `top`
+ *   is exclusive unless the region sets `topInclusive`.
+ *   Do not read this fake as a model of Foundry's own elevation-band semantics.
  * @returns {object}
  */
 export function rectRegion({
@@ -64,7 +72,12 @@ export function rectRegion({
   return region;
 }
 
-/** Whether a band admits an elevation; a non-finite elevation is never admitted. */
+/**
+ * Whether a band admits an elevation; a non-finite elevation is never admitted.
+ * `top` is treated as INCLUSIVE here, where Foundry's is exclusive unless the
+ * region sets `topInclusive` — another respect in which this is a simplified
+ * fake, not a model of Foundry's band semantics.
+ */
 function admitsElevation(band, elevation) {
   const value = Number(elevation);
   if (!Number.isFinite(value)) return false;

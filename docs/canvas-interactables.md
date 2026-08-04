@@ -167,7 +167,8 @@ So the answer is the same whether or not the GM has your scene open, whether or 
 It also honours **elevation**.
 If the GM has given the region an explicit elevation range, your token has to be standing *within* that range, not merely over the region's footprint.
 This cuts both ways.
-A token standing inside a raised region — a platform, an upper floor — is now let in where it used to be turned away, and a token far above or below a region's configured range is now correctly turned away where it used to be let in.
+A token standing inside a raised region, such as a platform or an upper floor, is now let in where it used to be turned away.
+A token far above or below a region's configured range is now correctly turned away where it used to be let in.
 A region with no elevation range set (the default) is unaffected: every elevation is inside it, exactly as before.
 
 {: .note }
@@ -182,7 +183,11 @@ Fabricate covers this two ways:
 - **Control re-trigger** means taking control of a token that is already inside a region the interactable does not conceal re-raises the prompt (a locked interactable still re-prompts, and the lock is still enforced at Interact time).
 - **Keybinding** means the client keybinding *Fabricate: interact here* (default **E**) re-raises the prompt for the controlled token's current region.
 
-Both re-trigger paths honour the token's elevation the same way the "still inside" check does, so an elevation-ranged region re-prompts a token standing in it.
+Both re-trigger paths also honour the token's elevation, so an elevation-ranged region re-prompts a token standing in it.
+The two checks are not identical at the edges of a range, though.
+The "still inside" check also credits a tall token whose feet have dropped just below the range, if the token is tall enough that its head still reaches into it.
+The re-trigger paths look only at where the token's feet are, and will not re-prompt in that same situation.
+This only affects a very tall token sitting right at the boundary of a range.
 
 ### A GM must be online
 
