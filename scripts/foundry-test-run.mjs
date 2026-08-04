@@ -726,6 +726,40 @@ async function authenticateIfRequired(page, results) {
 }
 
 /**
+ * Name whatever modal is currently covering the interface, or return null when nothing is.
+ *
+ * PURELY DIAGNOSTIC — only ever called on a failure path to enrich an error message, never
+ * to decide whether a step passed. That separation is deliberate: the previous attempt at
+ * this made a positive assertion out of "is the Items tab selected", and its selector did
+ * not match on Foundry 14, so it failed a run whose sidebar was open, populated and
+ * perfectly healthy (issue #996). A diagnostic that is wrong costs a confusing sentence; an
+ * assertion that is wrong costs a red release.
+ *
+ * @param {import('playwright').Page} page
+ * @returns {Promise<string|null>}
+ */
+async function describeBlockingOverlay(page) {
+  try {
+    return await page.evaluate(() => {
+      const activeTour = globalThis.foundry?.nue?.Tour?.activeTour;
+      if (activeTour) return `a Foundry NUE tour ("${activeTour.title ?? activeTour.id ?? 'unknown'}")`;
+      const dialog = document.querySelector('dialog[open], .application.dialog, #client-settings');
+      if (dialog) {
+        const label = dialog.getAttribute('aria-label') || dialog.querySelector('.window-title')?.textContent;
+        return `a modal dialog${label ? ` ("${label.trim()}")` : ''}`;
+      }
+      if (document.querySelector('#pause:not(.paused)') === null && globalThis.game?.paused) {
+        return 'the Game Paused overlay';
+      }
+      return null;
+    });
+  } catch {
+    // The page may be gone; a diagnostic must never mask the original failure.
+    return null;
+  }
+}
+
+/**
  * Stop Foundry's New User Experience tours ever starting, for the whole browser
  * context.
  *
@@ -11195,23 +11229,33 @@ async function main() {
         await closeOpenApplications(page);
         const sidebarItemsTab = page.locator('#sidebar [data-tab="items"]').first();
         await sidebarItemsTab.click({ force: true });
-        // Assert the tab ACTUALLY activated before waiting on anything inside it.
-        // `force: true` skips actionability checks but still dispatches at the element's
-        // coordinates, so a modal overlay silently swallows the click and the panel never
-        // opens — the craft button then times out "resolved to hidden", which reads like a
-        // Fabricate UI defect rather than a blocked click (issue #993). Failing here names
-        // the real cause instead.
-        await page
-          .locator('#sidebar [data-tab="items"][aria-selected="true"], #sidebar [data-application-part="items"]')
-          .first()
-          .waitFor({ state: 'visible', timeout: 10_000 })
-          .catch(() => {
-            throw new Error(
-              'Items sidebar tab did not activate after clicking it — a modal overlay (e.g. a Foundry NUE tour) is most likely intercepting the click.'
-            );
-          });
+        // The craft button IS the readiness signal — it lives in the Items directory header,
+        // so it can only be visible once that panel is active. Wait on it directly rather
+        // than on a separate "is the tab selected" probe: the tab markup varies across
+        // Foundry versions and sheet layouts, and asserting it produced a FALSE failure on a
+        // run where the sidebar was open, populated, and the button plainly visible
+        // (issue #996).
+        //
+        // On timeout, diagnose before throwing. `force: true` skips actionability CHECKS but
+        // still dispatches at the element's coordinates, so a modal overlay silently swallows
+        // the click and the panel never opens — the bare Playwright error then reads
+        // "resolved to hidden", which looks like a Fabricate UI defect rather than a blocked
+        // click (issue #993). Naming the overlay is the whole value; it must not also be able
+        // to fail when nothing is wrong.
         const craftButton = page.locator('button[data-fabricate-action="craft"]').first();
-        await craftButton.waitFor({ state: 'visible', timeout: 10_000 });
+        try {
+          await craftButton.waitFor({ state: 'visible', timeout: 10_000 });
+        } catch (waitError) {
+          const blocker = await describeBlockingOverlay(page);
+          if (blocker) {
+            throw new Error(
+              `The "Craft Item" sidebar action never became visible, and ${blocker} is on screen — ` +
+                'a modal overlay intercepts the sidebar click even with force:true. ' +
+                `Original error: ${waitError.message}`
+            );
+          }
+          throw waitError;
+        }
         await craftButton.evaluate(button => button.click());
 
         const appShell = page.locator('#fabricate-app').first();
