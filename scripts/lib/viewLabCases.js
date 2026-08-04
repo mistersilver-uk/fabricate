@@ -693,8 +693,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
       { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
       { selector: '[data-recipe-bulk-category]', select: 'Armoursmithing' },
-      { selector: '[data-recipe-bulk-status-option="enable"] input' },
-      { selector: '[data-recipe-bulk-lock-option="lock"] input' },
+      { selector: '[data-recipe-bulk-status-option="enable"]' },
+      { selector: '[data-recipe-bulk-lock-option="lock"]' },
       // Karrun Forgecraft is the only lab system that authors check tiers, so this select is the
       // only populated one in the world; every other system renders the info Callout instead.
       { selector: '[data-recipe-bulk-check-tier]', select: 'sm-tier-masterwork' },
@@ -744,11 +744,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     // least 1 of 2" rather than a degenerate 1-of-1 and the LOWER-BOUND wording is legible.
     reaches: 'exact',
     query: {},
+    // ORDER IS LOAD-BEARING, and `expectSelector` cannot enforce it: a click auto-scrolls its
+    // target into view, so whichever row is ticked LAST is the one the frame is scrolled to.
+    // Ticking the blocked row first scrolled it off the top and published a Callout with none
+    // of the rows it counts — DOM-present, so the guard passed, and visually a lie.
+    // `sm-r-longsword` therefore goes first and the blocked row last.
     steps: [
       'Crafting',
-      { selector: 'label:has(input[data-recipe-select="sm-r-runeplate-draft"])' },
       { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
-      { selector: '[data-recipe-bulk-status-option="enable"] input' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-runeplate-draft"])' },
+      { selector: '[data-recipe-bulk-status-option="enable"]' },
     ],
     expectView: 'recipes',
     // BOTH halves of the claim, in one selector, because either alone would publish a lie: a
