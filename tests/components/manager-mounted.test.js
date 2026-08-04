@@ -166,6 +166,10 @@ function compileManagerRoot() {
   // The library inspector, extracted out of the root (issue 643). It lives under
   // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
   writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
+  // The rail's other half (issue 1010): the root swaps this in for the inspector while a
+  // bulk selection exists, so it is a STATIC import of the mounted root. Omitting it kills
+  // this suite in its `before` hook, which `node --test` reports as `# cancelled 220`.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   // The GM Knowledge surface (issue 785). Adding a `knowledge` branch to the root
   // puts this WHOLE subtree into the compiled root's STATIC module graph regardless

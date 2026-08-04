@@ -1192,7 +1192,16 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
   it("says a locked, incomplete, disabled recipe can't be enabled", async () => {
     const root = await inspector.mount({
-      selectedRecipe: makeRecipe({ id: 'r1', enabled: false, locked: true, incomplete: true }),
+      // `enableBlocked` is the projection field the pill now reads (issue 1010); this
+      // fixture is hand-built, so it has to state it. `incomplete` stays because the row
+      // is genuinely both — an incomplete shell IS one of the things activation refuses.
+      selectedRecipe: makeRecipe({
+        id: 'r1',
+        enabled: false,
+        locked: true,
+        incomplete: true,
+        enableBlocked: true
+      }),
       recipeCount: 1
     });
 
