@@ -34,7 +34,10 @@ const browser = createMountedComponentHarness({
     'src/utils/browserGroupCounts.js',
     // The pure bulk selection + staging model (issue 772). The view imports it for the
     // selection helpers and its toolbar reads the description it returns.
-    'src/utils/componentBulkEditModel.js'
+    'src/utils/componentBulkEditModel.js',
+    // Its shared leaf (issue 1010): those selection helpers now live here and
+    // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
+    'src/utils/bulkSelectionModel.js'
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the

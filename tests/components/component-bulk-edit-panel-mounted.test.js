@@ -34,7 +34,11 @@ const panel = createMountedComponentHarness({
     'src/utils/componentCategories.js',
     // The pure selection + staging model. Omitting it throws loudly in this shared
     // harness — the hand-rolled suites are the ones that hang instead.
-    'src/utils/componentBulkEditModel.js'
+    'src/utils/componentBulkEditModel.js',
+    // Its shared leaf (issue 1010): the four selection helpers now live here and
+    // `componentBulkEditModel.js` re-exports them under their original names, so this is a
+    // STATIC import of that module and belongs in every closure that names it.
+    'src/utils/bulkSelectionModel.js'
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',

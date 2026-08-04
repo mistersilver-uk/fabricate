@@ -427,6 +427,11 @@ function compileManagerRoot() {
     // ComponentsBrowserView, by the bulk edit panel AND by the root (which owns the staged
     // draft); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/utils/componentBulkEditModel.js',
+    // Its shared leaf (issue 1010). The four selection helpers moved here and are
+    // re-exported above under their original names, so this is a STATIC import of that
+    // module. This suite hand-rolls its temp tree and has NO dependency validator, so
+    // omitting it hangs silently rather than naming the missing file.
+    'src/utils/bulkSelectionModel.js',
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
