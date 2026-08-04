@@ -17,6 +17,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
+import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -27,7 +28,14 @@ const RECIPE_RAW_MODULES = [
   'src/utils/recipeBrowserModel.js',
   // recipeBrowserModel imports the shared category totals (issue 676); omitting it here
   // HANGS this suite (`# cancelled`) rather than failing it.
-  'src/utils/browserGroupCounts.js'
+  'src/utils/browserGroupCounts.js',
+  // The pure bulk selection + staging model (issue 1010). The browser imports it for the
+  // four selection helpers and the toolbar reads the description it returns.
+  'src/utils/recipeBulkEditModel.js',
+  // Its shared leaf: those selection helpers live here and `recipeBulkEditModel.js`
+  // re-exports them, so it is a STATIC import of that module. Naming only the model HANGS
+  // the suite (`# cancelled`) rather than failing it.
+  'src/utils/bulkSelectionModel.js'
 ];
 
 const RECIPE_PRIMITIVES = [
@@ -52,6 +60,11 @@ const browser = createMountedComponentHarness({
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // The manager's ONE selection control and its ONE multi-select toolbar row (issue
+    // 1010). The inspector harness below does not render either, so they are named here
+    // rather than hoisted into RECIPE_PRIMITIVES.
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
@@ -301,6 +314,71 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
     flushSync();
     assert.deepEqual(recipeGroupsOnPage(root), [['smithing', '2 of 4 recipes']]);
   });
+});
+
+// Issue 1010 — the recipe half of the manager's multi-select contract. The cases are the
+// shared, parameterised run in `browserBulkSelectionCases.js`, instantiated here and in
+// `components-browser-view-mounted.test.js` alike: the two studios render the SAME
+// `BulkSelectionToolbar` over the SAME `bulkSelectionModel.js`, so a second hand-copied
+// run of the same seven bodies would be duplication rather than coverage.
+//
+// The eighth shipped Component Studio case — the focus-ring adjacency contract (issue
+// 924) — is deliberately NOT twinned: issue 1010 relocated it to
+// `tests/components/bulk-selection-toolbar-mounted.test.js`, which owns it for both
+// studios at once along with the drift assertion over the tokens inside the toolbar's
+// `:global()`.
+describeBrowserBulkSelection({
+  label: 'RecipesBrowserView',
+  prefix: 'recipe',
+  rowClass: 'manager-recipe-row',
+  rowIdKey: 'recipeId',
+  selectionKey: 'bulkSelectedRecipeIds',
+  rowsProp: 'recipes',
+  harness: browser,
+  createBrowserState: createRecipeBrowserState,
+  makeFlatRows: (count) =>
+    Array.from({ length: count }, (_, index) =>
+      makeRecipe({
+        id: `f${index + 1}`,
+        // Zero-padded so name-ascending order is also numeric order, which is what makes
+        // `flatId(1)` reliably the first row of page 1.
+        name: `Flask ${String(index + 1).padStart(2, '0')}`,
+        category: 'general'
+      })
+    ),
+  flatId: (index) => `f${index}`,
+  makeGroupedRows: () => [
+    makeRecipe({ id: 'a1', name: 'Acid Flask', category: 'alchemy' }),
+    makeRecipe({ id: 'a2', name: 'Alkahest', category: 'alchemy' }),
+    makeRecipe({ id: 's1', name: 'Bronze Ingot', category: 'smithing' }),
+    makeRecipe({ id: 's2', name: 'Steel Ingot', category: 'smithing' })
+  ],
+  grouped: {
+    // The header's `data-group-header` is the DISPLAY name, and a custom recipe category
+    // is its own label — only the reserved `general` is localized.
+    collapseHeader: 'alchemy',
+    hiddenIds: ['a1', 'a2'],
+    visibleIds: ['s1', 's2']
+  },
+  props: (recipes, extra = {}) => ({
+    recipes,
+    // Grouping is ON by default but the recipe browser also gates it on the system
+    // actually having a category vocabulary, so both must be supplied or the grouped
+    // branch of `pageIds` is never exercised.
+    showRecipeCategories: true,
+    recipeCategories: [...new Set(recipes.map((recipe) => recipe.category))].map((name) => ({
+      name,
+      count: recipes.filter((recipe) => recipe.category === name).length
+    })),
+    ...extra
+  }),
+  rowControls: {
+    scope: '.manager-recipe-cluster',
+    count: 3,
+    why:
+      'the row still carries exactly its three cluster buttons — lock, enable and edit — ' +
+      'so the smoke walk that reaches Edit through them is undisturbed by the new control'
+  }
 });
 
 describe('RecipesBrowserView filtering and sorting', () => {

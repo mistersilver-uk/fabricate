@@ -339,12 +339,29 @@ export function deriveRecipeIo(recipe, resolutionMode) {
 
 /**
  * The row's status pills, in render order. At most one of the two authoring
- * states applies:
+ * states applies, and BOTH read the SAME predicate — `recipe.enableBlocked`, the
+ * projected answer to "would activation refuse this recipe?" (issue 1010):
  *
- *  - `blocked` — incomplete AND currently off: enabling would be REFUSED by
- *    `toggleRecipeEnabled` (RecipeActivationError), so the row says so up front.
- *  - `incomplete` — incomplete but already on (a legacy row): work still to do,
- *    but nothing is being refused.
+ *  - `blocked` — activation would refuse it AND it is currently off: enabling would
+ *    be REFUSED by `toggleRecipeEnabled` (RecipeActivationError), so the row says so
+ *    up front.
+ *  - `incomplete` — the same blocker on a recipe that is already ON: unfinished or
+ *    conflicting work a GM should still resolve, but nothing is being refused,
+ *    because the activation check runs only on a transition into the enabled state.
+ *
+ * Both branches used to read `recipe.incomplete`, which is
+ * `validate() === false && validateStructure() === true` (`adminStore.js`). A
+ * STRUCTURALLY BROKEN recipe therefore reads `incomplete: false` and wore NO pill at
+ * all while still being un-enableable — and the bulk edit panel's pre-flight count and
+ * the set-apply write both read the wider activation predicate. Two surfaces on one
+ * screen would then disagree about one fact: "3 selected recipes will stay off" above
+ * zero pilled rows. The row pill, the panel's count and the write now read ONE
+ * predicate and cannot disagree by construction.
+ *
+ * The off/on split is tested STRICTLY (`enabled === false`), not as `!enabled`, to
+ * match `countBlockedRecipeEnables` in `recipeBulkEditModel.js` — a row missing the
+ * field would otherwise be counted by one surface and not pilled by the other, which
+ * is precisely the drift this shared predicate exists to close.
  *
  * @param {object} recipe a projected recipe row.
  * @returns {{id: 'disabled' | 'locked' | 'blocked' | 'incomplete', tone: string, icon: string}[]}
@@ -357,7 +374,7 @@ export function deriveRecipeStatuses(recipe) {
   if (recipe?.locked === true) {
     pills.push({ id: 'locked', tone: 'accent', icon: 'fas fa-lock' });
   }
-  if (recipe?.incomplete === true) {
+  if (recipe?.enableBlocked === true) {
     pills.push(
       recipe?.enabled === false
         ? { id: 'blocked', tone: 'danger', icon: 'fas fa-circle-exclamation' }

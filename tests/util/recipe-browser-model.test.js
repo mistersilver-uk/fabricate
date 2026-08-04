@@ -377,16 +377,79 @@ describe('recipeBrowserModel — row derivations', () => {
       deriveRecipeStatuses(makeRecipe({ locked: true })).map((pill) => [pill.id, pill.tone]),
       [['locked', 'accent']]
     );
-    // Off + incomplete: enabling would be REFUSED, so the row says "can't enable".
+    // Off + activation-blocked: enabling would be REFUSED, so the row says "can't enable".
     assert.deepEqual(
-      deriveRecipeStatuses(makeRecipe({ enabled: false, incomplete: true })).map((pill) => [pill.id, pill.tone]),
+      deriveRecipeStatuses(makeRecipe({ enabled: false, enableBlocked: true })).map((pill) => [pill.id, pill.tone]),
       [['disabled', 'subtle'], ['blocked', 'danger']]
     );
-    // On + incomplete: nothing is being refused, it is just unfinished.
+    // On + activation-blocked: nothing is being refused, it is just unfinished.
     assert.deepEqual(
-      deriveRecipeStatuses(makeRecipe({ enabled: true, incomplete: true })).map((pill) => [pill.id, pill.tone]),
+      deriveRecipeStatuses(makeRecipe({ enabled: true, enableBlocked: true })).map((pill) => [pill.id, pill.tone]),
       [['incomplete', 'warning']]
     );
+  });
+
+  // Issue 1010 — BOTH authoring pills were re-pointed from `incomplete` to `enableBlocked`,
+  // and the two directions are stated separately because only one of them is a widening.
+  //
+  // `incomplete` is `validate() === false && validateStructure() === true`, so it is
+  // NARROWER than "activation would refuse this": a structurally broken recipe reads
+  // `incomplete: false`. Under the old predicate such a recipe wore no pill at all, while
+  // the bulk panel's pre-flight count and the set-apply write — which read the activation
+  // predicate — would both have counted it. That is two surfaces on one screen disagreeing
+  // about one fact, which is exactly what the shared predicate closes.
+  describe('the row pill reads the activation predicate, not `incomplete`', () => {
+    // A structurally broken recipe: un-enableable, yet `incomplete: false`.
+    const structurallyBroken = { incomplete: false, enableBlocked: true };
+
+    it('pills a structurally broken recipe that is OFF as blocked', () => {
+      assert.deepEqual(
+        deriveRecipeStatuses(makeRecipe({ enabled: false, ...structurallyBroken })).map(
+          (pill) => pill.id
+        ),
+        ['disabled', 'blocked'],
+        'the row that the bulk panel counts as un-enableable must be the row that is pilled'
+      );
+    });
+
+    it('pills a structurally broken recipe that is ON as incomplete — where it wore nothing before', () => {
+      assert.deepEqual(
+        deriveRecipeStatuses(makeRecipe({ enabled: true, ...structurallyBroken })).map(
+          (pill) => pill.id
+        ),
+        ['incomplete'],
+        'the ON branch was widened too; leaving it would have kept half the drift'
+      );
+    });
+
+    it('ignores `incomplete` entirely, in both directions', () => {
+      // A recipe the activation check accepts wears no authoring pill, whatever the
+      // narrower legacy flag says — so the flag is not merely additional, it is retired
+      // from this derivation.
+      assert.deepEqual(
+        deriveRecipeStatuses(makeRecipe({ enabled: false, incomplete: true, enableBlocked: false })),
+        [{ id: 'disabled', tone: 'subtle', icon: '' }],
+        'a recipe activation would accept carries no blocked pill'
+      );
+      assert.deepEqual(
+        deriveRecipeStatuses(makeRecipe({ enabled: true, incomplete: true, enableBlocked: false })),
+        [],
+        'and none on the enabled side either'
+      );
+    });
+
+    it('splits off/on strictly, so a row missing `enabled` is not read as off', () => {
+      // `countBlockedRecipeEnables` tests `enabled === false` strictly for exactly this
+      // reason. A looser `!enabled` here would re-open the drift on a malformed row: the
+      // pill would say "can't enable" while the panel's count ignored it.
+      const noEnabledField = makeRecipe({ enableBlocked: true });
+      delete noEnabledField.enabled;
+      assert.deepEqual(
+        deriveRecipeStatuses(noEnabledField).map((pill) => pill.id),
+        ['incomplete'],
+        'absent is not `false`'
+      );
+    });
   });
 });
 

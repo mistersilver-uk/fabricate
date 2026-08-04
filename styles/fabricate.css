@@ -3478,14 +3478,26 @@
      line up row-to-row (each row cluster is its own grid, so `auto` columns would
      drift per row — fixed widths are what make them agree). The collapse ladder
      rewrites `--fab-recipe-cluster-cols` at each container breakpoint to drop a
-     column as its item is hidden. */
+     column as its item is hidden.
+
+     `--fab-recipe-col-select` is the bulk selection box (issue 1010), APPENDED as the
+     last track rather than prepended: the row renders it as the last cell of
+     `.manager-recipe-cluster`, and the column header's four explicit `grid-column`
+     placements below all survive an append while every one of them would break on a
+     prepend. 22px is the `SelectionCheckbox` `lg` box, stated rather than derived.
+
+     The ladder NEVER drops it. A readout the row cannot show is a truncation; a
+     selection the GM cannot reach is a control that has silently stopped working, so
+     the select track outranks every readout in the drop order. */
   --fab-recipe-col-io: 112px;
   --fab-recipe-col-check: 108px;
   --fab-recipe-col-lock: 28px;
   --fab-recipe-col-status: 40px;
   --fab-recipe-col-edit: 28px;
+  --fab-recipe-col-select: 22px;
   --fab-recipe-cluster-cols: var(--fab-recipe-col-io) var(--fab-recipe-col-check)
-    var(--fab-recipe-col-lock) var(--fab-recipe-col-status) var(--fab-recipe-col-edit);
+    var(--fab-recipe-col-lock) var(--fab-recipe-col-status) var(--fab-recipe-col-edit)
+    var(--fab-recipe-col-select);
 
   container-type: inline-size;
   container-name: fabricate-recipes;
@@ -3535,11 +3547,27 @@
   white-space: nowrap;
 }
 
-/* Explicit column placement so the labels sit over the RIGHT cells. The cluster
-   template is `io check lock status edit` (5 tracks); with the empty lock header
-   removed, CHECK stays over the DC pill (track 2) and STATUS spans the lock +
-   enable-toggle pair (tracks 3–4), centred over them, so the lock reads as a
-   status control rather than drifting under CHECK. Edit stays over track 5. */
+/* Explicit column placement so the labels sit over the RIGHT cells. At the WIDEST band
+   the cluster template is `io check lock status edit select` (6 tracks); with the empty
+   lock header removed, CHECK stays over the DC pill (track 2) and STATUS spans the lock +
+   enable-toggle pair (tracks 3–4), centred over them, so the lock reads as a status
+   control rather than drifting under CHECK. Edit stays over track 5, and the appended
+   select track (6) carries no label — a checkbox column needs none.
+
+   THE PLACEMENTS ARE PER-BAND, and issue 1010 fixed them rather than leaving them. The
+   ladder rewrites `--fab-recipe-cluster-cols` at each container rung but this block sits
+   OUTSIDE those queries, so before that fix `is-check: 2` sat over the LOCK once I/O was
+   dropped, `is-status: 3 / span 2` sat over status + edit, and `is-edit: 5` addressed a
+   track that did not exist and spilled into an implicit one. Appending the select track
+   would have turned that last spill into a real landing on the SELECT column, so the
+   arithmetic is now stated for all three bands and each rung re-places what it moved:
+
+     wide   (> 634px): io(1) check(2) lock(3) status(4) edit(5) select(6)
+     mid    (≤ 634px): check(1) lock(2) status(3) edit(4) select(5)   — I/O dropped
+     narrow (≤ 554px): lock(1) status(2) edit(3) select(4)            — check dropped too
+
+   The two rung overrides live with the rules that drop their columns, at the bottom of
+   this sheet. */
 .fabricate-manager .manager-recipe-head-cell.is-io {
   grid-column: 1;
 }
@@ -4231,16 +4259,22 @@
   gap: var(--fab-space-1);
 }
 
-/* The multi-select row (issue 772) — the LAST row of the component toolbar, sitting
-   directly above the list. It JOINS `.manager-component-filter-row` for the toolbar's row
-   metrics rather than declaring a bespoke bar, and this block adds only the row CONTEXT
-   that makes it read as a different register from the filter rows above it: a hairline
-   rule and the row's own gap. Its content is a control, a count and two text actions, not
-   a run of filter fields, so the toolbar's `.is-secondary` spacing would be too loose.
+/* The multi-select row (issue 772, joined by the Recipe Studio for issue 1010) — the LAST
+   row of a browser toolbar, sitting directly above its list. It JOINS that toolbar's own
+   filter-row class for the row metrics rather than declaring a bespoke bar, and this block
+   adds only the row CONTEXT that makes it read as a different register from the filter
+   rows above it: a hairline rule and the row's own gap. Its content is a control, a count
+   and two text actions, not a run of filter fields, so the toolbar's `.is-secondary`
+   spacing would be too loose.
 
-   It is its OWN block on purpose. The rows above are shared recipe/component joins pinned
-   by exact selector string, and adding a third variant selector to one of them would
-   couple this row to the recipe toolbar, which has no selection row at all. */
+   It stays a SEPARATE block from the `.is-secondary` / `.is-chips` joins above rather than
+   becoming a third variant on one of them: those are pinned by exact selector string, and
+   this row wants different metrics from both. But it now names BOTH studios, because both
+   render the one shared `BulkSelectionToolbar` — its `rowClass` prop is what selects which
+   half of this selector applies. (This block used to say the recipe toolbar "has no
+   selection row at all"; issue 1010 gave it one, so that reason is retired rather than
+   left standing as a false claim.) */
+.fabricate-manager .manager-recipe-filter-row.is-selection,
 .fabricate-manager .manager-component-filter-row.is-selection {
   gap: var(--fab-space-2);
   padding-top: var(--fab-space-2);
@@ -5316,15 +5350,21 @@
   box-shadow: none;
 }
 
-/* A row ticked for BULK edit (issue 772). This is a different question from `.is-selected`
-   ("you are here", the row whose inspector is open) — it means "this row is in the set the
-   Apply will write to" — so it reads as the same accent ring over the ACTIVE surface,
-   which sits one step forward of the selected row's soft surface. A row can be both.
+/* A row ticked for BULK edit (issue 772; the recipe row joined for issue 1010). This is a
+   different question from `.is-selected` ("you are here", the row whose inspector is open)
+   — it means "this row is in the set the Apply will write to" — so it reads as the same
+   accent ring over the ACTIVE surface, which sits one step forward of the selected row's
+   soft surface. A row can be both.
 
-   Its OWN block, never folded into the `.is-selected` joins above: those are pinned by
-   exact selector string in `tests/components/manager-layout.test.js`, and appending to
-   them would also give four other browser rows a state none of them has. */
-.fabricate-manager .manager-component-row.is-bulk-selected {
+   The two multi-select browsers JOIN one selector here rather than authoring a block each:
+   the state means one thing and must look identical in both studios, and a second block
+   would be the per-studio variant the shared-primitive rule refuses.
+
+   It stays its OWN block, never folded into the `.is-selected` joins above: those are
+   pinned by exact selector string in `tests/components/manager-layout.test.js`, and
+   appending to them would also give four other browser rows a state none of them has. */
+.fabricate-manager .manager-component-row.is-bulk-selected,
+.fabricate-manager .manager-recipe-row.is-bulk-selected {
   border-color: var(--fab-accent-border);
   background: var(--fab-surface-active);
 }
@@ -19516,14 +19556,32 @@
    The steps query `fabricate-recipes` — the ROW's own container (`.manager-recipes-table`)
    — not the whole manager. The ghost control cluster needs roughly 230px and the identity
    cell another 160 to stay legible, so the row starts giving things up around 680px of
-   table width, wherever the window happens to be. */
-@container fabricate-recipes (max-width: 680px) {
+   table width, wherever the window happens to be.
+
+   RE-BUDGETED for the bulk selection column (issue 1010). Every rung moved out by 34px —
+   680→714, 600→634, 520→554 — because the cluster grew by exactly that: a 22px
+   `--fab-recipe-col-select` track plus one more 12px `--fab-space-3` grid gap. The
+   thresholds are a budget for the IDENTITY cell, not a taste, so holding them fixed would
+   have quietly spent the identity's allowance on the checkbox:
+
+     cluster, wide band   112+108+28+40+28 = 316 + 4 gaps (48) = 364px  ->  398px
+     identity at the rung 680 − 24 padding − 2 border − 12 gap − 364 = 278px
+                          714 − 24 − 2 − 12 − 398 = 278px   (preserved exactly)
+     cluster, mid band    108+28+40+28 = 204 + 3 gaps (36) = 240px      ->  274px
+     identity at the rung 600 − 38 − 240 = 322px ; 634 − 38 − 274 = 322px
+     cluster, narrow band 28+40+28 = 96 + 2 gaps (24) = 120px           ->  154px
+     identity at the rung 520 − 38 − 120 = 362px ; 554 − 38 − 154 = 362px
+
+   So each band gives the identity cell the same room it did before, and each readout is
+   given up at the same identity width it always was. The select track is never dropped at
+   any rung — see `--fab-recipe-col-select`. */
+@container fabricate-recipes (max-width: 714px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-description {
     display: none;
   }
 }
 
-@container fabricate-recipes (max-width: 600px) {
+@container fabricate-recipes (max-width: 634px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-io,
   .fabricate-manager .manager-recipe-head-cell.is-io {
     display: none;
@@ -19533,11 +19591,27 @@
      than reserving an empty grid track. */
   .fabricate-manager .manager-recipes-table {
     --fab-recipe-cluster-cols: var(--fab-recipe-col-check) var(--fab-recipe-col-lock)
-      var(--fab-recipe-col-status) var(--fab-recipe-col-edit);
+      var(--fab-recipe-col-status) var(--fab-recipe-col-edit) var(--fab-recipe-col-select);
+  }
+
+  /* Re-place the header labels onto the tracks this rung left (issue 1010): the template
+     is rewritten here but the placements are authored outside every container query, so
+     without these CHECK sits over the lock, STATUS over status + edit, and EDIT lands on
+     the appended SELECT column. */
+  .fabricate-manager .manager-recipe-head-cell.is-check {
+    grid-column: 1;
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-status {
+    grid-column: 2 / span 2;
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-edit {
+    grid-column: 4;
   }
 }
 
-@container fabricate-recipes (max-width: 520px) {
+@container fabricate-recipes (max-width: 554px) {
   .fabricate-manager .manager-recipe-row .manager-recipe-check,
   .fabricate-manager .manager-recipe-head-cell.is-check {
     display: none;
@@ -19545,7 +19619,15 @@
 
   .fabricate-manager .manager-recipes-table {
     --fab-recipe-cluster-cols: var(--fab-recipe-col-lock) var(--fab-recipe-col-status)
-      var(--fab-recipe-col-edit);
+      var(--fab-recipe-col-edit) var(--fab-recipe-col-select);
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-status {
+    grid-column: 1 / span 2;
+  }
+
+  .fabricate-manager .manager-recipe-head-cell.is-edit {
+    grid-column: 3;
   }
 }
 
