@@ -15,8 +15,10 @@
  * - `enabled: false` and `locked: false` surviving the same projection, for the same reason;
  * - a book never being simultaneously staged for add and for remove, asserted against a
  *   HAND-BUILT hostile draft so the invariant is proven structural in the model's own
- *   normalization rather than merely a property of the cycle that usually feeds it;
+ *   normalization rather than merely a property of the setter that usually feeds it;
  * - a removal-only draft counting as a change, so `Apply` enables for it;
+ * - the per-book selection count being read from each projected row's `recipeItemIds`,
+ *   which is basis-aware, and NEVER from a definition's own `recipeIds`;
  * - the check-tier gate reporting each of its five reasons, and reporting `available` only
  *   when the gate is open AND the system actually authors tiers;
  * - the blocked-enable forecast counting the same rows the row pill pills — in particular
@@ -36,14 +38,16 @@ import { createRecipeBrowserState } from '../src/utils/recipeBrowserModel.js';
 import {
   RECIPE_CHECK_TIER_DEFAULT,
   RECIPE_CHECK_TIER_UNCHANGED,
+  bulkRecipeBookOp,
   bulkRecipeCheckTierSelectValue,
   bulkRecipeDraftHasChanges,
   countBlockedRecipeEnables,
+  countRecipeBookMembership,
   createRecipeBulkDraft,
-  cycleBulkRecipeBook,
   describeRecipeCheckTierAxis,
   describeRecipeSelection,
   pruneRecipeSelection,
+  setBulkRecipeBookOp,
   setBulkRecipeCategory,
   setBulkRecipeCheckTier,
   setBulkRecipeLock,
@@ -111,12 +115,9 @@ describe('recipe bulk edit model (issue 1010) — the staged draft', () => {
   });
 
   it('reads a removal-only draft as a change, so Apply is live for it', () => {
-    // A chip cycled straight past `add` to `remove` is a real edit the book run can stage on
-    // its own; reading only `bookAdd` would leave Apply inert for it.
-    const removalOnly = cycleBulkRecipeBook(
-      cycleBulkRecipeBook(createRecipeBulkDraft(), 'tome'),
-      'tome'
-    );
+    // `Remove` is reachable in ONE gesture from the pick card, so a removal-only draft is
+    // not an exotic state; reading only `bookAdd` would leave Apply inert for it.
+    const removalOnly = setBulkRecipeBookOp(createRecipeBulkDraft(), 'tome', 'remove');
 
     assert.deepEqual(books(removalOnly), { bookAdd: [], bookRemove: ['tome'] });
     assert.equal(bulkRecipeDraftHasChanges(removalOnly), true);
@@ -130,30 +131,54 @@ describe('recipe bulk edit model (issue 1010) — the staged draft', () => {
   });
 });
 
-describe('recipe bulk edit model — the recipe-book tri-state cycle', () => {
-  it('cycleBulkRecipeBook walks none -> add -> remove -> none, and rounds again', () => {
-    const walk = [
-      { bookAdd: ['tome'], bookRemove: [] },
-      { bookAdd: [], bookRemove: ['tome'] },
-      { bookAdd: [], bookRemove: [] },
-      { bookAdd: ['tome'], bookRemove: [] },
-    ];
+describe('recipe bulk edit model — the recipe-book op setter', () => {
+  // The control SETS an op rather than advancing a cycle, so the model must be idempotent
+  // per op and reachable in one step from any starting state. A cycle-shaped helper could
+  // not express "the GM pressed Remove" without knowing what they had pressed before.
+  it('setBulkRecipeBookOp lands on the named op from ANY starting state, in one call', () => {
+    const start = {
+      none: createRecipeBulkDraft(),
+      add: setBulkRecipeBookOp(createRecipeBulkDraft(), 'tome', 'add'),
+      remove: setBulkRecipeBookOp(createRecipeBulkDraft(), 'tome', 'remove'),
+    };
+    const expected = {
+      none: { bookAdd: [], bookRemove: [] },
+      add: { bookAdd: ['tome'], bookRemove: [] },
+      remove: { bookAdd: [], bookRemove: ['tome'] },
+    };
 
-    let draft = createRecipeBulkDraft();
-    walk.forEach((expected, step) => {
-      draft = cycleBulkRecipeBook(draft, 'tome');
-      assert.deepEqual(books(draft), expected, `step ${step} of the cycle`);
+    for (const [from, draft] of Object.entries(start)) {
+      for (const [to, shape] of Object.entries(expected)) {
+        assert.deepEqual(
+          books(setBulkRecipeBookOp(draft, 'tome', to)),
+          shape,
+          `${from} -> ${to} is one call, not a walk`
+        );
+      }
+    }
+  });
+
+  it('is idempotent: pressing the same op twice stages it once', () => {
+    const once = setBulkRecipeBookOp(createRecipeBulkDraft(), 'tome', 'add');
+    const twice = setBulkRecipeBookOp(once, 'tome', 'add');
+    assert.deepEqual(books(twice), { bookAdd: ['tome'], bookRemove: [] });
+  });
+
+  it('treats an unrecognised op as UNSTAGE rather than staging something nobody asked for', () => {
+    const staged = setBulkRecipeBookOp(createRecipeBulkDraft(), 'tome', 'add');
+    assert.deepEqual(books(setBulkRecipeBookOp(staged, 'tome', 'obliterate')), {
+      bookAdd: [],
+      bookRemove: [],
     });
   });
 
-  it('cycles each book independently and leaves the other axes alone', () => {
+  it('stages each book independently and leaves the other axes alone', () => {
     const staged = setBulkRecipeCheckTier(
       setBulkRecipeCategory(createRecipeBulkDraft(), 'Alchemy'),
       RECIPE_CHECK_TIER_DEFAULT
     );
-    const withTome = cycleBulkRecipeBook(staged, 'tome');
-    const withBoth = cycleBulkRecipeBook(withTome, 'grimoire');
-    const mixed = cycleBulkRecipeBook(withBoth, 'tome');
+    const withTome = setBulkRecipeBookOp(staged, 'tome', 'remove');
+    const mixed = setBulkRecipeBookOp(withTome, 'grimoire', 'add');
 
     assert.deepEqual(books(mixed), { bookAdd: ['grimoire'], bookRemove: ['tome'] });
     assert.equal(mixed.category, 'Alchemy');
@@ -161,13 +186,31 @@ describe('recipe bulk edit model — the recipe-book tri-state cycle', () => {
     assert.equal(mixed.checkTierId, null);
     // The inputs are untouched.
     assert.deepEqual(books(staged), { bookAdd: [], bookRemove: [] });
-    assert.deepEqual(books(withBoth), { bookAdd: ['tome', 'grimoire'], bookRemove: [] });
+    assert.deepEqual(books(withTome), { bookAdd: [], bookRemove: ['tome'] });
   });
 
   it('ignores a blank book id instead of staging an empty membership change', () => {
-    const draft = cycleBulkRecipeBook(createRecipeBulkDraft(), '');
+    const draft = setBulkRecipeBookOp(createRecipeBulkDraft(), '', 'add');
     assert.deepEqual(books(draft), { bookAdd: [], bookRemove: [] });
     assert.equal(bulkRecipeDraftHasChanges(draft), false);
+  });
+
+  it('bulkRecipeBookOp reads back exactly what was staged, and normalizes a hostile draft', () => {
+    const draft = setBulkRecipeBookOp(
+      setBulkRecipeBookOp(createRecipeBulkDraft(), 'tome', 'add'),
+      'grimoire',
+      'remove'
+    );
+
+    assert.equal(bulkRecipeBookOp(draft, 'tome'), 'add');
+    assert.equal(bulkRecipeBookOp(draft, 'grimoire'), 'remove');
+    assert.equal(bulkRecipeBookOp(draft, 'atlas'), 'none');
+    // `bookAdd` wins the collision in `readDraft`, so the reader agrees with the write.
+    assert.equal(
+      bulkRecipeBookOp({ bookAdd: ['tome'], bookRemove: ['tome'] }, 'tome'),
+      'add',
+      'one book, one op — the reader can never report a state the write cannot produce'
+    );
   });
 
   it('never stages one book as BOTH add and remove — proven against a hostile draft', () => {
@@ -189,13 +232,67 @@ describe('recipe bulk edit model — the recipe-book tri-state cycle', () => {
     assert.deepEqual(edit.addBookIds, ['tome', 'grimoire']);
     assert.deepEqual(edit.removeBookIds, ['scroll']);
 
-    // …and every other reader of the draft agrees, without a cycle ever running.
-    const normalized = cycleBulkRecipeBook(hostile, 'atlas');
+    // …and every other reader of the draft agrees, without a setter ever running.
+    const normalized = setBulkRecipeBookOp(hostile, 'atlas', 'add');
     assert.deepEqual(books(normalized), {
       bookAdd: ['tome', 'grimoire', 'atlas'],
       bookRemove: ['scroll'],
     });
     assert.equal(bulkRecipeDraftHasChanges(hostile), true);
+  });
+});
+
+describe('recipe bulk edit model — countRecipeBookMembership', () => {
+  /** A projected recipe row in the shape `_buildRecipeList` emits. */
+  const membershipRow = (id, recipeItemIds) => ({ id, name: id, recipeItemIds });
+
+  it('counts, per book, how many of the SELECTED rows that book holds', () => {
+    const counts = countRecipeBookMembership([
+      membershipRow('r1', ['tome', 'grimoire']),
+      membershipRow('r2', ['tome']),
+      membershipRow('r3', []),
+    ]);
+
+    assert.equal(counts.get('tome'), 2);
+    assert.equal(counts.get('grimoire'), 1);
+    assert.equal(counts.get('atlas'), undefined, 'a book holding none of them is simply absent');
+  });
+
+  // THE POINT OF THIS HELPER. Membership resolves through the monotone
+  // `system.membershipResolvesByRecipeIds` marker, and while it is unset it resolves through
+  // the legacy `recipe.recipeItemId` scalar — so a book that holds every selected recipe can
+  // still carry an EMPTY `definition.recipeIds`. A count sourced from the definition would
+  // report "holds none selected" on exactly the legacy worlds that most need this axis, and
+  // would disable Remove for a book the GM can see on every one of those rows.
+  //
+  // The rows below are what `_buildRecipeList` projects for such a system:
+  // `recipeItemIds` comes from `_recipeItemDefinitionsContaining`, which IS basis-aware.
+  // `tests/recipe-book-membership-basis.test.js` proves that projection against a real
+  // legacy-basis store; this case proves the counter reads it rather than the definition.
+  it('reads each row\'s basis-aware recipeItemIds, never a definition\'s own recipeIds', () => {
+    const legacyBasisDefinition = { id: 'tome', resolvedName: 'Forgecraft Folio', recipeIds: [] };
+    const rows = [membershipRow('r1', ['tome']), membershipRow('r2', ['tome'])];
+
+    assert.deepEqual(
+      legacyBasisDefinition.recipeIds,
+      [],
+      'the fixture really is legacy-basis: the definition itself knows nothing'
+    );
+    assert.equal(
+      countRecipeBookMembership(rows).get(legacyBasisDefinition.id),
+      2,
+      'counting from definition.recipeIds would report 0 and disable Remove'
+    );
+  });
+
+  it('is total over junk input and coerces ids to strings', () => {
+    assert.equal(countRecipeBookMembership(null).size, 0);
+    assert.equal(countRecipeBookMembership([null, {}, { recipeItemIds: 'tome' }]).size, 0);
+    assert.equal(countRecipeBookMembership([{ recipeItemIds: [7] }]).get('7'), 1);
+  });
+
+  it('counts a row once per book even if the projection repeated an id', () => {
+    assert.equal(countRecipeBookMembership([membershipRow('r1', ['tome', 'tome'])]).get('tome'), 1);
   });
 });
 
@@ -275,7 +372,7 @@ describe('recipe bulk edit model — projection of the falsy-but-real keys', () 
     let draft = setBulkRecipeCategory(createRecipeBulkDraft(), 'Alchemy');
     draft = setBulkRecipeStatus(draft, 'enable');
     draft = setBulkRecipeCheckTier(draft, 'tier-a');
-    draft = cycleBulkRecipeBook(draft, 'tome');
+    draft = setBulkRecipeBookOp(draft, 'tome', 'add');
 
     assert.deepEqual(toBulkRecipeEdit(draft), {
       category: 'Alchemy',
@@ -288,7 +385,7 @@ describe('recipe bulk edit model — projection of the falsy-but-real keys', () 
   });
 
   it('copies the book lists rather than aliasing the draft into the write', () => {
-    const draft = cycleBulkRecipeBook(createRecipeBulkDraft(), 'tome');
+    const draft = setBulkRecipeBookOp(createRecipeBulkDraft(), 'tome', 'add');
     const edit = toBulkRecipeEdit(draft);
     edit.addBookIds.push('grimoire');
     assert.deepEqual(draft.bookAdd, ['tome']);

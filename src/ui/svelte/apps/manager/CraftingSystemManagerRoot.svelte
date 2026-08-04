@@ -42,6 +42,7 @@
   } from '../../../../utils/componentBulkEditModel.js';
   import {
     countBlockedRecipeEnables,
+    countRecipeBookMembership,
     createRecipeBulkDraft,
     describeRecipeCheckTierAxis,
     toBulkRecipeEdit,
@@ -1634,6 +1635,18 @@
   const recipeBulkBlockedCount = $derived(
     countBlockedRecipeEnables(recipeBulkSelectedRows, recipeBulkDraft?.status)
   );
+  // How many of the SELECTED recipes each recipe book holds — the `holds n of {total}`
+  // figure the bulk panel's book picker states, and what its Add / Remove counts and
+  // disabled states are derived from.
+  //
+  // Derived from the same PROJECTED ROWS, and that is the load-bearing part. Each row's
+  // `recipeItemIds` comes from `_recipeItemDefinitionsContaining`, which takes the system's
+  // `membershipResolvesByRecipeIds` marker as a parameter and is therefore basis-aware.
+  // Counting from `recipeItemDefinitions[].recipeIds` instead would report "holds none
+  // selected" on every legacy-basis system — where membership still resolves through the
+  // `recipe.recipeItemId` scalar and a book's own array is empty — and would disable Remove
+  // on exactly the worlds this axis exists to fix.
+  const recipeBulkBookMembership = $derived(countRecipeBookMembership(recipeBulkSelectedRows));
   // The axis gate reuses the EXISTING `recipeCheckTierOptions` derived rather than
   // re-resolving the tier list: `resolveRecipeCheckTierOptions` is the single source of
   // truth for which tiers a system offers, and this helper only explains an empty list.
@@ -3810,28 +3823,92 @@
     return text(manyKey, manyFallback).replace('{count}', count);
   }
 
+  // The book half of the post-apply report, reporting membership EDGES rather than the
+  // DEFINITIONS `booksUpdated` counts: the GM asked to put these recipes in that book, so
+  // "4 additions and 2 removals" answers them where "1 book updated" does not.
+  //
+  // Returns `''` when the batch created no edges, including for an unstaged book axis, so
+  // the caller composes it in exactly as it does the blocked and rejected sentences.
+  function recipeBulkBooksMessage(result) {
+    const added = Number(result?.bookAdditions) || 0;
+    const removed = Number(result?.bookRemovals) || 0;
+    if (added === 0 && removed === 0) return '';
+
+    const addedText = bulkRecipeCountText(
+      added,
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookAdditionsOne',
+      '1 addition',
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookAdditions',
+      '{count} additions'
+    );
+    const removedText = bulkRecipeCountText(
+      removed,
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookRemovalsOne',
+      '1 removal',
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookRemovals',
+      '{count} removals'
+    );
+    // Three WHOLE sentences rather than one assembled around a localized " and ": a join
+    // word is the part of this string a translator is least able to place, and two of the
+    // three shapes never need one.
+    if (added > 0 && removed > 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBooksBoth',
+        'Books & scrolls updated — {added} and {removed}.'
+      )
+        .replace('{added}', addedText)
+        .replace('{removed}', removedText);
+    }
+    if (added > 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBooksAdded',
+        'Books & scrolls updated — {added}.'
+      ).replace('{added}', addedText);
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBooksRemoved',
+      'Books & scrolls updated — {removed}.'
+    ).replace('{removed}', removedText);
+  }
+
   // The post-apply report, and the AUTHORITY on the blocked count — the panel's pre-flight
   // figure is only a lower bound, because it cannot see collisions the batch itself
   // creates. `rejected` is named separately and is not an expected outcome: it counts
   // recipes a persistence failure excluded from the batch entirely, each of which the write
   // primitive logs, which is what makes "see the console" point at something real.
+  //
+  // Every sentence COMPOSES; none replaces another. The prototype swaps its books message
+  // in for its blocked message with a ternary, which would let a batch that touched books
+  // silently swallow the report that some recipes stayed off — the one outcome the GM
+  // cannot see by looking at the rows they just deselected.
   function recipeBulkAppliedMessage(result) {
     const updated = Number(result?.updated) || 0;
     const blocked = Number(result?.blockedEnables) || 0;
     const rejected = Number(result?.rejected) || 0;
+    const books = recipeBulkBooksMessage(result);
     // Zero is its own message rather than "applied to 0 recipes", which reads as a failure
-    // for what is a legitimate outcome — every selected recipe already matched.
-    const sentences = [
-      updated === 0
-        ? text('FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedNone', 'No recipes needed changing.')
-        : bulkRecipeCountText(
-            updated,
-            'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedOne',
-            'Applied bulk changes to 1 recipe.',
-            'FABRICATE.Admin.Manager.Recipe.BulkEdit.Applied',
-            'Applied bulk changes to {count} recipes.'
-          ),
-    ];
+    // for what is a legitimate outcome — every selected recipe already matched. It is
+    // SUPPRESSED when the batch moved book membership: `updated` counts recipes whose own
+    // fields changed, so a book-only edit legitimately changes none, and leading with "No
+    // recipes needed changing" ahead of "4 additions" reads as a contradiction rather than
+    // as the two distinct facts it is.
+    const sentences = [];
+    if (updated === 0 && !books) {
+      sentences.push(
+        text('FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedNone', 'No recipes needed changing.')
+      );
+    } else if (updated > 0) {
+      sentences.push(
+        bulkRecipeCountText(
+          updated,
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedOne',
+          'Applied bulk changes to 1 recipe.',
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.Applied',
+          'Applied bulk changes to {count} recipes.'
+        )
+      );
+    }
+    if (books) sentences.push(books);
     if (blocked > 0) {
       sentences.push(
         bulkRecipeCountText(
@@ -10271,6 +10348,7 @@
               checkTierAxis={recipeBulkCheckTierAxis}
               checkTierOptions={recipeCheckTierOptions}
               books={recipeItemDefinitions}
+              bookMembership={recipeBulkBookMembership}
               blockedCount={recipeBulkBlockedCount}
               draft={recipeBulkDraft}
               applying={recipeBulkApplying}

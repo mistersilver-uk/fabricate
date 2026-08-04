@@ -18825,9 +18825,43 @@
   white-space: normal;
 }
 
+/* The TWO-LINE option (issue 1010). A picker whose choices differ by a fact rather than
+   by a name states that fact on a second line; the wrapper takes over the flex sizing the
+   single-line name carries alone, so the label still ellipsises instead of pushing a
+   trailing chip out of the row. */
+.fabricate-manager .manager-travel-option-lines {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-travel-option-lines > .manager-travel-option-name {
+  flex: 0 0 auto;
+}
+
+.fabricate-manager .manager-travel-option-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fab-text-subtle);
+  font-size: 0.62rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fabricate-manager .manager-travel-picker {
   position: relative;
   min-width: 0;
+}
+
+/* The recipe bulk panel's book picker (issue 1010). Its trigger sits in a 300px rail whose
+   other controls are full-width selects, so a content-hugging button would read as a stray
+   chip in a column of fields. It lives here rather than in that panel's scoped block
+   because the trigger is rendered by `SearchablePopover`, which scoping cannot reach. */
+.fabricate-manager .fab-bulk-book-picker .fab-bulk-book-trigger {
+  width: 100%;
 }
 
 .fabricate-manager .manager-travel-picker-trigger {

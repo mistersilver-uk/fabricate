@@ -13,10 +13,23 @@
  * selection helpers are re-exported at the foot of this file under `…RecipeSelection`
  * names so the recipe surfaces import one module. The staged DRAFT halves share nothing:
  * a component stages category / tags / essences / difficulty, a recipe stages category /
- * status / lock / check tier / recipe-book membership. The one exception is the tri-state
- * leave → add → remove → leave machine, which is a machine over two list keys rather than
- * a model, and which `cycleBulkRecipeBook` therefore delegates to the shared
- * `cycleTriStateStaging` instead of re-implementing.
+ * status / lock / check tier / recipe-book membership.
+ *
+ * ## The two studios stage their multi-value axis through DIFFERENT controls
+ *
+ * The Component Studio's tag run is a flat run of tri-state chips and CYCLES
+ * (leave → add → remove → leave) through the shared `cycleTriStateStaging` machine. The
+ * Recipe Studio's book axis does not: it is a search-and-pick control that SETS an op on
+ * one book at a time, because a chip per book stops being readable at the eight-plus
+ * recipe items a real system carries, while a system's tag vocabulary is small and flat by
+ * nature. That divergence is deliberate and maintainer-decided (issue 1010), and it is
+ * confined to the STAGED AXIS: the panel CHROME — shell, section, select, toolbar — stays
+ * common, and so does the staged shape both studios produce.
+ *
+ * `setBulkRecipeBookOp` is therefore a SETTER, not a cycle, and it does not delegate to
+ * `cycleTriStateStaging`: a set is not expressible as a cycle without knowing which state
+ * the control was in, which is exactly the knowledge a pick card does not have after the
+ * pick auto-clears. `cycleTriStateStaging` keeps its component-tag consumer.
  *
  * Nothing here mutates its input. Every helper returns a NEW draft — the Svelte side
  * propagates on reference change, exactly as `collapsedCategories` already documents.
@@ -31,8 +44,8 @@
  *   mean `Leave unchanged` here.
  * - Status and Lock carry their sentinel IN the enum (`'unchanged'`).
  * - Recipe books are two disjoint lists, and emptiness on both is unambiguous. A
- *   REMOVAL-ONLY draft is a real edit, so `bulkRecipeDraftHasChanges` reads both lists or
- *   Apply goes inert for it.
+ *   REMOVAL-ONLY draft is a real edit — and reachable in ONE gesture from the pick card —
+ *   so `bulkRecipeDraftHasChanges` reads both lists or Apply goes inert for it.
  *
  * The check tier cannot, and the reason is precise enough to be worth stating exactly,
  * because it is easy to state loosely and wrong. The draft's `''`
@@ -57,10 +70,7 @@
  * selection.
  */
 
-import {
-  cycleTriStateStaging,
-  normalizeSelectionIds as normalizeBookIds,
-} from './bulkSelectionModel.js';
+import { normalizeSelectionIds as normalizeBookIds } from './bulkSelectionModel.js';
 
 /**
  * @typedef {object} RecipeBulkDraft
@@ -95,8 +105,13 @@ export const RECIPE_CHECK_TIER_UNCHANGED = '';
  */
 export const RECIPE_CHECK_TIER_DEFAULT = '__default__';
 
-/** The two list keys `cycleBulkRecipeBook` advances, named once. */
-const BOOK_STAGING_KEYS = Object.freeze({ addKey: 'bookAdd', removeKey: 'bookRemove' });
+/**
+ * The three ops the book axis can stage for ONE book.
+ *
+ * `'none'` is the unstaged state and is a real instruction the control can send — it is
+ * what the staged list's unstage control emits — rather than merely the absence of one.
+ */
+export const RECIPE_BULK_BOOK_OPS = Object.freeze(['none', 'add', 'remove']);
 
 /** One of the axis's three enum values, or its `unchanged` sentinel. */
 function enumValue(value, allowed) {
@@ -108,7 +123,7 @@ function enumValue(value, allowed) {
  * them has to re-guard its input.
  *
  * `bookAdd` wins over `bookRemove` on collision: the never-both-states invariant is
- * structural HERE rather than merely a property of the cycle, so a draft that arrived from
+ * structural HERE rather than merely a property of the setter, so a draft that arrived from
  * anywhere else — a persisted blob, a hand-built test fixture, a future panel — can never
  * stage one book as both, and the write primitive's "apply removals after additions" is
  * safe by construction rather than by convention.
@@ -246,25 +261,97 @@ export function bulkRecipeCheckTierSelectValue(draft) {
 }
 
 /**
- * Advance one recipe book through `none -> add -> remove -> none`.
+ * Stage ONE recipe book's op: `'add'`, `'remove'`, or `'none'` to unstage it.
  *
- * Delegates the machine to the shared `cycleTriStateStaging`, which the Component Studio's
- * tag run is the other instance of. Normalization stays here, because `readDraft` knows
- * this model's other four axes and the shared machine deliberately does not.
+ * A SET, not a cycle — see the header. Every call lands on the named op from any starting
+ * state, so `Remove` is one gesture from the pick card and the staged list's unstage
+ * control is one gesture from anywhere, neither of them needing to know what was staged
+ * before. It is therefore idempotent per op, which a cycle can never be.
+ *
+ * An unrecognised op UNSTAGES rather than throwing, matching `enumValue`'s rule for the
+ * status and lock axes: a stray value can only ever remove an edit, never invent one
+ * across a whole selection.
  *
  * @param {RecipeBulkDraft} draft
  * @param {string} bookId a recipe-item definition id.
+ * @param {'none' | 'add' | 'remove'} op
  * @returns {RecipeBulkDraft} a NEW draft; the input is not mutated.
  */
-export function cycleBulkRecipeBook(draft, bookId) {
-  return cycleTriStateStaging(readDraft(draft), bookId, BOOK_STAGING_KEYS);
+export function setBulkRecipeBookOp(draft, bookId, op) {
+  const next = readDraft(draft);
+  const id = String(bookId ?? '');
+  if (!id) return next;
+
+  // Cleared from BOTH lists first, so the never-both-states invariant holds by
+  // construction here as well as in `readDraft`.
+  const bookAdd = next.bookAdd.filter((entry) => entry !== id);
+  const bookRemove = next.bookRemove.filter((entry) => entry !== id);
+  if (op === 'add') bookAdd.push(id);
+  else if (op === 'remove') bookRemove.push(id);
+  return { ...next, bookAdd, bookRemove };
+}
+
+/**
+ * The op currently staged for one recipe book, as the panel and its staged list read it.
+ *
+ * Lives here rather than in the component so the read and the write cannot disagree: it
+ * normalizes through `readDraft`, where `bookAdd` wins a collision, so this can never
+ * report a state {@link setBulkRecipeBookOp} could not have produced.
+ *
+ * @param {RecipeBulkDraft} draft
+ * @param {string} bookId
+ * @returns {'none' | 'add' | 'remove'}
+ */
+export function bulkRecipeBookOp(draft, bookId) {
+  const next = readDraft(draft);
+  const id = String(bookId ?? '');
+  if (next.bookAdd.includes(id)) return 'add';
+  if (next.bookRemove.includes(id)) return 'remove';
+  return 'none';
+}
+
+/**
+ * How many of the SELECTED recipes each recipe book currently holds — the `holds n of
+ * {total}` figure the picker's option rows and its pick card state, and the figure the
+ * Add / Remove labels and their disabled states are derived from.
+ *
+ * **The input is the projected ROWS, never the book definitions, and that is the whole
+ * point of this helper.** Membership resolves through the monotone
+ * `system.membershipResolvesByRecipeIds` marker: while it is unset, membership resolves
+ * through the legacy `recipe.recipeItemId` scalar, so `definition.recipeIds` can be EMPTY
+ * for a book that holds every selected recipe. Counting from the definition would report
+ * "holds none selected" and DISABLE Remove on exactly the legacy worlds that most need
+ * this axis. Each projected row's `recipeItemIds` is derived by
+ * `_recipeItemDefinitionsContaining` (`adminStore.js`), which takes the basis as a
+ * parameter and is pinned against a real legacy-basis world by
+ * `tests/recipe-book-membership-basis.test.js` — so reading it is basis-aware for free.
+ *
+ * A `Map` rather than a plain object because a recipe-item definition id is unvalidated
+ * imported data: an object keyed on it inherits `Object.prototype`, so a book id of
+ * `constructor` would read back a function instead of a count.
+ *
+ * @param {{recipeItemIds?: string[]}[]} rows the SELECTED projected recipe rows.
+ * @returns {Map<string, number>} book id -> how many of `rows` that book holds. A book
+ *   holding none of them is ABSENT rather than present with `0`, so callers read
+ *   `get(id) ?? 0` and no caller has to enumerate the vocabulary twice.
+ */
+export function countRecipeBookMembership(rows) {
+  const counts = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    // De-duplicated per row: one recipe contributes at most 1 to each book, whatever the
+    // projection handed over, so the count can never exceed the selection size.
+    for (const bookId of normalizeBookIds(row?.recipeItemIds)) {
+      counts.set(bookId, (counts.get(bookId) || 0) + 1);
+    }
+  }
+  return counts;
 }
 
 /**
  * Whether anything at all is staged — the enablement condition for `Apply to {N} recipes`.
  *
- * A REMOVAL-ONLY draft counts: a book chip cycled straight past `add` to `remove` is a real
- * edit the chip run can stage on its own, and reading only `bookAdd` here would leave Apply
+ * A REMOVAL-ONLY draft counts: `Remove` is one gesture from the pick card, so it is a real
+ * edit the book axis stages on its own, and reading only `bookAdd` here would leave Apply
  * inert for it.
  *
  * `checkTierStaged` is read as the flag it is, never as the truthiness of `checkTierId` — a

@@ -153,11 +153,10 @@ const FIXTURE = `
         </section>
         <!--
           The BULK EDIT panel. It REPLACES the recipe browser inspector in the same rail
-          while the selection is non-empty, so the swap must not re-type the rail. Unlike
-          its Component Studio sibling the recipe panel owns NO scoped CSS of its own — it
-          is chrome primitives plus SegmentedControl, Chip and Callout end to end — which is
-          why it is absent from the scoped-component pairing below and why nothing here
-          would be stamped for it.
+          while the selection is non-empty, so the swap must not re-type the rail. It owned
+          no scoped CSS of its own while every axis was a chrome primitive; the book
+          axis's picker, pick card and staged list (issue 1010) are its own surfaces, so it
+          now appears in the scoped-component pairing below like any other.
         -->
         <section class="fab-bulk-edit-panel" data-recipe-bulk-panel>
           <header class="fab-bulk-edit-header">
@@ -183,12 +182,48 @@ const FIXTURE = `
           </div>
           <p class="manager-callout is-warning" data-callout-tone="warning"><i class="fas fa-triangle-exclamation"></i><span data-m="bulk-callout">At least 2 of 3 selected recipes can't be enabled yet and will stay off.</span></p>
           <div class="fab-bulk-edit-label-row">
-            <p class="fab-bulk-edit-label">Recipe books</p>
-            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove · again to leave unchanged</span>
+            <p class="fab-bulk-edit-label">Books &amp; scrolls</p>
+            <span class="fab-bulk-edit-hint" data-m="bulk-hint">2 changes staged</span>
           </div>
-          <div class="manager-chip-row">
-            <button type="button" class="manager-chip is-positive" data-m="bulk-book-chip"><i class="fas fa-book"></i>Alchemist Primer<i class="fas fa-plus"></i></button>
+          <!--
+            The book axis is a SEARCH AND PICK control (issue 1010), so three surfaces
+            carry type here where the retired chip run carried one: the picker's two-line
+            option row, the pick card that replaces the trigger, and the staged list that
+            accumulates below it. All three are new roles the Component Studio's panel does
+            not render, so none of them has a committed number there.
+          -->
+          <div class="manager-travel-popover">
+            <button type="button" class="manager-travel-option">
+              <span class="manager-travel-option-lines">
+                <span class="manager-travel-option-name">Alchemist Primer</span>
+                <span class="manager-travel-option-meta" data-m="bulk-book-option-meta">Recipe book · holds 2 of 3 selected</span>
+              </span>
+            </button>
           </div>
+          <div class="fab-bulk-book-pick">
+            <div class="fab-bulk-book-pick-head">
+              <span class="fab-bulk-book-pick-art"><i class="fas fa-book"></i></span>
+              <span class="fab-bulk-book-pick-copy">
+                <strong class="fab-bulk-book-pick-name" data-m="bulk-book-name">Alchemist Primer</strong>
+                <span class="fab-bulk-book-pick-meta" data-m="bulk-book-meta">Recipe book · holds 2 of 3 selected</span>
+              </span>
+              <button type="button" class="fab-bulk-book-pick-clear"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="fab-bulk-book-pick-actions">
+              <button type="button" class="fab-bulk-book-op is-add" data-m="bulk-book-op"><i class="fas fa-plus"></i>Add 1</button>
+              <button type="button" class="fab-bulk-book-op is-remove">Remove 2</button>
+            </div>
+          </div>
+          <ul class="fab-bulk-book-staged">
+            <li class="fab-bulk-book-staged-row is-add">
+              <span class="fab-bulk-book-staged-op" data-m="bulk-book-staged-op"><i class="fas fa-plus"></i>Add</span>
+              <span class="fab-bulk-book-staged-copy">
+                <span class="fab-bulk-book-staged-name" data-m="bulk-book-staged-name">Forge Manual</span>
+                <span class="fab-bulk-book-staged-count" data-m="bulk-book-staged-count">3 recipes</span>
+              </span>
+              <button type="button" class="fab-bulk-book-unstage"><i class="fas fa-xmark"></i></button>
+            </li>
+          </ul>
           <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
         </section>
       </div>
@@ -219,10 +254,10 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
-  // `recipes/RecipeBulkEditPanel.svelte` is deliberately ABSENT: it emits no scoped CSS at
-  // all, because it renders entirely through the primitives above. `scopedComponentCss`
-  // throws on a component with no emitted CSS, which is the correct outcome — there is
-  // nothing of its own to pair.
+  // The recipe panel's own block, which exists only because of the book axis (issue 1010):
+  // its pick card and staged list are surfaces no shared primitive supplies. Every other
+  // axis it renders still comes from the chrome above.
+  'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
 
 // The contract classes are DERIVED from each component's own emitted CSS rather than
@@ -310,7 +345,19 @@ const EXPECTED = {
   // the point of a full-width track: the axis reads as one control, not two registers.
   'bulk-segment-label': 11.52, // 0.72rem — inherits `.manager-segment`
   'bulk-callout': 11.2, // 0.7rem — the shared standing-statement strip
-  'bulk-book-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
+  // ── The book axis's search-and-pick control (issue 1010), which replaced the tri-state
+  // chip run this gate used to pin at the one chip scale. Three surfaces, three registers,
+  // and the ordering between them is the design: the picked book's NAME is the loudest
+  // thing in the section (it is the subject), its membership sentence reads at the panel's
+  // standing-sentence scale, and a staged row is quieter than the card that produced it
+  // because it is a record rather than a control.
+  'bulk-book-option-meta': 9.92, // 0.62rem — the picker option's second line
+  'bulk-book-name': 13.12, // 0.82rem — the picked book, the section's subject
+  'bulk-book-meta': 9.92, // 0.62rem — its membership against the selection
+  'bulk-book-op': 10.88, // 0.68rem — Add / Remove, the toolbar action scale
+  'bulk-book-staged-op': 9.28, // 0.58rem — an uppercase micro-label, as section headings are
+  'bulk-book-staged-name': 10.88, // 0.68rem
+  'bulk-book-staged-count': 9.28, // 0.58rem
   // 0.78rem, matching the browser inspector's primary button — the button this one SWAPS
   // PLACES with in the rail's bottom slot.
   'bulk-apply': 12.48,

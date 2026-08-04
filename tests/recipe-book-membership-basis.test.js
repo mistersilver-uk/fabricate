@@ -22,6 +22,9 @@ import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 
 import { createServices, makeRecipe } from './helpers/adminStoreServices.js';
+// The bulk panel's per-book selection count — a SIXTH reader of this basis, and the only
+// one whose failure mode is a disabled control rather than a wrong list.
+import { countRecipeBookMembership } from '../src/utils/recipeBulkEditModel.js';
 
 let idCounter = 0;
 
@@ -530,5 +533,59 @@ describe('recipe-book membership basis — the write choke point', () => {
     });
 
     assert.deepEqual(persistedRecipeIds(fixture, 'book-a'), ['r-scalar-a', 'r-uuid-a']);
+  });
+});
+
+describe('recipe-book membership basis — the bulk panel book counts (issue 1010)', () => {
+  /**
+   * The Recipe Studio's bulk edit states `holds n of {total} selected` per book, and
+   * derives both the Add / Remove labels and their disabled states from it.
+   *
+   * It is a SIXTH consumer of this basis, and the one where getting it wrong is silent:
+   * a count read from `definition.recipeIds` reports "holds none selected" on a
+   * legacy-basis system, which DISABLES Remove and makes the axis one-way on exactly the
+   * worlds it exists to fix. Both surfaces below are asserted in the same case, so the
+   * fixture cannot drift out from under the claim.
+   */
+  it('counts the selection basis-aware, though every definition array is empty', async () => {
+    const fixture = await makeFixture();
+    await fixture.store.refresh();
+    const viewState = get(fixture.store.viewState);
+
+    // The trap, asserted as a precondition rather than assumed: on this system the
+    // definitions themselves know nothing.
+    assert.equal(marker(fixture), false, 'precondition: the system is on the legacy basis');
+    for (const definition of viewState.selectedSystem.recipeItemDefinitions) {
+      assert.deepEqual(
+        definition.recipeIds,
+        [],
+        `${definition.id}: counting from here would report "holds none selected"`
+      );
+    }
+
+    // The GM ticks both scalar-resolved recipes plus the unlinked one.
+    const selection = new Set(['r-scalar-a', 'r-scalar-b', 'r-none']);
+    const selectedRows = viewState.recipes.filter((row) => selection.has(row.id));
+    assert.equal(selectedRows.length, 3, 'the fixture really projected all three rows');
+
+    const counts = countRecipeBookMembership(selectedRows);
+    assert.equal(counts.get('book-a'), 1, 'book A holds r-scalar-a via the legacy scalar');
+    assert.equal(counts.get('book-b'), 1, 'book B holds r-scalar-b via the legacy scalar');
+  });
+
+  it('agrees with the array basis once the marker is set', async () => {
+    const fixture = await makeFixture({
+      system: persistedSystem({
+        aRecipeIds: ['r-scalar-a', 'r-uuid-a'],
+        bRecipeIds: ['r-scalar-b'],
+      }),
+    });
+    await fixture.store.refresh();
+    const viewState = get(fixture.store.viewState);
+
+    assert.equal(marker(fixture), true);
+    const counts = countRecipeBookMembership(viewState.recipes);
+    assert.equal(counts.get('book-a'), 2);
+    assert.equal(counts.get('book-b'), 1);
   });
 });

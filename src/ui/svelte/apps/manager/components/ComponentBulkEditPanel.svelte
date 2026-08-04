@@ -171,9 +171,15 @@
 
   // The tri-state cycle stated in full. "click to add · again to remove" named only two of
   // the three stops and left the third — the one that UNDOES a staged remove — undiscoverable
-  // except by clicking a third time and watching what happens. Shared verbatim with the
-  // Recipe Studio's book run, which cycles identically; the spec forbids the two studios
-  // diverging here, so one key serves both (issue 1010).
+  // except by clicking a third time and watching what happens.
+  //
+  // This studio is now the key's ONLY consumer. The Recipe Studio's book axis was a
+  // matching chip run when the key moved to the neutral `BulkEdit.*` namespace, but it is
+  // now a search-and-pick control (issue 1010) and cycles nothing, so there is no shared
+  // instruction left to state. The key stays here rather than moving back under
+  // `Component.*`: the shared namespace still describes what it is — a neutral, noun-free
+  // bulk-edit string — and the divergence is in the two studios' staged AXES, which the
+  // spec permits, not in their shared chrome, which it does not.
   const chipCycleHint = $derived(
     text(
       'FABRICATE.Admin.Manager.BulkEdit.TagsHint',

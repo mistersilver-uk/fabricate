@@ -1,26 +1,33 @@
 /**
  * The recipe browser's BULK EDIT panel (issue 1010).
  *
- * What is tested here is the staging semantics, not the pixels: the tri-state book cycle,
- * the Apply enablement rule (including the removal-only draft an earlier design would have
- * left inert), the three distinct instructions of the check-tier axis, the five
- * unavailability messages that render IN PLACE OF that control, and the conditional
- * blocked-enable warning.
+ * What is tested here is the staging semantics, not the pixels: the book picker and its
+ * accumulating staged list, the Apply enablement rule (including the removal-only draft an
+ * earlier design would have left inert), the three distinct instructions of the check-tier
+ * axis, the five unavailability messages that render IN PLACE OF that control, and the
+ * conditional blocked-enable warning.
  *
  * The panel does NOT own the draft — the manager root does, because the panel is unmounted
  * the moment the selection empties. So these tests drive it the way the root does: hand it
  * a draft, take the NEW draft back through `onDraftChange`, and re-render with it.
  *
  * That round-trip is the point. Every helper in `recipeBulkEditModel.js` is IMMUTABLE, so a
- * panel that called `cycleBulkRecipeBook(draft, id)` without reassigning would compile,
+ * panel that called `setBulkRecipeBookOp(draft, id, op)` without reassigning would compile,
  * run, and silently do nothing — the control would simply look dead. Asserting on the
- * rendered chip state after the round-trip is what catches that.
+ * rendered staged list after the round-trip is what catches that.
+ *
+ * The ONE piece of state the panel does own is which book the pick card is composing, which
+ * is view state and not an instruction; the accumulating `bookAdd` / `bookRemove` lists
+ * still belong to the caller, so staging several books in turn is tested end to end here.
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  createMountedComponentHarness,
+  SEARCHABLE_POPOVER_RAW_MODULES
+} from '../helpers/svelte-component-harness.js';
 import { createRecipeBulkDraft } from '../../src/utils/recipeBulkEditModel.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -29,7 +36,10 @@ const panel = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-bulk-panel-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    // The book axis is a `SearchablePopover`, so its portal / dismiss actions and popover
+    // layout util come with it. A missing entry here HANGS the suite (`# cancelled`)
+    // rather than failing it, which is why the list is hoisted and shared.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/utils/recipeCategories.js',
     // The pure staging model and its shared selection leaf. Both are STATIC imports of the
     // component under test, and the shared harness's closure validator throws loudly on an
@@ -40,6 +50,8 @@ const panel = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The shared bulk-edit chrome: this panel renders its header, hero, section headings,
     // staged selects and Apply through these three, exactly as the Component Studio's does.
@@ -61,11 +73,18 @@ const panel = createMountedComponentHarness({
  * from its linked world item and only falls back to the stored one. The panel renders
  * against either publish, so a fixture that hand-builds `{id, name}` builds a shape no
  * publish produces — and that is precisely what let a `book?.name || book?.id` label ship
- * showing `book-alchemy` in place of `Alchemist Primer` on every chip.
+ * showing `book-alchemy` in place of `Alchemist Primer` on every option row.
  *
  * `resolvedImg` / `derivedType` / `linkMissing` / `recipes` / `learnedByCount` are the
  * projection's other fields, carried here so the fixture stays a faithful sample rather
  * than a second hand-built shape.
+ *
+ * EVERY `recipeIds` IS EMPTY, and that is load-bearing rather than lazy. It is the shape a
+ * LEGACY-BASIS system projects — one whose `membershipResolvesByRecipeIds` marker is unset,
+ * so membership resolves through the `recipe.recipeItemId` scalar and a book's own array
+ * says nothing. The membership counts below are handed in separately, exactly as the
+ * manager root derives them from the projected ROWS, so a panel that read `book.recipeIds`
+ * would report "holds none selected" for every one of these books.
  */
 const BOOKS = [
   {
@@ -73,7 +92,7 @@ const BOOKS = [
     originItemUuid: 'Item.alchemy',
     resolvedName: 'Alchemist Primer',
     resolvedImg: 'icons/svg/item-bag.svg',
-    derivedType: 'book',
+    derivedType: 'Book',
     recipeIds: [],
     linkMissing: false,
     recipes: [],
@@ -84,13 +103,21 @@ const BOOKS = [
     originItemUuid: 'Item.forge',
     resolvedName: 'Forge Manual',
     resolvedImg: 'icons/svg/item-bag.svg',
-    derivedType: 'book',
+    derivedType: 'Scroll',
     recipeIds: [],
     linkMissing: false,
     recipes: [],
     learnedByCount: 0
   }
 ];
+
+/**
+ * The basis-aware membership the manager root derives from the SELECTED projected rows'
+ * `recipeItemIds`: over a selection of three, the Primer holds two of them and the Manual
+ * holds none. Both books' own `recipeIds` are empty above, so these numbers are reachable
+ * only through the map.
+ */
+const MEMBERSHIP = new Map([['book-alchemy', 2]]);
 
 // The second tier is deliberately UNNAMED: `resolveRecipeCheckTierOptions` returns tiers
 // raw, so the "Unnamed tier (DC n)" fallback is this panel's to render.
@@ -114,6 +141,7 @@ async function mountPanel(props = {}) {
     checkTierAxis: OPEN_AXIS,
     checkTierOptions: TIERS,
     books: BOOKS,
+    bookMembership: MEMBERSHIP,
     ...props,
     draft: state.draft,
     onDraftChange: async (next) => {
@@ -126,10 +154,34 @@ async function mountPanel(props = {}) {
   return { root, state };
 }
 
-const bookChip = (root, id) => root.querySelector(`[data-bulk-book="${id}"]`);
-const bookState = (root, id) => bookChip(root, id).getAttribute('data-bulk-book-state');
 const applyButton = (root) => root.querySelector('[data-recipe-bulk-apply]');
 const tierSelect = (root) => root.querySelector('[data-recipe-bulk-check-tier]');
+
+// ── The book axis ────────────────────────────────────────────────────────────────
+const bookTrigger = (root) => root.querySelector('.fab-bulk-book-trigger');
+const pickCard = (root) => root.querySelector('[data-recipe-bulk-book-pick]');
+const addButton = (root) => root.querySelector('[data-recipe-bulk-book-add]');
+const removeButton = (root) => root.querySelector('[data-recipe-bulk-book-remove]');
+const stagedList = (root) => root.querySelector('[data-recipe-bulk-books-staged]');
+const stagedRow = (root, id) => root.querySelector(`[data-bulk-book="${id}"]`);
+const stagedState = (root, id) => stagedRow(root, id)?.getAttribute('data-bulk-book-state');
+const stagedIds = (root) =>
+  [...root.querySelectorAll('[data-bulk-book]')].map((row) => row.getAttribute('data-bulk-book'));
+
+/** Open the picker popover and click one book's option row by id. */
+function pickBook(root, bookId) {
+  bookTrigger(root).click();
+  flushSync();
+  root.querySelector(`[data-popover-option="${bookId}"]`).click();
+  flushSync();
+}
+
+/** Pick a book and press one of its two actions — the whole gesture, as a GM performs it. */
+function stageBook(root, bookId, op) {
+  pickBook(root, bookId);
+  (op === 'add' ? addButton(root) : removeButton(root)).click();
+  flushSync();
+}
 
 // The segmented axes render REAL radios, so a segment is chosen by firing `change` on the
 // radio inside it rather than by clicking a styled label.
@@ -156,110 +208,327 @@ afterEach(() => {
   panel.remount();
 });
 
-describe('RecipeBulkEditPanel recipe-book staging (issue 1010)', () => {
-  it('cycles a chip leave -> add -> remove -> leave and is never both', async () => {
-    const { root, state } = await mountPanel();
-
-    assert.equal(bookState(root, 'book-alchemy'), 'none', 'a fresh draft stages nothing');
-
-    bookChip(root, 'book-alchemy').click();
+describe('RecipeBulkEditPanel book picker (issue 1010)', () => {
+  it('offers the whole AUTHORED vocabulary, not the books the selection is already in', async () => {
+    const { root } = await mountPanel();
+    bookTrigger(root).click();
     flushSync();
-    assert.equal(bookState(root, 'book-alchemy'), 'add');
-    assert.deepEqual(state.draft.bookAdd, ['book-alchemy']);
-    assert.deepEqual(state.draft.bookRemove, []);
 
-    bookChip(root, 'book-alchemy').click();
-    flushSync();
-    assert.equal(bookState(root, 'book-alchemy'), 'remove');
-    assert.deepEqual(state.draft.bookAdd, [], 'a book is never simultaneously add and remove');
-    assert.deepEqual(state.draft.bookRemove, ['book-alchemy']);
-
-    bookChip(root, 'book-alchemy').click();
-    flushSync();
-    assert.equal(bookState(root, 'book-alchemy'), 'none');
-    assert.deepEqual(state.draft.bookRemove, []);
-
-    assert.equal(bookState(root, 'book-forge'), 'none', 'the other books are untouched throughout');
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-popover-option]')].map((option) =>
+        option.getAttribute('data-popover-option')
+      ),
+      ['book-alchemy', 'book-forge'],
+      'a vocabulary built from books the selected recipes are already in would drop the '
+        + 'Forge Manual, which holds none of them — and it is the commonest Add target there is'
+    );
   });
 
-  it('renders each chip as a real focusable button whose name opens with the book', async () => {
+  // The prototype's results list stays EMPTY until the GM types, which on a four-book system
+  // is a bare search box that shows nothing at all.
+  it('lists every book with an empty query rather than waiting to be typed at', async () => {
     const { root } = await mountPanel();
-    const chip = bookChip(root, 'book-alchemy');
+    bookTrigger(root).click();
+    flushSync();
 
-    assert.equal(chip.tagName, 'BUTTON', 'a span could not be reached by keyboard');
-    assert.equal(chip.getAttribute('type'), 'button', 'and an untyped button would submit');
-    assert.equal(
-      chip.textContent,
-      'Alchemist Primer',
-      'the chip children carry no internal whitespace'
+    const search = root.querySelector('.manager-travel-popover-search input');
+    assert.equal(search.value, '', 'precondition: nothing has been typed');
+    assert.equal(root.querySelectorAll('[data-popover-option]').length, 2);
+  });
+
+  // THE BASIS-AWARE COUNT. Every fixture book carries an EMPTY `recipeIds` — the shape a
+  // legacy-basis system projects — so these numbers exist only in the membership map the
+  // root derives from the projected ROWS. A panel that counted from `book.recipeIds` would
+  // render "holds none of the 3 selected" here and, below, disable Remove.
+  it('states each book membership from the basis-aware map, never from book.recipeIds', async () => {
+    const { root } = await mountPanel();
+    bookTrigger(root).click();
+    flushSync();
+
+    const metaOf = (id) =>
+      root.querySelector(`[data-popover-option="${id}"] .manager-travel-option-meta`).textContent;
+
+    assert.equal(metaOf('book-alchemy'), 'Recipe book · holds 2 of 3 selected');
+    assert.equal(metaOf('book-forge'), 'Scroll · holds none of the 3 selected');
+    assert.ok(
+      BOOKS.every((book) => book.recipeIds.length === 0),
+      'the fixture really is legacy-basis: no definition knows its own membership'
+    );
+  });
+
+  it('names both extremes as whole sentences rather than "holds 0 of 3"', async () => {
+    const { root } = await mountPanel({
+      count: 3,
+      bookMembership: new Map([['book-alchemy', 3]])
+    });
+    bookTrigger(root).click();
+    flushSync();
+
+    assert.match(
+      root.querySelector('[data-popover-option="book-alchemy"]').textContent,
+      /holds all 3 selected/
     );
     assert.match(
-      chip.getAttribute('aria-label'),
-      /^Alchemist Primer — leave unchanged\.$/,
-      'the name OPENS with the visible label (WCAG 2.5.3) then states the staged ACTION — '
-        + 'aria-pressed cannot describe three states'
+      root.querySelector('[data-popover-option="book-forge"]').textContent,
+      /holds none of the 3 selected/
     );
   });
 
-  // `bookActionLabel` reads `bookLabel`, so a broken label chain breaks the VISIBLE text
-  // and the ACCESSIBLE NAME together — and the accessible name is where it is least
-  // likely to be noticed. Both are asserted against the projected `resolvedName`, and the
-  // id is asserted absent so a fixture that happens to also carry a `name` cannot mask a
-  // regression back to `book?.id`.
-  it('labels every chip from the projection resolvedName, never the raw definition id', async () => {
+  it('labels every option from the projection resolvedName, never the raw definition id', async () => {
     const { root } = await mountPanel();
+    bookTrigger(root).click();
+    flushSync();
 
     for (const [id, name] of [['book-alchemy', 'Alchemist Primer'], ['book-forge', 'Forge Manual']]) {
-      const chip = bookChip(root, id);
-      assert.equal(chip.textContent, name, `${id} renders its resolved name, not its id`);
-      assert.ok(
-        chip.getAttribute('aria-label').startsWith(name),
-        `${id}: the accessible name opens with the same resolved name`
+      const option = root.querySelector(`[data-popover-option="${id}"]`);
+      assert.equal(
+        option.querySelector('.manager-travel-option-name').textContent,
+        name,
+        `${id} renders its resolved name, not its id`
       );
       assert.ok(
-        !chip.getAttribute('aria-label').includes(id),
+        !option.textContent.includes(id),
         `${id}: a raw definition id must never reach a GM-visible string`
       );
     }
-    assert.ok(
-      !root.querySelector('[data-recipe-bulk-books]').textContent.includes('book-'),
-      'no chip in the run falls through to an id'
-    );
   });
 
   // A book whose projection somehow carries no resolved name still gets SOMETHING: an
-  // empty chip is unclickable in practice and unnameable for speech input, so the id is
-  // the last resort rather than the first.
+  // unnamed option is unreadable and unnameable for speech input, so the id is the last
+  // resort rather than the first.
   it('falls back to the id only when no resolvable name exists at all', async () => {
     const { root } = await mountPanel({ books: [{ id: 'sm-book' }] });
-    assert.equal(bookChip(root, 'sm-book').textContent, 'sm-book');
-  });
-
-  // The run is ONE axis, so it is exposed as one control rather than as a stray sequence of
-  // buttons, and the hint above it states all THREE stops of the cycle. Both facts are
-  // shared verbatim with the Component Studio's tag run — see its twin case.
-  it('exposes the chip run as a named group above an honest three-state hint', async () => {
-    const { root } = await mountPanel();
-    const run = root.querySelector('[data-recipe-bulk-books]');
-
-    assert.equal(run.getAttribute('role'), 'group');
+    bookTrigger(root).click();
+    flushSync();
     assert.equal(
-      run.getAttribute('aria-label'),
-      'Recipe books',
-      'the group name is the section heading a sighted GM reads, not a second string'
-    );
-    assert.match(
-      root.textContent,
-      /click to add · again to remove · again to leave unchanged/,
-      'the third stop is the one that UNDOES a staged remove; naming only two of three left '
-        + 'it discoverable only by clicking and watching'
+      root.querySelector('[data-popover-option="sm-book"] .manager-travel-option-name').textContent,
+      'sm-book'
     );
   });
 
-  it('says the system defines no recipe books rather than rendering an empty run', async () => {
+  it('says the system defines no books rather than rendering an empty picker', async () => {
     const { root } = await mountPanel({ books: [] });
     assert.ok(Boolean(root.querySelector('[data-recipe-bulk-books-empty]')));
-    assert.ok(!root.querySelector('[data-recipe-bulk-books]'), 'and renders no chip row at all');
+    assert.ok(!bookTrigger(root), 'and renders no trigger at all');
+  });
+});
+
+describe('RecipeBulkEditPanel book pick card (issue 1010)', () => {
+  it('replaces the trigger with a card naming the book and its membership', async () => {
+    const { root } = await mountPanel();
+    pickBook(root, 'book-alchemy');
+
+    const card = pickCard(root);
+    assert.ok(Boolean(card), 'picking a book opens the composer');
+    assert.equal(card.getAttribute('data-recipe-bulk-book-pick'), 'book-alchemy');
+    assert.match(card.textContent, /Alchemist Primer/);
+    assert.match(card.textContent, /Recipe book · holds 2 of 3 selected/);
+    assert.ok(!bookTrigger(root), 'the search and the composer are two steps of one gesture');
+  });
+
+  // THE CORRECTED LABELS. The prototype names the whole SELECTION on both buttons while
+  // deriving their disabled state from the missing/present counts, so `Add 3` can sit
+  // enabled over a book only one recipe is missing.
+  it('labels Add and Remove with the count each will actually affect', async () => {
+    const { root } = await mountPanel();
+    pickBook(root, 'book-alchemy');
+
+    assert.match(addButton(root).textContent, /Add 1/, '3 selected, 2 already held — 1 to add');
+    assert.match(removeButton(root).textContent, /Remove 2/);
+    assert.ok(
+      !/Add 3|Remove 3/.test(pickCard(root).textContent),
+      'never the selection size, which is not the number either button writes'
+    );
+  });
+
+  it('disables the action whose count is zero, and only that one', async () => {
+    const { root } = await mountPanel();
+
+    pickBook(root, 'book-forge');
+    assert.equal(addButton(root).disabled, false, 'the Manual holds none of the three');
+    assert.equal(removeButton(root).disabled, true, 'so there is nothing to remove');
+    assert.equal(
+      removeButton(root).textContent.trim(),
+      'Remove',
+      'and the count is dropped rather than rendered as "Remove 0"'
+    );
+  });
+
+  // The failure this whole membership prop exists to prevent, stated as its own case: on a
+  // legacy-basis system a count read from `definition.recipeIds` is 0 for every book, which
+  // disables Remove and makes the axis one-way.
+  it('leaves Remove LIVE for a legacy-basis book whose own recipeIds is empty', async () => {
+    const { root } = await mountPanel();
+    pickBook(root, 'book-alchemy');
+
+    assert.equal(
+      removeButton(root).disabled,
+      false,
+      'counting from the definition would report "holds none" and kill this control'
+    );
+  });
+
+  it('names both actions accessibly, opening with the visible label', async () => {
+    const { root } = await mountPanel();
+    pickBook(root, 'book-alchemy');
+
+    assert.equal(addButton(root).tagName, 'BUTTON', 'a span could not be reached by keyboard');
+    assert.equal(addButton(root).getAttribute('type'), 'button');
+    assert.equal(
+      addButton(root).getAttribute('aria-label'),
+      'Add 1 — add Alchemist Primer to every selected recipe that is missing it.',
+      'WCAG 2.5.3: the name opens with the label a speech-input user can read'
+    );
+    assert.equal(
+      removeButton(root).getAttribute('aria-label'),
+      'Remove 2 — remove Alchemist Primer from every selected recipe that has it.'
+    );
+    assert.ok(
+      !addButton(root).hasAttribute('aria-pressed'),
+      'these are one-shot actions; the staged list is what reports and undoes the result'
+    );
+  });
+
+  it('explains a disabled action rather than leaving it unnamed', async () => {
+    const { root } = await mountPanel();
+    pickBook(root, 'book-forge');
+    assert.equal(
+      removeButton(root).getAttribute('aria-label'),
+      'Remove — no selected recipe has Forge Manual.'
+    );
+  });
+
+  it('returns to the trigger when the pick is cleared, staging nothing', async () => {
+    const { root, state } = await mountPanel();
+    pickBook(root, 'book-alchemy');
+
+    root.querySelector('[data-recipe-bulk-book-clear-pick]').click();
+    flushSync();
+
+    assert.ok(!pickCard(root));
+    assert.ok(Boolean(bookTrigger(root)));
+    assert.deepEqual(state.draft.bookAdd, [], 'picking is not staging');
+    assert.deepEqual(state.draft.bookRemove, []);
+  });
+});
+
+describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
+  // THE ACCUMULATION. One book on screen is a property of the CONTROL; the staged set grows.
+  // The prototype computes this list and never renders it, which leaves a
+  // one-book-at-a-time control with no record of what it was told about the others.
+  it('accumulates across books, and the pick clears so the next one costs one gesture', async () => {
+    const { root, state } = await mountPanel();
+
+    stageBook(root, 'book-alchemy', 'add');
+    assert.ok(!pickCard(root), 'the staged row is the confirmation, so the composer stands down');
+    assert.ok(Boolean(bookTrigger(root)), 'and the trigger is already back for the next book');
+    assert.deepEqual(state.draft.bookAdd, ['book-alchemy']);
+
+    stageBook(root, 'book-forge', 'add');
+
+    assert.deepEqual(
+      state.draft.bookAdd,
+      ['book-alchemy', 'book-forge'],
+      'the second pick ADDS to the staged set rather than replacing it'
+    );
+    assert.deepEqual(stagedIds(root), ['book-alchemy', 'book-forge']);
+  });
+
+  // The view-lab frame asserts an `add` state and a `remove` state as SIBLINGS, which is
+  // only satisfiable because the staged list holds both at once.
+  it('holds a mixed add/remove draft, one row each', async () => {
+    const { root, state } = await mountPanel();
+
+    stageBook(root, 'book-alchemy', 'remove');
+    stageBook(root, 'book-forge', 'add');
+
+    assert.equal(stagedState(root, 'book-alchemy'), 'remove');
+    assert.equal(stagedState(root, 'book-forge'), 'add');
+    assert.deepEqual(state.draft.bookAdd, ['book-forge']);
+    assert.deepEqual(state.draft.bookRemove, ['book-alchemy']);
+    assert.equal(
+      stagedList(root).children.length,
+      2,
+      'both rows are siblings of one list, which is what makes the mixed frame capturable'
+    );
+  });
+
+  it('names the operation, the book and the number of recipes it will affect', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'add');
+
+    const row = stagedRow(root, 'book-alchemy');
+    assert.match(row.textContent, /Add/);
+    assert.match(row.textContent, /Alchemist Primer/);
+    assert.match(row.textContent, /1 recipe/, '3 selected, 2 already held');
+    assert.ok(!/1 recipes/.test(row.textContent), 'never the plural at one');
+  });
+
+  // "no change" is not reachable from the pick card — the action whose count is zero is
+  // disabled there — but it IS reachable, because the SELECTION moves under a draft that
+  // outlives it: stage Remove while the book holds one selected recipe, then untick that
+  // recipe, and the staged op now moves nothing. Apply would report a write that did
+  // nothing, and this row is the only warning before it. Driven by handing the panel that
+  // draft directly, which is exactly what the manager root does after such a change.
+  it('says "no change" for a staged op the selection has since emptied of work', async () => {
+    const { root } = await mountPanel({
+      draft: { ...createRecipeBulkDraft(), bookRemove: ['book-alchemy'] },
+      bookMembership: new Map()
+    });
+
+    assert.equal(stagedState(root, 'book-alchemy'), 'remove');
+    assert.match(stagedRow(root, 'book-alchemy').textContent, /no change/);
+    assert.ok(
+      !/0 recipes/.test(stagedRow(root, 'book-alchemy').textContent),
+      'a quantity where the honest statement is that there is nothing to do'
+    );
+  });
+
+  it('unstages one book without disturbing the others', async () => {
+    const { root, state } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'remove');
+    stageBook(root, 'book-forge', 'add');
+
+    const unstage = root.querySelector('[data-recipe-bulk-book-unstage="book-alchemy"]');
+    assert.equal(
+      unstage.getAttribute('aria-label'),
+      'Alchemist Primer — leave this book unchanged.'
+    );
+    unstage.click();
+    flushSync();
+
+    assert.deepEqual(stagedIds(root), ['book-forge']);
+    assert.deepEqual(state.draft.bookRemove, []);
+    assert.deepEqual(state.draft.bookAdd, ['book-forge'], 'the other staged book is untouched');
+  });
+
+  it('re-picking a staged book reports the op already staged for it', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'remove');
+
+    bookTrigger(root).click();
+    flushSync();
+    assert.match(
+      root.querySelector('[data-popover-option="book-alchemy"]').textContent,
+      /Remove/,
+      're-picking must be a deliberate revision, not a blind overwrite'
+    );
+  });
+
+  it('renders no list at all until something is staged, and reports the tally once it is', async () => {
+    const { root } = await mountPanel();
+
+    assert.ok(!stagedList(root));
+    assert.match(
+      root.textContent,
+      /Pick one, then add it where missing or remove it where present/
+    );
+
+    stageBook(root, 'book-alchemy', 'add');
+    assert.match(root.textContent, /1 change staged/);
+
+    stageBook(root, 'book-forge', 'add');
+    assert.match(root.textContent, /2 changes staged/);
   });
 });
 
@@ -287,17 +556,14 @@ describe('RecipeBulkEditPanel apply enablement (issue 1010)', () => {
   it('is live for a REMOVAL-ONLY book draft', async () => {
     const { root } = await mountPanel();
 
-    // Straight to `remove`: two clicks, never resting on `add`.
-    bookChip(root, 'book-forge').click();
-    flushSync();
-    bookChip(root, 'book-forge').click();
-    flushSync();
+    // ONE gesture: pick the book, press Remove. Never resting on `add`.
+    stageBook(root, 'book-alchemy', 'remove');
 
-    assert.equal(bookState(root, 'book-forge'), 'remove');
+    assert.equal(stagedState(root, 'book-alchemy'), 'remove');
     assert.equal(
       applyButton(root).disabled,
       false,
-      'a removal-only edit is a real edit the chip run can stage on its own'
+      'a removal-only edit is a real edit the book axis stages on its own'
     );
   });
 
@@ -458,12 +724,12 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
   it('goes inert rather than double-writing', async () => {
     const { root } = await mountPanel({
       applying: true,
-      draft: { ...createRecipeBulkDraft(), status: 'enable' }
+      draft: { ...createRecipeBulkDraft(), status: 'enable', bookAdd: ['book-alchemy'] }
     });
 
     assert.equal(root.querySelector('[data-recipe-bulk-category]').disabled, true);
     assert.equal(tierSelect(root).disabled, true);
-    assert.equal(bookChip(root, 'book-alchemy').disabled, true);
+    assert.equal(bookTrigger(root).disabled, true, 'the picker cannot be opened mid-apply');
     for (const axis of ['status', 'lock']) {
       const radios = [...root.querySelectorAll(`[data-recipe-bulk-${axis}-option] input`)];
       assert.equal(radios.length, 3, `the ${axis} axis renders its three segments`);
@@ -472,6 +738,10 @@ describe('RecipeBulkEditPanel in-flight apply (issue 1010)', () => {
         `a dimmed-but-live ${axis} segment would still stage an edit mid-apply`
       );
     }
+    assert.ok(
+      root.querySelector('[data-recipe-bulk-book-unstage="book-alchemy"]').disabled,
+      'and a staged book cannot be unstaged out from under an in-flight write'
+    );
     assert.equal(
       applyButton(root).disabled,
       true,

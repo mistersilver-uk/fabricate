@@ -18,6 +18,19 @@
   rather than two implementations of one meaning. What is here is what is genuinely about
   RECIPES: the category, status, lock, check-tier and recipe-book axes.
 
+  ── THE BOOK AXIS IS A PICKER, NOT A CHIP RUN ─────────────────────────────────────
+  The Component Studio stages its many-valued axis (tags) as a flat run of tri-state chips.
+  This one deliberately does not, and the divergence is maintainer-decided (issue 1010): a
+  chip per book stops being readable at the eight-plus recipe items a real system carries,
+  where a system's tag vocabulary is small and flat by nature. So the axis is a SEARCH AND
+  PICK control — trigger, searchable option list, pick card with Add and Remove — over one
+  book at a time, with a STAGED LIST below it accumulating the answers.
+
+  The divergence is confined to the staged AXIS. The chrome above stays common, and so does
+  the staged SHAPE: `bookAdd[]` / `bookRemove[]`, `toBulkRecipeEdit`'s `addBookIds` /
+  `removeBookIds`, and the write primitive's books-not-recipes iteration are all unchanged.
+  One book on screen is a property of the CONTROL, never of the staged set.
+
   Consequence, accepted and recorded: Edit, Duplicate and Delete live ONLY in
   `RecipeBrowserInspector`, so ticking one box hides them until the selection clears.
   `Clear selection` is the documented escape and is the first control in the header.
@@ -56,15 +69,22 @@
    - checkTierAxis: `describeRecipeCheckTierAxis(...)` output, `{available, reason}`.
    - checkTierOptions: the system's authored `{id, name, dc}` tiers, from the SAME derived
      the single-recipe editor's dropdown reads.
-   - books: the system's recipe-item definitions, one tri-state chip each.
+   - books: the system's AUTHORED recipe-item definitions — `selectedSystem.recipeItemDefinitions`
+     — never a vocabulary derived from the books the selected recipes are already in. A book
+     holding zero recipes would be invisible to the latter, and it is unreachable as an Add
+     target exactly when it is the commonest reason to open this control.
+   - bookMembership: `Map<bookId, number>` — how many of the SELECTED recipes each book
+     holds. Derived by the caller from the projected rows' `recipeItemIds`, which is
+     basis-aware; see `countRecipeBookMembership` for why a count read off
+     `definition.recipeIds` would be wrong on every legacy-basis world.
    - blockedCount: how many selected recipes activation would currently refuse.
    - draft / onDraftChange(next): the staged edit, owned by the caller.
    - applying: an in-flight apply; the panel goes inert rather than double-writing.
    - onClearSelection() / onApply().
 -->
 <script>
-  import Chip from '../Chip.svelte';
   import Callout from '../Callout.svelte';
+  import SearchablePopover from '../SearchablePopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
@@ -76,10 +96,11 @@
     RECIPE_BULK_STATUS_VALUES,
     RECIPE_CHECK_TIER_DEFAULT,
     RECIPE_CHECK_TIER_UNCHANGED,
+    bulkRecipeBookOp,
     bulkRecipeCheckTierSelectValue,
     bulkRecipeDraftHasChanges,
     createRecipeBulkDraft,
-    cycleBulkRecipeBook,
+    setBulkRecipeBookOp,
     setBulkRecipeCategory,
     setBulkRecipeCheckTier,
     setBulkRecipeLock,
@@ -92,6 +113,7 @@
     checkTierAxis = { available: false, reason: 'noTiers' },
     checkTierOptions = [],
     books = [],
+    bookMembership = new Map(),
     blockedCount = 0,
     draft = createRecipeBulkDraft(),
     applying = false,
@@ -99,6 +121,16 @@
     onClearSelection = () => {},
     onApply = () => {},
   } = $props();
+
+  // Which book the pick card is composing. PANEL-LOCAL VIEW STATE, not a staged edit: it
+  // names no instruction, survives no apply, and belongs in the draft as little as a
+  // scroll position does. The draft it composes into is still the caller's.
+  //
+  // It is an ID rather than the object, so a republished projection (phase 2 resolves each
+  // book's real name and art) re-resolves through `books` instead of pinning a stale
+  // snapshot — and a book that leaves the vocabulary simply stops resolving, which returns
+  // the trigger without an effect to clean up after it.
+  let pickedBookId = $state('');
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -115,8 +147,6 @@
 
   const stagedStatus = $derived(draft?.status || 'unchanged');
   const stagedLock = $derived(draft?.lock || 'unchanged');
-  const stagedBookAdd = $derived(Array.isArray(draft?.bookAdd) ? draft.bookAdd : []);
-  const stagedBookRemove = $derived(Array.isArray(draft?.bookRemove) ? draft.bookRemove : []);
   const inert = $derived(applying === true);
   const canApply = $derived(bulkRecipeDraftHasChanges(draft) && !inert);
 
@@ -145,25 +175,12 @@
     text('FABRICATE.Admin.Manager.BulkEdit.CategoryUnchanged', 'Leave unchanged')
   );
 
-  // The tri-state cycle stated in full, and the SAME shared key the Component Studio's tag
-  // run renders — the two runs cycle identically (leave → add → remove → leave) and the
-  // spec forbids the two studios diverging, so one string serves both. It used to name only
-  // two of the three stops, which left the third — the one that UNDOES a staged remove —
-  // undiscoverable except by clicking a third time and watching what happened.
-  const chipCycleHint = $derived(
-    text(
-      'FABRICATE.Admin.Manager.BulkEdit.TagsHint',
-      'click to add · again to remove · again to leave unchanged'
-    )
-  );
-
-  // The chip run is a GROUP, not a stray sequence of buttons: it is one axis whose members
-  // are read together, and without the role a screen-reader user arrives at a `<button>`
-  // named "Forgecraft Folio — add to every selected recipe." with nothing saying which
-  // control they are inside. Named from the section's own visible label, so the group name
-  // and the heading a sighted GM reads are one string.
+  // The section heading, and the accessible name of the staged list under it, so the group
+  // name and the heading a sighted GM reads are one string. `recipe item` remains the
+  // canonical spec noun; `Books & scrolls` is the display name the manager's own navigation
+  // already uses for the same vocabulary, so the panel names it as the GM finds it.
   const booksLabel = $derived(
-    text('FABRICATE.Admin.Manager.Recipe.BulkEdit.Books', 'Recipe books')
+    text('FABRICATE.Admin.Manager.Recipe.BulkEdit.Books', 'Books & scrolls')
   );
 
   // The two segmented axes are the same control with different words, so the segment table
@@ -275,17 +292,7 @@
     );
   });
 
-  // Tri-state colour maps onto the shipped chip tones, exactly as the Component Studio's
-  // tag run does: add is the success family, remove the danger family, leave the neutral
-  // one. The trailing glyph reinforces it for anyone who cannot separate the three by hue.
-  const BOOK_TONES = { add: 'positive', remove: 'danger', none: 'neutral' };
-  const BOOK_ICONS = { add: 'fas fa-plus', remove: 'fas fa-minus', none: 'far fa-circle' };
-
-  function bookState(bookId) {
-    if (stagedBookAdd.includes(bookId)) return 'add';
-    if (stagedBookRemove.includes(bookId)) return 'remove';
-    return 'none';
-  }
+  // ── The book axis ────────────────────────────────────────────────────────────────
 
   // `books` is `selectedSystem.recipeItemDefinitions`, the PROJECTION — and the projection
   // emits `resolvedName`, never a bare `name`. That holds in both publishes the panel can
@@ -297,38 +304,240 @@
   //
   // The chain is `CraftingSystemManagerRoot.recipeItemSourceSnapshot`'s, which is how the
   // rest of the manager labels a recipe-item definition; `id` is appended as a last resort
-  // because an empty chip is neither clickable nor nameable by speech input.
+  // because an unnamed option is neither readable nor nameable by speech input.
   function bookLabel(book) {
     return book?.resolvedName || book?.name || book?.id || '';
   }
 
-  // The accessible name OPENS with the visible label and then states the staged ACTION.
-  // Opening with the label is WCAG 2.5.3 Label in Name — a speech-input user says what they
-  // can read — and the action half is there because `aria-pressed` cannot honestly describe
-  // a control with THREE states, so the name has to carry it instead.
-  function bookActionLabel(book) {
-    const state = bookState(book.id);
-    const name = bookLabel(book);
-    if (state === 'add') {
+  // How many of the SELECTED recipes this book holds. Read from the caller's basis-aware
+  // map, NEVER from `book.recipeIds`: while a system's membership-basis marker is unset,
+  // membership resolves through the legacy `recipe.recipeItemId` scalar and a book that
+  // holds every selected recipe still carries an EMPTY `recipeIds`. Counting from the
+  // definition would report "holds none selected", disable Remove, and make this axis
+  // unusable on exactly the worlds that most need it.
+  //
+  // Clamped to the selection size so a stale or over-counted map can never render the
+  // arithmetically impossible "holds 5 of 3 selected".
+  function holdsCount(bookId) {
+    return Math.min(Number(bookMembership?.get?.(bookId)) || 0, count);
+  }
+
+  // The `kind` half of an option's second line. `derivedType` is `Book` / `Scroll` /
+  // `Incomplete`, and the third is deliberately NOT surfaced: the synchronous phase-1
+  // publish emits it for EVERY book unconditionally (it derives from a hard-coded zero
+  // recipe count), so it is not a fact this control can trust, and it names a validation
+  // state rather than a kind. A book holding no recipes yet is the commonest Add target
+  // there is; labelling it `Incomplete` in the very control that fixes it would be both
+  // unhelpful and, one publish out of two, untrue.
+  function bookKind(book) {
+    const type = String(book?.derivedType || '');
+    if (type === 'Book') {
+      return text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookKindBook', 'Recipe book');
+    }
+    if (type === 'Scroll') {
+      return text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookKindScroll', 'Scroll');
+    }
+    return text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookKindItem', 'Recipe item');
+  }
+
+  // "holds none of the 12 selected" / "holds all 12 selected" / "holds 3 of 12 selected".
+  // Three whole sentences rather than one with an interchangeable number, because the two
+  // extremes are the ones the GM acts on and "holds 0 of 12" reads as a broken template.
+  function bookHolds(bookId) {
+    const holds = holdsCount(bookId);
+    if (holds === 0) {
       return format(
-        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookChipActionAdd',
-        '{book} — add to every selected recipe.',
-        { book: name }
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookHoldsNone',
+        'holds none of the {total} selected',
+        { total: count }
       );
     }
-    if (state === 'remove') {
+    if (holds >= count) {
       return format(
-        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookChipActionRemove',
-        '{book} — remove from every selected recipe.',
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookHoldsAll',
+        'holds all {total} selected',
+        {
+          total: count,
+        }
+      );
+    }
+    return format(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookHoldsSome',
+      'holds {count} of {total} selected',
+      { count: holds, total: count }
+    );
+  }
+
+  function bookMeta(book) {
+    return format('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookMeta', '{kind} · {holds}', {
+      kind: bookKind(book),
+      holds: bookHolds(book?.id),
+    });
+  }
+
+  const addWord = $derived(text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookOpAdd', 'Add'));
+  const removeWord = $derived(
+    text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookOpRemove', 'Remove')
+  );
+
+  function opWord(op) {
+    return op === 'add' ? addWord : removeWord;
+  }
+
+  // The whole authored vocabulary, every time. `SearchablePopover` filters it by the search
+  // term and lists ALL of it while the term is empty — which is the correction to the
+  // prototype, whose results list is empty until the GM types and therefore shows nothing
+  // at all on a system with four books. Nothing is capped either: the popover's option list
+  // SCROLLS, so a cap would hide books that scrolling already reaches and reintroduce the
+  // unreachable-Add-target defect the authored vocabulary exists to prevent.
+  const bookOptions = $derived(
+    books.map((book) => {
+      const op = bulkRecipeBookOp(draft, book.id);
+      return {
+        id: book.id,
+        dataId: book.id,
+        label: bookLabel(book),
+        img: book.resolvedImg || '',
+        icon: 'fas fa-book',
+        meta: bookMeta(book),
+        // An already-staged book says so in the list, so re-picking one is a deliberate
+        // revision rather than a blind overwrite.
+        trailing: op === 'none' ? '' : opWord(op),
+      };
+    })
+  );
+
+  // The pick resolves through `books` on every read, so it self-heals: a book that leaves
+  // the vocabulary simply returns the trigger.
+  const pickedBook = $derived(books.find((book) => book.id === pickedBookId) || null);
+  const pickedHolds = $derived(pickedBook ? holdsCount(pickedBook.id) : 0);
+  const pickedMissing = $derived(pickedBook ? count - pickedHolds : 0);
+
+  // Labelled with the count actually AFFECTED, not with the selection size. The prototype
+  // names the whole selection on both buttons while deriving their disabled state from the
+  // missing/present counts, so `Add 5` can sit enabled over a book only two recipes are
+  // missing — the number on the control and the number it writes disagree.
+  //
+  // At zero the count is dropped rather than rendered: `Add 0` on a disabled control states
+  // a quantity where the honest statement is that there is nothing to do.
+  function opButtonLabel(op, affected) {
+    if (affected === 0) return opWord(op);
+    if (op === 'add') {
+      return format('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookAdd', 'Add {count}', {
+        count: affected,
+      });
+    }
+    return format('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookRemove', 'Remove {count}', {
+      count: affected,
+    });
+  }
+
+  // The accessible name OPENS with the visible label and then states the action, which is
+  // WCAG 2.5.3 Label in Name — a speech-input user says what they can read. No
+  // `aria-pressed`: these are one-shot actions that stage an op and hand the panel back to
+  // the trigger, and the staged list below is what reports (and undoes) the result.
+  function opActionLabel(op, affected, book) {
+    const name = bookLabel(book);
+    if (op === 'add') {
+      if (affected === 0) {
+        return format(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookAddNone',
+          'Add — every selected recipe already has {book}.',
+          { book: name }
+        );
+      }
+      return format(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookAddAction',
+        'Add {count} — add {book} to every selected recipe that is missing it.',
+        { count: affected, book: name }
+      );
+    }
+    if (affected === 0) {
+      return format(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookRemoveNone',
+        'Remove — no selected recipe has {book}.',
         { book: name }
       );
     }
     return format(
-      'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookChipActionNone',
-      '{book} — leave unchanged.',
-      { book: name }
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookRemoveAction',
+      'Remove {count} — remove {book} from every selected recipe that has it.',
+      { count: affected, book: name }
     );
   }
+
+  // THE STAGED LIST. The prototype computes this list and never renders it, which leaves a
+  // one-book-at-a-time control with no record of what the other books were told to do — so
+  // the accumulating draft is invisible right up until Apply. It is the confirmation, the
+  // undo, and the only surface on which a mixed add/remove draft can be read at all.
+  //
+  // Sorted by name so the list is stable under re-staging rather than ordered by the
+  // accident of which book the GM happened to pick first.
+  const stagedBooks = $derived.by(() =>
+    books
+      .filter((book) => bulkRecipeBookOp(draft, book.id) !== 'none')
+      .map((book) => {
+        const op = bulkRecipeBookOp(draft, book.id);
+        const holds = holdsCount(book.id);
+        const affected = op === 'add' ? count - holds : holds;
+        return {
+          id: book.id,
+          op,
+          name: bookLabel(book),
+          opLabel: opWord(op),
+          icon: op === 'add' ? 'fas fa-plus' : 'fas fa-minus',
+          // "no change" is a real and reachable outcome — staging Add on a book that
+          // already holds every selected recipe — and stating it here is the only warning
+          // the GM gets before Apply reports nothing happened.
+          countLabel: stagedCountLabel(affected),
+          unstageLabel: format(
+            'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookUnstage',
+            '{book} — leave this book unchanged.',
+            { book: bookLabel(book) }
+          ),
+        };
+      })
+      .sort((left, right) => left.name.localeCompare(right.name))
+  );
+
+  function stagedCountLabel(affected) {
+    if (affected === 0) {
+      return text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookStagedNoChange', 'no change');
+    }
+    if (affected === 1) {
+      return text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookStagedRecipesOne', '1 recipe');
+    }
+    return format('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookStagedRecipes', '{count} recipes', {
+      count: affected,
+    });
+  }
+
+  const booksHint = $derived.by(() => {
+    if (stagedBooks.length === 1) {
+      return text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BooksStagedHintOne', '1 change staged');
+    }
+    if (stagedBooks.length > 1) {
+      return format(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.BooksStagedHint',
+        '{count} changes staged',
+        { count: stagedBooks.length }
+      );
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.BooksHint',
+      'Pick one, then add it where missing or remove it where present'
+    );
+  });
+
+  const bookSearchPlaceholder = $derived(
+    books.length === 1
+      ? text('FABRICATE.Admin.Manager.Recipe.BulkEdit.BookSearchOne', 'Search 1 book or scroll…')
+      : format(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookSearch',
+          'Search {count} books & scrolls…',
+          { count: books.length }
+        )
+  );
 
   // Every mutator below REASSIGNS through the caller: the model's helpers return a NEW
   // draft and never mutate their argument.
@@ -348,8 +557,20 @@
     onDraftChange(setBulkRecipeCheckTier(draft, value));
   }
 
-  function cycleBook(bookId) {
-    onDraftChange(cycleBulkRecipeBook(draft, bookId));
+  // Staging CLEARS the pick, deliberately, and this is the one place this control departs
+  // from the prototype's behaviour rather than its defects. The prototype keeps the book
+  // picked, which leaves two surfaces claiming authority over one fact — an active Add
+  // button and a staged row — and makes every subsequent book cost an extra dismissal. With
+  // the staged list rendered, the row IS the confirmation and carries the undo, so the pick
+  // card is a transient composer: pick, act, and the trigger is back for the next book.
+  function stageBook(op) {
+    if (!pickedBook) return;
+    onDraftChange(setBulkRecipeBookOp(draft, pickedBook.id, op));
+    pickedBookId = '';
+  }
+
+  function unstageBook(bookId) {
+    onDraftChange(setBulkRecipeBookOp(draft, bookId, 'none'));
   }
 </script>
 
@@ -484,40 +705,371 @@
     />
   {/if}
 
+  <!--
+    The hint on the label row swaps from the instruction to a running tally the moment
+    anything is staged, so the section heading itself reports the accumulating draft — the
+    one line of the panel a GM scrolling past the picker will still read.
+  -->
   <BulkEditSection
     label={booksLabel}
-    hint={chipCycleHint}
+    hint={booksHint}
     subhint={books.length === 0
       ? text(
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.NoBooks',
-          'This system defines no recipe books.'
+          'This system defines no books or scrolls.'
         )
       : ''}
     subhintAttr="data-recipe-bulk-books-empty"
   />
   {#if books.length > 0}
-    <!--
-      A FLAT run of tri-state chips: the whole book vocabulary and the staged answer for
-      every entry are visible at once. `tag` and `type` are load-bearing — `Chip` defaults
-      to a `<span>` and defaults no `type`, which would make a tri-state control
-      non-focusable and, inside a form, a submit button. The children carry NO internal
-      whitespace, because `Chip` records that call sites assert exact `textContent`.
-    -->
-    <div class="manager-chip-row" role="group" aria-label={booksLabel} data-recipe-bulk-books>
-      {#each books as book (book.id)}
-        <Chip
-          tag="button"
-          type="button"
-          tone={BOOK_TONES[bookState(book.id)]}
-          icon="fas fa-book"
-          data-bulk-book={book.id}
-          data-bulk-book-state={bookState(book.id)}
-          aria-label={bookActionLabel(book)}
-          disabled={inert}
-          onclick={() => cycleBook(book.id)}
-          >{bookLabel(book)}<i class={BOOK_ICONS[bookState(book.id)]} aria-hidden="true"></i></Chip
-        >
-      {/each}
-    </div>
+    {#if pickedBook}
+      <!--
+        The PICK CARD. One book, its membership against the selection, and the two
+        instructions that can be given about it. It REPLACES the trigger rather than
+        sitting under it: the search and the composer are two steps of one gesture, and
+        showing both would put two book-shaped controls in a 300px rail.
+      -->
+      <div class="fab-bulk-book-pick" data-recipe-bulk-book-pick={pickedBook.id}>
+        <div class="fab-bulk-book-pick-head">
+          <span class="fab-bulk-book-pick-art" aria-hidden="true">
+            {#if pickedBook.resolvedImg}
+              <img src={pickedBook.resolvedImg} alt="" />
+            {:else}
+              <i class="fas fa-book"></i>
+            {/if}
+          </span>
+          <span class="fab-bulk-book-pick-copy">
+            <strong class="fab-bulk-book-pick-name">{bookLabel(pickedBook)}</strong>
+            <span class="fab-bulk-book-pick-meta">{bookMeta(pickedBook)}</span>
+          </span>
+          <button
+            type="button"
+            class="fab-bulk-book-pick-clear"
+            data-recipe-bulk-book-clear-pick
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookClearPick',
+              'Clear the picked book or scroll'
+            )}
+            disabled={inert}
+            onclick={() => {
+              pickedBookId = '';
+            }}
+          >
+            <i class="fas fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+        <!--
+          Two REAL buttons side by side, each disabled when its own count is zero: Add is
+          dead once every selected recipe already holds the book, Remove once none of them
+          does. The counts are the affected ones, so the label and the write agree.
+        -->
+        <div class="fab-bulk-book-pick-actions">
+          <button
+            type="button"
+            class="fab-bulk-book-op is-add"
+            data-recipe-bulk-book-add
+            aria-label={opActionLabel('add', pickedMissing, pickedBook)}
+            disabled={inert || pickedMissing === 0}
+            onclick={() => stageBook('add')}
+          >
+            <i class="fas fa-plus" aria-hidden="true"></i>{opButtonLabel('add', pickedMissing)}
+          </button>
+          <button
+            type="button"
+            class="fab-bulk-book-op is-remove"
+            data-recipe-bulk-book-remove
+            aria-label={opActionLabel('remove', pickedHolds, pickedBook)}
+            disabled={inert || pickedHolds === 0}
+            onclick={() => stageBook('remove')}
+          >
+            <i class="fas fa-minus" aria-hidden="true"></i>{opButtonLabel('remove', pickedHolds)}
+          </button>
+        </div>
+      </div>
+    {:else}
+      <!--
+        The shipped `SearchablePopover`, not a hand-rolled search field: it already owns the
+        search input, the option rows, outside-click and Escape dismissal, focus restoration
+        to the trigger, and a portal past the manager panel's `overflow: hidden`. Its option
+        list SCROLLS, which is what lets this control offer the whole authored vocabulary
+        with no cap and no "keep typing to narrow" affordance.
+      -->
+      <SearchablePopover
+        options={bookOptions}
+        disabled={inert}
+        pickerClass="fab-bulk-book-picker"
+        triggerClass="manager-button manager-travel-picker-trigger fab-bulk-book-trigger"
+        triggerIcon="fas fa-magnifying-glass"
+        triggerLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
+          'Pick a book or scroll'
+        )}
+        triggerAriaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookPick',
+          'Pick a book or scroll'
+        )}
+        dialogAriaLabel={booksLabel}
+        searchPlaceholder={bookSearchPlaceholder}
+        searchAriaLabel={bookSearchPlaceholder}
+        emptyHint={text(
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookNoMatch',
+          'No book or scroll by that name.'
+        )}
+        onChoose={(id) => {
+          pickedBookId = id;
+        }}
+      />
+    {/if}
+    {#if stagedBooks.length > 0}
+      <!--
+        The staged list. A LIST rather than a chip row: these are rows of record, each
+        carrying an operation, an affected count and its own undo, and each is read down the
+        rail rather than scanned across it.
+      -->
+      <ul class="fab-bulk-book-staged" aria-label={booksLabel} data-recipe-bulk-books-staged>
+        {#each stagedBooks as entry (entry.id)}
+          <li
+            class={`fab-bulk-book-staged-row is-${entry.op}`}
+            data-bulk-book={entry.id}
+            data-bulk-book-state={entry.op}
+          >
+            <span class="fab-bulk-book-staged-op">
+              <i class={entry.icon} aria-hidden="true"></i>{entry.opLabel}
+            </span>
+            <span class="fab-bulk-book-staged-copy">
+              <span class="fab-bulk-book-staged-name">{entry.name}</span>
+              <span class="fab-bulk-book-staged-count">{entry.countLabel}</span>
+            </span>
+            <button
+              type="button"
+              class="fab-bulk-book-unstage"
+              data-recipe-bulk-book-unstage={entry.id}
+              aria-label={entry.unstageLabel}
+              disabled={inert}
+              onclick={() => unstageBook(entry.id)}
+            >
+              <i class="fas fa-xmark" aria-hidden="true"></i>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {/if}
 </BulkEditPanelShell>
+
+<style>
+  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
+     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. It sits here rather than
+     in `styles/fabricate.css` so `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs`
+     routes a change to the views that actually render it, exactly as `BulkEditSection`
+     records for the same reason. */
+
+  /* ── The pick card ─────────────────────────────────────────────────────────────── */
+  .fab-bulk-book-pick {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
+    border: 1px solid var(--fab-mv2-accent);
+    border-radius: 8px;
+    background: var(--fab-mv2-bg);
+  }
+
+  .fab-bulk-book-pick-head {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    min-width: 0;
+  }
+
+  .fab-bulk-book-pick-art {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--fab-surface-raised);
+    color: var(--fab-mv2-accent);
+    font-size: 0.68rem;
+  }
+
+  .fab-bulk-book-pick-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .fab-bulk-book-pick-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .fab-bulk-book-pick-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fab-mv2-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fab-bulk-book-pick-meta {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fab-text-subtle);
+    font-size: 0.62rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Foundry's global `button` rule centres content and pins a fixed height; every button
+     in this block therefore restates height and alignment (see the CSS override map in
+     `CONTRIBUTING.md`). */
+  .fab-bulk-book-pick-clear,
+  .fab-bulk-book-unstage {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--fab-text-subtle);
+    font-size: 0.68rem;
+    cursor: pointer;
+  }
+
+  .fab-bulk-book-pick-clear:hover:not(:disabled),
+  .fab-bulk-book-unstage:hover:not(:disabled) {
+    background: var(--fab-surface-raised);
+    color: var(--fab-mv2-text);
+  }
+
+  .fab-bulk-book-pick-actions {
+    display: flex;
+    gap: var(--fab-space-1);
+    min-width: 0;
+  }
+
+  .fab-bulk-book-op {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fab-space-1);
+    height: auto;
+    min-height: 30px;
+    padding: 0 var(--fab-space-2);
+    border: 1px solid var(--fab-mv2-border-strong);
+    border-radius: 6px;
+    background: var(--fab-surface-raised);
+    color: var(--fab-mv2-text);
+    font-size: 0.68rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .fab-bulk-book-op.is-add:hover:not(:disabled) {
+    border-color: var(--fab-success-border);
+    color: var(--fab-success-text);
+  }
+
+  .fab-bulk-book-op.is-remove:hover:not(:disabled) {
+    border-color: var(--fab-danger-border);
+    color: var(--fab-danger-text);
+  }
+
+  /* `.is-disabled` is the repo's component-scoped state convention, but these controls
+     carry the real `disabled` attribute — the styling hangs off that rather than off a
+     generic class, so a dimmed control is inert by construction. */
+  .fab-bulk-book-op:disabled,
+  .fab-bulk-book-pick-clear:disabled,
+  .fab-bulk-book-unstage:disabled {
+    border-color: var(--fab-border);
+    background: transparent;
+    color: var(--fab-text-subtle);
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  /* ── The staged list ───────────────────────────────────────────────────────────── */
+  .fab-bulk-book-staged {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .fab-bulk-book-staged-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    min-width: 0;
+    padding: var(--fab-space-1) var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+  }
+
+  .fab-bulk-book-staged-op {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--fab-space-2xs);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .fab-bulk-book-staged-row.is-add {
+    border-color: var(--fab-success-border);
+  }
+
+  .fab-bulk-book-staged-row.is-add .fab-bulk-book-staged-op {
+    color: var(--fab-success-text);
+  }
+
+  .fab-bulk-book-staged-row.is-remove {
+    border-color: var(--fab-danger-border);
+  }
+
+  .fab-bulk-book-staged-row.is-remove .fab-bulk-book-staged-op {
+    color: var(--fab-danger-text);
+  }
+
+  .fab-bulk-book-staged-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .fab-bulk-book-staged-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--fab-mv2-text);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fab-bulk-book-staged-count {
+    color: var(--fab-text-subtle);
+    font-size: 0.58rem;
+    line-height: 1.3;
+  }
+</style>

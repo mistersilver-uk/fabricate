@@ -1627,6 +1627,17 @@ function createStore(calls = [], options = {}) {
       }
       return { updated: ids.length, componentIds: ids };
     },
+    // The recipe twin (issue 1010). Its result carries SIX counts, and the two book ones
+    // count membership EDGES rather than the definitions `booksUpdated` counts — the
+    // post-apply toast composes a sentence out of them.
+    applyRecipeBulkEdit: (recipeIds, edit) => {
+      const ids = [...(recipeIds || [])];
+      calls.push(['applyRecipeBulkEdit', ids, edit]);
+      if (Object.hasOwn(options, 'applyRecipeBulkEditResult')) {
+        return options.applyRecipeBulkEditResult;
+      }
+      return { updated: ids.length, recipeIds: ids };
+    },
     // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a
     // four-parameter stub records a call that looks identical whether the argument is
     // threaded or silently dropped — which is exactly how the value went missing once
@@ -6499,6 +6510,108 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['c1', offPageId].sort(),
       'the off-page id reaches the write, not just the count'
     );
+  });
+
+  // ── Issue 1010: the recipe bulk edit's post-apply report ─────────────────────────
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only place
+  // the composed toast can be proved at all. It matters because it COMPOSES: the prototype
+  // this panel follows swaps its books message in for its blocked message with a ternary,
+  // which would let a batch that moved book membership silently swallow the report that
+  // some recipes stayed off — the one outcome the GM cannot see by looking at the rows they
+  // just deselected, because applying clears the selection and unmounts the panel.
+  async function applyRecipeBulkEditOverRows(ids, options = {}) {
+    const messages = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      mountManager([], options);
+      craftingParent().click();
+      await tick();
+      flushSync();
+      for (const id of ids) {
+        target.querySelector(`[data-recipe-select="${id}"]`).click();
+        flushSync();
+      }
+      // Stage one book through the picker: open it, choose the definition, press Add.
+      target.querySelector('.fab-bulk-book-trigger').click();
+      flushSync();
+      target.querySelector('[data-popover-option="ri1"]').click();
+      flushSync();
+      target.querySelector('[data-recipe-bulk-book-add]').click();
+      flushSync();
+      target.querySelector('[data-recipe-bulk-apply]').click();
+      await tick();
+      flushSync();
+      return messages;
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('reports book membership as EDGES, not as the number of books touched', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 2,
+        recipeIds: ['r1', 'r2'],
+        booksUpdated: 1,
+        bookAdditions: 4,
+        bookRemovals: 2,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 4 additions and 2 removals.',
+    ]);
+  });
+
+  it('composes the books sentence WITH the blocked one rather than replacing it', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 2,
+        recipeIds: ['r1', 'r2'],
+        blockedEnables: 1,
+        blockedRecipeIds: ['r2'],
+        bookAdditions: 1,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 1 addition. '
+        + "1 recipe couldn't be enabled yet.",
+    ]);
+  });
+
+  // `updated` counts recipes whose own FIELDS changed, so a book-only edit legitimately
+  // changes none. Leading with "No recipes needed changing" ahead of "3 additions" reads as
+  // a contradiction rather than as the two distinct facts it is.
+  it('drops "No recipes needed changing" when the batch moved book membership', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 0,
+        recipeIds: [],
+        booksUpdated: 1,
+        bookAdditions: 3,
+      },
+    });
+
+    assert.deepEqual(messages, ['Books & scrolls updated — 3 additions.']);
+  });
+
+  it('keeps "No recipes needed changing" when nothing at all moved', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: { updated: 0, recipeIds: [] },
+    });
+
+    assert.deepEqual(messages, ['No recipes needed changing.']);
+  });
+
+  it('says nothing about books when the axis moved no membership', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1'], {
+      applyRecipeBulkEditResult: { updated: 1, recipeIds: ['r1'] },
+    });
+
+    assert.deepEqual(messages, ['Applied bulk changes to 1 recipe.']);
   });
 
   // Creating a crafting system already SELECTED it in the store, but the GM was left on
