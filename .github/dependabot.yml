@@ -1,0 +1,68 @@
+# Dependabot configuration.
+#
+# This repository runs SECURITY updates only, and did so with no config file at
+# all until this one. That matters: an `updates:` block normally switches on
+# scheduled VERSION updates as well, which would open a pull request for every
+# outdated dependency. `open-pull-requests-limit: 0` turns version-update PRs
+# off while leaving the `ignore` rules below in force, so the observable
+# behaviour is unchanged apart from those rules. Do not raise that limit unless
+# you actually want scheduled dependency PRs.
+#
+# `schedule` is required by the schema even though no version updates run.
+#
+# Only the npm ecosystem is declared. The Jekyll site's bundler ecosystem in
+# /docs is deliberately absent: its security updates already succeed, and
+# declaring it here would gain nothing while adding a second limit to keep at 0.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+    ignore:
+      # Both entries below name dependencies BUNDLED INSIDE the npm tarball
+      # (`"inBundle": true` in package-lock.json), reached dev-only through
+      # semantic-release -> @semantic-release/npm -> npm@^11.6.2:
+      #
+      #   node_modules/npm/node_modules/ip-address
+      #   node_modules/npm/node_modules/undici
+      #
+      # Their versions ship inside that tarball. npm `overrides` do not reach
+      # bundled dependencies and Dependabot cannot rewrite them either, so a
+      # security update resolves a target, writes no files, and fails the
+      # GitHub-managed "Dependabot Updates" run with
+      # `Dependabot::NpmAndYarn::FileUpdater::NoChangeError`. That was five
+      # failed runs on 2026-08-04 alone.
+      #
+      # These runs only began failing once PR #992 landed: it fixed every copy
+      # that WAS fixable (top-level undici to 7.29.0, @actions/http-client's to
+      # 6.28.0), leaving nothing but the bundled copies to act on. The failure
+      # is therefore structural and recurs on every new advisory for anything
+      # npm bundles — it is not a transient CI problem.
+      #
+      # Both are dev-only and reachable solely through npm's own internals at
+      # publish time in CI. Revisit when @semantic-release/npm bumps to an npm
+      # release whose bundle carries the patched versions; at that point delete
+      # the matching entry rather than widening it.
+
+      # ip-address exists ONLY as the bundled copy, so ignoring it outright is
+      # exact today. If it ever becomes a direct or separately-resolved
+      # dependency, this entry would start hiding a fixable advisory — narrow it
+      # to a version range at that point.
+      - dependency-name: "ip-address"
+
+      # undici is deliberately NOT ignored wholesale. The 7.x line is
+      # separately resolved (via @semantic-release/github) and IS patchable, so
+      # advisories against it must keep coming through. Only the 6.x line is
+      # suppressed, which covers the bundled npm copy.
+      #
+      # Known cost, accepted: the 6.x line also holds
+      # @actions/http-client's copy (via @actions/core), which is dev-only and
+      # genuinely updatable — PR #992 moved it 6.27.0 -> 6.28.0. This rule will
+      # suppress future 6.x advisories against it too. That is the price of
+      # Dependabot's ignore rules having no path granularity; it was judged
+      # acceptable because the package is dev-only GitHub Actions tooling.
+      - dependency-name: "undici"
+        versions: ["< 7"]
