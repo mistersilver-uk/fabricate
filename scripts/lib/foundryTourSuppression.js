@@ -80,13 +80,15 @@ export function withSuppressedTours(existing, tourIds = CORE_TOUR_IDS) {
  * @param {readonly string[]} [tourIds]
  */
 export function seedTourProgress(storage, tourIds = CORE_TOUR_IDS) {
+  // Declared null and only ever assigned on the success path: if JSON.parse throws, the
+  // assignment never ran, so the catch has nothing to reset (and writing `existing = null`
+  // there is a `no-useless-assignment` error, not merely redundant).
   let existing = null;
   try {
     const raw = storage.getItem(TOUR_PROGRESS_STORAGE_KEY);
     existing = raw ? JSON.parse(raw) : null;
   } catch {
     // A malformed stored value is treated as absent — see withSuppressedTours.
-    existing = null;
   }
   storage.setItem(
     TOUR_PROGRESS_STORAGE_KEY,
