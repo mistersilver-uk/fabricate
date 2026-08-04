@@ -51,9 +51,45 @@ const panel = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'
 });
 
+/**
+ * The books in the shape the PROJECTION actually emits.
+ *
+ * `books` is `selectedSystem.recipeItemDefinitions`, which is
+ * `_projectRecipeItemDefinitionSync` in the phase-1 publish and
+ * `_enrichRecipeItemLibrary`'s spread of it in the phase-2 publish. NEITHER emits a bare
+ * `name`: the display string is `resolvedName`, because a recipe item's name is resolved
+ * from its linked world item and only falls back to the stored one. The panel renders
+ * against either publish, so a fixture that hand-builds `{id, name}` builds a shape no
+ * publish produces — and that is precisely what let a `book?.name || book?.id` label ship
+ * showing `book-alchemy` in place of `Alchemist Primer` on every chip.
+ *
+ * `resolvedImg` / `derivedType` / `linkMissing` / `recipes` / `learnedByCount` are the
+ * projection's other fields, carried here so the fixture stays a faithful sample rather
+ * than a second hand-built shape.
+ */
 const BOOKS = [
-  { id: 'book-alchemy', name: 'Alchemist Primer' },
-  { id: 'book-forge', name: 'Forge Manual' }
+  {
+    id: 'book-alchemy',
+    originItemUuid: 'Item.alchemy',
+    resolvedName: 'Alchemist Primer',
+    resolvedImg: 'icons/svg/item-bag.svg',
+    derivedType: 'book',
+    recipeIds: [],
+    linkMissing: false,
+    recipes: [],
+    learnedByCount: 0
+  },
+  {
+    id: 'book-forge',
+    originItemUuid: 'Item.forge',
+    resolvedName: 'Forge Manual',
+    resolvedImg: 'icons/svg/item-bag.svg',
+    derivedType: 'book',
+    recipeIds: [],
+    linkMissing: false,
+    recipes: [],
+    learnedByCount: 0
+  }
 ];
 
 // The second tier is deliberately UNNAMED: `resolveRecipeCheckTierOptions` returns tiers
@@ -163,6 +199,40 @@ describe('RecipeBulkEditPanel recipe-book staging (issue 1010)', () => {
       'the name OPENS with the visible label (WCAG 2.5.3) then states the staged ACTION — '
         + 'aria-pressed cannot describe three states'
     );
+  });
+
+  // `bookActionLabel` reads `bookLabel`, so a broken label chain breaks the VISIBLE text
+  // and the ACCESSIBLE NAME together — and the accessible name is where it is least
+  // likely to be noticed. Both are asserted against the projected `resolvedName`, and the
+  // id is asserted absent so a fixture that happens to also carry a `name` cannot mask a
+  // regression back to `book?.id`.
+  it('labels every chip from the projection resolvedName, never the raw definition id', async () => {
+    const { root } = await mountPanel();
+
+    for (const [id, name] of [['book-alchemy', 'Alchemist Primer'], ['book-forge', 'Forge Manual']]) {
+      const chip = bookChip(root, id);
+      assert.equal(chip.textContent, name, `${id} renders its resolved name, not its id`);
+      assert.ok(
+        chip.getAttribute('aria-label').startsWith(name),
+        `${id}: the accessible name opens with the same resolved name`
+      );
+      assert.ok(
+        !chip.getAttribute('aria-label').includes(id),
+        `${id}: a raw definition id must never reach a GM-visible string`
+      );
+    }
+    assert.ok(
+      !root.querySelector('[data-recipe-bulk-books]').textContent.includes('book-'),
+      'no chip in the run falls through to an id'
+    );
+  });
+
+  // A book whose projection somehow carries no resolved name still gets SOMETHING: an
+  // empty chip is unclickable in practice and unnameable for speech input, so the id is
+  // the last resort rather than the first.
+  it('falls back to the id only when no resolvable name exists at all', async () => {
+    const { root } = await mountPanel({ books: [{ id: 'sm-book' }] });
+    assert.equal(bookChip(root, 'sm-book').textContent, 'sm-book');
   });
 
   it('says the system defines no recipe books rather than rendering an empty run', async () => {

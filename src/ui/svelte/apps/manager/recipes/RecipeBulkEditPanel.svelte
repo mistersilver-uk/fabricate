@@ -240,8 +240,19 @@
     return 'none';
   }
 
+  // `books` is `selectedSystem.recipeItemDefinitions`, the PROJECTION — and the projection
+  // emits `resolvedName`, never a bare `name`. That holds in both publishes the panel can
+  // render against: `_projectRecipeItemDefinitionSync` sets it from the stored name or a
+  // uuid-derived label in the synchronous phase-1 publish, and `_enrichRecipeItemLibrary`
+  // overwrites it with the linked world item's name in the phase-2 one. So a
+  // `name`-first chain falls straight through to the id and paints `sm-book` where the GM
+  // wrote "Forgecraft Folio".
+  //
+  // The chain is `CraftingSystemManagerRoot.recipeItemSourceSnapshot`'s, which is how the
+  // rest of the manager labels a recipe-item definition; `id` is appended as a last resort
+  // because an empty chip is neither clickable nor nameable by speech input.
   function bookLabel(book) {
-    return book?.name || book?.id || '';
+    return book?.resolvedName || book?.name || book?.id || '';
   }
 
   // The accessible name OPENS with the visible label and then states the staged ACTION.
