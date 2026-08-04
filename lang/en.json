@@ -1751,6 +1751,19 @@
           "LearnPerCopy": "{n} / copy",
           "LearnSubTotal": "Shared cap across all copies"
         },
+        "BulkEdit": {
+          "SelectAll": "Select all",
+          "SelectRow": "Select {name} for bulk edit",
+          "SelectedCount": "{count} selected",
+          "SelectAllResults": "Select all {count} results",
+          "Clear": "Clear",
+          "PanelTitle": "Bulk edit",
+          "ClearSelection": "Clear selection",
+          "SelectedHint": "Stage changes below, then apply to all at once.",
+          "Unchanged": "Unchanged",
+          "CategoryUnchanged": "Leave unchanged",
+          "TagsHint": "click to add · again to remove"
+        },
         "Recipe": {
           "Kicker": "Recipes View",
           "Title": "Recipes",
@@ -2404,21 +2417,10 @@
             "NoEssences": "No essences are defined for this system yet."
           },
           "BulkEdit": {
-            "SelectAll": "Select all",
-            "SelectRow": "Select {name} for bulk edit",
-            "SelectedCount": "{count} selected",
-            "SelectAllResults": "Select all {count} results",
-            "Clear": "Clear",
-            "PanelTitle": "Bulk edit",
-            "ClearSelection": "Clear selection",
             "SelectedHeading": "{count} components selected",
             "SelectedHeadingOne": "1 component selected",
-            "SelectedHint": "Stage changes below, then apply to all at once.",
             "Category": "Category",
-            "CategoryUnchanged": "Leave unchanged",
-            "Unchanged": "Unchanged",
             "Tags": "Tags",
-            "TagsHint": "click to add · again to remove",
             "TagStateAdd": "Add {tag} to every selected component",
             "TagStateRemove": "Remove {tag} from every selected component",
             "TagStateNone": "Leave {tag} unchanged",

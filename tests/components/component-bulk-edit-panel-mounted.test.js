@@ -44,6 +44,12 @@ const panel = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared bulk-edit chrome (issue 1010). The panel now renders its header, hero,
+    // section headings, staged select and Apply through these three, so they are STATIC
+    // imports of the component under test and belong in its closure.
+    'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+    'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
   ],

@@ -82,6 +82,13 @@ const TOOL_STUDIO_MATCHES = [
 const COMPONENTS_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+  // The shared bulk-edit primitives (issue 1010). They sit directly under `apps/manager/`,
+  // beside `Chip` and `Callout`, so they fall through BOTH the `components/` glob above and
+  // the `recipes/` one — a change to any of them would otherwise map to no view at all and
+  // publish nothing. Enumerated by name rather than widened to a directory glob, because
+  // `apps/manager/*.svelte` is the whole manager and would conscript these frames as the
+  // evidence for every screen in it.
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
 ];
 
 // A single-frame components-browser view: one same-named smoke label over the shared
@@ -95,6 +102,17 @@ const componentsBrowserFrame = (id, label, extraMatches = []) => ({
   smokeLabels: [id],
   matches: [...COMPONENTS_BROWSER_MATCHES, ...extraMatches],
 });
+
+// The two pure models the bulk panel stages against. `bulkSelectionModel.js` is the shared
+// leaf the four selection helpers moved to (issue 1010) — without it named here a change to
+// the selection model would map to NO view at all, since `componentBulkEditModel.js` merely
+// re-exports it and is not itself touched. Hoisted rather than written out at each of the
+// three bulk frames: Sonar's Automatic Analysis counts repeated literals in `scripts/**`
+// and ignores `cpd.exclusions`.
+const BULK_EDIT_MODEL_MATCHES = [
+  /^src\/utils\/componentBulkEditModel\.js$/,
+  /^src\/utils\/bulkSelectionModel\.js$/,
+];
 
 // The player Crafting tab's requirement surface (issue 917): the slot rail, the single
 // open chooser, the shared essence pool and the consumption-plan panel. Scoped to the
@@ -221,10 +239,7 @@ export const VIEW_RECIPES = Object.freeze([
   componentsBrowserFrame(
     'manager-components-bulk-edit',
     'Manager components browser — bulk edit (multi-select, selection toolbar, staged rail panel)',
-    [
-      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
-      /^src\/utils\/componentBulkEditModel\.js$/,
-    ],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES],
   ),
   // The bulk panel's other two states, each its OWN view for the same `candidates[0]`
   // reason as the staged frame above — and each a separate FRAME because no one
@@ -235,10 +250,7 @@ export const VIEW_RECIPES = Object.freeze([
   componentsBrowserFrame(
     'manager-components-bulk-edit-unstaged',
     'Manager components browser — bulk edit, pristine draft (every axis unstaged, Apply inert)',
-    [
-      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
-      /^src\/utils\/componentBulkEditModel\.js$/,
-    ],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES],
   ),
   // The Progressive DC section is gated on `componentDifficultyAxisProgressive`, so it
   // renders on the progressive smoke system and on no other — which is also the only
@@ -250,7 +262,7 @@ export const VIEW_RECIPES = Object.freeze([
   componentsBrowserFrame(
     'manager-components-bulk-edit-progressive',
     'Manager components browser — bulk edit, progressive DC section + empty item-tag copy',
-    [/^src\/utils\/componentBulkEditModel\.js$/],
+    [...BULK_EDIT_MODEL_MATCHES],
   ),
   // Issue 801: the grouped-category CONTINUATION frame — a category split across a page
   // boundary, its continuation slice ("N of M") at the head of the next page. Its OWN view

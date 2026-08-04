@@ -94,12 +94,23 @@ function compileManagerRoot() {
   // so omitting it here HANGS every mounted manager test as `# cancelled` — this suite
   // hand-rolls its compile loop and has no closure validator to fail loudly instead.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte');
-  // The browser's multi-select toolbar and the bulk edit panel that REPLACES the
-  // single-component inspector in the rail (issue 772). `ComponentsBrowserView` imports the
-  // first statically and the root imports the second, so omitting either HANGS every
-  // mounted manager test as `# cancelled` for the same reason as the card above.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte');
+  // The bulk edit panel that REPLACES the single-component inspector in the rail
+  // (issue 772). The root imports it statically, so omitting it HANGS every mounted manager
+  // test as `# cancelled` for the same reason as the card above.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
+  // The four shared bulk-edit primitives (issue 1010). They sit directly under
+  // `apps/manager/` — beside Chip and Callout, NOT under `components/` — because their
+  // scoped CSS reads `--fab-mv2-*`, which is only in scope inside `.fabricate-manager`.
+  // `ComponentsBrowserView` imports the toolbar and `ComponentBulkEditPanel` imports the
+  // other three, so omitting any one of them HANGS every mounted manager test.
+  for (const bulkPrimitive of [
+    'BulkSelectionToolbar',
+    'BulkEditPanelShell',
+    'BulkEditSection',
+    'BulkEditSelect',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/${bulkPrimitive}.svelte`);
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');

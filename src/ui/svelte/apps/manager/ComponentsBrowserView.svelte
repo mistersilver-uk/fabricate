@@ -7,7 +7,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import ComponentRow from './components/ComponentRow.svelte';
-  import ComponentSelectionToolbar from './components/ComponentSelectionToolbar.svelte';
+  import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import {
     describeComponentSelection,
     pruneComponentSelection,
@@ -438,7 +438,7 @@
       noDescriptionText: text('FABRICATE.Admin.Manager.NoDescription', 'No description'),
       bulkSelected: bulkSelectedIds.has(item.id),
       selectLabel: format(
-        'FABRICATE.Admin.Manager.Component.BulkEdit.SelectRow',
+        'FABRICATE.Admin.Manager.BulkEdit.SelectRow',
         'Select {name} for bulk edit',
         { name: item.name }
       ),
@@ -664,7 +664,12 @@
       the default manager window size, which is why the PR carries a frame proving
       `.manager-table-scroll` still shows several rows with it present.
     -->
-    <ComponentSelectionToolbar
+    <!--
+      Rendered on the shared primitive's DEFAULTS (issue 1010): its row class and its five
+      `data-*` hooks default to this studio's strings, so the smoke selectors, the view-lab
+      cases and the mounted assertions that predate the extraction still resolve unchanged.
+    -->
+    <BulkSelectionToolbar
       pageSelectionState={selectionSummary.pageSelectionState}
       count={selectionSummary.count}
       showSelectAllResults={selectionSummary.showSelectAllResults}

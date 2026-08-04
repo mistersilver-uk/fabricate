@@ -105,28 +105,32 @@ const FIXTURE = `
             <span class="manager-component-count" data-m="count">1–2 of 2</span>
           </div>
           <!-- The multi-select row (issue 772) — the toolbar's FOURTH row, above the list.
+               Its markup moved to the shared BulkSelectionToolbar.svelte under apps/manager/
+               (issue 1010) and its own classes were renamed with it; the host row class
+               ".manager-component-filter-row is-selection" is a PROP of that primitive,
+               defaulted to this studio's string, so the row context below is unchanged.
 
                The input/box pair below is a HAND-COPY of what SelectionCheckbox.svelte renders
-               inside ComponentSelectionToolbar.svelte, and it silently duplicates a structural
+               inside BulkSelectionToolbar.svelte, and it silently duplicates a structural
                contract: that component's focus ring is drawn by the adjacent-sibling selector
                ".fab-selection-input:focus-visible + .fab-selection-check", written inside
                :global() because it reaches across a component boundary — so nothing analyses
                it (issue 924). This fixture is a font-size probe and does not check the ring;
-               the ring's structure is asserted in
-               tests/components/components-browser-view-mounted.test.js. If either class name
+               the ring's structure and the drift of those class tokens are asserted in
+               tests/components/bulk-selection-toolbar-mounted.test.js. If either class name
                changes in SelectionCheckbox.svelte, update this fixture too, so the two stop
                disagreeing about what the studio renders.
                (No backticks in here — this whole block is a JS template literal.) -->
           <div class="manager-component-filter-row is-selection" data-component-selection-toolbar>
-            <label class="manager-component-selection-all" data-m="bulk-select-all">
+            <label class="fab-bulk-selection-all" data-m="bulk-select-all">
               <input type="checkbox" class="fab-selection-input">
               <span class="fab-selection-check is-md"><i class="fas fa-minus"></i></span>
-              <span class="manager-component-selection-all-label">Select all</span>
+              <span class="fab-bulk-selection-all-label">Select all</span>
             </label>
-            <span class="manager-component-selection-divider"></span>
-            <span class="manager-component-selection-count" data-m="bulk-selected-count"><i class="fas fa-layer-group"></i><span>2 selected</span></span>
-            <button type="button" class="manager-component-selection-link" data-m="bulk-results-link">Select all 4 results</button>
-            <button type="button" class="manager-component-selection-clear" data-m="bulk-clear"><i class="fas fa-xmark"></i><span>Clear</span></button>
+            <span class="fab-bulk-selection-divider"></span>
+            <span class="fab-bulk-selection-count" data-m="bulk-selected-count"><i class="fas fa-layer-group"></i><span>2 selected</span></span>
+            <button type="button" class="fab-bulk-selection-link" data-m="bulk-results-link">Select all 4 results</button>
+            <button type="button" class="fab-bulk-selection-clear" data-m="bulk-clear"><i class="fas fa-xmark"></i><span>Clear</span></button>
           </div>
         </section>
         <div class="manager-components-list">
@@ -163,24 +167,29 @@ const FIXTURE = `
           not re-type the rail. Its appearance is a scoped block, which is why the panel is
           in the scoped-component pairing below - without that treatment every role in
           here would match nothing and land on Foundry's 14px app base.
+
+          Its CHROME moved to BulkEditPanelShell / BulkEditSection / BulkEditSelect under
+          apps/manager/ (issue 1010) and its classes were renamed with it; only the essence
+          grid and the DC row are still the component panel's own. Every EXPECTED px value
+          below is unchanged, which is the point: the extraction is a pure move.
         -->
-        <section class="manager-component-bulk-panel" data-component-bulk-panel>
-          <header class="manager-component-bulk-header">
-            <p class="manager-component-bulk-eyebrow" data-m="bulk-eyebrow">Bulk edit</p>
-            <button type="button" class="manager-component-bulk-clear" data-m="bulk-clear-selection"><i class="fas fa-xmark"></i><span>Clear selection</span></button>
+        <section class="fab-bulk-edit-panel" data-component-bulk-panel>
+          <header class="fab-bulk-edit-header">
+            <p class="fab-bulk-edit-eyebrow" data-m="bulk-eyebrow">Bulk edit</p>
+            <button type="button" class="fab-bulk-edit-clear" data-m="bulk-clear-selection"><i class="fas fa-xmark"></i><span>Clear selection</span></button>
           </header>
-          <div class="manager-component-bulk-hero">
-            <span class="manager-component-bulk-hero-icon"><i class="fas fa-layer-group"></i></span>
-            <div class="manager-component-bulk-hero-copy">
-              <strong class="manager-component-bulk-hero-title" data-m="bulk-hero-title">2 components selected</strong>
-              <span class="manager-component-bulk-hero-hint" data-m="bulk-hero-hint">Stage changes below, then apply to all at once.</span>
+          <div class="fab-bulk-edit-hero">
+            <span class="fab-bulk-edit-hero-icon"><i class="fas fa-layer-group"></i></span>
+            <div class="fab-bulk-edit-hero-copy">
+              <strong class="fab-bulk-edit-hero-title" data-m="bulk-hero-title">2 components selected</strong>
+              <span class="fab-bulk-edit-hero-hint" data-m="bulk-hero-hint">Stage changes below, then apply to all at once.</span>
             </div>
           </div>
-          <p class="manager-component-bulk-label" data-m="bulk-label">Category</p>
-          <select class="manager-component-bulk-select" data-m="bulk-select"><option>Leave unchanged</option></select>
-          <div class="manager-component-bulk-label-row">
-            <p class="manager-component-bulk-label">Tags</p>
-            <span class="manager-component-bulk-hint" data-m="bulk-hint">click to add · again to remove</span>
+          <p class="fab-bulk-edit-label" data-m="bulk-label">Category</p>
+          <select class="fab-bulk-edit-select" data-m="bulk-select"><option>Leave unchanged</option></select>
+          <div class="fab-bulk-edit-label-row">
+            <p class="fab-bulk-edit-label">Tags</p>
+            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove</span>
           </div>
           <div class="manager-chip-row">
             <button type="button" class="manager-chip is-positive" data-m="bulk-tag-chip"><i class="fas fa-tag"></i>metal<i class="fas fa-plus"></i></button>
@@ -188,7 +197,7 @@ const FIXTURE = `
           <!-- The panel's SECOND hint scale: a standing sentence, not the inline aside
                above. Both are pinned, because the whole point of splitting them is that
                they are different sizes — one map entry could not state that. -->
-          <p class="manager-component-bulk-subhint" data-m="bulk-subhint">Applying essences overwrites the essence values on every selected component.</p>
+          <p class="fab-bulk-edit-subhint" data-m="bulk-subhint">Applying essences overwrites the essence values on every selected component.</p>
           <div class="manager-component-bulk-essence-grid">
             <article class="manager-component-essence-card is-inactive" data-component-edit-essence="fire">
               <div class="manager-component-essence-identity">
@@ -208,7 +217,7 @@ const FIXTURE = `
             <i class="fas fa-dice-d20"></i>
             <span class="manager-component-bulk-dc-copy" data-m="bulk-dc-copy">Set every selected component to</span>
           </div>
-          <button type="button" class="manager-button manager-component-bulk-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+          <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
         </section>
       </div>
 
@@ -288,11 +297,21 @@ const FIXTURE = `
 // the rules match nothing, and adding the hash without the real ordering proves the wrong
 // winner. A role that gets neither silently measures Foundry's 14px app base and trips the
 // anti-bleed loop at the end of this file.
+//
+// Issue 1010 split the toolbar and the panel's chrome into four shared primitives under
+// `apps/manager/`, so the list below grew rather than moved: the panel still owns the
+// essence grid and the DC row, while the header, hero, section scales, select and Apply are
+// emitted by their own components and therefore carry their own scope hashes. Miss one and
+// its roles fall to 14px — which is why no `EXPECTED` value needed touching to make this
+// pass, and why a green run is evidence the extraction preserved the cascade.
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/apps/manager/Chip.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
   'src/ui/svelte/components/Stepper.svelte',
-  'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte',
+  'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
