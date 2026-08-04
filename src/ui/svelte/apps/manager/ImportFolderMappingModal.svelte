@@ -502,4 +502,16 @@
   .manager-import-mapping-category select {
     min-width: 140px;
   }
+
+  /* The real control is 1px and transparent, so the ring has to be drawn on the visible
+     box. `SelectionCheckbox` scopes its own ring to the `<label>` IT renders, which this
+     host opts out of with `wrapper="contents"` — so the host draws it. This rule reaches
+     into the component's markup using `:global()`, following the pattern in
+     `ComponentSelectionToolbar.svelte` (issue 924). The adjacent-sibling form is what makes
+     `:global()` sufficient: `<input>` and `<span class="fab-selection-check">` are
+     siblings in the component's `wrapper="contents"` mode. */
+  .manager-import-mapping-match :global(.fab-selection-input:focus-visible + .fab-selection-check) {
+    outline: 2px solid var(--fab-mv2-accent);
+    outline-offset: 2px;
+  }
 </style>
