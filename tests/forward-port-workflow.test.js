@@ -149,7 +149,12 @@ test('forward-port.yml declares every input on BOTH entry points, and bounds its
   for (const trigger of ['workflow_call', 'workflow_dispatch']) {
     const inputs = nestedEntries(triggerOf(source, trigger), 'inputs');
     const declared = scalars(inputs);
-    const defaultOf = (name) => unquote(scalars(nestedEntries(inputs, name)).default ?? '');
+    // Read the raw `default:` entry, NOT a `?? ''` fallback: an absent `default:` and a declared
+    // `default: ""` both resolve to the empty string, so the two `expected_tag: ''` rows below
+    // would pass against a file whose `default: ""` had been deleted — a row that cannot fail, in
+    // a suite whose whole standard is that every assertion must.
+    const defaultEntry = (name) => scalars(nestedEntries(inputs, name));
+    const defaultOf = (name) => unquote(defaultEntry(name).default ?? '');
 
     for (const name of INPUT_NAMES) {
       assert.ok(Object.hasOwn(declared, name), `on.${trigger}.inputs declares '${name}'`);
@@ -164,6 +169,10 @@ test('forward-port.yml declares every input on BOTH entry points, and bounds its
     //     point at `main`; flipped to false, a maintainer probing the workflow pushes for real. The
     //     workflow_call default is deliberately the opposite: a caller states its own intent.
     for (const [name, expected] of Object.entries(EXPECTED_DEFAULTS[trigger])) {
+      assert.ok(
+        Object.hasOwn(defaultEntry(name), 'default'),
+        `on.${trigger}.inputs.${name} declares an explicit default:`
+      );
       assert.equal(
         defaultOf(name),
         expected,

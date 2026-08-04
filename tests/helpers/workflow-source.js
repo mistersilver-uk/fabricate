@@ -109,6 +109,10 @@ export function section(all, name) {
  * `value()` reader returns only the block indicator for it. `>`/`>-` join with a space (folded),
  * `|`/`|-` join with a newline (literal).
  *
+ * KNOWN GAP: an explicit indentation indicator (`|2`, `>-2`) is not recognised, so this returns the
+ * literal indicator string rather than the block. Nothing in this repository uses that form; add it
+ * here rather than working around it at a call site.
+ *
  * @param {{indent: number, text: string}[]} all The entry list containing the entry.
  * @param {number} index The entry's index in that list.
  * @returns {string} The scalar value.
