@@ -443,6 +443,11 @@ function compileManagerRoot() {
     // module. This suite hand-rolls its temp tree and has NO dependency validator, so
     // omitting it hangs silently rather than naming the missing file.
     'src/utils/bulkSelectionModel.js',
+    // The recipe browser's bulk selection + staging model (issue 1010). RecipesBrowserView
+    // imports it for the selection helpers, so it is a STATIC import of the mounted tree.
+    // Omitting it kills this suite in its `before` hook, which `node --test` reports as
+    // `# cancelled 220` rather than a failure — read the count, not just `# fail`.
+    'src/utils/recipeBulkEditModel.js',
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
@@ -1157,6 +1162,11 @@ function createStore(calls = [], options = {}) {
               enabled: false,
               locked: true,
               incomplete: true,
+              // This suite hand-builds projected rows rather than running the real
+              // `_buildRecipeList`, so the projection's `enableBlocked` (issue 1010) has to
+              // be stated here. The row pills now read it rather than `incomplete`, and r2
+              // is exactly the off-and-un-enableable case the assertion below is about.
+              enableBlocked: true,
               isSimple: false,
               structureLabel: 'Single step',
               stepCount: 1,
