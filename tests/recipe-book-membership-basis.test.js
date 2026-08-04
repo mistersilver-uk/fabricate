@@ -275,11 +275,25 @@ const READERS = [
   {
     // The SIXTH reader, and the second one inside `adminStore`: `_enrichRecipeItemLibrary`
     // derives each book's `recipes[]` — what Books & Scrolls counts and lists — on the
-    // OTHER side of the same many-to-many. It is here because a reader that agrees with
-    // the other five only as a CONSEQUENCE of an upstream projection choice made in a
-    // different function is one refactor away from disagreeing, and the disagreement
-    // would be a book reporting contents the Contents tab and both player-facing readers
-    // say it does not have.
+    // OTHER side of the same many-to-many.
+    //
+    // THIS ROW IS A PIN, NOT FAILING-FIRST EVIDENCE, and it is worth being exact about
+    // what it can and cannot see. It cannot catch a basis inference reintroduced INSIDE
+    // `_enrichRecipeItemLibrary` — reverting its `membershipResolvesByRecipeIds === true`
+    // guard to a per-definition "this book's `recipeIds` is empty, so fall back" leaves
+    // all five scenarios below green. That is not a gap in the scenarios: the enrichment
+    // is handed the PROJECTED recipe rows, and `_buildRecipeList` derives their
+    // `recipeItemId` from `_recipeItemDefinitionsContaining` rather than copying the raw
+    // legacy scalar, so on a marked system an emptied book's former members already carry
+    // `recipeItemId: ''` and the legacy reverse index has nothing to resurrect.
+    //
+    // What it DOES hold is that the book-side answer and the recipe-side answer agree
+    // across every scenario while both are read off that one upstream projection. So it
+    // fails on a change to what `_buildRecipeList` projects, or to how the enrichment
+    // resolves member ids against it — the fifth reader's territory, approached from the
+    // opposite side, where a disagreement would be a book reporting contents the Contents
+    // tab and both player-facing readers say it does not have. It is not vacuous either:
+    // three of the five scenarios expect a non-empty result from it.
     name: 'adminStore Books & Scrolls library (recipeItemDefinitions[].recipes)',
     legacyMemberships: LEGACY_MEMBERSHIPS_WITHOUT_UUID_LEG,
     async resolve(fixture, recipeId) {

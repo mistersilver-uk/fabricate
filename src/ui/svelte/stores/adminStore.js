@@ -2082,12 +2082,19 @@ function _legacyRecipeItemIndex(recipeList) {
 // This is the SIXTH recipe-book membership reader, and the second in this file: it
 // answers the same many-to-many from the BOOK's side. Like
 // `_recipeItemDefinitionsContaining`, it takes the basis as a PARAMETER threaded from
-// the raw manager system rather than inferring it — here the inference would have been
-// per DEFINITION ("this book's `recipeIds` is empty, so it must be un-migrated"), which
-// is the retired system-wide predicate at definition scope and flips the same way: one
-// bulk removal that legitimately empties a book would make it report the recipes it used
-// to contain, while the Contents tab and both player-facing readers correctly show it
-// empty (`ui-integration/spec.md`, the membership-basis paragraph).
+// the raw manager system rather than inferring it — the inference available here would
+// have been per DEFINITION ("this book's `recipeIds` is empty, so it must be
+// un-migrated"), which is the retired system-wide predicate at definition scope.
+//
+// The parameter is BELT AND BRACES at this call site, and saying so is more useful than
+// overstating it: `recipes` is the PROJECTED recipe list, whose `recipeItemId`
+// `_buildRecipeList` derives from `_recipeItemDefinitionsContaining` rather than copying
+// the raw legacy scalar. So on a marked system an emptied book's former members already
+// carry `recipeItemId: ''`, and `_legacyRecipeItemIndex` could not resurrect them even if
+// this guard were dropped — the basis decision has already been taken upstream. What the
+// parameter buys is that this function does not have a SECOND, differently-shaped opinion
+// about the basis for a future caller to hand a rawer list to
+// (`ui-integration/spec.md`, the membership-basis paragraph).
 async function _enrichRecipeItemLibrary(projectedItems, recipes, membershipResolvesByRecipeIds) {
   const items = Array.isArray(projectedItems) ? projectedItems : [];
   if (items.length === 0) return [];
