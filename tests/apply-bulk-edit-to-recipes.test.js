@@ -371,7 +371,8 @@ describe('applyBulkEditToRecipes — the three falsy-but-real axes', () => {
   // could not fail.
   it('a staged DISABLE turns an enabled recipe off', async () => {
     const edit = toBulkRecipeEdit(setBulkRecipeStatus(createRecipeBulkDraft(), 'disable'));
-    assert.ok(Object.hasOwn(edit, 'enabled') && !edit.enabled, 'staged, and falsy');
+    assert.equal(Object.hasOwn(edit, 'enabled'), true, 'staged');
+    assert.equal(edit.enabled, false, 'and falsy');
     const fixture = makeFixture({ recipes: [completeRecipe('r1', { enabled: true })] });
 
     const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1'], edit);
@@ -383,7 +384,8 @@ describe('applyBulkEditToRecipes — the three falsy-but-real axes', () => {
 
   it('a staged UNLOCK unlocks a locked recipe', async () => {
     const edit = toBulkRecipeEdit(setBulkRecipeLock(createRecipeBulkDraft(), 'unlock'));
-    assert.ok(Object.hasOwn(edit, 'locked') && !edit.locked, 'staged, and falsy');
+    assert.equal(Object.hasOwn(edit, 'locked'), true, 'staged');
+    assert.equal(edit.locked, false, 'and falsy');
     const fixture = makeFixture({ recipes: [completeRecipe('r1', { locked: true })] });
 
     const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1'], edit);
@@ -448,9 +450,10 @@ describe('applyBulkEditToRecipes — the check tier axis', () => {
     // The discriminator is PRESENCE, never truthiness: both payloads read falsy here.
     assert.equal(Object.hasOwn(staged, 'checkTierId'), true);
     assert.equal(Object.hasOwn(unstaged, 'checkTierId'), false);
+    assert.ok(!staged.checkTierId, 'staged reads falsy too');
     assert.ok(
-      !staged.checkTierId && !unstaged.checkTierId,
-      'a truthiness guard cannot tell them apart'
+      !unstaged.checkTierId,
+      'unstaged reads falsy, so a truthiness guard cannot tell them apart'
     );
 
     const cleared = makeFixture({ recipes: [completeRecipe('r1', { checkTierId: TIER_EASY })] });
