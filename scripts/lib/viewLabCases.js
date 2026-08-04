@@ -787,6 +787,81 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
+  // ── The two surfaces the three frames above cannot hold (issue 1010) ───────────────────────────
+  //
+  // The staged case opens the picker, picks, presses the action and repeats; the pick CLEARS on
+  // staging by design, so that frame lands on the trigger plus the staged list. The unstaged case
+  // shows the trigger alone. Between them, the two surfaces this redesign actually INTRODUCES were
+  // photographed nowhere: the open option list, whose two-line rows state the membership fact the
+  // GM chooses on, and the pick card, whose Add/Remove counts and opposite disabled states are the
+  // whole argument for replacing the chip run. A redesign commissioned because a chip per book is
+  // unusable at eight-plus books cannot be reviewed from frames showing neither replacement.
+  //
+  // `reaches: 'beyond'` with no smoke labels, which is the honest declaration and not a way around
+  // adding one: the smoke's own bulk-edit walk drives THROUGH both of these states to the staged
+  // one and never rests on either, so neither has a counterpart to fall short of. They still
+  // PUBLISH — `beyond` is a statement about the smoke, not about whether a frame is evidence, and
+  // the issue-901 Journal pair sets the same precedent — which is what makes them the PR's evidence
+  // for the part of this change nothing else photographs. No new smoke label means no new
+  // `SCREENSHOT_CAPTURE_ORDER` entry either.
+  //
+  // Both stop one step short of an existing case's walk rather than driving anywhere new, so the
+  // fixture facts they rest on are the ones the staged case already documents.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-picker',
+    label: 'Manager — Recipes bulk edit picker',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '.fab-bulk-book-trigger' },
+    ],
+    expectView: 'recipes',
+    // Three claims in one selector, and the trigger-only frame satisfies none of them: the popover
+    // exists at all, it is portaled INTO the manager (the whole reason it escapes the inspector's
+    // `overflow: hidden`), and its rows carry the second META line — which is the fact the GM
+    // chooses on and which only renders when the option was given one. Asserting the popover alone
+    // would pass over a run of bare single-line rows, which is the state this frame exists to
+    // distinguish itself from.
+    expectSelector:
+      '.fabricate-manager .manager-travel-popover ' +
+      '[data-popover-option="sm-book"] .manager-travel-option-meta',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-edit-pick-card',
+    label: 'Manager — Recipes bulk edit pick card',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '.fab-bulk-book-trigger' },
+      { selector: '[data-popover-option="sm-book"]' },
+    ],
+    expectView: 'recipes',
+    // The card for the Folio, which holds NEITHER selected recipe — so `Add 2` is live and `Remove`
+    // is dead with its count dropped rather than rendered as `Remove 0`. Both states are asserted,
+    // in opposite directions, because they ARE the design argument: two real buttons whose labels
+    // name what each would actually write and which go inert when that number is zero. A card-only
+    // assertion would pass over two enabled buttons labelled with the selection size, which is the
+    // prototype defect this control was corrected away from.
+    //
+    // Every `:has()` argument is a simple compound, for the reason the blocked case records: `:has(A
+    // B)` is where DOM implementations disagree, and this form is checkable outside a browser.
+    expectSelector:
+      '.fabricate-manager [data-recipe-bulk-book-pick="sm-book"]' +
+      ':has([data-recipe-bulk-book-add]:not([disabled]))' +
+      ':has([data-recipe-bulk-book-remove][disabled])',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
   managerCase({
     id: 'manager-crafting-group-expanded',
     label: 'Manager — Crafting group expanded',
