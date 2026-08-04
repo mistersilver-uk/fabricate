@@ -311,20 +311,34 @@ const READERS = [
 ];
 
 async function assertMemberships(fixture, reader, expected, label) {
-  for (const [recipeId, definitionIds] of Object.entries(expected)) {
+  const entries = Object.entries(expected);
+  for (const [recipeId, definitionIds] of entries) {
     assert.deepEqual(
       await reader.resolve(fixture, recipeId),
       definitionIds,
       `${label}: ${recipeId} via ${reader.name}`
     );
   }
+  // Return how many assertions ran, so `forEachReader` can prove a reader body did not
+  // silently assert nothing (javascript:S2699) — the real fix, not a dummy assertion
+  // added only to satisfy the analyser.
+  return entries.length;
 }
 
-/** Run one assertion body against every reader, as its own test case. */
+/**
+ * Run one assertion body against every reader, as its own test case. Every body here
+ * routes its real assertions through `assertMemberships` and returns its count, so this
+ * is a genuine anti-vacuity guard rather than a satisfied-the-analyser dummy: a body
+ * that stopped asserting would fail here, not just read green.
+ */
 function forEachReader(title, body) {
   for (const reader of READERS) {
     it(`${title} — ${reader.name}`, async () => {
-      await body(reader);
+      const assertionCount = await body(reader);
+      assert.ok(
+        Number.isInteger(assertionCount) && assertionCount > 0,
+        'the reader body performed at least one real assertion via assertMemberships'
+      );
     });
   }
 }
@@ -335,7 +349,7 @@ describe('recipe-book membership basis — a legacy-basis system', () => {
   forEachReader('resolves membership through the legacy scalars', async (reader) => {
     const fixture = await makeFixture();
     assert.equal(marker(fixture), false, 'no array is populated, so the marker backfills false');
-    await assertMemberships(
+    return assertMemberships(
       fixture,
       reader,
       reader.legacyMemberships ?? LEGACY_MEMBERSHIPS,
@@ -361,7 +375,7 @@ describe('recipe-book membership basis — the first membership write', () => {
     assert.equal(marker(fixture), true, 'the write set the marker');
     // Every reader now agrees, INCLUDING the adminStore helper that has no uuid leg:
     // once the basis is `recipeIds`, the seed has carried that membership across.
-    await assertMemberships(fixture, reader, LEGACY_MEMBERSHIPS, 'after the first write');
+    return assertMemberships(fixture, reader, LEGACY_MEMBERSHIPS, 'after the first write');
   });
 
   it('seeds every definition in the system, not only the one written', async () => {
@@ -424,7 +438,7 @@ describe('recipe-book membership basis — emptying every array', () => {
     await fixture.manager.updateRecipeItemDefinition(SYSTEM_ID, 'book-a', { recipeIds: [] });
     await fixture.manager.updateRecipeItemDefinition(SYSTEM_ID, 'book-b', { recipeIds: [] });
 
-    await assertMemberships(fixture, reader, NO_MEMBERSHIPS, 'after emptying every book');
+    return assertMemberships(fixture, reader, NO_MEMBERSHIPS, 'after emptying every book');
   });
 });
 
@@ -434,7 +448,7 @@ describe('recipe-book membership basis — the monotone OR', () => {
   forEachReader('a marked system with every array empty stays empty', async (reader) => {
     const fixture = await makeFixture({ system: emptyButMarked() });
     assert.equal(marker(fixture), true, 'the persisted marker survives normalization');
-    await assertMemberships(fixture, reader, NO_MEMBERSHIPS, 'marked with empty arrays');
+    return assertMemberships(fixture, reader, NO_MEMBERSHIPS, 'marked with empty arrays');
   });
 
   it('survives reload(), initialize(), and a save() round-trip', async () => {
@@ -490,7 +504,7 @@ describe('recipe-book membership basis — the backfill', () => {
       const fixture = await makeFixture({
         system: persistedSystem({ aRecipeIds: ['r-scalar-a'] }),
       });
-      await assertMemberships(
+      return assertMemberships(
         fixture,
         reader,
         { ...NO_MEMBERSHIPS, 'r-scalar-a': ['book-a'] },
