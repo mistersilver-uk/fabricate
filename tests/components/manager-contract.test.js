@@ -827,17 +827,30 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'the browser view-state must be lifted, not held as local component $state'
     );
+    // The derived authoring state the row renders is `enableBlocked`, not `incomplete`
+    // (issue 1010). Both pill branches and the attention sort read it, because
+    // `incomplete` is `validate() === false && validateStructure() === true` and so does
+    // not capture blocked-ness at all. This assertion used to name `recipe.incomplete`,
+    // and by the end of issue 1010 the ONLY thing satisfying it was a dead
+    // `data-recipe-incomplete` attribute nothing read — so it was pinning a hook rather
+    // than the rendered state it claims to pin.
     assert.ok(
+      recipesBrowserSource.includes('recipe.enableBlocked'),
+      'RecipesBrowserView should derive its authoring-state pills from enableBlocked'
+    );
+    assert.equal(
       recipesBrowserSource.includes('recipe.incomplete'),
-      'RecipesBrowserView should render the derived Incomplete state'
+      false,
+      'and must not reintroduce the narrower incomplete predicate the pills were moved off'
     );
     assert.ok(
       recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
       'RecipesBrowserView should use the localized Incomplete label'
     );
     // The four row states are one component (StatusPill) rather than four ad-hoc
-    // chips. The tones stay distinguishable: warning = incomplete-but-enabled,
-    // danger = incomplete AND off, i.e. enabling would be REFUSED (issue 643).
+    // chips. The tones stay distinguishable: warning = blocked but already enabled,
+    // danger = blocked AND off, i.e. enabling would be REFUSED (issue 643, repointed
+    // onto the shared activation predicate by issue 1010).
     assert.ok(
       recipesBrowserSource.includes("import StatusPill from '../../components/StatusPill.svelte'"),
       'the row should render its states through the shared StatusPill'
