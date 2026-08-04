@@ -118,6 +118,21 @@ const MANAGER_PRIMITIVES = [
   'ToggleCard',
 ];
 
+/**
+ * The shared bulk-edit chrome (issue 1010): the selection toolbar and the panel shell, section
+ * and select the Component Studio and the Recipe Studio both render.
+ *
+ * Deliberately NOT in `MANAGER_PRIMITIVES` above, which would make them broad signals and
+ * claim-exempt. A broad signal routes to the representative set, but
+ * `scripts/ui-pr-screenshot-evidence.mjs` routes these same four files to the bulk-edit frames —
+ * so making them broad here would have the two registries disagree about what evidence a change
+ * to one of them requires. They have exactly two consumers, both of which claim them below, so
+ * targeting is both possible and honest; the alternative is a shared primitive with dozens of
+ * consumers, which is what `MANAGER_PRIMITIVES` is for.
+ */
+const BULK_EDIT_CHROME_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
+
 export const BROAD_SIGNAL_PATTERN = new RegExp(
   [
     '^styles/',
@@ -1102,6 +1117,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BULK_EDIT_CHROME_PATTERN,
     ],
   }),
   managerCase({
@@ -1122,6 +1138,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BULK_EDIT_CHROME_PATTERN,
     ],
   }),
   managerCase({
@@ -2038,6 +2055,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BULK_EDIT_CHROME_PATTERN,
     ],
   }),
   managerCase({
