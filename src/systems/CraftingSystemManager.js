@@ -4780,13 +4780,19 @@ export class CraftingSystemManager {
    *   addBookIds?: string[], removeBookIds?: string[]}} [edit]
    * @returns {Promise<{updated: number, recipeIds: string[], blockedEnables: number,
    *   blockedRecipeIds: string[], rejected: number, rejectedRecipeIds: string[],
-   *   booksUpdated: number, bookIds: string[]}>}
+   *   booksUpdated: number, bookIds: string[], bookAdditions: number, bookRemovals: number}>}
    *   `recipeIds` are the recipes actually changed; `blockedRecipeIds` those whose enable
    *   the activation gate refused (their other staged axes still landed); `rejectedRecipeIds`
    *   those a `RecipePersistenceError` excluded from the batch entirely — a data-integrity
    *   signal, not an expected outcome. `bookIds` are the definitions the requested
    *   add/remove changed, which does NOT include a definition touched only by the
    *   legacy-scalar seed.
+   *
+   *   `bookAdditions` / `bookRemovals` count membership EDGES — one per (recipe, book) pair
+   *   the write created or destroyed — while `booksUpdated` counts DEFINITIONS. Neither
+   *   derives from the other (one book over twelve recipes is 1 definition and 12 edges),
+   *   and the edge counts are what the post-apply notification reports, because "put these
+   *   recipes in that book" is the instruction the GM actually gave.
    * @throws {Error} when the system does not resolve, or when `checkTierId` names a tier
    *   this system's crafting check does not author — both BEFORE any write.
    */
@@ -4804,6 +4810,8 @@ export class CraftingSystemManager {
       rejectedRecipeIds: [],
       booksUpdated: 0,
       bookIds: [],
+      bookAdditions: 0,
+      bookRemovals: 0,
     };
 
     // Resolves — and REJECTS — the staged check tier before anything is mutated.
@@ -4821,6 +4829,8 @@ export class CraftingSystemManager {
     const books = this._applyBulkRecipeBookMembership(system, cohort, axes);
     result.bookIds = books.bookIds;
     result.booksUpdated = books.bookIds.length;
+    result.bookAdditions = books.additions;
+    result.bookRemovals = books.removals;
     if (books.changed) {
       system.membershipResolvesByRecipeIds = true;
       await this.save();
@@ -4880,8 +4890,8 @@ export class CraftingSystemManager {
       locked: bulkEdit.locked === true,
       hasCheckTier: Object.hasOwn(bulkEdit, 'checkTierId'),
       checkTierId: null,
-      // The chip run's two disjoint book-id lists. `normalizeSelectionIds` is the same
-      // coercion the selection itself goes through — a chip run IS a selection of books.
+      // The book axis's two disjoint id lists. `normalizeSelectionIds` is the same coercion
+      // the selection itself goes through — a staged book set IS a selection of books.
       addBookIds: new Set(normalizeSelectionIds(bulkEdit.addBookIds)),
       removeBookIds: new Set(normalizeSelectionIds(bulkEdit.removeBookIds)),
     };
@@ -4956,23 +4966,36 @@ export class CraftingSystemManager {
    * ONE operation — a union with the whole selection, or a difference against it — and is
    * written exactly once. A definition named by neither list is left byte-identical (the
    * legacy-scalar seed is the one exception, and it is a basis carry-across rather than a
-   * requested edit). A definition named by both would be a contract violation the tri-state
-   * chips make unreachable; the REMOVE wins, mirroring the component primitive's
-   * removals-after-the-union rule, so the operation stays single and defined.
+   * requested edit). A definition named by both would be a contract violation the panel's
+   * one-op-per-book staging makes unreachable; the REMOVE wins, mirroring the component
+   * primitive's removals-after-the-union rule, so the operation stays single and defined.
+   *
+   * **The EDGE counts are measured here, against the SEEDED arrays.** The seed runs first
+   * and rewrites `recipeIds` from the legacy scalars, so `current` is the book's true
+   * membership on either basis by the time the delta is taken — which is what makes an
+   * addition count honest on a legacy world, where an unseeded `recipeIds` would be empty
+   * and every member would read as newly added. The seed's own writes are deliberately NOT
+   * counted: they carry an existing membership across a basis switch rather than adding one,
+   * and reporting them would tell the GM they had added members to books they never named.
    *
    * @param {object} system a live normalized system.
    * @param {object[]} cohort the resolved recipes of this system named by the selection.
    * @param {{addBookIds: Set<string>, removeBookIds: Set<string>}} axes
-   * @returns {{changed: boolean, bookIds: string[]}} `changed` is true when this call
-   *   mutated ANY definition — including one the seed alone touched, which must be
-   *   persisted rather than left diverging from the stored setting.
+   * @returns {{changed: boolean, bookIds: string[], additions: number, removals: number}}
+   *   `changed` is true when this call mutated ANY definition — including one the seed alone
+   *   touched, which must be persisted rather than left diverging from the stored setting.
+   *   `additions` / `removals` are membership EDGES, not definitions.
    * @private
    */
   _applyBulkRecipeBookMembership(system, cohort, axes) {
     const bookIds = [];
+    let additions = 0;
+    let removals = 0;
     const touched = axes.addBookIds.size > 0 || axes.removeBookIds.size > 0;
     const selectedIds = cohort.map((recipe) => String(recipe?.id ?? '')).filter(Boolean);
-    if (!touched || selectedIds.length === 0) return { changed: false, bookIds };
+    if (!touched || selectedIds.length === 0) {
+      return { changed: false, bookIds, additions, removals };
+    }
 
     // Seed BEFORE any array is replaced, while the legacy resolution is still the live
     // basis. Without it the marker set below would close the revert direction but make the
@@ -4997,9 +5020,13 @@ export class CraftingSystemManager {
 
       definition.recipeIds = next;
       bookIds.push(definitionId);
+      // One operation per definition, so exactly one of these can be non-zero per book and
+      // the delta IS the edge count: a union only grows, a difference only shrinks.
+      if (remove) removals += current.length - next.length;
+      else additions += next.length - current.length;
     }
 
-    return { changed: seeded || bookIds.length > 0, bookIds };
+    return { changed: seeded || bookIds.length > 0, bookIds, additions, removals };
   }
 
   /**

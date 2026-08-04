@@ -1944,6 +1944,8 @@ const BULK_RECIPE_EDIT_RESULT_COUNTS = Object.freeze([
   'blockedEnables',
   'rejected',
   'booksUpdated',
+  'bookAdditions',
+  'bookRemovals',
 ]);
 const BULK_RECIPE_EDIT_RESULT_ID_LISTS = Object.freeze([
   'recipeIds',
@@ -1956,10 +1958,13 @@ const BULK_RECIPE_EDIT_RESULT_ID_LISTS = Object.freeze([
  * Coerce the bulk-recipe write result into its full shape so the bulk panel's post-apply
  * notification can read every count unconditionally.
  *
- * All four counts are distinct and none is derivable from another: `updated` counts
+ * All six counts are distinct and none is derivable from another: `updated` counts
  * recipes that genuinely changed, `blockedEnables` those activation refused (still off,
  * other axes applied), `rejected` those a persistence failure excluded from the batch
- * entirely, and `booksUpdated` the recipe-book definitions whose membership changed.
+ * entirely, `booksUpdated` the recipe-book DEFINITIONS whose membership changed, and
+ * `bookAdditions` / `bookRemovals` the membership EDGES it created and destroyed. The last
+ * pair is what the post-apply notification reports: one book over twelve recipes is one
+ * definition and twelve edges, and the GM asked for the twelve.
  *
  * @param {object} result
  * @returns {object} every count as a number and every id list as an array.

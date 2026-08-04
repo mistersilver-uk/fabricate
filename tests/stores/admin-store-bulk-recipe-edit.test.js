@@ -44,6 +44,11 @@ function makeResult(recipeIds, overrides = {}) {
     rejectedRecipeIds: [],
     booksUpdated: 0,
     bookIds: [],
+    // Membership EDGES, distinct from `booksUpdated`'s DEFINITIONS — the post-apply
+    // notification reports these, so a normalizer that dropped them would report `0`
+    // additions for a write that made twelve.
+    bookAdditions: 0,
+    bookRemovals: 0,
     ...overrides,
   };
 }
@@ -182,6 +187,8 @@ describe('adminStore.applyRecipeBulkEdit (issue 1010)', () => {
           rejectedRecipeIds: ['r3'],
           booksUpdated: 1,
           bookIds: ['book-1'],
+          bookAdditions: 3,
+          bookRemovals: 2,
         }),
     });
     await store.selectSystem('sys1');
@@ -197,6 +204,10 @@ describe('adminStore.applyRecipeBulkEdit (issue 1010)', () => {
     assert.deepEqual(result.rejectedRecipeIds, ['r3']);
     assert.equal(result.booksUpdated, 1);
     assert.deepEqual(result.bookIds, ['book-1']);
+    // The edge counts are the ones the notification reports, and they are NOT derivable
+    // from `booksUpdated`: one definition here carries five edges.
+    assert.equal(result.bookAdditions, 3);
+    assert.equal(result.bookRemovals, 2);
   });
 
   it('fills in every count when the primitive reports a partial result', async () => {

@@ -712,6 +712,115 @@ describe('applyBulkEditToRecipes — the book axis', () => {
   });
 });
 
+/**
+ * `booksUpdated` counts DEFINITIONS whose membership array changed; the post-apply
+ * notification reports MEMBERSHIP EDGES. Those are different numbers and neither derives
+ * from the other: adding one book to twelve recipes is one definition and twelve edges,
+ * and adding two books to one recipe is two definitions and two edges. The GM asked "put
+ * these recipes in that book", so the edge count is the one that answers them.
+ */
+describe('applyBulkEditToRecipes — the membership EDGE counts', () => {
+  it('counts one addition per recipe the book did not already hold, never per definition', async () => {
+    const fixture = makeFixture({
+      recipes: [completeRecipe('r1'), completeRecipe('r2'), completeRecipe('r3')],
+      system: systemData({ definitions: [bookDefinition('book-a', ['r2'])] }),
+    });
+
+    const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1', 'r2', 'r3'], {
+      addBookIds: ['book-a'],
+    });
+
+    assert.equal(result.booksUpdated, 1, 'one DEFINITION changed');
+    assert.equal(result.bookAdditions, 2, 'but two EDGES were created — r2 was already a member');
+    assert.equal(result.bookRemovals, 0);
+  });
+
+  it('counts one removal per recipe the book actually held, ignoring the rest', async () => {
+    const fixture = makeFixture({
+      recipes: [completeRecipe('r1'), completeRecipe('r2'), completeRecipe('r3')],
+      system: systemData({ definitions: [bookDefinition('book-a', ['r1', 'r-other'])] }),
+    });
+
+    const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1', 'r2', 'r3'], {
+      removeBookIds: ['book-a'],
+    });
+
+    assert.equal(result.bookRemovals, 1, 'only r1 was a member; r-other is out of the selection');
+    assert.equal(result.bookAdditions, 0);
+    assert.deepEqual(definitionOf(fixture, 'book-a').recipeIds, ['r-other']);
+  });
+
+  it('sums both edge counts across a mixed draft over several definitions', async () => {
+    const fixture = makeFixture({
+      recipes: [completeRecipe('r1'), completeRecipe('r2')],
+      system: systemData({
+        definitions: [
+          bookDefinition('book-a'),
+          bookDefinition('book-b'),
+          bookDefinition('book-c', ['r1', 'r2']),
+        ],
+      }),
+    });
+
+    const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1', 'r2'], {
+      addBookIds: ['book-a', 'book-b'],
+      removeBookIds: ['book-c'],
+    });
+
+    assert.equal(result.bookAdditions, 4, 'two books x two recipes');
+    assert.equal(result.bookRemovals, 2);
+    assert.equal(result.booksUpdated, 3, 'and the definition count stays its own number');
+  });
+
+  it('reports zero edges for a no-op membership request', async () => {
+    const fixture = makeFixture({
+      recipes: [completeRecipe('r1')],
+      system: systemData({ definitions: [bookDefinition('book-a', ['r1'])] }),
+    });
+
+    const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1'], {
+      addBookIds: ['book-a'],
+    });
+
+    assert.equal(result.bookAdditions, 0);
+    assert.equal(result.bookRemovals, 0);
+  });
+
+  // The legacy-basis seed is a BASIS CARRY-ACROSS, not a requested edit. Counting its
+  // writes as additions would tell the GM they added members to books they never named —
+  // on the one apply where the number is largest and least explicable.
+  it('never counts the legacy-scalar seed as a requested addition', async () => {
+    const fixture = makeFixture({
+      recipes: [
+        completeRecipe('r1', { recipeItemId: 'book-b' }),
+        completeRecipe('r2', { linkedRecipeItemUuid: 'Item.book-c' }),
+      ],
+      system: systemData({ marker: false }),
+    });
+
+    const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1'], {
+      addBookIds: ['book-a'],
+    });
+
+    assert.deepEqual(definitionOf(fixture, 'book-b').recipeIds, ['r1'], 'the seed still ran');
+    assert.deepEqual(definitionOf(fixture, 'book-c').recipeIds, ['r2']);
+    assert.equal(result.bookAdditions, 1, 'and only the REQUESTED edge is reported');
+  });
+
+  it('never counts an edge for a recipe outside the selected system', async () => {
+    const fixture = makeFixture({
+      recipes: [completeRecipe('r1')],
+      system: systemData({ definitions: [bookDefinition('book-a')] }),
+    });
+
+    const result = await fixture.manager.applyBulkEditToRecipes(SYSTEM_ID, ['r1', 'r-foreign'], {
+      addBookIds: ['book-a'],
+    });
+
+    assert.equal(result.bookAdditions, 1, 'a dangling id is absent from the cohort, not an edge');
+  });
+});
+
 describe('applyBulkEditToRecipes — the membership-basis marker', () => {
   /**
    * A legacy-basis system: no marker, every `recipeIds` empty, membership carried by the
