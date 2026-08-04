@@ -1558,6 +1558,36 @@ function selectRecipeRowsByName(...names) {
 }
 
 /**
+ * Choose one segment of a `SegmentedControl`, by its `optionDataAttr` value.
+ *
+ * The LABEL is the click target, never the radio inside it. `SegmentedControl.svelte` renders a
+ * real `<input type="radio">` per segment and then hides it — 1x1, `clip: rect(0 0 0 0)` — behind
+ * the visible `<span class="manager-segment-label">`, and an absolutely-positioned child of a
+ * `justify-content: center` flex container takes its static position at that container's CENTRE.
+ * So the radio's 1px box sits directly under the middle of the span, and Playwright refuses the
+ * click with "<span class="manager-segment-label">Lock</span> intercepts pointer events" — it does
+ * not fall back to the label, it times out after 30s and fails the step. `optionDataAttr` is
+ * stamped on the wrapping `<label>`, which is both hittable and the control a GM actually presses,
+ * so the bare attribute selector is the correct target and the ` input` suffix is always wrong.
+ *
+ * This exists as a named helper because the trap is invisible at the call site: `[…="lock"] input`
+ * reads like the more precise selector and is the one that cannot work. `scripts/lib/viewLabCases.js`
+ * targets these same two controls the same way (`{ selector: '[data-recipe-bulk-status-option="enable"]' }`).
+ *
+ * `waitFor` before the click so a genuinely missing segment reports as a missing segment rather
+ * than as a 30s actionability timeout — the failure mode that hid this defect in the first place.
+ *
+ * @param {import('playwright').Locator} scope The container holding the control.
+ * @param {string} optionDataAttr The `optionDataAttr` the control was rendered with.
+ * @param {string} value The segment's option value.
+ */
+async function clickSegment(scope, optionDataAttr, value) {
+  const segment = scope.locator(`label[${optionDataAttr}="${value}"]`).first();
+  await segment.waitFor({ state: 'visible', timeout: 5_000 });
+  await segment.click();
+}
+
+/**
  * Issue 772 / 1010 — capture ONE state of a manager browser's BULK EDIT rail panel.
  *
  * SIX frames share this scaffold — three per studio — because each panel has more axes than one
@@ -8968,7 +8998,7 @@ async function main() {
             // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
             // category is staged whatever vocabulary this world has authored.
             await bulkPanel.locator('[data-recipe-bulk-category]').first().selectOption({ index: 1 });
-            await bulkPanel.locator('[data-recipe-bulk-lock-option="lock"] input').first().click();
+            await clickSegment(bulkPanel, 'data-recipe-bulk-lock-option', 'lock');
 
             // Apply must be live with two axes staged — but it is never clicked: this
             // capture writes nothing.
@@ -9007,7 +9037,7 @@ async function main() {
           // publish this frame with no Callout in it, passing every other guard here.
           selectRows: selectRecipeRowsByName('Temper a Blade', 'Quench a Blade'),
           stage: async (bulkPanel) => {
-            await bulkPanel.locator('[data-recipe-bulk-status-option="enable"] input').first().click();
+            await clickSegment(bulkPanel, 'data-recipe-bulk-status-option', 'enable');
             // BOTH halves of the claim, because either alone would publish a lie: a Callout
             // with no pilled row says the panel invented a count, and a pilled row with no
             // Callout is the plain browser frame under a step named for the warning.

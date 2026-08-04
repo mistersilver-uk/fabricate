@@ -712,6 +712,49 @@ test('the recipe bulk-edit frames pin their rows by NAME, not by position', () =
   assert.match(strategy, /throw new Error\(`Recipe browser rendered no row named/);
 });
 
+// A real smoke failure, not a hypothetical: the two recipe bulk-edit frames staged their
+// segmented axes with `[data-recipe-bulk-lock-option="lock"] input`, and both steps timed out
+// after 30s with `<span class="manager-segment-label">Lock</span> intercepts pointer events`.
+// `SegmentedControl.svelte` hides its real radio at 1x1 under `clip: rect(0 0 0 0)`, and an
+// absolutely-positioned child of a `justify-content: center` flex container takes its static
+// position at that container's CENTRE — so the radio's 1px box sits directly beneath the middle
+// of the visible span. Playwright does not fall back to the enclosing label; it fails the step.
+//
+// The harness had no working precedent to copy, which is how the wrong shape got in: the
+// Component Studio's bulk panel renders NO segmented control (its axes are a select, a stepper,
+// tri-state tag chips and a number field), and the harness's only other `-option=` selector
+// merely counts `.is-active`. So no smoke step had ever successfully clicked a segment.
+//
+// This is a source-text guard because `npm test` cannot run the harness — it top-level-imports
+// Playwright and launches Docker — and `scripts/foundry-test-run.mjs` is outside the ESLint and
+// Prettier globs too, so nothing else here would catch the regression before a 13-minute run.
+test('a segmented-control smoke step clicks the LABEL, never the hidden radio inside it', () => {
+  const helper = HARNESS.match(/async function clickSegment\([\s\S]*?\n\}\n/)?.[0];
+  assert.ok(helper, 'the segment-click helper was not found in the harness');
+  assert.match(
+    helper,
+    /locator\(`label\[\$\{optionDataAttr\}="\$\{value\}"\]`\)/,
+    'the helper must target the wrapping label, which is what carries `optionDataAttr`',
+  );
+  // A missing segment must report as a missing segment, not as a 30s actionability timeout —
+  // that indistinguishability is what let the defect sit unread in the run output.
+  assert.match(helper, /waitFor\(\{ state: 'visible'/);
+
+  // Both recipe frames route through it rather than hand-rolling a selector again.
+  assert.match(HARNESS, /clickSegment\(bulkPanel, 'data-recipe-bulk-lock-option', 'lock'\)/);
+  assert.match(HARNESS, /clickSegment\(bulkPanel, 'data-recipe-bulk-status-option', 'enable'\)/);
+
+  // And the shape itself is banned harness-wide. `input:checked` is deliberately still legal:
+  // the unstaged frame asserts the sentinel radio is checked with `waitFor({state:'attached'})`,
+  // which reads the a11y tree and never hit-tests, so it needs the input and cannot intercept.
+  const offenders = HARNESS.match(/-option="[^"]*"\] input['"`]/g) ?? [];
+  assert.deepEqual(
+    offenders,
+    [],
+    'a `-option="…"] input` click target is the segmented-control interception trap',
+  );
+});
+
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
   // Split rather than one lazy regex per label: a `[\s\S]*?label: '<wanted>'` starts at the
   // EARLIEST call site and happily swallows the two before it, which would let a staging
