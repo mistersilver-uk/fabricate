@@ -24,6 +24,8 @@ The driver alone mutates the coordinator checkout, GitHub or remote state, integ
 Use the provider-neutral lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; do not create a Claude-specific worktree convention.
 Before maintainer handoff, the driver finalizes PR metadata, rebases onto fetched `origin/main`, reruns authoritative gates and commitlint, preserves valid approval across a patch-equivalent rebase or obtains fresh detached exact-target review when the owned concern materially changed or a finding remains unresolved, pushes only with an explicit expected-head lease, marks the PR ready, and requires all post-undraft exact-head checks including both SonarCloud checks.
 Draft checks are preflight only; on failure or a moved main/head, return the PR to draft and repeat the delivery loop.
+The ready transition is the driver's own step, so run it without asking: a green PR still sitting in draft has not had its deciding checks run, so it is unfinished, not safely parked.
+Hold at draft only when the user asked to hold or a delivery precondition is unmet, and say which.
 
 ## Skills
 
