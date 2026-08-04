@@ -168,19 +168,73 @@ const stagedState = (root, id) => stagedRow(root, id)?.getAttribute('data-bulk-b
 const stagedIds = (root) =>
   [...root.querySelectorAll('[data-bulk-book]')].map((row) => row.getAttribute('data-bulk-book'));
 
+/**
+ * Activate a control the way a KEYBOARD user does: focus it, then press it.
+ *
+ * A bare `.click()` moves no focus, so every gesture below would start from
+ * `document.body` and the focus assertions could not tell "the panel re-homed focus"
+ * from "focus was never anywhere to lose".
+ */
+function press(node) {
+  node.focus();
+  node.click();
+  flushSync();
+}
+
 /** Open the picker popover and click one book's option row by id. */
 function pickBook(root, bookId) {
-  bookTrigger(root).click();
-  flushSync();
-  root.querySelector(`[data-popover-option="${bookId}"]`).click();
-  flushSync();
+  press(bookTrigger(root));
+  press(root.querySelector(`[data-popover-option="${bookId}"]`));
 }
 
 /** Pick a book and press one of its two actions — the whole gesture, as a GM performs it. */
 function stageBook(root, bookId, op) {
   pickBook(root, bookId);
-  (op === 'add' ? addButton(root) : removeButton(root)).click();
-  flushSync();
+  press(op === 'add' ? addButton(root) : removeButton(root));
+}
+
+/**
+ * Drain the microtask queue so a `queueMicrotask`-deferred focus hop has run.
+ *
+ * The panel re-homes focus the way `SearchablePopover.close()` does — after Svelte's own
+ * flush, which is itself a microtask — so an assertion made synchronously after the press
+ * would read the pre-hop `document.activeElement` and pass or fail for the wrong reason.
+ */
+async function settleFocus() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+/**
+ * What holds focus, as a SHORT STRING.
+ *
+ * Never the node: `node:assert` serialises the actual value to build its diff, and walking
+ * a mounted happy-dom element's circular tree kills the heap — a two-second assertion
+ * failure surfaces as a `# cancelled` suite with no message.
+ *
+ * `detached` is reported separately from the control's name because the failure this whole
+ * block exists to catch has BOTH shapes: focus falling to `document.body`, and focus left
+ * stranded on a node the re-render has already removed from the document.
+ */
+function focusHolder() {
+  const active = document.activeElement;
+  if (!active || active === document.body) return 'document.body';
+  const name = controlName(active);
+  return active.isConnected === false ? `detached ${name}` : name;
+}
+
+function controlName(node) {
+  const unstage = node.getAttribute?.('data-recipe-bulk-book-unstage');
+  if (unstage) return `unstage ${unstage}`;
+  for (const [attribute, name] of [
+    ['data-recipe-bulk-book-add', 'add'],
+    ['data-recipe-bulk-book-remove', 'remove'],
+    ['data-recipe-bulk-book-clear-pick', 'clear pick']
+  ]) {
+    if (node.hasAttribute?.(attribute)) return name;
+  }
+  if (node.classList?.contains?.('fab-bulk-book-trigger')) return 'trigger';
+  return `<${String(node.tagName ?? 'unknown').toLowerCase()}>`;
 }
 
 // The segmented axes render REAL radios, so a segment is chosen by firing `change` on the
@@ -529,6 +583,100 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
 
     stageBook(root, 'book-forge', 'add');
     assert.match(root.textContent, /2 changes staged/);
+  });
+});
+
+/**
+ * KEYBOARD FOCUS ACROSS THE DESTRUCTIVE RE-RENDERS.
+ *
+ * Every gesture on this axis destroys the control holding focus — the popover unmounts on
+ * a choice, the pick card is replaced by the trigger on Add / Remove / clear, and an
+ * unstage removes its own row. Left unhandled, each one drops focus to `document.body` and
+ * a keyboard-only GM staging three books tabs back in from the top of the Foundry document
+ * six extra times. The retired chip run had no such cost, so this is the one property the
+ * redesign could regress while improving everything else.
+ *
+ * Asserted against the REAL mounted DOM's `document.activeElement`, not by reasoning about
+ * the handlers: the ordering these hops depend on (Svelte's flush microtask running ahead
+ * of the panel's own) is exactly what reading the code got wrong the first time.
+ */
+describe('RecipeBulkEditPanel keyboard focus (issue 1010)', () => {
+  it('lands on the pick card action after choosing, rather than on document.body', async () => {
+    const { root } = await mountPanel();
+    pickBook(root, 'book-alchemy');
+    await settleFocus();
+
+    assert.equal(
+      focusHolder(),
+      'add',
+      "the popover's own restore correctly declines here — its trigger went with the "
+        + 'choice — so the panel has to land focus itself'
+    );
+  });
+
+  it('skips the action its own count has deadened', async () => {
+    const { root } = await mountPanel({ bookMembership: new Map([['book-alchemy', 3]]) });
+    pickBook(root, 'book-alchemy');
+    await settleFocus();
+
+    assert.equal(addButton(root).disabled, true, 'all three selected recipes already hold it');
+    assert.equal(focusHolder(), 'remove', 'focus never parks on an inert control');
+  });
+
+  it('follows a staged book to its own undo control', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'add');
+    await settleFocus();
+
+    assert.equal(
+      focusHolder(),
+      'unstage book-alchemy',
+      'the staged row is where the gesture landed, and its unstage control is the undo'
+    );
+  });
+
+  it('returns to the trigger when the pick is cleared', async () => {
+    const { root } = await mountPanel();
+    pickBook(root, 'book-alchemy');
+    press(root.querySelector('[data-recipe-bulk-book-clear-pick]'));
+    await settleFocus();
+
+    assert.equal(focusHolder(), 'trigger');
+  });
+
+  it('steps to the next staged row when one is unstaged', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'remove');
+    stageBook(root, 'book-forge', 'add');
+
+    // Sorted by name, so the Primer is above the Manual and the Manual is what takes its
+    // place. Read BEFORE the mutation, because afterwards the row and its position are gone.
+    press(root.querySelector('[data-recipe-bulk-book-unstage="book-alchemy"]'));
+    await settleFocus();
+
+    assert.equal(focusHolder(), 'unstage book-forge');
+  });
+
+  it('steps to the row ABOVE when the last staged row is unstaged', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'remove');
+    stageBook(root, 'book-forge', 'add');
+
+    press(root.querySelector('[data-recipe-bulk-book-unstage="book-forge"]'));
+    await settleFocus();
+
+    assert.equal(focusHolder(), 'unstage book-alchemy', 'there is no next row to step to');
+  });
+
+  it('returns to the trigger when unstaging empties the list', async () => {
+    const { root } = await mountPanel();
+    stageBook(root, 'book-alchemy', 'add');
+
+    press(root.querySelector('[data-recipe-bulk-book-unstage="book-alchemy"]'));
+    await settleFocus();
+
+    assert.ok(!stagedList(root), 'precondition: the list itself is gone');
+    assert.equal(focusHolder(), 'trigger');
   });
 });
 

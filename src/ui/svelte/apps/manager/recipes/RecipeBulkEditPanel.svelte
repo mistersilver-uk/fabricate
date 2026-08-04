@@ -557,20 +557,97 @@
     onDraftChange(setBulkRecipeCheckTier(draft, value));
   }
 
+  // ── Focus across a destructive re-render ─────────────────────────────────────────
+  //
+  // EVERY gesture on this axis destroys the control that was holding focus: choosing an
+  // option unmounts the popover, Add / Remove / the pick-card clear replace the card with
+  // the trigger, and unstaging removes its own row. A destroyed node's focus falls to
+  // `document.body`, so a keyboard-only GM staging three books would tab back in from the
+  // top of the Foundry document six extra times. The retired chip run had no such cost — a
+  // chip cycles IN PLACE and keeps focus — so leaving it unhandled would undercut the exact
+  // property this redesign exists to improve.
+  //
+  // `SearchablePopover.close()` already owns this idiom, and its restore correctly DECLINES
+  // here rather than being broken: `onChoose` writes `pickedBookId` first, so Svelte's flush
+  // microtask is enqueued ahead of the popover's, and by the time the restore runs its
+  // trigger has been unmounted by the `{:else}` swap. Nothing took its place. These helpers
+  // are what takes its place, and they copy that idiom exactly — `queueMicrotask` plus an
+  // optional-chained, connection-guarded `focus()`.
+  //
+  // `queueMicrotask` works for the same reason it works there: the state write that
+  // schedules Svelte's re-render happens BEFORE the call, so Svelte's flush is already ahead
+  // of this callback in the queue and the node being focused is the newly rendered one.
+  //
+  // The target is found by QUERY rather than by a binding, because the whole point is that
+  // the node did not exist when the gesture started — there is nothing to have bound. The
+  // query is anchored on this panel's own hook, so it can never reach the Component Studio's
+  // panel; the attribute name is declared ONCE here and handed to the shell below, so the
+  // anchor and the rendered hook cannot drift into a query that matches nothing.
+  const PANEL_ATTR = 'data-recipe-bulk-panel';
+  const PANEL_HOOK = `[${PANEL_ATTR}]`;
+  const BOOK_TRIGGER = '.fab-bulk-book-trigger';
+
+  // First candidate that exists, is still attached and is not disabled. Every hop is
+  // guarded: a candidate may never have rendered, may have been detached again by a
+  // republished projection, or may be dead under an in-flight apply — in which case focus
+  // is left where it is rather than parked on an inert control.
+  function focusAfterRerender(selectors) {
+    queueMicrotask(() => {
+      if (typeof document === 'undefined') return;
+      for (const selector of selectors) {
+        const node = document.querySelector(`${PANEL_HOOK} ${selector}`);
+        if (!node || node.isConnected === false || node.disabled === true) continue;
+        node.focus?.();
+        return;
+      }
+    });
+  }
+
+  // The picker has just closed with focus inside it. Land on the action the GM opened it to
+  // press; Remove when the book already holds every selected recipe and Add is therefore
+  // dead, and the clear when an in-flight apply has deadened both.
+  function pickBook(bookId) {
+    pickedBookId = bookId;
+    focusAfterRerender([
+      '[data-recipe-bulk-book-add]',
+      '[data-recipe-bulk-book-remove]',
+      '[data-recipe-bulk-book-clear-pick]',
+    ]);
+  }
+
+  function clearPick() {
+    pickedBookId = '';
+    focusAfterRerender([BOOK_TRIGGER]);
+  }
+
   // Staging CLEARS the pick, deliberately, and this is the one place this control departs
   // from the prototype's behaviour rather than its defects. The prototype keeps the book
   // picked, which leaves two surfaces claiming authority over one fact — an active Add
   // button and a staged row — and makes every subsequent book cost an extra dismissal. With
   // the staged list rendered, the row IS the confirmation and carries the undo, so the pick
   // card is a transient composer: pick, act, and the trigger is back for the next book.
+  //
+  // Focus follows the gesture to that row's own undo, which is where the GM's attention
+  // already is. The trigger is the fallback for a staging that renders no row at all.
   function stageBook(op) {
     if (!pickedBook) return;
-    onDraftChange(setBulkRecipeBookOp(draft, pickedBook.id, op));
+    const bookId = pickedBook.id;
+    onDraftChange(setBulkRecipeBookOp(draft, bookId, op));
     pickedBookId = '';
+    focusAfterRerender([`[data-recipe-bulk-book-unstage="${bookId}"]`, BOOK_TRIGGER]);
   }
 
+  // The neighbour is read from the sorted list BEFORE the mutation, because afterwards this
+  // row is gone and its position with it: the row that takes its place, then the row above
+  // it when it was the last one, then the trigger once the list empties entirely.
   function unstageBook(bookId) {
+    const order = stagedBooks.map((entry) => entry.id);
+    const index = order.indexOf(bookId);
+    const neighbour = index < 0 ? '' : (order[index + 1] ?? order[index - 1] ?? '');
     onDraftChange(setBulkRecipeBookOp(draft, bookId, 'none'));
+    focusAfterRerender(
+      neighbour ? [`[data-recipe-bulk-book-unstage="${neighbour}"]`, BOOK_TRIGGER] : [BOOK_TRIGGER]
+    );
   }
 </script>
 
@@ -588,7 +665,7 @@
   heading={headingLabel}
   {applyLabel}
   {canApply}
-  panelAttr="data-recipe-bulk-panel"
+  panelAttr={PANEL_ATTR}
   clearAttr="data-recipe-bulk-clear"
   countAttr="data-recipe-bulk-count"
   applyAttr="data-recipe-bulk-apply"
@@ -751,9 +828,7 @@
               'Clear the picked book or scroll'
             )}
             disabled={inert}
-            onclick={() => {
-              pickedBookId = '';
-            }}
+            onclick={() => clearPick()}
           >
             <i class="fas fa-xmark" aria-hidden="true"></i>
           </button>
@@ -790,9 +865,13 @@
       <!--
         The shipped `SearchablePopover`, not a hand-rolled search field: it already owns the
         search input, the option rows, outside-click and Escape dismissal, focus restoration
-        to the trigger, and a portal past the manager panel's `overflow: hidden`. Its option
-        list SCROLLS, which is what lets this control offer the whole authored vocabulary
-        with no cap and no "keep typing to narrow" affordance.
+        to the trigger on a DISMISSAL, and a portal past the manager panel's
+        `overflow: hidden`. Its option list SCROLLS, which is what lets this control offer
+        the whole authored vocabulary with no cap and no "keep typing to narrow" affordance.
+
+        Restoration on a CHOICE is this component's, not the popover's, and deliberately so:
+        choosing replaces the trigger with the pick card, so there is nothing for the popover
+        to restore to and its guard correctly declines. See `focusAfterRerender` above.
       -->
       <SearchablePopover
         options={bookOptions}
@@ -815,9 +894,7 @@
           'FABRICATE.Admin.Manager.Recipe.BulkEdit.BookNoMatch',
           'No book or scroll by that name.'
         )}
-        onChoose={(id) => {
-          pickedBookId = id;
-        }}
+        onChoose={(id) => pickBook(id)}
       />
     {/if}
     {#if stagedBooks.length > 0}
