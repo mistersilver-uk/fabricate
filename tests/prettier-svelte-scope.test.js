@@ -70,6 +70,7 @@ const GATE_TARGETS = [
   'scripts/lib/screenshotCaptureMap.js',
   'scripts/lib/foundryRunIdentity.js',
   'scripts/lib/foundryRunBudget.js',
+  'scripts/lib/foundryTourSuppression.js',
   'scripts/lib/agentModelTiers.js',
   'scripts/lib/foundryDataPreparation.js',
   'scripts/lib/smokeSectionFixture.js',
