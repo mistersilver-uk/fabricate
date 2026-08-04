@@ -134,9 +134,10 @@ export class RecipeVisibilityService {
   }
 
   // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Canonical
-  // read is each definition's `recipeIds[]`; a system with no membership authored yet
-  // (fully un-migrated) falls back to the recipe's legacy single reverse ref. Returns a
-  // SET — a recipe may live in several books, each with its own caps.
+  // read is each definition's `recipeIds[]`; while the system's
+  // `membershipResolvesByRecipeIds` marker is unset it falls back to the recipe's legacy
+  // single reverse ref. Returns a SET — a recipe may live in several books, each with
+  // its own caps.
   _getRecipeItemDefinitions(recipe) {
     const system = this._getCraftingSystem(recipe);
     if (!system) return [];
@@ -148,11 +149,12 @@ export class RecipeVisibilityService {
     );
     if (byMembership.length > 0) return byMembership;
 
-    // Only fall back when NO book in the system carries membership yet.
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) return [];
+    // Only fall back while the system has not resolved by `recipeIds` (issue 1011). This
+    // is player-facing — per-book learn caps and character prerequisites are enforced
+    // off it — so the basis is READ from the system, never re-derived from the arrays:
+    // the retired inference flipped in both directions, so emptying the last array
+    // resurrected phantom memberships for every player at once.
+    if (system.membershipResolvesByRecipeIds === true) return [];
 
     const recipeItemId = String(recipe?.recipeItemId || '').trim();
     if (recipeItemId) {

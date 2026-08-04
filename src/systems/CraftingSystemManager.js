@@ -269,6 +269,21 @@ export class CraftingSystemManager {
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
       recipeItemDefinitions,
+      // Which basis resolves recipe-book membership for THIS system (issue 1011,
+      // landed with issue 1010). Monotonic: once set it is never cleared, so an empty
+      // `recipeIds` means "this book has no members" rather than "this system has not
+      // migrated". Backfilled here as a monotone OR over the PERSISTED value — never a
+      // bare `some(...)`, which would be the retired per-read inference byte for byte
+      // and would flip the basis back on every client the moment `reload()` saw the
+      // last array emptied. Normalize-on-read needs no versioned migration, matching
+      // `toolBreakage` and `visibilityMode` above; this literal has no `...system`
+      // spread, so the field must be listed here or the persisted `true` is destroyed
+      // on the next round-trip.
+      membershipResolvesByRecipeIds:
+        system.membershipResolvesByRecipeIds === true ||
+        recipeItemDefinitions.some(
+          (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+        ),
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
@@ -2671,14 +2686,22 @@ export class CraftingSystemManager {
     }
 
     // Book membership (issue 511 many-to-many): replace the contained-recipe id set.
+    //
+    // This is the SINGLE choke point for the membership-basis marker (issue 1011): the
+    // Contents tab (`CraftingSystemManagerRoot` → `adminStore.saveRecipeItem`),
+    // `adminStore.setRecipeBookMembership` and the recipe browser's bulk book axis all
+    // land here, and none of them re-runs `_normalizeSystem` — so setting the marker at
+    // a store instead would leave the writing client reading `false` against a
+    // non-empty array while every peer, catching up through `reload()`, read `true`.
     if (Object.prototype.hasOwnProperty.call(patch, 'recipeIds')) {
-      definition.recipeIds = [
-        ...new Set(
-          (Array.isArray(patch.recipeIds) ? patch.recipeIds : [])
-            .map((id) => String(id || '').trim())
-            .filter(Boolean)
-        ),
-      ];
+      // Seed BEFORE the marker flips and before this definition's array is replaced, so
+      // the legacy resolution is still the live basis while it is being read across.
+      // Without it the marker would close the revert direction but make the ORPHANING
+      // direction permanent: every OTHER definition's scalar-only members would be
+      // stranded by this one write, recoverable only by re-authoring each book by hand.
+      this._seedMembershipFromLegacyScalars(system);
+      definition.recipeIds = this._normalizeMembershipRecipeIds(patch.recipeIds);
+      system.membershipResolvesByRecipeIds = true;
     }
 
     const capsPatch = patch?.caps || {};
@@ -2694,6 +2717,101 @@ export class CraftingSystemManager {
 
     await this.save();
     return { item: { ...definition } };
+  }
+
+  /**
+   * Coerce a book-membership id list to the canonical persisted shape: trimmed,
+   * non-empty, deduped strings. Factored out of `updateRecipeItemDefinition` so every
+   * writer of `recipeItemDefinitions[].recipeIds` produces the same shape — the five
+   * membership readers compare with `String(id) === rid`, so a whitespace-padded id
+   * written by a second path would simply stop matching.
+   *
+   * Deliberately NOT named `…IdList`: `_normalizeSelectionIds` coerces a SELECTION of
+   * recipe ids, and near-homographs on one class are invisible at a call site.
+   *
+   * @param {unknown} recipeIds Raw membership ids from a patch.
+   * @returns {string[]} Trimmed, deduped, non-empty ids.
+   * @private
+   */
+  _normalizeMembershipRecipeIds(recipeIds) {
+    return [
+      ...new Set(
+        (Array.isArray(recipeIds) ? recipeIds : [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+  }
+
+  /**
+   * Carry a system's legacy scalar membership across onto the canonical
+   * `recipeItemDefinitions[].recipeIds` arrays, in memory (issue 1011).
+   *
+   * Run by the write that FIRST sets `membershipResolvesByRecipeIds`, before the
+   * requested change is applied, so switching basis preserves the membership the
+   * legacy basis resolved instead of discarding it. A no-op once the marker is set, so
+   * a second write never re-seeds and a removal cannot be undone by the next write.
+   *
+   * This is `migrateInvertRecipeItemLink`'s PUSH half re-run at first-write time,
+   * WITHOUT its delete half: it mutates no legacy reference. That is the whole reason
+   * this approach was chosen over clearing the reverse refs — `_migrateLegacyRecipeItems`
+   * re-stamps `recipe.recipeItemId` from a surviving `linkedRecipeItemUuid` on every
+   * `initialize()` on every client, so no clear is durable, and the only clear that
+   * would be durable also severs the standalone alchemy formula-item links that the
+   * 1.13.0 migration deliberately preserved.
+   *
+   * Resolution order mirrors the legacy READERS (see
+   * `_getRecipeObjectsReferencingRecipeItemDefinition`'s fallback, and the identical
+   * branch in `getRecipeItemDefinitionsContaining`, `RecipeVisibilityService` and
+   * `InventoryListingBuilder`): a present `recipeItemId` resolves by definition id and
+   * the uuid branch is NOT consulted even when that id names nothing, and only an
+   * absent `recipeItemId` falls through to `linkedRecipeItemUuid` against a definition's
+   * `originItemUuid`. Falling through on a dangling id (as the 1.13.0 migration does)
+   * would seed a membership the legacy basis never resolved, which is precisely the
+   * change of resolved membership this seed exists to prevent.
+   *
+   * @param {object} system A live normalized system from the in-memory map.
+   * @returns {boolean} `true` when at least one definition gained a member.
+   * @private
+   */
+  _seedMembershipFromLegacyScalars(system) {
+    if (!system || system.membershipResolvesByRecipeIds === true) return false;
+    const definitions = Array.isArray(system.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    if (definitions.length === 0) return false;
+
+    const byId = new Map();
+    const bySource = new Map();
+    for (const def of definitions) {
+      if (!def || typeof def !== 'object') continue;
+      if (!Array.isArray(def.recipeIds)) def.recipeIds = [];
+      const id = String(def.id || '').trim();
+      if (id && !byId.has(id)) byId.set(id, def);
+      const source = String(def.originItemUuid || '').trim();
+      if (source && !bySource.has(source)) bySource.set(source, def);
+    }
+
+    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) ?? [];
+    let seeded = false;
+    for (const recipe of Array.isArray(recipes) ? recipes : []) {
+      const recipeId = String(recipe?.id || '').trim();
+      if (!recipeId) continue;
+
+      const recipeItemId = String(recipe?.recipeItemId || '').trim();
+      let definition = null;
+      if (recipeItemId) {
+        definition = byId.get(recipeItemId) || null;
+      } else {
+        const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+        if (legacyUuid) definition = bySource.get(legacyUuid) || null;
+      }
+      if (!definition || definition.recipeIds.includes(recipeId)) continue;
+
+      definition.recipeIds.push(recipeId);
+      seeded = true;
+    }
+    return seeded;
   }
 
   // Merge a caps patch over the stored caps sub-block while keeping the legacy/new
@@ -3310,8 +3428,8 @@ export class CraftingSystemManager {
 
   // The recipes a book/scroll contains. Canonical source is the definition's
   // `recipeIds[]` (issue 511 many-to-many). Falls back to the legacy reverse ref
-  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → originItemUuid`) only for
-  // un-migrated definitions that carry no `recipeIds` yet.
+  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → originItemUuid`) only while the
+  // system's `membershipResolvesByRecipeIds` marker is unset.
   _getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition) {
     if (!definition || !this.recipeManager?.getRecipes) return [];
     const recipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
@@ -3322,17 +3440,13 @@ export class CraftingSystemManager {
       return recipes.filter((recipe) => idSet.has(String(recipe?.id)));
     }
 
-    // This definition carries no membership. Only reach for the legacy reverse ref when
-    // the WHOLE system is un-migrated; in a migrated system an empty `recipeIds` means an
-    // empty book, and a recipe's stale `recipeItemId`/`linkedRecipeItemUuid` must not
-    // resurrect a phantom membership (mirrors getRecipeItemDefinitionsContaining).
-    const definitions = Array.isArray(this.getSystem(systemId)?.recipeItemDefinitions)
-      ? this.getSystem(systemId).recipeItemDefinitions
-      : [];
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) return [];
+    // This definition carries no membership. Only reach for the legacy reverse ref while
+    // the system has not resolved by `recipeIds`; once the marker is set an empty
+    // `recipeIds` means an empty book, and a recipe's stale `recipeItemId`/
+    // `linkedRecipeItemUuid` must not resurrect a phantom membership. The marker is
+    // read, never re-derived from the arrays (issue 1011): that inference flipped in
+    // BOTH directions, so emptying the last array reverted the whole system.
+    if (this.getSystem(systemId)?.membershipResolvesByRecipeIds === true) return [];
 
     const definitionId = String(definition.id || '').trim();
     const originItemUuid = String(definition.originItemUuid || '').trim();
@@ -3347,9 +3461,9 @@ export class CraftingSystemManager {
   }
 
   // Forward membership query (issue 511 many-to-many): the definitions of `systemId`
-  // that contain `recipeId`. Canonical read is each definition's `recipeIds[]`; when a
-  // system carries no membership yet (fully un-migrated) it falls back to resolving the
-  // recipe's legacy reverse ref (`recipeItemId` / `linkedRecipeItemUuid`) to its book.
+  // that contain `recipeId`. Canonical read is each definition's `recipeIds[]`; while the
+  // system's `membershipResolvesByRecipeIds` marker is unset it falls back to resolving
+  // the recipe's legacy reverse ref (`recipeItemId` / `linkedRecipeItemUuid`) to its book.
   getRecipeItemDefinitionsContaining(systemId, recipeId) {
     const system = this.getSystem(systemId);
     if (!system || !recipeId) return [];
@@ -3363,11 +3477,9 @@ export class CraftingSystemManager {
     );
     if (byMembership.length > 0) return byMembership;
 
-    // Only fall back for a system that has no membership authored anywhere.
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) return [];
+    // Only fall back while the system has not resolved by `recipeIds` (issue 1011). Read
+    // the marker; never re-derive it from the arrays.
+    if (system.membershipResolvesByRecipeIds === true) return [];
 
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) return [];
