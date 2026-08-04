@@ -317,11 +317,13 @@ function tokenDocumentElevatedCenter(tokenDoc) {
  *
  * This prefers `getCenterPoint()` FIRST, the opposite order from
  * {@link tokenDocumentCenter}. That is deliberate, not a divergence to reconcile:
- * `getCenterPoint()` is hex-aware, and the move-animation lag that makes
- * {@link tokenDocumentCenter} avoid it (the placeable centre reporting the region
- * the token just LEFT) is a property of the `updateToken` hook, not of
- * `getCenterPoint()` itself. This function runs at Interact time, on a user
- * click, never from inside `updateToken`, so that lag never applies here.
+ * `getCenterPoint()` reads the PREPARED `x`/`y`/`elevation` fields rather than
+ * the source ones, which is what makes IT, not the `updateToken` hook, the actual
+ * source of the lag {@link tokenDocumentCenter} avoids — Foundry's own
+ * `testInsideRegion` JSDoc says it must read source fields instead for exactly
+ * this reason. That lag needs an actively animating, rendered placeable, and
+ * this function exists precisely for the client that has none, so
+ * `getCenterPoint()`'s hex-aware math is safe (and preferred) here.
  *
  * @param {object} tokenDoc
  * @returns {{ x: number, y: number, elevation?: unknown } | null}

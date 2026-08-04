@@ -33,12 +33,14 @@
  * @param {number} [options.w]  Rect width.
  * @param {number} [options.h]  Rect height.
  * @param {{ bottom?: number, top?: number }|null} [options.elevationBand]
- *   Absent ⇒ THIS FAKE admits any elevation, including a non-finite one. That is
- *   a simplification, not a model of Foundry: real `RegionDocument#testPoint`
- *   still rejects a non-finite elevation even with no band configured, because
- *   the elevation is compared against the band's bounds and every comparison
- *   against a non-finite value reads false — this is the exact defect class
- *   issue 999 fixes.
+ *   Absent ⇒ THIS FAKE admits any elevation, including `undefined` and `NaN`.
+ *   That is a simplification, not a model of Foundry: real
+ *   `RegionDocument#testPoint` still rejects `undefined`/`NaN` even with no band
+ *   configured, because an unset `bottom` normalizes to `-Infinity` and neither
+ *   value compares true against `-Infinity` or `Infinity`. An elevation of
+ *   exactly `-Infinity` is NOT rejected the same way, because `#testElevation`'s
+ *   flat-region escape (`elevation === bottom`) admits it. `undefined`/`NaN` is
+ *   exactly what the real defect submits (issue 999).
  *   Present ⇒ only a finite elevation inside the band is admitted (see
  *   {@link admitsElevation}), and `top` here is INCLUSIVE, where Foundry's `top`
  *   is exclusive unless the region sets `topInclusive`.
