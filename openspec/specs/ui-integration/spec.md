@@ -132,6 +132,8 @@ A surface that paints its permanent hint in `warning` alongside a conditional `w
 
 Every multi-select affordance in the manager renders through one shared selection-control primitive: a square custom control with a checked, unchecked and indeterminate state, at the sizes its host row needs.
 A host-supplied `<input type="checkbox">` rendered with Foundry's default control chrome is a second selection design and is not an acceptable rendering.
+A multi-select surface's SELECTION TOOLBAR — the tri-state control over the rendered rows, the selected-count readout, the select-all-results action and Clear — likewise renders through one shared toolbar primitive that every browser imports.
+Its test and screenshot hook names, its host row class and its labels are parameters of that primitive, not a reason to fork it.
 
 #### Segmented controls
 
@@ -727,8 +729,11 @@ Row authoring-state pills — at most one authoring state applies to a row:
 
 - `Disabled` — the GM has switched the recipe off.
 - `Locked` — the recipe stays visible to players, but only a GM can craft it.
-- `Can't enable` — the recipe is an incomplete shell (missing ingredient sets and/or result groups) **and** is currently off, so enabling it would be refused.
-- `Incomplete` — an incomplete shell that is already on: unfinished, but nothing is being refused.
+- `Can't enable` — the activation check would refuse to enable this recipe **and** it is currently off.
+  The activation check is the full completeness contract plus the alchemy signature scan, so an incomplete shell, a structurally broken recipe, a dangling essence or tag reference, an unmet resolution-mode requirement and an alchemy signature conflict all qualify.
+  The pill, the bulk panel's pre-flight count and the write read that ONE predicate, so no two surfaces can disagree about whether a given recipe is currently enableable.
+- `Incomplete` — the same activation blocker on a recipe that is already ON: unfinished or conflicting work a GM should still resolve, but nothing is being refused, because the activation check runs only on a transition into the enabled state.
+  `Can't enable` and `Incomplete` read ONE predicate and differ only in whether the recipe is currently off.
 
 The **I/O readout** always shows the ingredient count (`N in`).
 It shows an output item count (`N out`) **only** in the `simple` and `progressive` resolution modes.
@@ -821,13 +826,41 @@ The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
 Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
 
+**Recipe Studio — bulk selection.**
+
+The GM recipe browser supports multi-select bulk editing.
+Each row carries a selection control at its TRAILING edge, after the Edit / Duplicate / Delete group, rendered through the shared selection-control primitive.
+A selection toolbar sits directly above the list carrying a tri-state control over the CURRENTLY RENDERED rows, a selected-count readout, a `Select all {N} results` action over ALL filtered rows, and a Clear action, rendered through the shared bulk-selection toolbar primitive.
+The rendered-rows control and the results action are distinct operations and are never conflated; a collapsed category's rows are not rendered and are never selected by the former.
+The selection is scoped to the selected crafting system, survives an editor round-trip exactly as the browser's other view state does, is cleared by a crafting-system switch, and never retains an id that no longer resolves to a recipe.
+
+**Recipe Studio — bulk edit.**
+
+While the selection is non-empty, the recipe browser's inspector rail renders the bulk edit panel IN PLACE OF the single-recipe inspector.
+The panel stages changes without writing: category (single-valued, overwriting, with an explicit leave-unchanged option), status (leave unchanged / enable / disable), lock (leave unchanged / lock / unlock), check tier, and recipe-book membership (a run of tri-state controls over the system's recipe items, cycling leave → add → remove → leave).
+The check tier axis carries THREE distinct instructions and never collapses two of them: leave the recipe's tier alone, clear it to the system's default DC, and set a named tier.
+Where the system's crafting check carries no recipe-level tier — a progressive system, a dynamically resolved DC, a fixed-type routed check whose per-recipe difficulty is its minimum success tier instead, or a check with no tiers authored — the panel states which of those it is in place of the control rather than hiding it.
+That is not the same fact as the system having no usable check at all, which the row's own check pill already reports, and the two are never conflated.
+When Enable is staged, the panel states before applying how many selected recipes cannot currently be enabled and will stay off, read from the SAME activation predicate as the row's `Can't enable` pill, so the pilled rows and the counted rows are one set by construction.
+The write applies that same predicate but evaluates it per recipe in batch order, and alchemy signature uniqueness is order-dependent: two selected recipes that collide only with each other both read as enableable, and the write enables the first and refuses the second.
+The pre-flight count is therefore a LOWER BOUND on what a batch may refuse and is worded as one; the post-apply report is the authority.
+One action applies every staged axis to every selected recipe; it names the number of recipes it will affect and is inert until at least one axis is staged, including a removal-only book draft.
+Applying persists through a single set-apply write — at most one `recipes` world write and at most one `craftingSystems` world write, and none for an axis that changed nothing — applies every ungated axis to a recipe whose enable is refused, reports both the number of recipes changed and the number of enables refused, then clears the selection and the staged changes, returning the rail to the single-recipe inspector.
+
 ### Books & Scrolls Surface
 
 `Books & Scrolls` is the `Crafting` group's recipe-item management surface, available whenever a crafting system is selected (the `Crafting` group is unconditional as of issue 745).
 It is a display name only: the surface manages every recipe item in the selected system regardless of the item's Foundry item type (book, scroll, ring, wand, gem, note), and `recipe item` remains the canonical noun.
 
-The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership, with a legacy `recipe.recipeItemId` fallback for un-migrated systems) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
-Membership is authored on the item's **Contents** tab (writing the definition's `recipeIds`), not on the recipe editor.
+The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
+
+Which basis resolves membership is recorded on the system, not inferred per read.
+A system carries a monotonic `membershipResolvesByRecipeIds` marker: it is set by the first write to any definition's `recipeIds` and is never cleared, and on load it is set for any system that does not already carry it and has at least one definition with a non-empty `recipeIds`, so an existing marker is preserved rather than recomputed.
+The write that first sets it seeds every definition in the system from the legacy scalars in the same write, so switching basis carries existing membership across rather than discarding it.
+While the marker is unset, membership resolves through the legacy `recipe.recipeItemId` scalar; once set, only `recipeIds` resolves it, so an empty `recipeIds` array means "this book has no members" rather than "this system has not migrated".
+Re-deriving the basis per read — "any definition has a non-empty `recipeIds`" — is forbidden: it flips in both directions, so the first membership write to a legacy system would orphan every scalar-only member, and emptying the last array would revert the whole system and resurrect phantom memberships on player-facing reads.
+
+Membership is authored on the item's **Contents** tab (writing the definition's `recipeIds`) or, for a multi-row selection, on the recipe browser's bulk edit panel — never on the recipe editor.
 The caps are per recipe item, not a shared system-wide rule, so two recipe items in one system may show different chips (a one-recipe scroll beside a three-recipe tome).
 When the selected system has no recipe items, the surface shows an empty state.
 
@@ -1198,10 +1231,12 @@ If the system's visibility mode consumes an item or teaches by knowledge (`item`
 
 - The recipe's context rail lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
   There is no book/scroll `kind` — `RecipeItemDefinition` manages every recipe item regardless of Foundry item type.
-- Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
+- Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only while the system's membership-basis marker is unset), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
+  A multi-row selection can remove membership the same way from the recipe browser's bulk edit panel.
   A row whose definition's `originItemUuid` no longer resolves shows a missing/stale state and retains the link.
-- **Adding** a recipe to a book is authored from the book's side (Books & Scrolls → the recipe-item editor stages `recipeIds` and persists on Save).
-  The recipe editor carries no drop zone and no "link another" affordance: a second authoring path for the same many-to-many is duplication, not a capability.
+- **Adding** a recipe to a book is authored from the book's side (Books & Scrolls → the recipe-item editor stages `recipeIds` and persists on Save), or, for a multi-row selection, from the recipe browser's bulk edit panel.
+  The recipe EDITOR still carries no drop zone and no "link another" affordance: a second SINGLE-recipe authoring path for the same many-to-many is duplication, not a capability.
+  The bulk panel is admitted because it expresses an operation neither surface can — one membership change applied across a whole selection — rather than a second way to do what the Contents tab already does.
 - Membership changes apply immediately (through `setRecipeBookMembership`), independently of the recipe draft's Save.
 
 Owned copies match by UUID or resolved source UUID of the linked recipe item definition.
