@@ -781,6 +781,10 @@
         "Redacted": {
           "Title": "Hidden recipe"
         },
+        "BlindSecret": {
+          "Badge": "GM only",
+          "Title": "Secret preview: this blind run will yield this task. The player cannot see it."
+        },
         "Fizzle": {
           "Title": "Failed alchemy attempt",
           "Failure": "The submitted ingredients matched no known recipe."

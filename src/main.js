@@ -27,6 +27,8 @@ import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
 import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGatheringNodeDepleteMessage } from './systems/gatheringNodeSocket.js';
+import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
+import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
@@ -131,6 +133,9 @@ let gatheringEngine = null;
 // the window survives across socket messages (a per-message limiter would never
 // refuse anything). Only the active GM ever consults it.
 const gatheringDepletionRateLimiter = createDepletionRateLimiter();
+// Separate budget for the blind-start relay (issue 901) so a burst of gathers and
+// a burst of starts cannot starve one another through a shared allowance.
+const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
 
 // The GM-only crafting system manager app is deferred to a lazy chunk so
 // non-GM players never download/parse its subtree at module init. The dynamic
@@ -227,6 +232,42 @@ function getGatheringRunViewer({ run } = {}) {
 
 function isCurrentWorldPaused() {
   return game.paused === true;
+}
+
+/**
+ * ACTIVE-GM edge for a relayed BLIND gathering start (issue 901).
+ *
+ * The GM re-runs the WHOLE attempt with the REQUESTING USER as the viewer rather
+ * than itself. That matters twice over: every gate the player would have faced
+ * (actor ownership via `isActorSelectable`, scene presence, task visibility,
+ * tools, stamina, and node availability net of outstanding reservations) is
+ * re-evaluated GM-side against the player who asked, and `_isOpaqueBlindTask`
+ * stays TRUE so the run is persisted blind. Running it as the GM's own viewer
+ * would silently write the real task id back onto the actor flag.
+ *
+ * The `senderId` is Foundry's server-attested socket sender, never a payload
+ * field, so a forged message cannot impersonate another user.
+ *
+ * @param {object} payload Validated blind-start request plus the attested sender.
+ * @returns {Promise<object|null>} The start result, or null when unresolvable.
+ */
+async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, taskId = null, interactableRef = null } = {}) {
+  const requester = game.users?.get?.(senderId) ?? null;
+  if (!requester) return null;
+  const resolve = globalThis.fromUuidSync;
+  let startActor = null;
+  try { startActor = typeof resolve === 'function' ? resolve(String(actorUuid)) : null; } catch (_) { startActor = null; }
+  if (!startActor) return null;
+  // `interactive: false`: the situational-modifier dialog belongs to the player's
+  // client, never the GM's. A timed blind run does not roll at start anyway.
+  return gatheringEngine?.startAttempt({
+    viewer: requester,
+    actor: startActor,
+    environmentId,
+    taskId,
+    interactableRef,
+    interactive: false
+  });
 }
 
 /**
@@ -406,6 +447,8 @@ class Fabricate {
     this._runJournalBuilder = null;
     this.gatheringEnvironmentStore = null;
     this.gatheringNodeDepletionWriter = null;
+    this.gatheringBlindRunStore = null;
+    this.gatheringBlindStartWriter = null;
     this.gatheringRichStateService = null;
     this.gatheringRunManager = null;
     this.gatheringGateAndCheckEvaluator = null;
@@ -669,6 +712,56 @@ class Fabricate {
           behaviorId: ref?.behaviorId,
           update
         })
+    });
+    // Issue 901. A blind run's secret state — the drawn task, its start-time
+    // snapshot, and its provisional node reservation — lives in the
+    // `gatheringBlindRuns` WORLD setting, which only a GM may update. That is the
+    // integrity boundary: a player can still READ world state (Foundry has no
+    // server-side read authorization) but can no longer FORGE the task their run
+    // will yield, which they could when it sat on an Actor flag they own.
+    this.gatheringBlindRunStore = new GatheringBlindRunStore({
+      getSetting,
+      setSetting,
+      settingKey: SETTING_KEYS.GATHERING_BLIND_RUNS,
+      // Load-bearing: the active GM is the SINGLE writer. `game.settings.set`
+      // replaces rather than merges and there is no compare-and-set anywhere, so a
+      // second concurrent writer would clobber another run's record.
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      // Liveness: a record only counts while its run is still active. This is what
+      // keeps a reservation PROVISIONAL under every path that never reaches the
+      // maturity release — a GM deleting the environment, task, or actor.
+      isRunActive: ({ actorUuid, runId }) => {
+        const resolve = globalThis.fromUuidSync;
+        if (typeof resolve !== 'function' || !actorUuid || !runId) return true;
+        let runActor = null;
+        try { runActor = resolve(String(actorUuid)); } catch (_) { runActor = null; }
+        if (!runActor) return false;
+        return Boolean(this.gatheringRunManager?.getActiveRun?.(runActor, runId));
+      },
+      nowWorldTime: () => Number(game.time?.worldTime || 0)
+    });
+    // Only a GM may write that setting, and — more importantly — the blind DRAW
+    // must happen somewhere the acting player cannot rig it. A player's blind
+    // timed start is therefore routed to the active GM over the same
+    // `module.fabricate` channel the node-depletion relay already uses (issue 983),
+    // and the GM re-runs the whole attempt with the requesting user as the viewer.
+    this.gatheringBlindStartWriter = createGatheringBlindStartWriter({
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      hasActiveGM: () => !!game.users?.activeGM,
+      onUnroutable: ({ environmentId }) => console.warn(
+        'Fabricate | Blind gathering start was not applied: no active GM is connected to write the world setting',
+        { environmentId }
+      ),
+      emitStart: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+      // The local-apply branch (this client IS the active GM) has no socket sender
+      // to attest, so supply the current user. Reached only if a GM ever routes its
+      // own start; the engine short-circuits before that, because a client that may
+      // write the setting never relays.
+      applyStart: (payload) => applyGatheringBlindStart({ senderId: game.user?.id, ...payload })
+    });
+    gatheringEngine.installBlindRunRelay({
+      store: this.gatheringBlindRunStore,
+      relayStart: (args) => this.gatheringBlindStartWriter.start(args)
     });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
     const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
@@ -1974,7 +2067,10 @@ class Fabricate {
     // attempt — the player-app "nothing happens" bug. See _withRememberedActorDefault.
     const withRememberedActor = this._withRememberedActorDefault(options);
 
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', withRememberedActor, () => game.user);
+    // `requestStart`, not `startAttempt`: a blind timed start this client may not
+    // write is routed to the active GM before any task is drawn (issue 901). Every
+    // other start delegates straight to `startAttempt` and is unchanged.
+    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'requestStart', withRememberedActor, () => game.user);
   }
 
   /**
@@ -2225,6 +2321,10 @@ class Fabricate {
         getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
         getGatheringTask: (environmentId, taskId) =>
           this._resolveJournalGatheringTask(environmentId, taskId),
+        // GM-only secret preview of an in-flight blind run's drawn task (issue 901).
+        // The builder consults it only for a GM viewer; a player's journal shows the
+        // generic blind label, which is what the run record itself now carries.
+        getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
         getComponent: (systemId, componentId) =>
           this._resolveJournalComponent(systemId, componentId),
@@ -2815,6 +2915,25 @@ Hooks.once('ready', async () => {
           // rejection on the GM's client.
           Promise.resolve(fabricate.gatheringRichStateService?.applyEnvironmentNodeDepletion(args))
             .catch(error => console.warn('Fabricate | Gathering node depletion failed', error));
+        }
+      });
+    } catch (_error) {
+      // Defensive: never block the Interactable payload below.
+    }
+    // Same channel carries a player's BLIND gathering start (issue 901): only the
+    // active GM may write the `gatheringBlindRuns` world setting, and only a client
+    // the player does not control may draw the task without the player being able
+    // to rig it. Guarded for the same reason as the routes above.
+    try {
+      routeGatheringBlindStartMessage(payload, {
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+        senderId,
+        allowSender: gatheringBlindStartRateLimiter,
+        applyStart: (args) => {
+          // Nothing awaits a socket handler, so a rejected start must be caught
+          // here or it lands as an unhandled rejection on the GM's client.
+          Promise.resolve(applyGatheringBlindStart(args))
+            .catch(error => console.warn('Fabricate | Blind gathering start failed', error));
         }
       });
     } catch (_error) {

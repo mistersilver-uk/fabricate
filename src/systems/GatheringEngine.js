@@ -11,12 +11,15 @@ import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
   actorMatchesId,
+  blindWaitingTaskId,
   callMaybe,
   cloneJson,
   idOf,
+  isBlindWaitingTaskId,
   normalizeActorList,
   normalizeInteractableRef,
   normalizeList,
@@ -114,6 +117,21 @@ const FAILURE_KEYWORDS = new Set([
  * start behavior is unchanged.
  */
 export class GatheringEngine {
+  /**
+   * World-setting-backed secret store for in-flight blind runs (issue 901).
+   * Declared here, and installed by {@link GatheringEngine#installBlindRunRelay}
+   * rather than through the constructor, which already sits at SonarCloud's
+   * cognitive-complexity ceiling.
+   * @type {import('./GatheringBlindRunStore.js').GatheringBlindRunStore|null}
+   */
+  blindRunStore = null;
+
+  /**
+   * Player→active-GM relay for a blind start this client may not write.
+   * @type {Function|null}
+   */
+  relayBlindStart = null;
+
   constructor({
     environmentStore,
     runManager,
@@ -254,6 +272,56 @@ export class GatheringEngine {
         resolveRevealPolicy: (environment) => this._resolveRevealPolicy(environment),
         blockedReason: (code, options) => this._blockedReason(code, options),
       });
+  }
+
+  /**
+   * Install the blind-run secret store and the player→GM start relay (issue 901).
+   *
+   * This is deliberately a POST-CONSTRUCTION seam rather than two more
+   * constructor parameters. `GatheringEngine`'s constructor already sits at
+   * SonarCloud's cognitive-complexity ceiling, so adding to it would re-flag the
+   * whole constructor as new code and fail the maintainability gate; the repo's
+   * rule is to extract rather than add one more branch to a giant. Both fields
+   * are optional everywhere they are read (`?.`), so an engine that never calls
+   * this behaves exactly as it did before: it writes blind runs directly, which
+   * is correct for a GM-only world and for unit fixtures.
+   *
+   * @param {object} deps
+   * @param {import('./GatheringBlindRunStore.js').GatheringBlindRunStore|null} [deps.store]
+   *   World-setting-backed secret store. Reads work on any client; writes are
+   *   GM-only and the store fails them closed.
+   * @param {Function|null} [deps.relayStart] `({ environmentId, actorUuid, taskId,
+   *   interactableRef }) => boolean` — routes a start this client cannot write to
+   *   the active GM. Returns false when nothing could be routed (no active GM).
+   * @returns {GatheringEngine} this, for chaining at the bootstrap site.
+   */
+  installBlindRunRelay({ store = null, relayStart = null } = {}) {
+    this.blindRunStore = store;
+    this.relayBlindStart = typeof relayStart === 'function' ? relayStart : null;
+    // The GM's listing must show the real task behind an in-flight blind run,
+    // marked as a secret preview. The builder reads it through this callback for
+    // the same constructor-complexity reason as above.
+    this.listingBuilder?.useBlindRunSecrets?.((runId) => this._blindRunSecret(runId));
+    return this;
+  }
+
+  /**
+   * Public start entry point (issue 901). Routes a blind start this client may
+   * not write to the active GM, and otherwise starts the attempt locally.
+   *
+   * `main.js` calls this rather than {@link GatheringEngine#startAttempt} so the
+   * routing decision is made once, before the blind draw. `startAttempt` remains
+   * the direct, non-routing entry: the active GM's relay handler calls it, and so
+   * do macros and tests that model a GM-authored attempt.
+   *
+   * @param {object} [options] Same options as {@link GatheringEngine#startAttempt}.
+   * @returns {Promise<object>} A start result. A relayed start reports
+   *   `state: 'relayed'` with a null `runId` — the run appears when the GM's
+   *   write replicates.
+   */
+  async requestStart(options = {}) {
+    const relayed = await this._relayBlindStartIfNeeded(options);
+    return relayed ?? this.startAttempt(options);
   }
 
   /**
@@ -609,9 +677,15 @@ export class GatheringEngine {
 
   async _processMaturedWaitingRun({ actor, run }) {
     const viewer = await this._viewerForRun({ actor, run });
-    const resolved = this._resolveWaitingRunContext({ actor, run });
+    // A blind run's task and start-time snapshot live in the GM-owned blind-run
+    // store, not on the actor flag. Fold them back in here so the whole maturity
+    // path below — context resolution, outcome, history, cancellation — is the
+    // unchanged code that already knows how to read them off a run. Non-blind
+    // runs, and blind runs written before issue 901, pass through untouched.
+    const resolvedRun = this._hydrateBlindWaitingRun(run);
+    const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
     if (resolved.missingReference) {
-      return this._cancelMissingReferenceRun({ viewer, actor, run, resolved });
+      return this._cancelMissingReferenceRun({ viewer, actor, run: resolvedRun, resolved });
     }
 
     const { system, environment, task, interactableRef } = resolved;
@@ -620,7 +694,7 @@ export class GatheringEngine {
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
-        run,
+        run: resolvedRun,
         environment,
         task,
         errors: configuration.errors,
@@ -637,7 +711,7 @@ export class GatheringEngine {
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
-        run,
+        run: resolvedRun,
         environment,
         task,
         outcome,
@@ -658,7 +732,7 @@ export class GatheringEngine {
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
-        run,
+        run: resolvedRun,
         environment,
         task,
         outcome: plan,
@@ -675,9 +749,13 @@ export class GatheringEngine {
       checkResult,
       plan,
     });
-    const completedRun = await this.runManager.completeRun(actor, run, outcome.status, payload, {
-      terminalRunData: runData,
-    });
+    const completedRun = await this.runManager.completeRun(
+      actor,
+      resolvedRun,
+      outcome.status,
+      payload,
+      { terminalRunData: runData }
+    );
     if (!completedRun) {
       throw Object.assign(new Error('Timed gathering terminal history was not written'), {
         code: 'TERMINAL_HISTORY_NOT_WRITTEN',
@@ -693,8 +771,11 @@ export class GatheringEngine {
       viewer,
       interactableRef,
       // Second of this run's two commits: the node was already consumed at
-      // `waitingStart` unless the task defers it to `onSuccess`.
-      phase: 'timedMaturity',
+      // `waitingStart` unless the task defers it to `onSuccess`. A BLIND run is
+      // the exception — it holds a reservation rather than a decrement — so it
+      // commits as `immediate` here and converts that reservation into the one
+      // real decrement it is owed. See `maturityCommitPhase`.
+      phase: maturityCommitPhase(run),
     });
     const completedRunWithRichEvidence =
       richEvidence && typeof richEvidence === 'object'
@@ -716,6 +797,9 @@ export class GatheringEngine {
       outcome,
       checkResult,
     });
+    // The reservation has now been converted into the real decrement (or was
+    // never owed, for a failed `onSuccess` task), so the claim is spent.
+    await this._releaseBlindReservation(run);
 
     return await this._terminalStart({
       viewer,
@@ -1753,7 +1837,119 @@ export class GatheringEngine {
     return typeof this.isGamePaused === 'function' && this.isGamePaused() === true;
   }
 
-  async _resolveStartContext({ viewer, actor, rememberedActorId, environmentId, taskId }) {
+  /**
+   * Decide whether a start must be routed to the active GM, and route it.
+   *
+   * A blind run's secret state lives in a world setting only a GM may write, and
+   * — more importantly — the DRAW must happen somewhere the acting player cannot
+   * rig it. So a blind start that will create a waiting run is handed to the
+   * active GM, which re-runs the whole attempt with the requesting user as the
+   * viewer: every gate the player would have faced is re-evaluated GM-side, the
+   * task is drawn GM-side, the node is reserved GM-side, and both records are
+   * written GM-side.
+   *
+   * Returns null — meaning "start locally, unchanged" — whenever this client may
+   * write the setting itself (a GM, or a fixture with no relay wired), when there
+   * is no relay, or when the start cannot produce a persisted in-flight run.
+   *
+   * @returns {Promise<object|null>} A relayed start result, or null.
+   */
+  async _relayBlindStartIfNeeded({
+    viewer = null,
+    actor = null,
+    rememberedActorId = null,
+    environmentId = null,
+    taskId = null,
+    interactableRef = null,
+  } = {}) {
+    if (!this.relayBlindStart || this.blindRunStore?.canWrite() !== false) return null;
+    const targets = await this._resolveStartTargets({
+      viewer,
+      actor,
+      rememberedActorId,
+      environmentId,
+    });
+    // Let `startAttempt` produce the real blocked reason for an unresolvable
+    // start rather than duplicating its diagnostics here.
+    if (targets.blockedReason) return null;
+    const { selectedActor, environment } = targets;
+    if (!this._isOpaqueBlindTask({ environment, viewer })) return null;
+    if (!this._blindStartPersistsRun({ environment, taskId })) return null;
+
+    const routed = this.relayBlindStart({
+      environmentId: stringOrNull(environment.id),
+      actorUuid: stringOrNull(selectedActor?.uuid),
+      taskId: stringOrNull(taskId),
+      interactableRef: normalizeInteractableRef(interactableRef),
+    });
+    if (routed !== true) {
+      return this._blockedStart({
+        viewer,
+        actor: selectedActor,
+        environment,
+        task: null,
+        reason: this._blockedReason('RUN_CREATION_FAILED', { data: null }),
+      });
+    }
+    return this._relayedStart({ viewer, actor: selectedActor, environment });
+  }
+
+  /**
+   * Whether a blind start will leave persisted in-flight state — i.e. whether it
+   * can create a WAITING run, which is the only case that needs the GM.
+   *
+   * A targeted start names its task, so this is exact. An automatic start does
+   * not yet know its task (that is the whole point), so it is answered
+   * conservatively from the environment's shape: if ANY task there is timed, the
+   * draw could land on one. The cost of being conservative is that a blind
+   * environment mixing timed and immediate tasks resolves an immediate draw on
+   * the GM's client, which does not prompt the player's situational-modifier
+   * dialog. A wholly immediate blind environment never routes and is unchanged.
+   *
+   * @returns {boolean}
+   */
+  _blindStartPersistsRun({ environment, taskId }) {
+    const targeted = this._findStartTask({ environment, taskId });
+    if (targeted) return hasTimeRequirement(targeted);
+    return normalizeList(environment?.tasks).some((task) => hasTimeRequirement(task));
+  }
+
+  /**
+   * The result of a start handed to the active GM. Accepted but not yet started
+   * on this client: there is no run id to report, because the run is created by
+   * the GM and arrives when the actor-flag write replicates.
+   *
+   * @returns {object}
+   */
+  _relayedStart({ viewer, actor, environment }) {
+    return {
+      accepted: true,
+      started: false,
+      relayed: true,
+      state: 'relayed',
+      viewerId: idOf(viewer),
+      actorId: actor ? idOf(actor) : null,
+      environmentId: stringOrNull(environment?.id),
+      taskId: null,
+      runId: null,
+      blockedReasons: [],
+    };
+  }
+
+  /**
+   * Resolve the actor, environment, and crafting system a start addresses —
+   * everything the start context needs BEFORE any task is chosen.
+   *
+   * Extracted from {@link GatheringEngine#_resolveStartContext} (issue 901) so
+   * the player→GM blind-start relay can decide whether to route WITHOUT drawing
+   * the blind task first. The draw is the thing that must happen GM-side; doing
+   * it on the player's client to work out where to send the request would defeat
+   * the point.
+   *
+   * @returns {Promise<{selectedActor?: object, system?: object, environment?: object,
+   *   actor?: object|null, blockedReason?: object}>}
+   */
+  async _resolveStartTargets({ viewer, actor, rememberedActorId, environmentId }) {
     const selectableActors = normalizeActorList(
       await callMaybe(this.getSelectableActors, { viewer })
     );
@@ -1795,13 +1991,26 @@ export class GatheringEngine {
       };
     }
 
+    return { selectedActor: selected.actor, system, environment };
+  }
+
+  async _resolveStartContext({ viewer, actor, rememberedActorId, environmentId, taskId }) {
+    const targets = await this._resolveStartTargets({
+      viewer,
+      actor,
+      rememberedActorId,
+      environmentId,
+    });
+    if (targets.blockedReason) return targets;
+
+    const { selectedActor, system, environment } = targets;
     const blindAuto = environment?.selectionMode === 'blind' && !stringOrNull(taskId);
     const task = blindAuto
-      ? await this._selectBlindStartTask({ environment, system, actor: selected.actor, viewer })
+      ? await this._selectBlindStartTask({ environment, system, actor: selectedActor, viewer })
       : this._findStartTask({ environment, taskId });
     if (!task) {
       return {
-        actor: selected.actor,
+        actor: selectedActor,
         environment,
         blockedReason: blindAuto
           ? this._blockedReason('BLIND_NO_CANDIDATE')
@@ -1814,7 +2023,7 @@ export class GatheringEngine {
       };
     }
 
-    return { selectedActor: selected.actor, system, environment, task };
+    return { selectedActor, system, environment, task };
   }
 
   _findEnvironment(environmentId) {
@@ -1849,10 +2058,18 @@ export class GatheringEngine {
    * `blindCandidateGate` is `attemptableOnly` (default), then draws via weighted
    * random over `blindSelection.weights` (default weight `1`, non-positive
    * excludes). Returns null when the pool is empty.
+   *
+   * Candidates whose node pool is already fully spoken for by OUTSTANDING BLIND
+   * RESERVATIONS are excluded (issue 901). The plain `current > 0` gate cannot
+   * see them: a reservation is deliberately not a `nodeRuntime` decrement, so
+   * without this a party could hold more in-flight blind runs than the pool can
+   * ever pay out and over-harvest it at maturity.
    */
   async _selectBlindStartTask({ environment, system, actor, viewer }) {
     const visibleTasks = await this._visibleTaskListings({ environment, system, viewer, actor });
-    let pool = visibleTasks.map((entry) => entry.task);
+    let pool = visibleTasks
+      .map((entry) => entry.task)
+      .filter((task) => this._blindNodeReservable({ environment, task }));
 
     const gate =
       environment?.rules?.blindCandidateGate === 'allMatching' ? 'allMatching' : 'attemptableOnly';
@@ -1873,6 +2090,43 @@ export class GatheringEngine {
 
     if (pool.length === 0) return null;
     return this._pickBlindTask(pool, environment?.blindSelection);
+  }
+
+  /**
+   * The provisional node claim a blind waiting run takes on a task, or null when
+   * the task has no finite node pool or the system's node economy is off.
+   *
+   * @returns {{environmentId: string, taskId: string, units: number, scope: string}|null}
+   */
+  _blindNodeReservation({ environment, task }) {
+    if (!task?.nodes) return null;
+    const systemId = stringOrNull(environment?.craftingSystemId);
+    if (this.richState?.nodesEnabled?.(systemId) !== true) return null;
+    return {
+      environmentId: stringOrEmpty(environment?.id),
+      taskId: stringOrEmpty(task?.id),
+      units: BLIND_RESERVATION_UNITS,
+      scope: 'environment',
+    };
+  }
+
+  /**
+   * Whether one more blind run could still be paid out of a task's node pool
+   * once every outstanding reservation is subtracted. True when there is no
+   * reservation to take (no pool, or node economy disabled), so the check is
+   * inert for every environment that does not use finite nodes.
+   *
+   * @returns {boolean}
+   */
+  _blindNodeReservable({ environment, task }) {
+    const reservation = this._blindNodeReservation({ environment, task });
+    if (!reservation) return true;
+    const reserved =
+      this.blindRunStore?.reservedUnits({
+        environmentId: reservation.environmentId,
+        taskId: reservation.taskId,
+      }) ?? 0;
+    return Number(task.nodes.current || 0) - reserved >= reservation.units;
   }
 
   _pickBlindTask(pool, blindSelection) {
@@ -1933,24 +2187,20 @@ export class GatheringEngine {
       });
     }
 
-    const runData = {
-      craftingSystemId: stringOrNull(system.id),
-      environmentId: stringOrNull(environment.id),
-      taskId: stringOrNull(task.id),
-    };
-    // Persist the scene-interactable ref so a timed run that matures later
-    // decrements the SAME scoped node it gated against (issue 302). Null/absent
-    // for the environment-scoped flow (no behaviour stored).
-    const persistedRef = normalizeInteractableRef(interactableRef);
-    if (persistedRef) runData.interactableRef = persistedRef;
-    if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
-      const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
-      richPayload.economyEvidence = {
-        ...richPayload.economyEvidence,
-        runtimeSnapshot: this._runtimeSnapshot({ environment, task }),
-      };
-      Object.assign(runData, richPayload);
-    }
+    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    const runData = this._waitingRunData({
+      system,
+      environment,
+      task,
+      richAttempt,
+      viewer,
+      interactableRef,
+      opaqueBlind,
+    });
+    const blindGuard = opaqueBlind
+      ? this._blindWaitingStartGuard({ viewer, actor, environment, task, runData })
+      : null;
+    if (blindGuard) return blindGuard;
     const timeRequirement = normalizeTimeRequirement(task.timeRequirement);
 
     try {
@@ -1973,11 +2223,44 @@ export class GatheringEngine {
         });
       }
 
-      const richEvidence = await this._commitRichAttempt({
+      // The secret record must land before the run is treated as started: without
+      // it a blind run has no task and no snapshot to mature against, so a failed
+      // write is rolled back rather than left as an unresolvable run.
+      const secret = await this._recordBlindRunSecret({
+        run,
         actor,
         system,
         environment,
         task,
+        interactableRef,
+        opaqueBlind,
+      });
+      if (secret === false) {
+        await this.runManager?.clearActiveRun?.(actor, run.id);
+        return this._blockedStart({
+          viewer,
+          actor,
+          environment,
+          task,
+          reason: this._blockedReason('RUN_CREATION_FAILED', {
+            data: this._waitingRunFailureData({
+              environment,
+              task,
+              viewer,
+              code: 'BLIND_RUN_NOT_RECORDED',
+            }),
+          }),
+        });
+      }
+
+      const richEvidence = await this._commitRichAttempt({
+        actor,
+        system,
+        environment,
+        // A blind run's claim on a node is the RESERVATION recorded above, not a
+        // `nodeRuntime` decrement, so the start commit must not consume one. It
+        // still spends stamina, so a blind attempt is never free up front.
+        task: waitingStartCommitTask(task, opaqueBlind),
         outcome: { status: 'waitingTime' },
         viewer,
         interactableRef,
@@ -2018,6 +2301,205 @@ export class GatheringEngine {
         }),
       });
     }
+  }
+
+  /**
+   * Build the payload persisted on the ACTOR for a waiting run.
+   *
+   * For an opaque-blind run this is the integrity boundary (issue 901). The
+   * player-readable flag carries the `blind:<environmentId>` marker instead of
+   * the drawn task's id; it omits the runtime snapshot entirely (that snapshot
+   * embeds the whole task — name, drop rows, tools — and used to be re-added on
+   * top of the already-redacted evidence, undoing the redaction one line later);
+   * and it reports the ENVIRONMENT's risk rather than the task's `riskOverride`,
+   * which would otherwise fingerprint the drawn task. The real id and the
+   * snapshot go to the GM-owned blind-run store instead.
+   *
+   * What remains on the flag — the time gate, the redacted economy evidence, the
+   * environment condition snapshot — describes only facts the acting player can
+   * already observe.
+   *
+   * @param {object} args
+   * @param {boolean} args.opaqueBlind Whether this viewer sees the task as blind.
+   * @returns {object} The run data handed to `createWaitingRun`.
+   */
+  _waitingRunData({
+    system,
+    environment,
+    task,
+    richAttempt = null,
+    viewer = null,
+    interactableRef = null,
+    opaqueBlind = false,
+  }) {
+    const runData = {
+      craftingSystemId: stringOrNull(system.id),
+      environmentId: stringOrNull(environment.id),
+      taskId: opaqueBlind ? blindWaitingTaskId(environment) : stringOrNull(task.id),
+    };
+    // Persist the scene-interactable ref so a timed run that matures later
+    // decrements the SAME scoped node it gated against (issue 302). Null/absent
+    // for the environment-scoped flow (no behaviour stored).
+    const persistedRef = normalizeInteractableRef(interactableRef);
+    if (persistedRef) runData.interactableRef = persistedRef;
+    if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
+      const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
+      if (opaqueBlind) {
+        richPayload.riskLevel = stringOrNull(environment?.risk) || 'safe';
+      } else {
+        richPayload.economyEvidence = {
+          ...richPayload.economyEvidence,
+          runtimeSnapshot: this._runtimeSnapshot({ environment, task }),
+        };
+      }
+      Object.assign(runData, richPayload);
+    }
+    return runData;
+  }
+
+  /**
+   * Pre-creation guards that apply only to an opaque-blind waiting start:
+   * the marker-keyed duplicate check and the reservation-aware node check.
+   * Returns a blocked start result, or null when the start may proceed.
+   *
+   * @returns {object|null}
+   */
+  _blindWaitingStartGuard({ viewer, actor, environment, task, runData }) {
+    // The duplicate check `startAttempt` already made was against the REAL task
+    // id, which no blind run is stored under, so it cannot see an in-flight blind
+    // run in this environment. Re-check against the marker the run is actually
+    // keyed by — that is what enforces "one active blind run per blind
+    // environment" — or `createWaitingRun` would reject the second attempt as a
+    // run-creation failure instead of the duplicate it is.
+    if (this.runManager?.findActiveRunForTask?.(actor, runData.taskId)) {
+      return this._blockedStart({
+        viewer,
+        actor,
+        environment,
+        task,
+        reason: this._blockedReason('DUPLICATE_ACTIVE_RUN', {
+          data: this._blindTaskData({ environment, task, viewer }),
+        }),
+      });
+    }
+    // Re-check availability against outstanding reservations immediately before
+    // taking one, not only when the candidate pool was built, so two
+    // near-simultaneous starts cannot both claim the last node.
+    if (!this._blindNodeReservable({ environment, task })) {
+      return this._blockedStart({
+        viewer,
+        actor,
+        environment,
+        task,
+        reason: this._blockedReason('NODE_DEPLETED', {
+          data: this._blindTaskData({ environment, task, viewer }),
+        }),
+      });
+    }
+    return null;
+  }
+
+  /**
+   * Write a blind run's secret state — drawn task, start-time snapshot, and
+   * provisional node reservation — into the GM-owned blind-run store.
+   *
+   * The snapshot is taken HERE, at start, so the run resolves at maturity
+   * against the environment as it was when the player set out rather than as it
+   * stands when they get back. The reservation is taken here for the same
+   * reason: deferring it to maturity would let a party start more blind runs
+   * than the pool can pay out.
+   *
+   * @returns {Promise<object|null|false>} The stored record, `null` when this run
+   *   needs none (not blind), or `false` when the write was refused/failed.
+   */
+  async _recordBlindRunSecret({
+    run,
+    actor,
+    system,
+    environment,
+    task,
+    interactableRef,
+    opaqueBlind,
+  }) {
+    if (!opaqueBlind) return null;
+    if (!this.blindRunStore) return false;
+    const reservation = this._blindNodeReservation({ environment, task });
+    const stored = await this.blindRunStore.reserve({
+      runId: stringOrNull(run?.id),
+      actorUuid: stringOrNull(actor?.uuid),
+      craftingSystemId: stringOrNull(system?.id),
+      environmentId: stringOrNull(environment?.id),
+      taskId: stringOrNull(task?.id),
+      snapshot: this._runtimeSnapshot({ environment, task }),
+      reservation: reservation
+        ? { ...reservation, interactableRef: normalizeInteractableRef(interactableRef) }
+        : null,
+    });
+    return stored ?? false;
+  }
+
+  /**
+   * The blind-run secret record for a run id, or null. Reads only — every client
+   * can read a world setting, but only the GM's listing is allowed to render it.
+   *
+   * @param {string} runId
+   * @returns {object|null}
+   */
+  _blindRunSecret(runId) {
+    return this.blindRunStore?.get?.(runId) ?? null;
+  }
+
+  /**
+   * Fold a blind run's GM-held secret state back onto the run record so the
+   * maturity path can resolve it with the code that already reads a run's own
+   * `taskId` and `economyEvidence.runtimeSnapshot`.
+   *
+   * BACK-COMPAT: a run whose `taskId` is a real id — every run written before
+   * issue 901 — is returned untouched and keeps resolving from its own persisted
+   * snapshot. A blind-marked run with no store record returns a null `taskId`,
+   * which routes into the existing blind-redacted missing-reference cancellation
+   * rather than resolving against an arbitrary task.
+   *
+   * @param {object} run
+   * @returns {object} The run to resolve the maturity context from.
+   */
+  _hydrateBlindWaitingRun(run) {
+    if (!isBlindWaitingTaskId(run?.taskId)) return run;
+    const secret = this._blindRunSecret(stringOrNull(run?.id));
+    if (!secret) return { ...run, taskId: null };
+    return {
+      ...run,
+      taskId: secret.taskId,
+      economyEvidence: {
+        ...plainObjectOrNull(run?.economyEvidence),
+        runtimeSnapshot: secret.snapshot ?? undefined,
+      },
+    };
+  }
+
+  /**
+   * Release a blind run's provisional node reservation once the run has reached a
+   * terminal state — completed, cancelled, or cleared.
+   *
+   * A released reservation never touched the real `nodeRuntime` pool, so nothing
+   * has to be given back; that is precisely why the reservation lives in the blind
+   * store rather than as a "reserved but not consumed" limbo state in the pool.
+   *
+   * Keyed by RUN ID, not by the blind marker, so it works equally on the persisted
+   * run and on its hydrated copy (hydration replaces the marker with the real task
+   * id). A run with no record — every non-blind run — is a no-op, and so is any
+   * client that may not write the world setting.
+   *
+   * A THROWN maturity is deliberately released nowhere: the run stays active and
+   * matures again on the next tick, so it must keep its reservation.
+   *
+   * @param {object} run
+   * @returns {Promise<object|null>} The released record, or null.
+   */
+  async _releaseBlindReservation(run) {
+    const runId = stringOrNull(run?.id);
+    if (!runId || !this.blindRunStore?.get?.(runId)) return null;
+    return (await this.blindRunStore.release(runId)) ?? null;
   }
 
   async _resolveImmediateAttempt({
@@ -3095,6 +3577,9 @@ export class GatheringEngine {
     errors = null,
     outcome = null,
   }) {
+    // A cleared run is terminal for the pool: release its provisional claim
+    // without the real `nodeRuntime` count ever having moved (issue 901).
+    await this._releaseBlindReservation(run);
     if (typeof this.runManager?.clearActiveRun !== 'function') {
       throw Object.assign(
         new Error('Gathering timed misconfiguration requires active-run cleanup'),
@@ -3135,6 +3620,9 @@ export class GatheringEngine {
   }
 
   async _cancelMissingReferenceRun({ viewer, actor, run, resolved }) {
+    // A cancelled run is terminal for the pool: release its provisional claim
+    // without the real `nodeRuntime` count ever having moved (issue 901).
+    await this._releaseBlindReservation(run);
     const opaqueBlind =
       resolved.environment &&
       this._isOpaqueBlindTask({ environment: resolved.environment, viewer });
@@ -3690,6 +4178,49 @@ function validateResultGroupNames(resultGroups) {
 
 function hasTimeRequirement(task) {
   return task?.timeRequirement !== null && task?.timeRequirement !== undefined;
+}
+
+/**
+ * Which commit phase a matured run's rich-state commit runs as.
+ *
+ * A timed run normally commits twice, so `timedMaturity` suppresses the node
+ * consumption already taken at `waitingStart`. A blind run took a PROVISIONAL
+ * RESERVATION at start instead of touching the real pool, so it converts that
+ * reservation into the real decrement here and runs as the single-commit
+ * `immediate` case — which still honours an `onSuccess` task's success gate,
+ * because `shouldDepleteNode` is evaluated independently of the phase.
+ *
+ * @param {object} run The run as persisted, before blind hydration.
+ * @returns {'immediate'|'timedMaturity'}
+ */
+function maturityCommitPhase(run) {
+  return isBlindWaitingTaskId(run?.taskId) ? 'immediate' : 'timedMaturity';
+}
+
+/**
+ * A copy of a task carrying no node configuration.
+ *
+ * A blind run's START commit spends stamina but must NOT decrement the real
+ * `nodeRuntime` pool: its claim on a node is a reservation held in the blind-run
+ * store, which a cancelled run releases without the pool ever having moved.
+ *
+ * @param {object} task
+ * @returns {object}
+ */
+function withoutNodeReservation(task) {
+  return { ...task, nodes: null };
+}
+
+/**
+ * The task a waiting run's START commit spends against: the real task, or a
+ * node-free copy for a blind run whose node claim is a reservation.
+ *
+ * @param {object} task
+ * @param {boolean} opaqueBlind
+ * @returns {object}
+ */
+function waitingStartCommitTask(task, opaqueBlind) {
+  return opaqueBlind ? withoutNodeReservation(task) : task;
 }
 
 function normalizeTimeRequirement(timeRequirement = null) {

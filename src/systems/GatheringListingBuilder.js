@@ -42,6 +42,14 @@ const GATHERING_EVENT_VISIBILITIES = new Set(['dangerLevelOnly', 'encounterChanc
  */
 export class GatheringListingBuilder {
   /**
+   * GM-only reader for an in-flight blind run's secret record (issue 901).
+   * Installed by {@link GatheringListingBuilder#useBlindRunSecrets}, not through
+   * the constructor — see that method for why.
+   * @type {Function|null}
+   */
+  _blindRunSecret = null;
+
+  /**
    * @param {object} deps
    * @param {object} deps.richState - GatheringRichStateService (preview/reveal/biome/stamina reads).
    * @param {object} deps.runManager - GatheringRunManager (active runs + history).
@@ -337,11 +345,62 @@ export class GatheringListingBuilder {
     };
   }
 
+  /**
+   * Install the blind-run secret reader (issue 901).
+   *
+   * A post-construction seam rather than a constructor parameter, because this
+   * builder is default-constructed inside `GatheringEngine`'s constructor, which
+   * already sits at the cognitive-complexity ceiling — see
+   * `GatheringEngine#installBlindRunRelay`.
+   *
+   * @param {(runId: string) => (object|null)} resolve
+   */
+  useBlindRunSecrets(resolve) {
+    this._blindRunSecret = typeof resolve === 'function' ? resolve : null;
+  }
+
+  /**
+   * GM-only secret preview for an in-flight blind run (issue 901).
+   *
+   * The GM needs to know what the player will get: a blind run's actor flag
+   * carries only a marker, so without this the GM's listing shows an anonymous
+   * row for a run whose outcome is already decided. The real task comes from the
+   * GM-owned blind-run store and is flagged `blindSecretPreview: true` so the UI
+   * can mark it as something the player cannot see.
+   *
+   * Returns `{}` — no override — for every non-GM viewer, for non-blind runs, and
+   * for blind runs written before issue 901 (which carry their own real task id
+   * and resolve through the normal path).
+   *
+   * @returns {object} Fields to merge over the run model.
+   */
+  _blindRunSecretFields({ model, viewer }) {
+    if (viewer?.isGM !== true || !this._blindRunSecret) return {};
+    const secret = this._blindRunSecret(stringOrNull(model?.id));
+    if (!secret) return {};
+    const environment = this._findEnvironment(model?.environmentId);
+    const task =
+      normalizeList(environment?.tasks).find((entry) => entry?.id === secret.taskId) ??
+      plainObjectOrNull(secret.snapshot?.task);
+    return {
+      blindSecretPreview: true,
+      taskId: stringOrNull(secret.taskId),
+      label: stringOrEmpty(task?.name) || stringOrNull(secret.taskId) || '',
+    };
+  }
+
   _activeRunModels({ actor, viewer }) {
-    return normalizeList(this.runManager?.getActiveRuns?.(actor))
-      .filter((run) => run?.status === 'waitingTime')
-      .map((run) => this._runModel({ run, viewer, terminal: false }))
-      .filter(Boolean);
+    return (
+      normalizeList(this.runManager?.getActiveRuns?.(actor))
+        .filter((run) => run?.status === 'waitingTime')
+        .map((run) => this._runModel({ run, viewer, terminal: false }))
+        .filter(Boolean)
+        // GM-only: replaces the anonymous blind row with the task the run will
+        // actually yield, marked as a secret preview (issue 901). Applied HERE
+        // rather than inside `_runModel`, which is already past the
+        // cognitive-complexity ceiling and so must not be edited.
+        .map((model) => ({ ...model, ...this._blindRunSecretFields({ model, viewer }) }))
+    );
   }
 
   _historyModels({ actor, viewer }) {

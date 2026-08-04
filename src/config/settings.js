@@ -18,6 +18,13 @@ export const SETTING_KEYS = Object.freeze({
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
+  // Issue 901: secret state for in-flight BLIND gathering runs, keyed by run id —
+  // the drawn task, its start-time snapshot, and its provisional node reservation.
+  // `scope: 'world'` is the WHOLE POINT: only a GM may update a world Setting, so a
+  // player can no longer forge the task their blind run will yield (it used to live
+  // on an Actor flag they own). It is NOT a confidentiality store — Foundry has no
+  // server-side read authorization — see `GatheringBlindRunStore`.
+  GATHERING_BLIND_RUNS: 'gatheringBlindRuns',
   LAST_CRAFTING_ACTOR: 'lastCraftingActor',
   LAST_GATHERING_ACTOR: 'lastGatheringActor',
   LAST_COMPONENT_SOURCES: 'lastComponentSources',
@@ -109,6 +116,16 @@ const BASE_DEFINITIONS = Object.freeze({
     config: false,
     type: Array,
     default: [],
+  },
+  // Map of `runId -> { taskId, snapshot, reservation }` for in-flight blind runs.
+  // Written ONLY by the active GM (a player's start is relayed there), because
+  // `game.settings.set` replaces rather than merges and there is no compare-and-set.
+  [SETTING_KEYS.GATHERING_BLIND_RUNS]: {
+    name: 'Blind Gathering Runs',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
   },
   [SETTING_KEYS.THEME]: {
     name: 'FABRICATE.Settings.Theme.Name',
