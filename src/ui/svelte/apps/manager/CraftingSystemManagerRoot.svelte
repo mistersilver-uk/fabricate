@@ -21,6 +21,7 @@
     resolveRecipeFixedOutcomeTierOptions,
   } from '../../../../utils/routedOutcomeKeywords.js';
   import {
+    getEffectiveRecipeCategories,
     getRecipeCategoryLabel,
     normalizeRecipeCategory,
   } from '../../../../utils/recipeCategories.js';
@@ -39,6 +40,12 @@
     createComponentBulkDraft,
     toBulkComponentEdit,
   } from '../../../../utils/componentBulkEditModel.js';
+  import {
+    countBlockedRecipeEnables,
+    createRecipeBulkDraft,
+    describeRecipeCheckTierAxis,
+    toBulkRecipeEdit,
+  } from '../../../../utils/recipeBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -60,6 +67,10 @@
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeBrowserInspector from './recipes/RecipeBrowserInspector.svelte';
+  // The recipe library's bulk edit panel (issue 1010) — the sibling of the above, and
+  // under `recipes/` for the same reason: `recipe/` is the EDITOR's directory, which the
+  // screenshot map globs for the five recipe-editor frames.
+  import RecipeBulkEditPanel from './recipes/RecipeBulkEditPanel.svelte';
   // The component library's inspector (issue 676) — the sibling of the above. It lives
   // under `components/` (the BROWSER's dir), NOT `component/`, which the screenshot map
   // globs for the component EDITOR's frames.
@@ -147,6 +158,12 @@
   // lives on the lifted `componentBrowserState`, beside the browser's other view-state.
   let componentBulkDraft = $state(createComponentBulkDraft());
   let componentBulkApplying = $state(false);
+  // The recipe library's twin (issue 1010), owned here for the identical reason: the
+  // recipe bulk panel is unmounted the moment the selection empties, so a panel-owned
+  // draft would be destroyed by the very transition that is supposed to DISCARD it. The
+  // selection itself lives on the lifted `recipeBrowserState`.
+  let recipeBulkDraft = $state(createRecipeBulkDraft());
+  let recipeBulkApplying = $state(false);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
@@ -1599,6 +1616,45 @@
   // point, so this is the only place the discard can honestly happen.
   $effect(() => {
     if (componentBulkSelectionCount === 0) componentBulkDraft = createComponentBulkDraft();
+  });
+  // ── The recipe bulk selection (issue 1010) ───────────────────────────────────────
+  // Read straight off the LIFTED browser state, which `RecipesBrowserView` binds: the
+  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
+  // prop or a second copy of the truth. The Component Studio's block above is the twin.
+  const recipeBulkSelectedIds = $derived(recipeBrowserState.bulkSelectedRecipeIds ?? new Set());
+  const recipeBulkSelectionCount = $derived(recipeBulkSelectedIds.size);
+  // The PROJECTED rows, not the ids: the blocked-enable forecast reads `enableBlocked` and
+  // `enabled`, both of which live on the projection the browser renders.
+  const recipeBulkSelectedRows = $derived(
+    ($viewState.recipes || []).filter((recipe) => recipeBulkSelectedIds.has(recipe.id))
+  );
+  // The SAME predicate the row's `Can't enable` pill reads, so the panel's count and the
+  // pilled rows are one set by construction rather than by convention. It is 0 unless
+  // `Enable` is actually staged — nothing can be refused by a disable or a leave-alone.
+  const recipeBulkBlockedCount = $derived(
+    countBlockedRecipeEnables(recipeBulkSelectedRows, recipeBulkDraft?.status)
+  );
+  // The axis gate reuses the EXISTING `recipeCheckTierOptions` derived rather than
+  // re-resolving the tier list: `resolveRecipeCheckTierOptions` is the single source of
+  // truth for which tiers a system offers, and this helper only explains an empty list.
+  const recipeBulkCheckTierAxis = $derived(
+    describeRecipeCheckTierAxis({
+      craftingCheck: selectedSystem?.craftingCheck,
+      craftingCheckMode,
+      tierOptions: recipeCheckTierOptions,
+    })
+  );
+  // The system's AUTHORED vocabulary, which is what the single-recipe editor's own select
+  // offers — not the browser filter's in-use tally, which would make an authored but
+  // currently unused category unreachable as an assignment target.
+  const recipeBulkCategoryOptions = $derived(
+    getEffectiveRecipeCategories(selectedSystem?.categories || [])
+  );
+  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
+  // prune that removed the last id, or a successful apply. The panel is unmounted at that
+  // point, so this is the only place the discard can honestly happen.
+  $effect(() => {
+    if (recipeBulkSelectionCount === 0) recipeBulkDraft = createRecipeBulkDraft();
   });
   const environmentList = $derived($viewState.environments || []);
   const environmentValidationCount = $derived(
@@ -3729,6 +3785,104 @@
       return true;
     } finally {
       componentBulkApplying = false;
+    }
+  }
+
+  // ── Recipe bulk edit (issue 1010) ────────────────────────────────────────────────
+  // The twin of the block above. The panel stages into a draft this root owns; NOTHING is
+  // written until Apply, and the model's helpers are immutable, so the panel hands back a
+  // NEW draft rather than mutating this one.
+  function stageRecipeBulkDraft(next) {
+    recipeBulkDraft = next || createRecipeBulkDraft();
+  }
+
+  // Clearing the selection is the documented escape from a mode that hides Edit, Duplicate
+  // and Delete; the count reaching zero also discards the draft (see the effect above) and
+  // returns the rail to the single-recipe inspector.
+  function clearRecipeBulkSelection() {
+    recipeBrowserState.bulkSelectedRecipeIds = new Set();
+  }
+
+  // Singular / plural over one count, so the three post-apply sentences below do not each
+  // grow their own ternary pair.
+  function bulkRecipeCountText(count, oneKey, oneFallback, manyKey, manyFallback) {
+    if (count === 1) return text(oneKey, oneFallback);
+    return text(manyKey, manyFallback).replace('{count}', count);
+  }
+
+  // The post-apply report, and the AUTHORITY on the blocked count — the panel's pre-flight
+  // figure is only a lower bound, because it cannot see collisions the batch itself
+  // creates. `rejected` is named separately and is not an expected outcome: it counts
+  // recipes a persistence failure excluded from the batch entirely, each of which the write
+  // primitive logs, which is what makes "see the console" point at something real.
+  function recipeBulkAppliedMessage(result) {
+    const updated = Number(result?.updated) || 0;
+    const blocked = Number(result?.blockedEnables) || 0;
+    const rejected = Number(result?.rejected) || 0;
+    // Zero is its own message rather than "applied to 0 recipes", which reads as a failure
+    // for what is a legitimate outcome — every selected recipe already matched.
+    const sentences = [
+      updated === 0
+        ? text('FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedNone', 'No recipes needed changing.')
+        : bulkRecipeCountText(
+            updated,
+            'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedOne',
+            'Applied bulk changes to 1 recipe.',
+            'FABRICATE.Admin.Manager.Recipe.BulkEdit.Applied',
+            'Applied bulk changes to {count} recipes.'
+          ),
+    ];
+    if (blocked > 0) {
+      sentences.push(
+        bulkRecipeCountText(
+          blocked,
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBlockedOne',
+          "1 recipe couldn't be enabled yet.",
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBlocked',
+          "{count} recipes couldn't be enabled yet."
+        )
+      );
+    }
+    if (rejected > 0) {
+      sentences.push(
+        bulkRecipeCountText(
+          rejected,
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedRejectedOne',
+          "1 recipe couldn't be saved — see the console.",
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedRejected',
+          "{count} recipes couldn't be saved — see the console."
+        )
+      );
+    }
+    return sentences.join(' ');
+  }
+
+  async function applyRecipeBulkEdit() {
+    if (recipeBulkApplying) return false;
+    const ids = recipeBulkSelectedIds;
+    if (ids.size === 0) return false;
+    // An unstaged axis is never sent. Three of the projected keys are FALSY BUT REAL —
+    // `enabled: false`, `locked: false` and `checkTierId: null` — so the write primitive
+    // tests key PRESENCE rather than truthiness, and this projection is what gives it
+    // something to test.
+    const edit = toBulkRecipeEdit(recipeBulkDraft);
+    if (Object.keys(edit).length === 0) return false;
+    recipeBulkApplying = true;
+    try {
+      // The store returns the write RESULT, never a bare boolean, so a `null` covers every
+      // no-write case in one test — including the optional call resolving to `undefined`
+      // because the action is absent, which a `=== false` check would have read as success.
+      const result = await store.applyRecipeBulkEdit?.(ids, edit);
+      if (!result) return false;
+      // One save and one refresh happened inside the store action, so the rows are already
+      // re-rendering; clearing the selection returns the rail to the single-recipe
+      // inspector and the count-to-zero effect discards the draft. The toast below is the
+      // only feedback that survives the panel unmounting on a successful apply.
+      clearRecipeBulkSelection();
+      notifyInfo(recipeBulkAppliedMessage(result));
+      return true;
+    } finally {
+      recipeBulkApplying = false;
     }
   }
 
@@ -10104,23 +10258,45 @@
             />
           {/if}
         {:else if currentView === 'recipes'}
-          <RecipeBrowserInspector
-            {selectedRecipe}
-            resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-            outcomeTiers={recipeAllOutcomeTierOptions}
-            recipeCount={($viewState.recipes || []).length}
-            componentCount={selectedCounts.components}
-            componentOptions={selectedSystem?.managedItemOptions || []}
-            essenceOptions={selectedSystem?.features?.essences
-              ? selectedSystem?.essenceDefinitions || []
-              : []}
-            {showRecipeCategories}
-            showVisibilitySummary={$viewState.showVisibilitySummary}
-            onEdit={() => editRecipe(selectedRecipe?.id)}
-            onDuplicate={() => duplicateRecipe()}
-            onDelete={() => deleteRecipe()}
-            onAddComponents={() => setView('components')}
-          />
+          <!--
+          The bulk panel REPLACES the single-recipe inspector while the selection is
+          non-empty (issue 1010), at the same `> 0` threshold the Component Studio uses. It
+          sits FIRST so it wins over `selectedRecipe`, which is always truthy once the
+          library has rows.
+        -->
+          {#if recipeBulkSelectionCount > 0}
+            <RecipeBulkEditPanel
+              count={recipeBulkSelectionCount}
+              categoryOptions={recipeBulkCategoryOptions}
+              checkTierAxis={recipeBulkCheckTierAxis}
+              checkTierOptions={recipeCheckTierOptions}
+              books={recipeItemDefinitions}
+              blockedCount={recipeBulkBlockedCount}
+              draft={recipeBulkDraft}
+              applying={recipeBulkApplying}
+              onDraftChange={(next) => stageRecipeBulkDraft(next)}
+              onClearSelection={() => clearRecipeBulkSelection()}
+              onApply={() => applyRecipeBulkEdit()}
+            />
+          {:else}
+            <RecipeBrowserInspector
+              {selectedRecipe}
+              resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+              outcomeTiers={recipeAllOutcomeTierOptions}
+              recipeCount={($viewState.recipes || []).length}
+              componentCount={selectedCounts.components}
+              componentOptions={selectedSystem?.managedItemOptions || []}
+              essenceOptions={selectedSystem?.features?.essences
+                ? selectedSystem?.essenceDefinitions || []
+                : []}
+              {showRecipeCategories}
+              showVisibilitySummary={$viewState.showVisibilitySummary}
+              onEdit={() => editRecipe(selectedRecipe?.id)}
+              onDuplicate={() => duplicateRecipe()}
+              onDelete={() => deleteRecipe()}
+              onAddComponents={() => setView('components')}
+            />
+          {/if}
         {:else if currentView === 'tools'}
           <ToolBrowserInspector
             tool={selectedLibraryTool}

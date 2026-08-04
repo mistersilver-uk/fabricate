@@ -119,6 +119,79 @@ const FIXTURE = `
         </section>
         <input type="text" data-m="bleed-baseline" value="bare">
       </div>
+
+      <!--
+        The recipe BROWSER (issue 1010). Its multi-select toolbar row and its bulk edit
+        panel render through the SAME shared primitives the Component Studio's gate already
+        commits numbers for, so every value below is that gate's number rather than a fresh
+        reading: the two studios share the rules, so they must share the sizes, and a
+        divergence here means the sharing broke.
+
+        Its own container, at the browser's view attribute rather than the editor's, so
+        anything the recipes VIEW scopes applies as it does in the shipped tree.
+      -->
+      <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="recipes">
+        <section class="manager-toolbar manager-recipe-toolbar">
+          <!-- The multi-select row is the LAST row of this toolbar, immediately above the
+               list. The host row class is a PROP of the shared toolbar primitive, so this
+               studio names its own ("manager-recipe-filter-row") and its own data hook.
+               The input/box pair is a HAND-COPY of what SelectionCheckbox.svelte renders;
+               its structural contract (the adjacent-sibling focus ring written inside
+               :global()) is asserted in tests/components/bulk-selection-toolbar-mounted.test.js,
+               not here — this fixture is a font-size probe. -->
+          <div class="manager-recipe-filter-row is-selection" data-recipe-selection-toolbar>
+            <label class="fab-bulk-selection-all" data-m="bulk-select-all">
+              <input type="checkbox" class="fab-selection-input">
+              <span class="fab-selection-check is-md"><i class="fas fa-minus"></i></span>
+              <span class="fab-bulk-selection-all-label">Select all</span>
+            </label>
+            <span class="fab-bulk-selection-divider"></span>
+            <span class="fab-bulk-selection-count" data-m="bulk-selected-count"><i class="fas fa-layer-group"></i><span>3 selected</span></span>
+            <button type="button" class="fab-bulk-selection-link" data-m="bulk-results-link">Select all 7 results</button>
+            <button type="button" class="fab-bulk-selection-clear" data-m="bulk-clear"><i class="fas fa-xmark"></i><span>Clear</span></button>
+          </div>
+        </section>
+        <!--
+          The BULK EDIT panel. It REPLACES the recipe browser inspector in the same rail
+          while the selection is non-empty, so the swap must not re-type the rail. Unlike
+          its Component Studio sibling the recipe panel owns NO scoped CSS of its own — it
+          is chrome primitives plus SegmentedControl, Chip and Callout end to end — which is
+          why it is absent from the scoped-component pairing below and why nothing here
+          would be stamped for it.
+        -->
+        <section class="fab-bulk-edit-panel" data-recipe-bulk-panel>
+          <header class="fab-bulk-edit-header">
+            <p class="fab-bulk-edit-eyebrow" data-m="bulk-eyebrow">Bulk edit</p>
+            <button type="button" class="fab-bulk-edit-clear" data-m="bulk-clear-selection"><i class="fas fa-xmark"></i><span>Clear selection</span></button>
+          </header>
+          <div class="fab-bulk-edit-hero">
+            <span class="fab-bulk-edit-hero-icon"><i class="fas fa-layer-group"></i></span>
+            <div class="fab-bulk-edit-hero-copy">
+              <strong class="fab-bulk-edit-hero-title" data-m="bulk-hero-title">3 recipes selected</strong>
+              <span class="fab-bulk-edit-hero-hint" data-m="bulk-hero-hint">Stage changes below, then apply to all at once.</span>
+            </div>
+          </div>
+          <p class="fab-bulk-edit-label" data-m="bulk-label">Category</p>
+          <select class="fab-bulk-edit-select" data-m="bulk-select"><option>Leave unchanged</option></select>
+          <p class="fab-bulk-edit-subhint" data-m="bulk-subhint">Enabling is gated by the activation check, so a refused recipe is left switched off.</p>
+          <!-- Both segmented axes are full-width tracks under a full-width select. -->
+          <div class="manager-segmented is-fill" role="radiogroup" aria-label="Status">
+            <label class="manager-segment is-active">
+              <input type="radio" class="manager-segment-input" checked>
+              <span class="manager-segment-label" data-m="bulk-segment-label">Unchanged</span>
+            </label>
+          </div>
+          <p class="manager-callout is-warning" data-callout-tone="warning"><i class="fas fa-triangle-exclamation"></i><span data-m="bulk-callout">At least 2 of 3 selected recipes can't be enabled yet and will stay off.</span></p>
+          <div class="fab-bulk-edit-label-row">
+            <p class="fab-bulk-edit-label">Recipe books</p>
+            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove</span>
+          </div>
+          <div class="manager-chip-row">
+            <button type="button" class="manager-chip is-positive" data-m="bulk-book-chip"><i class="fas fa-book"></i>Alchemist Primer<i class="fas fa-plus"></i></button>
+          </div>
+          <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
+        </section>
+      </div>
     </section>
   </div>`;
 
@@ -130,12 +203,46 @@ const FIXTURE = `
 // the SPECIFICITY matches too. Both halves matter — this is the only place in the repo
 // where a global rule that ties with the scoped block, and silently loses on source order,
 // can be caught.
-const chip = scopedComponentCss(resolve(repoRoot, 'src/ui/svelte/apps/manager/Chip.svelte'));
-const SCOPED_FIXTURE = withScopeHash(FIXTURE, 'manager-chip', chip.hashClass);
+//
+// Issue 1010 made this a LIST rather than the single chip pairing it started as: the
+// browser's multi-select toolbar and its bulk edit panel are built from shared primitives
+// that each own their appearance in a scoped block, so every one of them needs BOTH halves
+// of the treatment. Appending the CSS without the hash class makes the rules match nothing;
+// adding the hash without the real ordering proves the wrong winner. A role that gets
+// neither silently measures Foundry's 14px app base, which the anti-bleed loop then catches.
+const SCOPED_COMPONENTS = [
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
+  'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // `recipes/RecipeBulkEditPanel.svelte` is deliberately ABSENT: it emits no scoped CSS at
+  // all, because it renders entirely through the primitives above. `scopedComponentCss`
+  // throws on a component with no emitted CSS, which is the correct outcome — there is
+  // nothing of its own to pair.
+].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
+
+// The contract classes are DERIVED from each component's own emitted CSS rather than
+// hand-listed beside it: renaming a scoped class would otherwise leave its role unstamped,
+// and the failure would read as a size change rather than as a stale fixture.
+const SCOPED_FIXTURE = SCOPED_COMPONENTS.reduce((markup, { css, hashClass }) => {
+  const contractClasses = new Set(
+    [...css.matchAll(new RegExp(`\\.([\\w-]+)\\.${hashClass}\\b`, 'g'))].map(([, name]) => name)
+  );
+  let stamped = markup;
+  for (const contractClass of contractClasses) {
+    stamped = withScopeHash(stamped, contractClass, hashClass);
+  }
+  return stamped;
+}, FIXTURE);
+const SCOPED_CSS = SCOPED_COMPONENTS.map((component) => component.css).join('\n');
 
 function page() {
   return `<!doctype html><html><head><meta charset="utf-8">
-    <style>${foundryCss}</style><style>${fabricateCss}</style><style>${chip.css}</style>
+    <style>${foundryCss}</style><style>${fabricateCss}</style><style>${SCOPED_CSS}</style>
     <style>:root{--font-primary:Arial,sans-serif}</style></head>
     <body class="game">${SCOPED_FIXTURE}</body></html>`;
 }
@@ -176,6 +283,37 @@ const EXPECTED = {
   'summary-sub': 11.52, // 0.72rem
   'count-label': 12.48, // 0.78rem — the count row
   'count-value': 12.48, // 0.78rem mono 700 — inherits the count row's size
+  // ── The browser's multi-select row (issue 1010). One scale for the whole row: the box's
+  // caption, the count readout and the two text actions are peers, and a row that sized
+  // them differently would read as three registers stacked in one bar. Every number here
+  // is the one component-studio-font-size.test.js already commits for the SAME shared
+  // primitive — the two studios render one toolbar, so a divergence means the sharing broke.
+  'bulk-select-all': 10.88, // 0.68rem
+  'bulk-selected-count': 10.88, // 0.68rem — accent, but the SAME size
+  'bulk-results-link': 10.88,
+  'bulk-clear': 10.88,
+  // ── The BULK EDIT panel. Same rule: these are the shared chrome's committed numbers.
+  // It replaces the recipe browser inspector in the same rail, so its micro-label matches
+  // that inspector's section label exactly and its hero sits just under the inspector's
+  // stat value — the swap must not re-type the rail.
+  'bulk-eyebrow': 9.28, // 0.58rem — the rail micro-label scale, in accent
+  'bulk-clear-selection': 9.92, // 0.62rem
+  'bulk-hero-title': 14.72, // 0.92rem serif
+  'bulk-hero-hint': 9.92, // 0.62rem
+  'bulk-label': 9.28, // 0.58rem — the section micro-label
+  'bulk-hint': 9.28, // 0.58rem — the INLINE aside, on its label's baseline
+  'bulk-subhint': 9.92, // 0.62rem — a STANDING SENTENCE, a step up from the inline hint
+  'bulk-select': 11.52, // 0.72rem — the shared manager control-text scale
+  // ── The two roles the recipe panel adds to that chrome. Both are shipped primitives the
+  // Component Studio's panel does not render, so neither has a committed number there.
+  // The segment reads at the SAME control-text scale as the select it sits under, which is
+  // the point of a full-width track: the axis reads as one control, not two registers.
+  'bulk-segment-label': 11.52, // 0.72rem — inherits `.manager-segment`
+  'bulk-callout': 11.2, // 0.7rem — the shared standing-statement strip
+  'bulk-book-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
+  // 0.78rem, matching the browser inspector's primary button — the button this one SWAPS
+  // PLACES with in the rail's bottom slot.
+  'bulk-apply': 12.48,
   'bleed-baseline': 14, // Foundry app base (bare control)
 };
 
@@ -207,6 +345,18 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
     // the nav label must NOT sit at that base — it is now design-pinned, not bleeding.
     assert.equal(measured['bleed-baseline'], 14, 'bare <input> inherits the Foundry 14px app base');
     assert.notEqual(measured['nav-label'], 14, 'nav label must not bleed to the Foundry base');
+
+    // And every OTHER role, generally (issue 1010). This is what turns a stale fixture
+    // class or an unpaired scoped component into a failure rather than a plausible-looking
+    // number: a rule that stopped applying lands the role on Foundry's app base.
+    for (const [role, px] of Object.entries(measured)) {
+      if (role === 'bleed-baseline') continue;
+      assert.notEqual(
+        px,
+        14,
+        `${role} is at the Foundry 14px app base — its rule stopped applying`
+      );
+    }
 
     // The flat and stage component pickers SHARE one rule (issue 676), so they must read
     // identically. Asserting the relationship (not just two equal constants) is what

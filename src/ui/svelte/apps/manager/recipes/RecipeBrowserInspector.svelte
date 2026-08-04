@@ -431,7 +431,17 @@
               label={text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}
             />
           {/if}
-          {#if selectedRecipe.incomplete}
+          <!--
+            ONE predicate, three surfaces (issue 1010). This pill reads `enableBlocked` —
+            the projection of the SAME activation check the row pills and the bulk panel's
+            pre-flight count read — and not `incomplete`, which is narrower: `incomplete` is
+            "fails validation but is structurally sound", so a STRUCTURALLY BROKEN recipe
+            reads `incomplete: false` and wore no pill here while still being un-enableable.
+            The strict `enabled === false` split survives and is meaningful: a broken recipe
+            that is already ON is unfinished, but nothing is being refused, because the
+            activation gate fires only on a transition into the enabled state.
+          -->
+          {#if selectedRecipe.enableBlocked}
             <StatusPill
               tone={selectedRecipe.enabled === false ? 'danger' : 'warning'}
               icon={selectedRecipe.enabled === false
