@@ -161,6 +161,74 @@ function playerCase(entry) {
   };
 }
 
+/**
+ * The Journal's in-flight BLIND gathering run, from both sides of the redaction (issue 901).
+ *
+ * TWO cases rather than one, because the change is a DIFFERENCE between viewers and no single
+ * photograph holds both: the acting player must see the generic blind label where the real task
+ * name used to be rendered, and the GM must see the real task behind a warning-toned "GM only"
+ * chip. A case model that captured one viewer per frame would publish half the fix.
+ *
+ * Both drive the SAME state — the blind run card selected, so the redaction shows in the card, in
+ * the detail title, and in the run's own header — and differ only in `viewer`, which is what makes
+ * the pair readable side by side: everything that is not the redaction is held constant.
+ *
+ * `reaches: 'beyond'`. The live smoke walks no blind gathering run into the Journal, so there is no
+ * counterpart to fall short of, and no smoke label to claim.
+ *
+ * `expectSelector` carries the assertion in both directions, so a frame that does not show what the
+ * case names fails the capture instead of being published:
+ *   - the GM frame must CONTAIN `[data-run-secret-preview]`;
+ *   - the player frame must contain a blind run card that does NOT, which is the leak itself.
+ * Without the second one, a regression that rendered the chip (and the real name) to players would
+ * publish silently under a case whose whole subject is that it must not.
+ *
+ * @returns {object[]} The player and GM cases, in that order.
+ */
+function journalBlindRunCases() {
+  // The in-flight blind run seeded by `tests/view-lab/world/labRunStates.js`.
+  const card = '.journal-run-card[data-run-id="lab-gathering-blind-waiting"]';
+  const shared = {
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: card },
+      // Assert the SELECTION landed on the gathering run as well as scrolling its detail in: a
+      // mis-click would otherwise photograph the crafting detail under a gathering case's name.
+      { selector: '[data-journal-detail][data-run-type="gathering"]', scroll: true },
+    ],
+    kinds: ['player', 'journal', 'gathering'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/journal\//,
+      /^src\/ui\/svelte\/stores\/journalStore/,
+      // The projection that decides what each viewer is told. It is not a render file, so it
+      // cannot SELECT a frame today (`mapChangedFilesToCases` filters to `isUiFile` first) — it is
+      // declared because it is what these two frames are evidence about, and because the moment
+      // that filter widens this is the case that must answer for it.
+      /^src\/systems\/RunJournalBuilder\.js$/,
+    ],
+  };
+  return [
+    playerCase({
+      ...shared,
+      id: 'fabricate-journal-blind-run',
+      label: 'Player app — Journal, in-flight blind gathering run (player view)',
+      query: { tab: 'journal' },
+      expectSelector: `${card}:not(:has([data-run-secret-preview]))`,
+    }),
+    playerCase({
+      ...shared,
+      id: 'fabricate-journal-blind-run-gm',
+      label: 'Player app — Journal, in-flight blind gathering run (GM secret preview)',
+      // The player app rendered for a GM. An ordinary state — a GM owns the same tabs — and the
+      // only one in which the secret preview exists at all: the projection consults the GM-owned
+      // blind-run store for no other viewer.
+      query: { tab: 'journal', viewer: 'gm' },
+      expectSelector: `${card} [data-run-secret-preview]`,
+    }),
+  ];
+}
+
 export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipes-editor-roundtrip',
@@ -2950,6 +3018,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'journal'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
+  ...journalBlindRunCases(),
   // ───────────────────────────────────────────────────────────────────────────────────────────────
   // Coverage matrix — states the live smoke does NOT photograph.
   //

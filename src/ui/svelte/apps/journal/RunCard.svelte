@@ -29,6 +29,10 @@
   // On the final step the run finishes rather than continuing, so the matured
   // countdown mirrors the detail button's "finish" wording.
   const isFinalStep = $derived(run?.isFinalStep === true);
+  // GM-only: this row names the task an in-flight BLIND gathering run will yield,
+  // which the acting player cannot see (issue 901). The projection only ever sets
+  // it for a GM viewer, so no player-facing branch depends on it.
+  const blindSecretPreview = $derived(run?.blindSecretPreview === true);
 
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
   const initiatedAt = $derived(Number(run?.timeGate?.initiatedAt));
@@ -79,6 +83,16 @@
       {/if}
       <div class="journal-run-card-meta">
         <RunStatusPill {status} />
+        {#if blindSecretPreview}
+          <span
+            class="journal-run-card-secret"
+            data-run-secret-preview="true"
+            title={localize('FABRICATE.App.Journal.BlindSecret.Title')}
+          >
+            <i class="fas fa-eye-slash" aria-hidden="true"></i>
+            {localize('FABRICATE.App.Journal.BlindSecret.Badge')}
+          </span>
+        {/if}
         {#if stepLabel !== ''}
           <span class="journal-run-card-step">{stepLabel}</span>
         {/if}
@@ -192,6 +206,21 @@
   .journal-run-card-step {
     font-size: 11px;
     color: var(--fab-text-muted);
+  }
+
+  /* GM secret preview marker. Deliberately styled as a warning-toned chip rather
+     than a neutral one so a GM cannot mistake it for something the player sees. */
+  .journal-run-card-secret {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border: 1px solid var(--fab-warning);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--fab-warning);
+    white-space: nowrap;
   }
 
   .journal-run-card-countdown {

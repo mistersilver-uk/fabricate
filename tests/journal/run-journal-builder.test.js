@@ -519,7 +519,12 @@ test('gathering run with a blind/null taskId does not consult the task resolver'
   }).activeRuns[0];
 
   assert.equal(consulted, false, 'resolver not called for a blind task');
-  assert.equal(run.names.title, 'blind');
+  // Issue 901: the title is now the generic localization KEY, not the raw marker. The
+  // builder emits keys and the view localizes them, so a player used to be shown the
+  // literal string "blind" as a task title; they now get the same "Gather" label every
+  // other blind surface uses. The resolver assertion above is what this test is for and
+  // is unchanged.
+  assert.equal(run.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
   assert.equal(run.img, 'icons/svg/item-bag.svg');
 });
 

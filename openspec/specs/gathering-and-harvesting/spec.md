@@ -1265,6 +1265,37 @@ In `blind` mode:
 
 Blind gathering simulates gathering from a place without player certainty about which hidden resource the environment will yield.
 
+### Blind Run Secret State
+
+Blind redaction is a persistence rule and not only a projection rule.
+A gathering run is stored in `flags.fabricate.gatheringRuns` on a gathering actor the player owns, and Foundry pushes an owned Actor's full source — flags included — to that client, so redacting a task identity only on the read path leaves it readable in clear text and, worse, writable by the player before any reveal policy discloses it.
+
+The boundary this specification draws is **integrity, not confidentiality**.
+Foundry performs no server-side read authorization, so no store exists that a player's client never receives; a determined player with a console can still read blind state.
+What they must not be able to do is **forge** it.
+
+1. The secret state of an in-flight blind run — the resolved task, its start-time snapshot, and its resource-node reservation — is held in world-scoped state keyed by run id, which only a GM may write.
+2. The actor-scoped run record carries an environment-scoped blind marker in place of the resolved task id, the time gate, and the non-secret economy evidence only.
+It carries no task identity, no start-time runtime snapshot, and the **environment's** risk rather than the task's `riskOverride`.
+3. Because the marker is environment-scoped, an actor holds at most one active blind run per blind environment, and a second attempt there is blocked with the generic `DUPLICATE_ACTIVE_RUN` reason.
+4. The task is resolved **at start**, not at maturity, and is recorded with the start-time snapshot of the environment, its rules, its events, and its conditions.
+A matured blind run resolves against that snapshot, so a task edited or deleted mid-run still completes as it was when the attempt began.
+5. A blind run **reserves** its resource node at start rather than decrementing the pool.
+The reservation is provisional: it never mutates `nodeRuntime`, so no "reserved but not consumed" limbo state appears in the pool, and a run that is cancelled, cleared, or orphaned releases it with nothing to give back.
+At maturity the reservation is converted into the single real decrement the run is owed, subject to the task's ordinary `onStart`/`onSuccess` depletion rule.
+6. Start-time node availability counts outstanding reservations against the pool, so a party can never hold more in-flight blind runs than the pool can pay out.
+A candidate whose pool is fully reserved is excluded from the blind candidate draw.
+7. Because only a GM may write world-scoped state, and because the draw must not run on a client the acting player controls, a player's blind start that would create a waiting run is routed to the active GM.
+The GM re-runs the whole attempt with the requesting user as the viewer — re-evaluating actor authorization, scene, visibility, tool, stamina, and reservation-aware node availability against that user — then resolves the task, takes the reservation, and writes both records.
+The requesting user is the server-attested socket sender, never a value carried in the request.
+8. Where no GM is connected the start is reported as blocked rather than silently dropped.
+9. A GM's run listing shows the real task behind an in-flight blind run, explicitly marked as a secret preview the acting player cannot see.
+Player-facing listings continue to show the generic blind label and no task identity.
+10. Runs persisted with a real task id and their own runtime snapshot — those written before this rule — keep resolving from their own record, need no world-scoped record, and are not charged a second node at maturity.
+No migration is required.
+
+Structurally player-observable channels remain outside this rule: a task-dependent wait duration, a task-dependent stamina cost, and a world-scoped node pool decrement are each visible to the acting player whatever the run record says.
+
 ### Blind Gathering Discovery
 
 1. A blind environment may enable progressive task reveal.
@@ -1685,6 +1716,7 @@ Resumption is not a read: it writes run flags, creates gathered result items, ap
 Where no GM is connected, matured runs stay waiting and resolve when one joins and world time next advances.
 
 1. Re-resolve the environment, task, crafting system, and actor.
+For a run persisted under the blind marker, the task and the start-time snapshot come from the world-scoped blind run record rather than the actor flag; a run whose record is gone resolves nothing and is cancelled through the missing-reference path with blind redaction, rather than resolving against an arbitrary task.
 2. If required references are missing, cancel the run and move it to history with a terminal status, with blind redaction where an opaque blind environment can still be resolved.
 3. If the task is misconfigured at resume time, clear the active run without terminal player history, result items, tool usage, or failure feedback, and require a fresh manual start after the task is repaired.
 4. Resolve completion-time condition/economy behavior from the persisted run snapshot unless the GM explicitly configured completion-time conditions.
@@ -1704,10 +1736,13 @@ Where no GM is connected, matured runs stay waiting and resolve when one joins a
 ### Rich Lifecycle Evidence
 
 1. Start guards evaluate node availability and stamina after existing environment/task/scene/visibility/tool guards pass and before terminal resolution begins.
+For blind runs, node availability is net of outstanding reservations.
 2. Timed runs preserve the condition/economy snapshot needed to resolve or explain the run at completion.
+For blind runs that snapshot is preserved in world-scoped state a player may not write, not on the actor's own run record.
 3. If conditions are intended to affect completion rather than start, that behavior must be configured explicitly and visible to the GM.
 4. History entries should include redaction-safe summaries of stamina spent, node availability changes, condition modifiers, risk, and encounter outcomes.
 5. Blind environments continue to redact real task identity, hidden results, provider diagnostics, and sensitive encounter details for non-GM users.
+That redaction applies to what is written as well as to what is read: a persisted blind run must not name its task, its result rows, or its tools.
 
 ## Rich Gathering APIs and Hooks
 
