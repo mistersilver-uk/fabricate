@@ -827,16 +827,22 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'the browser view-state must be lifted, not held as local component $state'
     );
-    // The derived authoring state the row renders is `enableBlocked`, not `incomplete`
-    // (issue 1010). Both pill branches and the attention sort read it, because
-    // `incomplete` is `validate() === false && validateStructure() === true` and so does
-    // not capture blocked-ness at all. This assertion used to name `recipe.incomplete`,
-    // and by the end of issue 1010 the ONLY thing satisfying it was a dead
-    // `data-recipe-incomplete` attribute nothing read — so it was pinning a hook rather
-    // than the rendered state it claims to pin.
+    // The row DELEGATES its authoring-state pills to the shared activation predicate
+    // (issue 1010), which the bulk panel's pre-flight count and the attention sort read
+    // too — so the pilled rows and the counted rows are one set by construction.
+    //
+    // Delegation is all this assertion may claim, because it is all the component's text
+    // contains. The predicate is owned by `tests/util/recipe-browser-model.test.js`, and
+    // the RENDERED pills by the `authoring-state pills` cases in
+    // `tests/components/recipes-browser-view-mounted.test.js`. Two earlier attempts to
+    // pin the state here instead both failed the same way: `recipe.incomplete` ended up
+    // satisfied only by a dead `data-recipe-incomplete` attribute nothing read, and
+    // `recipe.enableBlocked` only by the prose above `STATUS_LABELS` — the field is read
+    // inside `recipeBrowserModel.js` and never appears in this markup at all. A source
+    // scan cannot see rendered state that no rendered text names.
     assert.ok(
-      recipesBrowserSource.includes('recipe.enableBlocked'),
-      'RecipesBrowserView should derive its authoring-state pills from enableBlocked'
+      /return deriveRecipeStatuses\(recipe\)/.test(recipesBrowserSource),
+      'RecipesBrowserView should derive its authoring-state pills through the shared predicate'
     );
     assert.equal(
       recipesBrowserSource.includes('recipe.incomplete'),

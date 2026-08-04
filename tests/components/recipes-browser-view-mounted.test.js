@@ -525,6 +525,58 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
   });
 });
 
+// Issue 1010 — the row's two AUTHORING-state pills read ONE predicate: `deriveRecipeStatuses`
+// over the projected `enableBlocked`, "would activation refuse this recipe?". That is the same
+// predicate the bulk panel's pre-flight count and the set-apply write run, so the pilled rows
+// and the counted rows are one set by construction. The pre-1010 predicate was `incomplete`
+// (`validate() === false && validateStructure() === true`), which a STRUCTURALLY broken recipe
+// does not trip — so the reddest rows in the library wore no pill at all.
+//
+// These are MOUNTED rather than asserted against the component's source, and that is the whole
+// point of them: `enableBlocked` is read inside `recipeBrowserModel.js` and never appears in
+// this component's markup, so a source-text pin on the field name is satisfied by the comment
+// above `STATUS_LABELS` and by nothing else. Reverting the predicate reds every case below
+// while changing not one character of the component.
+describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
+  const pills = (root, id) =>
+    [
+      ...root.querySelectorAll(
+        `[data-recipe-id="${id}"] .manager-recipe-name-row [data-status-pill]`
+      )
+    ].map((pill) => [pill.dataset.statusPill, pill.textContent.trim()]);
+
+  it('paints an off, blocked recipe RED and says enabling would be refused', async () => {
+    // `incomplete: false` is the load-bearing half: this is the structurally-broken row the
+    // narrower predicate reads as fine, and it is exactly what the bulk panel forecasts.
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: false, enableBlocked: true })]
+    });
+    assert.deepEqual(pills(root, 'r1'), [
+      ['subtle', 'Disabled'],
+      ['danger', "Can't enable"]
+    ]);
+  });
+
+  it('paints an ON, blocked recipe AMBER — unfinished, but nothing is being refused', async () => {
+    // The activation gate fires only on the transition INTO enabled, so an already-on blocked
+    // recipe is authoring work outstanding rather than a refusal. Two tones, one predicate.
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', enabled: true, incomplete: false, enableBlocked: true })]
+    });
+    assert.deepEqual(pills(root, 'r1'), [['warning', 'Incomplete']]);
+  });
+
+  // The mirror, and the case that makes the two above non-vacuous: `incomplete` alone paints
+  // NOTHING now. Without this a predicate reading `incomplete || enableBlocked` would satisfy
+  // both cases above and still let the browser and the panel disagree.
+  it('paints no authoring pill on a row only the narrower incomplete predicate flags', async () => {
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true, enableBlocked: false })]
+    });
+    assert.deepEqual(pills(root, 'r1'), [['subtle', 'Disabled']]);
+  });
+});
+
 // The count is quiet right-aligned METADATA and reports the page WINDOW. As a bordered
 // mono chip reading "6 of 6" it looked like a control and never told the GM which page
 // they were on.
