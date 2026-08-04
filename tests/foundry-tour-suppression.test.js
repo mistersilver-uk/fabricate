@@ -140,13 +140,46 @@ test('the inlined page copy stays consistent with the tested module', () => {
   });
 });
 
-test('Phase E fails loudly when the items tab does not activate', async () => {
-  // The original failure reported the craft button as "resolved to hidden", which reads like a
-  // Fabricate UI defect. The real cause was a modal tour swallowing a force:true click. The
-  // harness must name that instead of timing out on a downstream symptom.
+test('overlay detection is diagnostic only — it can never fail a healthy run', async () => {
+  // Issue #996: the first attempt asserted "is the Items tab selected" with a selector that
+  // does not match on Foundry 14, and failed a run whose sidebar was open, populated and
+  // healthy. The craft button is the readiness signal; an overlay probe may only ENRICH the
+  // resulting error. Pin both halves of that contract.
   const harness = await readFile(HARNESS_PATH, 'utf8');
+
   assert.ok(
-    harness.includes('Items sidebar tab did not activate after clicking it'),
-    'the harness must assert tab activation before waiting on the craft button'
+    !harness.includes('Items sidebar tab did not activate after clicking it'),
+    'the retired tab-activation assertion must not come back — it produced false failures'
+  );
+
+  const phaseE = harness.slice(harness.indexOf('Opening shared Fabricate app via "Craft Item"'));
+  const block = phaseE.slice(0, phaseE.indexOf('const appShell'));
+  assert.ok(
+    block.includes('await craftButton.waitFor'),
+    'the craft button must remain the readiness signal'
+  );
+  assert.ok(
+    block.includes('describeBlockingOverlay'),
+    'a timeout must be diagnosed for a blocking overlay before it is rethrown'
+  );
+  assert.ok(
+    block.includes('throw waitError'),
+    'with no overlay found, the original Playwright error must be rethrown unchanged'
+  );
+});
+
+test('describeBlockingOverlay is only ever called on a failure path', async () => {
+  // If it were awaited unconditionally it would become a de facto assertion, which is the
+  // exact mistake issue #996 records.
+  const harness = await readFile(HARNESS_PATH, 'utf8');
+  // `await …` distinguishes a call from the `async function describeBlockingOverlay(page)`
+  // declaration, which contains the same substring.
+  const CALL = 'await describeBlockingOverlay(page)';
+  const callSites = harness.split(CALL).length - 1;
+  assert.equal(callSites, 1, 'exactly one call site expected');
+  const before = harness.slice(0, harness.indexOf(CALL));
+  assert.ok(
+    before.lastIndexOf('catch (') > before.lastIndexOf('try {'),
+    'the call must sit inside a catch block, not on the happy path'
   );
 });
