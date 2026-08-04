@@ -68,6 +68,7 @@ const GATE_TARGETS = [
   'scripts/lib/foundrySmokeSignal.js',
   'scripts/lib/managerLayoutGuards.js',
   'scripts/lib/screenshotCaptureMap.js',
+  'scripts/lib/foundryCanvasReadiness.js',
   'scripts/lib/foundryRunIdentity.js',
   'scripts/lib/foundryRunBudget.js',
   'scripts/lib/foundryTourSuppression.js',

@@ -56,6 +56,7 @@ import {
   SUPPRESSED_STEP_INDEX,
 } from './lib/foundryTourSuppression.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
+import { isCanvasReadyForScene } from './lib/foundryCanvasReadiness.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
 
@@ -6551,6 +6552,45 @@ async function closeOpenApplications(page) {
 }
 
 /**
+ * Activate a scene and wait until the canvas has FINISHED drawing it.
+ *
+ * The single seam every scene switch in this harness goes through, so the readiness contract is
+ * stated once. Do NOT call `scene.activate()` directly: activation only STARTS an async draw, and
+ * a wait keyed on the scene id alone resolves partway through it, roughly sixty lines before the
+ * canvas can accept a placeable document. `isCanvasReadyForScene` carries the verified Foundry
+ * 14.365 draw ordering that makes `canvas.ready` the correct predicate and the scene id the wrong
+ * one (issue #1010); `tests/foundry-canvas-readiness.test.js` pins both this call site count and
+ * the predicate itself.
+ *
+ * Deliberately TOLERANT of the wait timing out, matching the pre-existing behaviour at the
+ * interactables-manager call site. `canvas.ready` never latches if a draw aborts (a texture-load
+ * failure returns from `Canvas##draw` at board.mjs:1199 with `ready` still false), and adding a
+ * strictly harder predicate must not newly fail a capture step that used to pass. A swallow is
+ * still OBSERVABLE: the timeout is bounded and writes a diagnostic naming the scene, so a run that
+ * proceeds against an undrawn canvas says so rather than only manifesting as a downstream
+ * assertion failure.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} sceneId the scene to activate and draw
+ * @param {object} [options]
+ * @param {number} [options.timeout] milliseconds to wait for the draw to complete
+ * @returns {Promise<void>}
+ */
+async function activateSceneAndAwaitCanvasReady(page, sceneId, { timeout = 15_000 } = {}) {
+  if (!sceneId) return;
+  await page.evaluate(async (id) => {
+    const scene = game.scenes.get(id);
+    if (scene && !scene.active) await scene.activate();
+  }, sceneId).catch(() => {});
+  await page.waitForFunction(isCanvasReadyForScene, sceneId, { timeout }).catch(() => {
+    process.stderr.write(
+      `Canvas did not report ready for scene ${sceneId} within ${timeout}ms; ` +
+      'continuing against a possibly undrawn canvas.\n'
+    );
+  });
+}
+
+/**
  * Attach browser console capture to a Playwright page.
  * @param {import('playwright').Page} page
  * @param {RegExp[]} ignoredErrorPatterns
@@ -6580,6 +6620,13 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   page.on('pageerror', err => {
     const entry = `[pageerror] ${err.message}`;
     consoleLog.push(entry);
+    // The stack goes to the DIAGNOSTIC log only, never to consoleErrors — the gate matches its
+    // waiver patterns against the message, and widening what it sees would change which runs
+    // fail. Recorded because a `pageerror` from an un-awaited core promise (see
+    // CanvasDocumentMixin#_onCreate) carries no harness step to attribute it to, so a bare
+    // message leaves source archaeology as the only way to find the throwing call — which is
+    // exactly what diagnosing issue #1010 cost.
+    if (err.stack) consoleLog.push(`[pageerror-stack] ${err.stack}`);
     // pageerror waiving is a deliberate existing capability (the Foundry
     // canvas-artefact default filters pageerror entries too); an appended
     // pattern extends it, it does not remove it. Route through the SAME
@@ -6776,14 +6823,29 @@ async function main() {
     // exactly what it was told — any scoped set including the Tool Studio parity
     // walk tripped it (issue 881).
     /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater\..*display has a resolution of (?:1280px by 720px|1280px by 520px|900px by 700px|680px by 700px)\./i,
-    // Headless canvas-draw race: activating/redrawing a scene that gains new
-    // placeables mid-capture (e.g. the issue-335 Manage-Interactables marker
-    // fixtures) can momentarily read a canvas layer constant before the layer is
-    // initialised in the offscreen WebGL context, surfacing as
-    // "Cannot read properties of undefined (reading 'OBJECTS')". It is a Foundry
-    // canvas-rendering timing artifact of the headless harness, not a Fabricate
-    // product error — the scene draws correctly and the captures are unaffected.
-    /reading 'OBJECTS'/
+    //
+    // NOTE (issue #1010): a `/reading 'OBJECTS'/` waiver used to sit here, described as a headless
+    // WebGL timing artifact. It was neither headless-specific nor unfixable — it was this harness
+    // waiting on the wrong thing, and the waiver hid a real defect for a year. It has been RETIRED
+    // rather than extended, and nothing replaces it. Do not re-add it, or a priority-renamed
+    // variant of it (v14 added an `INTERFACE` queue, which is why the same race started reporting
+    // `reading 'INTERFACE'` after the 14.365 bump), without first reading this:
+    //
+    // Both message forms come from exactly two lines of Foundry 14.365,
+    // `canvas.pendingRenderFlags[this.priority]` in `RenderFlags#set` and `RenderFlags#clear`
+    // (`client/canvas/interaction/render-flags.mjs`). `pendingRenderFlags` is a bare class field
+    // (`board.mjs:2518`) assigned only by `Canvas##activateTicker` (`board.mjs:2562`), through a
+    // `configurable: true` `defineProperty` that is thereafter only ever REDEFINED — teardown
+    // (`#deactivateTicker`) clears the queues rather than removing the property. So the property is
+    // undefined for exactly one window per page session: from load until the first scene finishes
+    // drawing past `board.mjs:1209`. The smoke world seeds no scene, so it boots down the
+    // `#drawBlank` path and that window stayed open until the harness's first `scene.activate()` —
+    // whereupon it created a Tile and two Regions straight into it, one `pageerror` each.
+    // `activateSceneAndAwaitCanvasReady` closes the window by construction, and after the first
+    // successful draw neither form can recur at all.
+    //
+    // If one of these messages ever comes back, that is a REGRESSION worth diagnosing, not noise
+    // to re-suppress: the `[pageerror-stack]` line now in console.log names the throwing call.
   ];
 
   // APPEND any run-supplied patterns (--allowed-console-error-patterns / the
@@ -10782,19 +10844,12 @@ async function main() {
 
           const interactableRef = craftingSetup.interactable;
           // Ensure the seeded interactable's scene is the active/viewed scene so the
-          // panel's scene-scan finds it in the list, and wait for the canvas to
-          // actually switch to it (activation → canvas redraw is async).
-          if (interactableRef?.sceneId) {
-            await page.evaluate(async (sceneId) => {
-              const scene = game.scenes.get(sceneId);
-              if (scene && !scene.active) await scene.activate();
-            }, interactableRef.sceneId).catch(() => {});
-            await page.waitForFunction(
-              (sceneId) => globalThis.canvas?.scene?.id === sceneId,
-              interactableRef.sceneId,
-              { timeout: 15_000 }
-            ).catch(() => {});
-          }
+          // panel's scene-scan finds it in the list, and wait for the canvas to have
+          // FINISHED drawing it (activation → canvas redraw is async). The wait must
+          // clear before the placeable creates below: this is the FIRST real draw of
+          // the session, so it is the one draw whose pre-ticker window is open — see
+          // activateSceneAndAwaitCanvasReady and issue #1010.
+          await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
           // Seed extra interactables on the active scene so the captured list shows
           // MULTIPLE marker-status variants + a Tool-type row (not just the lone
@@ -10948,19 +11003,16 @@ async function main() {
               active: false,
               background: { src: 'icons/environment/settlement/tower-stone-blue.webp' }
             });
-            await scene.activate();
             return scene.id;
           });
+          // Registered for cleanup BEFORE activation, so a scene that is created but
+          // fails to draw is still torn down by Phase F.
           if (emptySceneId) cleanup.sceneIds.push(emptySceneId);
           // The panel scans `canvas.scene`; wait until the canvas has actually
           // switched to the empty scene before opening (activation → canvas redraw
           // is async), otherwise the panel scans the prior populated scene and the
           // empty branch never renders.
-          await page.waitForFunction(
-            (sceneId) => globalThis.canvas?.scene?.id === sceneId,
-            emptySceneId,
-            { timeout: 15_000 }
-          );
+          await activateSceneAndAwaitCanvasReady(page, emptySceneId);
           await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
           await page.locator('.fabricate-interactables-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await page.locator('.fabricate-interactables-manager .fab-im-empty').first()
@@ -10970,13 +11022,11 @@ async function main() {
 
           await closeOpenApplications(page);
 
-          // Re-activate the original scene so later phases see the expected state.
-          if (interactableRef?.sceneId) {
-            await page.evaluate(async (sceneId) => {
-              const scene = game.scenes.get(sceneId);
-              if (scene && !scene.active) await scene.activate();
-            }, interactableRef.sceneId).catch(() => {});
-          }
+          // Re-activate the original scene so later phases see the expected state,
+          // and leave it DRAWN rather than mid-draw: this block ends here, so an
+          // un-awaited redraw would otherwise run on underneath whatever phase
+          // follows.
+          await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
           results.steps.push({ step: 'interactables-manager', passed: true });
         } catch (err) {
