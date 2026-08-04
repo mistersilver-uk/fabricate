@@ -12,6 +12,11 @@
  * - the SELECTION, a `Set` of component ids the browser owns as lifted view state;
  * - the DRAFT, the staged-but-unwritten edit the inspector rail's panel owns.
  *
+ * Only the DRAFT half is defined here. The selection half now lives in the row-agnostic
+ * `bulkSelectionModel.js`, shared with the Recipe Studio's bulk edit (issue 1010), and is
+ * re-exported at the foot of this file under its original `…ComponentSelection` names — so
+ * the distinction above still holds for every importer, and no call site moved.
+ *
  * Nothing here mutates its input. Every draft helper returns a NEW draft and every
  * selection helper returns a NEW `Set` — the Svelte side propagates on reference change,
  * exactly as `collapsedCategories` already documents.
@@ -63,13 +68,6 @@ function clampDifficulty(value) {
 function tagList(value) {
   const names = (Array.isArray(value) ? value : []).map((tag) => String(tag ?? '')).filter(Boolean);
   return [...new Set(names)];
-}
-
-/** A de-duplicated list of non-empty ids from an array, `Set`, or any other iterable. */
-function idList(value) {
-  if (!value || typeof value === 'string') return [];
-  const source = Array.isArray(value) ? value : [...value];
-  return [...new Set(source.map((id) => String(id ?? '')).filter(Boolean))];
 }
 
 /** A well-formed `{ essenceId: quantity }` map from arbitrary input. */
@@ -338,90 +336,18 @@ export function countComponentsChangingEssences(selectedCards, stagedEssences) {
 }
 
 /**
- * Describe the selection for the toolbar.
+ * The selection helpers this module used to define, re-exported under the names every call
+ * site already imports.
  *
- * `pageSelectionState` is computed over the RENDERED row ids — which is `page.components`
- * flat, and the union of the NON-COLLAPSED groups' components when grouping is on — while
- * `showSelectAllResults` covers ALL filtered rows. They are two distinct actions and this
- * model keeps them distinct, exactly as the prototype does: the page control's job is the
- * rows the GM can see, and the results link's job is to reach the ones it cannot.
- *
- * An EMPTY page is `'none'`, never `'all'`. `[].every()` returns `true`, which would paint
- * a checked page box over a no-results search; the same trap is guarded on the filtered
- * set, so an empty result never suppresses the link by claiming it is fully selected.
- *
- * `count` is the WHOLE selection, not its intersection with the page: a selection made on
- * page 1 survives paging and must still be counted in `Apply to {N}`.
- *
- * @param {{pageIds?: string[], filteredIds?: string[], selectedIds?: Set<string> | string[]}} selection
- * @returns {{count: number, pageSelectionState: 'all' | 'some' | 'none', showSelectAllResults: boolean, selectAllResultsCount: number}}
+ * They moved to `bulkSelectionModel.js` (issue 1010) so the Recipe Studio's bulk edit can
+ * share them rather than own a second copy: the selection semantics are identical over any
+ * row id, while the STAGED DRAFT above is not shareable at all — the two studios' axes
+ * differ entirely. Re-exporting rather than re-pointing every importer keeps that move
+ * invisible to the component surfaces, which is what makes it verifiably behaviour-preserving.
  */
-export function describeComponentSelection(selection = {}) {
-  const pageIds = idList(selection.pageIds);
-  const filteredIds = idList(selection.filteredIds);
-  const selectedIds = new Set(idList(selection.selectedIds));
-
-  const selectedOnPage = pageIds.filter((id) => selectedIds.has(id)).length;
-  let pageSelectionState = 'none';
-  if (pageIds.length > 0 && selectedOnPage === pageIds.length) pageSelectionState = 'all';
-  else if (selectedOnPage > 0) pageSelectionState = 'some';
-
-  const allFilteredSelected =
-    filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
-
-  return {
-    count: selectedIds.size,
-    pageSelectionState,
-    showSelectAllResults: filteredIds.length > pageIds.length && !allFilteredSelected,
-    selectAllResultsCount: filteredIds.length,
-  };
-}
-
-/**
- * Add or drop one id.
- *
- * @param {Set<string> | string[]} selectedIds
- * @param {string} id
- * @returns {Set<string>} a NEW `Set`; the input is not mutated.
- */
-export function toggleComponentSelection(selectedIds, id) {
-  const next = new Set(idList(selectedIds));
-  const name = String(id ?? '');
-  if (!name) return next;
-  if (next.has(name)) next.delete(name);
-  else next.add(name);
-  return next;
-}
-
-/**
- * Select or clear a whole run of ids in one pass — the page control and the
- * `Select all {N} results` link.
- *
- * @param {Set<string> | string[]} selectedIds
- * @param {string[]} ids
- * @param {boolean} [on]
- * @returns {Set<string>} a NEW `Set`; the input is not mutated.
- */
-export function setComponentSelection(selectedIds, ids, on = true) {
-  const next = new Set(idList(selectedIds));
-  for (const id of idList(ids)) {
-    if (on) next.add(id);
-    else next.delete(id);
-  }
-  return next;
-}
-
-/**
- * Drop every selected id that no longer resolves to a component.
- *
- * A delete, an unlink or a search change must never leave a phantom id in the count or in
- * an `Apply`; the browser runs this against the current `itemCards` ids.
- *
- * @param {Set<string> | string[]} selectedIds
- * @param {string[]} knownIds
- * @returns {Set<string>} a NEW `Set`; the input is not mutated.
- */
-export function pruneComponentSelection(selectedIds, knownIds) {
-  const known = new Set(idList(knownIds));
-  return new Set(idList(selectedIds).filter((id) => known.has(id)));
-}
+export {
+  describeBulkSelection as describeComponentSelection,
+  toggleBulkSelection as toggleComponentSelection,
+  setBulkSelection as setComponentSelection,
+  pruneBulkSelection as pruneComponentSelection,
+} from './bulkSelectionModel.js';
