@@ -45,6 +45,17 @@ import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 /**
+ * These row ids are ASCII kebab-case, so codepoint order and `localeCompare` agree; the
+ * comparator is spelled out explicitly anyway (rather than a bare `.sort()`) so a reader
+ * cannot mistake the ordering for locale-default and "simplify" it back to the implicit form.
+ *
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+const compareIds = (a, b) => a.localeCompare(b);
+
+/**
  * Register the seven multi-select cases against one studio.
  *
  * @param {BulkSelectionStudio} studio
@@ -62,8 +73,7 @@ export function describeBrowserBulkSelection(studio) {
     [...root.querySelectorAll(`.${rowClass}.is-bulk-selected`)].map((row) => row.dataset[rowIdKey]);
 
   /** The toolbar's `{N} selected` readout, or '' when nothing is selected (it is absent). */
-  const selectionCountText = (root) =>
-    root.querySelector(countSelector)?.textContent.trim() || '';
+  const selectionCountText = (root) => root.querySelector(countSelector)?.textContent.trim() || '';
 
   const clickRowBox = (root, id) => {
     root.querySelector(rowBoxSelector(id)).click();
@@ -98,11 +108,7 @@ export function describeBrowserBulkSelection(studio) {
 
       clickRowBox(root, first);
       assert.deepEqual(bulkSelectedIds(root), [], 'ticking again clears the row');
-      assert.equal(
-        selectionCountText(root),
-        '',
-        'the readout disappears with an empty selection'
-      );
+      assert.equal(selectionCountText(root), '', 'the readout disappears with an empty selection');
     });
 
     it('toggles ONLY the rendered rows from the page box, leaving a collapsed group alone', async () => {
@@ -112,8 +118,10 @@ export function describeBrowserBulkSelection(studio) {
       root.querySelector(`[data-group-header="${studio.grouped.collapseHeader}"]`).click();
       flushSync();
       assert.deepEqual(
-        [...root.querySelectorAll(`.${rowClass}`)].map((row) => row.dataset[rowIdKey]).sort(),
-        [...studio.grouped.visibleIds].sort(),
+        [...root.querySelectorAll(`.${rowClass}`)]
+          .map((row) => row.dataset[rowIdKey])
+          .sort(compareIds),
+        [...studio.grouped.visibleIds].sort(compareIds),
         'only the expanded category renders rows once the other is collapsed'
       );
 
@@ -122,8 +130,8 @@ export function describeBrowserBulkSelection(studio) {
       flushSync();
 
       assert.deepEqual(
-        bulkSelectedIds(root).sort(),
-        [...studio.grouped.visibleIds].sort(),
+        bulkSelectedIds(root).sort(compareIds),
+        [...studio.grouped.visibleIds].sort(compareIds),
         'the page control must not reach rows the GM cannot see'
       );
       assert.match(selectionCountText(root), /2 selected/, 'and the count cannot exceed them');
