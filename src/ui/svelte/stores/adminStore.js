@@ -2061,24 +2061,45 @@ function _buildLearnedRecipeActorIndex() {
   return index;
 }
 
+// The legacy reverse-ref index: `recipeItemId -> rows`. Built ONLY while the system's
+// membership-basis marker is unset, so it costs nothing on a system that has switched
+// basis and cannot be consulted there by accident.
+function _legacyRecipeItemIndex(recipeList) {
+  const index = new Map();
+  for (const recipe of recipeList) {
+    const key = String(recipe?.recipeItemId || '');
+    if (!key) continue;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(recipe);
+  }
+  return index;
+}
+
 // Enrich the synchronously-projected recipe items with async-resolved
 // name/img/type plus their derived `recipes[]` and `learnedByCount`. Called once
 // per refresh from the async phase; `fromUuid` resolution is batched.
-async function _enrichRecipeItemLibrary(projectedItems, recipes) {
+//
+// This is the SIXTH recipe-book membership reader, and the second in this file: it
+// answers the same many-to-many from the BOOK's side. Like
+// `_recipeItemDefinitionsContaining`, it takes the basis as a PARAMETER threaded from
+// the raw manager system rather than inferring it — here the inference would have been
+// per DEFINITION ("this book's `recipeIds` is empty, so it must be un-migrated"), which
+// is the retired system-wide predicate at definition scope and flips the same way: one
+// bulk removal that legitimately empties a book would make it report the recipes it used
+// to contain, while the Contents tab and both player-facing readers correctly show it
+// empty (`ui-integration/spec.md`, the membership-basis paragraph).
+async function _enrichRecipeItemLibrary(projectedItems, recipes, membershipResolvesByRecipeIds) {
   const items = Array.isArray(projectedItems) ? projectedItems : [];
   if (items.length === 0) return [];
 
   const recipeList = Array.isArray(recipes) ? recipes : [];
   const recipeById = new Map();
-  // Legacy reverse-ref index — fallback for definitions with no `recipeIds` yet.
-  const recipesByItemId = new Map();
-  for (const recipe of recipeList) {
-    recipeById.set(String(recipe?.id), recipe);
-    const key = String(recipe?.recipeItemId || '');
-    if (!key) continue;
-    if (!recipesByItemId.has(key)) recipesByItemId.set(key, []);
-    recipesByItemId.get(key).push(recipe);
-  }
+  for (const recipe of recipeList) recipeById.set(String(recipe?.id), recipe);
+  // `=== true` exactly as `_recipeItemDefinitionsContaining` tests it: a missing boolean
+  // fails to LEGACY, which is the safe direction, and `null` is what the index being
+  // absent means downstream.
+  const legacyIndex =
+    membershipResolvesByRecipeIds === true ? null : _legacyRecipeItemIndex(recipeList);
   const toRecipeRef = (recipe) => ({
     id: recipe.id,
     name: recipe.name,
@@ -2092,8 +2113,9 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
 
   return items.map((item, index) => {
     const { doc, missing } = resolved[index];
-    // Canonical membership: the book's `recipeIds`. Fall back to the legacy reverse
-    // ref only for a definition that carries none yet (un-migrated).
+    // Canonical membership: the book's `recipeIds`. `legacyIndex` is null once the
+    // system resolves by `recipeIds`, so an empty array then means "this book has no
+    // members" — full stop — rather than "this book has not migrated".
     const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
     const linkedRecipes =
       memberIds.length > 0
@@ -2101,7 +2123,7 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
             .map((id) => recipeById.get(String(id)))
             .filter(Boolean)
             .map(toRecipeRef)
-        : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
+        : (legacyIndex?.get(String(item.id)) || []).map(toRecipeRef);
     const learnedActors = new Set();
     for (const recipe of linkedRecipes) {
       const actorsForRecipe = actorIndex.get(recipe.id);
@@ -5267,9 +5289,15 @@ export function createAdminStore(services) {
       // empty projection after any refresh (e.g. switching visibility mode).
       selectedSystemData = {
         ...selectedSystemData,
+        // The basis marker comes from `selectedSystem` — the RAW manager system — and
+        // NOT from `selectedSystemData`, which is the hand-built viewState projection
+        // and does not carry the field. Reading it from the projection would yield a
+        // silently `undefined` marker that fails open to the legacy index, which is
+        // exactly the failure the parameter exists to prevent (issue 1011).
         recipeItemDefinitions: await _enrichRecipeItemLibrary(
           selectedSystemData.recipeItemDefinitions,
-          recipeListData.recipes
+          recipeListData.recipes,
+          selectedSystem?.membershipResolvesByRecipeIds
         ),
       };
     }

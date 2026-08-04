@@ -272,6 +272,25 @@ const READERS = [
       return [...(row?.recipeItemIds ?? [])].sort(byId);
     },
   },
+  {
+    // The SIXTH reader, and the second one inside `adminStore`: `_enrichRecipeItemLibrary`
+    // derives each book's `recipes[]` — what Books & Scrolls counts and lists — on the
+    // OTHER side of the same many-to-many. It is here because a reader that agrees with
+    // the other five only as a CONSEQUENCE of an upstream projection choice made in a
+    // different function is one refactor away from disagreeing, and the disagreement
+    // would be a book reporting contents the Contents tab and both player-facing readers
+    // say it does not have.
+    name: 'adminStore Books & Scrolls library (recipeItemDefinitions[].recipes)',
+    legacyMemberships: LEGACY_MEMBERSHIPS_WITHOUT_UUID_LEG,
+    async resolve(fixture, recipeId) {
+      await fixture.store.refresh();
+      const definitions = get(fixture.store.viewState).selectedSystem?.recipeItemDefinitions ?? [];
+      return definitions
+        .filter((def) => (def.recipes ?? []).some((recipe) => recipe.id === recipeId))
+        .map((def) => def.id)
+        .sort(byId);
+    },
+  },
 ];
 
 async function assertMemberships(fixture, reader, expected, label) {
