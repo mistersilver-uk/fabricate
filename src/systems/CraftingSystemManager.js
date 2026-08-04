@@ -2770,15 +2770,11 @@ export class CraftingSystemManager {
    * would be durable also severs the standalone alchemy formula-item links that the
    * 1.13.0 migration deliberately preserved.
    *
-   * Resolution order mirrors the legacy READERS (see
-   * `_getRecipeObjectsReferencingRecipeItemDefinition`'s fallback, and the identical
-   * branch in `getRecipeItemDefinitionsContaining`, `RecipeVisibilityService` and
-   * `InventoryListingBuilder`): a present `recipeItemId` resolves by definition id and
-   * the uuid branch is NOT consulted even when that id names nothing, and only an
-   * absent `recipeItemId` falls through to `linkedRecipeItemUuid` against a definition's
-   * `originItemUuid`. Falling through on a dangling id (as the 1.13.0 migration does)
-   * would seed a membership the legacy basis never resolved, which is precisely the
-   * change of resolved membership this seed exists to prevent.
+   * Builds the legacy definition index (see
+   * {@link CraftingSystemManager#_indexRecipeItemDefinitionsForLegacySeed}), then
+   * resolves each recipe against it (see
+   * {@link CraftingSystemManager#_resolveLegacyMembershipDefinition} for the resolution
+   * order this seed relies on).
    *
    * @param {object} system A live normalized system from the in-memory map.
    * @returns {boolean} `true` when at least one definition gained a member.
@@ -2791,6 +2787,36 @@ export class CraftingSystemManager {
       : [];
     if (definitions.length === 0) return false;
 
+    const { byId, bySource } = this._indexRecipeItemDefinitionsForLegacySeed(definitions);
+
+    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) ?? [];
+    let seeded = false;
+    for (const recipe of Array.isArray(recipes) ? recipes : []) {
+      const recipeId = String(recipe?.id || '').trim();
+      if (!recipeId) continue;
+
+      const definition = this._resolveLegacyMembershipDefinition(recipe, byId, bySource);
+      if (!definition || definition.recipeIds.includes(recipeId)) continue;
+
+      definition.recipeIds.push(recipeId);
+      seeded = true;
+    }
+    return seeded;
+  }
+
+  /**
+   * Index a system's recipe item definitions for
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}: by the definition's
+   * own id (for a recipe's `recipeItemId`) and by `originItemUuid` (for a recipe's
+   * `linkedRecipeItemUuid`). Also ensures every definition carries a `recipeIds` array
+   * before the caller seeds members into it.
+   *
+   * @param {object[]} definitions A system's `recipeItemDefinitions`.
+   * @returns {{byId: Map<string, object>, bySource: Map<string, object>}} The two
+   *   legacy-resolution indexes.
+   * @private
+   */
+  _indexRecipeItemDefinitionsForLegacySeed(definitions) {
     const byId = new Map();
     const bySource = new Map();
     for (const def of definitions) {
@@ -2801,27 +2827,37 @@ export class CraftingSystemManager {
       const source = String(def.originItemUuid || '').trim();
       if (source && !bySource.has(source)) bySource.set(source, def);
     }
+    return { byId, bySource };
+  }
 
-    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) ?? [];
-    let seeded = false;
-    for (const recipe of Array.isArray(recipes) ? recipes : []) {
-      const recipeId = String(recipe?.id || '').trim();
-      if (!recipeId) continue;
+  /**
+   * Resolve which recipe item definition a recipe belongs to under the LEGACY scalar
+   * membership basis, for
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}.
+   *
+   * Resolution order mirrors the legacy READERS (see
+   * `_getRecipeObjectsReferencingRecipeItemDefinition`'s fallback, and the identical
+   * branch in `getRecipeItemDefinitionsContaining`, `RecipeVisibilityService` and
+   * `InventoryListingBuilder`): a present `recipeItemId` resolves by definition id and
+   * the uuid branch is NOT consulted even when that id names nothing, and only an
+   * ABSENT `recipeItemId` falls through to `linkedRecipeItemUuid` against a
+   * definition's `originItemUuid`. Falling through on a dangling id (as the 1.13.0
+   * migration does) would seed a membership the legacy basis never resolved, which is
+   * precisely the change of resolved membership this seed exists to prevent —
+   * deliberately, a dangling id does NOT fall through.
+   *
+   * @param {object} recipe A recipe object being resolved.
+   * @param {Map<string, object>} byId Definitions indexed by their own id.
+   * @param {Map<string, object>} bySource Definitions indexed by `originItemUuid`.
+   * @returns {object|null} The matching definition, or `null` when none resolves.
+   * @private
+   */
+  _resolveLegacyMembershipDefinition(recipe, byId, bySource) {
+    const recipeItemId = String(recipe?.recipeItemId || '').trim();
+    if (recipeItemId) return byId.get(recipeItemId) || null;
 
-      const recipeItemId = String(recipe?.recipeItemId || '').trim();
-      let definition = null;
-      if (recipeItemId) {
-        definition = byId.get(recipeItemId) || null;
-      } else {
-        const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
-        if (legacyUuid) definition = bySource.get(legacyUuid) || null;
-      }
-      if (!definition || definition.recipeIds.includes(recipeId)) continue;
-
-      definition.recipeIds.push(recipeId);
-      seeded = true;
-    }
-    return seeded;
+    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+    return legacyUuid ? bySource.get(legacyUuid) || null : null;
   }
 
   // Merge a caps patch over the stored caps sub-block while keeping the legacy/new
