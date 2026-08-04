@@ -4,7 +4,7 @@ title: Home
 nav_order: 1
 ---
 
-![Fabricate repository preview](img/fabricate-repo-preview.png)
+![Fabricate repository preview](img/fabricate-logo.jpg)
 
 # Fabricate
 
