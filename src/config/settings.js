@@ -11,6 +11,10 @@ import {
 import { ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES_KEY } from './playerCharacterTypes.js';
 import { registerPlayerCharacterTypesMenu } from './playerCharacterTypesMenu.js';
 import { registerRepairItemDataMenu } from './repairItemData.js';
+import {
+  DEFAULT_ITEM_STACK_QUANTITY_PATH,
+  stackQuantityPathPresetFor,
+} from './stackQuantityPathPresets.js';
 
 export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
 
@@ -63,6 +67,12 @@ export const SETTING_KEYS = Object.freeze({
   // here, so an existing dnd5e/pf2e world is unaffected by the default `[]`. Edited
   // through the `playerCharacterActorTypes` settings menu, not a config field.
   ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES: ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES_KEY,
+  // Issue 1024 (#853 proposal 1): the dotted path Fabricate reads AND writes for an
+  // item's stack size. `world`-scoped because a Foundry world runs exactly one game
+  // system and one owned Item can participate in two crafting systems at once — a
+  // per-crafting-system path would make a single document's stack count AMBIGUOUS
+  // rather than configurable.
+  ITEM_STACK_QUANTITY_PATH: 'itemStackQuantityPath',
 });
 
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
@@ -297,6 +307,22 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Array,
     default: [],
   },
+  // `config: true` — free text, deliberately, and NOT a `choices` dropdown: the design
+  // refuses to auto-append a `.value` leaf and the set of real paths in the wild is
+  // open-ended (`.value`, `.val`, `.qty`, bare numbers). The `default` and `hint` are
+  // overlaid per game system at registration time by `withActiveSystemDefaults` below.
+  // No `onChange`, for the same reason as the setting above: the shared setting
+  // listener in `main.js` re-invokes `configureItemStackQuantityPath` and then runs the
+  // probe, and registering both would double-fire — two full world scans and two
+  // permanent notifications per save, on every client.
+  [SETTING_KEYS.ITEM_STACK_QUANTITY_PATH]: {
+    name: 'FABRICATE.Settings.ItemStackQuantityPath.Name',
+    hint: 'FABRICATE.Settings.ItemStackQuantityPath.Hint',
+    scope: 'world',
+    config: true,
+    type: String,
+    default: DEFAULT_ITEM_STACK_QUANTITY_PATH,
+  },
 });
 
 const keys = Object.values(SETTING_KEYS);
@@ -305,12 +331,19 @@ const keys = Object.values(SETTING_KEYS);
  * The setting keys stored at `scope: 'world'`, derived from the definitions above
  * rather than restated, so it cannot drift as settings are added or re-scoped.
  *
- * These are the keys Foundry lets ONLY a GM update (`BaseSetting.#canModify` requires
- * the `SETTINGS_MODIFY` permission, whose `requiredRoles` is `[GAMEMASTER]`). A
- * player-reachable code path that writes one of these fails at the server with
- * `User <name> lacks permission to update Setting [...]`, so any such write must be
- * routed to the active GM. Exported so tests can model that refusal instead of
- * assuming an omnipotent settings seam.
+ * These are the keys an ordinary player cannot update. The real gate is
+ * `BaseSetting.#canModify` -> `user.hasPermission('SETTINGS_MODIFY')`. There is NO
+ * `requiredRoles` field in V13 (an earlier version of this comment asserted
+ * `[GAMEMASTER]`, which does not exist); `SETTINGS_MODIFY` has `defaultRole: ASSISTANT`
+ * and a GM may grant it to any role. The guardrail is unchanged either way — a plain
+ * player still cannot write a world setting by default — but the mechanism is a
+ * PERMISSION, not a role list, so the accurate description is "SETTINGS_MODIFY only",
+ * never "GM only".
+ *
+ * A code path reachable by a user without that permission which writes one of these
+ * fails at the server with `User <name> lacks permission to update Setting [...]`, so
+ * any such write must be routed to the active GM. Exported so tests can model that
+ * refusal instead of assuming an omnipotent settings seam.
  *
  * @type {ReadonlySet<string>}
  */
@@ -318,9 +351,41 @@ export const WORLD_SCOPED_SETTING_KEYS = Object.freeze(
   new Set(keys.filter((key) => BASE_DEFINITIONS[key]?.scope === 'world'))
 );
 
+/**
+ * Overlay the ACTIVE game system's defaults onto a frozen base definition.
+ *
+ * `BASE_DEFINITIONS` is frozen at module import, when `game` may not exist at all, so
+ * the per-system stack-quantity preset has to be applied here instead. Three details
+ * are load-bearing:
+ *
+ *   - every `game` read is optional-chained, because existing tests call
+ *     `registerFabricateSettings()` against a stub with no `system` and no `i18n`;
+ *   - a NEW object is built rather than the shared entry mutated, since `Object.freeze`
+ *     is shallow and `ClientSettings#register` mutates the object it is handed; and
+ *   - the result can never be `undefined`, because `register` applies
+ *     `data.default ??= null`, which would make every read return `null` rather than a
+ *     usable path.
+ *
+ * The hint names the active system's default VERBATIM so a GM edits a known-good string
+ * rather than inventing one. Foundry localizes a hint at render time and
+ * `Localization#localize` returns a non-key string unchanged, so pre-formatting here is
+ * safe.
+ *
+ * @param {string} key The setting key.
+ * @param {object} definition The frozen base definition.
+ * @returns {object} The definition to register.
+ */
+function withActiveSystemDefaults(key, definition) {
+  if (key !== SETTING_KEYS.ITEM_STACK_QUANTITY_PATH) return definition;
+  const preset = stackQuantityPathPresetFor(globalThis.game?.system?.id);
+  const hintKey = definition.hint;
+  const hint = globalThis.game?.i18n?.format?.(hintKey, { default: preset }) ?? hintKey;
+  return { ...definition, default: preset || DEFAULT_ITEM_STACK_QUANTITY_PATH, hint };
+}
+
 export function registerFabricateSettings() {
   for (const key of keys) {
-    const definition = BASE_DEFINITIONS[key];
+    const definition = withActiveSystemDefaults(key, BASE_DEFINITIONS[key]);
     game.settings.register(FABRICATE_SETTINGS_NAMESPACE, key, definition);
   }
   // GM maintenance button, surfaced alongside the theme selector in module settings.

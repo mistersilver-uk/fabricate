@@ -80,6 +80,7 @@ import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
+import { configureItemStackQuantityPath, probeStackQuantityPath } from './systems/itemStackQuantity.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
@@ -207,6 +208,72 @@ const getBarSelectableActors = createGatheringSelectableActorsGetter({
   getCurrentUser: () => game.user,
   isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })
 });
+
+/**
+ * Push the configured item stack-quantity path into the accessor, then optionally probe
+ * it against the world's items and warn the GM when it looks wrong (issue 1024).
+ *
+ * ORDER IS LOAD-BEARING: the re-configure happens BEFORE the probe. Without that, a GM
+ * editing the path mid-session would get a notification reporting counts for the NEW
+ * path while every engine read and write continued on the OLD one until reload — an
+ * advisory asserting a state that is not live, which is worse than no advisory at all
+ * for a setting whose entire justification is data-loss avoidance.
+ *
+ * The re-configure is UNGATED (the engine path has to be live on every client), while
+ * the notification is GM-only: a permanent toast about a misconfiguration is actionable
+ * for the GM who just saved it and pure noise for a player who cannot change it.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.notify=false] Whether to run the probe and notify.
+ * @returns {string} The path now in force.
+ */
+function applyItemStackQuantityPathSetting({ notify = false } = {}) {
+  let stored = null;
+  try {
+    stored = getSetting(SETTING_KEYS.ITEM_STACK_QUANTITY_PATH);
+  } catch {
+    // Unregistered or unreadable: `configureItemStackQuantityPath` keeps the current
+    // path rather than storing a falsy one, and never throws.
+  }
+  const path = configureItemStackQuantityPath(stored);
+  if (!notify || game.user?.isGM !== true) return path;
+
+  // `game.items` only. This is a bounded, synchronous, read-only scan of the world item
+  // directory — it resolves nothing and rewrites nothing.
+  const report = probeStackQuantityPath(game.items ?? [], { path });
+  const message = describeStackQuantityProbe(report);
+  // PERMANENT: this notification is the entire remaining defence against a typo'd path
+  // destroying stacks. The object-valued write guard cannot see the failure, because all
+  // four consume sites take `item.delete()` INSTEAD of `item.update(...)`.
+  if (message) ui.notifications?.warn?.(message, { permanent: true });
+  return path;
+}
+
+/**
+ * The GM-facing advisory for a stack-quantity probe result, or `null` when healthy.
+ *
+ * The string names the CONSEQUENCE in plain language, not just the counts. A GM reading
+ * "0 of 412" has no reason to connect it to inventory destruction and may reasonably
+ * read it as "nothing has this field yet — fine, I just set it up".
+ *
+ * @param {object} report A `probeStackQuantityPath` report.
+ * @returns {string|null} The notification text, or `null`.
+ */
+function describeStackQuantityProbe(report) {
+  if (!report || report.verdict === 'ok' || report.verdict === 'no-items') return null;
+  const key =
+    report.verdict === 'schema-discard'
+      ? 'FABRICATE.Settings.ItemStackQuantityPath.SchemaDiscard'
+      : 'FABRICATE.Settings.ItemStackQuantityPath.Unresolved';
+  const data = {
+    path: report.path,
+    total: report.total,
+    resolved: report.resolved,
+    default: report.defaultPath,
+    defaultResolved: report.defaultResolved,
+  };
+  return game.i18n?.format?.(key, data) ?? key;
+}
 
 function getGatheringRunViewer({ run } = {}) {
   const userId = run?.userId;
@@ -475,6 +542,12 @@ class Fabricate {
     // Register settings
     this.registerSettings();
     applyCurrentFabricateTheme(getSetting, SETTING_KEYS.THEME);
+    // Push the configured item stack-quantity path into the accessor BEFORE anything
+    // reads or writes a stack. It has to precede `_runMigrations()` because a migration
+    // may touch owned items, and it has to follow `registerSettings()` because the key
+    // is not readable until it is registered. There is no MIGRATIONS entry for this
+    // key: it is brand new, so no prior stored value exists to migrate.
+    applyItemStackQuantityPathSetting();
     // Run data migrations before managers load persisted data
     await this._runMigrations();
     // Create managers
@@ -2853,6 +2926,14 @@ Hooks.once('ready', async () => {
   // and self-clears once the GM has run Repair Item Data.
   notifyUnresolvedItemDescriptions();
 
+  // Issue 1024: GM-only advisory for a stack-quantity path that resolves nothing (or
+  // reads on the prepared document but is absent from `_source`, so every write is
+  // silently discarded by the system's schema cleaner). The path itself was already
+  // configured during `initialize()`; this re-applies it and adds the world scan, which
+  // needs `game.items` populated. Same call as the setting listener uses, so startup and
+  // mid-session edits report identically.
+  applyItemStackQuantityPathSetting({ notify: true });
+
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
   // marker, the region-enter presence prompt, the controlToken re-trigger, and
@@ -2957,21 +3038,34 @@ Hooks.once('ready', async () => {
   // `(doc, options, userId)` and `updateSetting` emits `(doc, change, options, userId)`,
   // so a handler written as `(setting, changed) => …` would receive `options` in
   // `changed` on the create leg.
+  // The whole body is wrapped in try/catch. A throw inside a setting callback propagates
+  // out of `#handleUpdateDocuments` BEFORE `Hooks.callAll("updateSetting")`, silently
+  // killing the broadcast for that whole batch on every client.
   const handleFabricateSettingDocumentChange = (setting) => {
-    const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
-    if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
-      void runInteractableMarkerSync();
+    try {
+      const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
+      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
+        void runInteractableMarkerSync();
+      }
+      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ITEM_STACK_QUANTITY_PATH}`) {
+        // Re-configure, THEN probe. The setting is runtime-mutable, and a startup-only
+        // probe would separate the advisory from the typo by an arbitrary amount of
+        // destroyed inventory.
+        applyItemStackQuantityPathSetting({ notify: true });
+      }
+      // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
+      // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
+      // client when the replicated world setting lands, so reload the stale in-memory
+      // manager here and re-emit the local change hook so open player apps refresh.
+      handleFabricateSettingChange(key, {
+        craftingSystemManager: fabricate.craftingSystemManager,
+        recipeManager: fabricate.recipeManager,
+        gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
+        callAll: (hook, payload) => Hooks.callAll(hook, payload),
+      });
+    } catch (error) {
+      console.error('Fabricate | Failed to handle a Fabricate setting change', error);
     }
-    // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
-    // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
-    // client when the replicated world setting lands, so reload the stale in-memory
-    // manager here and re-emit the local change hook so open player apps refresh.
-    handleFabricateSettingChange(key, {
-      craftingSystemManager: fabricate.craftingSystemManager,
-      recipeManager: fabricate.recipeManager,
-      gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
-      callAll: (hook, payload) => Hooks.callAll(hook, payload),
-    });
   };
   Hooks.on('updateSetting', handleFabricateSettingDocumentChange);
   // The FIRST EVER write to a world setting is a CREATE, not an update (issue 1024).
