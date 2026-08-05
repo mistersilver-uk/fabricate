@@ -126,8 +126,12 @@ jobs:
 
       - name: Lint commit messages
         run: |
-          # Lint all commits on this PR (from base to HEAD)
-          npx commitlint \
+          # Lint all commits on this PR (from base to HEAD). Invoked through the local bin rather
+          # than `npx` per Sonar S6505/S8543: `npx` falls back to fetching and RUNNING an unpinned
+          # package from the registry when the name does not resolve locally, so a lockfile-verified
+          # @commitlint/cli is the supply-chain-safe form. This is the same idiom the playwright
+          # steps already use.
+          ./node_modules/.bin/commitlint \
             --from "${{ github.event.pull_request.base.sha }}" \
             --to "${{ github.event.pull_request.head.sha }}" \
             --verbose
@@ -140,7 +144,7 @@ jobs:
           # Read the live title (not the event payload) so a re-run or `edited`
           # event always lints the current PR title.
           PR_TITLE=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json title --jq .title)
-          echo "$PR_TITLE" | npx commitlint --verbose
+          echo "$PR_TITLE" | ./node_modules/.bin/commitlint --verbose
 
   check-screenshots:
     if: github.event_name == 'pull_request'
