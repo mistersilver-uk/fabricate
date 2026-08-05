@@ -836,7 +836,7 @@ Represent one curated item entry available to recipes and salvage operations.
    Explicit `fabricate.essences` item flags remain a compatibility override for that item.
    The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
    The separate name fallback some callers apply after the resolver returns null is not part of this matcher and is unchanged here.
-   That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine._findComponentItems`.
+   That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine.findComponentItems` (the private `_findComponentItems` spelling survives only as a thin delegate for existing callers).
    Closing that name path is deferred to issue 557.
 7. `salvage.outcomeRouting` is only meaningful when `salvageResolutionMode` is `"routed"`.
    In routed salvage mode it keys on the salvage check's outcome-tier NAMES (`salvageCraftingCheck.routed.{relativeOutcomes,fixedOutcomes}` for the active `type`) — the same source the per-component routing editor offers and the runtime routes by — NOT the legacy flat `salvageCraftingCheck.outcomes` list.
@@ -878,6 +878,14 @@ Represent one curated item entry available to recipes and salvage operations.
     An axis is written only when the caller supplies it; supplying an empty essence map or a zero difficulty is an instruction to CLEAR that value, not an absent instruction, and a removal-only call is a real edit rather than a no-op.
     Every written component is re-normalized under the owning system's essence and salvage context, exactly as a single-component write is, so an essence outside the system's definitions cannot be introduced and the salvage invariants of this data model continue to hold.
     The bulk axes never carry salvage: salvage is only ever touched by that shared normalization, never edited by this write.
+17. **Bulk destroy** deletes every contributing document of the named component **on the target actor** — whole stacks — and never reads `salvage.ingredientQuantity`.
+    It is not gated on `salvage.enabled` or on `CraftingSystem.features.salvage`: destroying is not a salvage outcome, and a row blocked for salvage is often exactly the row a player wants gone.
+    Whole stacks are the unit because that is what destroying a thing means and the gesture carries no quantity control; salvage's one-unit-at-a-time rule comes from the GM-authored `ingredientQuantity`, for which destroy has no analogue.
+    Document resolution uses the **same Component Item Matching resolver salvage uses** (see the `### Component Item Matching` section below), including the case-sensitive name fallback requirement 6 records — a destroy that matched more broadly than salvage would delete documents the player was shown as belonging to a different component.
+    The reported unit count derives from the documents the delete **actually removed**, never from the ids requested, because a `preDeleteItem` veto drops individual ids silently while the rest of the batch deletes; a vetoed document is reported to the player rather than counted as destroyed.
+    Stack quantities are read through the configured stack-quantity accessor and captured **before** deleting, since a deleted document's name, image and stack size are unreadable afterwards.
+18. **Bulk salvage** consumes `salvage.ingredientQuantity` per selected row exactly as a single salvage does.
+    There is no per-row quantity in the bulk gesture: each queued row is one `salvage()` call at the component's authored `ingredientQuantity`.
 
 ## Recipe
 
