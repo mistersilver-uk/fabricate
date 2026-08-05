@@ -952,8 +952,8 @@ export class InventoryListingBuilder {
     // Group the system's recipes by the book that contains them. Canonical read is
     // each definition's `recipeIds[]` (many-to-many — a recipe may appear under several
     // books). Falls back to the legacy reverse ref (`recipe.recipeItemId`, or
-    // `linkedRecipeItemUuid → definition originItemUuid`) only when no book carries
-    // membership yet.
+    // `linkedRecipeItemUuid → definition originItemUuid`) only while the system's
+    // `membershipResolvesByRecipeIds` marker is unset.
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
     const recipeList = Array.isArray(recipes) ? recipes : [];
     // System-wide recipe index (by id) — used for book membership below AND to
@@ -966,10 +966,11 @@ export class InventoryListingBuilder {
       return !(allowedRecipeIds && !allowedRecipeIds.has(recipe?.id));
     };
     const recipesByDef = new Map();
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def?.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) {
+    // Player-facing basis read (issue 1011): the marker is READ from the system, never
+    // re-derived from the arrays. The retired inference flipped both ways, so the first
+    // membership write to a legacy system dropped every scalar-only recipe out of its
+    // book's listing, and emptying the last array put phantom members back into it.
+    if (system?.membershipResolvesByRecipeIds === true) {
       for (const def of definitions) {
         if (!def?.id) continue;
         const members = (Array.isArray(def.recipeIds) ? def.recipeIds : [])

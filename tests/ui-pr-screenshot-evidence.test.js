@@ -406,14 +406,21 @@ describe('UI PR screenshot evidence', () => {
       'the browser view must not also claim the bulk-edit label',
     );
 
-    // The browser view, any file in the browser's own directory, the shared selection
-    // primitive and the pure staging model all republish the frame.
+    // The browser view, any file in the browser's own directory, the four shared bulk
+    // primitives, the shared selection primitive and both pure models all republish the
+    // frame. The primitives are the sharp case (issue 1010): they live directly under
+    // `apps/manager/`, so they match NEITHER the `components/` glob nor the `recipes/` one
+    // and are only reachable because they are enumerated by name.
     for (const file of [
       'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
       'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
-      'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte',
+      'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+      'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+      'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+      'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
       'src/utils/componentBulkEditModel.js',
+      'src/utils/bulkSelectionModel.js',
     ]) {
       assert.ok(
         mapChangedFilesToViews([file]).map(view => view.id).includes('manager-components-bulk-edit'),
@@ -421,17 +428,92 @@ describe('UI PR screenshot evidence', () => {
       );
     }
 
-    // The two narrow triggers must NOT drag in the whole components-browser set — and in
-    // particular the model is not a Tool Studio or theme change. It republishes the bulk
-    // panel's three frames and nothing else.
+    // The narrow model triggers must NOT drag in the whole components-browser set — and in
+    // particular neither model is a Tool Studio or theme change. The per-studio staging model
+    // republishes THAT studio's three frames and nothing else.
+    const componentBulkPanelFrames = [
+      'manager-components-bulk-edit',
+      'manager-components-bulk-edit-unstaged',
+      'manager-components-bulk-edit-progressive',
+    ];
+    const recipeBulkPanelFrames = [
+      'manager-recipes-bulk-edit',
+      'manager-recipes-bulk-edit-unstaged',
+      'manager-recipes-bulk-edit-blocked',
+    ];
     assert.deepEqual(
       mapChangedFilesToViews(['src/utils/componentBulkEditModel.js']).map(view => view.id),
-      [
-        'manager-components-bulk-edit',
-        'manager-components-bulk-edit-unstaged',
-        'manager-components-bulk-edit-progressive',
-      ],
+      componentBulkPanelFrames,
     );
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/utils/recipeBulkEditModel.js']).map(view => view.id),
+      recipeBulkPanelFrames,
+    );
+    // The SHARED leaf is asserted separately rather than folded in, and it is the one file
+    // here that must reach BOTH studios: `describeBulkSelection` / `toggleBulkSelection` /
+    // `setBulkSelection` / `pruneBulkSelection` live here and each studio's own model merely
+    // re-exports them, so a change to a selection helper touches neither studio's model file.
+    // Before issue 1010 named it in the components list it mapped to zero views and published
+    // nothing at all; naming it in only ONE studio's list would be the same defect halved —
+    // a selection regression would publish three frames of the studio that did not change.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/utils/bulkSelectionModel.js']).map(view => view.id),
+      [...componentBulkPanelFrames, ...recipeBulkPanelFrames],
+    );
+  });
+
+  it('gives the recipe bulk panel its own three frames and its own trigger set (issue 1010)', () => {
+    const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view]));
+    // Each is its own view with exactly one same-named label, for the `candidates[0]` reason
+    // stated on the Component Studio's trio above.
+    for (const id of [
+      'manager-recipes-bulk-edit',
+      'manager-recipes-bulk-edit-unstaged',
+      'manager-recipes-bulk-edit-blocked',
+    ]) {
+      assert.deepEqual(byId[id].smokeLabels, [id], `${id} must carry exactly its own label`);
+      assert.equal(
+        byId['manager-recipes'].smokeLabels.includes(id),
+        false,
+        'the plain recipes browser view must not claim a bulk-edit label',
+      );
+    }
+
+    // The recipe browser view, anything in the browser's own directory, the four shared
+    // primitives and the shared selection control all republish the frames. The primitives
+    // are the sharp case: they sit directly under `apps/manager/`, so they match NEITHER
+    // studio's directory glob and are reachable only because both lists enumerate them.
+    for (const file of [
+      'src/ui/svelte/apps/manager/RecipesBrowserView.svelte',
+      'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
+      'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+      'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+      'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+      'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+      'src/ui/svelte/components/SelectionCheckbox.svelte',
+    ]) {
+      assert.ok(
+        mapChangedFilesToViews([file]).map(view => view.id).includes('manager-recipes-bulk-edit'),
+        `${file} must republish the recipe bulk-edit frame`,
+      );
+    }
+
+    // The UNSTAGED frame shares the staged frame's trigger set — same panel, same system,
+    // and the sentinel faces it exists to photograph are rendered by the same files.
+    assert.deepEqual(
+      byId['manager-recipes-bulk-edit-unstaged'].matches.map(String),
+      byId['manager-recipes-bulk-edit'].matches.map(String),
+    );
+
+    // The BLOCKED frame carries one trigger the other two do not: the browser model that
+    // derives the row's `Can't enable` pill. That frame is the only one which photographs
+    // the pill and the panel's pre-flight count together, so a change to the derivation must
+    // republish it — and must NOT republish the two frames that show neither.
+    const pillDerivation = mapChangedFilesToViews(['src/utils/recipeBrowserModel.js'])
+      .map(view => view.id);
+    assert.ok(pillDerivation.includes('manager-recipes-bulk-edit-blocked'));
+    assert.equal(pillDerivation.includes('manager-recipes-bulk-edit'), false);
+    assert.equal(pillDerivation.includes('manager-recipes-bulk-edit-unstaged'), false);
   });
 
   it('gives the bulk panel THREE frames, because one photograph cannot hold its four sections', () => {
@@ -492,7 +574,7 @@ describe('UI PR screenshot evidence', () => {
     // editor frame — the entry is a named file, not a widened directory glob.
     assert.equal(
       mapChangedFilesToViews([
-        'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte',
+        'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
       ]).map(view => view.id).includes('manager-component-edit'),
       false,
     );
@@ -1628,11 +1710,11 @@ describe('UI PR screenshot evidence', () => {
     for (const match of harness.matchAll(/captureGroupedContinuationFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
-    // Issue 772: the three bulk-edit frames route through the shared
-    // captureComponentBulkEditFrame(page, results, { stepName, label, stage }) helper for
-    // the same reason — the literal lives in the helper CALL, and the helper forwards
-    // `label` onward as a variable.
-    for (const match of harness.matchAll(/captureComponentBulkEditFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
+    // Issues 772 / 1010: the SIX bulk-edit frames — three per studio — route through the
+    // shared captureBulkEditFrame(page, results, { studio, stepName, label, … }) helper for
+    // the same reason: the literal lives in the helper CALL, and the helper forwards `label`
+    // onward as a variable.
+    for (const match of harness.matchAll(/captureBulkEditFrame\(\s*page,\s*results,\s*\{[\s\S]*?label:\s*'([^']+)'/g)) {
       emitted.add(match[1]);
     }
     // The Results-tab captures (issue 643) route through captureRecipeResultsTab(page,

@@ -8,7 +8,11 @@
 
   It lives under `apps/manager/components/` — the BROWSER's directory, which
   `scripts/ui-pr-screenshot-evidence.mjs` globs for the components views — NOT `component/`,
-  which is the EDITOR's.
+  which is the EDITOR's. Its CHROME does not: the header, hero, section headings, staged
+  select and Apply were extracted to `BulkEditPanelShell` / `BulkEditSection` /
+  `BulkEditSelect` under `apps/manager/` so the Recipe Studio's panel renders the same
+  chrome (issue 1010). What remains here is what is genuinely about COMPONENTS: the
+  category, tag, essence and progressive-DC axes.
 
   Consequence, accepted and recorded: unlink, delete and copy-source-UUID live ONLY in
   `ComponentBrowserInspector`, so ticking one box hides them until the selection clears.
@@ -61,6 +65,9 @@
 <script>
   import Chip from '../Chip.svelte';
   import Callout from '../Callout.svelte';
+  import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
+  import BulkEditSection from '../BulkEditSection.svelte';
+  import BulkEditSelect from '../BulkEditSelect.svelte';
   import EssenceQuantityCard from './EssenceQuantityCard.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
@@ -158,9 +165,34 @@
   // wipe. Its staged twin reads "Will overwrite" / "Will set", which is STATE phrasing, so
   // a neutral state word is also the consistent choice. The `<select>` sentinel keeps
   // `CategoryUnchanged` ("Leave unchanged"): there it genuinely is an option to choose.
-  const unchangedLabel = $derived(
-    text('FABRICATE.Admin.Manager.Component.BulkEdit.Unchanged', 'Unchanged')
+  // Both keys are noun-free, so both moved to the neutral `BulkEdit.*` namespace together
+  // (issue 1010) — moving one and not the other is exactly the drift this note guards.
+  const unchangedLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.Unchanged', 'Unchanged'));
+
+  // The tri-state cycle stated in full. "click to add · again to remove" named only two of
+  // the three stops and left the third — the one that UNDOES a staged remove — undiscoverable
+  // except by clicking a third time and watching what happens.
+  //
+  // This studio is now the key's ONLY consumer. The Recipe Studio's book axis was a
+  // matching chip run when the key moved to the neutral `BulkEdit.*` namespace, but it is
+  // now a search-and-pick control (issue 1010) and cycles nothing, so there is no shared
+  // instruction left to state. The key stays here rather than moving back under
+  // `Component.*`: the shared namespace still describes what it is — a neutral, noun-free
+  // bulk-edit string — and the divergence is in the two studios' staged AXES, which the
+  // spec permits, not in their shared chrome, which it does not.
+  const chipCycleHint = $derived(
+    text(
+      'FABRICATE.Admin.Manager.BulkEdit.TagsHint',
+      'click to add · again to remove · again to leave unchanged'
+    )
   );
+
+  // The chip run is a GROUP, not a stray sequence of buttons: it is one axis whose members
+  // are read together, and without the role a screen-reader user arrives at a `<button>`
+  // named "Add sundry to every selected component" with nothing saying which control they
+  // are inside. Named from the section's own visible label, so the group name and the
+  // heading a sighted GM reads are one string.
+  const tagsLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.Tags', 'Tags'));
 
   function tagState(tag) {
     if (stagedTagAdd.includes(tag)) return 'add';
@@ -174,27 +206,32 @@
   const TAG_TONES = { add: 'positive', remove: 'danger', none: 'neutral' };
   const TAG_ICONS = { add: 'fas fa-plus', remove: 'fas fa-minus', none: 'far fa-circle' };
 
-  // The accessible name states the STAGED ACTION, not the state: `aria-pressed` cannot
-  // honestly describe a control with three states, so the name carries it instead.
+  // The accessible name OPENS with the visible label and then states the STAGED ACTION:
+  // `aria-pressed` cannot honestly describe a control with three states, so the name
+  // carries it instead — but an action-FIRST name breaks WCAG 2.5.3 Label in Name, which
+  // is the rule the staged-essences chip above already states for this same panel. The em
+  // dash rather than a comma or a colon is what lets a lowercase tag vocabulary (`ore`,
+  // `ingot`) lead without opening a sentence on a lowercase word. Same shape as the Recipe
+  // Studio's book chips, which are the other tri-state run in the manager.
   function tagActionLabel(tag) {
     const state = tagState(tag);
     if (state === 'add') {
       return format(
         'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateAdd',
-        'Add {tag} to every selected component',
+        '{tag} — add to every selected component.',
         { tag }
       );
     }
     if (state === 'remove') {
       return format(
         'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateRemove',
-        'Remove {tag} from every selected component',
+        '{tag} — remove from every selected component.',
         { tag }
       );
     }
     return format(
       'FABRICATE.Admin.Manager.Component.BulkEdit.TagStateNone',
-      'Leave {tag} unchanged',
+      '{tag} — leave unchanged.',
       { tag }
     );
   }
@@ -230,93 +267,52 @@
   }
 </script>
 
-<section class="manager-component-bulk-panel" data-component-bulk-panel>
-  <header class="manager-component-bulk-header">
-    <p class="manager-component-bulk-eyebrow">
-      {text('FABRICATE.Admin.Manager.Component.BulkEdit.PanelTitle', 'Bulk edit')}
-    </p>
-    <button
-      type="button"
-      class="manager-component-bulk-clear"
-      data-component-bulk-clear
-      onclick={() => onClearSelection()}
-    >
-      <i class="fas fa-xmark" aria-hidden="true"></i>
-      <span
-        >{text(
-          'FABRICATE.Admin.Manager.Component.BulkEdit.ClearSelection',
-          'Clear selection'
-        )}</span
-      >
-    </button>
-  </header>
+<!--
+  The chrome — header, hero, section headings, the staged select and Apply — is the shared
+  primitive set (issue 1010). This panel supplies only the NOUN-bearing strings (the hero
+  heading and the Apply label) and the four component axes; every hook name is left at the
+  primitive's Component Studio default, so the smoke selectors, the view-lab cases and the
+  shipped mounted assertions resolve unchanged.
 
-  <div class="manager-component-bulk-hero">
-    <span class="manager-component-bulk-hero-icon" aria-hidden="true"
-      ><i class="fas fa-layer-group"></i></span
-    >
-    <div class="manager-component-bulk-hero-copy">
-      <strong class="manager-component-bulk-hero-title" data-component-bulk-count
-        >{headingLabel}</strong
-      >
-      <span class="manager-component-bulk-hero-hint"
-        >{text(
-          'FABRICATE.Admin.Manager.Component.BulkEdit.SelectedHint',
-          'Stage changes below, then apply to all at once.'
-        )}</span
-      >
-    </div>
-  </div>
-
-  <p class="manager-component-bulk-label">
-    {text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
-  </p>
+  The axes are emitted as SIBLING flex items of the shell's panel, not wrapped: the shell's
+  uniform `gap` is the panel's rhythm and a wrapper per section would re-space the rail.
+-->
+<BulkEditPanelShell heading={headingLabel} {applyLabel} {canApply} {onClearSelection} {onApply}>
+  <BulkEditSection
+    label={text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
+  />
   <!--
     The sentinel is FIRST and carries `value=""`, which is the model's `Leave unchanged`.
     The options carry NO `({count})` suffix the browser's filter uses: a count of the
     components currently IN a category says nothing about it as an assignment target.
   -->
-  <select
-    class="manager-component-bulk-select"
-    data-component-bulk-category
+  <BulkEditSelect
+    data-component-bulk-category=""
     value={draft?.category || ''}
     disabled={applying}
-    aria-label={text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
-    onchange={(event) => setCategory(event.currentTarget.value)}
+    ariaLabel={text('FABRICATE.Admin.Manager.Component.BulkEdit.Category', 'Category')}
+    onChange={(value) => setCategory(value)}
   >
     <option value=""
-      >{text(
-        'FABRICATE.Admin.Manager.Component.BulkEdit.CategoryUnchanged',
-        'Leave unchanged'
-      )}</option
+      >{text('FABRICATE.Admin.Manager.BulkEdit.CategoryUnchanged', 'Leave unchanged')}</option
     >
     {#each categoryOptions as option (option.name)}
       <option value={option.name}>{categoryOptionLabel(option.name)}</option>
     {/each}
-  </select>
+  </BulkEditSelect>
 
-  <div class="manager-component-bulk-label-row">
-    <p class="manager-component-bulk-label">
-      {text('FABRICATE.Admin.Manager.Component.BulkEdit.Tags', 'Tags')}
-    </p>
-    <span class="manager-component-bulk-hint"
-      >{text(
-        'FABRICATE.Admin.Manager.Component.BulkEdit.TagsHint',
-        'click to add · again to remove'
-      )}</span
-    >
-  </div>
-  {#if tags.length === 0}
-    <!-- The panel's OWN sub-hint scale, not the global `manager-muted` (0.78rem): that
-         class would make an empty-state aside the LARGEST text in a rail whose loudest
-         copy is 0.62rem. -->
-    <p class="manager-component-bulk-subhint" data-component-bulk-tags-empty>
-      {text(
-        'FABRICATE.Admin.Manager.Component.BulkEdit.NoTags',
-        'This system defines no item tags.'
-      )}
-    </p>
-  {:else}
+  <BulkEditSection
+    label={tagsLabel}
+    hint={chipCycleHint}
+    subhint={tags.length === 0
+      ? text(
+          'FABRICATE.Admin.Manager.Component.BulkEdit.NoTags',
+          'This system defines no item tags.'
+        )
+      : ''}
+    subhintAttr="data-component-bulk-tags-empty"
+  />
+  {#if tags.length > 0}
     <!--
       A FLAT run of tri-state chips rather than an Add/Remove segmented control plus a
       searchable popover: the whole tag vocabulary and the staged answer for every entry
@@ -325,7 +321,7 @@
       Chip's rest spread onto the real `<button>`; the children carry NO internal
       whitespace, because `Chip` records that call sites assert exact `textContent`.
     -->
-    <div class="manager-chip-row" data-component-bulk-tags>
+    <div class="manager-chip-row" role="group" aria-label={tagsLabel} data-component-bulk-tags>
       {#each tags as tag (tag)}
         <Chip
           tag="button"
@@ -344,46 +340,48 @@
   {/if}
 
   {#if showEssences}
-    <div class="manager-component-bulk-label-row">
-      <p class="manager-component-bulk-label">
-        {text('FABRICATE.Admin.Manager.Component.BulkEdit.Essences', 'Essences')}
-      </p>
-      <!--
-        Rendered in BOTH states: on a fresh draft every essence is 0 and `Stepper` emits
-        nothing at that boundary, so this chip is the ONLY way to stage "clear essences on
-        every selected component". `tag`/`type` are load-bearing (see the header comment).
-      -->
-      <Chip
-        tag="button"
-        type="button"
-        tone={essencesStaged ? 'warning' : 'neutral'}
-        data-component-bulk-essences-staged={essencesStaged}
-        aria-label={essencesStaged
-          ? text(
-              'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChipAction',
-              'Will overwrite — essences will be overwritten on every selected component. Activate to leave them unchanged.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesUnstagedChipAction',
-              'Unchanged — essences are left unchanged. Activate to overwrite them on every selected component.'
-            )}
-        disabled={applying}
-        onclick={() => toggleEssences()}
-        >{essencesStaged
-          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChip', 'Will overwrite')
-          : unchangedLabel}</Chip
-      >
-    </div>
-    <!-- PERMANENT, and a sub-hint rather than a Callout: the one tinted strip in a 320px
-         rail is reserved for the conditional hazard below. A STANDING SENTENCE, so it
+    <!-- PERMANENT sub-hint, and a sub-hint rather than a Callout: the one tinted strip in a
+         320px rail is reserved for the conditional hazard below. A STANDING SENTENCE, so it
          wears `-subhint` rather than the inline `-hint` scale — the sentence that makes
          the destructive axis legible must not be the smallest text in the panel. -->
-    <p class="manager-component-bulk-subhint">
-      {text(
+    <BulkEditSection
+      label={text('FABRICATE.Admin.Manager.Component.BulkEdit.Essences', 'Essences')}
+      subhint={text(
         'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesOverwriteHint',
         'Applying essences overwrites the essence values on every selected component.'
       )}
-    </p>
+    >
+      {#snippet trailing()}
+        <!--
+          Rendered in BOTH states: on a fresh draft every essence is 0 and `Stepper` emits
+          nothing at that boundary, so this chip is the ONLY way to stage "clear essences on
+          every selected component". `tag`/`type` are load-bearing (see the header comment).
+        -->
+        <Chip
+          tag="button"
+          type="button"
+          tone={essencesStaged ? 'warning' : 'neutral'}
+          data-component-bulk-essences-staged={essencesStaged}
+          aria-label={essencesStaged
+            ? text(
+                'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChipAction',
+                'Will overwrite — essences will be overwritten on every selected component. Activate to leave them unchanged.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesUnstagedChipAction',
+                'Unchanged — essences are left unchanged. Activate to overwrite them on every selected component.'
+              )}
+          disabled={applying}
+          onclick={() => toggleEssences()}
+          >{essencesStaged
+            ? text(
+                'FABRICATE.Admin.Manager.Component.BulkEdit.EssencesStagedChip',
+                'Will overwrite'
+              )
+            : unchangedLabel}</Chip
+        >
+      {/snippet}
+    </BulkEditSection>
     {#if essencesStaged && essenceWarningCount > 0}
       <Callout
         tone="warning"
@@ -428,37 +426,36 @@
   {/if}
 
   {#if showProgressiveDifficulty}
-    <div class="manager-component-bulk-label-row">
-      <p class="manager-component-bulk-label">
-        {text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDc', 'Progressive DC')}
-      </p>
-      <Chip
-        tag="button"
-        type="button"
-        tone={difficultyStaged ? 'warning' : 'neutral'}
-        data-component-bulk-difficulty-staged={difficultyStaged}
-        aria-label={difficultyStaged
-          ? text(
-              'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChipAction',
-              'Will set — the progressive DC will be set on every selected component. Activate to leave it unchanged.'
-            )
-          : text(
-              'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcUnstagedChipAction',
-              'Unchanged — the progressive DC is left unchanged. Activate to set it on every selected component.'
-            )}
-        disabled={applying}
-        onclick={() => toggleDifficulty()}
-        >{difficultyStaged
-          ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChip', 'Will set')
-          : unchangedLabel}</Chip
-      >
-    </div>
-    <p class="manager-component-bulk-subhint">
-      {text(
+    <BulkEditSection
+      label={text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDc', 'Progressive DC')}
+      subhint={text(
         'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcHint',
         'DC when used as a progressive result'
       )}
-    </p>
+    >
+      {#snippet trailing()}
+        <Chip
+          tag="button"
+          type="button"
+          tone={difficultyStaged ? 'warning' : 'neutral'}
+          data-component-bulk-difficulty-staged={difficultyStaged}
+          aria-label={difficultyStaged
+            ? text(
+                'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChipAction',
+                'Will set — the progressive DC will be set on every selected component. Activate to leave it unchanged.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcUnstagedChipAction',
+                'Unchanged — the progressive DC is left unchanged. Activate to set it on every selected component.'
+              )}
+          disabled={applying}
+          onclick={() => toggleDifficulty()}
+          >{difficultyStaged
+            ? text('FABRICATE.Admin.Manager.Component.BulkEdit.ProgressiveDcStagedChip', 'Will set')
+            : unchangedLabel}</Chip
+        >
+      {/snippet}
+    </BulkEditSection>
     <div class="manager-component-bulk-dc-row">
       <i class="fas fa-dice-d20" aria-hidden="true"></i>
       <span class="manager-component-bulk-dc-copy"
@@ -490,221 +487,21 @@
       />
     </div>
   {/if}
-
-  <button
-    type="button"
-    class="manager-button manager-component-bulk-apply"
-    data-component-bulk-apply
-    disabled={!canApply}
-    onclick={() => onApply()}
-  >
-    <i class="fas fa-check-double" aria-hidden="true"></i>
-    <span>{applyLabel}</span>
-  </button>
-</section>
+</BulkEditPanelShell>
 
 <style>
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
      `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
      HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the components views that
-     actually render it instead of matching the broad `theme-or-global-ui` recipe. */
+     actually render it instead of matching the broad `theme-or-global-ui` recipe.
 
-  .manager-component-bulk-panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    min-width: 0;
-  }
-
-  .manager-component-bulk-header {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    justify-content: space-between;
-    min-width: 0;
-  }
-
-  /* ACCENT, where the single-component inspector's eyebrow is subtle: the rail has
-     changed what it is for, and that is the first thing the GM must read. */
-  .manager-component-bulk-eyebrow {
-    margin: 0;
-    color: var(--fab-mv2-accent);
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  /* The documented escape from a mode that hides unlink / delete / copy-source, so it is
-     a real focusable button and the FIRST control in the panel — Foundry's host button
-     geometry (fixed height, its own font) reset explicitly, as `Chip` does. */
-  .manager-component-bulk-clear {
-    appearance: none;
-    display: inline-flex;
-    gap: var(--fab-space-chip);
-    align-items: center;
-    flex: 0 0 auto;
-    width: auto;
-    height: auto;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--fab-text-subtle);
-    font-family: inherit;
-    font-size: 0.62rem;
-    font-weight: 600;
-    line-height: 1.2;
-    cursor: pointer;
-  }
-
-  .manager-component-bulk-clear:hover {
-    color: var(--fab-mv2-text);
-  }
-
-  .manager-component-bulk-clear:focus-visible,
-  .manager-component-bulk-apply:focus-visible,
-  .manager-component-bulk-select:focus-visible {
-    outline: 2px solid var(--fab-mv2-accent);
-    outline-offset: 2px;
-  }
-
-  .manager-component-bulk-clear > i {
-    font-size: 0.58rem;
-  }
-
-  /* The hero restates the blast radius in the rail, so the number the Apply button names
-     is never the only place it appears. */
-  .manager-component-bulk-hero {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: center;
-    min-width: 0;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 10px;
-    background: var(--fab-accent-soft);
-  }
-
-  .manager-component-bulk-hero-icon {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 9px;
-    background: var(--fab-bg-0);
-    color: var(--fab-mv2-accent);
-    font-size: 0.86rem;
-  }
-
-  .manager-component-bulk-hero-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .manager-component-bulk-hero-title {
-    color: var(--fab-mv2-text);
-    font-family: var(--fab-font-serif);
-    font-size: 0.92rem;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-
-  .manager-component-bulk-hero-hint {
-    color: var(--fab-mv2-text-muted);
-    font-size: 0.62rem;
-    line-height: 1.35;
-  }
-
-  /* Sections are uppercase micro-labels ON the panel background — the treatment the
-     single-component inspector this panel replaces already uses, so the rail reads the
-     same either way.
-
-     The panel's SECTION RHYTHM lives on this margin and on the label row's below, because
-     the container's flex `gap` is uniform, and a uniform gap puts a section heading
-     exactly as far from the previous section's last control as from its own — so the
-     panel reads as one undifferentiated stack. The prototype separates sections by twice
-     what it puts between controls WITHIN one; the container gap already supplies the
-     inner spacing, and this extra `space-2` is what turns the flat run back into groups. */
-  .manager-component-bulk-label {
-    margin: var(--fab-space-2) 0 0;
-    color: var(--fab-text-subtle);
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .manager-component-bulk-label-row {
-    display: flex;
-    gap: var(--fab-space-2);
-    align-items: baseline;
-    justify-content: space-between;
-    min-width: 0;
-    /* The row carries the section break for the label INSIDE it (which is zeroed just
-       below, since a flex item's own margin would push it off the shared baseline). */
-    margin-top: var(--fab-space-2);
-  }
-
-  .manager-component-bulk-label-row > .manager-component-bulk-label {
-    margin-top: 0;
-  }
-
-  /* Two hint scales, deliberately. `-hint` is the INLINE aside that sits on a label row's
-     baseline and must not out-weigh the label beside it. `-subhint` is a STANDING
-     SENTENCE addressed to the GM — the essence-overwrite warning and the DC's meaning —
-     which is read, not glanced at, so it is a step larger and looser. Collapsing the two
-     made the sentence explaining the panel's destructive axis the smallest text in it. */
-  .manager-component-bulk-hint {
-    margin: 0;
-    color: var(--fab-text-subtle);
-    font-size: 0.58rem;
-    font-weight: 400;
-    line-height: 1.4;
-  }
-
-  .manager-component-bulk-subhint {
-    margin: 0;
-    color: var(--fab-text-subtle);
-    font-size: 0.62rem;
-    font-weight: 400;
-    line-height: 1.4;
-  }
-
-  /*
-    Full width, and wearing the Fabricate select treatment rather than Foundry core's
-    default light chrome — the same treatment the toolbar's filter selects carry.
-
-    The background MUST be opaque, and `--fab-mv2-bg` specifically (issue 772).
-
-    A native `<select>`'s option popup is painted by the browser, which derives its surface
-    from the control's own COMPUTED background. This rule originally used
-    `--fab-surface-soft`, which is a 5%-alpha LIGHT tint (`styles/fabricate.css:192`) — it
-    looks right on the closed control because it composites over the dark rail, but the
-    popup has nothing to composite against, so it opened light while every other manager
-    dropdown opened dark. `color-scheme: dark` does not rescue it: the author background
-    wins. The toolbar filters and the pagination size select both use `--fab-mv2-bg`
-    (`styles/fabricate.css:4255`, `:3436`) and open dark, which is the look to match.
-  */
-  .manager-component-bulk-select {
-    width: 100%;
-    min-width: 0;
-    height: 32px;
-    padding: 0 var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border-strong);
-    border-radius: 8px;
-    color: var(--fab-mv2-text);
-    background: var(--fab-mv2-bg);
-    font-family: inherit;
-    font-size: 0.72rem;
-    cursor: pointer;
-  }
+     What is left here is only what is genuinely about COMPONENTS. The panel container, the
+     header, the hero, the section label scales, the staged select and Apply all moved to
+     `BulkEditPanelShell` / `BulkEditSection` / `BulkEditSelect` under `apps/manager/`
+     (issue 1010), which is why nothing below styles this component's own root: there is no
+     longer a root element here, only the axes the shell renders between its hero and its
+     Apply button. */
 
   /* The panel's 2-up, against the editor's 4-up. Both render the same card. */
   .manager-component-bulk-essence-grid {
@@ -737,48 +534,5 @@
     color: var(--fab-mv2-text-muted);
     font-size: 0.62rem;
     line-height: 1.3;
-  }
-
-  /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an
-     axis is staged, so the GM cannot fire a no-op write and read success from it.
-     Geometry, weight and foreground are the browser inspector's primary button verbatim
-     (`.manager-button.manager-component-browser-inspector-edit`, styles/fabricate.css),
-     because this button LITERALLY SWAPS PLACES with it in the rail's bottom slot the
-     moment a box is ticked: 38px and 0.78rem, so the swap does not resize or re-type the
-     slot, and `--fab-on-accent` — the token that means "foreground ON an accent fill" —
-     rather than `--fab-bg-1`, which is a surface colour and differs from it in all seven
-     themes. */
-  .manager-component-bulk-apply {
-    display: flex;
-    gap: var(--fab-space-chip);
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: auto;
-    min-height: 38px;
-    margin-top: var(--fab-space-1);
-    padding: 0 var(--fab-space-3);
-    border: 1px solid var(--fab-accent-border);
-    border-radius: 9px;
-    color: var(--fab-on-accent);
-    background: var(--fab-accent);
-    font-family: inherit;
-    font-size: 0.78rem;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  /* The same accent-strong hover its twin carries. Without it the rail's primary action
-     is the only button on the panel with no pointer feedback. */
-  .manager-component-bulk-apply:not(:disabled):hover {
-    border-color: var(--fab-accent);
-    background: var(--fab-accent-strong);
-  }
-
-  .manager-component-bulk-apply:disabled {
-    border-color: var(--fab-mv2-border);
-    color: var(--fab-text-disabled);
-    background: var(--fab-surface-soft);
-    cursor: default;
   }
 </style>

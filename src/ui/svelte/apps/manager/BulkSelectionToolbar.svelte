@@ -1,20 +1,28 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The component browser's multi-select toolbar (issue 772) — the LAST row of
-  `.manager-toolbar.manager-component-toolbar`, sitting directly above the list, matching
-  the prototype's third-row-then-list order.
+  The manager's ONE multi-select toolbar: the tri-state page box, the selected-count
+  readout, `Select all {N} results` and Clear, in the LAST row of a browser's toolbar,
+  sitting directly above its list (issue 772, extracted for issue 1010).
 
-  Its root JOINS `.manager-component-filter-row` so it inherits the toolbar's row metrics
-  (flex, wrap, gap, full width) rather than declaring a bespoke bar; `is-selection` adds
-  only the row CONTEXT that separates it from the filter rows above, and that class is
+  It lives under `apps/manager/` — beside `Chip`, `Callout` and `SegmentedControl` — and
+  NOT under `apps/manager/components/`, which holds the area-agnostic leaves. That is
+  deliberate and load-bearing: this component's root class is `manager-*`, both of its
+  consumers are manager views, and staying inside `apps/manager/` keeps `--fab-mv2-*`
+  (declared on `.fabricate-manager`) in scope, so the extraction needed no token swap. A
+  `components/` leaf can be rendered outside `.fabricate-manager`, where those properties
+  are undefined and the colours silently fall back to inheritance.
+
+  Its root JOINS the host browser's own filter-row class so it inherits that toolbar's row
+  metrics (flex, wrap, gap, full width) rather than declaring a bespoke bar; `is-selection`
+  adds only the row CONTEXT that separates it from the filter rows above, and that class is
   authored once in `styles/fabricate.css` beside the rows it joins. Everything this
   component draws for ITSELF lives in the scoped block below.
 
   TWO DISTINCT ACTIONS, and they are never conflated:
-   - the tri-state box acts on the RENDERED rows — `page.components` flat, or the union of
-     the NON-COLLAPSED groups when grouping is on. A collapsed category's rows are not
-     rendered and this control must never reach them, or the count would exceed the rows
-     the GM can see;
+   - the tri-state box acts on the RENDERED rows — the page flat, or the union of the
+     NON-COLLAPSED groups when grouping is on. A collapsed category's rows are not rendered
+     and this control must never reach them, or the count would exceed the rows the GM can
+     see;
    - `Select all {N} results` acts on the WHOLE filtered set, which is the only way to
      reach a row the page control cannot.
 
@@ -23,8 +31,10 @@
   where the prototype would not show it. That is correct; a collapsed group's rows are
   exactly the rows the page control cannot reach.
 
-  The model returns DATA (`describeComponentSelection`) and this component localizes it —
-  the pure model carries no strings.
+  The model returns DATA (`describeBulkSelection`) and this component localizes it — the
+  pure model carries no strings. Its four labels are NOUN-FREE, so they live in the neutral
+  `Admin.Manager.BulkEdit.*` namespace rather than under either studio. (Written without its
+  `FABRICATE` root on purpose — see the note in `BulkEditPanelShell.svelte`.)
 
   Props:
    - pageSelectionState: `'all' | 'some' | 'none'` over the RENDERED rows.
@@ -32,10 +42,17 @@
      selection made on page 1 survives paging and is still counted here.
    - showSelectAllResults / selectAllResultsCount: the results link and its number.
    - onTogglePage(on) / onSelectAllResults() / onClear().
+   - rowClass: the host toolbar's row class this root joins. Defaulted to the Component
+     Studio's, so its shipped call site, the smoke selectors and the view-lab cases keep
+     working untouched.
+   - toolbarAttr / pageBoxAttr / countAttr / resultsAttr / clearAttr: the five test and
+     screenshot hook names, defaulted to the Component Studio's strings for the same
+     reason. They are PARAMETERS of this primitive, not a reason to fork it
+     (`openspec/specs/ui-integration/spec.md`, Selection controls).
 -->
 <script>
-  import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
+  import { localize } from '../../util/foundryBridge.js';
 
   let {
     pageSelectionState = 'none',
@@ -45,6 +62,12 @@
     onTogglePage = () => {},
     onSelectAllResults = () => {},
     onClear = () => {},
+    rowClass = 'manager-component-filter-row',
+    toolbarAttr = 'data-component-selection-toolbar',
+    pageBoxAttr = 'data-component-select-all-page',
+    countAttr = 'data-component-selection-count',
+    resultsAttr = 'data-component-select-all-results',
+    clearAttr = 'data-component-clear-selection',
   } = $props();
 
   function text(key, fallback) {
@@ -60,27 +83,35 @@
     return result;
   }
 
-  const selectAllLabel = $derived(
-    text('FABRICATE.Admin.Manager.Component.BulkEdit.SelectAll', 'Select all')
-  );
+  // Spread, following `Callout`'s hook idiom: the attribute NAME is a parameter, so it
+  // cannot be written literally in the markup.
+  //
+  // The value is `''`, NOT `true`. Svelte serializes `true` as `="true"`, and these five
+  // hooks shipped as BARE attributes (`data-x=""`) written literally in the markup — so a
+  // truthy value would silently re-serialize every screenshot and smoke hook in the
+  // Component Studio's toolbar. Presence selectors would not notice; a value-matching one
+  // would, and this extraction is supposed to change nothing a consumer can observe.
+  const toolbarHook = $derived({ [toolbarAttr]: '' });
+  const pageBoxHook = $derived({ [pageBoxAttr]: '' });
+  const countHook = $derived({ [countAttr]: '' });
+  const resultsHook = $derived({ [resultsAttr]: '' });
+  const clearHook = $derived({ [clearAttr]: '' });
+
+  const selectAllLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.SelectAll', 'Select all'));
   const countLabel = $derived(
-    format('FABRICATE.Admin.Manager.Component.BulkEdit.SelectedCount', '{count} selected', {
+    format('FABRICATE.Admin.Manager.BulkEdit.SelectedCount', '{count} selected', {
       count,
     })
   );
   const resultsLabel = $derived(
-    format(
-      'FABRICATE.Admin.Manager.Component.BulkEdit.SelectAllResults',
-      'Select all {count} results',
-      {
-        count: selectAllResultsCount,
-      }
-    )
+    format('FABRICATE.Admin.Manager.BulkEdit.SelectAllResults', 'Select all {count} results', {
+      count: selectAllResultsCount,
+    })
   );
-  const clearLabel = $derived(text('FABRICATE.Admin.Manager.Component.BulkEdit.Clear', 'Clear'));
+  const clearLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear'));
 </script>
 
-<div class="manager-component-filter-row is-selection" data-component-selection-toolbar>
+<div class="{rowClass} is-selection" {...toolbarHook}>
   <!--
     `wrapper="contents"` because THIS element is the label: the box and its caption are one
     click target, and nesting the primitive's own `<label>` inside another would be invalid
@@ -90,39 +121,34 @@
     reaches into another component's markup, and the obvious authoring of it compiles to
     nothing at all.
   -->
-  <label class="manager-component-selection-all">
+  <label class="fab-bulk-selection-all">
     <SelectionCheckbox
       wrapper="contents"
       size="md"
       checked={pageSelectionState === 'all'}
       indeterminate={pageSelectionState === 'some'}
       ariaLabel={selectAllLabel}
-      data-component-select-all-page
+      {...pageBoxHook}
       onChange={(on) => onTogglePage(on === true)}
     />
-    <span class="manager-component-selection-all-label">{selectAllLabel}</span>
+    <span class="fab-bulk-selection-all-label">{selectAllLabel}</span>
   </label>
 
   {#if count > 0}
-    <span class="manager-component-selection-divider" aria-hidden="true"></span>
-    <span class="manager-component-selection-count" data-component-selection-count>
+    <span class="fab-bulk-selection-divider" aria-hidden="true"></span>
+    <span class="fab-bulk-selection-count" {...countHook}>
       <i class="fas fa-layer-group" aria-hidden="true"></i>
       <span>{countLabel}</span>
     </span>
     {#if showSelectAllResults}
       <button
         type="button"
-        class="manager-component-selection-link"
-        data-component-select-all-results
+        class="fab-bulk-selection-link"
+        {...resultsHook}
         onclick={() => onSelectAllResults()}>{resultsLabel}</button
       >
     {/if}
-    <button
-      type="button"
-      class="manager-component-selection-clear"
-      data-component-clear-selection
-      onclick={() => onClear()}
-    >
+    <button type="button" class="fab-bulk-selection-clear" {...clearHook} onclick={() => onClear()}>
       <i class="fas fa-xmark" aria-hidden="true"></i>
       <span>{clearLabel}</span>
     </button>
@@ -133,13 +159,13 @@
   /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
      `--fab-mv2-*` (declared on `.fabricate-manager`) is always in scope here. That is the
      opposite of `SelectionCheckbox`, which is area-agnostic and reaches theme root only;
-     do not carry this over to a shared primitive.
+     do not carry this over to a shared `components/` primitive.
 
-     The row itself is NOT styled here. `.manager-component-filter-row.is-selection` in the
-     global sheet owns the row metrics and the hairline that separates this register from
-     the filter rows above, because that is layout context shared with the rows it joins. */
+     The row itself is NOT styled here. `.<rowClass>.is-selection` in the global sheet owns
+     the row metrics and the hairline that separates this register from the filter rows
+     above, because that is layout context shared with the rows it joins. */
 
-  .manager-component-selection-all {
+  .fab-bulk-selection-all {
     display: inline-flex;
     gap: var(--fab-space-2);
     align-items: center;
@@ -173,17 +199,18 @@
      excludes `.svelte`, SonarCloud indexes none of it, and the sweep compiles each component
      alone. Rename `.fab-selection-input` or `.fab-selection-check` in `SelectionCheckbox`, or
      interpose an element between them, and this ring dies with nothing objecting. The
-     structural assertion lives in `tests/components/components-browser-view-mounted.test.js`
-     ("keeps the page box adjacent to its visible box"); a second, hand-copied copy of the
+     structural assertions live in `tests/components/bulk-selection-toolbar-mounted.test.js`
+     — a DRIFT assertion that re-reads the class tokens out of this `:global()` and demands
+     each one still appear in `SelectionCheckbox`'s markup, plus the adjacency case, because
+     adjacency alone cannot see a typo inside `:global()`. A second, hand-copied copy of the
      same markup sits in the Playwright fixture in
      `tests/components/component-studio-font-size.test.js`. */
-  .manager-component-selection-all
-    :global(.fab-selection-input:focus-visible + .fab-selection-check) {
+  .fab-bulk-selection-all :global(.fab-selection-input:focus-visible + .fab-selection-check) {
     outline: 2px solid var(--fab-mv2-accent);
     outline-offset: 2px;
   }
 
-  .manager-component-selection-divider {
+  .fab-bulk-selection-divider {
     flex: 0 0 auto;
     width: 1px;
     height: 16px;
@@ -192,7 +219,7 @@
 
   /* The selection count is the one ACCENT thing in the row: it is the fact the rest of the
      row acts on, and the panel in the rail restates it. */
-  .manager-component-selection-count {
+  .fab-bulk-selection-count {
     display: inline-flex;
     gap: var(--fab-space-chip);
     align-items: center;
@@ -202,7 +229,7 @@
     font-weight: 700;
   }
 
-  .manager-component-selection-count > i {
+  .fab-bulk-selection-count > i {
     font-size: 0.62rem;
   }
 
@@ -210,8 +237,8 @@
      action on this screen and must be reachable by keyboard as the action it is. Foundry's
      host button geometry is reset explicitly (fixed height, its own font family), the same
      properties `Chip`'s button rule resets and for the same reason. */
-  .manager-component-selection-link,
-  .manager-component-selection-clear {
+  .fab-bulk-selection-link,
+  .fab-bulk-selection-clear {
     appearance: none;
     display: inline-flex;
     gap: var(--fab-space-chip);
@@ -231,7 +258,7 @@
     cursor: pointer;
   }
 
-  .manager-component-selection-link {
+  .fab-bulk-selection-link {
     color: var(--fab-mv2-info);
     border-bottom: 1px solid var(--fab-info-border);
     border-radius: 0;
@@ -239,23 +266,23 @@
 
   /* Clear is the quiet escape from the whole mode, so it recedes and sits at the far end
      of the row — away from the two controls that ADD to the selection. */
-  .manager-component-selection-clear {
+  .fab-bulk-selection-clear {
     margin-left: auto;
     color: var(--fab-text-subtle);
   }
 
-  .manager-component-selection-clear:hover,
-  .manager-component-selection-link:hover {
+  .fab-bulk-selection-clear:hover,
+  .fab-bulk-selection-link:hover {
     color: var(--fab-mv2-text);
   }
 
-  .manager-component-selection-link:focus-visible,
-  .manager-component-selection-clear:focus-visible {
+  .fab-bulk-selection-link:focus-visible,
+  .fab-bulk-selection-clear:focus-visible {
     outline: 2px solid var(--fab-mv2-accent);
     outline-offset: 2px;
   }
 
-  .manager-component-selection-clear > i {
+  .fab-bulk-selection-clear > i {
     font-size: 0.62rem;
   }
 </style>

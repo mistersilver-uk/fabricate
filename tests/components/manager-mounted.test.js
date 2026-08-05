@@ -94,12 +94,23 @@ function compileManagerRoot() {
   // so omitting it here HANGS every mounted manager test as `# cancelled` — this suite
   // hand-rolls its compile loop and has no closure validator to fail loudly instead.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte');
-  // The browser's multi-select toolbar and the bulk edit panel that REPLACES the
-  // single-component inspector in the rail (issue 772). `ComponentsBrowserView` imports the
-  // first statically and the root imports the second, so omitting either HANGS every
-  // mounted manager test as `# cancelled` for the same reason as the card above.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte');
+  // The bulk edit panel that REPLACES the single-component inspector in the rail
+  // (issue 772). The root imports it statically, so omitting it HANGS every mounted manager
+  // test as `# cancelled` for the same reason as the card above.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
+  // The four shared bulk-edit primitives (issue 1010). They sit directly under
+  // `apps/manager/` — beside Chip and Callout, NOT under `components/` — because their
+  // scoped CSS reads `--fab-mv2-*`, which is only in scope inside `.fabricate-manager`.
+  // `ComponentsBrowserView` imports the toolbar and `ComponentBulkEditPanel` imports the
+  // other three, so omitting any one of them HANGS every mounted manager test.
+  for (const bulkPrimitive of [
+    'BulkSelectionToolbar',
+    'BulkEditPanelShell',
+    'BulkEditSection',
+    'BulkEditSelect',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/${bulkPrimitive}.svelte`);
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -155,6 +166,10 @@ function compileManagerRoot() {
   // The library inspector, extracted out of the root (issue 643). It lives under
   // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
   writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
+  // The rail's other half (issue 1010): the root swaps this in for the inspector while a
+  // bulk selection exists, so it is a STATIC import of the mounted root. Omitting it kills
+  // this suite in its `before` hook, which `node --test` reports as `# cancelled 220`.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   // The GM Knowledge surface (issue 785). Adding a `knowledge` branch to the root
   // puts this WHOLE subtree into the compiled root's STATIC module graph regardless
@@ -427,6 +442,16 @@ function compileManagerRoot() {
     // ComponentsBrowserView, by the bulk edit panel AND by the root (which owns the staged
     // draft); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/utils/componentBulkEditModel.js',
+    // Its shared leaf (issue 1010). The four selection helpers moved here and are
+    // re-exported above under their original names, so this is a STATIC import of that
+    // module. This suite hand-rolls its temp tree and has NO dependency validator, so
+    // omitting it hangs silently rather than naming the missing file.
+    'src/utils/bulkSelectionModel.js',
+    // The recipe browser's bulk selection + staging model (issue 1010). RecipesBrowserView
+    // imports it for the selection helpers, so it is a STATIC import of the mounted tree.
+    // Omitting it kills this suite in its `before` hook, which `node --test` reports as
+    // `# cancelled 220` rather than a failure — read the count, not just `# fail`.
+    'src/utils/recipeBulkEditModel.js',
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
@@ -1141,6 +1166,11 @@ function createStore(calls = [], options = {}) {
               enabled: false,
               locked: true,
               incomplete: true,
+              // This suite hand-builds projected rows rather than running the real
+              // `_buildRecipeList`, so the projection's `enableBlocked` (issue 1010) has to
+              // be stated here. The row pills now read it rather than `incomplete`, and r2
+              // is exactly the off-and-un-enableable case the assertion below is about.
+              enableBlocked: true,
               isSimple: false,
               structureLabel: 'Single step',
               stepCount: 1,
@@ -1596,6 +1626,17 @@ function createStore(calls = [], options = {}) {
         return options.applyComponentBulkEditResult;
       }
       return { updated: ids.length, componentIds: ids };
+    },
+    // The recipe twin (issue 1010). Its result carries SIX counts, and the two book ones
+    // count membership EDGES rather than the definitions `booksUpdated` counts — the
+    // post-apply toast composes a sentence out of them.
+    applyRecipeBulkEdit: (recipeIds, edit) => {
+      const ids = [...(recipeIds || [])];
+      calls.push(['applyRecipeBulkEdit', ids, edit]);
+      if (Object.hasOwn(options, 'applyRecipeBulkEditResult')) {
+        return options.applyRecipeBulkEditResult;
+      }
+      return { updated: ids.length, recipeIds: ids };
     },
     // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a
     // four-parameter stub records a call that looks identical whether the argument is
@@ -6469,6 +6510,108 @@ describe('CraftingSystemManager mounted behavior', () => {
       ['c1', offPageId].sort(),
       'the off-page id reaches the write, not just the count'
     );
+  });
+
+  // ── Issue 1010: the recipe bulk edit's post-apply report ─────────────────────────
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only place
+  // the composed toast can be proved at all. It matters because it COMPOSES: the prototype
+  // this panel follows swaps its books message in for its blocked message with a ternary,
+  // which would let a batch that moved book membership silently swallow the report that
+  // some recipes stayed off — the one outcome the GM cannot see by looking at the rows they
+  // just deselected, because applying clears the selection and unmounts the panel.
+  async function applyRecipeBulkEditOverRows(ids, options = {}) {
+    const messages = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      mountManager([], options);
+      craftingParent().click();
+      await tick();
+      flushSync();
+      for (const id of ids) {
+        target.querySelector(`[data-recipe-select="${id}"]`).click();
+        flushSync();
+      }
+      // Stage one book through the picker: open it, choose the definition, press Add.
+      target.querySelector('.fab-bulk-book-trigger').click();
+      flushSync();
+      target.querySelector('[data-popover-option="ri1"]').click();
+      flushSync();
+      target.querySelector('[data-recipe-bulk-book-add]').click();
+      flushSync();
+      target.querySelector('[data-recipe-bulk-apply]').click();
+      await tick();
+      flushSync();
+      return messages;
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('reports book membership as EDGES, not as the number of books touched', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 2,
+        recipeIds: ['r1', 'r2'],
+        booksUpdated: 1,
+        bookAdditions: 4,
+        bookRemovals: 2,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 4 additions and 2 removals.',
+    ]);
+  });
+
+  it('composes the books sentence WITH the blocked one rather than replacing it', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 2,
+        recipeIds: ['r1', 'r2'],
+        blockedEnables: 1,
+        blockedRecipeIds: ['r2'],
+        bookAdditions: 1,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 1 addition. '
+        + "1 recipe couldn't be enabled yet.",
+    ]);
+  });
+
+  // `updated` counts recipes whose own FIELDS changed, so a book-only edit legitimately
+  // changes none. Leading with "No recipes needed changing" ahead of "3 additions" reads as
+  // a contradiction rather than as the two distinct facts it is.
+  it('drops "No recipes needed changing" when the batch moved book membership', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 0,
+        recipeIds: [],
+        booksUpdated: 1,
+        bookAdditions: 3,
+      },
+    });
+
+    assert.deepEqual(messages, ['Books & scrolls updated — 3 additions.']);
+  });
+
+  it('keeps "No recipes needed changing" when nothing at all moved', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: { updated: 0, recipeIds: [] },
+    });
+
+    assert.deepEqual(messages, ['No recipes needed changing.']);
+  });
+
+  it('says nothing about books when the axis moved no membership', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1'], {
+      applyRecipeBulkEditResult: { updated: 1, recipeIds: ['r1'] },
+    });
+
+    assert.deepEqual(messages, ['Applied bulk changes to 1 recipe.']);
   });
 
   // Creating a crafting system already SELECTED it in the store, but the GM was left on

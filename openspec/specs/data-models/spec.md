@@ -65,6 +65,7 @@ CraftingSystem = {
 
   components: Component[],
   recipeItemDefinitions: RecipeItemDefinition[],
+  membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-integration/spec.md.
 
   // System-owned character-prerequisite library (issue 544). Reusable pass/fail
   // conditions the GM authors in System Settings and attaches, by id, to a book/
@@ -735,7 +736,7 @@ RecipeItemDefinition = {
    See **Recipe Item Identity → Registration Source Identity** for the clone-gate and stamping rules.
 4. `recipeIds[]` is the **canonical** recipe↔book membership (issue 511, PR-B): it is many-to-many, so a book may contain several recipes and a recipe may belong to several books.
    This is the canonical way to model shared formulas, books, schematics, or recipe scrolls.
-   The scalar reverse ref `recipe.recipeItemId` (and the legacy `recipe.linkedRecipeItemUuid` book alias) is removed by the `1.13.0` migration, which inverts it onto `recipeIds`; membership is authored book-side on the Contents tab, and the runtime falls back to the legacy reverse ref only for a fully un-migrated system (no book carries `recipeIds` yet).
+   The scalar reverse ref `recipe.recipeItemId` (and the legacy `recipe.linkedRecipeItemUuid` book alias) is removed by the `1.13.0` migration, which inverts it onto `recipeIds`; membership is authored book-side on the Contents tab, and the runtime falls back to the legacy reverse ref only while the system's monotonic `membershipResolvesByRecipeIds` marker is unset (issue 1010).
 5. `caps` holds this recipe item's own use and learn caps.
    The use cap (`caps.item.limitUses` / `maxUses` / `whenSpent`) governs how many times holding the item grants crafting access; the learn cap (`caps.learn.limitLearning` / `learnsAllowed` / `learnScope` / `destroyWhenSpent`) governs how many of the item's linked recipes may be learned from it.
    The PR-B redesign renamed the cap fields; the new names are canonical and each legacy name (`destroyWhenExhausted`, `limitRecipes`, `maxRecipes`, `learningMode`) is persisted and kept in sync so an un-migrated raw cap still loads.
@@ -1043,8 +1044,8 @@ Recipe = {
     Only `recipeItemId` reaches disk today, because `Recipe.fromJSON` reconstructs from named fields and drops the other three; that is a property of the model's current field list rather than a guarantee, so the whole derived set is stripped and named in one place.
     `recipe.recipeItemId` is authored ONLY by migration and by `CraftingSystemManager._migrateLegacyRecipeItems`, never by the editor.
     A recipe that is a book member through `RecipeItemDefinition.recipeIds[]` and carries no `linkedRecipeItemUuid` has its leaked scalar cleared by that same un-gated pass, which is idempotent because a cleared recipe is not a re-stamp candidate.
-    The repair is deliberately unreachable in a fully un-migrated system, where no definition carries `recipeIds` so no recipe is a member and the scalar is still the membership source for `getRecipeItemDefinitionsContaining` and `_getRecipeObjectsReferencingRecipeItemDefinition`.
-    Those two membership reads, and their `adminStore` mirror `_recipeItemDefinitionsContaining`, are each gated on no definition in the system carrying membership, so a leaked scalar never resurrected phantom book membership — its only live consequence was the image borrow in requirement 16.
+    The repair is deliberately unreachable while the system's `membershipResolvesByRecipeIds` marker is unset, because no recipe is then a member by `recipeIds` and the scalar is still the membership source for `getRecipeItemDefinitionsContaining` and `_getRecipeObjectsReferencingRecipeItemDefinition`.
+    Those two membership reads, and their `adminStore` mirrors `_recipeItemDefinitionsContaining` and `_enrichRecipeItemLibrary`, are each gated on that marker rather than on any per-read inference over the arrays, so a leaked scalar never resurrects phantom book membership — its only live consequence was the image borrow in requirement 16.
 
 ### Validation Guidance
 
@@ -2436,6 +2437,7 @@ The following canonical field names must be used in all new writes:
 | Result                    | `componentId`                     | Produced item component reference                                                                                                                                                                                                  |
 | CraftingSystem            | `components`                      | Array of managed item entries                                                                                                                                                                                                      |
 | CraftingSystem            | `recipeItemDefinitions`           | Array of managed recipe-item entries                                                                                                                                                                                               |
+| CraftingSystem            | `membershipResolvesByRecipeIds`   | Monotonic marker: recipe↔book membership resolves by `recipeIds`, never by the legacy scalar (issue 1010)                                                                                                                          |
 | CraftingSystem            | `essenceDefinitions`              | Array of essence definitions, emitted unconditionally by normalization (empty when `features.essences` is off); supersedes the derived `essences` id-string alias                                                                  |
 | CraftingSystem            | `visibilityMode`                  | Canonical flat recipe-visibility strategy (`global`/`restricted`/`item`/`knowledge`); supersedes legacy `recipeVisibility.listMode` + `knowledge.mode`                                                                             |
 | IngredientSet             | `ingredientGroups`                | Array of ingredient group objects                                                                                                                                                                                                  |

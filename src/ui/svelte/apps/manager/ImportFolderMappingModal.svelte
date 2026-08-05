@@ -507,7 +507,7 @@
      box. `SelectionCheckbox` scopes its own ring to the `<label>` IT renders, which this
      host opts out of with `wrapper="contents"` — so the host draws it. This rule reaches
      into the component's markup using `:global()`, following the pattern in
-     `ComponentSelectionToolbar.svelte` (issue 924). The adjacent-sibling form is what makes
+     `BulkSelectionToolbar.svelte` (issue 924). The adjacent-sibling form is what makes
      `:global()` sufficient: `<input>` and `<span class="fab-selection-check">` are
      siblings in the component's `wrapper="contents"` mode. */
   .manager-import-mapping-match :global(.fab-selection-input:focus-visible + .fab-selection-check) {

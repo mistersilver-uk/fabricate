@@ -118,6 +118,47 @@ const MANAGER_PRIMITIVES = [
   'ToggleCard',
 ];
 
+/**
+ * The shared bulk-edit chrome (issue 1010): the selection toolbar and the panel shell, section
+ * and select the Component Studio and the Recipe Studio both render.
+ *
+ * Deliberately NOT in `MANAGER_PRIMITIVES` above, which would make them broad signals and
+ * claim-exempt. A broad signal routes to the representative set, but
+ * `scripts/ui-pr-screenshot-evidence.mjs` routes these same four files to the bulk-edit frames —
+ * so making them broad here would have the two registries disagree about what evidence a change
+ * to one of them requires. They have exactly two consumers, both of which claim them below, so
+ * targeting is both possible and honest; the alternative is a shared primitive with dozens of
+ * consumers, which is what `MANAGER_PRIMITIVES` is for.
+ */
+const BULK_EDIT_CHROME_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect)\.svelte$/;
+
+/**
+ * The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010).
+ *
+ * The first two patterns are the recipe browser's own pair, exactly as every other recipe case
+ * declares them. The third is the shared chrome above, which sits directly under `apps/manager/`
+ * and therefore falls through BOTH — without it a change to the toolbar or the panel shell would
+ * select the Component Studio's bulk frames and none of the Recipe Studio's.
+ *
+ * The fourth is the pure staging model. Like `RunJournalBuilder.js` on the blind-run cases, it
+ * cannot SELECT a frame today (`mapChangedFilesToCases` filters to `isUiFile` first, and
+ * `src/utils/` is not a render path); it is declared because it is what these three frames are
+ * evidence ABOUT — every sentinel, every tri-state and the blocked count are computed there — and
+ * because the moment that filter widens, these are the cases that must answer for it.
+ *
+ * Hoisted rather than repeated three times: `scripts/**` is analysed by SonarCloud's Automatic
+ * Analysis, which counts repeated literals and ignores `cpd.exclusions`. It sits OUTSIDE every
+ * case region on purpose — `parseCaseLineRegions` maps only the lines inside a case literal, so a
+ * change here widens the capture selection instead of narrowing it to one arbitrary frame.
+ */
+const RECIPE_BULK_EDIT_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/Recipe/,
+  /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+  BULK_EDIT_CHROME_PATTERN,
+  /^src\/utils\/recipeBulkEditModel\.js$/,
+];
+
 export const BROAD_SIGNAL_PATTERN = new RegExp(
   [
     '^styles/',
@@ -621,6 +662,206 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
     ],
   }),
+  // ── The Recipe Studio's bulk edit panel (issue 1010) ───────────────────────────────────────────
+  //
+  // THREE frames, because the panel's five axes cannot be photographed in one. A staged axis and
+  // its `Unchanged` face are mutually exclusive states of the same control, and the blocked-enable
+  // Callout only exists while Enable is staged over a selection that contains a refused recipe —
+  // so the pristine face and the warning face are each the sole evidence of what they show.
+  //
+  // Every row click is pinned BY ID rather than by position. `data-recipe-select` sits on a
+  // visually hidden input, so the click target is the wrapping `<label>` (the Component Studio's
+  // cases below do the same). Position would not do: the blocked frame needs one SPECIFIC row —
+  // the only one in the world that is both off and un-enableable — and an ordering change would
+  // silently stage Enable over two ordinary recipes and publish a frame with no Callout at all.
+  managerCase({
+    id: 'manager-recipes-bulk-edit',
+    label: 'Manager — Recipes bulk edit',
+    smokeLabels: ['manager-recipes-bulk-edit'],
+    // The STAGED face, over two ordinary Weaponsmithing recipes. Every axis the panel owns is
+    // armed at once: a category, Status at `Enable`, Lock at `Lock`, a named check tier, and the
+    // book axis's STAGED LIST holding one book at `add` beside another at `remove` — which is why
+    // the lab world authors two smithing books rather than one.
+    //
+    // The book axis is a search-and-pick control (issue 1010), so each staged book costs three
+    // steps: open the picker, choose the book, press the action. The pick then CLEARS, which is
+    // what returns the trigger and lets the second book be staged at all — the frame is therefore
+    // also the evidence that staging accumulates rather than replacing.
+    //
+    // The two actions are not interchangeable. `Add` is dead for a book that already holds every
+    // selected recipe and `Remove` is dead for one that holds none, so the Folio (which holds
+    // neither selected recipe) can only be added and the Almanac (which holds the greatsword,
+    // through the legacy scalar — see `labContent.js`) can only be removed.
+    //
+    // Enable is staged over two recipes that are already ON, so `countBlockedRecipeEnables` is 0
+    // and the warning Callout stays absent. That is deliberate: the Callout is the blocked frame's
+    // subject, and a staged frame carrying it would make the two photographs the same picture.
+    reaches: 'exact',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '[data-recipe-bulk-category]', select: 'Armoursmithing' },
+      { selector: '[data-recipe-bulk-status-option="enable"]' },
+      { selector: '[data-recipe-bulk-lock-option="lock"]' },
+      // Karrun Forgecraft is the only lab system that authors check tiers, so this select is the
+      // only populated one in the world; every other system renders the info Callout instead.
+      { selector: '[data-recipe-bulk-check-tier]', select: 'sm-tier-masterwork' },
+      { selector: '.fab-bulk-book-trigger' },
+      { selector: '[data-popover-option="sm-book"]' },
+      { selector: '[data-recipe-bulk-book-add]' },
+      { selector: '.fab-bulk-book-trigger' },
+      { selector: '[data-popover-option="sm-almanac"]' },
+      { selector: '[data-recipe-bulk-book-remove]' },
+    ],
+    expectView: 'recipes',
+    // Both staged states must be on screen at once, or a control that shows one book at a time
+    // reads as a control that stages one book at a time. A frame showing only `add` is the
+    // failure this assertion exists to refuse, and the staged list is what makes it satisfiable:
+    // the pick card can only ever hold the book it is composing.
+    expectSelector:
+      '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
+      '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-edit-unstaged',
+    label: 'Manager — Recipes bulk edit unstaged',
+    smokeLabels: ['manager-recipes-bulk-edit-unstaged'],
+    // The PRISTINE face: a selection and nothing staged. It is the only evidence of the three
+    // `Unchanged` segments, of BOTH check-tier sentinels — `— Leave unchanged —` and `Default DC`,
+    // which look alike and mean opposite things — and of the genuinely disabled Apply. None of
+    // those can appear in the staged frame, because staging is what replaces them.
+    reaches: 'exact',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+    ],
+    expectView: 'recipes',
+    expectSelector: '.fabricate-manager [data-recipe-bulk-apply][disabled]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-edit-blocked',
+    label: 'Manager — Recipes bulk edit blocked',
+    smokeLabels: ['manager-recipes-bulk-edit-blocked'],
+    // The BLOCKED face, and the frame acceptance criterion 6 is settled by: the panel's warning
+    // Callout counting the same rows the browser has pilled, in one photograph, so the two cannot
+    // be shown to disagree.
+    //
+    // `sm-r-runeplate-draft` is the world's only off-and-un-enableable recipe and is what makes
+    // the count non-zero; `sm-r-longsword` is an ordinary enabled row, so the Callout reads "at
+    // least 1 of 2" rather than a degenerate 1-of-1 and the LOWER-BOUND wording is legible.
+    reaches: 'exact',
+    query: {},
+    // ORDER IS LOAD-BEARING, and `expectSelector` cannot enforce it: a click auto-scrolls its
+    // target into view, so whichever row is ticked LAST is the one the frame is scrolled to.
+    // Ticking the blocked row first scrolled it off the top and published a Callout with none
+    // of the rows it counts — DOM-present, so the guard passed, and visually a lie.
+    // `sm-r-longsword` therefore goes first and the blocked row last.
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-runeplate-draft"])' },
+      { selector: '[data-recipe-bulk-status-option="enable"]' },
+    ],
+    expectView: 'recipes',
+    // BOTH halves of the claim, in one selector, because either alone would publish a lie: a
+    // Callout with no pilled row says the panel invented a count, and a pilled row with no Callout
+    // is the plain browser frame under a case named for the warning. `expectView` cannot see
+    // either — the route is `recipes` whether the panel staged anything or not.
+    //
+    // Written as manager-with-Callout DESCENDANT row-with-pill rather than as two `:has()`
+    // clauses on the root, so every `:has()` argument is a simple selector. Both forms are
+    // correct CSS and Chromium (which is what `document.querySelector` runs here) evaluates
+    // either; this one is additionally checkable outside a browser, and `:has(A B)` is where
+    // the DOM implementations disagree.
+    expectSelector:
+      '.fabricate-manager:has([data-recipe-bulk-blocked-warning]) ' +
+      '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]:has([data-status-pill="danger"])',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  // ── The two surfaces the three frames above cannot hold (issue 1010) ───────────────────────────
+  //
+  // The staged case opens the picker, picks, presses the action and repeats; the pick CLEARS on
+  // staging by design, so that frame lands on the trigger plus the staged list. The unstaged case
+  // shows the trigger alone. Between them, the two surfaces this redesign actually INTRODUCES were
+  // photographed nowhere: the open option list, whose two-line rows state the membership fact the
+  // GM chooses on, and the pick card, whose Add/Remove counts and opposite disabled states are the
+  // whole argument for replacing the chip run. A redesign commissioned because a chip per book is
+  // unusable at eight-plus books cannot be reviewed from frames showing neither replacement.
+  //
+  // `reaches: 'beyond'` with no smoke labels, which is the honest declaration and not a way around
+  // adding one: the smoke's own bulk-edit walk drives THROUGH both of these states to the staged
+  // one and never rests on either, so neither has a counterpart to fall short of. They still
+  // PUBLISH — `beyond` is a statement about the smoke, not about whether a frame is evidence, and
+  // the issue-901 Journal pair sets the same precedent — which is what makes them the PR's evidence
+  // for the part of this change nothing else photographs. No new smoke label means no new
+  // `SCREENSHOT_CAPTURE_ORDER` entry either.
+  //
+  // Both stop one step short of an existing case's walk rather than driving anywhere new, so the
+  // fixture facts they rest on are the ones the staged case already documents.
+  managerCase({
+    id: 'manager-recipes-bulk-edit-picker',
+    label: 'Manager — Recipes bulk edit picker',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '.fab-bulk-book-trigger' },
+    ],
+    expectView: 'recipes',
+    // Three claims in one selector, and the trigger-only frame satisfies none of them: the popover
+    // exists at all, it is portaled INTO the manager (the whole reason it escapes the inspector's
+    // `overflow: hidden`), and its rows carry the second META line — which is the fact the GM
+    // chooses on and which only renders when the option was given one. Asserting the popover alone
+    // would pass over a run of bare single-line rows, which is the state this frame exists to
+    // distinguish itself from.
+    expectSelector:
+      '.fabricate-manager .manager-travel-popover ' +
+      '[data-popover-option="sm-book"] .manager-travel-option-meta',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
+  managerCase({
+    id: 'manager-recipes-bulk-edit-pick-card',
+    label: 'Manager — Recipes bulk edit pick card',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
+      { selector: 'label:has(input[data-recipe-select="sm-r-greatsword"])' },
+      { selector: '.fab-bulk-book-trigger' },
+      { selector: '[data-popover-option="sm-book"]' },
+    ],
+    expectView: 'recipes',
+    // The card for the Folio, which holds NEITHER selected recipe — so `Add 2` is live and `Remove`
+    // is dead with its count dropped rather than rendered as `Remove 0`. Both states are asserted,
+    // in opposite directions, because they ARE the design argument: two real buttons whose labels
+    // name what each would actually write and which go inert when that number is zero. A card-only
+    // assertion would pass over two enabled buttons labelled with the selection size, which is the
+    // prototype defect this control was corrected away from.
+    //
+    // Every `:has()` argument is a simple compound, for the reason the blocked case records: `:has(A
+    // B)` is where DOM implementations disagree, and this form is checkable outside a browser.
+    expectSelector:
+      '.fabricate-manager [data-recipe-bulk-book-pick="sm-book"]' +
+      ':has([data-recipe-bulk-book-add]:not([disabled]))' +
+      ':has([data-recipe-bulk-book-remove][disabled])',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: RECIPE_BULK_EDIT_MATCHES,
+  }),
   managerCase({
     id: 'manager-crafting-group-expanded',
     label: 'Manager — Crafting group expanded',
@@ -1102,6 +1343,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BULK_EDIT_CHROME_PATTERN,
     ],
   }),
   managerCase({
@@ -1122,6 +1364,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BULK_EDIT_CHROME_PATTERN,
     ],
   }),
   managerCase({
@@ -2038,6 +2281,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      BULK_EDIT_CHROME_PATTERN,
     ],
   }),
   managerCase({

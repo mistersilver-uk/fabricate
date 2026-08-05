@@ -8,12 +8,25 @@
   within it does not dismiss).
 
   Props:
-    options      — [{ id, label, icon?, trailing?, addMarker?, group? }] (consumer
-                   builds the full list, including any leading "special" option such
-                   as Auto).
+    options      — [{ id, label, icon?, img?, meta?, trailing?, addMarker?, dataId?,
+                   group? }] (consumer builds the full list, including any leading
+                   "special" option such as Auto).
                    `addMarker` stamps `data-recipe-add` on that OPTION (the recipe
                    editor's add menu keeps its token family on the four type choices
                    rather than on a trigger per type)
+                   `meta` promotes the option to TWO LINES: the label above, this
+                   secondary sentence below (issue 1010). It exists because a picker
+                   whose choices differ by a FACT rather than by a name cannot put that
+                   fact in the label without making every row read as a sentence — the
+                   recipe bulk panel's book picker states "Recipe book · holds 3 of 12
+                   selected" per book, which is the whole basis on which the GM chooses.
+                   Both lines are inside the button, so they are both in its accessible
+                   name and a screen-reader user hears the same two facts.
+                   `dataId` stamps `data-popover-option` on that option — the sibling of
+                   the `data-popover-group` this component already stamps on a bucket.
+                   Capture walks and mounted tests address an option by identity through
+                   it; without one the only handle is the display label, which is
+                   localized and therefore not a selector.
     optionGroups — OPTIONAL [{ id, label }]. When non-empty the options are bucketed
                    by `option.group` and each bucket renders under its own heading as
                    an ARIA `role="group"` with that label. This exists because a menu
@@ -331,6 +344,7 @@
           role="option"
           aria-selected={option.id === value}
           data-recipe-add={option.addMarker || undefined}
+          data-popover-option={option.dataId || undefined}
           title={option.label}
           onclick={() => choose(option.id)}
         >
@@ -341,7 +355,17 @@
           {:else if option.icon}
             <i class={option.icon} aria-hidden="true"></i>
           {/if}
-          <span class="manager-travel-option-name">{option.label}</span>
+          {#if option.meta}
+            <!-- The two-line form. The wrapper is what carries the flex sizing the
+                 single-line `-name` carries on its own, so the label keeps ellipsising
+                 rather than pushing the trailing Chip out of the row. -->
+            <span class="manager-travel-option-lines">
+              <span class="manager-travel-option-name">{option.label}</span>
+              <span class="manager-travel-option-meta">{option.meta}</span>
+            </span>
+          {:else}
+            <span class="manager-travel-option-name">{option.label}</span>
+          {/if}
           {#if option.trailing}<Chip tone="disabled">{option.trailing}</Chip>{/if}
         </button>
       {/snippet}

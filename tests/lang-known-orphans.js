@@ -489,7 +489,6 @@ export const KNOWN_ORPHANS = [
   'FABRICATE.Admin.Manager.Recipe.Routing',
   'FABRICATE.Admin.Manager.Recipe.Simple',
   'FABRICATE.Admin.Manager.Recipe.SingleStepHint',
-  'FABRICATE.Admin.Manager.Recipe.Status',
   'FABRICATE.Admin.Manager.Recipe.StatusAll',
   'FABRICATE.Admin.Manager.Recipe.StepsHint',
   'FABRICATE.Admin.Manager.Recipe.Structure',

@@ -34,12 +34,22 @@ const panel = createMountedComponentHarness({
     'src/utils/componentCategories.js',
     // The pure selection + staging model. Omitting it throws loudly in this shared
     // harness — the hand-rolled suites are the ones that hang instead.
-    'src/utils/componentBulkEditModel.js'
+    'src/utils/componentBulkEditModel.js',
+    // Its shared leaf (issue 1010): the four selection helpers now live here and
+    // `componentBulkEditModel.js` re-exports them under their original names, so this is a
+    // STATIC import of that module and belongs in every closure that names it.
+    'src/utils/bulkSelectionModel.js'
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared bulk-edit chrome (issue 1010). The panel now renders its header, hero,
+    // section headings, staged select and Apply through these three, so they are STATIC
+    // imports of the component under test and belong in its closure.
+    'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+    'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+    'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
     'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte'
   ],
@@ -131,10 +141,38 @@ describe('ComponentBulkEditPanel tag staging (issue 772)', () => {
 
     assert.equal(chip.tagName, 'BUTTON', 'a span could not be reached by keyboard');
     assert.equal(chip.getAttribute('type'), 'button', 'and an untyped button would submit');
+    // ANCHORED, exactly as the Recipe Studio's book-chip twin is. Unanchored, the previous
+    // action-first name ("Leave metal unchanged") satisfied this too, so the one property
+    // the assertion exists for — that the name OPENS with the visible label — was the one
+    // thing it could not see. The em-dash form is what carries a lowercase tag vocabulary
+    // (`ore`, `ingot`) without opening a sentence on a lowercase word.
     assert.match(
       chip.getAttribute('aria-label'),
-      /Leave metal unchanged/,
-      'the accessible name states the staged ACTION — aria-pressed cannot describe three states'
+      /^metal — leave unchanged\.$/,
+      'the name OPENS with the visible label (WCAG 2.5.3) then states the staged ACTION — '
+        + 'aria-pressed cannot describe three states'
+    );
+  });
+
+  // The run is ONE axis, so it is exposed as one control rather than as a stray sequence of
+  // buttons, and the hint above it states all THREE stops of the cycle. Both facts are
+  // shared verbatim with the Recipe Studio's book run — see its twin case. The spec forbids
+  // the two studios diverging here, so the two cases assert the same two things.
+  it('exposes the chip run as a named group above an honest three-state hint', async () => {
+    const { root } = await mountPanel();
+    const run = root.querySelector('[data-component-bulk-tags]');
+
+    assert.equal(run.getAttribute('role'), 'group');
+    assert.equal(
+      run.getAttribute('aria-label'),
+      'Tags',
+      'the group name is the section heading a sighted GM reads, not a second string'
+    );
+    assert.match(
+      root.textContent,
+      /click to add · again to remove · again to leave unchanged/,
+      'the third stop is the one that UNDOES a staged remove; naming only two of three left '
+        + 'it discoverable only by clicking and watching'
     );
   });
 

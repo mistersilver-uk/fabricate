@@ -50,6 +50,16 @@ const SHARED_PRIMITIVES = [
   // essentially every manager screen, so as the conversion proceeds this component enters
   // the static graph of almost every mounted tree, and each omission costs a HUNG suite.
   'src/ui/svelte/apps/manager/Chip.svelte',
+  // The manager's ONE multi-select toolbar and ONE bulk-edit chrome (issue 1010), extracted
+  // so the Component Studio and the Recipe Studio render the same controls. They live
+  // directly under `apps/manager/` rather than `components/` because their scoped CSS reads
+  // `--fab-mv2-*`, which is declared on `.fabricate-manager` and undefined outside it. Each
+  // is already in two mounted trees — the browser view's and the bulk panel's — and reaches
+  // a third through the manager root, so an omission costs a HUNG suite, not a failing one.
+  'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

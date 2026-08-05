@@ -82,6 +82,13 @@ const TOOL_STUDIO_MATCHES = [
 const COMPONENTS_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+  // The shared bulk-edit primitives (issue 1010). They sit directly under `apps/manager/`,
+  // beside `Chip` and `Callout`, so they fall through BOTH the `components/` glob above and
+  // the `recipes/` one — a change to any of them would otherwise map to no view at all and
+  // publish nothing. Enumerated by name rather than widened to a directory glob, because
+  // `apps/manager/*.svelte` is the whole manager and would conscript these frames as the
+  // evidence for every screen in it.
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
 ];
 
 // A single-frame components-browser view: one same-named smoke label over the shared
@@ -95,6 +102,55 @@ const componentsBrowserFrame = (id, label, extraMatches = []) => ({
   smokeLabels: [id],
   matches: [...COMPONENTS_BROWSER_MATCHES, ...extraMatches],
 });
+
+// The two pure models the bulk panel stages against. `bulkSelectionModel.js` is the shared
+// leaf the four selection helpers moved to (issue 1010) — without it named here a change to
+// the selection model would map to NO view at all, since `componentBulkEditModel.js` merely
+// re-exports it and is not itself touched. Hoisted rather than written out at each of the
+// three bulk frames: Sonar's Automatic Analysis counts repeated literals in `scripts/**`
+// and ignores `cpd.exclusions`.
+const BULK_EDIT_MODEL_MATCHES = [
+  /^src\/utils\/componentBulkEditModel\.js$/,
+  /^src\/utils\/bulkSelectionModel\.js$/,
+];
+
+// The Recipe Studio BROWSER's own files (issue 1010), mirroring COMPONENTS_BROWSER_MATCHES.
+// `recipes/` is the browser's directory and `recipe/` is the EDITOR's (RECIPE_EDIT_MATCHES),
+// so a browser-side component placed in the latter would republish the editor frames and never
+// this one — the split is load-bearing and stated on `manager-recipes` below too.
+//
+// The four shared bulk-edit primitives are enumerated here for the same reason they are
+// enumerated in the components list: they sit directly under `apps/manager/`, so they fall
+// through BOTH studios' directory globs and a change to one of them would otherwise map to no
+// recipe view at all. Widening to `apps/manager/*.svelte` instead would conscript these frames
+// as the evidence for every screen in the manager.
+const RECIPES_BROWSER_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
+];
+
+// A single-frame recipes-browser view: one same-named smoke label over the shared browser match
+// list, plus whatever extra file that STATE additionally depends on. Same argument as
+// `componentsBrowserFrame` above — Sonar's Automatic Analysis counts repeated object literals,
+// ignores `cpd.exclusions`, and analyses `scripts/**`, so three fresh sibling literals differing
+// only in two strings is exactly the span that trips the new-code duplication gate.
+const recipesBrowserFrame = (id, label, extraMatches = []) => ({
+  id,
+  label,
+  smokeLabels: [id],
+  matches: [...RECIPES_BROWSER_MATCHES, ...extraMatches],
+});
+
+// The two pure models the recipe bulk panel stages against — the recipe half of
+// `BULK_EDIT_MODEL_MATCHES` above, and hoisted for the same reason. `bulkSelectionModel.js` is
+// named on BOTH because both studios' selection helpers now live there; `recipeBulkEditModel.js`
+// merely re-exports them, so a change to the shared leaf touches neither studio's own model file
+// and would map to no view without this.
+const RECIPE_BULK_EDIT_MODEL_MATCHES = [
+  /^src\/utils\/recipeBulkEditModel\.js$/,
+  /^src\/utils\/bulkSelectionModel\.js$/,
+];
 
 // The player Crafting tab's requirement surface (issue 917): the slot rail, the single
 // open chooser, the shared essence pool and the consumption-plan panel. Scoped to the
@@ -221,10 +277,7 @@ export const VIEW_RECIPES = Object.freeze([
   componentsBrowserFrame(
     'manager-components-bulk-edit',
     'Manager components browser — bulk edit (multi-select, selection toolbar, staged rail panel)',
-    [
-      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
-      /^src\/utils\/componentBulkEditModel\.js$/,
-    ],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES],
   ),
   // The bulk panel's other two states, each its OWN view for the same `candidates[0]`
   // reason as the staged frame above — and each a separate FRAME because no one
@@ -235,10 +288,7 @@ export const VIEW_RECIPES = Object.freeze([
   componentsBrowserFrame(
     'manager-components-bulk-edit-unstaged',
     'Manager components browser — bulk edit, pristine draft (every axis unstaged, Apply inert)',
-    [
-      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
-      /^src\/utils\/componentBulkEditModel\.js$/,
-    ],
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES],
   ),
   // The Progressive DC section is gated on `componentDifficultyAxisProgressive`, so it
   // renders on the progressive smoke system and on no other — which is also the only
@@ -250,7 +300,7 @@ export const VIEW_RECIPES = Object.freeze([
   componentsBrowserFrame(
     'manager-components-bulk-edit-progressive',
     'Manager components browser — bulk edit, progressive DC section + empty item-tag copy',
-    [/^src\/utils\/componentBulkEditModel\.js$/],
+    [...BULK_EDIT_MODEL_MATCHES],
   ),
   // Issue 801: the grouped-category CONTINUATION frame — a category split across a page
   // boundary, its continuation slice ("N of M") at the head of the next page. Its OWN view
@@ -483,12 +533,46 @@ export const VIEW_RECIPES = Object.freeze([
     // The library inspector deliberately lives under `apps/manager/recipes/` and NOT
     // `apps/manager/recipe/` (issue 643): the latter is RECIPE_EDIT_MATCHES, so a
     // browser-side component placed there would republish the five recipe-EDITOR
-    // frames and never the browser frame.
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
-    ],
+    // frames and never the browser frame. See RECIPES_BROWSER_MATCHES, which this shares
+    // with the three bulk-edit frames below; the only recipes-browser view with more than
+    // one smoke label, so it cannot come from `recipesBrowserFrame`.
+    matches: RECIPES_BROWSER_MATCHES,
   },
+  // Issue 1010: the Recipe Studio's bulk-edit states — rows multi-selected, the shared selection
+  // toolbar, and the rail's staged bulk panel in place of the single-recipe inspector. THREE
+  // dedicated view ids, not extra labels on `manager-recipes`: `collect` publishes only
+  // `candidates[0]` from a path-sorted list, so appending them there would publish
+  // `manager-recipes-normal` forever and none of these states would ever reach a PR.
+  //
+  // The extra trigger on all three is the shared selection primitive, which renders on every row
+  // AND inside the toolbar, plus the pure staging models behind the panel.
+  recipesBrowserFrame(
+    'manager-recipes-bulk-edit',
+    'Manager recipes browser — bulk edit (multi-select, selection toolbar, every axis staged)',
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES],
+  ),
+  // The pristine draft is its own FRAME as well as its own view, because no one photograph holds
+  // both faces of an axis: a segmented control cannot read `Unchanged` and `Enable` at once, and
+  // the two check-tier sentinels (`— Leave unchanged —` and `Default DC`, which mean opposite
+  // things) are only both visible while neither has been chosen.
+  recipesBrowserFrame(
+    'manager-recipes-bulk-edit-unstaged',
+    'Manager recipes browser — bulk edit, pristine draft (three Unchanged segments, both check-tier sentinels, Apply inert)',
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES],
+  ),
+  // Acceptance criterion 6's frame: the pre-flight warning Callout over the rows the browser has
+  // itself pilled `Can't enable`. It additionally names the projection and the predicate the
+  // count is read from, because those are the files a regression would land in — the row pill and
+  // the panel's count read ONE predicate, and this is the only frame that can show them agreeing.
+  recipesBrowserFrame(
+    'manager-recipes-bulk-edit-blocked',
+    'Manager recipes browser — bulk edit, blocked-enable warning over the pilled rows it counts',
+    [
+      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
+      ...RECIPE_BULK_EDIT_MODEL_MATCHES,
+      /^src\/utils\/recipeBrowserModel\.js$/,
+    ],
+  ),
   // Issue 801: the grouped-category CONTINUATION frame for the recipe library. Phase 1 is
   // MODEL-ONLY — RecipesBrowserView.svelte is untouched — so `recipeBrowserModel.js` is the
   // SOLE changed file that maps a frame to this browser; its `matches` MUST name it or the

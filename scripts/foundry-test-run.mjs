@@ -56,6 +56,7 @@ import {
   SUPPRESSED_STEP_INDEX,
 } from './lib/foundryTourSuppression.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
+import { isCanvasReadyForScene } from './lib/foundryCanvasReadiness.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
 
@@ -1473,70 +1474,183 @@ async function captureStableManagerView(page, { width, height, layout, label, se
 }
 
 /**
- * Issue 772 — capture ONE state of the components browser's BULK EDIT rail panel.
+ * The Component Studio's bulk-edit surface, as data (issues 772 / 1010).
  *
- * THREE frames share this scaffold, because the panel has four sections and no single
- * frame can hold them all. A STAGED axis chip and an UNSTAGED one are mutually exclusive
- * states of the same control, so "leave unchanged" — the only route to *clear essences on
- * every selected component*, since `Stepper` emits nothing at the zero boundary — can
- * never appear in the same photograph as "will overwrite". And the Progressive DC section
- * renders only where a system's crafting, salvage or gathering resolution is progressive,
- * which in this world is never the same system as the essence-bearing one. Only the
- * `stage` callback differs between the three, so the selection, the toolbar assertion, the
- * capture and the teardown live here once; a fresh sibling copy per frame would also trip
- * Sonar's new-code duplication gate, which counts `scripts/` and ignores `cpd.exclusions`.
+ * Every selector, the layout pin and the row-selection strategy live here rather than inside
+ * `captureBulkEditFrame`, which is what lets the Recipe Studio share that scaffold instead of
+ * copying it. `tests/screenshot-capture-scoping.test.js` pins each field PER STUDIO — under
+ * parameterisation an assertion made against the scaffold body alone would pass because the
+ * literal it looks for can no longer appear there, whatever the walk actually does.
  *
- * NET-ZERO by construction. `stage` drives the SHIPPED controls only — seeding the
- * selection or the draft through `page.evaluate` would touch `game.` / settings / flags,
- * the Foundry content-signal shape these frames deliberately avoid, and would photograph a
- * state no GM can actually reach. Apply is NEVER pressed, so not one component is written,
- * and the `finally` clears the selection so every following capture sees the
- * single-component inspector it expects.
+ * `selectRows` is POSITIONAL here, and that is a property of the fixture rather than a default:
+ * these frames need any two component rows, none of which carries state the walk must single
+ * out. The Recipe Studio's blocked frame does, and pins its rows by name instead.
  *
- * A failed CLEAR is recorded as its own failed step rather than swallowed: it leaves the
- * rail showing the bulk panel for every following components frame, which is silent
- * evidence corruption. It is RECORDED, not thrown, because throwing from this `finally`
- * would both mask an in-flight capture error and abort the rest of the section — and a
- * recorded failure is already fatal to the run (`evaluateSmokeOutcome` treats step
- * failures as non-waivable) while leaving the remaining frames to be captured.
+ * The selection control is an `<input type="checkbox">` whose real input is 1px and transparent
+ * behind a painted box, so the wrapping LABEL is the click target. It is deliberately NOT a
+ * `<button>` — which is why this walk's `.manager-component-row … button:has(i.fa-pen)` Edit
+ * selectors still resolve to exactly one control per row.
+ */
+const COMPONENT_BULK_EDIT_STUDIO = Object.freeze({
+  // The browser surface is unchanged by the selection — the list, the row and the row identity
+  // are all still on screen, and only the RAIL swapped the inspector for the panel — so this
+  // reuses the plain browser frame's pinned selectors rather than declaring a second layout.
+  layout: 'components normal',
+  noun: 'component',
+  rowSelector: '.fabricate-manager .manager-component-row',
+  selectedRowSelector: '.fabricate-manager .manager-component-row.is-bulk-selected',
+  rowBoxSelector: 'label:has(input[data-component-select])',
+  panelSelector: '.fabricate-manager [data-component-bulk-panel]',
+  displacedInspectorSelector: '.fabricate-manager [data-component-inspector]',
+  toolbarCountSelector:
+    '.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]',
+  clearSelector: '.fabricate-manager [data-component-clear-selection]',
+  selectRows: async (rows, studio) => {
+    for (const index of [0, 1]) {
+      await rows.nth(index).locator(studio.rowBoxSelector).first().click();
+    }
+  },
+});
+
+/**
+ * The Recipe Studio's bulk-edit surface (issue 1010) — the same shape, none of the same hooks.
+ *
+ * `selectRows` is supplied PER CALL rather than defaulted, because one of the three recipe
+ * frames is about a specific row: `manager-recipes-bulk-edit-blocked` must select the seeded
+ * off-and-un-enableable recipe, which is what makes the panel's blocked count non-zero and the
+ * warning Callout render at all. A positional pick would stage Enable over two ordinary recipes
+ * and publish a frame with no Callout in it — passing every guard the scaffold has, because two
+ * rows would still be selected and the count readout would still be visible.
+ */
+const RECIPE_BULK_EDIT_STUDIO = Object.freeze({
+  layout: 'recipes normal',
+  noun: 'recipe',
+  rowSelector: '.fabricate-manager .manager-recipe-row',
+  selectedRowSelector: '.fabricate-manager .manager-recipe-row.is-bulk-selected',
+  rowBoxSelector: 'label:has(input[data-recipe-select])',
+  panelSelector: '.fabricate-manager [data-recipe-bulk-panel]',
+  displacedInspectorSelector: '.fabricate-manager [data-recipe-inspector]',
+  toolbarCountSelector:
+    '.fabricate-manager [data-recipe-selection-toolbar] [data-recipe-selection-count]',
+  clearSelector: '.fabricate-manager [data-recipe-clear-selection]',
+});
+
+/**
+ * Tick the two rows whose NAMES are given, in order.
+ *
+ * The smoke's recipes are seeded by `createRecipe` and carry generated ids, so the id-pinning the
+ * View Lab's cases use is not available here; the authored name is the stable handle. Fails loudly
+ * on a name that matches no row rather than degrading to whatever happened to be first, which is
+ * the whole reason this exists as an alternative to the positional strategy.
+ *
+ * @param {...string} names Authored recipe names, in click order.
+ * @returns {(rows: import('playwright').Locator, studio: object) => Promise<void>}
+ */
+function selectRecipeRowsByName(...names) {
+  return async (rows, studio) => {
+    for (const name of names) {
+      const row = rows.filter({ hasText: name }).first();
+      if (await row.count() === 0) {
+        throw new Error(`Recipe browser rendered no row named "${name}" to bulk-select.`);
+      }
+      await row.locator(studio.rowBoxSelector).first().click();
+    }
+  };
+}
+
+/**
+ * Choose one segment of a `SegmentedControl`, by its `optionDataAttr` value.
+ *
+ * The LABEL is the click target, never the radio inside it. `SegmentedControl.svelte` renders a
+ * real `<input type="radio">` per segment and then hides it — 1x1, `clip: rect(0 0 0 0)` — behind
+ * the visible `<span class="manager-segment-label">`, and an absolutely-positioned child of a
+ * `justify-content: center` flex container takes its static position at that container's CENTRE.
+ * So the radio's 1px box sits directly under the middle of the span, and Playwright refuses the
+ * click with "<span class="manager-segment-label">Lock</span> intercepts pointer events" — it does
+ * not fall back to the label, it times out after 30s and fails the step. `optionDataAttr` is
+ * stamped on the wrapping `<label>`, which is both hittable and the control a GM actually presses,
+ * so the bare attribute selector is the correct target and the ` input` suffix is always wrong.
+ *
+ * This exists as a named helper because the trap is invisible at the call site: `[…="lock"] input`
+ * reads like the more precise selector and is the one that cannot work. `scripts/lib/viewLabCases.js`
+ * targets these same two controls the same way (`{ selector: '[data-recipe-bulk-status-option="enable"]' }`).
+ *
+ * `waitFor` before the click so a genuinely missing segment reports as a missing segment rather
+ * than as a 30s actionability timeout — the failure mode that hid this defect in the first place.
+ *
+ * @param {import('playwright').Locator} scope The container holding the control.
+ * @param {string} optionDataAttr The `optionDataAttr` the control was rendered with.
+ * @param {string} value The segment's option value.
+ */
+async function clickSegment(scope, optionDataAttr, value) {
+  const segment = scope.locator(`label[${optionDataAttr}="${value}"]`).first();
+  await segment.waitFor({ state: 'visible', timeout: 5_000 });
+  await segment.click();
+}
+
+/**
+ * Issue 772 / 1010 — capture ONE state of a manager browser's BULK EDIT rail panel.
+ *
+ * SIX frames share this scaffold — three per studio — because each panel has more axes than one
+ * photograph can hold. A STAGED axis control and its `Unchanged` face are mutually exclusive
+ * states of the same control, so the pristine draft can never appear in the same frame as a
+ * staged one; the Component Studio's Progressive DC section renders only on a progressive system,
+ * and the Recipe Studio's blocked-enable Callout only over a selection containing a refused
+ * recipe. Only `stage` and `selectRows` differ between them, so the selection, the panel/inspector
+ * assertions, the capture and the teardown live here once. A fresh sibling copy per frame — or
+ * per studio — would also trip Sonar's new-code duplication gate, which counts `scripts/` and
+ * ignores `cpd.exclusions`.
+ *
+ * NET-ZERO by construction. `stage` drives the SHIPPED controls only — seeding the selection or
+ * the draft through `page.evaluate` would touch `game.` / settings / flags, the Foundry
+ * content-signal shape these frames deliberately avoid, and would photograph a state no GM can
+ * actually reach. Apply is NEVER pressed, so not one component and not one recipe is written, and
+ * the `finally` clears the selection so every following capture sees the single-row inspector it
+ * expects.
+ *
+ * A failed CLEAR is recorded as its own failed step rather than swallowed: it leaves the rail
+ * showing the bulk panel for every following frame in the section, which is silent evidence
+ * corruption. It is RECORDED, not thrown, because throwing from this `finally` would both mask an
+ * in-flight capture error and abort the rest of the section — and a recorded failure is already
+ * fatal to the run (`evaluateSmokeOutcome` treats step failures as non-waivable) while leaving
+ * the remaining frames to be captured.
  *
  * @param {import('playwright').Page} page
  * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
  * @param {{
+ *   studio: object,
  *   stepName: string,
  *   label: string,
+ *   selectRows?: (rows: import('playwright').Locator, studio: object) => Promise<void>,
  *   stage: (bulkPanel: import('playwright').Locator) => Promise<void>
  * }} options
  */
-async function captureComponentBulkEditFrame(page, results, { stepName, label, stage }) {
+async function captureBulkEditFrame(page, results, { studio, stepName, label, selectRows, stage }) {
+  const pickRows = selectRows ?? studio.selectRows;
   try {
-    const componentRows = page.locator('.fabricate-manager .manager-component-row');
-    if (await componentRows.count() < 2) {
-      throw new Error('Components browser rendered fewer than two rows to bulk-select.');
+    const rows = page.locator(studio.rowSelector);
+    if (await rows.count() < 2) {
+      throw new Error(`Browser rendered fewer than two ${studio.noun} rows to bulk-select.`);
     }
-    // The selection control is an `<input type="checkbox">` whose real input is 1px and
-    // transparent behind a painted box, so the wrapping LABEL is the click target. It is
-    // deliberately NOT a `<button>` — which is why this walk's
-    // `.manager-component-row … button:has(i.fa-pen)` Edit selectors still resolve to
-    // exactly one control per row.
-    for (const index of [0, 1]) {
-      await componentRows.nth(index).locator('label:has(input[data-component-select])').first().click();
-    }
-    const bulkPanel = page.locator('.fabricate-manager [data-component-bulk-panel]').first();
+    await pickRows(rows, studio);
+    const bulkPanel = page.locator(studio.panelSelector).first();
     await bulkPanel.waitFor({ state: 'visible', timeout: 5_000 });
-    const bulkSelectedRows = await page.locator('.fabricate-manager .manager-component-row.is-bulk-selected').count();
-    if (bulkSelectedRows !== 2) {
-      throw new Error(`Expected two bulk-selected component rows, found ${bulkSelectedRows}.`);
+    // The panel REPLACES the single-row inspector rather than sitting beside it, so the
+    // inspector's absence is half of what the frame is evidence for. Without this a rail that
+    // rendered both would photograph as a success.
+    if (await page.locator(studio.displacedInspectorSelector).count() > 0) {
+      throw new Error(`The ${studio.noun} bulk panel mounted alongside the inspector it replaces.`);
     }
-    await page.locator('.fabricate-manager [data-component-selection-toolbar] [data-component-selection-count]')
+    const bulkSelectedRows = await page.locator(studio.selectedRowSelector).count();
+    if (bulkSelectedRows !== 2) {
+      throw new Error(`Expected two bulk-selected ${studio.noun} rows, found ${bulkSelectedRows}.`);
+    }
+    await page.locator(studio.toolbarCountSelector)
       .first().waitFor({ state: 'visible', timeout: 5_000 });
 
     await stage(bulkPanel);
 
-    // The browser surface is unchanged by the selection, so this reuses the `components
-    // normal` pinned selectors: the list, the row and the row identity are all still on
-    // screen, and only the RAIL swapped the inspector for the panel.
-    await captureStableManagerView(page, { layout: 'components normal', label });
+    await captureStableManagerView(page, { layout: studio.layout, label });
     process.stdout.write(`  D0: ${stepName} screenshotted\n`);
     results.steps.push({ step: stepName, passed: true });
   } catch (err) {
@@ -1545,9 +1659,9 @@ async function captureComponentBulkEditFrame(page, results, { stepName, label, s
   } finally {
     // Clear whether or not the capture succeeded: a live selection keeps the rail on the
     // bulk panel, and the count-to-zero transition is what discards the staged draft.
-    await softClick(page.locator('.fabricate-manager [data-component-clear-selection]'));
+    await softClick(page.locator(studio.clearSelector));
     try {
-      await page.locator('.fabricate-manager [data-component-bulk-panel]')
+      await page.locator(studio.panelSelector)
         .first().waitFor({ state: 'detached', timeout: 5_000 });
     } catch (err) {
       results.steps.push({ step: `${stepName}-cleared`, passed: false, error: err.message });
@@ -6438,6 +6552,53 @@ async function closeOpenApplications(page) {
 }
 
 /**
+ * Activate a scene and wait until the canvas has FINISHED drawing it.
+ *
+ * The single seam every scene switch in this harness goes through, so the readiness contract is
+ * stated once. Do NOT call `scene.activate()` directly: activation only STARTS an async draw, and
+ * a wait keyed on the scene id alone resolves partway through it, roughly sixty lines before the
+ * canvas can accept a placeable document. `isCanvasReadyForScene` carries the verified Foundry
+ * 14.365 draw ordering that makes `canvas.ready` the correct predicate and the scene id the wrong
+ * one (issue #1010); `tests/foundry-canvas-readiness.test.js` pins both this call site count and
+ * the predicate itself.
+ *
+ * Deliberately TOLERANT of the wait not resolving. `canvas.ready` never latches if a draw aborts
+ * (a texture-load failure returns from `Canvas##draw` with `ready` still false), and a strictly
+ * harder predicate must not newly fail a capture step that used to pass.
+ *
+ * That tolerance is exactly why callers must not depend on this for CORRECTNESS. It is a capture
+ * aid — it stops a panel scanning the previous scene — not a safety barrier. Anything that would
+ * be unsafe against a mid-draw canvas must be ordered so it cannot happen, not merely waited for;
+ * see the placeable seeding in the Manage Interactables block for the worked example.
+ *
+ * The default timeout is sized for the FIRST draw of a session, which is far more expensive than
+ * the ones after it: WebGL init, the BASIS transcoder, worker startup and a full asset load, on a
+ * headless software renderer that logs GPU stalls. At 15s a real run overran it, the swallow let
+ * the walk continue, and the resulting failure looked nothing like a timeout (issue #1010).
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} sceneId the scene to activate and draw
+ * @param {object} [options]
+ * @param {number} [options.timeout] milliseconds to wait for the draw to complete
+ * @returns {Promise<void>}
+ */
+async function activateSceneAndAwaitCanvasReady(page, sceneId, { timeout = 90_000 } = {}) {
+  if (!sceneId) return;
+  await page.evaluate(async (id) => {
+    const scene = game.scenes.get(id);
+    if (scene && !scene.active) await scene.activate();
+  }, sceneId).catch(() => {});
+  await page.waitForFunction(isCanvasReadyForScene, sceneId, { timeout }).catch(err => {
+    // Name the REASON, not just the fact. A timeout and a destroyed execution context both land
+    // here and mean different things, and the previous message asserted "timeout" for both.
+    process.stderr.write(
+      `Canvas never reported ready for scene ${sceneId} (waited up to ${timeout}ms): ` +
+      `${err?.message?.split('\n')[0] ?? err}. Continuing against a possibly undrawn canvas.\n`
+    );
+  });
+}
+
+/**
  * Attach browser console capture to a Playwright page.
  * @param {import('playwright').Page} page
  * @param {RegExp[]} ignoredErrorPatterns
@@ -6467,6 +6628,13 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   page.on('pageerror', err => {
     const entry = `[pageerror] ${err.message}`;
     consoleLog.push(entry);
+    // The stack goes to the DIAGNOSTIC log only, never to consoleErrors — the gate matches its
+    // waiver patterns against the message, and widening what it sees would change which runs
+    // fail. Recorded because a `pageerror` from an un-awaited core promise (see
+    // CanvasDocumentMixin#_onCreate) carries no harness step to attribute it to, so a bare
+    // message leaves source archaeology as the only way to find the throwing call — which is
+    // exactly what diagnosing issue #1010 cost.
+    if (err.stack) consoleLog.push(`[pageerror-stack] ${err.stack}`);
     // pageerror waiving is a deliberate existing capability (the Foundry
     // canvas-artefact default filters pageerror entries too); an appended
     // pattern extends it, it does not remove it. Route through the SAME
@@ -6663,14 +6831,29 @@ async function main() {
     // exactly what it was told — any scoped set including the Tool Studio parity
     // walk tripped it (issue 881).
     /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater\..*display has a resolution of (?:1280px by 720px|1280px by 520px|900px by 700px|680px by 700px)\./i,
-    // Headless canvas-draw race: activating/redrawing a scene that gains new
-    // placeables mid-capture (e.g. the issue-335 Manage-Interactables marker
-    // fixtures) can momentarily read a canvas layer constant before the layer is
-    // initialised in the offscreen WebGL context, surfacing as
-    // "Cannot read properties of undefined (reading 'OBJECTS')". It is a Foundry
-    // canvas-rendering timing artifact of the headless harness, not a Fabricate
-    // product error — the scene draws correctly and the captures are unaffected.
-    /reading 'OBJECTS'/
+    //
+    // NOTE (issue #1010): a `/reading 'OBJECTS'/` waiver used to sit here, described as a headless
+    // WebGL timing artifact. It was neither headless-specific nor unfixable — it was this harness
+    // waiting on the wrong thing, and the waiver hid a real defect for a year. It has been RETIRED
+    // rather than extended, and nothing replaces it. Do not re-add it, or a priority-renamed
+    // variant of it (v14 added an `INTERFACE` queue, which is why the same race started reporting
+    // `reading 'INTERFACE'` after the 14.365 bump), without first reading this:
+    //
+    // Both message forms come from exactly two lines of Foundry 14.365,
+    // `canvas.pendingRenderFlags[this.priority]` in `RenderFlags#set` and `RenderFlags#clear`
+    // (`client/canvas/interaction/render-flags.mjs`). `pendingRenderFlags` is a bare class field
+    // (`board.mjs:2518`) assigned only by `Canvas##activateTicker` (`board.mjs:2562`), through a
+    // `configurable: true` `defineProperty` that is thereafter only ever REDEFINED — teardown
+    // (`#deactivateTicker`) clears the queues rather than removing the property. So the property is
+    // undefined for exactly one window per page session: from load until the first scene finishes
+    // drawing past `board.mjs:1209`. The smoke world seeds no scene, so it boots down the
+    // `#drawBlank` path and that window stayed open until the harness's first `scene.activate()` —
+    // whereupon it created a Tile and two Regions straight into it, one `pageerror` each.
+    // `activateSceneAndAwaitCanvasReady` closes the window by construction, and after the first
+    // successful draw neither form can recur at all.
+    //
+    // If one of these messages ever comes back, that is a REGRESSION worth diagnosing, not noise
+    // to re-suppress: the `[pageerror-stack]` line now in console.log names the throwing call.
   ];
 
   // APPEND any run-supplied patterns (--allowed-console-error-patterns / the
@@ -8852,6 +9035,89 @@ async function main() {
         await assertRecipeRowsHittable(page, 'recipes normal');
         await captureStableManagerView(page, { layout: 'recipes normal', label: 'manager-recipes-normal' });
 
+        // ---------------------------------------------------------------------
+        // Issue 1010 — the recipe browser's BULK EDIT rail panel, in its three frames. They
+        // sit here, immediately after the plain browser frame and BEFORE the narrow one, so
+        // `manager-recipes` keeps winning its own `candidates[0]` with
+        // `manager-recipes-normal` and every one of them is captured at the 1280x820 width
+        // the shared scaffold's `recipes normal` layout pin is measured against.
+        //
+        // See `captureBulkEditFrame` for the scaffold and `RECIPE_BULK_EDIT_STUDIO` for the
+        // hooks. Every frame clears its selection in a `finally`, so the narrow frame and
+        // the no-check frame below still measure the single-recipe rail they expect.
+        //
+        //  1. STAGED — a category and the Lock axis armed. Deliberately NOT the check tier
+        //     or the book run: Arcane Forge is `routedByCheck`, so whether it offers recipe
+        //     tiers at all is a property of its authored check rather than of this walk, and
+        //     a frame that asserts on a control the fixture may not render fails the walk
+        //     instead of photographing the panel. The View Lab's counterpart case stages all
+        //     five axes against a world authored for exactly that.
+        //  2. UNSTAGED — the pristine draft. Nothing is staged, so the ASSERTIONS are the
+        //     state: Apply inert, and the three `Unchanged` segments on their default face.
+        //  3. BLOCKED — Enable staged over a selection containing 'Temper a Blade', the
+        //     seeded off-and-incomplete recipe the activation gate refuses. This is the one
+        //     frame that shows the panel's pre-flight count and the row's own `Can't enable`
+        //     pill in one photograph, which is how the two are shown to read ONE predicate.
+        // ---------------------------------------------------------------------
+        await captureBulkEditFrame(page, results, {
+          studio: RECIPE_BULK_EDIT_STUDIO,
+          stepName: 'recipes-bulk-edit',
+          label: 'manager-recipes-bulk-edit',
+          selectRows: selectRecipeRowsByName('Brew Healing Potion', 'Quench a Blade'),
+          stage: async (bulkPanel) => {
+            // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
+            // category is staged whatever vocabulary this world has authored.
+            await bulkPanel.locator('[data-recipe-bulk-category]').first().selectOption({ index: 1 });
+            await clickSegment(bulkPanel, 'data-recipe-bulk-lock-option', 'lock');
+
+            // Apply must be live with two axes staged — but it is never clicked: this
+            // capture writes nothing.
+            if (await bulkPanel.locator('[data-recipe-bulk-apply]').first().isDisabled()) {
+              throw new Error('Recipe bulk edit Apply stayed inert after a category and Lock were staged.');
+            }
+          },
+        });
+        await captureBulkEditFrame(page, results, {
+          studio: RECIPE_BULK_EDIT_STUDIO,
+          stepName: 'recipes-bulk-edit-unstaged',
+          label: 'manager-recipes-bulk-edit-unstaged',
+          selectRows: selectRecipeRowsByName('Brew Healing Potion', 'Quench a Blade'),
+          stage: async (bulkPanel) => {
+            // A pristine draft can write nothing, so Apply must be inert. Re-selecting from
+            // a cleared rail rather than un-staging also proves the discard-on-empty-selection
+            // effect in real Foundry.
+            if (!await bulkPanel.locator('[data-recipe-bulk-apply]').first().isDisabled()) {
+              throw new Error('Recipe bulk edit Apply was live on a pristine draft with nothing staged.');
+            }
+            // Both segmented axes on their sentinel face. `Unchanged` is a real segment
+            // rather than an absence, and this frame is its only evidence.
+            for (const axis of ['status', 'lock']) {
+              await bulkPanel.locator(`[data-recipe-bulk-${axis}-option="unchanged"] input:checked`)
+                .first().waitFor({ state: 'attached', timeout: 5_000 });
+            }
+          },
+        });
+        await captureBulkEditFrame(page, results, {
+          studio: RECIPE_BULK_EDIT_STUDIO,
+          stepName: 'recipes-bulk-edit-blocked',
+          label: 'manager-recipes-bulk-edit-blocked',
+          // Pinned BY NAME, not positionally. 'Temper a Blade' is the only seeded recipe
+          // that is both off and un-enableable, so it is what makes the blocked count
+          // non-zero; a positional pick would stage Enable over two ordinary recipes and
+          // publish this frame with no Callout in it, passing every other guard here.
+          selectRows: selectRecipeRowsByName('Temper a Blade', 'Quench a Blade'),
+          stage: async (bulkPanel) => {
+            await clickSegment(bulkPanel, 'data-recipe-bulk-status-option', 'enable');
+            // BOTH halves of the claim, because either alone would publish a lie: a Callout
+            // with no pilled row says the panel invented a count, and a pilled row with no
+            // Callout is the plain browser frame under a step named for the warning.
+            await bulkPanel.locator('[data-recipe-bulk-blocked-warning]')
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
+            await page.locator('.fabricate-manager .manager-recipe-row:has-text("Temper a Blade") [data-status-pill="danger"]')
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
+          },
+        });
+
         // The rich recipe row (issue 643) is the highest horizontal-overflow risk in the
         // manager: identity + I/O readout + check pill + lock + toggle + three actions on
         // one line. Drive it at the narrow width too — assertManagerLayoutStable only
@@ -9379,7 +9645,8 @@ async function main() {
         //     nothing at the zero boundary). Re-selecting from a cleared rail rather than
         //     un-staging also proves the discard-on-empty-selection effect in real Foundry.
         // ---------------------------------------------------------------------
-        await captureComponentBulkEditFrame(page, results, {
+        await captureBulkEditFrame(page, results, {
+          studio: COMPONENT_BULK_EDIT_STUDIO,
           stepName: 'components-bulk-edit',
           label: 'manager-components-bulk-edit',
           stage: async (bulkPanel) => {
@@ -9416,7 +9683,8 @@ async function main() {
             }
           },
         });
-        await captureComponentBulkEditFrame(page, results, {
+        await captureBulkEditFrame(page, results, {
+          studio: COMPONENT_BULK_EDIT_STUDIO,
           stepName: 'components-bulk-edit-unstaged',
           label: 'manager-components-bulk-edit-unstaged',
           stage: async (bulkPanel) => {
@@ -10389,7 +10657,8 @@ async function main() {
             // system authors NO item tags, so the empty-tags line is evidenced, and it has
             // essences disabled, so the DC section sits above the fold instead of below a
             // six-card essence grid.
-            await captureComponentBulkEditFrame(page, results, {
+            await captureBulkEditFrame(page, results, {
+              studio: COMPONENT_BULK_EDIT_STUDIO,
               stepName: 'components-bulk-edit-progressive',
               label: 'manager-components-bulk-edit-progressive',
               stage: async (bulkPanel) => {
@@ -10582,26 +10851,34 @@ async function main() {
             .waitFor({ state: 'detached', timeout: 10_000 });
 
           const interactableRef = craftingSetup.interactable;
-          // Ensure the seeded interactable's scene is the active/viewed scene so the
-          // panel's scene-scan finds it in the list, and wait for the canvas to
-          // actually switch to it (activation → canvas redraw is async).
-          if (interactableRef?.sceneId) {
-            await page.evaluate(async (sceneId) => {
-              const scene = game.scenes.get(sceneId);
-              if (scene && !scene.active) await scene.activate();
-            }, interactableRef.sceneId).catch(() => {});
-            await page.waitForFunction(
-              (sceneId) => globalThis.canvas?.scene?.id === sceneId,
-              interactableRef.sceneId,
-              { timeout: 15_000 }
-            ).catch(() => {});
-          }
 
-          // Seed extra interactables on the active scene so the captured list shows
-          // MULTIPLE marker-status variants + a Tool-type row (not just the lone
-          // region-only gathering task). A REAL Tile is created and linked by uuid
-          // so that row resolves to a present "Tile" marker; another row points at
-          // a non-existent Tile uuid so it renders the danger "missing" badge.
+          // ORDER IS LOAD-BEARING: seed the placeables BEFORE the scene is viewed,
+          // then activate (issue #1010). Creating a placeable on a scene the canvas
+          // is CURRENTLY DRAWING throws out of core, un-awaited and un-caught, as a
+          // bare `pageerror` with no failing step:
+          //
+          //   Canvas##draw sets `scene._view` (board.mjs:1150) — which is what makes
+          //   `document.object` non-null — and only stands up the ticker queues at
+          //   `#activateTicker()` (1209), with `await #loadTextures()` (1191) in
+          //   between. A create landing in that gap reaches
+          //   `CanvasDocumentMixin#_onCreate`, which calls `object.draw()`; the draw
+          //   hits `canvas.pendingRenderFlags[priority]` while that field is still
+          //   the bare class declaration and throws `reading 'INTERFACE'`.
+          //
+          // Creating FIRST removes the race by construction rather than by timing: on
+          // a scene that has never been viewed, `_view` is null, so `_onCreate` finds
+          // no placeable and returns without drawing anything. The documents are then
+          // drawn by the LAYER pass (`Drawing the RegionLayer/TilesLayer canvas
+          // layer`), which core runs after `#activateTicker()`, so the queues exist.
+          // This is exactly why the interactables seeded during crafting setup have
+          // never thrown — they are created while their scene is inactive.
+          //
+          // Waiting for `canvas.ready` is NOT sufficient on its own here. The wait is
+          // bounded and tolerant, and the FIRST draw of a session is the expensive one
+          // (WebGL init, BASIS transcoder, 62 assets); when it overran the timeout the
+          // harness proceeded and created straight into the open window, which is what
+          // the readiness fix alone still failed on. Ordering does not depend on how
+          // long a draw takes.
           await page.evaluate(async ({ sceneId, systemId, toolId, taskId }) => {
             const scene = game.scenes.get(sceneId);
             if (!scene) return;
@@ -10651,6 +10928,13 @@ async function main() {
             toolId: 'smoke-herbalist-sickle',
             taskId: 'smoke-forage-library'
           }).catch(() => {});
+
+          // NOW view the scene, with every placeable already on it, so the panel's
+          // scene-scan finds them. The readiness wait is still required for the
+          // CAPTURE to be correct — the panel scans `canvas.scene`, so opening it
+          // mid-draw scans the previous scene — but it is no longer what stands
+          // between the run and a `pageerror`.
+          await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
           await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
 
@@ -10749,19 +11033,16 @@ async function main() {
               active: false,
               background: { src: 'icons/environment/settlement/tower-stone-blue.webp' }
             });
-            await scene.activate();
             return scene.id;
           });
+          // Registered for cleanup BEFORE activation, so a scene that is created but
+          // fails to draw is still torn down by Phase F.
           if (emptySceneId) cleanup.sceneIds.push(emptySceneId);
           // The panel scans `canvas.scene`; wait until the canvas has actually
           // switched to the empty scene before opening (activation → canvas redraw
           // is async), otherwise the panel scans the prior populated scene and the
           // empty branch never renders.
-          await page.waitForFunction(
-            (sceneId) => globalThis.canvas?.scene?.id === sceneId,
-            emptySceneId,
-            { timeout: 15_000 }
-          );
+          await activateSceneAndAwaitCanvasReady(page, emptySceneId);
           await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
           await page.locator('.fabricate-interactables-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
           await page.locator('.fabricate-interactables-manager .fab-im-empty').first()
@@ -10771,13 +11052,11 @@ async function main() {
 
           await closeOpenApplications(page);
 
-          // Re-activate the original scene so later phases see the expected state.
-          if (interactableRef?.sceneId) {
-            await page.evaluate(async (sceneId) => {
-              const scene = game.scenes.get(sceneId);
-              if (scene && !scene.active) await scene.activate();
-            }, interactableRef.sceneId).catch(() => {});
-          }
+          // Re-activate the original scene so later phases see the expected state,
+          // and leave it DRAWN rather than mid-draw: this block ends here, so an
+          // un-awaited redraw would otherwise run on underneath whatever phase
+          // follows.
+          await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
           results.steps.push({ step: 'interactables-manager', passed: true });
         } catch (err) {

@@ -2391,6 +2391,78 @@ describe('createAdminStore', () => {
       assert.equal(projected.craftingModifier, null, 'no override projects as null (inherit)');
     });
 
+    it('viewState.recipes projects enableBlocked true for a STRUCTURALLY BROKEN recipe that reads incomplete false (issue 1010)', async () => {
+      // The case proving `incomplete` could not have served. `_isRecipeIncomplete` is
+      // `validate().valid === false && validateStructure().valid === true`, so a recipe
+      // that fails validateStructure() reads `incomplete: false` — wearing no pill —
+      // while activation still refuses it. Reading `incomplete` for the blocked-enable
+      // count would report zero for exactly the recipes the bulk write leaves off.
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const broken = makeRecipe({
+        id: 'r-broken',
+        craftingSystemId: 'sys1',
+        validate: () => ({ valid: false }),
+        validateStructure: () => ({ valid: false }),
+      });
+      const activationChecks = [];
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: () => [broken],
+        canActivateRecipe: (recipe) => {
+          activationChecks.push(recipe);
+          return { valid: false, issues: [{ code: 'resultGroupEmpty', params: {} }] };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-broken');
+      assert.ok(projected, 'recipe should be projected');
+      assert.equal(projected.incomplete, false, 'a structurally broken recipe is NOT incomplete');
+      assert.equal(projected.enableBlocked, true, 'yet activation would still refuse it');
+      assert.ok(activationChecks.length > 0, 'the predicate is consulted');
+      assert.ok(
+        activationChecks.every((asked) => asked === broken),
+        'it is asked about the recipe MODEL, not the projected row'
+      );
+    });
+
+    it('viewState.recipes projects enableBlocked false for an activatable recipe (issue 1010)', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const healthy = makeRecipe({
+        id: 'r-ok',
+        craftingSystemId: 'sys1',
+        validate: () => ({ valid: true }),
+        validateStructure: () => ({ valid: true }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: () => [healthy],
+        canActivateRecipe: () => ({ valid: true }),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-ok');
+      assert.equal(projected.enableBlocked, false, 'nothing refuses an activatable recipe');
+      assert.equal(projected.incomplete, false);
+    });
+
+    it('viewState.recipes projects enableBlocked false when the recipe manager has no activation predicate (issue 1010)', async () => {
+      // The projection runs against injected services, so a manager without the
+      // predicate must not throw at projection time. Absent means "unknown", never
+      // "blocked" — an invalid RESULT is still honoured (the two cases above).
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r1');
+      assert.ok(projected, 'recipe should be projected');
+      assert.equal(projected.enableBlocked, false);
+    });
+
     it('updateRecipe threads a craftingModifier override through the save path (issue 770 round-trip)', async () => {
       // The editor saves the whole draft (seeded from the projection above). Assert the
       // store save path forwards craftingModifier to the recipe manager so an authored

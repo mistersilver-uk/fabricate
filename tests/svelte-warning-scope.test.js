@@ -352,7 +352,7 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
         codesOf(CSS_PROBE, {}),
         ['css_unused_selector'],
         'a pruned selector must still be reported under css: injected — that class is what' +
-          " caught ComponentSelectionToolbar's dead focus ring"
+          " caught the bulk selection toolbar's dead focus ring"
       );
       assert.deepEqual(
         codesOf(CSS_PROBE, { css: 'external' }),
@@ -379,7 +379,7 @@ describe('the sweep and onwarn cannot drift apart on compiler options', () => {
     // every component under `src/` is warning-free by the bar asserted above, so both sides
     // are `[]` here by construction and this can only catch a compile that THROWS.
     it('compiles a real component both ways without either side throwing', () => {
-      const file = 'src/ui/svelte/apps/manager/components/ComponentSelectionToolbar.svelte';
+      const file = 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte';
       const source = readFileSync(path.join(repoRoot, file), 'utf8');
       const codes = (options) =>
         compileComponent(source, file, options)

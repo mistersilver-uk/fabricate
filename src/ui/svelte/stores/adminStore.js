@@ -453,6 +453,32 @@ function _isRecipeIncomplete(recipe) {
   return _isRecipeIncompleteByCounts(recipe);
 }
 
+/**
+ * Derive whether ACTIVATION would refuse this recipe (issue 1010) — the ONE predicate
+ * behind the row's `Can't enable` pill, the bulk panel's pre-flight count and the bulk
+ * write's `blockedEnables`. `RecipeManager.canActivateRecipe` runs the same
+ * `_validateRecipeForActivation` the write runs, against a clone with `enabled: true`.
+ *
+ * It CANNOT be derived from {@link _isRecipeIncomplete}, which is
+ * `validate().valid === false && validateStructure().valid === true`. A STRUCTURALLY
+ * BROKEN recipe therefore reads `incomplete: false` while still being un-enableable, and
+ * none of the essence-reference, tag-placeholder, resolution-mode or alchemy-signature
+ * blockers move it either. Reading `incomplete` here would let the panel warn that three
+ * selected recipes will stay off while zero rows wear the pill — two contradicting
+ * statements about one fact, on one screen.
+ *
+ * The guard covers only a recipe manager that does not implement the predicate (an
+ * injected test seam); an invalid RESULT is never swallowed.
+ *
+ * @param {object} recipeManager
+ * @param {Recipe} recipe
+ * @returns {boolean}
+ */
+function _isRecipeEnableBlocked(recipeManager, recipe) {
+  if (typeof recipeManager?.canActivateRecipe !== 'function') return false;
+  return !recipeManager.canActivateRecipe(recipe).valid;
+}
+
 function _buildRecipeBrowserDisplay(recipe, craftingSystem = null) {
   const executionSteps = _getRecipeExecutionSteps(recipe);
   const isSimple =
@@ -1640,9 +1666,13 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
     // legacy scalars `recipeItemId`/name/source reflect the FIRST containing book —
     // an accident of definition order, which is exactly why NO image is derived from
     // them (issue 884): a recipe's icon is its own `img` and nothing else.
+    // `selectedSystem` here is the RAW manager system (`getSystems()`), not the
+    // hand-built viewState projection, so the membership-basis marker is reachable
+    // without adding it to that allowlist (issue 1011).
     const containingDefinitions = _recipeItemDefinitionsContaining(
       selectedSystem.recipeItemDefinitions,
-      recipe
+      recipe,
+      selectedSystem.membershipResolvesByRecipeIds
     );
     const recipeItemIds = containingDefinitions.map((def) => String(def.id));
     const recipeItemDefinition = containingDefinitions[0] || null;
@@ -1716,6 +1746,12 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),
+      // Derived (no stored flag): would ACTIVATION refuse this recipe? See
+      // `_isRecipeEnableBlocked` for why `incomplete` above could NOT have served — a
+      // structurally broken recipe reads `incomplete: false` and still cannot be enabled.
+      // This projection is a hand-built ALLOWLIST, so omitting the field would leave it
+      // invisible to the row pill and every downstream blocked-enable count silently zero.
+      enableBlocked: _isRecipeEnableBlocked(recipeManager, recipe),
       // Book membership: all books containing this recipe (many-to-many), plus the
       // first book's id/name/source for legacy single-link consumers. Deliberately no
       // book IMAGE among them (issue 884): the GM readers resolve `recipe.img` through
@@ -1898,18 +1934,67 @@ export function withoutDerivedRecipeProjectionFields(updates) {
   return stripped;
 }
 
+/**
+ * The result shape of `CraftingSystemManager.applyBulkEditToRecipes` (issue 1010), split
+ * by kind so {@link _normalizeBulkRecipeEditResult} stays a two-line loop rather than an
+ * eight-way object literal of near-identical coercions.
+ */
+const BULK_RECIPE_EDIT_RESULT_COUNTS = Object.freeze([
+  'updated',
+  'blockedEnables',
+  'rejected',
+  'booksUpdated',
+  'bookAdditions',
+  'bookRemovals',
+]);
+const BULK_RECIPE_EDIT_RESULT_ID_LISTS = Object.freeze([
+  'recipeIds',
+  'blockedRecipeIds',
+  'rejectedRecipeIds',
+  'bookIds',
+]);
+
+/**
+ * Coerce the bulk-recipe write result into its full shape so the bulk panel's post-apply
+ * notification can read every count unconditionally.
+ *
+ * All six counts are distinct and none is derivable from another: `updated` counts
+ * recipes that genuinely changed, `blockedEnables` those activation refused (still off,
+ * other axes applied), `rejected` those a persistence failure excluded from the batch
+ * entirely, `booksUpdated` the recipe-book DEFINITIONS whose membership changed, and
+ * `bookAdditions` / `bookRemovals` the membership EDGES it created and destroyed. The last
+ * pair is what the post-apply notification reports: one book over twelve recipes is one
+ * definition and twelve edges, and the GM asked for the twelve.
+ *
+ * @param {object} result
+ * @returns {object} every count as a number and every id list as an array.
+ */
+function _normalizeBulkRecipeEditResult(result) {
+  const normalized = {};
+  for (const key of BULK_RECIPE_EDIT_RESULT_COUNTS) normalized[key] = Number(result?.[key]) || 0;
+  for (const key of BULK_RECIPE_EDIT_RESULT_ID_LISTS) {
+    normalized[key] = Array.isArray(result?.[key]) ? result[key] : [];
+  }
+  return normalized;
+}
+
 // The recipe-item definitions of a system that CONTAIN a recipe (issue 511
-// many-to-many). Canonical read is each definition's `recipeIds[]`; only a system
-// with no membership authored yet falls back to the recipe's book-only `recipeItemId`.
-function _recipeItemDefinitionsContaining(definitions, recipe) {
+// many-to-many). Canonical read is each definition's `recipeIds[]`; only while the
+// system's membership-basis marker is unset does it fall back to the recipe's book-only
+// `recipeItemId`.
+//
+// The basis is a PARAMETER, not re-derived here (issue 1011). This is a module-scope
+// pure helper with no system in scope, and the "any definition has a non-empty
+// recipeIds" inference it used to run flipped in both directions — so the caller threads
+// `system.membershipResolvesByRecipeIds` down from the raw manager system.
+function _recipeItemDefinitionsContaining(definitions, recipe, membershipResolvesByRecipeIds) {
   const defs = Array.isArray(definitions) ? definitions : [];
   const rid = String(recipe?.id || '');
   const byMembership = defs.filter((def) =>
     (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
   );
   if (byMembership.length > 0) return byMembership;
-  const anyMigrated = defs.some((def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0);
-  if (anyMigrated) return [];
+  if (membershipResolvesByRecipeIds === true) return [];
   const recipeItemId = String(recipe?.recipeItemId || '').trim();
   return recipeItemId ? defs.filter((def) => String(def.id) === recipeItemId) : [];
 }
@@ -1981,24 +2066,52 @@ function _buildLearnedRecipeActorIndex() {
   return index;
 }
 
+// The legacy reverse-ref index: `recipeItemId -> rows`. Built ONLY while the system's
+// membership-basis marker is unset, so it costs nothing on a system that has switched
+// basis and cannot be consulted there by accident.
+function _legacyRecipeItemIndex(recipeList) {
+  const index = new Map();
+  for (const recipe of recipeList) {
+    const key = String(recipe?.recipeItemId || '');
+    if (!key) continue;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(recipe);
+  }
+  return index;
+}
+
 // Enrich the synchronously-projected recipe items with async-resolved
 // name/img/type plus their derived `recipes[]` and `learnedByCount`. Called once
 // per refresh from the async phase; `fromUuid` resolution is batched.
-async function _enrichRecipeItemLibrary(projectedItems, recipes) {
+//
+// This is the SIXTH recipe-book membership reader, and the second in this file: it
+// answers the same many-to-many from the BOOK's side. Like
+// `_recipeItemDefinitionsContaining`, it takes the basis as a PARAMETER threaded from
+// the raw manager system rather than inferring it — the inference available here would
+// have been per DEFINITION ("this book's `recipeIds` is empty, so it must be
+// un-migrated"), which is the retired system-wide predicate at definition scope.
+//
+// The parameter is BELT AND BRACES at this call site, and saying so is more useful than
+// overstating it: `recipes` is the PROJECTED recipe list, whose `recipeItemId`
+// `_buildRecipeList` derives from `_recipeItemDefinitionsContaining` rather than copying
+// the raw legacy scalar. So on a marked system an emptied book's former members already
+// carry `recipeItemId: ''`, and `_legacyRecipeItemIndex` could not resurrect them even if
+// this guard were dropped — the basis decision has already been taken upstream. What the
+// parameter buys is that this function does not have a SECOND, differently-shaped opinion
+// about the basis for a future caller to hand a rawer list to
+// (`ui-integration/spec.md`, the membership-basis paragraph).
+async function _enrichRecipeItemLibrary(projectedItems, recipes, membershipResolvesByRecipeIds) {
   const items = Array.isArray(projectedItems) ? projectedItems : [];
   if (items.length === 0) return [];
 
   const recipeList = Array.isArray(recipes) ? recipes : [];
   const recipeById = new Map();
-  // Legacy reverse-ref index — fallback for definitions with no `recipeIds` yet.
-  const recipesByItemId = new Map();
-  for (const recipe of recipeList) {
-    recipeById.set(String(recipe?.id), recipe);
-    const key = String(recipe?.recipeItemId || '');
-    if (!key) continue;
-    if (!recipesByItemId.has(key)) recipesByItemId.set(key, []);
-    recipesByItemId.get(key).push(recipe);
-  }
+  for (const recipe of recipeList) recipeById.set(String(recipe?.id), recipe);
+  // `=== true` exactly as `_recipeItemDefinitionsContaining` tests it: a missing boolean
+  // fails to LEGACY, which is the safe direction, and `null` is what the index being
+  // absent means downstream.
+  const legacyIndex =
+    membershipResolvesByRecipeIds === true ? null : _legacyRecipeItemIndex(recipeList);
   const toRecipeRef = (recipe) => ({
     id: recipe.id,
     name: recipe.name,
@@ -2012,8 +2125,9 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
 
   return items.map((item, index) => {
     const { doc, missing } = resolved[index];
-    // Canonical membership: the book's `recipeIds`. Fall back to the legacy reverse
-    // ref only for a definition that carries none yet (un-migrated).
+    // Canonical membership: the book's `recipeIds`. `legacyIndex` is null once the
+    // system resolves by `recipeIds`, so an empty array then means "this book has no
+    // members" — full stop — rather than "this book has not migrated".
     const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
     const linkedRecipes =
       memberIds.length > 0
@@ -2021,7 +2135,7 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
             .map((id) => recipeById.get(String(id)))
             .filter(Boolean)
             .map(toRecipeRef)
-        : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
+        : (legacyIndex?.get(String(item.id)) || []).map(toRecipeRef);
     const learnedActors = new Set();
     for (const recipe of linkedRecipes) {
       const actorsForRecipe = actorIndex.get(recipe.id);
@@ -5187,9 +5301,15 @@ export function createAdminStore(services) {
       // empty projection after any refresh (e.g. switching visibility mode).
       selectedSystemData = {
         ...selectedSystemData,
+        // The basis marker comes from `selectedSystem` — the RAW manager system — and
+        // NOT from `selectedSystemData`, which is the hand-built viewState projection
+        // and does not carry the field. Reading it from the projection would yield a
+        // silently `undefined` marker that fails open to the legacy index, which is
+        // exactly the failure the parameter exists to prevent (issue 1011).
         recipeItemDefinitions: await _enrichRecipeItemLibrary(
           selectedSystemData.recipeItemDefinitions,
-          recipeListData.recipes
+          recipeListData.recipes,
+          selectedSystem?.membershipResolvesByRecipeIds
         ),
       };
     }
@@ -8802,6 +8922,67 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * Apply one staged bulk edit to a SET of recipes in the selected system (issue 1010)
+   * through the manager's set-apply primitive: at most ONE `recipes` world write, at most
+   * ONE `craftingSystems` world write, and ONE refresh for the whole selection.
+   *
+   * Those are TWO settings, not a redundant pair: recipe-book membership is persisted on
+   * the system and the recipe fields are persisted with the recipes, so a book axis and a
+   * recipe axis staged together genuinely cost one write each.
+   *
+   * `edit` carries only the STAGED axes — `category`, `enabled`, `locked`, `checkTierId`,
+   * `addBookIds`, `removeBookIds` — and is forwarded VERBATIM. Three of the six keys are
+   * falsy but REAL: `enabled: false` (disable), `locked: false` (unlock) and
+   * `checkTierId: null` (clear to the system default). Pruning "empty" keys would collapse
+   * a present `checkTierId: null` into an absent one, and those are different instructions
+   * — "clear the tier" versus "leave the tier alone". Everything downstream tests key
+   * presence, never truthiness.
+   *
+   * Deliberately NOT routed through {@link withoutDerivedRecipeProjectionFields}. That
+   * strip guards payloads built from a WHOLE projected recipe row, which carries
+   * `recipeItemId` and its derived siblings; this edit is a hand-built six-key allowlist
+   * emitted by `toBulkRecipeEdit` that can never carry one. A strip here would only
+   * suggest otherwise.
+   *
+   * Returns the write RESULT rather than a boolean: a blocked enable is a PARTIAL success
+   * — the recipe stays off while its other staged axes still land — which a boolean cannot
+   * express, and the panel's post-apply notification is the authority on both counts.
+   * `null` means nothing was written, for any reason: a bad or empty argument, no selected
+   * system, or a throw that has already been reported to the GM.
+   *
+   * @param {Iterable<string>} recipeIds
+   * @param {object} [edit]
+   * @returns {Promise<object|null>} the normalized write result, or `null` when no write
+   *   happened.
+   */
+  async function applyRecipeBulkEdit(recipeIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    const ids = Array.from(recipeIds || [], String).filter(Boolean);
+    if (ids.length === 0 || !sysId) return null;
+    if (!edit || typeof edit !== 'object') return null;
+    if (Object.keys(edit).length === 0) return null;
+
+    try {
+      const result = await systemManager.applyBulkEditToRecipes(sysId, ids, edit);
+      await refresh();
+      return _normalizeBulkRecipeEditResult(result);
+    } catch (err) {
+      console.error('Fabricate | Failed to apply recipe bulk edit:', err);
+      // The batch fails as a whole through the same two coded error classes the
+      // single-recipe writes raise, so reuse their localizers: the GM gets the coded,
+      // id-free copy rather than a raw English aggregate naming internal ids.
+      services.notify?.error?.(
+        localizeRecipeActivationError(err, services.localize) ||
+          localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to apply recipe bulk edit'
+      );
+      return null;
+    }
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
@@ -9041,6 +9222,7 @@ export function createAdminStore(services) {
     deleteComponent,
     updateComponent,
     applyComponentBulkEdit,
+    applyRecipeBulkEdit,
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,

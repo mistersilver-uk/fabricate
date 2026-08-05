@@ -827,17 +827,36 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'the browser view-state must be lifted, not held as local component $state'
     );
+    // The row DELEGATES its authoring-state pills to the shared activation predicate
+    // (issue 1010), which the bulk panel's pre-flight count and the attention sort read
+    // too — so the pilled rows and the counted rows are one set by construction.
+    //
+    // Delegation is all this assertion may claim, because it is all the component's text
+    // contains. The predicate is owned by `tests/util/recipe-browser-model.test.js`, and
+    // the RENDERED pills by the `authoring-state pills` cases in
+    // `tests/components/recipes-browser-view-mounted.test.js`. Two earlier attempts to
+    // pin the state here instead both failed the same way: `recipe.incomplete` ended up
+    // satisfied only by a dead `data-recipe-incomplete` attribute nothing read, and
+    // `recipe.enableBlocked` only by the prose above `STATUS_LABELS` — the field is read
+    // inside `recipeBrowserModel.js` and never appears in this markup at all. A source
+    // scan cannot see rendered state that no rendered text names.
     assert.ok(
+      /return deriveRecipeStatuses\(recipe\)/.test(recipesBrowserSource),
+      'RecipesBrowserView should derive its authoring-state pills through the shared predicate'
+    );
+    assert.equal(
       recipesBrowserSource.includes('recipe.incomplete'),
-      'RecipesBrowserView should render the derived Incomplete state'
+      false,
+      'and must not reintroduce the narrower incomplete predicate the pills were moved off'
     );
     assert.ok(
       recipesBrowserSource.includes('FABRICATE.Admin.Manager.Recipe.Incomplete'),
       'RecipesBrowserView should use the localized Incomplete label'
     );
     // The four row states are one component (StatusPill) rather than four ad-hoc
-    // chips. The tones stay distinguishable: warning = incomplete-but-enabled,
-    // danger = incomplete AND off, i.e. enabling would be REFUSED (issue 643).
+    // chips. The tones stay distinguishable: warning = blocked but already enabled,
+    // danger = blocked AND off, i.e. enabling would be REFUSED (issue 643, repointed
+    // onto the shared activation predicate by issue 1010).
     assert.ok(
       recipesBrowserSource.includes("import StatusPill from '../../components/StatusPill.svelte'"),
       'the row should render its states through the shared StatusPill'

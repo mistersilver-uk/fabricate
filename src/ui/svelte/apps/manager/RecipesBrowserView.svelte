@@ -24,9 +24,17 @@
   import Medallion from '../../components/Medallion.svelte';
   import StatusPill from '../../components/StatusPill.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
+  import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
+  import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
+  import {
+    describeRecipeSelection,
+    pruneRecipeSelection,
+    setRecipeSelection,
+    toggleRecipeSelection,
+  } from '../../../../utils/recipeBulkEditModel.js';
   import {
     RECIPE_SORT_KEYS,
     buildRecipeBrowserModel,
@@ -81,6 +89,10 @@
     ui.categoryFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
+    // The bulk selection is scoped to the selected system — its ids name recipes the new
+    // system does not have — so a switch clears it, and the root discards the staged draft
+    // when the count reaches zero (issue 1010). Mirrors ComponentsBrowserView.
+    ui.bulkSelectedRecipeIds = new Set();
     ui.systemId = selectedSystemId;
   });
 
@@ -123,6 +135,65 @@
   $effect(() => {
     if (model.pageIndex !== ui.pageIndex) ui.pageIndex = model.pageIndex;
   });
+
+  // ── Bulk selection (issue 1010) ──────────────────────────────────────────────────
+  // `pageIds` is the set of RENDERED row ids, NOT `model.page`: with grouping on (the
+  // default) a COLLAPSED group renders no rows at all, so a naive page list would let the
+  // toolbar's tri-state box select rows the GM cannot see and report a count exceeding the
+  // visible ones. `filteredIds` is the whole filtered set, which the results link reaches
+  // and the page box deliberately cannot.
+  const bulkSelectedIds = $derived(ui.bulkSelectedRecipeIds ?? new Set());
+  const filteredIds = $derived(model.filtered.map((recipe) => recipe.id));
+  const pageIds = $derived(
+    model.groups.filter(isGroupRendered).flatMap((group) => group.recipes.map((r) => r.id))
+  );
+  const selectionSummary = $derived(
+    describeRecipeSelection({
+      pageIds,
+      filteredIds,
+      selectedIds: bulkSelectedIds,
+    })
+  );
+
+  // The SAME condition the markup renders a group's rows under, read once so the two can
+  // never drift: an ungrouped run is always rendered, a grouped one only while expanded.
+  function isGroupRendered(group) {
+    const grouped = ui.groupByCategory && showRecipeCategories && !!group.category;
+    return !grouped || isExpanded(group.category);
+  }
+
+  // A delete, an unlink or a store refresh must never leave a phantom id in the count or
+  // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
+  // subset, so equal sizes mean an identical set — so this cannot loop.
+  $effect(() => {
+    const current = ui.bulkSelectedRecipeIds ?? new Set();
+    if (current.size === 0) return;
+    const pruned = pruneRecipeSelection(
+      current,
+      (recipes || []).map((recipe) => recipe.id)
+    );
+    if (pruned.size !== current.size) ui.bulkSelectedRecipeIds = pruned;
+  });
+
+  // Every mutation assigns a NEW Set rather than mutating in place: the reactive unit is
+  // `ui.bulkSelectedRecipeIds`, not the Set, so an in-place mutation compiles, runs, and
+  // silently stops the bound lifted state propagating back to the manager root — the rule
+  // `toggleGroup` below already documents for `collapsedCategories`.
+  function toggleRecipeBulkSelected(id) {
+    ui.bulkSelectedRecipeIds = toggleRecipeSelection(bulkSelectedIds, id);
+  }
+
+  function setPageSelected(on) {
+    ui.bulkSelectedRecipeIds = setRecipeSelection(bulkSelectedIds, pageIds, on);
+  }
+
+  function selectAllResults() {
+    ui.bulkSelectedRecipeIds = setRecipeSelection(bulkSelectedIds, filteredIds, true);
+  }
+
+  function clearBulkSelection() {
+    ui.bulkSelectedRecipeIds = new Set();
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -242,9 +313,12 @@
     ui.collapsedCategories = next;
   }
 
-  // The four row states, localized. `recipe.incomplete` is the derived authoring
-  // flag (no ingredient sets / no result groups); off + incomplete means enabling
-  // would be REFUSED, so the row says so rather than merely "incomplete".
+  // The four row states, localized. Both authoring states read ONE predicate —
+  // `recipe.enableBlocked`, "would activation refuse this recipe?" (issue 1010) — so the
+  // pilled rows, the bulk panel's pre-flight count and the set-apply write are the same
+  // set by construction. Off + blocked means enabling would be REFUSED, so the row says
+  // so rather than merely "incomplete"; on + blocked is unfinished work with nothing
+  // being refused. The labels are unchanged.
   const STATUS_LABELS = {
     disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
     locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
@@ -519,6 +593,34 @@
         })}
       </span>
     </div>
+
+    <!--
+      The multi-select row is the LAST row of the toolbar, immediately above the list —
+      the same third-row-then-list order the Component Studio shipped (issue 1010). It is
+      a row of THIS toolbar, not a sticky bar of its own over the list, so it inherits the
+      toolbar's own metrics instead of declaring a second register.
+
+      Every prop below is an OVERRIDE: the shared primitive's row class and its five
+      `data-*` hooks default to the Component Studio's strings so that studio's smoke
+      selectors, view-lab cases and mounted assertions kept working through the
+      extraction. This studio must name its own, or both browsers would answer to one set
+      of hooks.
+    -->
+    <BulkSelectionToolbar
+      rowClass="manager-recipe-filter-row"
+      toolbarAttr="data-recipe-selection-toolbar"
+      pageBoxAttr="data-recipe-select-all-page"
+      countAttr="data-recipe-selection-count"
+      resultsAttr="data-recipe-select-all-results"
+      clearAttr="data-recipe-clear-selection"
+      pageSelectionState={selectionSummary.pageSelectionState}
+      count={selectionSummary.count}
+      showSelectAllResults={selectionSummary.showSelectAllResults}
+      selectAllResultsCount={selectionSummary.selectAllResultsCount}
+      onTogglePage={(on) => setPageSelected(on)}
+      onSelectAllResults={selectAllResults}
+      onClear={clearBulkSelection}
+    />
   </section>
 
   {#if flashMessage}
@@ -626,10 +728,16 @@
                 {#each group.recipes as recipe (recipe.id)}
                   {@const io = ioReadout(recipe)}
                   {@const check = checkPill(recipe)}
+                  <!--
+                    `.is-bulk-selected` is a DIFFERENT question from `.is-selected` —
+                    "this row is in the set an Apply will write to" versus "you are
+                    here" — and a row can carry both (issue 1010).
+                  -->
                   <li
                     class={`manager-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''} ${recipe.enabled === false ? 'is-off' : ''}`}
+                    class:is-bulk-selected={bulkSelectedIds.has(recipe.id)}
                     data-recipe-id={recipe.id}
-                    data-recipe-incomplete={recipe.incomplete === true}
+                    data-recipe-bulk-selected={bulkSelectedIds.has(recipe.id)}
                     aria-current={isSelectedRecipe(recipe) ? 'true' : undefined}
                   >
                     <button
@@ -764,6 +872,38 @@
                       >
                         <i class="fas fa-pen" aria-hidden="true"></i>
                       </button>
+
+                      <!--
+                        The bulk selection box (issue 1010), AFTER the Edit pencil and
+                        INSIDE this cluster as its last cell — not a row-level sibling, or
+                        the `--fab-recipe-col-select` track appended to
+                        `--fab-recipe-cluster-cols` would have nothing to place. Trailing
+                        placement is also what lets that track be APPENDED: the column
+                        header's four explicit `grid-column` placements survive an append
+                        and would every one of them break on a prepend.
+
+                        `SelectionCheckbox` renders NO `<button>`, which is load-bearing
+                        here: the Foundry smoke walk reaches Edit through
+                        `[data-recipe-edit]` and the row through `.manager-recipe-identity`,
+                        and a selection control that answered to a looser row-button
+                        selector would start intercepting those clicks.
+
+                        This cluster is a `<div>`, so the primitive renders its own
+                        `<label>` (`wrapper="label"`); without it the visible box would have
+                        no label association and no click target.
+                      -->
+                      <SelectionCheckbox
+                        size="lg"
+                        wrapper="label"
+                        checked={bulkSelectedIds.has(recipe.id)}
+                        ariaLabel={format(
+                          'FABRICATE.Admin.Manager.BulkEdit.SelectRow',
+                          'Select {name} for bulk edit',
+                          { name: recipe.name }
+                        )}
+                        data-recipe-select={recipe.id}
+                        onChange={() => toggleRecipeBulkSelected(recipe.id)}
+                      />
                     </div>
                   </li>
                 {/each}

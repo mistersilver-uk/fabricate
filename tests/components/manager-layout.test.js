@@ -1768,10 +1768,14 @@ test('manager recipe row collapses in the specified order and never drops its co
   // is no longer rendered in the row at all — the track colour is the state, the aria-label
   // names it, and the Disabled pill says it in words — so the rung is gone rather than left
   // as a rule matching nothing.
+  // Each rung moved out by 34px for issue 1010 — the 22px bulk selection track plus one
+  // more 12px grid gap — so every band gives the identity cell exactly the room it did
+  // before. Holding the thresholds fixed would have spent the identity's own budget on the
+  // checkbox; the arithmetic is stated beside the ladder in the sheet.
   const LADDER = [
-    [680, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
-    [600, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
-    [520, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
+    [714, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
+    [634, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
+    [554, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
   ];
 
   for (const [width, selector] of LADDER) {
@@ -1809,6 +1813,82 @@ test('manager recipe row collapses in the specified order and never drops its co
   assert.ok(
     nameBlock.includes('flex: 0 1 auto;') && nameBlock.includes('min-width: 0;'),
     'the name is what gives way, so the pills stay readable'
+  );
+});
+
+// Issue 1010 — the bulk selection column. It is APPENDED to the cluster template rather
+// than prepended, and that is what makes the column header's four explicit `grid-column`
+// placements survive: a prepend would have shifted every one of them by a track.
+//
+// The ladder rewrites the template at each rung, so "appended" has to hold in ALL THREE
+// declarations — the base and the two rungs — or the checkbox lands under the edit pencil
+// at the very widths where the row is tightest.
+test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
+  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(([, value]) =>
+    value.replace(/\s+/g, ' ').trim()
+  );
+  assert.equal(
+    declarations.length,
+    3,
+    'the base template plus the ladder\'s two rewrites — a fourth would be an unpinned band'
+  );
+
+  for (const declaration of declarations) {
+    const tracks = [...declaration.matchAll(/var\(--fab-recipe-col-([a-z]+)\)/g)].map(
+      ([, name]) => name
+    );
+    assert.equal(
+      tracks.at(-1),
+      'select',
+      `the select track must be LAST in "${declaration}" — the header placements assume an append`
+    );
+    // Never dropped: a truncated readout is a compromise, a selection the GM cannot reach
+    // is a control that has silently stopped working.
+    assert.equal(
+      tracks.filter((track) => track === 'select').length,
+      1,
+      'the select track appears exactly once in every band'
+    );
+  }
+
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipes-table').includes(
+      '--fab-recipe-col-select: 22px;'
+    ),
+    'the track is the SelectionCheckbox `lg` box, declared rather than derived'
+  );
+});
+
+// The two multi-select browsers state the ticked-row treatment ONCE. A per-studio copy is
+// the variant the shared-primitive rule refuses, and it would drift the moment either
+// surface is re-toned.
+test('the bulk-selected row state is one joined selector across both studios', () => {
+  assert.ok(
+    css.includes(
+      '.fabricate-manager .manager-component-row.is-bulk-selected,\n.fabricate-manager .manager-recipe-row.is-bulk-selected {'
+    ),
+    'the recipe row JOINS the component row rule rather than authoring a second block'
+  );
+  for (const row of ['manager-component-row', 'manager-recipe-row']) {
+    assert.equal(
+      (css.match(new RegExp(`\\.${row}\\.is-bulk-selected`, 'g')) || []).length,
+      1,
+      `${row}.is-bulk-selected must be written exactly once`
+    );
+  }
+
+  // The selection ROW joins the same way, for the same reason: one primitive renders it in
+  // both toolbars and its `rowClass` prop picks which half applies.
+  assert.ok(
+    css.includes(
+      '.fabricate-manager .manager-recipe-filter-row.is-selection,\n.fabricate-manager .manager-component-filter-row.is-selection {'
+    ),
+    'the recipe toolbar joins the selection-row block rather than authoring a second one'
+  );
+  assert.equal(
+    css.includes('has no selection row at all'),
+    false,
+    'that block\'s stated reason is retired by issue 1010 and must not survive as a false claim'
   );
 });
 

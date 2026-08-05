@@ -114,7 +114,8 @@ The player book affordances (Learn vs Craft) are classified from this flat mode 
 ## Recipe↔Book Membership
 
 The recipes a book/scroll contains are the canonical many-to-many membership `RecipeItemDefinition.recipeIds[]` (issue 511, PR-B) — a recipe may belong to several books, and each book carries its own caps.
-The runtime reads `recipeIds[]`; it falls back to the legacy scalar reverse ref (`recipe.recipeItemId`, or `recipe.linkedRecipeItemUuid` → a definition `originItemUuid`) **only** for a fully un-migrated system where no book carries `recipeIds` yet.
+The runtime reads `recipeIds[]`; it falls back to the legacy scalar reverse ref (`recipe.recipeItemId`, or `recipe.linkedRecipeItemUuid` → a definition `originItemUuid`) **only** while the system's monotonic `membershipResolvesByRecipeIds` marker is unset (issue 1010).
+Once that marker is set, only `recipeIds` resolves membership, so an empty `recipeIds` array means "this book has no members" rather than "this system has not migrated"; the basis is recorded on the system and is never re-derived per read.
 The `1.13.0` migration inverts each recipe's former book onto `recipeIds` and strips `recipe.recipeItemId` unconditionally; it strips `recipe.linkedRecipeItemUuid` only when that uuid itself resolved a book, preserving a `linkedRecipeItemUuid` that instead links a standalone alchemy formula item.
 
 ## Recipe-Item Cap Resolution

@@ -109,6 +109,13 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'currency-macro',
   'currency-actor-inventory',
   'manager-recipes-normal',
+  // Issue 1010 — the Recipe Studio's bulk-edit states, captured immediately after the plain
+  // browser frame so `manager-recipes` keeps winning its own `candidates[0]` with
+  // `manager-recipes-normal` (the lowest capture counter among that view's three labels).
+  // Inside the `recipes` section span, so a recipe-only PR scopes to that section alone.
+  'manager-recipes-bulk-edit',
+  'manager-recipes-bulk-edit-unstaged',
+  'manager-recipes-bulk-edit-blocked',
   'manager-recipes-narrow',
   'manager-recipes-no-check',
   'manager-recipes-grouped-continuation',
