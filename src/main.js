@@ -39,6 +39,7 @@ import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } fro
 import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
 import { BulkSalvageService } from './systems/BulkSalvageService.js';
 import { BulkDestroyService } from './systems/BulkDestroyService.js';
+import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
 import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
@@ -500,69 +501,6 @@ function deprecate(oldName, newName) {
   if (_deprecationWarned.has(oldName)) return;
   _deprecationWarned.add(oldName);
   console.warn(`Fabricate: ${oldName} is deprecated; use ${newName} instead.`);
-}
-
-/**
- * Foundry V14's message-mode key for each LEGACY roll-mode token.
- *
- * This is core's OWN table, copied from `Roll._mapLegacyRollMode`, so Fabricate applies
- * exactly the translation core applies to the dice messages beside the card and the two
- * cannot drift across a Foundry release.
- *
- * Deliberately NOT exhaustive over V14's vocabulary: a token with no entry here is
- * passed through UNCHANGED (see {@link applyBulkChatVisibility}) rather than defaulted.
- * V14's `core.rollMode` shim returns `'ic'` verbatim for a user set to In-Character, and
- * `ic` is a real `CONFIG.ChatMessage.modes` key — so pass-through is correct, while a
- * `?? 'public'` default would silently downgrade a BLIND client default to public, which
- * is the exact leak this edge exists to close.
- */
-const V14_CHAT_MODE_BY_LEGACY_ROLL_MODE = Object.freeze({
-  publicroll: 'public',
-  gmroll: 'gm',
-  blindroll: 'blind',
-  selfroll: 'self'
-});
-
-/**
- * Apply a legacy roll-mode token's VISIBILITY to chat data before the message is created.
- *
- * ## Why this cannot be left to `ChatMessage.create(data, { rollMode })`
- *
- * `ChatMessage#_preCreate` maps the legacy `rollMode` create option INSIDE
- * `if (this.isRoll)`, and `isRoll` is `rolls.length > 0`. The aggregated bulk salvage
- * card carries NO rolls — the N dice messages do — so passing `rollMode: 'blindroll'` to
- * `create` maps nothing, never reaches the applier, and posts the card PUBLICLY. A blind
- * bulk run would leak its whole result table to the table.
- *
- * ## One probe selects the applier AND the vocabulary together
- *
- * V13 and V14 have DISJOINT vocabularies, and crossing them fails in two different
- * ways: a legacy key handed to V14's `applyMode` THROWS, and a V14 key handed to V13's
- * `applyRollMode` silently posts public. So the probe — `typeof
- * ChatMessage.applyMode === 'function'`, a static, which a subclassed
- * `CONFIG.ChatMessage.documentClass` inherits and therefore cannot fool — decides the
- * method and the translation in one step; they are never chosen independently.
- *
- * ## The caller must set `chatData.speaker` FIRST
- *
- * `applyMode`'s `ic` branch reads `chatData.speaker.actor` UNGUARDED. This function does
- * not defend against that, because defending would hide the ordering requirement rather
- * than enforce it; {@link Fabricate#_postBulkSalvageChatMessage} sets the speaker before
- * calling in.
- *
- * @param {object} chatData The message data, mutated in place (both core appliers mutate).
- * @param {string} rollMode A LEGACY token (`publicroll`/`gmroll`/`blindroll`/`selfroll`),
- *   or any other string, which is passed through untranslated.
- * @returns {object} The same `chatData`, for call-site readability.
- */
-function applyBulkChatVisibility(chatData, rollMode) {
-  if (!rollMode) return chatData;
-  if (typeof ChatMessage.applyMode === 'function') {
-    ChatMessage.applyMode(chatData, V14_CHAT_MODE_BY_LEGACY_ROLL_MODE[rollMode] || rollMode);
-    return chatData;
-  }
-  ChatMessage.applyRollMode?.(chatData, rollMode);
-  return chatData;
 }
 
 class Fabricate {
@@ -1841,17 +1779,10 @@ class Fabricate {
       // Destroy MUST resolve documents through the identical matcher salvage uses,
       // including its case-SENSITIVE name fallback: a destroy that matched more broadly
       // than salvage would delete things the player was shown as a different component.
-      // `findComponentItems` is the public promotion the engine task owns; the private
-      // spelling is accepted while that promotion is in flight so this lane does not
-      // reach into `CraftingEngine.js`, and the public name wins the moment it exists.
-      findComponentItems: (actor, component, system) => {
-        const engine = this.craftingEngine;
-        const resolve =
-          typeof engine.findComponentItems === 'function'
-            ? engine.findComponentItems
-            : engine._findComponentItems;
-        return resolve.call(engine, actor, component, system);
-      },
+      // Read off `this.craftingEngine` at CALL time, not at construction time, because
+      // this service is cached and the engine is (re)assigned during setup.
+      findComponentItems: (actor, component, system) =>
+        this.craftingEngine.findComponentItems(actor, component, system),
       // Must RETURN the deleted documents: the service derives `unitsDeleted` from what
       // came back, never from what it asked for, because a `preDeleteItem` hook can veto
       // individual ids silently while the rest of the batch deletes.
@@ -1870,7 +1801,8 @@ class Fabricate {
    *    throws for a player whose client default is In-Character.
    * 2. **Visibility before `create`**, because the legacy `rollMode` CREATE OPTION is
    *    honoured only for a message carrying rolls and this card carries none. See
-   *    {@link applyBulkChatVisibility}.
+   *    {@link module:src/systems/bulkChatVisibility.applyBulkChatVisibility}, which owns
+   *    the V13/V14 probe and vocabulary.
    * 3. **`create` last**, with `author` — the V14 schema defines `author` and has no
    *    `user` field and no shim, so the `user` key the single-salvage poster still
    *    passes is silently discarded there and works only by defaulting.

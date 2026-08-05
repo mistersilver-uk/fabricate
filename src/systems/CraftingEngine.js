@@ -3382,7 +3382,7 @@ export class CraftingEngine {
       craftingActor?.items != null && typeof craftingActor.items[Symbol.iterator] === 'function';
     let matchingItems = [];
     if (managedItem && system && itemsIterable && !hasPropertyUpdates && !transfersEffects) {
-      matchingItems = this._findComponentItems(craftingActor, managedItem, system) || [];
+      matchingItems = this.findComponentItems(craftingActor, managedItem, system) || [];
     }
 
     const resultItem = await createOrStackComponentItem({
@@ -4871,7 +4871,7 @@ export class CraftingEngine {
     }
 
     const ingredientQuantity = Number(component.salvage.ingredientQuantity) || 1;
-    const componentItems = this._findComponentItems(actor, component, system);
+    const componentItems = this.findComponentItems(actor, component, system);
     const totalAvailable = componentItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
     if (totalAvailable < ingredientQuantity) {
       if (salvageRunManager && salvageRun) {
@@ -5213,9 +5213,26 @@ export class CraftingEngine {
    * legacy scalar / raw source-reference chain), keeping those that resolve to the
    * target component. When none resolve, falls back to a case-SENSITIVE exact-name
    * match — a compatibility path whose closure is deferred to issue 557.
-   * @private
+   *
+   * ## Public because DESTROY must match exactly what SALVAGE matches
+   *
+   * Bulk destroy (issue 859) deletes the documents a player was shown as a component,
+   * so it has to resolve them through this matcher and no other. The three sibling
+   * matchers (`RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`,
+   * `essenceResolver.findMatchingComponent`) fall back case-INSENSITIVELY; matching more
+   * broadly than salvage would delete items belonging to a differently-cased component.
+   * Rather than let `BulkDestroyService` reach through the private spelling, the method
+   * is part of the engine's surface. {@link CraftingEngine#_findComponentItems} remains
+   * as a delegate for existing callers.
+   *
+   * @param {Actor} actor The owning actor whose items are searched.
+   * @param {object} component The managed component to resolve items against.
+   * @param {object} system The crafting system the component belongs to; its `id` scopes
+   *   durable-identity resolution and its `components` list makes resolution list-aware.
+   * @returns {Array<Item>} The matching items, in the actor's own item order. Empty when
+   *   nothing matches, and when the component carries neither source references nor a name.
    */
-  _findComponentItems(actor, component, system) {
+  findComponentItems(actor, component, system) {
     const items = [...actor.items];
     const components = Array.isArray(system?.components) ? system.components : [];
     if (
@@ -5237,6 +5254,24 @@ export class CraftingEngine {
       );
     }
     return [];
+  }
+
+  /**
+   * The private spelling {@link CraftingEngine#findComponentItems} was promoted from.
+   *
+   * Retained as a THIN DELEGATE, never a second copy: two bodies could drift, and a
+   * drifted destroy matcher deletes the wrong documents. Kept because callers still name
+   * it directly, and silent — no deprecation warning — because it is an internal spelling
+   * of a method whose behaviour did not change, not a deprecated feature.
+   *
+   * @param {Actor} actor
+   * @param {object} component
+   * @param {object} system
+   * @returns {Array<Item>}
+   * @private
+   */
+  _findComponentItems(actor, component, system) {
+    return this.findComponentItems(actor, component, system);
   }
 
   /**
