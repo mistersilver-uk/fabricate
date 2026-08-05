@@ -18,6 +18,14 @@
     bottom-left  essence chips — the essence's OWN authored icon on a dark
                  circular chip. The chip is what makes an 8px glyph read against
                  arbitrary artwork; the icon set is GM-authored, never a fixed four.
+    bottom-right bulk-select check badge (issue 859), 19px, inset 5px from the
+                 thumb's bottom/right edges. Only the FOURTH slot in the thumb, so
+                 it does not collide with the top-right quantity pip or the
+                 top-left badge row — but it DOES sit directly above the
+                 bottom-left essence chips, which are `flex-wrap` with no width
+                 limit of their own; `.inventory-card-pips` therefore carries
+                 `max-width: calc(100% - 32px)` to keep a wide essence row clear of
+                 this slot rather than running under it.
 
   The card owns its thumbnail markup rather than reusing CraftingThumb: that
   component takes a px `size` and hard-sets width/height from it, so it cannot
@@ -30,7 +38,14 @@
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
 
-  let { item = null, selected = false, onSelect = null } = $props();
+  let {
+    item = null,
+    selected = false,
+    bulkSelected = false,
+    bulkActive = false,
+    onSelect = null,
+    onBulkToggle = null,
+  } = $props();
 
   const id = $derived(String(item?.key ?? ''));
   const name = $derived(String(item?.name ?? ''));
@@ -49,14 +64,37 @@
   const broken = $derived(item?.broken === true);
   const essencePips = $derived(Array.isArray(item?.essences) ? item.essences : []);
   const brokenLabel = $derived(localize('FABRICATE.App.Inventory.Card.Broken'));
+  const selectedSuffixLabel = $derived(localize('FABRICATE.App.Inventory.Card.SelectedSuffix'));
+  const bulkSelectedPipLabel = $derived(localize('FABRICATE.App.Inventory.Card.BulkSelectedPip'));
+  const baseAriaLabel = $derived(
+    broken ? `${name} — ${brokenLabel}` : `${name} — ${quantityLabel}`
+  );
+  // The bulk-selected suffix is ADDED to the existing label, never a replacement —
+  // a broken selected card must still announce its brokenness.
+  const ariaLabel = $derived(
+    bulkSelected ? `${baseAriaLabel} — ${selectedSuffixLabel}` : baseAriaLabel
+  );
 
-  function select() {
+  // One handler serves click AND keydown: both MouseEvent and KeyboardEvent carry
+  // `shiftKey`, so the keyboard equivalent (Shift+Enter / Shift+Space) falls out
+  // free rather than needing its own branch. `preventDefault()` on the shift path
+  // is required — without it the browser starts a text selection across the grid.
+  // `onBulkToggle` is a prop the parent may not have wired yet; it degrades to a
+  // no-op via optional chaining rather than throwing.
+  function activate(event) {
+    if (event?.shiftKey) {
+      event.preventDefault();
+      onBulkToggle?.(id);
+      return;
+    }
     onSelect?.(id);
   }
   function onKey(event) {
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      // Stops a double activation on click-emulating keys AND stops a double
+      // TOGGLE on the shift path, which would otherwise silently cancel itself.
       event.preventDefault();
-      select();
+      activate(event);
     }
   }
 </script>
@@ -65,18 +103,21 @@
   class="inventory-card"
   class:is-selected={selected}
   class:is-essence={isEssence}
+  class:is-bulk-selected={bulkSelected}
   class:is-broken={broken}
   role="listitem"
   data-inventory-card={id}
   data-inventory-card-broken={broken ? 'true' : undefined}
+  data-inventory-card-bulk-selected={bulkSelected ? 'true' : undefined}
 >
   <button
     type="button"
     class="inventory-card-button"
-    aria-pressed={selected}
-    aria-label={broken ? `${name} — ${brokenLabel}` : `${name} — ${quantityLabel}`}
+    aria-pressed={bulkActive ? bulkSelected : selected}
+    aria-label={ariaLabel}
+    aria-keyshortcuts="Shift+Enter Shift+Space"
     title={name}
-    onclick={select}
+    onclick={activate}
     onkeydown={onKey}
   >
     <span class="inventory-card-thumb">
@@ -141,6 +182,17 @@
               <i class={pip.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>
             </span>
           {/each}
+        </span>
+      {/if}
+
+      {#if bulkSelected}
+        <span
+          class="inventory-card-bulk-badge"
+          data-inventory-bulk-badge
+          title={bulkSelectedPipLabel}
+          aria-label={bulkSelectedPipLabel}
+        >
+          <i class="fas fa-check" aria-hidden="true"></i>
         </span>
       {/if}
     </span>
@@ -209,6 +261,17 @@
   .inventory-card.is-selected .inventory-card-button {
     border-color: var(--fab-accent);
     background: var(--fab-accent-soft);
+  }
+
+  /* Bulk-selected treatment (issue 859): a softer fill than single-selection plus a
+     1px accent ring, so a multi-selected card reads distinctly from the single
+     inspected one. Declared BEFORE `.is-broken` so equal-specificity cascade order
+     lets the broken rule's border-color win when both classes are present — a
+     broken selected card keeps its danger border rather than being signalled by
+     the 19px check badge alone. */
+  .inventory-card.is-bulk-selected .inventory-card-button {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-surface-active);
   }
 
   /* A broken item's card border is the outermost signal; it survives selection. */
@@ -328,7 +391,11 @@
   }
 
   /* Essence chips: the chip exists so an 8px glyph reads on ANY artwork. The icon is
-     the essence's own authored icon — never a fixed four mapped onto tag hues. */
+     the essence's own authored icon — never a fixed four mapped onto tag hues.
+     max-width reserves the bottom-right bulk-select badge slot (issue 859): this
+     row is `flex-wrap` with no width limit of its own, and four essences already
+     reach ~73px in a ~98px thumb — enough to run under a 19px badge inset 5px from
+     the right without this constraint. */
   .inventory-card-pips {
     position: absolute;
     bottom: 5px;
@@ -337,6 +404,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 3px;
+    max-width: calc(100% - 32px);
   }
 
   .inventory-card-pip {
@@ -353,6 +421,31 @@
 
   .inventory-card-pip i {
     font-size: 8px;
+    line-height: 1;
+  }
+
+  /* Bulk-select check badge (issue 859): the fourth thumb slot, bottom-right,
+     mirroring the top-right quantity pip's 5px inset. Accent-filled so it reads as
+     a positive confirmation distinct from the neutral quantity pip and the danger
+     broken pip. */
+  .inventory-card-bulk-badge {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    z-index: 2;
+    width: 19px;
+    height: 19px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--fab-accent-border);
+    background: var(--fab-accent);
+    color: var(--fab-on-accent);
+  }
+
+  .inventory-card-bulk-badge i {
+    font-size: 9px;
     line-height: 1;
   }
 
