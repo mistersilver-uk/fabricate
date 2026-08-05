@@ -1161,6 +1161,9 @@ export function createInventoryStore({ services } = {}) {
     const total = snapshot.length;
     bulkProgress = { current: 0, total };
     const reporter = services?.createProgressReporter?.() ?? null;
+    // Whether the run ever produced a progress tick — the toast's open/close gate; see
+    // the `finally` below.
+    let ticked = false;
     try {
       const targets = snapshot.map((entry) => ({
         actorId: entry.actorId,
@@ -1176,6 +1179,7 @@ export function createInventoryStore({ services } = {}) {
         // — a graceful degrade, not a throw (a missing facade is `null`, and `?.`
         // on the awaited result already covers that).
         onProgress: (current) => {
+          ticked = true;
           bulkProgress = { current, total };
           reporter?.({ pct: total > 0 ? current / total : 1 });
         },
@@ -1188,7 +1192,15 @@ export function createInventoryStore({ services } = {}) {
       bulkReport = buildBulkReport('salvage', snapshot, { items: [], error: message });
       return { cancelled: false, items: [], error: message };
     } finally {
-      reporter?.({ pct: 1 });
+      // The terminal `pct: 1` is CONDITIONAL on a tick having happened. The reporter
+      // opens its toast lazily, on its first call (`createDefaultProgressReporter`), so
+      // an unconditional terminal emit on a ZERO-TICK exit — a dismissed batch prompt
+      // returns `{cancelled: true}` before the first target, and a throw can precede
+      // the first target too — OPENS the toast for the first time and immediately
+      // drives it to 100%: a completion notification for a run that never ran.
+      // `dismiss()` stays unconditional: it is documented as a no-op when the reporter
+      // never started, so it still discharges the abnormal-exit obligation.
+      if (ticked) reporter?.({ pct: 1 });
       reporter?.dismiss?.();
       bulkRunning = false;
       bulkProgress = null;
@@ -1207,6 +1219,13 @@ export function createInventoryStore({ services } = {}) {
    * count). A FALSY result is treated as not-confirmed: covers both `null` (the
    * dialog dismissed) and `false` (No, `DialogV2.confirm`'s own default button).
    *
+   * THE TARGET SET IS SNAPSHOTTED BEFORE THE DIALOG OPENS, which is what the spec
+   * states (§Bulk Destroy) and what the panel's own docblock claims. The listing
+   * reloads on world-time, scene and source changes, any of which can fire while the
+   * modal stands, so the set the caller counted for the confirmation copy has to be
+   * the set that is destroyed — a re-read afterwards would let the row count and the
+   * unit count the player agreed to drift from what is deleted.
+   *
    * Same single-`finally` exit-path obligation as `bulkSalvage()`.
    *
    * @param {object} prompt Already-localized `DialogV2.confirm` options.
@@ -1215,16 +1234,19 @@ export function createInventoryStore({ services } = {}) {
    */
   async function bulkDestroy(prompt) {
     if (bulkRunning || bulkDestroying) return { confirmed: false };
+    // BEFORE the modal, never after — see the docblock. `bulkEntries` recomputes into a
+    // NEW array whenever the listing changes, so holding this reference is a real
+    // snapshot rather than a live view.
+    const snapshot = bulkEntries;
     const confirmed = await services?.confirmDialog?.(prompt);
     if (!confirmed) return { confirmed: false };
-
-    const snapshot = bulkEntries;
     if (snapshot.length === 0) return { confirmed: true, items: [] };
 
     bulkDestroying = true;
     const total = snapshot.length;
     bulkProgress = { current: 0, total };
     const reporter = services?.createProgressReporter?.() ?? null;
+    let ticked = false;
     try {
       const targets = snapshot.map((entry) => ({
         actorId: entry.actorId,
@@ -1235,6 +1257,7 @@ export function createInventoryStore({ services } = {}) {
       const result = await services?.destroyComponents?.({
         targets,
         onProgress: (current) => {
+          ticked = true;
           bulkProgress = { current, total };
           reporter?.({ pct: total > 0 ? current / total : 1 });
         },
@@ -1247,7 +1270,9 @@ export function createInventoryStore({ services } = {}) {
       bulkReport = buildBulkReport('destroy', snapshot, { items: [], error: message });
       return { confirmed: true, items: [], error: message };
     } finally {
-      reporter?.({ pct: 1 });
+      // Conditional for the same reason `bulkSalvage`'s is: a zero-tick exit (a throw
+      // before the first target) must not OPEN the progress toast just to complete it.
+      if (ticked) reporter?.({ pct: 1 });
       reporter?.dismiss?.();
       bulkDestroying = false;
       bulkProgress = null;
@@ -1256,11 +1281,18 @@ export function createInventoryStore({ services } = {}) {
   }
 
   /**
-   * Handle a debounced owned-item change notification (`subscribeInventoryChange`,
-   * `src/ui/svelte/util/foundryBridge.js`), quietly reloading the listing UNLESS a
-   * bulk run is in flight (issue 859). Item mutations arrive one hook fire per
-   * document, so a burst under an open bulk run would otherwise reload roughly
-   * once per queued item.
+   * Handle a hook-driven listing refresh, quietly reloading UNLESS a bulk run is in
+   * flight (issue 859).
+   *
+   * THIS IS THE ONLY WAY THE SHELL MAY REFRESH THE LISTING. `FabricateAppRoot`
+   * routes BOTH of its subscriptions here — `subscribeInventoryChange` and
+   * `subscribeCraftingDataChange` (`src/ui/svelte/util/foundryBridge.js`) — and
+   * `fabricate-app-shell.test.js` pins the absence of a direct `load(true)` call
+   * there, because a bypassed guard is indistinguishable from a missing one and
+   * this store's own tests cannot see the bypass (they call the guard directly).
+   * The item-change hook is the sharp case: item mutations arrive one hook fire per
+   * document, so a bulk run's burst would otherwise reload roughly once per queued
+   * item.
    *
    * This is a DROP, not a defer, and that is safe ONLY because it is paired with
    * `bulkSalvage()`/`bulkDestroy()` always performing their own terminal

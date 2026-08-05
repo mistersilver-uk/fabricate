@@ -1951,6 +1951,34 @@ describe('inventoryStore', () => {
       assert.equal(store.bulkProgress, null, 'and the terminal state still clears');
     });
 
+    it('never OPENS the progress toast on a run that ticked zero times', async () => {
+      // `createDefaultProgressReporter` opens its toast LAZILY, on its first call. An
+      // unconditional terminal `pct: 1` therefore opened a toast for the first time on a
+      // dismissed batch prompt — which returns before the first target is touched — and
+      // drove it straight to 100%: a completion notification for a run that called the
+      // engine zero times. `dismiss()` is documented as a no-op when the reporter never
+      // started, so the exit-path obligation is still fully discharged.
+      const { store, log } = await loadedBulkStore([bulkRow('c1', 'Iron')], {
+        salvageResult: { cancelled: true, items: [] },
+      });
+      store.toggleBulkSelection('sys:c1');
+      flushSync();
+
+      await store.bulkSalvage();
+      flushSync();
+
+      assert.deepEqual(
+        log.filter(([name]) => name === 'progress'),
+        [],
+        'nothing ticked, so the reporter was never called and no toast ever opened'
+      );
+      assert.deepEqual(
+        log.filter(([name]) => name === 'dismiss'),
+        [['dismiss']],
+        'and the terminal dismissal still runs — a no-op against a toast that never opened'
+      );
+    });
+
     it('refuses to start a second run while one is in flight', async () => {
       let release;
       const gate = new Promise((resolve) => {
@@ -2058,7 +2086,7 @@ describe('inventoryStore', () => {
       assert.deepEqual(
         log.filter(([name]) => name === 'progress').map(([, update]) => update.pct),
         [1 / 3, 2 / 3, 1, 1],
-        'three ticks, then the terminal one the finally block always sends'
+        'three ticks, then the terminal one the finally block sends once a run has ticked'
       );
     });
 
