@@ -581,8 +581,15 @@
      material it acts on is, for the population this feature exists for, effectively not
      there. Pinned to the bottom of `.inventory-detail`'s scrollport, it is reachable in
      every selection size.
-     It needs the column's OWN fill (`.inventory-view-column-right` is
-     `--fab-surface-soft`) because rows now scroll behind it.
+     It needs an OPAQUE fill, not `.inventory-view-column-right`'s own
+     `--fab-surface-soft` (issue 859) — that token is a 5%-alpha overlay, not a fill,
+     so a `--fab-surface-soft` footer let scrolled rows show straight through it. The
+     column's true backdrop is that overlay painted once over `.inventory-view-grid`'s
+     `--fab-surface`, so `--fab-surface` — the opaque base of that composite, and the
+     one token every theme block defines it from — is what the footer paints instead:
+     solid enough to block the scrolled queue, and close enough in tone (the overlay
+     it omits is a bare 5% tint) to still read as part of the panel rather than a
+     foreign bar dropped on top of it.
      `.bulk-body`'s `padding-bottom` STAYS: it is the Chromium flex-overflow trap
      recorded above, and it is also what keeps this footer's natural (fully scrolled)
      resting place off the window edge — sticky can only pull an element UP to the
@@ -598,7 +605,7 @@
     border-top: 1px solid var(--fab-border);
     padding-top: var(--fab-space-3);
     padding-bottom: var(--fab-space-2);
-    background: var(--fab-surface-soft);
+    background: var(--fab-surface);
   }
 
   .bulk-footer-note {
