@@ -1158,6 +1158,7 @@
       "GatherActor": "Gatherer",
       "GatherTask": "Task",
       "GatherComponents": "Gathered",
+      "GatherNothing": "Nothing was found this time.",
       "GatherEvents": "Events Encountered",
       "GatherToolsBroken": "Tools Broken",
       "GatherStamina": "Stamina Spent",
@@ -5207,6 +5208,9 @@
         "ConditionsBlocked": "Current weather or time-of-day does not allow this task.",
         "LocationBlocked": "Not available in the party's current realm.",
         "NoCurrentRealm": "No party realm set."
+      },
+      "Diagnostics": {
+        "ResultSourceUnresolved": "A gathering result points at an item that no longer resolves."
       },
       "Realm": {
         "UndiscoveredPlaceholder": "Undiscovered realm"
