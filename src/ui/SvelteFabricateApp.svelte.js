@@ -368,6 +368,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this.updateProps({ showAlchemy, activeTab: this._activeTab });
   }
 
+  /**
+   * Re-project the actor-selection bar after the GM changed which actor types count
+   * as player characters (issue 1024).
+   *
+   * The bar seeds ONCE at load, so without this a player whose only owned actor just
+   * became a player character keeps an empty bar until reload — which is the reported
+   * bug's second half.
+   */
+  _refreshSelectableActors() {
+    this._services?.actorBar?.refreshSelectableActors?.();
+  }
+
   _onRender(context, options) {
     super._onRender(context, options);
     this._registerHooks();
@@ -379,7 +391,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
     this._hookIds = {
       systems: Hooks.on('fabricate.craftingSystemsChanged', () => this._refreshAlchemy()),
-      recipes: Hooks.on('fabricate.recipesChanged', () => this._refreshAlchemy())
+      recipes: Hooks.on('fabricate.recipesChanged', () => this._refreshAlchemy()),
+      playerCharacterTypes: Hooks.on('fabricate.playerCharacterTypesChanged', () =>
+        this._refreshSelectableActors()
+      )
     };
   }
 
@@ -389,6 +404,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
     Hooks.off('fabricate.craftingSystemsChanged', this._hookIds.systems);
     Hooks.off('fabricate.recipesChanged', this._hookIds.recipes);
+    Hooks.off('fabricate.playerCharacterTypesChanged', this._hookIds.playerCharacterTypes);
     this._hookIds = null;
   }
 

@@ -1,4 +1,8 @@
 import { getFabricateFlag } from '../config/flags.js';
+// `itemStackQuantity.js` never touches `game`, `ui`, `Hooks` or `CONFIG` — it receives
+// the configured path by push — so importing it here does NOT break the ingredient
+// model's Foundry-free contract (`openspec/specs/data-models/spec.md:1328`).
+import { readStackQuantity } from '../systems/itemStackQuantity.js';
 import { clampAllocation, deliveredEssences, greedyAllocate } from '../utils/essenceAllocation.js';
 
 import { IngredientGroup } from './IngredientGroup.js';
@@ -324,7 +328,11 @@ export class IngredientSet {
   _initialRemaining(availableItems) {
     const remaining = new Map();
     for (const item of availableItems) {
-      remaining.set(this._itemKey(item), Number(item.system?.quantity || 1));
+      // BLOCKING routing site (issue 1024): this ledger is what the whole consumption
+      // plan is computed from. Leaving it on a hardcoded path while `_consumeIngredients`
+      // reads the configured one would split the read from the write one layer up —
+      // exactly the failure the single-resolved-path requirement forbids.
+      remaining.set(this._itemKey(item), readStackQuantity(item));
     }
     return remaining;
   }
@@ -1038,7 +1046,8 @@ export class IngredientSet {
    *
    * `ownedUnits` is what `remaining` holds — the units left AFTER every component/tag
    * group has claimed — so an allocation can never be steered into an infeasible
-   * state, and no caller has to re-read the game-system-specific `system.quantity`.
+   * state, and no caller has to re-read the item's raw stack quantity at the
+   * game-system-specific configured path.
    * @private
    */
   _essenceCarriers(members, availableItems, remaining, resolveEssences) {
@@ -1118,7 +1127,7 @@ export class IngredientSet {
    * the units the allocation draws from that stack.
    *
    * One entry per (item, requirement) would be a live double-consume bug: the engine
-   * re-reads `item.system.quantity` per plan entry and deletes the document once the
+   * re-reads the item's live stack quantity per plan entry and deletes the document once the
    * live quantity is covered, so a second entry for the same shared unit throws on a
    * document that is already gone — after earlier ingredients have been deleted. A
    * component/tag group MAY still contribute its own entry for the same item key,

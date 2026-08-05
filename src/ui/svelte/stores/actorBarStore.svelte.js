@@ -106,6 +106,44 @@ export function createActorBarStore({ services } = {}) {
   }
 
   /**
+   * Re-read the selectable-actor list after the world's definition of a player
+   * character changed (issue 1024: the GM edited the configured actor types).
+   *
+   * Distinct from {@link loadSelectableActors}, which is a ONE-SHOT startup seed
+   * guarded by `loaded`. This runs on demand, and deliberately does NOT reset the
+   * `loaded` latch — that latch exists to stop a later `$effect` run clobbering a
+   * deliberate pick, and clearing it here would re-arm exactly that.
+   *
+   * Selection rules:
+   *
+   *   - An EMPTY selection with a non-empty list seeds and persists the first entry.
+   *     This is the reported scenario: the player owned only a `robot`, so the bar was
+   *     empty and nothing was selected. A naive "re-seed only when the current pick is
+   *     GONE" guard short-circuits on the falsy id — `''` is trivially "not present" but
+   *     reads as "nothing to fix" to a `selectedActorId && !present` test — and renders a
+   *     populated but unselected bar.
+   *   - A pick that is STILL PRESENT is left untouched and is not re-persisted.
+   *   - A pick that VANISHED (its actor type stopped counting) re-seeds to the first
+   *     entry.
+   *   - An EMPTY list sets nothing, persists nothing, and never indexes `[0]`.
+   *
+   * Re-seeding routes through {@link selectActor} rather than assigning
+   * `selectedActorId`, so the store and the persisted preference converge.
+   */
+  function refreshSelectableActors() {
+    const actors = services?.listSelectableActors?.() ?? [];
+    selectableActors = Array.isArray(actors) ? actors : [];
+
+    if (selectableActors.length === 0) return;
+
+    const isPresent =
+      selectedActorId && selectableActors.some((actor) => actor?.id === selectedActorId);
+    if (isPresent) return;
+
+    selectActor(selectableActors[0].id);
+  }
+
+  /**
    * Store the gathering tab's active stamina pool (`{ current, max, … }`) for
    * the header bar, or `null` when the active system is not in stamina mode (or
    * no actor/pool applies).
@@ -177,6 +215,7 @@ export function createActorBarStore({ services } = {}) {
       return selectedActor;
     },
     loadSelectableActors,
+    refreshSelectableActors,
     selectActor,
     selectScopedActor,
     setStaminaPool,

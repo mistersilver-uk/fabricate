@@ -1,5 +1,6 @@
 import { stampItemDataRoleIdentity } from './config/flags.js';
 import { Tool } from './models/Tool.js';
+import { setStackQuantity } from './systems/itemStackQuantity.js';
 
 /**
  * Stamp a broken-tool REPLACEMENT grant's durable identity onto its item-data payload
@@ -51,7 +52,7 @@ function replacementItemData(source) {
             : {},
         };
   itemData.system ??= {};
-  itemData.system.quantity = 1;
+  setStackQuantity(itemData, 1);
   if (source.uuid) {
     globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
   }

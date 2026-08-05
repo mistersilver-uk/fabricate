@@ -41,6 +41,13 @@ import {
   refundCurrencySpends,
   spendCurrencySpends,
 } from './currencyAffordance.js';
+import {
+  hasStackQuantity,
+  readStackQuantity,
+  readStoredStackQuantity,
+  setStackQuantity,
+  updateStackQuantity,
+} from './itemStackQuantity.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
 import { buildStepRecipeView } from './stepRecipeView.js';
@@ -208,7 +215,9 @@ function selectedQuantityItems(items, quantity) {
   for (const item of Array.isArray(items) ? items : []) {
     if (remaining <= 0) break;
     selected.add(item);
-    remaining -= Number(item?.system?.quantity) || 1;
+    // Under-reading here OVER-selects items into the plan that the delete branch then
+    // destroys one by one, so this is a routed site even though it never writes.
+    remaining -= readStackQuantity(item);
   }
   return selected;
 }
@@ -2082,11 +2091,11 @@ export class CraftingEngine {
    * of its options has its required quantity met. Each submission counts as one
    * unit toward a group, because the workbench expands a stack into one
    * submission per unit. Available units are counted by occurrence (how many
-   * submissions match an option's component IDs), NOT by reading each item's
-   * `system.quantity`. This per-unit occurrence model matches how essences are
+   * submissions match an option's component IDs), NOT by reading each item's stack
+   * quantity. This per-unit occurrence model matches how essences are
    * accumulated and how {@link _consumeSubmittedAlchemyItems} consumes items. It
    * is deliberately different from {@link IngredientSet#resolveIngredientSelection},
-   * which sums `system.quantity` per item.
+   * which sums the stack quantity per item.
    *
    * A submission contributes at most one unit per option even if several of the
    * option's components share its source-reference chain. Essence requirements,
@@ -2195,7 +2204,7 @@ export class CraftingEngine {
       for (const set of ingredientSets) {
         // The signature is computed 1:1 from `set.ingredientGroups`, so they align by
         // index. Counting differs from IngredientSet.resolveIngredientSelection (that
-        // method sums each item's system.quantity, whereas this counts submission
+        // method sums each item's stack quantity, whereas this counts submission
         // occurrences per unit); only the option-as-alternative semantics is shared.
         const signature = signatureValidator.computeSignature(set, components);
         const groups = Array.isArray(set.ingredientGroups) ? set.ingredientGroups : [];
@@ -2283,8 +2292,8 @@ export class CraftingEngine {
       for (const item of actor.items || []) {
         const count = essenceConsumeCounts.get(item.uuid);
         if (!count) continue;
-        const qty = Number(item.system?.quantity ?? 1);
-        await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
+        const qty = readStoredStackQuantity(item, { absentDefault: 1 });
+        await (count >= qty ? item.delete() : updateStackQuantity(item, qty - count));
         consumedItems.push({ item, quantity: count, ingredient: null });
       }
     }
@@ -2308,8 +2317,8 @@ export class CraftingEngine {
         const count = consumeCounts.get(item.uuid);
         if (!count) continue;
         try {
-          const qty = Number(item.system?.quantity ?? 1);
-          await (count >= qty ? item.delete() : item.update({ 'system.quantity': qty - count }));
+          const qty = readStoredStackQuantity(item, { absentDefault: 1 });
+          await (count >= qty ? item.delete() : updateStackQuantity(item, qty - count));
         } catch (error) {
           console.error('Fabricate | Alchemy: failed to consume item', item.uuid, error);
         }
@@ -2487,7 +2496,7 @@ export class CraftingEngine {
     }
 
     itemData.system ??= {};
-    itemData.system.quantity = qty;
+    setStackQuantity(itemData, qty);
     if (component?.id) {
       stampCraftedComponentIdentity(itemData, system?.id, component.id);
     }
@@ -2850,7 +2859,7 @@ export class CraftingEngine {
 
     // Execute consumption
     for (const { item, quantity, ingredient } of consumptionPlan) {
-      const itemQuantity = item.system?.quantity ?? 1;
+      const itemQuantity = readStoredStackQuantity(item, { absentDefault: 1 });
 
       // Store consumed item info for effect transfer
       consumedItems.push({
@@ -2862,7 +2871,7 @@ export class CraftingEngine {
       // Update or delete the item
       await (quantity >= itemQuantity
         ? item.delete()
-        : item.update({ 'system.quantity': itemQuantity - quantity }));
+        : updateStackQuantity(item, itemQuantity - quantity));
     }
 
     return consumedItems;
@@ -3320,8 +3329,8 @@ export class CraftingEngine {
     }
 
     // Set quantity
-    if (itemData.system.quantity !== undefined || !sourceItem) {
-      itemData.system.quantity = result.quantity;
+    if (hasStackQuantity(itemData) || !sourceItem) {
+      setStackQuantity(itemData, result.quantity);
     }
 
     // Apply macro-based property updates
@@ -4840,10 +4849,7 @@ export class CraftingEngine {
 
     const ingredientQuantity = Number(component.salvage.ingredientQuantity) || 1;
     const componentItems = this._findComponentItems(actor, component, system);
-    const totalAvailable = componentItems.reduce(
-      (sum, item) => sum + (Number(item.system?.quantity) || 1),
-      0
-    );
+    const totalAvailable = componentItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
     if (totalAvailable < ingredientQuantity) {
       if (salvageRunManager && salvageRun) {
         salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
@@ -5208,13 +5214,15 @@ export class CraftingEngine {
 
     for (const item of items) {
       if (remaining <= 0) break;
-      const available = Number(item.system?.quantity) || 1;
+      // `readStackQuantity` (present => at least one) rather than the stored reader:
+      // this site coerced a stored 0 to 1 before the routing change and still does.
+      const available = readStackQuantity(item);
       const toConsume = Math.min(available, remaining);
       consumed.push({ item, quantity: toConsume });
       remaining -= toConsume;
       await (toConsume >= available
         ? item.delete()
-        : item.update({ 'system.quantity': available - toConsume }));
+        : updateStackQuantity(item, available - toConsume));
     }
 
     return consumed;

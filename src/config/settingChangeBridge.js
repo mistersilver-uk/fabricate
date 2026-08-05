@@ -3,6 +3,7 @@ import { FABRICATE_SETTINGS_NAMESPACE, SETTING_KEYS } from './settings.js';
 const CRAFTING_SYSTEMS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.CRAFTING_SYSTEMS}`;
 const RECIPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.RECIPES}`;
 const GATHERING_ENVIRONMENTS_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`;
+const PLAYER_CHARACTER_TYPES_KEY = `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES}`;
 
 /**
  * Bridge a replicated Fabricate world-setting change into the local change hooks the
@@ -60,6 +61,17 @@ export function handleFabricateSettingChange(
     // on: the store's `load()` returns the list, not a changed flag.
     gatheringEnvironmentStore?.load?.();
     callAll?.('fabricate.gatheringEnvironmentsChanged');
+    return true;
+  }
+  if (settingKey === PLAYER_CHARACTER_TYPES_KEY) {
+    // Issue 1024. There is nothing to reload: the predicate reads the setting per
+    // call, and by the time this hook fires Foundry has already replicated the new
+    // value into `game.settings`. What IS needed is a local signal, because every
+    // surface governed by the player-character concept — the actor-selection bar, the
+    // GM stamina roster, the manager's Access and Knowledge rosters, the party member
+    // picker — projected its list once and will otherwise show a stale roster until
+    // reload. This never writes a setting, so there is no write loop.
+    callAll?.('fabricate.playerCharacterTypesChanged');
     return true;
   }
   return false;

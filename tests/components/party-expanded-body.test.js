@@ -56,10 +56,15 @@ function remount() {
   target?.remove();
 }
 
+// Issue 1024: the projection the manager app hands down carries an `isPlayerCharacter`
+// BOOLEAN and no longer carries a raw `type` — that field is dropped precisely because
+// it is what an `actor.type === 'character'` filter grows back out of. The fixtures
+// mirror the real projection, so a component that went back to reading `type` would
+// filter everything out rather than pass.
 const actors = [
-  { uuid: 'Actor.a', id: 'a', name: 'Alara', img: 'icons/a.webp', type: 'character' },
-  { uuid: 'Actor.b', id: 'b', name: 'Bromm', img: '', type: 'character' },
-  { uuid: 'Actor.n', id: 'n', name: 'Nasty NPC', img: '', type: 'npc' }
+  { uuid: 'Actor.a', id: 'a', name: 'Alara', img: 'icons/a.webp', isPlayerCharacter: true },
+  { uuid: 'Actor.b', id: 'b', name: 'Bromm', img: '', isPlayerCharacter: true },
+  { uuid: 'Actor.n', id: 'n', name: 'Nasty NPC', img: '', isPlayerCharacter: false }
 ];
 
 describe('PartyExpandedBody mounted behavior', () => {
@@ -117,7 +122,8 @@ describe('PartyExpandedBody mounted behavior', () => {
     // Options only exist once the popover is opened.
     assert.equal(target.querySelectorAll('.manager-travel-option').length, 0);
     await openAddPopover();
-    // Alara (character, not a member) listed; Bromm excluded (already member); NPC excluded (not character).
+    // Alara (PC, not a member) listed; Bromm excluded (already member); NPC excluded
+    // (isPlayerCharacter: false).
     assert.deepEqual(optionNames(), ['Alara']);
     Array.from(target.querySelectorAll('.manager-travel-option'))
       .find(button => button.textContent.includes('Alara'))
@@ -130,7 +136,7 @@ describe('PartyExpandedBody mounted behavior', () => {
   it('filters the add popover options by search', async () => {
     await mountBody({ actorOptions: actors });
     await openAddPopover();
-    assert.equal(target.querySelectorAll('.manager-travel-option').length, 2); // Alara + Bromm (characters)
+    assert.equal(target.querySelectorAll('.manager-travel-option').length, 2); // Alara + Bromm (player characters)
     const search = target.querySelector('.manager-travel-popover-search input');
     search.value = 'brom';
     search.dispatchEvent(new window.Event('input', { bubbles: true }));
@@ -138,6 +144,26 @@ describe('PartyExpandedBody mounted behavior', () => {
     await tick();
     flushSync();
     assert.deepEqual(optionNames(), ['Bromm']);
+    remount();
+  });
+
+  it('admits a configured non-`character` player character and excludes non-PCs by STRICT positive test', async () => {
+    // The `robot` case from the report: the manager app's projection already resolved
+    // it against the GM-configured types, so the component sees a plain `true`.
+    //
+    // The third fixture is the trap. `actor.isPlayerCharacter !== false` would admit it
+    // (and every NPC in a world whose projection ever regressed), passes the old
+    // fixtures, trips no gate, and contains no literal. Only a strict `=== true`
+    // excludes it.
+    await mountBody({
+      actorOptions: [
+        { uuid: 'Actor.r', id: 'r', name: 'Robby', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.n', id: 'n', name: 'Nasty NPC', img: '', isPlayerCharacter: false },
+        { uuid: 'Actor.u', id: 'u', name: 'Unprojected', img: '' }
+      ]
+    });
+    await openAddPopover();
+    assert.deepEqual(optionNames(), ['Robby']);
     remount();
   });
 

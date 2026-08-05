@@ -538,7 +538,7 @@
         "Stamina": "Stamina",
         "SearchPlaceholder": "Search characters…",
         "SearchLabel": "Search characters",
-        "NoActors": "No selectable characters.",
+        "NoActors": "No selectable characters. Only actors of a player-character type appear in this bar — if yours is missing, ask your GM to add its actor type in Fabricate's module settings. Fabricate does not block the other actors you own, but they cannot be picked here until that type is added.",
         "DialogLabel": "Select a character",
         "TimeOfDay": {
           "Label": "Time of day",
@@ -1108,6 +1108,25 @@
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
         "Hint": "Shows experimental Fabricate surfaces that are still in development for this world — currently the recipe graph in the crafting manager. The crafting authoring tools are always available and are not gated by this switch. Disabled by default."
+      },
+      "PlayerCharacterActorTypes": {
+        "Name": "Player Character Actor Types",
+        "Label": "Choose Actor Types",
+        "Hint": "Choose which of your game system's actor types Fabricate treats as player characters. \"Character\" always counts and cannot be removed. Use this when your system has more than one player-character sheet — Fallout's \"Robot\", for example — so those actors appear in the character bar and in Fabricate's character rosters.",
+        "Title": "Player Character Actor Types",
+        "Body": "Fabricate uses these actor types for the character bar, the gathering stamina roster, the Access and Knowledge rosters, and party membership. It does not change who may attempt to craft or gather — that stays based on actor ownership.",
+        "Legend": "Actor types that count as player characters",
+        "AlwaysIncluded": "(always included)",
+        "UnknownType": "(not declared by this world — untick to remove)",
+        "Save": "Save",
+        "Cancel": "Cancel"
+      },
+      "ItemStackQuantityPath": {
+        "Name": "Item Stack Quantity Field",
+        "Hint": "The field Fabricate reads and writes for how many units an item stack holds, written as a dotted path. Your game system's default is \"{default}\" — only change this if your system stores stack counts somewhere else. A wrong path is destructive: crafting, salvage and alchemy will delete whole stacks instead of reducing them.",
+        "Unresolved": "Fabricate's item stack quantity field \"{path}\" holds a number on {resolved} of {total} of this world's items. Until you correct it, crafting, salvage and alchemy will DELETE a whole stack instead of reducing it — using one of a stack of twenty destroys all twenty. Your game system's usual field is \"{default}\", which holds a number on {defaultResolved} of {total}. Change it in Settings → Fabricate → Item Stack Quantity Field.",
+        "UnresolvedAtDefault": "None of this world's {total} items carry a stack count at Fabricate's item stack quantity field \"{path}\", which is already the field Fabricate expects for your game system. Either this world has no stackable items yet — spells, feats, classes and backgrounds hold no stack count — or this is the wrong field for your system. If your items do carry stack counts, crafting, salvage and alchemy will DELETE a whole stack instead of reducing it, and you should set the field your system really uses in Settings → Fabricate → Item Stack Quantity Field.",
+        "SchemaDiscard": "Fabricate's item stack quantity field \"{path}\" can be read on {resolved} of {total} of this world's items, but it is not part of your game system's item data, so anything Fabricate writes there is discarded without an error. Crafting, salvage and alchemy will hand out free components AND delete whole stacks instead of reducing them. Your game system's usual field is \"{default}\". Change it in Settings → Fabricate → Item Stack Quantity Field."
       },
       "RepairItemData": {
         "Name": "Repair Item Data",
@@ -3788,7 +3807,7 @@
             "AddSearchPlaceholder": "Search characters...",
             "AddSearchLabel": "Search characters to add",
             "NoAddMatches": "No characters match your search.",
-            "NoActors": "No character actors exist in this world yet.",
+            "NoActors": "No player-character actors are available to add. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if a character is missing.",
             "MoveLabel": "Move member to another party",
             "MoveSearchPlaceholder": "Search parties...",
             "MoveSearchLabel": "Search parties",

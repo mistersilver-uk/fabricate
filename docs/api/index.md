@@ -273,7 +273,7 @@ Hooks.once('fabricate.ready', () => {
 });
 ```
 
-- `listSelectableActors()` returns the current user's selectable **player characters** (`actor.type === 'character'`), owned actors for players, all for GMs.
+- `listSelectableActors()` returns the current user's selectable **player characters** (the GM-configured actor types that count as player characters, always including `'character'`), owned actors for players, all for GMs.
   Each record is redaction-safe display data containing only `{ id, uuid, name, img }`.
   No other actor internals are exposed.
   This selection list is narrower than gathering attempt authorization.
