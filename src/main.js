@@ -78,6 +78,7 @@ import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from '
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
+import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
@@ -182,24 +183,6 @@ const getGatheringSelectableActors = createGatheringSelectableActorsGetter({
   getCurrentUser: () => game.user,
   isSelectable: isGatheringActorSelectableByUser
 });
-
-/**
- * The current dnd5e/pf2e implementation of the **player-character concept**.
- *
- * "Player character" is a concept: the actor type(s) a system designates as
- * player characters. This predicate is the documented seam for future
- * per-system extension/configuration. `'character'` is the dnd5e/pf2e actor
- * type and is NOT asserted as a universal truth — systems whose player-character
- * actor type differs are a known limitation of this iteration (their PCs will not
- * appear in the actor-selection bar), and re-pointing this predicate is the
- * intended extension point.
- *
- * @param {Actor} actor Candidate actor.
- * @returns {boolean} True when the actor is a player character.
- */
-function isPlayerCharacterActor(actor) {
-  return actor?.type === 'character';
-}
 
 /**
  * Selection predicate for the actor-selection top bar.
@@ -2221,10 +2204,12 @@ class Fabricate {
     const systemId = options.systemId;
     const service = this.gatheringRichStateService;
     if (!service || !systemId) return [];
-    // Characters only — exclude NPCs (and other non-character actor types). A
-    // character with no rolled pool yet reports max: null (the panel offers Roll).
+    // Player characters only, per the CONFIGURED player-character actor types
+    // (issue 1024) — so a Fallout `robot` appears here once the GM ticks it, and a
+    // dnd5e `npc` never does. A player character with no rolled pool yet reports
+    // max: null (the panel offers Roll).
     return Array.from(game.actors?.contents ?? [])
-      .filter(actor => actor?.type === 'character')
+      .filter(actor => isPlayerCharacterActor(actor))
       .map(actor => {
         const stamina = service.getActorStamina(actor, systemId);
         return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };
@@ -2967,13 +2952,18 @@ Hooks.once('ready', async () => {
   // gather decrement and the world-time respawn write it — so reacting to that
   // setting change covers depletion AND recharge. canvasReady does the initial sync
   // to the current node state when a scene loads. Active-GM-gated inside the sync.
-  Hooks.on('updateSetting', (setting) => {
+  //
+  // The handler takes the `Setting` DOCUMENT ONLY. `createSetting` emits
+  // `(doc, options, userId)` and `updateSetting` emits `(doc, change, options, userId)`,
+  // so a handler written as `(setting, changed) => …` would receive `options` in
+  // `changed` on the create leg.
+  const handleFabricateSettingDocumentChange = (setting) => {
     const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
     if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
       void runInteractableMarkerSync();
     }
     // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
-    // `Hooks.callAll`s fired only on the GM's client. `updateSetting` fires on every
+    // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
     // client when the replicated world setting lands, so reload the stale in-memory
     // manager here and re-emit the local change hook so open player apps refresh.
     handleFabricateSettingChange(key, {
@@ -2982,7 +2972,17 @@ Hooks.once('ready', async () => {
       gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
       callAll: (hook, payload) => Hooks.callAll(hook, payload),
     });
-  });
+  };
+  Hooks.on('updateSetting', handleFabricateSettingDocumentChange);
+  // The FIRST EVER write to a world setting is a CREATE, not an update (issue 1024).
+  // `ClientSettings#set` calls `current.update(...)` only when a `Setting` document
+  // already exists; `get()` synthesises a detached document with no `_id` when nothing
+  // is stored. So a GM ticking a new player-character actor type for the first time
+  // emits `createSetting` and never `updateSetting`, and without this line the change
+  // propagates to nobody until reload. Wiring it at the shared handler also closes the
+  // same latent first-write hole for the `craftingSystems`, `recipes`, and
+  // `gatheringEnvironments` branches.
+  Hooks.on('createSetting', handleFabricateSettingDocumentChange);
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
   });

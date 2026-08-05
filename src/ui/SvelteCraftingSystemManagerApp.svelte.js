@@ -29,6 +29,7 @@ import { CompendiumImporter } from '../systems/CompendiumImporter.js';
 import { buildImportReportContent } from '../systems/importReportContent.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { getFabricateFlag } from '../config/flags.js';
+import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';
 import { DEFAULT_QUANTITY_PATH } from '../systems/componentStacking.js';
 import {
   KNOWLEDGE_MESSAGES,
@@ -238,12 +239,19 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
 
         const systemListener = (...args) => callback('systems', ...args);
         const recipeListener = (...args) => callback('recipes', ...args);
+        // Issue 1024: the GM who ticks a new player-character actor type is the one
+        // GUARANTEED to be looking at stale data — the settings sidebar sits over an
+        // open manager — so the Access, Knowledge and party rosters must republish.
+        const playerCharacterTypeListener = (...args) =>
+          callback('playerCharacterTypes', ...args);
         hooks.on('fabricate.craftingSystemsChanged', systemListener);
         hooks.on('fabricate.recipesChanged', recipeListener);
+        hooks.on('fabricate.playerCharacterTypesChanged', playerCharacterTypeListener);
 
         return () => {
           hooks?.off?.('fabricate.craftingSystemsChanged', systemListener);
           hooks?.off?.('fabricate.recipesChanged', recipeListener);
+          hooks?.off?.('fabricate.playerCharacterTypesChanged', playerCharacterTypeListener);
         };
       },
       setGatheringConditions: async (conditions) =>
@@ -277,6 +285,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             avatar: user.avatar || user.img || '',
           }))
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // EVERY world actor (the travel-marker drop zone accepts any of them), each
+      // carrying a PROJECTED `isPlayerCharacter` boolean so the party member picker can
+      // narrow to player characters without a `.svelte` component importing the
+      // predicate — which would also drag `playerCharacterTypes.js` into every mounted
+      // component test's raw-module allowlist. The raw `type` field is deliberately
+      // GONE (issue 1024): while it is present, a hardcoded actor-type comparison has
+      // something to grow back out of.
       getActorOptions: () =>
         Array.from(game.actors?.contents || [])
           .map((actor) => ({
@@ -284,22 +299,20 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             id: actor.id,
             name: actor.name,
             img: actor.img || '',
-            type: actor.type || '',
+            isPlayerCharacter: isPlayerCharacterActor(actor),
           }))
           .filter((actor) => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
       // Player-character actors, name-sorted, for the Access tab's grantable
-      // Characters roster under the `restricted` visibility mode. A character is a
-      // player-character per `game.fabricate.isPlayerCharacterActor`
-      // (actor.type === 'character'), with a plain type fallback so the store never
-      // touches classification logic. Each entry carries its control set — see
+      // Characters roster under the `restricted` visibility mode. Membership is the
+      // shared, GM-CONFIGURABLE player-character predicate (issue 1024), imported
+      // directly: this is a `.svelte.js` app module rather than a component, so no
+      // injection seam is needed, and the predicate is deliberately NOT published on
+      // `game.fabricate`. Each entry carries its control set — see
       // `_describeAccessActor`.
       getPlayerCharacterActors: () =>
         Array.from(game.actors?.contents || [])
-          .filter(
-            (actor) =>
-              game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'
-          )
+          .filter((actor) => isPlayerCharacterActor(actor))
           .map((actor) => this._describeAccessActor(actor))
           .filter((actor) => actor.id && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
@@ -1085,9 +1098,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
   // the projection needs `actor.items` and the actor's flags.
   _knowledgeRosterActors() {
     return Array.from(game.actors?.contents || [])
-      .filter(
-        (actor) => game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'
-      )
+      .filter((actor) => isPlayerCharacterActor(actor))
       .filter((actor) => actor?.id && actor?.name)
       .sort((a, b) => a.name.localeCompare(b.name));
   }
