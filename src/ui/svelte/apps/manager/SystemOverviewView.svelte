@@ -10,12 +10,17 @@
   crafting manager admin is GM-scoped.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
     // `{ issues, counts, blocksSystem }` from `evaluateSystemValidation`.
-    report = { issues: [], counts: { critical: 0, warning: 0, info: 0, blockers: 0 }, blocksSystem: false },
-    onSelectIssue = () => {}
+    report = {
+      issues: [],
+      counts: { critical: 0, warning: 0, info: 0, blockers: 0 },
+      blocksSystem: false,
+    },
+    onSelectIssue = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -32,7 +37,7 @@
     environment: ['GroupEnvironment', 'Gathering environments'],
     task: ['GroupTask', 'Gathering tasks'],
     event: ['GroupEvent', 'Gathering events'],
-    salvage: ['GroupSalvage', 'Component salvage']
+    salvage: ['GroupSalvage', 'Component salvage'],
   };
 
   // Per-kind deep-link button labels. The `system` kind is the overview itself,
@@ -42,7 +47,7 @@
     environment: ['LinkEnvironment', 'Open environment'],
     task: ['LinkTask', 'Open gathering task'],
     event: ['LinkEvent', 'Open gathering event'],
-    salvage: ['LinkSalvage', 'Open component']
+    salvage: ['LinkSalvage', 'Open component'],
   };
 
   // Per-issue-code message. The aggregator carries a stable default string for
@@ -53,27 +58,81 @@
     noIngredientSet: ['IssueNoIngredientSet', 'A step has no ingredient set.'],
     noResultGroup: ['IssueNoResultGroup', 'A step has no result set.'],
     duplicateAlternative: ['IssueDuplicateAlternative', 'An OR group repeats the same match.'],
-    duplicateRequirement: ['IssueDuplicateRequirement', 'A set repeats the same ingredient requirement.'],
-    requirementOverlap: ['IssueRequirementOverlap', 'Two requirements in a set can be satisfied by the same component.'],
-    unroutedResultGroup: ['IssueUnroutedResultGroup', 'A result set is not assigned to any check outcome.'],
-    unproducedOutcomeTier: ['IssueUnproducedOutcomeTier', 'A check outcome produces no result set.'],
-    disabledIncomplete: ['IssueDisabledIncomplete', 'The recipe is disabled and cannot be enabled until its gaps are fixed.'],
-    noAvailableTasks: ['IssueNoAvailableTasks', 'The environment composes no available gathering tasks.'],
-    activeNoComposition: ['IssueActiveNoComposition', 'The environment is on but composes no available tasks.'],
-    staleIncluded: ['IssueStaleIncluded', 'The environment includes a record that is no longer available.'],
+    duplicateRequirement: [
+      'IssueDuplicateRequirement',
+      'A set repeats the same ingredient requirement.',
+    ],
+    requirementOverlap: [
+      'IssueRequirementOverlap',
+      'Two requirements in a set can be satisfied by the same component.',
+    ],
+    unroutedResultGroup: [
+      'IssueUnroutedResultGroup',
+      'A result set is not assigned to any check outcome.',
+    ],
+    unproducedOutcomeTier: [
+      'IssueUnproducedOutcomeTier',
+      'A check outcome produces no result set.',
+    ],
+    disabledIncomplete: [
+      'IssueDisabledIncomplete',
+      'The recipe is disabled and cannot be enabled until its gaps are fixed.',
+    ],
+    noAvailableTasks: [
+      'IssueNoAvailableTasks',
+      'The environment composes no available gathering tasks.',
+    ],
+    activeNoComposition: [
+      'IssueActiveNoComposition',
+      'The environment is on but composes no available tasks.',
+    ],
+    staleIncluded: [
+      'IssueStaleIncluded',
+      'The environment includes a record that is no longer available.',
+    ],
     noScene: ['IssueNoScene', 'The environment has no linked scene.'],
-    noEventsAtDanger: ['IssueNoEventsAtDanger', 'The environment carries danger but composes no events.'],
+    noEventsAtDanger: [
+      'IssueNoEventsAtDanger',
+      'The environment carries danger but composes no events.',
+    ],
     taskNoDescription: ['IssueTaskNoDescription', 'A gathering task has no description.'],
     locallyExcluded: ['IssueLocallyExcluded', 'Some records are excluded for this environment.'],
-    invalidSalvage: ['IssueInvalidSalvage', 'The component salvage is invalid for the current salvage mode.'],
-    routedCheckNoFormula: ['IssueRoutedCheckNoFormula', 'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.'],
-    salvageRoutedNoFormula: ['IssueSalvageRoutedNoFormula', 'Routed salvage has no roll formula; salvage will not resolve until one is configured.'],
-    salvageRoutedNoTiers: ['IssueSalvageRoutedNoTiers', 'Routed salvage has no outcome tiers; configure salvage outcome tiers so salvage can be routed.'],
-    progressiveNoCheck: ['IssueProgressiveNoCheck', 'Progressive mode requires a configured progressive crafting check.'],
-    progressiveNoDifficulty: ['IssueProgressiveNoDifficulty', 'Progressive mode requires at least one component with a difficulty of 1 or more.'],
-    multiStepInAlchemy: ['IssueMultiStepInAlchemy', 'Multi-step recipes cannot be used while the system is in alchemy mode.'],
-    alchemyCheckNoFormula: ['IssueAlchemyCheckNoFormula', 'The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.'],
-    alchemySignatureCollision: ['IssueAlchemySignatureCollision', 'Two recipes share an ingredient signature, so alchemy attempts are ambiguous.']
+    invalidSalvage: [
+      'IssueInvalidSalvage',
+      'The component salvage is invalid for the current salvage mode.',
+    ],
+    routedCheckNoFormula: [
+      'IssueRoutedCheckNoFormula',
+      'This routed system has no crafting check roll formula; recipes that route by the check provider will not resolve until one is configured.',
+    ],
+    salvageRoutedNoFormula: [
+      'IssueSalvageRoutedNoFormula',
+      'Routed salvage has no roll formula; salvage will not resolve until one is configured.',
+    ],
+    salvageRoutedNoTiers: [
+      'IssueSalvageRoutedNoTiers',
+      'Routed salvage has no outcome tiers; configure salvage outcome tiers so salvage can be routed.',
+    ],
+    progressiveNoCheck: [
+      'IssueProgressiveNoCheck',
+      'Progressive mode requires a configured progressive crafting check.',
+    ],
+    progressiveNoDifficulty: [
+      'IssueProgressiveNoDifficulty',
+      'Progressive mode requires at least one component with a difficulty of 1 or more.',
+    ],
+    multiStepInAlchemy: [
+      'IssueMultiStepInAlchemy',
+      'Multi-step recipes cannot be used while the system is in alchemy mode.',
+    ],
+    alchemyCheckNoFormula: [
+      'IssueAlchemyCheckNoFormula',
+      'The alchemy check mode is Simple or Tiered but no crafting check roll formula is configured; no brew can resolve until one is set.',
+    ],
+    alchemySignatureCollision: [
+      'IssueAlchemySignatureCollision',
+      'Two recipes share an ingredient signature, so alchemy attempts are ambiguous.',
+    ],
   };
 
   const issues = $derived(Array.isArray(report?.issues) ? report.issues : []);
@@ -81,9 +140,10 @@
 
   // Group issues by kind, preserving KIND_ORDER and dropping empty groups.
   const groups = $derived(
-    KIND_ORDER
-      .map((kind) => ({ kind, issues: issues.filter((issue) => issue.kind === kind) }))
-      .filter((group) => group.issues.length > 0)
+    KIND_ORDER.map((kind) => ({
+      kind,
+      issues: issues.filter((issue) => issue.kind === kind),
+    })).filter((group) => group.issues.length > 0)
   );
 
   function groupLabel(kind) {
@@ -102,10 +162,10 @@
     return text(`FABRICATE.Admin.Manager.SystemOverview.${meta[0]}`, meta[1]);
   }
 
-  function severityClass(severity) {
-    if (severity === 'critical') return 'is-danger';
-    if (severity === 'warning') return 'is-warning';
-    return 'is-neutral';
+  function severityTone(severity) {
+    if (severity === 'critical') return 'danger';
+    if (severity === 'warning') return 'warning';
+    return 'neutral';
   }
 
   function severityLabel(severity) {
@@ -125,39 +185,86 @@
   }
 </script>
 
-<main class="manager-main manager-system-overview-main" data-system-overview aria-label={text('FABRICATE.Admin.Manager.SystemOverview.Title', 'System overview')}>
+<main
+  class="manager-main manager-system-overview-main"
+  data-system-overview
+  aria-label={text('FABRICATE.Admin.Manager.SystemOverview.Title', 'System overview')}
+>
   <section class="manager-section-header">
     <div class="manager-heading">
-      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.SystemOverview.Kicker', 'System overview')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.SystemOverview.Heading', 'Validation overview')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.SystemOverview.Subtitle', 'Review every validation issue across this crafting system and jump straight to the editor that owns each one.')}</p>
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.SystemOverview.Kicker', 'System overview')}
+      </p>
+      <h2 class="manager-title">
+        {text('FABRICATE.Admin.Manager.SystemOverview.Heading', 'Validation overview')}
+      </h2>
+      <p class="manager-subtitle">
+        {text(
+          'FABRICATE.Admin.Manager.SystemOverview.Subtitle',
+          'Review every validation issue across this crafting system and jump straight to the editor that owns each one.'
+        )}
+      </p>
     </div>
     <div class="manager-chip-row" data-system-overview-counts>
-      <span class="manager-chip is-danger" data-overview-count="critical">{counts.critical} {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</span>
-      <span class="manager-chip is-warning" data-overview-count="warning">{counts.warning} {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</span>
-      <span class="manager-chip is-neutral" data-overview-count="info">{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</span>
+      <Chip tone="danger" data-overview-count="critical"
+        >{counts.critical}
+        {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</Chip
+      >
+      <Chip tone="warning" data-overview-count="warning"
+        >{counts.warning}
+        {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</Chip
+      >
+      <Chip tone="neutral" data-overview-count="info"
+        >{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</Chip
+      >
     </div>
   </section>
 
   {#if report?.blocksSystem === true}
-    <div class="manager-environment-comp-callout manager-system-overview-blocker" role="note" data-system-overview-blocker>
+    <div
+      class="manager-environment-comp-callout manager-system-overview-blocker"
+      role="note"
+      data-system-overview-blocker
+    >
       <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.SystemOverview.BlockerNote', 'This system has a blocker: players cannot see or use any of its recipes until it is resolved.')}</span>
+      <span
+        >{text(
+          'FABRICATE.Admin.Manager.SystemOverview.BlockerNote',
+          'This system has a blocker: players cannot see or use any of its recipes until it is resolved.'
+        )}</span
+      >
     </div>
   {/if}
 
   {#if groups.length === 0}
     <section class="manager-task-core-card" data-system-overview-empty>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.SystemOverview.Empty', 'No validation issues detected. Everything in this system is ready to use.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.SystemOverview.Empty',
+          'No validation issues detected. Everything in this system is ready to use.'
+        )}
+      </p>
     </section>
   {:else}
     {#each groups as group (group.kind)}
-      <section class="manager-task-core-card manager-system-overview-group" data-system-overview-group={group.kind}>
-        <h3 class="manager-card-title">{groupLabel(group.kind)} <span class="manager-chip is-neutral">{group.issues.length}</span></h3>
+      <section
+        class="manager-task-core-card manager-system-overview-group"
+        data-system-overview-group={group.kind}
+      >
+        <h3 class="manager-card-title">
+          {groupLabel(group.kind)}
+          <Chip tone="neutral">{group.issues.length}</Chip>
+        </h3>
         <ul class="manager-system-overview-list">
           {#each group.issues as issue, index (issue.code + ':' + (issue.entityId ?? '') + ':' + index)}
-            <li class="manager-system-overview-row" data-overview-issue={issue.code} data-overview-kind={issue.kind}>
-              <span class={`manager-chip ${severityClass(issue.severity)}`} data-overview-severity={issue.severity}>{severityLabel(issue.severity)}</span>
+            <li
+              class="manager-system-overview-row"
+              data-overview-issue={issue.code}
+              data-overview-kind={issue.kind}
+            >
+              <Chip tone={severityTone(issue.severity)} data-overview-severity={issue.severity}
+                >{severityLabel(issue.severity)}</Chip
+              >
               <span class="manager-system-overview-entity">{issue.entityName}</span>
               <span class="manager-system-overview-message">{issueMessage(issue)}</span>
               {#if canDeepLink(issue)}

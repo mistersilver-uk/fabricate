@@ -44,6 +44,8 @@ When the state is not reachable by the existing capture walk in `scripts/foundry
 8. Return screenshot and smoke-test recommendations to the workflow driver.
 Do not generate, collect, publish, upload, or clean screenshot evidence from the lane, and do not update S3 or a PR.
 If capture appears impossible, report why so a maintainer can decide whether to apply the `screenshots-exempt` label.
+When an issue-specific maintainer instruction replaces automated screenshot production, report the affected views and pending maintainer visual gate.
+The instruction does not itself supply or waive evidence: the PR still needs qualifying embedded maintainer evidence or a maintainer-applied `screenshots-exempt` label.
 9. If implementation reveals a durable product rule, update the relevant canonical spec under `openspec/specs/` (and flag it for the issue delta when it changes the planned contract).
 10. Run only the focused checks explicitly allowed by the assignment brief.
 Do not install dependencies or run the complete unit-test, build, lint, format, Foundry, Docker, or screenshot gates from the lane.
@@ -82,12 +84,29 @@ New-code duplication over 3% fails the gate too, and near-identical per-manager 
 When the duplication gate fails, query SonarCloud's `api/duplications/show` per changed file for the exact duplicated spans instead of guessing which blocks collide.
 - A mounted-component suite does NOT fail loudly when a rendered `.svelte` (or a module it transitively imports) is missing from the harness allowlist (`createMountedComponentHarness`'s compiled-component list / `RAW_MODULES`) — it **hangs**, and `node --test` reports the blocked tests as `# cancelled N`, never `# fail`.
 When you add a component, or make an existing tree render a new one, register it in EVERY harness that mounts that tree (e.g. both `tests/components/recipe-edit-mounted.test.js` and `tests/components/manager-mounted.test.js`), and after the change confirm the mounted suites report `# cancelled 0` — not just `# fail 0`.
+- Never assert a DOM node against `null` (`assert.equal(el, null)`, `assert.strictEqual(el, someNode)`).
+On failure `node:assert` serialises the actual value to build its diff and walks a mounted happy-dom element's circular tree until the heap dies, so a two-second assertion failure surfaces as a heap OOM and a `# cancelled` suite with no message — indistinguishable from the harness-allowlist hang above.
+Assert the boolean instead: `assert.ok(!el, 'why')` or `assert.ok(Boolean(el), 'why')`.
+- A negative control only proves something once you have proved the mutation applied.
+A string replacement that silently matched nothing, or that hit a declaration another rule also uses, leaves the suite passing and reads as "the guard is fine" when nothing was perturbed.
+Print the substitution count (or re-grep the file) and assert it is non-zero BEFORE running the test, then restore.
+- Stage your work (`git add -u`) before any mutate-test-restore cycle.
+The natural cleanup after a control is `git checkout -- <file>`, which restores from the index and therefore DELETES uncommitted work in that file.
+Staging first makes the restore return your change instead of discarding it.
+- A passing suite does not prove a test still exercises the code you changed.
+Tests that build their own fixture markup (a Playwright `setContent` string, a hand-written HTML block) keep passing after the component stops emitting that markup, and assertions that match mid-sentence cannot see a defect at the join between two rendered fragments.
+When you change a component's markup, check whether its tests render the component or a copy of it, and retarget the ones asserting on a copy.
 - Do not run `npm ci`, create a dependency junction, or otherwise install dependencies in the lane.
 Report any focused check that cannot run with the existing lane environment.
 - When code hand-maintains a mirror of another part of the repo (selectors, labels, path/recipe maps, fixture lists), add a guard test that fails when they drift — e.g. assert every mapping entry resolves to a real tracked file or emitted symbol.
 These mirrors rot silently otherwise.
-- Recommend `npm run test:foundry` when the task depends on Foundry runtime integration or the user asks for live Foundry evidence; for PR screenshot evidence recommend the scoped `npm run test:foundry:screenshots` producer, which captures only the changed-file-affected views (from `mapChangedFilesToViews`) as full real-Foundry app windows.
+- For PR screenshot evidence, the View Lab is the producer and usually needs no recommendation at all: the `capture` CI job maps your changed files to cases and publishes the affected frames on every push.
+Render locally when you want to see a state before pushing — `node scripts/view-lab-screenshots.mjs apps <case-ids>`, seconds per frame, no Docker.
+If your change reaches a state no case covers, say so in the handoff and add the case: an uncovered state publishes an unrelated frame, which is the failure this registry exists to prevent.
+- Recommend `npm run test:foundry` only when the task depends on Foundry runtime integration, the user asks for live Foundry evidence, or the affected view is outside the case registry; then the producer is the scoped `npm run test:foundry:screenshots`, which captures the changed-file-affected views (from `mapChangedFilesToViews`) as full real-Foundry app windows.
+Do not recommend it to re-photograph a view the registry already covers — it costs ~31s per frame against the lab's ~5s and cannot run in CI.
 The workflow driver owns that run and separates harness infrastructure failures from product regressions.
+- For non-trivial UI work, return the plan's reference/reuse inventory and identify the shipped primitive or CSS contract used for each repeated control; a hand-rolled replacement needs a justified incompatibility.
 - For card, overlay, menu, disabled-state, and icon-button interactions, real browser pointer hit-tests are required whenever the change adds or repositions an overlay, menu, disabled state, card action, or icon-only control; skip them only when the rendered DOM and CSS stacking of the control are unchanged, and say so in the handoff. `elementFromPoint` checks catch CSS overlays and global Foundry styles that mounted tests can miss — see `.agents/skills/fabricate-implementer/references/pointer-hit-tests.md` for the `assertPointerTarget` recipe and where to wire it into the smoke harness.
 - For compact rails, headers, fact cards, buttons, and fixed navigation areas, test long localized/content strings so wrapping, truncation, and stable geometry are explicit.
 - For image-card UI, use representative fixture data so at least one screenshot proves the linked image path as well as fallback behavior; when no linked-image fixture exists, name that gap explicitly in the handoff.

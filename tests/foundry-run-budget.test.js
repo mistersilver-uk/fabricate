@@ -30,8 +30,21 @@ test('resolveSmokeProfile lowercases', () => {
   assert.equal(resolveSmokeProfile('RC'), 'rc');
 });
 
-test('defaultRunTimeoutMs(rc) is 18 minutes (no CI regression)', () => {
-  assert.equal(defaultRunTimeoutMs('rc'), 18 * 60_000);
+// The `rc` budget must clear a MEASURED walk, not an estimate. Beta run #144 walked
+// 1344.3s on a hosted runner and was SIGTERM-killed after printing "Smoke test PASSED."
+// (issue #987). Asserting against the measurement rather than the constant is what makes
+// this test fail if someone lowers the walk figure back toward the old 14-minute guess.
+const MEASURED_RC_WALK_MS = 1_344_300;
+
+test('defaultRunTimeoutMs(rc) clears the measured 1344.3s CI walk plus finalization', () => {
+  assert.ok(
+    defaultRunTimeoutMs('rc') >= MEASURED_RC_WALK_MS + FINALIZATION_GRACE_MS,
+    'the rc budget must cover the measured walk AND the finalization grace, or a passing run is killed mid-teardown'
+  );
+});
+
+test('defaultRunTimeoutMs(rc) is 28 minutes', () => {
+  assert.equal(defaultRunTimeoutMs('rc'), 28 * 60_000);
 });
 
 test('defaultRunTimeoutMs(full) clears the proven 1_500_000 ms workaround', () => {
@@ -43,6 +56,9 @@ test('defaultRunTimeoutMs(screenshots) also clears the long-walk workaround', ()
 });
 
 test('defaultRunTimeoutMs(full) exceeds defaultRunTimeoutMs(rc)', () => {
+  // The long walk is the rc walk PLUS phases D0 and F, so it can never be shorter.
+  // `full`/`screenshots` remain unmeasured (issue #973) — this ordering is the only
+  // claim made about them, and it is an inference from what the profiles do.
   assert.ok(defaultRunTimeoutMs('full') > defaultRunTimeoutMs('rc'));
 });
 

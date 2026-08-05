@@ -25,7 +25,7 @@
     granted = false,
     onToggle = () => {},
     ariaLabel = '',
-    dataAttr = ''
+    dataAttr = '',
   } = $props();
 
   function text(key, fallback) {
@@ -35,7 +35,9 @@
 </script>
 
 <div class="manager-roster-row" {...dataAttr ? { [dataAttr]: true } : {}}>
-  <span class="manager-roster-icon" aria-hidden="true"><i class={icon} style={iconColor ? `color: ${iconColor}` : undefined}></i></span>
+  <span class="manager-roster-icon" aria-hidden="true"
+    ><i class={icon} style={iconColor ? `color: ${iconColor}` : undefined}></i></span
+  >
   <div class="manager-roster-copy">
     <span class="manager-roster-name">{name}</span>
     {#if subtitle}<span class="manager-roster-subtitle">{subtitle}</span>{/if}
@@ -47,10 +49,14 @@
     aria-label={ariaLabel || undefined}
     onclick={() => onToggle(!granted)}
   >
-    <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-    <span class="manager-status-toggle-label">{granted
-      ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
-      : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span>
+    <span class="manager-status-toggle-track" aria-hidden="true"
+      ><span class="manager-status-toggle-knob"></span></span
+    >
+    <span class="manager-status-toggle-label"
+      >{granted
+        ? text('FABRICATE.Admin.Manager.SystemEdit.FeatureOn', 'On')
+        : text('FABRICATE.Admin.Manager.SystemEdit.FeatureOff', 'Off')}</span
+    >
   </button>
 </div>
 

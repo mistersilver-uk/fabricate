@@ -27,6 +27,7 @@
   Strings are localized here; the CALLER resolves nothing but the actions.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -39,7 +40,7 @@
     onEdit = () => {},
     onCopySourceUuid = () => {},
     onUnlink = () => {},
-    onDelete = () => {}
+    onDelete = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -63,18 +64,18 @@
       ? {
           tone: 'subtle',
           icon: 'fas fa-link-slash',
-          label: text('FABRICATE.Admin.Manager.Component.UnlinkedBadge', 'Not linked')
+          label: text('FABRICATE.Admin.Manager.Component.UnlinkedBadge', 'Not linked'),
         }
       : sourceMissing
         ? {
             tone: 'warning',
             icon: 'fas fa-triangle-exclamation',
-            label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing')
+            label: text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing'),
           }
         : {
             tone: 'accent',
             icon: 'fas fa-link',
-            label: text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked')
+            label: text('FABRICATE.Admin.Manager.Component.LinkedBadge', 'Linked'),
           }
   );
 
@@ -86,34 +87,42 @@
           {
             id: 'tags',
             value: tags.length,
-            label: text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')
+            label: text('FABRICATE.Admin.Manager.Component.Tags', 'Tags'),
           },
           {
             id: 'essences',
             value: essences.length,
-            label: text('FABRICATE.Admin.Manager.Component.Essences', 'Essences')
-          }
+            label: text('FABRICATE.Admin.Manager.Component.Essences', 'Essences'),
+          },
         ]
       : []
   );
 
   function essenceName(essence) {
-    return essence?.name || essence?.id || text('FABRICATE.Admin.Manager.Recipe.UnknownEssence', 'Unknown essence');
+    return (
+      essence?.name ||
+      essence?.id ||
+      text('FABRICATE.Admin.Manager.Recipe.UnknownEssence', 'Unknown essence')
+    );
   }
 </script>
 
 {#if selectedComponent}
   <section class="manager-component-browser-inspector" data-component-inspector>
-    <p class="manager-component-browser-inspector-label">{text('FABRICATE.Admin.Manager.Component.Selected', 'Selected component')}</p>
+    <p class="manager-component-browser-inspector-label">
+      {text('FABRICATE.Admin.Manager.Component.Selected', 'Selected component')}
+    </p>
 
     <div class="manager-component-browser-inspector-hero">
       <Medallion src={selectedComponent.img} icon="fas fa-cube" size={52} />
       <div class="manager-component-browser-inspector-identity">
-        <h2 class="manager-inspector-name" title={selectedComponent.name}>{selectedComponent.name}</h2>
+        <h2 class="manager-inspector-name" title={selectedComponent.name}>
+          {selectedComponent.name}
+        </h2>
         <div class="manager-chip-row">
-          <span class="manager-chip" data-component-category>
+          <Chip data-component-category>
             {getComponentCategoryLabel(selectedComponent.category, localize)}
-          </span>
+          </Chip>
           <StatusPill tone={linkedPill.tone} icon={linkedPill.icon} label={linkedPill.label} />
         </div>
       </div>
@@ -122,7 +131,8 @@
     <!-- The description, whole. It used to be cut at 160 characters, in the one panel
          with the room to show it. -->
     <p class="manager-component-browser-inspector-flavour">
-      {selectedComponent.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+      {selectedComponent.description ||
+        text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
     </p>
 
     <div class="manager-component-stat-grid">
@@ -135,9 +145,13 @@
     </div>
 
     {#if showTags}
-      <p class="manager-component-browser-inspector-label">{text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}</p>
+      <p class="manager-component-browser-inspector-label">
+        {text('FABRICATE.Admin.Manager.Component.Tags', 'Tags')}
+      </p>
       {#if tags.length === 0}
-        <p class="manager-muted" data-component-tags-empty>{text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}</p>
+        <p class="manager-muted" data-component-tags-empty>
+          {text('FABRICATE.Admin.Manager.Component.NoTags', 'No tags')}
+        </p>
       {:else}
         <!-- The SAME pill vehicle and purple mapping the editor's tag pills use, minus
              the remove button: one concept, one treatment across the two routes. -->
@@ -153,9 +167,13 @@
     {/if}
 
     {#if showEssences}
-      <p class="manager-component-browser-inspector-label">{text('FABRICATE.Admin.Manager.Component.EssenceContributions', 'Essence contributions')}</p>
+      <p class="manager-component-browser-inspector-label">
+        {text('FABRICATE.Admin.Manager.Component.EssenceContributions', 'Essence contributions')}
+      </p>
       {#if essences.length === 0}
-        <p class="manager-muted" data-component-essences-empty>{text('FABRICATE.Admin.Manager.Component.NoEssences', 'No essences')}</p>
+        <p class="manager-muted" data-component-essences-empty>
+          {text('FABRICATE.Admin.Manager.Component.NoEssences', 'No essences')}
+        </p>
       {:else}
         <!-- The CONTRIBUTION list: icon + name + the mono quantity this component
              contributes, mirroring the recipe inspector's flow rows. The compact
@@ -176,7 +194,12 @@
     {/if}
 
     {#if sourceMissing}
-      <p class="environment-stale-warning" data-component-source-missing>{text('FABRICATE.Admin.Manager.Component.SourceMissingHint', 'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.')}</p>
+      <p class="environment-stale-warning" data-component-source-missing>
+        {text(
+          'FABRICATE.Admin.Manager.Component.SourceMissingHint',
+          'The stored source no longer resolves. Replace the component source or verify the original compendium/world item still exists.'
+        )}
+      </p>
     {/if}
 
     <!--
@@ -189,7 +212,12 @@
       linkage and keeps the component; delete removes the component from the system.
     -->
     <div class="manager-component-browser-inspector-actions">
-      <button type="button" class="manager-button manager-component-browser-inspector-edit" data-component-action="edit" onclick={() => onEdit()}>
+      <button
+        type="button"
+        class="manager-button manager-component-browser-inspector-edit"
+        data-component-action="edit"
+        onclick={() => onEdit()}
+      >
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Component.Edit', 'Edit component')}</span>
       </button>
@@ -214,7 +242,12 @@
           <span>{text('FABRICATE.Admin.Manager.Component.UnlinkAction', 'Unlink component')}</span>
         </button>
       {/if}
-      <button type="button" class="manager-button manager-component-browser-inspector-delete" data-component-action="delete" onclick={() => onDelete(selectedComponent.id)}>
+      <button
+        type="button"
+        class="manager-button manager-component-browser-inspector-delete"
+        data-component-action="delete"
+        onclick={() => onDelete(selectedComponent.id)}
+      >
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Component.Delete', 'Delete component')}</span>
       </button>

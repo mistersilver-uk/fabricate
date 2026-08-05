@@ -41,12 +41,146 @@ const toolStudioFrame = (id, label, smokeLabel, matches) => ({
   smokeLabels: [smokeLabel],
   matches,
 });
+// The GM Knowledge surface (issue 785). Shared by the two Knowledge view ids below
+// (the surface itself and its armed-Delete frame) so the pair is one trigger set
+// expressed once. `ArmedDangerButton` is included because it renders inside every
+// owned-copy and learned row; `styles/` is deliberately NOT, so a broad stylesheet
+// change keeps routing to the existing theme-or-global-ui fallback.
+const KNOWLEDGE_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/(?:KnowledgeView|ArmedDangerButton)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.svelte$/,
+  // Every plain-JS module in the surface's own folder: the pure projection
+  // (`knowledgeStudio.js`) and the mutation collaborator (`knowledgeMutations.js`)
+  // both change what the captured frames show.
+  /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.js$/,
+];
+// ONLY Tool Studio's own files. It deliberately excludes two shared surfaces it used
+// to match:
+//
+// - `styles/fabricate.css`. A global stylesheet edit pulled in all 12 Tool Studio
+//   parity and stress frames regardless of relevance, which is most of why a
+//   single-screen change could demand 28 published views. A global change now routes
+//   to `theme-or-global-ui`, whose set samples every app-area shell instead of
+//   over-sampling one screen.
+// - `CraftingSystemManagerRoot.svelte`. The manager router hosts every manager view,
+//   so a change there is a global manager change, not a Tool Studio one; it now routes
+//   to `theme-or-global-ui` as well.
 const TOOL_STUDIO_MATCHES = [
-  /^src\/ui\/svelte\/apps\/manager\/(?:CraftingSystemManagerRoot|ToolsBrowserView|ToolEditView)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/(?:ToolsBrowserView|ToolEditView)\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/.+\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
-  /^styles\/fabricate\.css$/,
+  // The shared side-panel primitives the Tool Studio's preview and library inspector
+  // render (issue 881). Their CSS is co-located in their own scoped blocks precisely so a
+  // change to them maps HERE rather than to the broad `theme-or-global-ui` recipe — which
+  // only works if the recipes that render them name them.
+  /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
 ];
+
+// The Component Studio BROWSER's own files (issue 676): the view and every component in
+// `components/`, which is the browser's directory (`component/` is the EDITOR's, mirroring
+// the Recipe Studio's `recipes/` vs `recipe/` split). Shared by every browser frame below.
+const COMPONENTS_BROWSER_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
+  // The shared bulk-edit primitives (issue 1010). They sit directly under `apps/manager/`,
+  // beside `Chip` and `Callout`, so they fall through BOTH the `components/` glob above and
+  // the `recipes/` one — a change to any of them would otherwise map to no view at all and
+  // publish nothing. Enumerated by name rather than widened to a directory glob, because
+  // `apps/manager/*.svelte` is the whole manager and would conscript these frames as the
+  // evidence for every screen in it.
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
+];
+
+// A single-frame components-browser view: one same-named smoke label over the shared
+// browser match list, plus whatever extra file that STATE additionally depends on. Same
+// argument as `recipeEditFrame` above — Sonar's Automatic Analysis counts repeated object
+// literals and ignores `cpd.exclusions`, so a fresh sibling literal near-identical to its
+// neighbour trips the new-code duplication gate.
+const componentsBrowserFrame = (id, label, extraMatches = []) => ({
+  id,
+  label,
+  smokeLabels: [id],
+  matches: [...COMPONENTS_BROWSER_MATCHES, ...extraMatches],
+});
+
+// The two pure models the bulk panel stages against. `bulkSelectionModel.js` is the shared
+// leaf the four selection helpers moved to (issue 1010) — without it named here a change to
+// the selection model would map to NO view at all, since `componentBulkEditModel.js` merely
+// re-exports it and is not itself touched. Hoisted rather than written out at each of the
+// three bulk frames: Sonar's Automatic Analysis counts repeated literals in `scripts/**`
+// and ignores `cpd.exclusions`.
+const BULK_EDIT_MODEL_MATCHES = [
+  /^src\/utils\/componentBulkEditModel\.js$/,
+  /^src\/utils\/bulkSelectionModel\.js$/,
+];
+
+// The Recipe Studio BROWSER's own files (issue 1010), mirroring COMPONENTS_BROWSER_MATCHES.
+// `recipes/` is the browser's directory and `recipe/` is the EDITOR's (RECIPE_EDIT_MATCHES),
+// so a browser-side component placed in the latter would republish the editor frames and never
+// this one — the split is load-bearing and stated on `manager-recipes` below too.
+//
+// The four shared bulk-edit primitives are enumerated here for the same reason they are
+// enumerated in the components list: they sit directly under `apps/manager/`, so they fall
+// through BOTH studios' directory globs and a change to one of them would otherwise map to no
+// recipe view at all. Widening to `apps/manager/*.svelte` instead would conscript these frames
+// as the evidence for every screen in the manager.
+const RECIPES_BROWSER_MATCHES = [
+  /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect)\.svelte$/,
+];
+
+// A single-frame recipes-browser view: one same-named smoke label over the shared browser match
+// list, plus whatever extra file that STATE additionally depends on. Same argument as
+// `componentsBrowserFrame` above — Sonar's Automatic Analysis counts repeated object literals,
+// ignores `cpd.exclusions`, and analyses `scripts/**`, so three fresh sibling literals differing
+// only in two strings is exactly the span that trips the new-code duplication gate.
+const recipesBrowserFrame = (id, label, extraMatches = []) => ({
+  id,
+  label,
+  smokeLabels: [id],
+  matches: [...RECIPES_BROWSER_MATCHES, ...extraMatches],
+});
+
+// The two pure models the recipe bulk panel stages against — the recipe half of
+// `BULK_EDIT_MODEL_MATCHES` above, and hoisted for the same reason. `bulkSelectionModel.js` is
+// named on BOTH because both studios' selection helpers now live there; `recipeBulkEditModel.js`
+// merely re-exports them, so a change to the shared leaf touches neither studio's own model file
+// and would map to no view without this.
+const RECIPE_BULK_EDIT_MODEL_MATCHES = [
+  /^src\/utils\/recipeBulkEditModel\.js$/,
+  /^src\/utils\/bulkSelectionModel\.js$/,
+];
+
+// The player Crafting tab's requirement surface (issue 917): the slot rail, the single
+// open chooser, the shared essence pool and the consumption-plan panel. Scoped to the
+// crafting DETAIL sources — the `player-crafting-roll-result` precedent — so a detail
+// change maps here as well as to the broad `player-crafting` glob, plus the rail's own
+// pure projection and the store that holds which chooser is open and what the player has
+// allocated. Neither of those two modules has any other view recipe, so naming them here
+// routes a change to them at real evidence instead of the generic global fallback.
+//
+// `components/Stepper.svelte` is deliberately NOT named, matching the argument recorded
+// on `manager-components-bulk-edit-progressive`: it is a global primitive rendered by
+// several unrelated surfaces, and conscripting these six frames as its evidence would
+// mis-route every future change to it.
+const REQUIREMENT_RAIL_MATCHES = [
+  /^src\/ui\/svelte\/apps\/crafting\/detail\//,
+  /^src\/ui\/svelte\/util\/requirementSlots\.js$/,
+  /^src\/ui\/svelte\/stores\/craftingStore\.svelte\.js$/,
+];
+
+// One rail frame: a single same-named smoke label over the shared rail trigger list.
+// Same argument as `recipeEditFrame` / `componentsBrowserFrame` above — six sibling
+// object literals differing only in two strings is exactly the span Sonar's Automatic
+// Analysis counts as new duplicated lines (`cpd.exclusions` is ignored for it), and
+// `scripts/**` is analysed.
+const requirementRailFrame = (id, label) => ({
+  id,
+  label,
+  smokeLabels: [id],
+  matches: REQUIREMENT_RAIL_MATCHES,
+});
 
 export const VIEW_RECIPES = Object.freeze([
   {
@@ -119,28 +253,55 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/config\/currency(?:Presets|Providers)\.js$/,
     ],
   },
-  // The Component Studio (issue 676). Two dirs, deliberately distinct: `components/`
-  // is the BROWSER's, `component/` is the EDITOR's — mirroring the Recipe Studio's
-  // `recipes/` vs `recipe/` split.
+  // The Component Studio (issue 676). See COMPONENTS_BROWSER_MATCHES for the two
+  // deliberately-distinct directories.
   {
     id: 'manager-components',
     label: 'Manager components browser',
+    // The only components-browser view with TWO frames, so it is the one entry here that
+    // cannot come from `componentsBrowserFrame` (which keys its single label off the id).
     smokeLabels: ['manager-components-normal', 'manager-components-stacked'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
-      /^src\/utils\/componentBrowserModel\.js$/,
-    ],
+    matches: [...COMPONENTS_BROWSER_MATCHES, /^src\/utils\/componentBrowserModel\.js$/],
   },
-  {
-    id: 'manager-components-progressive',
-    label: 'Manager components browser — progressive difficulty badge (value + None)',
-    smokeLabels: ['manager-components-progressive'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
-    ],
-  },
+  componentsBrowserFrame(
+    'manager-components-progressive',
+    'Manager components browser — progressive difficulty badge (value + None)',
+  ),
+  // Issue 772: the bulk-edit state — rows multi-selected, the selection toolbar, and the
+  // rail's staged bulk panel. A DEDICATED view id, not extra labels on `manager-components`:
+  // `collect` publishes only `candidates[0]` from a path-sorted list, so appending the label
+  // there would publish an arbitrary components frame and the staged state — the whole point
+  // of the evidence — would never reach the PR. The two extra triggers are the shared
+  // selection primitive (which renders on every row AND in the toolbar) and the pure
+  // selection/staging model behind the panel.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit',
+    'Manager components browser — bulk edit (multi-select, selection toolbar, staged rail panel)',
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES],
+  ),
+  // The bulk panel's other two states, each its OWN view for the same `candidates[0]`
+  // reason as the staged frame above — and each a separate FRAME because no one
+  // photograph can hold them. An axis chip cannot read "leave unchanged" and "will
+  // overwrite" at once, and the staged frame is the one the prototype parity table
+  // compares, so the unstaged face — the sole route to "clear essences on every selected
+  // component" — needs a frame of its own or it ships unevidenced.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit-unstaged',
+    'Manager components browser — bulk edit, pristine draft (every axis unstaged, Apply inert)',
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...BULK_EDIT_MODEL_MATCHES],
+  ),
+  // The Progressive DC section is gated on `componentDifficultyAxisProgressive`, so it
+  // renders on the progressive smoke system and on no other — which is also the only
+  // system in this world that can evidence the panel's empty item-tag copy, since it
+  // authors no tags. Its extra trigger is the staging model alone, deliberately: the
+  // section is built from `Chip` and `Stepper`, but neither is named here because both are
+  // global primitives with no other `VIEW_RECIPES` entry, and conscripting this one frame
+  // as their evidence would mis-route every future change to them.
+  componentsBrowserFrame(
+    'manager-components-bulk-edit-progressive',
+    'Manager components browser — bulk edit, progressive DC section + empty item-tag copy',
+    [...BULK_EDIT_MODEL_MATCHES],
+  ),
   // Issue 801: the grouped-category CONTINUATION frame — a category split across a page
   // boundary, its continuation slice ("N of M") at the head of the next page. Its OWN view
   // id (one file per published frame; `collect` emits only `candidates[0]`) so the
@@ -199,6 +360,12 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/component\/.+\.svelte$/,
+      // The essence quantity card (issue 772) lives under `components/` — the BROWSER's
+      // directory, because the browser's bulk panel renders it too — but the EDITOR renders
+      // it as well, four-up. Named here explicitly: without this a change to the card would
+      // route evidence to the browser frames and NEVER to this one, which is the silent
+      // drift the comment on `manager-component-edit-difficulty` below was written after.
+      /^src\/ui\/svelte\/apps\/manager\/components\/EssenceQuantityCard\.svelte$/,
     ],
   },
   {
@@ -239,6 +406,10 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksRightMenu\.svelte$/,
+      // The rail's standing help card renders through the shared explainer primitive
+      // (issue 883), whose CSS is co-located in its own scoped block; this is the frame
+      // that shows it on this screen.
+      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
     ],
   },
   {
@@ -283,7 +454,13 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'manager-tags-categories',
     label: 'Manager tags and categories',
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      // The inspector rail's contextual help and reference-safety card render through the
+      // shared explainer primitive (issue 881), whose CSS is co-located in its own scoped
+      // block; these frames are the ones that show it on this screen.
+      /^src\/ui\/svelte\/apps\/manager\/ExplainerCard\.svelte$/,
+    ],
   },
   // Issue 752: the Item tags vocabulary rows (evidence for #735's row rendering).
   // Its OWN recipe, not a preferred label on manager-tags-categories: `collect`
@@ -356,12 +533,46 @@ export const VIEW_RECIPES = Object.freeze([
     // The library inspector deliberately lives under `apps/manager/recipes/` and NOT
     // `apps/manager/recipe/` (issue 643): the latter is RECIPE_EDIT_MATCHES, so a
     // browser-side component placed there would republish the five recipe-EDITOR
-    // frames and never the browser frame.
-    matches: [
-      /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
-    ],
+    // frames and never the browser frame. See RECIPES_BROWSER_MATCHES, which this shares
+    // with the three bulk-edit frames below; the only recipes-browser view with more than
+    // one smoke label, so it cannot come from `recipesBrowserFrame`.
+    matches: RECIPES_BROWSER_MATCHES,
   },
+  // Issue 1010: the Recipe Studio's bulk-edit states — rows multi-selected, the shared selection
+  // toolbar, and the rail's staged bulk panel in place of the single-recipe inspector. THREE
+  // dedicated view ids, not extra labels on `manager-recipes`: `collect` publishes only
+  // `candidates[0]` from a path-sorted list, so appending them there would publish
+  // `manager-recipes-normal` forever and none of these states would ever reach a PR.
+  //
+  // The extra trigger on all three is the shared selection primitive, which renders on every row
+  // AND inside the toolbar, plus the pure staging models behind the panel.
+  recipesBrowserFrame(
+    'manager-recipes-bulk-edit',
+    'Manager recipes browser — bulk edit (multi-select, selection toolbar, every axis staged)',
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES],
+  ),
+  // The pristine draft is its own FRAME as well as its own view, because no one photograph holds
+  // both faces of an axis: a segmented control cannot read `Unchanged` and `Enable` at once, and
+  // the two check-tier sentinels (`— Leave unchanged —` and `Default DC`, which mean opposite
+  // things) are only both visible while neither has been chosen.
+  recipesBrowserFrame(
+    'manager-recipes-bulk-edit-unstaged',
+    'Manager recipes browser — bulk edit, pristine draft (three Unchanged segments, both check-tier sentinels, Apply inert)',
+    [/^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/, ...RECIPE_BULK_EDIT_MODEL_MATCHES],
+  ),
+  // Acceptance criterion 6's frame: the pre-flight warning Callout over the rows the browser has
+  // itself pilled `Can't enable`. It additionally names the projection and the predicate the
+  // count is read from, because those are the files a regression would land in — the row pill and
+  // the panel's count read ONE predicate, and this is the only frame that can show them agreeing.
+  recipesBrowserFrame(
+    'manager-recipes-bulk-edit-blocked',
+    'Manager recipes browser — bulk edit, blocked-enable warning over the pilled rows it counts',
+    [
+      /^src\/ui\/svelte\/components\/SelectionCheckbox\.svelte$/,
+      ...RECIPE_BULK_EDIT_MODEL_MATCHES,
+      /^src\/utils\/recipeBrowserModel\.js$/,
+    ],
+  ),
   // Issue 801: the grouped-category CONTINUATION frame for the recipe library. Phase 1 is
   // MODEL-ONLY — RecipesBrowserView.svelte is untouched — so `recipeBrowserModel.js` is the
   // SOLE changed file that maps a frame to this browser; its `matches` MUST name it or the
@@ -388,25 +599,33 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/utils\/recipeBrowserModel\.js$/,
     ],
   },
+  // Issue 877 turned the report from a raw-HTML DialogV2 into a Svelte modal, so the
+  // rendering file is now `ImportReportModal.svelte` rather than the app shell's HTML
+  // builder — and `ManagerModal.svelte`, the chrome BOTH import-flow modals render
+  // through, changes this frame's appearance too. All four are load-bearing.
   {
     id: 'manager-import-report',
-    label: 'Manager import — post-import unresolved-reference report (#492)',
+    label: 'Manager import — post-import unresolved-reference report (#492, #877)',
     smokeLabels: ['manager-import-report'],
     matches: [
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
       /^src\/systems\/importReportContent\.js$/,
+      /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
     ],
   },
   // Issue 771: folder-aware categorization mapping modal, shown before a folder /
   // whole-pack component drop commits. Its own single-frame view (collect publishes only
   // candidates[0] per id). Mapped to the mapping component AND the drop-path service file
-  // that opens it, so a change to either republishes the frame.
+  // that opens it, so a change to either republishes the frame — plus the shared modal
+  // chrome it renders through since issue 877.
   {
     id: 'manager-import-folder-mapping',
     label: 'Manager import — folder-aware categorization mapping step (#771)',
     smokeLabels: ['manager-import-folder-mapping'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/ImportFolderMappingModal\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
     ],
   },
@@ -449,6 +668,30 @@ export const VIEW_RECIPES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\/RecipeItemValidationTab\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/RecipeItemEditor\.svelte$/,
     ],
+  },
+  // Issue 785: the GM Knowledge surface. TWO view ids sharing one `matches` list —
+  // `collect` publishes only `candidates[0]` from a filename-sorted list, so the armed
+  // Delete frame cannot be an extra `smokeLabels` entry on the main view (the un-armed
+  // owned-copies frame has the lower capture counter and would win forever). The shared
+  // `KNOWLEDGE_MATCHES` const is what keeps the pair from reading as two near-identical
+  // literals to SonarCloud's duplication gate.
+  {
+    id: 'manager-knowledge',
+    label: 'Manager Knowledge surface (roster, owned copies, learned recipes, narrow)',
+    smokeLabels: [
+      'manager-knowledge-owned-copies',
+      'manager-knowledge-empty-tab',
+      'manager-knowledge-learned-lost-copy',
+      'manager-knowledge-party-pool-warning',
+      'manager-knowledge-narrow',
+    ],
+    matches: KNOWLEDGE_MATCHES,
+  },
+  {
+    id: 'manager-knowledge-delete-armed',
+    label: 'Manager Knowledge surface — Delete armed to "Confirm?" beside un-armed rows',
+    smokeLabels: ['manager-knowledge-delete-armed'],
+    matches: KNOWLEDGE_MATCHES,
   },
   {
     id: 'manager-crafting-settings',
@@ -571,6 +814,16 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [/^src\/ui\/svelte\/apps\/crafting\//],
   },
   {
+    id: 'player-crafting-roll-prompt',
+    label: 'Player crafting — interactive check roll prompt',
+    // Issue 855: `rollPrompt.js` renders the whole dialog, so a change to it is only
+    // evidenced by the dialog frame itself. The broader `player-crafting` recipe above
+    // also matches this path, but its labels all show the crafting tab BEHIND the
+    // prompt — publishing one of those would be a frame that does not show the change.
+    smokeLabels: ['player-crafting-roll-prompt'],
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/rollPrompt\.js$/],
+  },
+  {
     id: 'player-crafting-essence-legacy',
     label: 'Player crafting — legacy set-level essence authored icon',
     smokeLabels: ['player-crafting-essence-legacy'],
@@ -672,6 +925,35 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['player-crafting-multistep'],
     matches: [/^src\/ui\/svelte\/apps\/crafting\//],
   },
+  // The requirement-rail redesign (issue 917). SIX dedicated view ids, not extra labels
+  // on `player-crafting`: `collect` emits one file per view id and picks `candidates[0]`
+  // from a FILENAME sort, so appending them to the broad entry would publish one
+  // arbitrary frame forever and every state below — which is the whole change — would
+  // never reach the PR. Each names a distinct rendered state no other frame can hold.
+  requirementRailFrame(
+    'player-crafting-slot-rail',
+    'Player crafting — requirement rail: met fixed slot, unchosen choice slot (accent), short essence slot',
+  ),
+  requirementRailFrame(
+    'player-crafting-tag-unmatched',
+    'Player crafting — tag requirement with nothing matching: fallback glyph, never the item bag',
+  ),
+  requirementRailFrame(
+    'player-crafting-essence-pool',
+    'Player crafting — essence pool: one requirement, player-allocated partial funding, selection recap',
+  ),
+  requirementRailFrame(
+    'player-crafting-pick-for-me',
+    'Player crafting — after "Pick for me": the resolver’s suggested allocation applied',
+  ),
+  requirementRailFrame(
+    'player-crafting-essence-pool-shared',
+    'Player crafting — shared essence pool: two requirements funded jointly from one dual carrier',
+  ),
+  requirementRailFrame(
+    'player-crafting-consumption-plan',
+    'Player crafting — consumption plan: fixed row, essence-carrier row, and the still-to-choose line',
+  ),
   // The player Alchemy workbench (issue 543) publishes three distinct frames — the
   // discipline chooser, the three-column workbench, and the narrow stacked layout.
   // `collect` emits one file per view id (first matching smoke label wins), so each
@@ -862,17 +1144,59 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    // The minimal core-window set for a change that can regress ANY surface: the global
+    // stylesheet, a theme block, or the manager router that hosts every manager view.
+    //
+    // Chosen to sample every app-AREA shell rather than to enumerate screens, because
+    // `styles/fabricate.css` is namespaced per area and its Foundry-override blocks
+    // (button height/alignment, focus rings) are written per area class — so a
+    // regression in one area is invisible in another. Rule counts in that file, which
+    // are a fair proxy for blast radius: `.fabricate-manager` ~2694,
+    // `.fabricate-interactables-manager` ~41, `.fabricate-app` ~18.
+    //
+    // 1 `manager-default-selection`   — `.fabricate-manager` shell: window chrome, rail,
+    //                                   and the crafting-system library rows.
+    // 2 `manager-components-normal`   — the densest row/chip/grid library; a bare
+    //                                   generic selector leaking out of a `.fabricate*`
+    //                                   root shows up here first (it is what broke the
+    //                                   dnd5e Armor Class badge).
+    // 3 `manager-gathering-task-editor-normal`
+    //                                 — the EDITOR archetype (fields, tabs, validation),
+    //                                   structurally unlike a browser, so it catches
+    //                                   button/field/focus-ring regressions a library
+    //                                   frame cannot.
+    // 4 `player-crafting-simple`      — `.fabricate-app`, the player-facing crafting
+    //                                   window. The previous set was manager-only, so a
+    //                                   global change got NO player-app verification.
+    // 5 `player-inventory`            — the second `.fabricate-app` archetype
+    //                                   (list/detail + scroll), cheap once phase E runs.
+    // 6 `interactables-manager-list`  — `.fabricate-interactables-manager`, its own
+    //                                   window and the second-largest rule block.
+    //
+    // Deliberately NOT included: the chat-card and roll-prompt surfaces
+    // (`.fabricate-craft-chat`, `.fabricate-gather-chat`, `.fabricate-roll-prompt`) are
+    // small, simple and low-rule-count; and the rail frames, which already have their
+    // own `styles/` recipes and would duplicate. Adding a screen here costs every
+    // global change, so additions want the same blast-radius argument.
+    //
+    // 4 and 5 are phase-E labels, so a scoped global run now needs phase E as well as
+    // D0. That is a deliberate cost: the old D0-only set was cheaper precisely because
+    // it never looked at the player app.
     id: 'theme-or-global-ui',
     label: 'Global UI styling or theme',
     smokeLabels: [
       'manager-default-selection',
       'manager-components-normal',
-      'manager-environments-browse-normal',
       'manager-gathering-task-editor-normal',
-      'manager-gathering-events-normal',
-      'manager-essences-normal',
+      'player-crafting-simple',
+      'player-inventory',
+      'interactables-manager-list',
     ],
-    matches: [/^styles\//, /\.css$/],
+    matches: [
+      /^styles\//,
+      /\.css$/,
+      /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
+    ],
   },
 ]);
 
@@ -986,9 +1310,8 @@ export function collectScreenshotEvidence({
   const copied = [];
   const missing = [];
   const allImages = existsSync(sourceRoot) ? listImages(sourceRoot).sort((a, b) => a.localeCompare(b)) : [];
-  const toolViews = views.filter(isToolStudioView);
-  const toolEvidence = toolViews.length > 0
-    ? validateToolStudioRunEvidence({ sourceRoot, views, headSha })
+  const runEvidence = views.length > 0
+    ? validateScreenshotRunEvidence({ sourceRoot, views, headSha })
     : null;
 
   mkdirSync(destinationRoot, { recursive: true });
@@ -998,13 +1321,11 @@ export function collectScreenshotEvidence({
       missing.push(view);
       continue;
     }
-    if (toolEvidence && isToolStudioView(view) && candidates.length !== 1) {
+    if (isToolStudioView(view) && candidates.length !== 1) {
       throw new Error(`Duplicate Tool Studio screenshot evidence for ${view.id}: ${candidates.length} candidates`);
     }
     const source = candidates[0];
-    if (toolEvidence && isToolStudioView(view)) {
-      validateToolStudioCapture(view, source, toolEvidence);
-    }
+    validateScreenshotCapture(view, source, runEvidence);
     const destination = join(destinationRoot, `${view.id}${extensionOf(source)}`);
     copyFileSync(source, destination);
     copied.push({ view, source, destination });
@@ -1042,11 +1363,11 @@ function readJsonEvidence(path, label) {
   }
 }
 
-function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
-  const summary = readJsonEvidence(join(sourceRoot, 'summary.json'), 'Tool Studio smoke summary');
+function validateScreenshotRunEvidence({ sourceRoot, views, headSha }) {
+  const summary = readJsonEvidence(join(sourceRoot, 'summary.json'), 'smoke summary');
   const manifest = readJsonEvidence(
     join(sourceRoot, 'screenshot-manifest.json'),
-    'Tool Studio screenshot manifest'
+    'screenshot manifest'
   );
   if (
     summary.passed !== true ||
@@ -1055,39 +1376,65 @@ function validateToolStudioRunEvidence({ sourceRoot, views, headSha }) {
     summary.degraded !== false ||
     summary.rendererCrashed !== false
   ) {
-    throw new Error('Tool Studio screenshot evidence comes from a failed or degraded smoke summary');
+    throw new Error('Screenshot evidence comes from a failed or degraded smoke summary');
   }
   const summaryRun = summary.screenshotRun || {};
   if (!summaryRun.runId || summaryRun.runId !== manifest.runId) {
-    throw new Error('Tool Studio summary and manifest do not share one run identity');
+    throw new Error('Screenshot summary and manifest do not share one run identity');
   }
   const expectedHead = normalizeHeadShaSegment(headSha);
   if (!expectedHead || summaryRun.headSha !== expectedHead || manifest.headSha !== expectedHead) {
-    throw new Error('Tool Studio screenshot evidence is stale for the requested PR head SHA');
+    throw new Error('Screenshot evidence is stale for the requested PR head SHA');
   }
-  const expectedLabels = views
-    .flatMap((view) => view.smokeLabels)
-    .sort((a, b) => a.localeCompare(b));
+  // DEDUPED, because the run records a SET of target labels while a label may belong
+  // to more than one view recipe (`manager-default-selection` is in both the systems
+  // view and the theme-or-global-ui fallback). Comparing a raw flatMap against the
+  // run's deduped set made this check fail for every change whose file set matched
+  // two views sharing a label — i.e. the documented
+  // `test:foundry:screenshots --target-labels=$(screenshots:ui:targets)` -> `collect`
+  // workflow was unrunnable there, since `targets` dedupes and this side did not.
+  const expectedLabels = [...new Set(views.flatMap((view) => view.smokeLabels))].sort((a, b) =>
+    a.localeCompare(b)
+  );
   const summaryLabels = [...(summaryRun.targetLabels || [])].sort((a, b) => a.localeCompare(b));
   const manifestLabels = [...(manifest.targetLabels || [])].sort((a, b) => a.localeCompare(b));
   if (
     JSON.stringify(summaryLabels) !== JSON.stringify(expectedLabels) ||
     JSON.stringify(manifestLabels) !== JSON.stringify(expectedLabels)
   ) {
-    throw new Error('Tool Studio screenshot evidence belongs to another target-label set');
+    throw new Error('Screenshot evidence belongs to another target-label set');
   }
   return { manifest, capturesByFile: new Map((manifest.captures || []).map((entry) => [entry.file, entry])) };
 }
 
-function validateToolStudioCapture(view, source, evidence) {
+function validateScreenshotCapture(view, source, evidence) {
   const file = basename(source);
   const capture = evidence.capturesByFile.get(file);
-  if (TOOL_PARITY_DIMENSIONS.has(view.id) && capture?.label?.includes('stress')) {
+  if (isToolStudioView(view) && TOOL_PARITY_DIMENSIONS.has(view.id) && capture?.label?.includes('stress')) {
     throw new Error(`Stress evidence cannot substitute for Tool Studio parity frame ${view.id}`);
   }
   if (!capture || !view.smokeLabels.includes(capture.label)) {
-    throw new Error(`Tool Studio manifest does not bind ${file} to ${view.id}`);
+    throw new Error(`Screenshot manifest does not bind ${file} to ${view.id}`);
   }
+  const actual = readPngDimensions(view, source);
+  if (isToolStudioView(view)) validateToolStudioCaptureRules(view, capture, actual);
+  // The manifest records geometry ONLY for a clipped capture: `screenshot()` writes
+  // `options.clip?.width ?? null`, so an unclipped full-page frame declares null. This
+  // cross-check exists to catch a frame that disagrees with the clip it claims, so it
+  // is meaningless — and was unconditionally fatal — when nothing was declared. Reading
+  // real pixels and comparing them to null failed every non-clipped view, which is most
+  // of them. `readPngDimensions` still runs above, so a corrupt or zero-sized PNG is
+  // rejected for every view regardless.
+  const declaresGeometry = capture.width != null && capture.height != null;
+  if (declaresGeometry && (actual.width !== capture.width || actual.height !== capture.height)) {
+    throw new Error(
+      `PNG dimensions do not match its manifest for ${view.id}: ` +
+      `${actual.width}x${actual.height} actual; ${capture.width}x${capture.height} declared`
+    );
+  }
+}
+
+function validateToolStudioCaptureRules(view, capture, actual) {
   if (TOOL_PARITY_DIMENSIONS.has(view.id)) {
     const [width, height] = TOOL_PARITY_DIMENSIONS.get(view.id);
     if (capture.width !== width || capture.height !== height) {
@@ -1095,26 +1442,18 @@ function validateToolStudioCapture(view, source, evidence) {
         `Wrong Tool Studio dimensions for ${view.id}: ${capture.width}x${capture.height}; expected ${width}x${height}`
       );
     }
-    const actual = readToolStudioPngDimensions(view, source);
     if (actual.width !== width || actual.height !== height) {
       throw new Error(
         `Wrong Tool Studio PNG dimensions for ${view.id}: ${actual.width}x${actual.height}; expected ${width}x${height}`
       );
     }
-    return;
-  }
-  const actual = readToolStudioPngDimensions(view, source);
-  if (actual.width !== capture.width || actual.height !== capture.height) {
-    throw new Error(
-      `Tool Studio PNG dimensions do not match its manifest for ${view.id}: ` +
-      `${actual.width}x${actual.height} actual; ${capture.width}x${capture.height} declared`
-    );
   }
 }
 
-function readToolStudioPngDimensions(view, source) {
+function readPngDimensions(view, source) {
+  const kind = isToolStudioView(view) ? 'Tool Studio PNG' : 'PNG';
   if (extensionOf(source) !== '.png') {
-    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} is not a .png file`);
+    throw new Error(`Invalid ${kind} for ${view.id}: ${basename(source)} is not a .png file`);
   }
   const bytes = readFileSync(source);
   const hasPngHeader =
@@ -1123,12 +1462,12 @@ function readToolStudioPngDimensions(view, source) {
     bytes.readUInt32BE(8) === 13 &&
     bytes.toString('ascii', 12, 16) === 'IHDR';
   if (!hasPngHeader) {
-    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has no valid PNG header`);
+    throw new Error(`Invalid ${kind} for ${view.id}: ${basename(source)} has no valid PNG header`);
   }
   const width = bytes.readUInt32BE(16);
   const height = bytes.readUInt32BE(20);
   if (width === 0 || height === 0) {
-    throw new Error(`Invalid Tool Studio PNG for ${view.id}: ${basename(source)} has zero dimensions`);
+    throw new Error(`Invalid ${kind} for ${view.id}: ${basename(source)} has zero dimensions`);
   }
   return { width, height };
 }
@@ -1426,6 +1765,30 @@ function runGit(args, { root = ROOT } = {}) {
   return spawnSync('git', args, { cwd: root, encoding: 'utf8' }); // NOSONAR S4036 — git-from-PATH is the intended dev-tool contract (see note above)
 }
 
+// Resolve the exact source revision shared by the screenshot producer and collector.
+// Explicit command/environment inputs win for reproducible automation, then GitHub's
+// checked-out SHA, while the documented local flow derives the current repository HEAD.
+// A missing or invalid revision is fatal: provenance validation must never weaken merely
+// because the caller omitted an override.
+export function resolveScreenshotHeadSha({
+  explicitHeadSha,
+  ciHeadSha = process.env.GITHUB_SHA,
+  root = ROOT,
+  runGit: gitRunner = runGit,
+} = {}) {
+  const explicitHead = normalizeHeadShaSegment(explicitHeadSha);
+  if (explicitHead) return explicitHead;
+  const ciHead = normalizeHeadShaSegment(ciHeadSha);
+  if (ciHead) return ciHead;
+  const result = gitRunner(['rev-parse', '--verify', 'HEAD'], { root });
+  if (!result || result.status !== 0) {
+    throw new Error(result?.stderr?.trim() || 'Could not resolve screenshot provenance from git HEAD');
+  }
+  const gitHead = normalizeHeadShaSegment(result.stdout);
+  if (!gitHead) throw new Error('Git returned an empty HEAD for screenshot provenance');
+  return gitHead;
+}
+
 function readChangedFilesFromGit(base, { root = ROOT } = {}) {
   // Three-dot `<base>...HEAD` is merge-base semantics: "what did THIS branch change
   // since it forked from <base>", applied to BOTH the resolved-default and explicit
@@ -1505,7 +1868,14 @@ export function loadChangedFiles(args, { resolveBase = resolveDefaultBase, readC
 export async function main(argv = process.argv.slice(2), deps = {}) {
   const args = parseArgs(argv);
   const command = args._[0] || 'plan';
-  const { resolveBase, readChangedFiles, runGh, putObject, config } = deps;
+  const {
+    resolveBase,
+    resolveHeadSha = resolveScreenshotHeadSha,
+    readChangedFiles,
+    runGh,
+    putObject,
+    config,
+  } = deps;
   // Base resolution is scoped to the commands that CONSUME the changed-file set.
   // `publish` derives its files from tmp/pr-screenshots/<pr>/ and `clean` just removes
   // a local dir — neither must spawn git, print the default-base note, or throw when no
@@ -1576,7 +1946,7 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
       sourceDir: args.sourceDir || 'test-results',
       outputDir: args.outputDir,
       allowMissing: args.allowMissing === true,
-      headSha: args.headSha,
+      headSha: resolveHeadSha({ explicitHeadSha: args.headSha }),
     });
     for (const item of result.copied) {
       console.log(`${relative(ROOT, item.destination).replaceAll(sep, '/')} <= ${relative(ROOT, item.source).replaceAll(sep, '/')}`);

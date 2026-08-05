@@ -34,7 +34,7 @@
     onOpenRecipe = null,
     onLearn = null,
     onLearnAll = null,
-    learningRecipeId = null
+    learningRecipeId = null,
   } = $props();
 
   // Exclusive affordances: a knowledge book is LEARNABLE (per-recipe Learn), an item
@@ -78,9 +78,9 @@
       tone: accessBadge.tone,
       attrs: {
         'data-inventory-access-badge': '',
-        'data-badge-tone': accessBadge.tone
-      }
-    }
+        'data-badge-tone': accessBadge.tone,
+      },
+    },
   ]);
 
   // Knowledge-mode "Read & learn all N recipes" convenience: shown ONLY when the reader
@@ -132,8 +132,12 @@
     if (query.length === 0) return bookRecipes;
     return bookRecipes.filter(
       (recipe) =>
-        String(recipe?.name ?? '').toLowerCase().includes(query) ||
-        String(recipe?.description ?? '').toLowerCase().includes(query)
+        String(recipe?.name ?? '')
+          .toLowerCase()
+          .includes(query) ||
+        String(recipe?.description ?? '')
+          .toLowerCase()
+          .includes(query)
     );
   });
   const recipePageCount = $derived(
@@ -219,7 +223,7 @@
   img={item.img ?? ''}
   name={item.name}
   total={localize('FABRICATE.App.Inventory.Detail.Total', {
-    count: Number(item.totalQuantity ?? 0)
+    count: Number(item.totalQuantity ?? 0),
   })}
   chips={headerChips}
 >
@@ -246,7 +250,9 @@
           )}
         >
           <i class={req.icon} aria-hidden="true"></i>
-          <span class="inventory-detail-requirement-name">{localize('FABRICATE.App.Inventory.Detail.Needs', { name: req.name })}</span>
+          <span class="inventory-detail-requirement-name"
+            >{localize('FABRICATE.App.Inventory.Detail.Needs', { name: req.name })}</span
+          >
           <i
             class={req.met ? 'fas fa-circle-check' : 'fas fa-lock'}
             data-requirement-status={req.met ? 'met' : 'unmet'}
@@ -269,16 +275,24 @@
       onclick={learnAll}
     >
       <i class="fas fa-graduation-cap" aria-hidden="true"></i>
-      <span>{recipeTotal === 1
-        ? localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipeSingular')
-        : localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', { total: recipeTotal })}</span>
+      <span
+        >{recipeTotal === 1
+          ? localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipeSingular')
+          : localize('FABRICATE.App.Inventory.Detail.ReadLearnAllRecipes', {
+              total: recipeTotal,
+            })}</span
+      >
     </button>
   {/if}
 
   <section class="inventory-detail-section" data-inventory-section="learn">
-    <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}</p>
+    <p class="inventory-detail-section-title">
+      {localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}
+    </p>
     {#if bookRecipes.length === 0}
-      <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.NoRecipes')}</p>
+      <p class="inventory-detail-empty-note">
+        {localize('FABRICATE.App.Inventory.Detail.NoRecipes')}
+      </p>
     {:else if bookRecipes.length === 1}
       {@const recipe = bookRecipes[0]}
       <div class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
@@ -287,7 +301,9 @@
             <CraftingThumb src={recipe.img ?? ''} alt="" size={40} />
             <span class="inventory-detail-row-name">{recipe.name}</span>
           </span>
-          {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(recipe)}{/if}
+          {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(
+              recipe
+            )}{/if}
         </div>
         {#if recipe.description}
           <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
@@ -310,7 +326,9 @@
         </div>
       {/if}
       {#if filteredRecipes.length === 0}
-        <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.NoRecipeMatches')}</p>
+        <p class="inventory-detail-empty-note">
+          {localize('FABRICATE.App.Inventory.Detail.NoRecipeMatches')}
+        </p>
       {:else}
         <ul class="inventory-detail-accordion" data-inventory-recipe-accordion>
           {#each pagedRecipes as recipe (recipe.id)}
@@ -332,14 +350,18 @@
                     aria-hidden="true"
                   ></i>
                 </button>
-                {#if learnable}{@render learnControl(recipe)}{:else if craftable}{@render craftControl(recipe)}{/if}
+                {#if learnable}{@render learnControl(
+                    recipe
+                  )}{:else if craftable}{@render craftControl(recipe)}{/if}
               </div>
               {#if expanded}
                 <div class="inventory-detail-accordion-body" data-inventory-recipe-body={recipe.id}>
                   {#if recipe.description}
                     <p class="inventory-detail-recipe-desc">{recipe.description}</p>
                   {:else}
-                    <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.NoRecipeDescription')}</p>
+                    <p class="inventory-detail-empty-note">
+                      {localize('FABRICATE.App.Inventory.Detail.NoRecipeDescription')}
+                    </p>
                   {/if}
                 </div>
               {/if}
@@ -350,7 +372,11 @@
           <div class="inventory-detail-recipe-pager" data-inventory-recipe-pager>
             <label class="inventory-detail-recipe-pagesize">
               <span>{localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}</span>
-              <select value={recipePageSize} onchange={onRecipePageSize} aria-label={localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}>
+              <select
+                value={recipePageSize}
+                onchange={onRecipePageSize}
+                aria-label={localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}
+              >
                 {#each RECIPE_PAGE_SIZES as size (size)}
                   <option value={size}>{size}</option>
                 {/each}
@@ -607,7 +633,8 @@
   }
 
   .inventory-detail-accordion-body {
-    padding: 0 var(--fab-space-2) var(--fab-space-2) calc(40px + var(--fab-space-2) + var(--fab-space-3));
+    padding: 0 var(--fab-space-2) var(--fab-space-2)
+      calc(40px + var(--fab-space-2) + var(--fab-space-3));
   }
 
   .inventory-detail-recipe-pager {

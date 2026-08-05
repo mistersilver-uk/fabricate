@@ -26,12 +26,7 @@
   import { riskClass, riskLabel, biomeChipStyle } from '../../util/gatheringFormat.js';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
 
-  let {
-    environment = null,
-    selectionMode = 'list',
-    selectedId = null,
-    onSelect = null
-  } = $props();
+  let { environment = null, selectionMode = 'list', selectedId = null, onSelect = null } = $props();
 
   const id = $derived(String(environment?.id ?? ''));
   const name = $derived(String(environment?.name ?? ''));
@@ -49,11 +44,13 @@
     if (!uuid || typeof globalThis.fromUuid !== 'function') return;
     let cancelled = false;
     Promise.resolve(globalThis.fromUuid(uuid))
-      .then(doc => {
+      .then((doc) => {
         if (!cancelled && doc) sceneThumb = sceneDocumentImage(doc) || '';
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   });
   const displayImg = $derived(sceneThumb || img);
   const description = $derived(String(environment?.description ?? ''));
@@ -71,7 +68,7 @@
   const discoveredLabel = $derived(
     localize('FABRICATE.App.Gathering.Environments.Discovered', {
       x: discoveredTaskCount,
-      y: composedTaskCount
+      y: composedTaskCount,
     })
   );
   const lockedLabel = $derived(
@@ -83,15 +80,12 @@
   // plus a NO_CURRENT_REALM / LOCATION_BLOCKED blocked reason. Render a header
   // alert (next to the danger pip) and use the full reason text as its tooltip.
   const notInRealm = $derived(
-    locked
-      && environment?.location?.gated === true
-      && environment?.location?.available === false
+    locked && environment?.location?.gated === true && environment?.location?.available === false
   );
   const realmAlertTitle = $derived(
-    (Array.isArray(environment?.blockedReasons) ? environment.blockedReasons : [])
-      .find(reason => reason?.code === 'NO_CURRENT_REALM' || reason?.code === 'LOCATION_BLOCKED')
-      ?.message
-    || localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')
+    (Array.isArray(environment?.blockedReasons) ? environment.blockedReasons : []).find(
+      (reason) => reason?.code === 'NO_CURRENT_REALM' || reason?.code === 'LOCATION_BLOCKED'
+    )?.message || localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')
   );
 
   // Danger pill: always shown, icon-only, coloured by the environment's risk
@@ -113,15 +107,22 @@
 {#snippet identity()}
   <span class="gathering-env-card-header">
     {#if blind}
-      <span class="gathering-env-card-blind" title={localize('FABRICATE.App.Gathering.Environments.BlindChip')}>
+      <span
+        class="gathering-env-card-blind"
+        title={localize('FABRICATE.App.Gathering.Environments.BlindChip')}
+      >
         <i class="fas fa-mask" aria-hidden="true"></i>
-        <span class="gathering-env-card-blind-label">{localize('FABRICATE.App.Gathering.Environments.BlindChip')}</span>
+        <span class="gathering-env-card-blind-label"
+          >{localize('FABRICATE.App.Gathering.Environments.BlindChip')}</span
+        >
       </span>
     {/if}
     {#if notInRealm}
       <span class="gathering-env-card-realm-alert" title={realmAlertTitle}>
         <i class="fas fa-location-dot" aria-hidden="true"></i>
-        <span class="gathering-env-card-realm-label">{localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')}</span>
+        <span class="gathering-env-card-realm-label"
+          >{localize('FABRICATE.App.Gathering.Environments.RealmLockedChip')}</span
+        >
       </span>
     {/if}
     <span class={`gathering-env-card-event ${dangerRiskClass}`} aria-label={dangerAria}>
@@ -150,8 +151,8 @@
           <span
             class="gathering-env-card-discovered"
             aria-label={discoveredLabel}
-            title={discoveredLabel}
-          >({discoveredTaskCount}/{composedTaskCount})</span>
+            title={discoveredLabel}>({discoveredTaskCount}/{composedTaskCount})</span
+          >
         {/if}
       </span>
       {#if biomeTags.length > 0}

@@ -55,7 +55,7 @@
     onRemove = () => {},
     // Deep-link from a progressive row's read-only difficulty badge to the component
     // editor (component.difficulty is a Component property with four consumers).
-    onOpenComponent = () => {}
+    onOpenComponent = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -143,7 +143,11 @@
   }
 
   const componentPickerOptions = $derived(
-    (componentOptions || []).map(option => ({ id: option.id, label: option.name, img: option.img }))
+    (componentOptions || []).map((option) => ({
+      id: option.id,
+      label: option.name,
+      img: option.img,
+    }))
   );
 
   function newId() {
@@ -181,10 +185,15 @@
     const existingIndex = results.findIndex((item) => item?.componentId === id);
     if (existingIndex !== -1) {
       const existing = results[existingIndex];
-      const nextQuantity = Math.min(9999, (Number(existing.quantity) > 0 ? Number(existing.quantity) : 1) + 1);
+      const nextQuantity = Math.min(
+        9999,
+        (Number(existing.quantity) > 0 ? Number(existing.quantity) : 1) + 1
+      );
       onChange({
         ...group,
-        results: results.map((item, i) => (i === existingIndex ? { ...existing, quantity: nextQuantity } : item))
+        results: results.map((item, i) =>
+          i === existingIndex ? { ...existing, quantity: nextQuantity } : item
+        ),
       });
       return;
     }
@@ -192,7 +201,11 @@
   }
 </script>
 
-<div class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''} ${reserved ? 'is-reserved' : ''}`} data-recipe-set data-recipe-result-set-id={group?.id || ''}>
+<div
+  class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''} ${reserved ? 'is-reserved' : ''}`}
+  data-recipe-set
+  data-recipe-result-set-id={group?.id || ''}
+>
   {#if !chromeless}
     <div class="manager-recipe-ingredient-set-head">
       {#if staticLabel}
@@ -210,9 +223,18 @@
           options={ingredientSetOptions}
           selectedIds={assignedIngredientSetIds}
           label={text('FABRICATE.Admin.Manager.Recipe.RoutingIngredientSets', 'Produced by')}
-          addLabel={text('FABRICATE.Admin.Manager.Recipe.RoutingAddIngredientSet', 'Add ingredient set')}
-          placeholder={text('FABRICATE.Admin.Manager.Recipe.RoutingSearchIngredientSets', 'Search ingredient sets...')}
-          emptyHint={text('FABRICATE.Admin.Manager.Recipe.RoutingNoIngredientSets', 'Add a named ingredient set first.')}
+          addLabel={text(
+            'FABRICATE.Admin.Manager.Recipe.RoutingAddIngredientSet',
+            'Add ingredient set'
+          )}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Recipe.RoutingSearchIngredientSets',
+            'Search ingredient sets...'
+          )}
+          emptyHint={text(
+            'FABRICATE.Admin.Manager.Recipe.RoutingNoIngredientSets',
+            'Add a named ingredient set first.'
+          )}
           onAdd={(id) => onAssignIngredientSet(id, true)}
           onRemove={(id) => onAssignIngredientSet(id, false)}
         />
@@ -222,7 +244,10 @@
           selectedIds={checkOutcomeIds}
           label={text('FABRICATE.Admin.Manager.Recipe.RoutingOutcomeTiers', 'Produced on outcome')}
           addLabel={text('FABRICATE.Admin.Manager.Recipe.RoutingAddOutcomeTier', 'Add outcome')}
-          placeholder={text('FABRICATE.Admin.Manager.Recipe.RoutingSearchOutcomeTiers', 'Search outcomes...')}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Recipe.RoutingSearchOutcomeTiers',
+            'Search outcomes...'
+          )}
           emptyHint={outcomeTiersDefined
             ? text(
                 'FABRICATE.Admin.Manager.Recipe.RoutingNoSuccessOutcomeTiers',
@@ -240,7 +265,10 @@
           type="text"
           class="manager-recipe-ingredient-set-name"
           data-recipe-result-set-field="name"
-          placeholder={text('FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder', 'Result set name')}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Recipe.ResultSetNamePlaceholder',
+            'Result set name'
+          )}
           value={group?.name || ''}
           onchange={(e) => setName(e.target.value)}
           aria-label={text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')}
@@ -253,8 +281,8 @@
           data-recipe-remove="result-set"
           aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
           title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
-          onclick={() => onRemove()}
-        ><i class="fas fa-trash" aria-hidden="true"></i></button>
+          onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></button
+        >
       {/if}
     </div>
   {/if}
@@ -262,7 +290,12 @@
   {#if results.length === 0}
     <!-- Danger-bordered dashed panel (§C5): an outcome that produces nothing is a gap. -->
     <div class="manager-recipe-result-empty" data-recipe-result-empty>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ResultSetEmptyPanel', 'Nothing produced on this outcome.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Recipe.ResultSetEmptyPanel',
+          'Nothing produced on this outcome.'
+        )}
+      </p>
     </div>
   {:else}
     <div class="manager-recipe-ingredient-set-groups">
@@ -279,10 +312,17 @@
             class="manager-recipe-result-row is-reorderable"
             data-recipe-result-row
             draggable="true"
-            ondragstart={() => { dragIndex = index; }}
-            ondragend={() => { dragIndex = -1; }}
+            ondragstart={() => {
+              dragIndex = index;
+            }}
+            ondragend={() => {
+              dragIndex = -1;
+            }}
             ondragover={(event) => event.preventDefault()}
-            ondrop={(event) => { event.preventDefault(); handleResultDrop(index); }}
+            ondrop={(event) => {
+              event.preventDefault();
+              handleResultDrop(index);
+            }}
           >
             <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
                  (issue 676). The order was stacked UNDER the grip inside one handle,
@@ -292,12 +332,13 @@
               class="manager-recipe-stage-grip"
               aria-hidden="true"
               title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
-            ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span>
+              ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span
+            >
             <span
               class="manager-recipe-stage-ordinal"
               data-recipe-result-ordinal={String(index + 1)}
-              aria-hidden="true"
-            >{index + 1}</span>
+              aria-hidden="true">{index + 1}</span
+            >
             <RecipeResultItemRow
               {item}
               {componentOptions}
@@ -322,7 +363,8 @@
                     title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
                     disabled={index === 0}
                     onclick={() => moveItem(index, -1)}
-                  ><i class="fas fa-chevron-up" aria-hidden="true"></i></button>
+                    ><i class="fas fa-chevron-up" aria-hidden="true"></i></button
+                  >
                   <button
                     type="button"
                     class="manager-recipe-stage-move"
@@ -331,7 +373,8 @@
                     title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}
                     disabled={index === results.length - 1}
                     onclick={() => moveItem(index, 1)}
-                  ><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                    ><i class="fas fa-chevron-down" aria-hidden="true"></i></button
+                  >
                 </span>
               {/snippet}
             </RecipeResultItemRow>
@@ -366,9 +409,18 @@
         : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
       triggerAddMarker="result-item"
       dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-      searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-      searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-      emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+      searchPlaceholder={text(
+        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+        'Search components...'
+      )}
+      searchAriaLabel={text(
+        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+        'Search components...'
+      )}
+      emptyHint={text(
+        'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
+        'No components defined'
+      )}
       showChevron={false}
       onChoose={(id) => addItem(id)}
     />

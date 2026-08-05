@@ -2,7 +2,7 @@
 
 ## Project
 
-System-agnostic FoundryVTT crafting module targeting Foundry VTT V13.
+System-agnostic FoundryVTT crafting module supporting Foundry VTT V13 as a minimum and verified on V14 (see `module.json`); the smoke harness and the View Lab both run V14.365.
 Primary stack: JavaScript ES modules, Svelte 5, Vite, `node:test`, happy-dom, Playwright, and Jekyll docs.
 
 ## Planning & Workflow
@@ -18,6 +18,7 @@ See `openspec/README.md` for the block format and rules.
 - Use GitHub issue numbers such as `#42` when an issue exists; treat legacy `T-XXX` IDs as reference only.
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth.
 - Route quick-start documentation changes to `docs/quickstart.md` only.
+- Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 
 ## Default Agentic Workflow
 
@@ -49,11 +50,16 @@ The driver timeboxes delegated lanes: after about 60 seconds without observable 
 
 Every spawned role works in its own Git worktree by default so independent workstreams do not share a mutable checkout.
 The workflow driver owns the clean coordinator checkout and integration branch, GitHub and remote mutations, lane lifecycle, integration, authoritative gates, and guarded cleanup.
+That coordinator checkout is itself a worktree created for the task — never the maintainer's primary clone — so integration, authoritative gates, and delivery all run from it and it is disposed under the same guarded cleanup as any lane.
+A maintainer's own checkout is never checked out to a task branch and is left as they left it.
+The one exception is an explicit maintainer instruction to work in their checkout, usually so they can watch the change in a running app or drive manual testing themselves; no agent may assume or grant itself that instruction.
+It authorizes only the task it was given for, does not become the default afterwards, and still requires confirming and reporting that checkout's current branch and dirty state before touching it.
 Mutable lanes use unique `agent/<issue>-<stage>-<role>-r<revision>` branches and exclusive path ownership; read-only lanes use fresh detached worktrees pinned to the exact commit under review.
 Spawned agents verify their assigned path, branch or detached SHA, base, and clean state before acting, then return local commits, base-relative diffs, or verdicts without pushing or mutating issue or PR state.
 Parallel mutable lanes require disjoint owned paths and no dependency on unintegrated output.
 The driver serializes dependency installation and complete test, build, lint, Foundry/Docker, and screenshot gates from the fully integrated coordinator branch.
 Follow the canonical mechanics in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for assignment briefs, review artifacts, integration mapping, feedback revisions, conflicts, and cleanup.
+That lifecycle also owns manual-test candidate visibility, unrelated dirty-state preservation, and explicit maintainer feedback batching.
 
 ### Auto-spawn routing
 
@@ -291,6 +297,12 @@ Loop until both approve.
 Before asking the maintainer to review a PR, the workflow driver completes a final delivery loop from the coordinator checkout.
 Draft-head checks are preflight evidence only because some CI workflows may run only on the `ready_for_review` event.
 
+**The driver runs this loop, including the ready transition, on its own initiative.**
+Marking a PR ready is a step the driver owns outright, not a decision to refer upward, so the driver never waits to be told to undraft.
+Delivery is only complete when the PR is ready and its exact-head checks are green; a green PR left in draft is unfinished work, not a cautious pause, because draft checks prove nothing about the workflows that run only on `ready_for_review`.
+The maintainer's decision point is reviewing and merging the ready PR, and asking them to authorise the transition into that state only moves work back to the person the loop exists to serve.
+Ask first only when the user has said to hold, when the change is one the user asked to inspect before it goes out, or when a delivery precondition below cannot be met.
+
 1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
 2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
 3. Rebase the integration branch onto current `origin/main`, then rerun every required authoritative local gate and `npx commitlint --from origin/main --to HEAD`.
@@ -302,6 +314,7 @@ A rejected lease stops the loop for investigation; never retry with `--force` or
 6. Mark the PR ready for review, then wait for every required GitHub Actions and external check triggered for that exact head.
 Both SonarCloud checks, Automatic Analysis and Quality Gate, must be successful.
 Pending, skipped when required, cancelled, stale-head, or failing checks are not green.
+Choose one authoritative full exact-head attempt, normally the `ready_for_review` attempt, and require all full gates from that attempt rather than combining jobs from duplicates; metadata-only `edited` attempts never qualify.
 7. On any failure, return the PR to draft before gathering evidence and routing fixes through the normal isolated implementation and review loops.
 After fixes, repeat the rebase, validation, lease push, ready transition, and exact-head checks, repeating review only for a materially changed owned concern or unresolved finding.
 8. After the final check rollup succeeds, fetch `origin/main` again and mechanically verify that it remains an ancestor of the unchanged remote PR head and that the PR remains ready.
@@ -352,34 +365,73 @@ The unit-test bar is `# cancelled 0` as well as `# fail 0`: a parallel run under
 - **SonarCloud quality gate** — a separate CI job evaluated on the PR's *new code*, distinct from `npm run lint`.
 It fails on `new_duplicated_lines_density > 3%`, and SonarCloud Automatic Analysis **does not honor `sonar.cpd.exclusions`** from `sonar-project.properties`: duplication in `tests/**` and `scripts/**` fixtures counts against the gate exactly like `src/`.
 Keep new test/fixture/script code DRY (shared helpers like `createMountedComponentHarness`, hoisted constants); the only durable way to exempt a path is the maintainer-set **Duplication Exclusion** in the SonarCloud project UI.
-The gate also fails on new bugs/code-smells that ESLint does not flag (e.g. `Array#sort()` without a comparator, a nested ternary), so a PR can be lint-green yet Sonar-red — read the gate's findings, don't assume `npm run lint` covers it.
+The gate also fails on new bugs/code-smells that ESLint does not flag (e.g. a nested ternary), so a PR can be lint-green yet Sonar-red — read the gate's findings, don't assume `npm run lint` covers it.
+The commoner trap is the reverse one, and it is worth naming because it reads identically from the PR: the rule exists and simply never ran, because the FILE was outside the gate's path list.
+`Array#sort()` without a comparator is a worked example — `unicorn/require-array-sort-compare` flags it here, yet Sonar still reported it as a new BUG, because the file it sat in was ungated (issue 933).
+So when Sonar reports something, first check whether `npm run lint` covers that file at all; unlinted paths are the risk far more often than unlintable rules.
 - The gate also fails on `new_security_rating` — a single new-code finding above rating A fails the PR.
 The ones that bite in practice: `Math.random()` for an id or token (`S2245`, a MEDIUM vulnerability — use `crypto.randomUUID()` / `crypto.getRandomValues()` / `foundry.utils.randomID()`), and spawning a bare command name resolved through `PATH` such as `spawnSync('git', …)` (`S4036` — read the data from stdin, or pass a fixed executable path, rather than searching `PATH`).
 For GitHub Actions workflows the gate adds its own rules: no `${{ inputs.* }}` / `${{ github.* }}` interpolated into a `run:` block (`S7630` — pass them through `env:` and reference `$VAR`); declare `permissions:` at the **job** level on any new job (`S8264`); and SHA-pin third-party actions such as `aws-actions/*` (`S7637`; `actions/*` are allowlisted).
 A **composite action** (`.github/actions/release-setup/action.yml`) has **no `secrets`/`vars` context** — only `inputs`/`env`/`github`/`runner`/`steps`/`job` — so a `${{ vars.* }}` / `${{ secrets.* }}` moved into one resolves to an empty string silently; declare those as `inputs` the caller passes explicitly.
 - Reading a smoke result: `test-results/summary.json` reports `passed: false` if any phase step fails OR if an un-waived `consoleErrors[]` entry remains, and also carries the split counts `stepFailures` and `consoleErrorCount` plus the flags `degraded` and `rendererCrashed` (all written in the harness's `finally` block, so an early phase abort still populates them, never `undefined`).
 Benign browser `404 (Not Found)` asset misses in the fixture world populate `consoleErrors` and flip `passed` to false even when every `steps[]` entry passed.
-A known-benign console or `pageerror` line can be admitted per run via `--allowed-console-error-patterns` (appended to the in-source defaults like `/reading 'OBJECTS'/`, never replacing them; waived lines are echoed to the step summary), but a failing `steps[]` entry is NEVER waivable and still throws first.
+A known-benign console or `pageerror` line can be admitted per run via `--allowed-console-error-patterns` (appended to the in-source `ignoredErrorPatternDefaults`, never replacing them; waived lines are echoed to the step summary), but a failing `steps[]` entry is NEVER waivable and still throws first.
+Reach for a waiver last, not first: the canvas-priority default that lived there for a year was suppressing a real harness defect rather than a browser artefact, and its removal is what surfaced it (issue 1010).
 `degraded: true` marks a run that tolerated a transient renderer/page teardown (a `screenshot-manager`/`player-journal` step recorded `skipped: true`) — the run stays exit 0 but is a flake, not a clean pass; `rendererCrashed: true` marks a Playwright page `crash` (canonically an OOM).
 A JS product bug surfaces via `consoleErrorCount` (the independent console-error gate), NOT the teardown-tolerance path — a tolerated teardown coincident with any non-waived console error still fails on the console gate; the tolerance can only mask a renderer PROCESS crash (OOM/target-destroyed) and only post-captures.
 A `rendererCrashed: true` exit-0 run warrants a confirming re-run, and a PERSISTENT `rendererCrashed` pattern is actionable (a systematic tail OOM), not cosmetic.
 Check `steps[]` for an actual failing step before treating a run as broken or discarding its screenshots — see the "Foundry integration (smoke) tests" section in `CONTRIBUTING.md`.
 - `npm run build` — required build gate for implementation changes.
-- `npm run lint` + `npm run lint:css` + `npm run format:check` + `npm run lint:md` — required ESLint + Stylelint + Prettier + markdownlint gate (the `lint` CI job).
-ESLint/Prettier run over a **staged path scope** (see the `lint`/`format` globs in `package.json`): now the entire `src/` JavaScript surface — `src/{models,utils,integrations,config,migration,canvas,systems}` + `src/toolBreakageRuntime.js`. `tests/`, `src/ui/**`, `*.svelte`, `src/main.js`, and `scripts/**` are NOT gated yet — widen a path in its own focused PR only once it passes BOTH ESLint and the SonarCloud quality gate (reformatting counts as new code, so it surfaces pre-existing Sonar findings). `npm run lint:css` (Stylelint, config in `stylelint.config.js`) gates `styles/**/*.{css,scss}` and enforces quality, reliability, duplication, reuse/shorthand, and cross-browser support (against the `browserslist` in `package.json`); Svelte scoped `<style>` blocks are out of scope.
+- `npm run lint` + `npm run lint:svelte` + `npm run lint:svelte:warnings` + `npm run lint:css` + `npm run format:check` + `npm run lint:md` — required ESLint + Svelte ESLint + Svelte compiler-warning sweep + Stylelint + Prettier + markdownlint gate (the `lint` CI job).
+ESLint/Prettier run over a **staged path scope** (see the `lint`/`format` globs in `package.json`): now the entire `src/` JavaScript surface — `src/{models,utils,integrations,config,migration,canvas,systems}` + `src/toolBreakageRuntime.js`.
+Prettier additionally formats every `*.svelte` file under `src/` — `prettier-plugin-svelte` is registered in `.prettierrc.json` (Prettier 3 does not auto-load plugins, so the devDependency alone is not enough) and `format:check` names `src/**/*.svelte`, so an unformatted component fails CI.
+`npm run lint:svelte` separately gates every `*.svelte` file under `src/` with `--max-warnings=0`, so a component's script and markup ARE ESLint-gated even though the `.js` around them under `src/ui/**` is not — the two halves of that directory are gated by different scripts and must not be reasoned about as one scope.
+That gate polices suppressions in both directions: `svelte/no-unused-svelte-ignore` is active, so a `svelte-ignore` comment that no longer suppresses anything is itself a lint failure and must be removed once it stops being needed.
+The same holds for an ESLint suppression — the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a stale `eslint-disable` directive fails the gate exactly as a stale `svelte-ignore` does.
+That is pinned rather than left to ESLint's default because it is half of what makes reformatting components safe: `eslint-disable-next-line` is anchored to a line and Prettier moves lines, so a directive that slips off its violation resurfaces the violation, and one that lands suppressing nothing is reported by this option.
+A suppression that must sit on a particular line therefore needs a `<!-- prettier-ignore -->` fence to keep it there — see the `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte`, where Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width; the fence protects the directive's line anchor, not the render.
+Svelte COMPILER warnings are gated too, as of issue 924: `onwarn` in `svelte.config.js` fails `npm run build`, and `npm run lint:svelte:warnings` runs the graph-independent sweep in `scripts/check-svelte-warnings.mjs` as its own step of the `lint` CI job.
+The sweep is the authoritative half — a Vite build compiles only the entry graph, so it is blind to a component nothing imports — and both read their compiler options from `svelte.config.js`, so a disagreement between them means graph reachability and never drift in `compilerOptions`.
+That qualifier is load-bearing: `emitCss` is a `vite-plugin-svelte` option rather than a compiler one, and `emitCss: false` makes the plugin drop every `css_unused_selector` before `onwarn` sees it, so the build would go quiet on a class the sweep still reports.
+`tests/svelte-warning-scope.test.js` pins `emitCss` at its default on both surfaces that can set it, and pins `compilerOptions` to carry no `warningFilter` — that one key would turn the sweep, the build and the whole-tree assertion clean while checking nothing.
+Stylelint still excludes `.svelte` (scoped `<style>` blocks are not linted) and SonarCloud indexes none of it, so ESLint plus the compiler sweep are the whole static-analysis story for a component.
+`tests/`, the `.js` under `src/ui/**`, and `src/main.js` are NOT gated yet — widen a path in its own focused PR only once it passes BOTH ESLint and the SonarCloud quality gate (reformatting counts as new code, so it surfaces pre-existing Sonar findings).
+`scripts/**` is a different shape and must not be lumped in with those: it IS gated, file by file — 20 files today, named one at a time in the `lint`, `format` and `format:check` scripts rather than globbed.
+Adding a script therefore does not lint it, which is the trap that let a new BUG and a new VULNERABILITY reach SonarCloud in issue 933.
+`tests/scripts-lint-gate-coverage.test.js` closes that at `npm test` speed: it parses the paths out of the `lint` script, enumerates `scripts/**`, and fails on any ungated file not written down as acknowledged debt in `tests/scripts-known-ungated.js` — a baseline that may only shrink.
+So a new script must be added to all three lists — the test compares them as sets, so the same paths, in whatever order — and recording one as debt instead means changing an exactly-pinned count in review.
+That count is pinned rather than capped so paying the debt down also has to be banked deliberately, and the test parses the ESLint `scripts/**` glob back out of `eslint.config.js` so widening it to a new extension cannot leave the enumeration behind.
+The ones still ungated stay that way for a measured reason: the Foundry smoke harness alone accounts for 844 of the 993 ESLint findings that remain across `scripts/**` and pins its Phase D0 selectors by class, index and button text with no unit coverage, so widening the glob is a large triage against the least-covered file here rather than a tidy-up.
+`npm run lint:css` (Stylelint, config in `stylelint.config.js`) gates `styles/**/*.{css,scss}` and enforces quality, reliability, duplication, reuse/shorthand, and cross-browser support (against the `browserslist` in `package.json`); Svelte scoped `<style>` blocks are out of scope.
 Use `npm run lint:fix` / `npm run lint:css:fix` / `npm run format` to auto-fix.
 See the "Linting & formatting" section in `CONTRIBUTING.md`.
 - `npm run lint:md` (markdownlint, config in `.markdownlint-cli2.jsonc`) gates every authored Markdown file and enforces **one sentence per line** — run it before finalising any change that touches Markdown.
 Run `npm run lint:md:fix` to auto-split prose, re-running until the count stops dropping (a long paragraph splits one boundary per pass), and wrap a multi-sentence table cell's table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region, since a cell cannot break across lines.
-- `npm run test:foundry` — use when a task needs live Foundry UI or screenshot validation.
+- `npm run lint:md:files -- <paths>` is the focused local and lane check and passes only the explicit paths to `markdownlint-cli2 --no-globs`, so configured repository globs cannot pull unrelated Markdown into the run.
+`npm run lint:md` remains the unchanged authoritative whole-repository gate in local development and CI; CI does not substitute the focused command for it.
+- `node scripts/view-lab-screenshots.mjs apps <case-ids>` — **the default way to produce and inspect application screenshots.** Seconds per frame, no Docker, no Foundry container, and it runs in CI.
 - For UI/UX work, prefer the local Vite dev server first, using the user-provided dev URL when available.
-- Fall back to `npm run test:foundry` when a change depends on real Foundry runtime behavior, when no Vite dev server is available, or when clean reproducible screenshots are needed.
-- UI-changing PRs (files under `src/ui/`, `styles/`, or any `*.svelte`/`*.css`) must include real smoke-run screenshot evidence for the relevant changed views before opening or updating the PR; a `lang/` change requires screenshots only when the same PR also changes one of those render files.
-Use `npm run screenshots:ui:plan -- --base origin/main` to identify expected views, run the scoped `screenshots` profile (`npm run test:foundry:screenshots -- --target-labels=$(npm run --silent screenshots:ui:targets -- --base origin/main)`) to produce real Foundry screenshots for only the changed-file-affected views under `test-results/`, `npm run screenshots:ui -- --base origin/main --pr <number>` to collect the relevant smoke artifacts into `tmp/pr-screenshots/<number>/`, then `npm run screenshots:ui:publish -- --pr <number>` to upload them to S3 (under `pr-screenshots/<number>/`) and embed the returned `![pr-<number> ...]` image markdown into a managed block in the PR body's `Screenshots (if applicable)` section, then `npm run screenshots:ui:clean -- --pr <number>` so PR-scoped screenshots are not committed as repository assets.
+- `npm run test:foundry` — use when a change depends on real Foundry RUNTIME behavior (document lifecycle, compendium APIs, cross-application context), or for a view the case registry does not cover.
+Do NOT run it to photograph a view the registry already covers: the `screenshots` profile costs ~31s per frame against the View Lab's ~5s, needs Docker and a licensed container, and cannot run on a GitHub Actions runner — so it produces nothing per-PR and serialises on one machine.
+- UI-changing PRs (files under `src/ui/`, `styles/`, or any `*.svelte`/`*.css`) must include screenshot evidence for the relevant changed views before opening or updating the PR; a `lang/` change requires screenshots only when the same PR also changes one of those render files.
+Evidence is always a FULL APPLICATION WINDOW — never a component on a blank page.
+Each case pins the size its smoke counterpart photographs rather than the app's declared `DEFAULT_OPTIONS.position`: the two differ (the smoke shoots the manager at 1280x820, not its declared 1280x940), and responsive cases deliberately pin narrower geometry, so the registry spans twelve sizes and the size is a per-case fact rather than a per-app one.
+- For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the normal case, at 155 cases across both windows — the **View Lab** is the producer, and it is what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.
+Measured: 155 frames in ~14 min locally (~5.6s each), a five-case subset in 36s, one case in 22s — against ~31s per frame for the smoke's `screenshots` profile.
+An unknown case id aborts in a second naming the id, so a typo costs nothing.
+Browse the result at `ui-screenshot-artifact/apps/index.html`, which groups frames by screen and offers a multi-tag filter; `npm run viewlab:index` regenerates it.
+It needs a one-off `npm run viewlab:chrome:harvest` first, which extracts Foundry's real window chrome from the release archive `npm run test:foundry:up` already caches; nothing harvested is ever committed.
+The lab fails closed rather than approximating: no harvested chrome, no frame.
+- The live smoke remains the FIDELITY AUTHORITY.
+Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is right and the lab is defective — fix the lab, do not publish the lab's version.
+For a view the registry does not cover, the smoke is also the producer:
+use `npm run screenshots:ui:plan -- --base origin/main` to identify expected views, run the scoped `screenshots` profile (`npm run test:foundry:screenshots -- --target-labels=$(npm run --silent screenshots:ui:targets -- --base origin/main)`) to produce real Foundry screenshots for only the changed-file-affected views under `test-results/`, `npm run screenshots:ui -- --base origin/main --pr <number>` to collect the relevant smoke artifacts into `tmp/pr-screenshots/<number>/`, then `npm run screenshots:ui:publish -- --pr <number>` to upload them to S3 (under `pr-screenshots/<number>/`) and embed the returned `![pr-<number> ...]` image markdown into a managed block in the PR body's `Screenshots (if applicable)` section, then `npm run screenshots:ui:clean -- --pr <number>` so PR-scoped screenshots are not committed as repository assets.
 The reduced `rc`/`ci` smoke stays the CI/release gate and `full` remains the occasional outer-loop suite; do NOT run the `full` (or `screenshots`) smoke profile on a GitHub Actions runner — generation is local.
-The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs`, the branch adds a capture state that reaches it rather than publishing an unrelated frame.
+The evidence must DEMONSTRATE the change, not merely clear the gate: at least one published frame must show the changed state itself, and when that state is not reachable by the existing capture walk in `scripts/foundry-test-run.mjs` or by a registry case, the branch adds one that reaches it rather than publishing an unrelated frame.
+A View Lab case that navigates must declare `expectView`; the capture asserts the app reached that route and fails rather than screenshotting whichever screen it landed on.
 The `check-screenshots` gate cannot be self-satisfied: there is no `SCREENSHOTS_NEEDED:` bypass.
 If capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label (agents must never apply it).
+An explicit issue-specific maintainer instruction may replace automated screenshot production, but it leaves agent visual approval pending and does not itself satisfy or waive `check-screenshots`; qualifying maintainer-provided evidence or the maintainer label is still required.
 - Smoke screenshot fixture data should use Foundry VTT core or dnd5e non-SVG raster icon paths directly when previews need imagery; do not invent custom SVG preview art.
 - The smoke harness Phase D0 (`screenshot-manager` step in `scripts/foundry-test-run.mjs`) pins many selectors by class, `.nth(N)` index, and visible button text.
 When changing any manager UI surface — environment row markup, env-edit view, composition list, header actions — grep the harness for the changed classes / text before declaring the change done.
@@ -433,6 +485,11 @@ Keep the control constraint as UX, and **test the requirement** (normalizer inpu
 - Manager confirmation prompts (discard unsaved, destructive actions) MUST go through `services.confirmDialog` → `foundry.applications.api.DialogV2.confirm`.
 Never use `globalThis.confirm()`, not even as a fallback.
 See [Manager confirm-discard guard](#manager-confirm-discard-guard).
+  - **Carve-out: high-frequency destructive ROW actions.** A per-row destructive action a GM performs repeatedly down a list (deleting one owned copy, erasing one learned recipe) uses the inline two-step arm — `src/ui/svelte/apps/manager/ArmedDangerButton.svelte` — instead of a modal: the first click arms the control, the second executes.
+A modal per row is the wrong ergonomics at that frequency, and the arm still requires a deliberate second act.
+`confirmDialog` is RETAINED for the heavyweight cases: deleting a stacked (`quantity > 1`) document, and any bulk or reset action.
+The armed token MUST be keyed on the target document id, never a row index, because a projection can re-publish asynchronously between the two clicks.
+This carve-out does NOT retrofit `VocabularyPanel`'s expanding below-row confirm strip, which is a different idiom by design — it carries a reference-count consequence sentence no two-word button label can hold.
 - When a Svelte component is shared between task and event (or similar `kind`-driven) contexts, split shared i18n keys into kind-specific siblings (`…Task` / `…Event`) and select with a ternary on `kind`.
 Reserve combined "tasks and events" / "task or event" wording for surfaces that genuinely mix kinds (overview hints, mixed validation issues, error messages).
 - Generic "record" / "records" wording in user-facing strings under `FABRICATE.Admin.Manager.EnvironmentEditor.*` is a known anti-pattern; environments don't have catalysts, they have tasks, events, and required tools.
@@ -444,17 +501,61 @@ When renaming variables, refactoring markup, or removing i18n keys, grep these a
 
 - `game`, `ui`, `Hooks`, and `CONFIG` are runtime globals.
 Never import them.
-- The module targets Foundry V13.
-Account for V13 API shapes when touching Foundry-facing code.
+- The module declares `minimum: "13"` and `verified: "14"`, and the smoke harness boots the pinned V14.365.
+Account for both API shapes when touching Foundry-facing code, and treat a note below that cites a specific build as verified against that build rather than as a claim about every supported one.
 - V13 **animates token movement**: at the `updateToken` hook the document is already at the destination, but the placeable (`token.object.center`) and `TokenDocument#getCenterPoint()` still report the *animating* position — the spot the token just left.
 Any Scene Region containment / "where is this token" read at the hook is off-by-one if it uses the placeable.
 Read `TokenDocument#regions` (authoritative membership) or compute the centre from the document `x/y` + footprint, and defer until the move animation settles.
 See [Travel: live current-realm sensing](#travel-live-current-realm-sensing).
+- **`RegionDocument#testPoint` reads a missing or non-finite `elevation` as a silent `false`, never an error** — an incomplete `ElevatedPoint` is a DENIAL, not a crash, so the defect presents as an unexplained containment miss with nothing in the console.
+`testPoint` is `#testElevation(point.elevation) && polygonTree.testPoint(point)` (`client/documents/region.mjs`, verified against V14.361), and every comparison in `#testElevation` — `elevation < bottom`, `elevation === bottom`, `elevation <= top`, `elevation < top` — is false against `undefined`.
+This bites **unbanded** regions too: `prepareBaseData` normalizes a `null` `elevation.bottom`/`top` to ∓`Infinity`, but `undefined < -Infinity` and `undefined < Infinity` are both false, so a region with no authored band rejects the point exactly like a banded one.
+Normalize to a finite elevation at the call site (`Number.isFinite(e) ? e : 0`) for every point handed to `testPoint`, including one built from `TokenDocument#getCenterPoint()` — that returns the document's `elevation` verbatim, so an absent elevation reaches `testPoint` on the *primary* branch, not just a fallback.
+`regionContainsPoint` in `src/canvas/regionHitTest.js` therefore takes elevation as an **explicit parameter defaulting to `0`** rather than reading `point.elevation`, so a caller that legitimately has no elevation (a mouse drop point) submits `0` by omission and cannot silently start submitting `undefined` when something later adds that field (issue 999).
+Note the band's `bottom` is inclusive but `top` is **exclusive** unless `elevation.topInclusive`, so "tests elevation" and "tests elevation the same way `testInsideRegion` does" are different claims.
+- **`TokenDocument#regions` is canvas-independent and safe to read on a client that is not viewing that scene**, which makes it the one containment input that survives an active GM re-validating a player's request against a scene they cannot see.
+It is backfilled from the **persisted, replicated** `_regions` schema field (`client/documents/token.mjs`, verified against V14.361): `prepareBaseData` fills it at load time but ONLY when `regions === null`, `_onCreate` fills it for a token created during play, and `#onUpdateRegions` rebuilds it when `_regions` changes — all three resolving ids through `this.parent.regions.get(id)`.
+So it is populated for a token that has never moved, and it holds the SAME `RegionDocument` instances `scene.regions.get(id)` returns, which is what makes identity comparison a valid match.
+It is a real `Set<RegionDocument>`, so an `Array.isArray` read silently misses it and leaves the primary path dead in production while every array fixture stays green — read it through a shape-tolerant collector (`collectRegions` in `src/canvas/regionHitTest.js`).
+An **empty** `regions` means "unknown", never "in no regions": the field initializer is `game._documentsReady ? new Set() : null` and only the `null` case is ever backfilled, so an unbackfilled empty set is indistinguishable from a genuine absence.
+Treat a membership miss as **indeterminate** and fall through to another signal; treating it as a negative converts a load-order race into a wrong denial (`membershipIncludesRegion`, issue 999).
+- **`TokenDocument#testInsideRegion` is the canvas-free token→region containment predicate; `Token#center` and the `Token` placeable are not.**
+`testInsideRegion` (`client/documents/token.mjs`, verified against V14.361) tests scene **level** inclusion via `region.includedInLevel`, the full elevation band including the token's head (`elevation + depth * grid.distance`), the token **footprint** via `getContainmentTestPoints`, and hex shapes — every one of which a centre-point `testPoint` drops — and it reads `this._source.x/y/elevation/width/height/shape` explicitly, so it is also immune to the animation lag documented above.
+It throws unless `this.parent === region.parent`, a precondition that is free at any call site enumerating `scene.tokens` off `region.parent`.
+By contrast the `Token` **placeable has no `elevation` getter at all** in 14.361 (neither does `PlaceableObject`; every internal read goes through `this.document.elevation`), and `Token#center` returns a bare `PIXI.Point` built from `document.getCenterPoint()` with the elevation **dropped**.
+Always read a token's elevation through `.document` (`tokenElevation` in `src/canvas/regionHitTest.js`): a bare `token.elevation` read is `undefined` on any placeable-fed path and degrades silently into whatever `?? 0` fallback follows it, while a document-shaped test fixture passes green.
+- **`TokenDocument#object` is `null` off-VIEW and, on V14, off-LEVEL**, so "the GM is on another scene" is only half the exposure.
+`CanvasDocumentMixin`'s `object` getter returns `null` unless `viewed`, and `viewed` is `!!this.parent?._view && this.includedInLevel(this.parent._view)` (`client/documents/abstract/canvas-document.mjs`, verified against V14.361) — a token on a non-active scene **level** of the scene the GM IS viewing also has no placeable.
+Any code reading `doc.object?.center` and falling back to `{ x: doc.x, y: doc.y }` therefore swaps the centre for the top-left **anchor**, roughly 70px diagonally off for a Medium token on a 100px grid, on a code path reachable while looking at the right scene.
+Write every GM-side re-validation against document APIs and never against a placeable: this failure is invisible to `npm test` (no fake refuses a placeable read) and invisible to the single-client smoke, so only the source contract catches it (issue 999).
+- **`canvas.scene?.id === X` is NOT a canvas-readiness predicate** — it starts answering roughly sixty lines before the canvas can accept a placeable.
+`Canvas##draw` (`client/canvas/board.mjs`, verified against V14.365) assigns `#scene = nextScene` early, then `await`s `#loadTextures()`, and only afterwards calls `#activateTicker()`, which is the sole assignment of the `pendingRenderFlags` field — a bare class field until that call runs.
+Creating a placeable document inside that window reaches `canvas.pendingRenderFlags[this.priority]` in `RenderFlags#set` / `RenderFlags#clear` (`client/canvas/interaction/render-flags.mjs`) and throws `Cannot read properties of undefined (reading '<PRIORITY>')`.
+It surfaces as a bare `pageerror` with **no failing step**, because `CanvasDocumentMixin#_onCreate` calls `object.draw()` un-awaited and un-caught, so the throw is an unhandled rejection nothing attributes to a caller.
+Wait on `canvas.ready` (or the `canvasReady` hook) rather than the scene id: `#ready = false` is assigned before the scene swaps and `#ready = true` after `#activateTicker()`, so the compound `canvas.ready === true && canvas.scene?.id === X` is the correct predicate.
+**But do not treat the wait as the fix — order the work instead.** A bounded wait is only as good as its timeout, and the FIRST draw of a session is the expensive one (WebGL init, transcoder, worker startup, a full asset load on a software renderer); when it overran a 15s bound the smoke harness swallowed the timeout and created placeables into the open window anyway, reproducing the identical failure.
+Create the documents while the scene is **not viewed** (`scene._view` is null, so `_onCreate` finds no placeable and draws nothing) and activate afterwards; the layer pass then draws them after `#activateTicker()`.
+That also explains which draws are exposed: placeables a scene ALREADY carries are drawn by the layer pass and are never at risk — a scene full of Regions and Tiles redraws cleanly — so a create during the window is the only route in.
+The window is per page session rather than per draw: `#activateTicker` defines the property with `configurable: true` and teardown only clears the queues, so once any scene has drawn past that call neither message form can recur (issue 1010).
+The smoke harness's `activateSceneAndAwaitCanvasReady` and `scripts/lib/foundryCanvasReadiness.js` are the worked example of the wait, and the Manage Interactables block's seed-then-activate order is the worked example of the fix.
+- **Foundry V14 added an `INTERFACE` ticker priority, and a priority-labelled error waiver goes stale on a version bump.**
+V13 had `OBJECTS` and `PERCEPTION` queues only; V14 adds `INTERFACE` and moves `ControlIcon` and the new `ShapeControls` onto it.
+The canvas race above therefore reported `reading 'OBJECTS'` under V13 and `reading 'INTERFACE'` under V14.365 — the same defect, renamed out from under the smoke harness's waiver, which is how it read as a new failure introduced by the version bump.
+When bumping the pinned Foundry build, re-check every waiver, selector, or matcher keyed on a core constant name: a waiver that stops matching turns a suppressed problem into a fresh-looking one, and a waiver that keeps matching a renamed symbol hides it for another year.
 - `updateWorldTime` is a **synced** hook — it fires on every connected client off the server's broadcast.
 Any externally observable side effect driven from it (publishing public hooks, posting chat, writing documents) must be gated to the primary GM (`game.users.activeGM?.id === game.user?.id`, the `isPrimaryGM` seam in `GatheringEngine`) or it duplicates N times.
 Idempotent shared-state updates (stamina regen, node respawn) are already gated this way; the gathering completion-hook publication follows the same rule for matured timed runs.
 The gate applies to actor `setFlag` / `_persist` broadcast document writes too, not only `craft()` / award side effects — `SalvageRunManager.processWorldTime` and `CraftingRunManager.processWorldTime` resume matured timed runs and persist a broadcast `setFlag`, so both carry the `isPrimaryGM` seam wired in `main.js` (issue 656).
 Use `activeGM` (`game.users.activeGM?.id === game.user?.id`), NOT `game.user.isGM`: `User#isGM` is true for assistant GMs too (who hold `SETTINGS_MODIFY`), so an `isGM` gate lets the full GM AND every assistant race the write — `activeGM` fires on exactly one client (this is also why `_runMigrations` gates on `activeGM`, issue 657).
+- **`isGM` vs `activeGM` — the decision rule stated positively.** Ask what drove the call, not who is allowed to make it.
+Use **`activeGM`** for BROADCAST-driven work that runs on every connected client — a synced hook (`updateWorldTime`), a world-load migration, any handler N clients receive — because the gate's job there is to elect exactly one executor and prevent N duplicate writes.
+Use **`isGM`** for a SINGLE-CLIENT, user-initiated GM action — a click in a GM-only application — because there is no duplicate-execution risk to prevent, and `activeGM` would instead lock out the assistant GMs the application already admits.
+`game.fabricate.resetActorKnowledge` is the canonical `isGM` example: one GM invokes it, from a macro/console or the GM Knowledge surface, and Foundry authorises the document writes for an assistant too (`testUserPermission` short-circuits any `isGM` to `OWNER`).
+Getting this backwards is silent in both directions — an `isGM` broadcast gate duplicates writes only when a second GM is logged in, and an `activeGM` click gate refuses only assistant GMs.
+- **Embedded documents created or destroyed WITH their parent emit no `create<Embedded>` / `delete<Embedded>` hook.** Hook dispatch is per-operation-type, and embedded collections are materialised through `EmbeddedCollection#_initialize`, a path with no lifecycle hook dispatch at all.
+So an `Actor.create` carrying `items[]` — from an import, a duplicate, or a compendium drop — fires `createActor` and **zero** `createItem`, and `deleteActor` is symmetric.
+Any projection over `actor.items` must therefore hook the PARENT's CRUD (`createActor` / `deleteActor`) as well as the child's (`createItem` / `updateItem` / `deleteItem`); the parent hooks are load-bearing, not belt-and-braces.
+Filter the child hooks with `doc.parent?.documentName === 'Actor' && !doc.pack` — an Item embedded in a *compendium* Actor also has an Actor parent and could never change a world projection, and `Document#pack` falls back to `this.parent?.pack`, so the clause is directly testable.
 - Directory entry context menus are extended through the `get<Directory>ContextOptions` hook family (`getCompendiumContextOptions`, introduced 13.344; confirmed against V14.361 source) — an **array-mutation** hook: `(app, contextOptions) => contextOptions.push(entry)`, mutate in place and return nothing.
 Two traps.
 (1) **Register early** (module top-level, or `init`/`setup` — NOT the `ready` body): the menu is built exactly once in the directory's `_onFirstRender`, which runs during the pre-`ready` sidebar force-render, so a `ready`-body listener can miss the one-time build (unlike `renderItemDirectory` header-button wiring, which legitimately re-runs on every render).
@@ -480,8 +581,14 @@ For BOTH compendium cases, read folder membership from `pack.index[].folder` —
 Do **NOT** use `Folder#getSubfolders` for a packed folder: it filters `game.folders` (world-only) and returns `[]` for an in-pack folder, silently dropping nested items; derive the in-pack subtree from the `pack.folders` parent links instead (`descendantFolderIdSet` in `src/ui/svelte/util/importFolderGroups.js`).
 A compendium-**directory** world folder (resolved `folder.documentType === 'Compendium'`) groups packs, not items, and has no item-level grouping — skip it with a notice.
 - Foundry `DiceTerm#total` is the post-modifier, active-only sum; `DiceTerm#number`/`#faces` may be undefined until evaluated — read `results[].result` for raw per-die logic.
-- `game.documentTypes.Item` is a `Set`; use `Array.from()` before array-style operations.
+- `game.documentTypes.Item` is a plain **array**, not a `Set` — `Game#setupPackages` builds it with `Object.keys(types)` (verified against V13.351 `client/game.mjs`).
+  A defensive `Array.from()` is harmless and still appears in the harness, but code may index and `.includes()` it directly.
+  This note previously claimed `Set`; a `.has()` written against it would have failed at runtime while passing every fake that copied the note.
 - Prefer `game.documentTypes` over `game.system.documentTypes`, with fallback only when needed.
+- **Character-prerequisite paths are ROLL-DATA paths, not document paths.**
+  They resolve against `actor.getRollData()`, which Foundry has already flattened, so dnd5e wants `skills.arc.value` — never `system.skills.arc.value`.
+  Gathering character modifiers use the *other* convention (`@actor.system.…`), which is what makes this easy to get wrong.
+  A `system.`-prefixed prerequisite resolves to `undefined`, coerces to 0/false, and fails its gate permanently while logging only a `console.warn` — and the manager renders the raw path, so the mistake reaches published screenshots.
 - Use `sheet.changeTab(tabName, groupName)` for ApplicationV2 tab switches.
 - Foundry core styles fight Fabricate styles for `button`/`input` controls; the override usually belongs in global per-area CSS in `styles/fabricate.css`, not in scoped Svelte `<style>`.
 Two recurring instances:
@@ -576,6 +683,7 @@ Treat the cited file paths as **load-bearing**: when a change touches a path men
 Cite code by symbol name and file path only — for example `_playerListingFields` in `src/systems/GatheringListingBuilder.js`, locatable with `grep -n` — never by line number; `npm run validate:agents` rejects `file.js:NNN`-style citations because they rot silently as code moves.
 
 Some contributor-workflow deep-dives moved into `CONTRIBUTING.md`: the Foundry smoke harness (`npm run test:foundry` phases, outputs, Phase D0 selector drift) is the "Foundry integration (smoke) tests" section; UI PR screenshot evidence is the "UI PR screenshot evidence" section; the Foundry-vs-Fabricate CSS override map (button layout, focus rings, specificity ladder) is the "Foundry vs Fabricate CSS overrides" section.
+Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md`.
 
 ### Manager confirm-discard guard
 
@@ -691,58 +799,11 @@ It is unrelated to the registered-entry match ref and stays `sourceUuid`.
 The learned-recipe provenance record (`Actor.flags.fabricate.learnedRecipes[recipeId].sourceItemUuid`, written by `RecipeVisibilityService`) is a fourth, actor-flag family that is also NOT in the settings-payload rename scope.
 Classify every occurrence by the owning object before renaming.
 
-### Prototype-driven redesign and design-system migration
+### Reference-led redesign and design-system migration
 
-Fabricate's UI is being redesigned surface-by-surface from standalone HTML prototypes.
-Issues 675 (player Inventory) and 676 (GM Component Studio) each passed a three-round plan gate, a two-round implementation review, and a docs loop — and the maintainer still found user-visible drift within minutes of opening them, plus two surfaces that were specified and never built.
-Every reviewer had checked the change against *rules* (tokens, geometry, type scale, a11y); none had put the new surface beside the shipped one it was supposed to match, and none had checked whether the CSS did anything.
-These notes are what that cost.
-
-- **The already-migrated side wins — identify it, do not assume it.**
-When a redesign lands one surface at a time, every prototype-vs-shipped disagreement has a side that is already the new design system.
-That side wins.
-The shipped sibling won for issue 676 (the Recipe Studio was itself built from a prototype and had already been corrected in use), and the **prototype** won for issue 675 (the Inventory leads the new player design; Crafting/Gathering/Journal are the old one and follow later).
-Neither "the mock is the source of truth" nor "match the neighbour" is safe as a blanket rule — applied blindly, the first re-introduces fixed defects and the second drags a leading surface backwards.
-
-- **"Where the brief is silent, X wins" does not fire where the brief speaks.**
-Issue 676's plan carried exactly that clause and drifted anyway: the brief spoke, the implementer followed it faithfully, and the result still diverged from its sibling — because the sibling had already fixed the thing the brief described.
-A sibling rule must read "the sibling wins wherever it has an opinion", and the check must be a control-by-control diff, not a tie-breaker invoked when someone happens to notice a gap.
-
-- **A shipped sibling's CSS comments are the record of what the prototype got wrong.**
-Read them before building from a mock.
-`.manager-recipe-row.is-selected { box-shadow: none; }` in `styles/fabricate.css` exists to opt the recipe row out of a shared rule, and says why: a ring plus a bar states the selection twice.
-Issue 676 was added to that shared rule's selector list, never got the opt-out, and shipped the bar.
-The same file documents deleting a duplicate page header, replacing a bordered count chip that "read as something to press", and cutting three row icons to one — all three of which issue 676 rebuilt.
-
-- **Implementing a brief's token NAMES is not implementing its design.**
-A brief describes a delta from the prototype's baseline, so the same declaration means different things against a different baseline.
-Issue 675's card selection shipped `--accent-border` + `--surface-soft` exactly as written, onto a resting card that was already `--surface-soft` — the rule compiled to a no-op and selection became invisible.
-Verify the change **renders**; a style that declares correctly and changes nothing passes every review we have.
-
-- **Duplicated scoped styles drift silently, and per-file review cannot see it.**
-Svelte scoping lets two components hand-roll the same class names with different values while each reads as perfectly self-consistent.
-Issue 675's `InventoryBookDetail.svelte` and `InventoryComponentDetail.svelte` did this across eleven classes, so the inspector rendered two design systems depending on what the player clicked.
-Extract the shared shell; matching the values by hand only resets the clock.
-
-- **A "verbatim" extraction during a redesign carries the OLD design forward.**
-Splitting a component is a structural refactor, and "I moved it unchanged" is the correct claim for the code and the wrong outcome for the pixels when everything around it is being restyled.
-
-- **A gate authored from the implementation enshrines the implementation.**
-`tests/components/component-studio-font-size.test.js` was written by measuring the shipped markup, so its fixture hardcoded the drifted controls and its own comments recorded the drift as expected values.
-It then defended the drift.
-Author a visual gate from the design source, and treat a gate whose fixture mirrors the component as measuring nothing.
-
-- **Hand-rolled markup where a primitive exists is a drift generator.**
-Both issues did this: `Medallion`, `StatusPill`, `DropZone`, `RollResultBox`, `CraftButton` and `CraftingThumb` all exist and were re-implemented locally, each copy landing on its own values.
-When reviewing a new surface, list the primitives its sibling uses and ask why each one is absent — "it's a valid manager surface" is not the bar, "it is the same surface" is.
-
-- **Borrowing vocabulary from the wrong neighbour is invisible to rule-based review.**
-Issue 676's editor was built from the Gathering vocabulary (`manager-task-core-card`, the environment scene widgets, `manager-availability-pill`) rather than the Recipe Studio's, so its tag pills inherited a **warning** ramp and rendered amber.
-Every token was a real `--fab-*` token and every gate passed.
-
-- **A mock's fixtures hide the states real data produces.**
-No item in issue 675's prototype was both a tool and salvageable, so its salvageable and tool badges could share one corner slot; in Fabricate those flags are independent and the broken salvageable tool is the headline case.
-The prototype is not authority on states it never had to survive — long names, missing art, both-flags-true, zero-length collections.
+Non-trivial UI work follows `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
+Open every supplied artifact, assign authority per control and state, record dimensions and expected deviations, inventory shipped siblings and primitives before plan approval, and compare rendered output rather than source declarations.
+The shipped primitive catalog and semantic-slider geometry live in `.agents/skills/fabricate-ux-designer/references/design-system.md`.
 
 ## Markdown & Prose Conventions
 

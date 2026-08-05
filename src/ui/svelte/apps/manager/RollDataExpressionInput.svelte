@@ -15,10 +15,15 @@
   } = $props();
 
   const displayValue = $derived(displayRollDataExpression(value));
-  const showSigil = $derived(String(value || '').trim() === '' || /^@?[A-Za-z_][\w.]*$/.test(String(value || '').trim()));
+  const showSigil = $derived(
+    String(value || '').trim() === '' || /^@?[A-Za-z_][\w.]*$/.test(String(value || '').trim())
+  );
 </script>
 
-<div class="manager-prerequisite-path-input manager-roll-data-expression-input" class:is-formula={!showSigil}>
+<div
+  class="manager-prerequisite-path-input manager-roll-data-expression-input"
+  class:is-formula={!showSigil}
+>
   {#if showSigil}<span class="manager-prerequisite-at" aria-hidden="true">@</span>{/if}
   <input
     type="text"

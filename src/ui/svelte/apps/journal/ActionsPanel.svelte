@@ -8,7 +8,9 @@
   runs to inProgress asynchronously off the same world-time hook. Gathering/salvage
   runs
   (manualAdvance: false) auto-resolve, so they show an explanatory line and the
-  TimeRemainingBox instead of a button.
+  TimeRemainingBox instead of a button. Both branches gate that box on `!ready`:
+  a matured run must never keep showing a "once enough world time has passed"
+  callout while its status pill reads Ready (issue 966).
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -25,7 +27,9 @@
   // Race-free readiness: an un-armed step (no gate) is actionable now; an armed
   // gate is ready only once world time reaches `availableAt`.
   const ready = $derived(!hasGate || availableAt <= now);
-  const busy = $derived(String(services?.journal?.busyRunId ?? '') === String(run?.id ?? '') && run?.id);
+  const busy = $derived(
+    String(services?.journal?.busyRunId ?? '') === String(run?.id ?? '') && run?.id
+  );
   const disabled = $derived(!ready || Boolean(busy));
 
   // Player self-cancel (issue 848): owner-only, live crafting runs only. The
@@ -57,19 +61,25 @@
   }
 </script>
 
-<section class="journal-actions" data-journal-actions data-manual-advance={manualAdvance ? 'true' : 'false'}>
+<section
+  class="journal-actions"
+  data-journal-actions
+  data-manual-advance={manualAdvance ? 'true' : 'false'}
+>
   {#if manualAdvance}
     <button
       type="button"
       class="fabricate-app-primary-button"
       data-journal-trigger
-      disabled={disabled}
+      {disabled}
       onclick={trigger}
     >
       <i class="fas fa-play" aria-hidden="true"></i>
       <span
         >{localize(
-          isFinalStep ? 'FABRICATE.App.Journal.Actions.FinishCrafting' : 'FABRICATE.App.Journal.Actions.TriggerNextStep'
+          isFinalStep
+            ? 'FABRICATE.App.Journal.Actions.FinishCrafting'
+            : 'FABRICATE.App.Journal.Actions.TriggerNextStep'
         )}</span
       >
     </button>
@@ -81,7 +91,11 @@
       />
     {:else}
       <p class="journal-actions-hint">
-        {localize(isFinalStep ? 'FABRICATE.App.Journal.Actions.FinishHint' : 'FABRICATE.App.Journal.Actions.TriggerHint')}
+        {localize(
+          isFinalStep
+            ? 'FABRICATE.App.Journal.Actions.FinishHint'
+            : 'FABRICATE.App.Journal.Actions.TriggerHint'
+        )}
       </p>
     {/if}
     {#if canCancel}
@@ -135,7 +149,7 @@
       <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
       <span>{localize('FABRICATE.App.Journal.Actions.AutoResolve')}</span>
     </p>
-    {#if hasGate}
+    {#if hasGate && !ready}
       <TimeRemainingBox {availableAt} {services} />
     {/if}
   {/if}

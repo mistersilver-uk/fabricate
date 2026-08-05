@@ -22,10 +22,36 @@
   import { formatTimeRequirementCompact } from '../../../util/recipeDuration.js';
   import IoTable from './IoTable.svelte';
 
-  let { steps = [] } = $props();
+  let {
+    steps = [],
+    // The requirement rail's interaction state (issue 917). ONLY the step the engine
+    // would execute next receives it; every other step renders an inert preview,
+    // because an allocation authored against a step the engine is not on would be
+    // dropped engine-side anyway and the rail must not imply otherwise.
+    rail = {},
+    activeStepId = null,
+    // The store's re-evaluated craftability for the active step's set. The step
+    // projection's own baked craftability predates any in-session option override or
+    // essence allocation, so the interactive step reads this instead — otherwise the
+    // tiles would stop matching the plan the craft consumes.
+    activeCraftability = null,
+  } = $props();
 
   const items = $derived(Array.isArray(steps) ? steps : []);
   const durationTitle = $derived(localize('FABRICATE.App.Crafting.Detail.Duration'));
+
+  function isActiveStep(step) {
+    return Boolean(activeStepId) && step?.id === activeStepId;
+  }
+
+  function craftabilityFor(step) {
+    if (isActiveStep(step) && activeCraftability) return activeCraftability;
+    return step?.ingredientSets?.[0]?.craftability ?? null;
+  }
+
+  function railFor(step) {
+    return isActiveStep(step) ? rail : { readOnly: true };
+  }
 </script>
 
 <div class="crafting-steps" data-recipe-section="steps">
@@ -40,7 +66,7 @@
         data-recipe-step
         aria-label={localize('FABRICATE.App.Crafting.Detail.StepLabel', {
           index: index + 1,
-          name: step.label
+          name: step.label,
         })}
       >
         <p class="crafting-step-label" data-recipe-step-label>
@@ -61,7 +87,12 @@
         <!-- INPUTS ONLY: result={null} suppresses IoTable's Output group. Intermediate
              step yields are not shown; the terminal PRODUCES row is rendered once by
              SimpleRecipeBody. -->
-        <IoTable craftability={step.ingredientSets?.[0]?.craftability ?? null} result={null} />
+        <IoTable
+          craftability={craftabilityFor(step)}
+          result={null}
+          idPrefix={`fabricate-req-step-${step.id ?? index}`}
+          {...railFor(step)}
+        />
       </li>
     {/each}
   </ol>

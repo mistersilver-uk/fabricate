@@ -27,6 +27,8 @@
   it is unit tested without a DOM and is written once for both lists.
 -->
 <script>
+  import Chip from '../Chip.svelte';
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -37,7 +39,7 @@
     buildRecipeRequirementRows,
     buildRecipeRoutingModel,
     buildRecipeStepModel,
-    groupProduceRowsByResultGroup
+    groupProduceRowsByResultGroup,
   } from '../../../../../utils/recipeBrowserModel.js';
 
   let {
@@ -60,7 +62,7 @@
     onEdit = () => {},
     onDuplicate = () => {},
     onDelete = () => {},
-    onAddComponents = () => {}
+    onAddComponents = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -76,10 +78,6 @@
     return result;
   }
 
-  function recipeImage(recipe) {
-    return recipe?.recipeItemImg || resolveRecipeImage(recipe);
-  }
-
   // The 2x2 stat grid asks the four questions a GM actually has about a recipe they
   // are looking at: what does it take, what does it make, how many steps, and what do
   // I have to roll. (The old grid answered Category / Structure / Steps / Result-groups
@@ -92,7 +90,7 @@
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
     progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive'],
     ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check']
+    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check'],
   };
 
   function checkValue(recipe) {
@@ -110,19 +108,19 @@
             // `Recipe.Ingredients` is the LOWERCASE count word ("2 ingredients"); the
             // sentence-case section noun is `IngredientsSection`.
             label: text('FABRICATE.Admin.Manager.Recipe.IngredientsSection', 'Ingredients'),
-            tone: ''
+            tone: '',
           },
           {
             id: 'results',
             value: selectedRecipe.resultItemCount ?? 0,
             label: text('FABRICATE.Admin.Manager.Recipe.Results', 'Results'),
-            tone: (selectedRecipe.resultItemCount ?? 0) === 0 ? 'danger' : ''
+            tone: (selectedRecipe.resultItemCount ?? 0) === 0 ? 'danger' : '',
           },
           {
             id: 'steps',
             value: selectedRecipe.stepCount ?? 0,
             label: text('FABRICATE.Admin.Manager.Recipe.Steps', 'Steps'),
-            tone: ''
+            tone: '',
           },
           {
             id: 'check',
@@ -130,8 +128,8 @@
             label: text('FABRICATE.Admin.Manager.Recipe.CraftingCheck', 'Crafting check'),
             // A system that cannot roll for this recipe is a WARNING, exactly as the row's
             // pill says. `ingredients` is not: it is a working, roll-free configuration.
-            tone: selectedRecipe.checkSummary?.kind === 'none' ? 'warning' : ''
-          }
+            tone: selectedRecipe.checkSummary?.kind === 'none' ? 'warning' : '',
+          },
         ]
       : []
   );
@@ -208,7 +206,8 @@
       .filter((name) => name && name.trim());
     if (tierNames.length > 0) return tierNames.join(', ');
     return (
-      group.groupName || `${text('FABRICATE.Admin.Manager.Recipe.ResultSetLabel', 'Result set')} ${index + 1}`
+      group.groupName ||
+      `${text('FABRICATE.Admin.Manager.Recipe.ResultSetLabel', 'Result set')} ${index + 1}`
     );
   }
 
@@ -220,6 +219,9 @@
     expandedTiers = new Set();
   });
   function toggleTier(groupId) {
+    // Copy-then-reassign: the reactive unit is `expandedTiers`, not the Set. The copy is
+    // mutated only before the assignment that publishes it.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(expandedTiers);
     if (next.has(groupId)) next.delete(groupId);
     else next.add(groupId);
@@ -308,7 +310,9 @@
   const activeProduceRows = $derived(
     isMultiStep ? currentStep?.produceRows || [] : visibleProduceRows
   );
-  const activeSuccessEmpty = $derived(isMultiStep ? !currentStepHasSuccess : successRows.length === 0);
+  const activeSuccessEmpty = $derived(
+    isMultiStep ? !currentStepHasSuccess : successRows.length === 0
+  );
   // Produces grouped by result group (routed-by-check only); flat list otherwise.
   const producedGroups = $derived(
     isRoutedByCheck ? groupProduceRowsByResultGroup(visibleProduceRows) : []
@@ -360,7 +364,7 @@
     if (row.kind === 'currency') {
       return format('FABRICATE.Admin.Manager.Recipe.CurrencyCost', '{amount} {unit}', {
         amount: row.amount,
-        unit: row.unit
+        unit: row.unit,
       });
     }
     if (row.kind === 'essence') {
@@ -390,10 +394,12 @@
     the things that ARE objects (stat tiles, flow rows) keep a box.
   -->
   <section class="manager-recipe-browser-inspector" data-recipe-inspector>
-    <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}</p>
+    <p class="manager-recipe-browser-inspector-label">
+      {text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}
+    </p>
 
     <div class="manager-recipe-browser-inspector-hero">
-      <Medallion src={recipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
+      <Medallion src={resolveRecipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
       <div class="manager-recipe-browser-inspector-identity">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <!--
@@ -407,9 +413,9 @@
           {#if showRecipeCategories}
             <!-- Through the SAME label helper the rows use: a recipe with no category
                  (or the reserved `general`) is localized, not rendered raw. -->
-            <span class="manager-chip" data-recipe-category>
+            <Chip data-recipe-category>
               {getRecipeCategoryLabel(selectedRecipe.category, localize)}
-            </span>
+            </Chip>
           {/if}
           <StatusPill
             tone={selectedRecipe.enabled === false ? 'subtle' : 'success'}
@@ -419,12 +425,28 @@
               : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
           />
           {#if selectedRecipe.locked}
-            <StatusPill tone="accent" icon="fas fa-lock" label={text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')} />
+            <StatusPill
+              tone="accent"
+              icon="fas fa-lock"
+              label={text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}
+            />
           {/if}
-          {#if selectedRecipe.incomplete}
+          <!--
+            ONE predicate, three surfaces (issue 1010). This pill reads `enableBlocked` —
+            the projection of the SAME activation check the row pills and the bulk panel's
+            pre-flight count read — and not `incomplete`, which is narrower: `incomplete` is
+            "fails validation but is structurally sound", so a STRUCTURALLY BROKEN recipe
+            reads `incomplete: false` and wore no pill here while still being un-enableable.
+            The strict `enabled === false` split survives and is meaningful: a broken recipe
+            that is already ON is unfinished, but nothing is being refused, because the
+            activation gate fires only on a transition into the enabled state.
+          -->
+          {#if selectedRecipe.enableBlocked}
             <StatusPill
               tone={selectedRecipe.enabled === false ? 'danger' : 'warning'}
-              icon={selectedRecipe.enabled === false ? 'fas fa-circle-exclamation' : 'fas fa-pen-ruler'}
+              icon={selectedRecipe.enabled === false
+                ? 'fas fa-circle-exclamation'
+                : 'fas fa-pen-ruler'}
               label={selectedRecipe.enabled === false
                 ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
                 : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
@@ -437,7 +459,8 @@
     <!-- The flavour text, whole. It used to be cut at 160 characters, in the one panel
          with the room to show it. -->
     <p class="manager-recipe-browser-inspector-flavour">
-      {selectedRecipe.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+      {selectedRecipe.description ||
+        text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
     </p>
 
     <!-- The four questions a GM has about the recipe they just clicked: what does it
@@ -446,7 +469,9 @@
     <div class="manager-recipe-stat-grid">
       {#each stats as stat (stat.id)}
         <div class="manager-recipe-stat" data-recipe-fact={stat.id}>
-          <strong class={`manager-recipe-stat-value ${stat.tone ? `is-${stat.tone}` : ''}`}>{stat.value}</strong>
+          <strong class={`manager-recipe-stat-value ${stat.tone ? `is-${stat.tone}` : ''}`}
+            >{stat.value}</strong
+          >
           <span class="manager-recipe-stat-label">{stat.label}</span>
         </div>
       {/each}
@@ -454,7 +479,9 @@
 
     {#if showVisibilitySummary}
       <p class="manager-muted">
-        <strong>{text('FABRICATE.Admin.Manager.Recipe.PlayerVisibility', 'Player visibility')}:</strong>
+        <strong
+          >{text('FABRICATE.Admin.Manager.Recipe.PlayerVisibility', 'Player visibility')}:</strong
+        >
         {selectedRecipe.visibilitySummary}
       </p>
     {/if}
@@ -471,10 +498,14 @@
           title={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
           disabled={currentStepIndex === 0}
           onclick={() => goToStep(-1)}
-        ><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+          ><i class="fas fa-chevron-left" aria-hidden="true"></i></button
+        >
         <div class="manager-recipe-step-pager-copy">
-          <span class="manager-recipe-step-pager-name" data-recipe-step-name>{currentStepName}</span>
-          <span class="manager-recipe-step-pager-count" data-recipe-step-count>{currentStepIndex + 1} / {stepModel.length}</span>
+          <span class="manager-recipe-step-pager-name" data-recipe-step-name>{currentStepName}</span
+          >
+          <span class="manager-recipe-step-pager-count" data-recipe-step-count
+            >{currentStepIndex + 1} / {stepModel.length}</span
+          >
         </div>
         <button
           type="button"
@@ -484,11 +515,14 @@
           title={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
           disabled={currentStepIndex === stepModel.length - 1}
           onclick={() => goToStep(1)}
-        ><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+          ><i class="fas fa-chevron-right" aria-hidden="true"></i></button
+        >
       </div>
     {/if}
 
-    <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}</p>
+    <p class="manager-recipe-browser-inspector-label">
+      {text('FABRICATE.Admin.Manager.Recipe.Requires', 'Requires')}
+    </p>
     {#if routedPairing}
       <!-- Routed by ingredients: the chosen set is the route, so a dropdown picks which
            set's requirements to show — and drives the paired result-set dropdown below. -->
@@ -496,7 +530,10 @@
         class="manager-recipe-route-select"
         data-recipe-route="ingredient-set"
         value={selectedRoutingSetId}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.SelectIngredientSet', 'Select ingredient set')}
+        aria-label={text(
+          'FABRICATE.Admin.Manager.Recipe.SelectIngredientSet',
+          'Select ingredient set'
+        )}
         onchange={(event) => selectRoutingSet(event.currentTarget.value)}
       >
         {#each routingModel.sets as set, index (set.id)}
@@ -518,7 +555,9 @@
       </div>
     {/snippet}
     {#if activeRequirementRows.length === 0}
-      <p class="manager-muted" data-recipe-requires-empty>{text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}</p>
+      <p class="manager-muted" data-recipe-requires-empty>
+        {text('FABRICATE.Admin.Manager.Recipe.NoRequirements', 'No requirements')}
+      </p>
     {:else}
       <div class="manager-recipe-flow-list">
         {#each activeRequirementRows as req (req.id)}
@@ -542,7 +581,9 @@
       </div>
     {/if}
 
-    <p class="manager-recipe-browser-inspector-label">{text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}</p>
+    <p class="manager-recipe-browser-inspector-label">
+      {text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}
+    </p>
     <!--
       One produced row, TONED BY ROLE. `showGroupPill` is false when the row already sits
       under a result-group heading (routed-by-check) or the group is otherwise identified
@@ -567,11 +608,14 @@
           <span
             class="manager-recipe-flow-group manager-recipe-flow-dc"
             data-recipe-produces-dc={row.difficulty === null ? '' : String(row.difficulty)}
-          >{progressiveDcLabel(row)}</span>
+            >{progressiveDcLabel(row)}</span
+          >
         {:else if showGroupPill && row.groupName && !routedPairing}
           <!-- The GM-authored group name, toned by the role it plays. Fabricate's outcome
                tiers are authored, so the NAME is the recipe's; the tone is not. -->
-          <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}>{row.groupName}</span>
+          <span class={`manager-recipe-flow-group ${row.failure ? 'is-failure' : 'is-success'}`}
+            >{row.groupName}</span
+          >
         {/if}
         {#if !isProgressive}
           <!-- Progressive ignores quantity (each entry is awarded once), so a "×1" there
@@ -587,7 +631,10 @@
              than disappearing. -->
         {#each twoOutcomeSections as section (section.key)}
           <div class="manager-recipe-produces-outcome" data-recipe-produces-outcome={section.key}>
-            <span class={`manager-recipe-flow-group manager-recipe-produces-outcome-head ${section.tone}`}>{section.label}</span>
+            <span
+              class={`manager-recipe-flow-group manager-recipe-produces-outcome-head ${section.tone}`}
+              >{section.label}</span
+            >
             {#if section.rows.length === 0}
               <p class="manager-recipe-flow-empty" data-recipe-outcome-empty={section.key}>
                 <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
@@ -618,8 +665,13 @@
               aria-expanded={expanded}
               onclick={() => toggleTier(group.groupId)}
             >
-              <i class={`fas ${expanded ? 'fa-chevron-down' : 'fa-chevron-right'}`} aria-hidden="true"></i>
-              <span class="manager-recipe-produces-tier-name">{produceGroupLabel(group, index)}</span>
+              <i
+                class={`fas ${expanded ? 'fa-chevron-down' : 'fa-chevron-right'}`}
+                aria-hidden="true"
+              ></i>
+              <span class="manager-recipe-produces-tier-name"
+                >{produceGroupLabel(group, index)}</span
+              >
               <span class="manager-recipe-produces-tier-count">{group.rows.length}</span>
             </button>
             {#if expanded}
@@ -642,7 +694,12 @@
              modes show a per-section "No results" instead, so skip the global note.) -->
         <p class="manager-recipe-flow-empty" data-recipe-produces-empty>
           <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.NoResults', 'No results — a successful craft makes nothing.')}</span>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Recipe.NoResults',
+              'No results — a successful craft makes nothing.'
+            )}</span
+          >
         </p>
       {/if}
     </div>
@@ -655,67 +712,146 @@
       still clearly a real, full-width action rather than a demoted afterthought.
     -->
     <div class="manager-recipe-browser-inspector-actions">
-      <button type="button" class="manager-button manager-recipe-browser-inspector-duplicate" data-recipe-action="duplicate" onclick={() => onDuplicate()}>
+      <button
+        type="button"
+        class="manager-button manager-recipe-browser-inspector-duplicate"
+        data-recipe-action="duplicate"
+        onclick={() => onDuplicate()}
+      >
         <i class="fas fa-copy" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
       </button>
-      <button type="button" class="manager-button manager-recipe-browser-inspector-edit" data-recipe-action="edit" onclick={() => onEdit()}>
+      <button
+        type="button"
+        class="manager-button manager-recipe-browser-inspector-edit"
+        data-recipe-action="edit"
+        onclick={() => onEdit()}
+      >
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
       </button>
-      <button type="button" class="manager-button manager-recipe-browser-inspector-delete" data-recipe-action="delete" onclick={() => onDelete()}>
+      <button
+        type="button"
+        class="manager-button manager-recipe-browser-inspector-delete"
+        data-recipe-action="delete"
+        onclick={() => onDelete()}
+      >
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
       </button>
     </div>
   </section>
 {:else if recipeCount === 0}
-  <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title', 'Set up recipes')}>
+  <section
+    class="manager-setup-card"
+    aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title', 'Set up recipes')}
+  >
     <div class="manager-setup-card-header">
       <i class="fas fa-scroll" aria-hidden="true"></i>
       <div>
-        <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Kicker', 'Recipe setup')}</p>
+        <p class="manager-kicker">
+          {text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Kicker', 'Recipe setup')}
+        </p>
         <h3>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Title', 'Set up recipes')}</h3>
       </div>
     </div>
     {#if componentCount > 0}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Hint', 'Create the first recipe for this system after its reusable components are available.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Recipe.EmptySetup.Hint',
+          'Create the first recipe for this system after its reusable components are available.'
+        )}
+      </p>
       <ol class="manager-setup-list">
-        <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.StepStructure', 'Choose the recipe structure supported by the selected system.')}</li>
-        <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.StepRequirements', 'Add ingredient sets, tools, and any visibility or timing requirements.')}</li>
-        <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.StepResults', 'Define result groups and enable the recipe when it is ready for players.')}</li>
+        <li>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.EmptySetup.StepStructure',
+            'Choose the recipe structure supported by the selected system.'
+          )}
+        </li>
+        <li>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.EmptySetup.StepRequirements',
+            'Add ingredient sets, tools, and any visibility or timing requirements.'
+          )}
+        </li>
+        <li>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.EmptySetup.StepResults',
+            'Define result groups and enable the recipe when it is ready for players.'
+          )}
+        </li>
       </ol>
     {:else}
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint', 'Add components before creating recipes so ingredients, tools, and results have reusable items to reference.')}</p>
+      <p class="manager-muted">
+        {text(
+          'FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsHint',
+          'Add components before creating recipes so ingredients, tools, and results have reusable items to reference.'
+        )}
+      </p>
       <ol class="manager-setup-list">
-        <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepComponents', 'Open Components and drop world, compendium, pack, or folder items into this system.')}</li>
-        <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepOrganize', 'Review component names, source links, tags, essences, and difficulty metadata.')}</li>
-        <li>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepRecipes', 'Return to Recipes and build requirements and results from those components.')}</li>
+        <li>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepComponents',
+            'Open Components and drop world, compendium, pack, or folder items into this system.'
+          )}
+        </li>
+        <li>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepOrganize',
+            'Review component names, source links, tags, essences, and difficulty metadata.'
+          )}
+        </li>
+        <li>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.EmptySetup.NoComponentsStepRecipes',
+            'Return to Recipes and build requirements and results from those components.'
+          )}
+        </li>
       </ol>
     {/if}
-    <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Resources', 'Recipe resources')}>
+    <div
+      class="manager-setup-links"
+      aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Resources', 'Recipe resources')}
+    >
       {#if componentCount <= 0}
         <button type="button" class="manager-button is-primary" onclick={() => onAddComponents()}>
           <i class="fas fa-boxes" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.AddComponents', 'Add components')}</span>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Recipe.EmptySetup.AddComponents',
+              'Add components'
+            )}</span
+          >
         </button>
       {/if}
-      <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/recipes" target="_blank" rel="noreferrer">
+      <a
+        class="manager-button"
+        href="https://mistersilver-uk.github.io/fabricate/recipes"
+        target="_blank"
+        rel="noreferrer"
+      >
         <i class="fas fa-book-open" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>
       </a>
-      <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
+      <a
+        class="manager-button"
+        href="https://mistersilver-uk.github.io/fabricate/quickstart"
+        target="_blank"
+        rel="noreferrer"
+      >
         <i class="fas fa-circle-question" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Quickstart', 'Quickstart')}</span>
       </a>
     </div>
   </section>
 {:else}
-  <div class="manager-empty">
-    <div>
-      <i class="fas fa-scroll" aria-hidden="true"></i>
-      <h3>{text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}</h3>
-      <p>{text('FABRICATE.Admin.Manager.Recipe.InspectorHint', 'The inspector shows recipe status, structure, and requirements for the selected row.')}</p>
-    </div>
-  </div>
+  <EmptyState
+    icon="fas fa-scroll"
+    title={text('FABRICATE.Admin.Manager.Recipe.SelectRecipe', 'Select a recipe')}
+    hint={text(
+      'FABRICATE.Admin.Manager.Recipe.InspectorHint',
+      'The inspector shows recipe status, structure, and requirements for the selected row.'
+    )}
+  />
 {/if}

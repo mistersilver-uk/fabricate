@@ -69,7 +69,10 @@ This is the only operation that creates a version number.
 - A **release promotion** takes an already-minted stable version and MOVES it to the next stage (early access, then public).
 It mints nothing and creates no tag; it changes only what each channel advertises and, as its final act, makes the release public.
 
-When a release-line version is promoted, the release line is merged back into the prerelease line first — the **forward-port** — so the prerelease line's next version always numbers above the one just released (the **Version authority and promotion mechanics** requirement).
+The **forward-port** — merging the release line back into the prerelease line — belongs to the *prerelease* promotion, not the release promotion.
+It runs as soon as the stable version that promotion minted has been **published** to its channel, so the prerelease line's next version always numbers above the one just released (the **Version authority and promotion mechanics** requirement).
+Deferring it to the release promotion is not a delay but a deadlock: while the prerelease line is numbered below a published stable version, every version that line mints is numbered below it too, so its channel head can never overtake the released version and the registry-lead guard refuses the very promotion whose forward-port would have fixed it (the **Prerelease line precedence** requirement).
+The release promotion still **confirms** the forward-port has happened and performs it if it has not, which is normally a no-op.
 
 ### Hotfixes
 
@@ -85,7 +88,7 @@ Nothing becomes publicly obtainable until the promotion completes — the **Prom
 ### The three-channel flow
 
 The prerelease line (`main`) feeds beta on every releasing push; a prerelease promotion mints the stable version on the release line and publishes early access; a release promotion moves that same version to public.
-The forward-port carries the release line back into `main`.
+The forward-port carries the release line back into `main` as soon as early access carries the new stable version — not later, at the public promotion.
 
 ```mermaid
 flowchart LR
@@ -93,7 +96,7 @@ flowchart LR
   main -->|"prerelease promotion: merge tested commit, mint stable"| release["release (release line)"]
   release -->|"publish stable"| ea["early-access channel (private patrons)"]
   ea -->|"release promotion: move the SAME version"| public["public channel + Foundry registry"]
-  release -. "forward-port merge" .-> main
+  release -. "forward-port merge, once early access carries the version" .-> main
 ```
 
 ### The hotfix path
@@ -115,11 +118,11 @@ flowchart TD
 ### The promotion job graph
 
 A public promotion is a four-job graph.
-The guard verifies the source channel and the private heads; the forward-port and the publish run in parallel; the final job reads everything back and only then performs the two irreversible steps — un-drafting the release and posting to the registry — LAST, so anything that can fail has already failed.
+The guard verifies the source channel and the private heads; the forward-port backstop calls the shared `forward-port.yml` and normally takes its already-forward-ported no-op; the publish re-stages the public targets; the final job reads everything back and only then performs the two irreversible steps — un-drafting the release and posting to the registry — LAST, so anything that can fail has already failed.
 
 ```mermaid
 flowchart TD
-  guard["guard: verify source channel + private heads"] --> fp["forward-port: merge release into main"]
+  guard["guard: verify source channel + private heads"] --> fp["forward-port BACKSTOP: call forward-port.yml (normally a no-op)"]
   guard --> publish["publish: re-stage public targets"]
   fp --> final["read back, download assets, aggregate notes, build + validate registry payload"]
   publish --> final
@@ -450,15 +453,17 @@ Header lines must be 100 characters or fewer.
 
 ## Linting & formatting
 
-Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
+Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript and Svelte static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
 All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
 
 ```bash
 npm run lint           # ESLint over the gated JS scope (fails on any warning)
 npm run lint:fix       # …and auto-fix what can be fixed
+npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
+npm run lint:svelte:warnings  # Svelte COMPILER warnings, every component (what CI runs)
 npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
 npm run lint:css:fix   # …and auto-fix what can be fixed
-npm run format         # Prettier-format the gated scope
+npm run format         # Prettier-format the gated scope (JS + every src/**/*.svelte)
 npm run format:check   # verify formatting (what CI runs)
 npm run lint:md        # markdownlint over all Markdown (what CI runs)
 npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
@@ -495,14 +500,125 @@ The gate (`npm run lint` / `npm run format:check`) now covers the **entire `src/
 
 - `src/models/`, `src/utils/`, `src/integrations/`, `src/config/`, `src/migration/`, `src/canvas/`, `src/systems/`, and `src/toolBreakageRuntime.js`
 
-Not yet gated (tracked for follow-up — run `npm run lint:all` / `npm run lint:svelte` to see them):
+`format:check` additionally covers `src/**/*.svelte`, so the Prettier half of the gate is no longer JavaScript-only.
+
+A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
+It is separate because components need the Svelte parser and their own rule set, not because they are optional.
+Note what this does and does not mean for `src/ui/**`: that directory holds both halves, and only the `.svelte` half is gated — the plain `.js` under it still is not.
+
+`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
+A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
+Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
+The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
+That is the narrow case of a stronger property that covers every `eslint-disable` directive too: the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a directive that suppresses nothing exits 1 — which is what stops a suppression from outliving the finding it was written for.
+It is pinned explicitly rather than left to ESLint's default because it is load-bearing.
+`eslint-disable-next-line` is anchored to a line, and Prettier — which now formats components — moves lines.
+A directive that slips off its violation resurfaces the violation as an unsuppressed error; one that lands suppressing nothing is caught by this option.
+Both failure shapes fail the gate, which is what makes a mechanical reformat of a component safe.
+Where a suppression must sit on a particular line, fence the element with `<!-- prettier-ignore -->` — it has to be the LAST comment before the element to take effect.
+The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
+The fence there protects the directive's line anchor and nothing else — `{' '}` is an expression, so both the fenced and the split form compile to the same template and render identically.
+
+ESLint and the Svelte compiler are the static analysis a `.svelte` file gets.
+Prettier now formats components as well — `prettier-plugin-svelte` is registered in `.prettierrc.json`, and `format:check` covers `src/**/*.svelte`.
+Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser and dropping the config entry fails loudly — the glob names the components, so `format:check` exits 2 with "No parser could be inferred".
+The silent way back is the other one, and the one `tests/prettier-svelte-scope.test.js` guards: re-ignoring `*.svelte` makes `format:check` match zero files, report success and exit 0.
+
+Svelte compiler warnings fail the build as of issue 924, which found seven of them passing unnoticed.
+Five were real accessibility defects; one was a `css_unused_selector` that was not dead code at all but a focus ring the compiler was emitting COMMENTED OUT, so the ring had never applied in a shipped build; the seventh was a `state_referenced_locally` in `GatheringEnvironmentList.svelte`, a deliberate one-time seed now said so with `untrack()` rather than suppressed.
+The gate has two halves.
+`onwarn` in `svelte.config.js` throws, so `npm run build` fails; that is the fast local signal, but a Vite build compiles only the entry graph and cannot see a component nothing imports (`GatheringTravelView.svelte`, issue 927).
+`npm run lint:svelte:warnings` (`scripts/check-svelte-warnings.mjs`) sweeps every `src/**/*.svelte` regardless of reachability and is the step CI runs, so it is the authoritative half.
+Both take their compiler options from `svelte.config.js` through `scripts/lib/svelteCompilerWarnings.js`, which is what makes a disagreement between them diagnostic: it can only be graph reachability, never drift in `compilerOptions`.
+Read that qualifier literally.
+`emitCss` is a `vite-plugin-svelte` option, not a compiler option, so it is outside the shared read — and `emitCss: false` makes the plugin drop every `css_unused_selector` before `onwarn` is called, which would silence the build on the exact class that motivated the issue while the sweep kept reporting it.
+A disagreement in which the sweep is the clean one is a bug in the sweep, not grounds to override `onwarn`.
+`tests/svelte-warning-scope.test.js` keeps the whole thing honest — it drives the real sweep against a fixture tree to prove it still detects a warning and still attributes an uncompilable component to that file, asserts the CI wiring, and pins the two config keys that could go quiet: `emitCss` at its default, and no `warningFilter` in `compilerOptions`.
+A warning worth keeping is suppressed at its site with `<!-- svelte-ignore <code> -->` and a stated reason, which `svelte/no-unused-svelte-ignore` then polices in the other direction; there is deliberately no allowlist.
+
+SonarCloud still indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts, and Stylelint still excludes their scoped `<style>` blocks.
+Both are tracked as their own follow-ups.
+
+Not yet gated (tracked for follow-up — run `npm run lint:all` to see them):
 
 - the `tests/` suite — sort comparators, fixture duplication
-- `src/ui/**` and all `*.svelte` components (Svelte parsing is wired up; findings triaged later)
+- the plain `.js` under `src/ui/**` (the `.svelte` components in the same directory ARE gated, by `lint:svelte`)
 - `src/main.js`, `src/gatheringBootstrapAdapters.js`, `src/gatheringToolRuntime.js` (covered by source-text assertions in `tests/gathering-bootstrap-api.test.js`, so they change with that test)
-- `scripts/**` build/release tooling
 
-When you bring a new path to green (ESLint **and** SonarCloud), add it to the `lint`/`format` globs in `package.json` so the gate keeps it green.
+`scripts/**` is NOT in that list, and is a different shape worth understanding before you add a script.
+It IS gated — but file by file, 20 files today, each named individually in the `lint`, `format` and `format:check` scripts rather than matched by a glob.
+The consequence is that adding a script does not lint it, which is exactly how a new BUG and a new VULNERABILITY reached SonarCloud in issue 933.
+`tests/scripts-lint-gate-coverage.test.js` now closes that at `npm test` speed: it parses the paths back out of the `lint` script, enumerates `scripts/**`, and fails on any ungated file that is not recorded as acknowledged debt in `tests/scripts-known-ungated.js`.
+That baseline only shrinks, and its length is pinned exactly, so recording a new script as debt instead of gating it means changing a number in review rather than appending a line — and paying debt down means lowering that number in the same commit.
+The remainder stays ungated for a measured reason: the Foundry smoke harness alone accounts for 844 of the 993 ESLint findings still reported across `scripts/**`, and it pins its Phase D0 selectors by class, index and button text with no unit coverage.
+
+When you bring a new path to green (ESLint **and** SonarCloud), add it to the `lint`, `format` **and** `format:check` lists in `package.json` so the gate keeps it green.
+All three, not two — `tests/scripts-lint-gate-coverage.test.js` asserts the three carry the same set of `scripts/` paths, so a file added to only some of them fails `npm test`.
+
+## The View Lab (Foundry-free window captures)
+
+The View Lab renders whole Fabricate application windows in Chromium — the real app roots, the real
+stores, production `styles/fabricate.css` at its production cascade layer — with no Foundry, no
+Docker, and no world.
+It exists because PR screenshot evidence should not cost a container boot and a twenty-minute walk.
+
+```sh
+npm run viewlab:chrome:harvest              # one-off; see below
+node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
+npm run viewlab:index                       # regenerate the evidence index on its own
+```
+
+The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up`
+already caches under `.foundry-e2e/cache/`.
+That material is proprietary: it lands in the gitignored `.foundry-chrome/`, is never committed, and
+is never downloaded for you.
+Without it the lab fails closed rather than approximating — a frame drawn without the real cascade is
+worse than no frame, because it looks authoritative.
+
+A capture accumulates in `ui-screenshot-artifact/apps/` rather than replacing it.
+Each frame's manifest entry records the head sha it was drawn at, so a rerun can tell an older frame
+from a fresh one.
+Pass `--clean` to force a full reset.
+The same directory also carries a self-contained `index.html`, grouped by application and area with
+a multi-tag filter, written automatically at the end of every capture.
+It shows the lab's own frames only, never a smoke label, because it is not a comparison.
+
+Cases live in `scripts/lib/viewLabCases.js`.
+A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from
+a changed-file set.
+Every manager case declares `expectView`, which the capture asserts against the app's actual route
+before taking the frame — without it a mis-click silently screenshots the wrong screen.
+
+A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own
+condition, `window` when it reaches the right application window but not that condition (known
+remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe
+resolution modes, the visibility modes it does not visit, Foundry's light application theme.
+A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
+A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
+`scripts/README.md`, not by a per-case comment.
+As of this writing the registry holds 155 cases: 135 `exact`, 4 `window`, 16 `beyond`.
+
+Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
+`<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
+true}` scrolls an element into view inside its own overflow container, and `{selector, upload}`
+chooses a file on a native file input.
+The scroll verb matters more than it sounds: `frame.screenshot()` on the outer `.application` does
+not scroll nested containers, so a card that never scrolled into view is absent from the frame while
+every assertion still passes.
+
+A real `DialogV2` confirmation or prompt, transcribed from the harvested
+`client/applications/api/dialog.mjs`, can be left open for the screenshot, answered with its default
+button, or answered with a named button action, so a state that used to be blocked behind a native
+Foundry dialog is often reachable now.
+`input` and `query` are not wired, and a native drag-and-drop payload is outside the runner's step
+vocabulary, so a handful of cases still cannot reach their state.
+The known-gaps register in `scripts/README.md` names them.
+
+**The live smoke is still the fidelity authority.**
+Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and
+the lab is defective.
+`scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, a real `DialogV2`
+confirmation but otherwise no live Foundry JS, fixture world rather than the smoke world).
 
 ## Foundry integration (smoke) tests
 
@@ -907,6 +1023,56 @@ A hotfix line is semantic-release's `'maintenance'` branch *type*; in our vocabu
 
 A `workflow_dispatch(tag)` re-entry point exists because a push run can mint the tag and draft but then fail the S3 publish; without re-entry the channel would never carry the version and the promotion's guard would refuse it forever.
 
+**It also schedules the forward-port.**
+A final `forward-port` job calls the shared `.github/workflows/forward-port.yml`, gated on `if: always() && github.ref_name == 'release' && needs.verify-publish.result == 'success'`.
+Every conjunct is load-bearing.
+`always()` is required because `semantic-release` is *skipped* on the `workflow_dispatch(tag)` re-entry path and a skipped `need` fails the implicit `success()`; because `always()` disables that wrapping entirely, the `verify-publish` conjunct is the only thing preventing a forward-port after a **failed** publish.
+`github.ref_name == 'release'` is the hotfix exclusion — a hotfix leaves its line by cherry-pick, never a release-into-`main` merge.
+A job-level `if:` is safe here (unlike in `promote-to-public.yml`) because nothing in this workflow depends on this job's result.
+
+The job passes an `expected_tag`, and it is not decoration.
+This run's gate is on *its own* publish, but the merge acts on `origin/release`'s **current tip**, and on the re-entry path those differ: republishing an older tag successfully satisfies the gate while a newer commit on `release` still has a failing publish, and merging that tip would number `main` above a version no channel advertises.
+When `expected_tag` does not point at `origin/release`'s tip the callee **skips and reports success**, printing both the expected tag and the tags actually found.
+Nothing is stranded by that skip: the merge takes `origin/release`'s whole tip rather than one tag, and the re-run no-op compares branches rather than tags, so the next successful release-line publish carries everything the skipped run would have.
+
+### The forward-port workflow
+
+File: `.github/workflows/forward-port.yml`
+
+One implementation, three entry points (`workflow_call` and `workflow_dispatch` in one file, with **job-level** `concurrency` so it survives being called):
+
+1. `release.yml` calls it after `verify-publish`, on the `release` line only — the scheduling point that keeps the prerelease line numbered above what is published.
+2. `promote-to-public.yml` job 2 calls it as a **confirming backstop**; `release` is normally already an ancestor of `main` by then, so it takes the ancestry no-op.
+3. A manual `workflow_dispatch` is the standing recovery lever, and the only thing that can unjam a prerelease line that has already fallen below a published stable version — **without promoting anything to `public`**.
+
+It merges `origin/release` into `main` with `--no-ff` (never a squash: `release` carries semantic-release's tags and notes) under a `chore:` subject (which must not be a releasing Conventional Commit type), and pushes as the ruleset-bypass App installation token — never `GITHUB_TOKEN`, which is neither the bypass actor nor able to trigger the downstream `beta.yml` run.
+Two guards short-circuit it, both through step **outputs** and neither ever failing the job: `git merge-base --is-ancestor origin/release origin/main` (already forward-ported) and `git tag --points-at origin/release` (the `expected_tag` check above).
+A guard that failed the job would turn a legitimate no-op into a red release run, which is exactly what the `enabled` no-op design exists to avoid.
+
+The `enabled` input, not a job-level `if:`, is how a caller no-ops it.
+`promote-to-public.yml` job 4's `if:` requires `needs.forward-port.result == 'success'`, and a *skipped* job reports `skipped` — so job 2 carries no job-level `if:` and passes `enabled: ${{ inputs.source_channel == 'early-access' }}` instead.
+Every step after the skip notice is gated so it evaluates false when `enabled` is false, under either value of `dry_run`; `tests/forward-port-workflow.test.js` *evaluates* those conditions rather than string-matching them, because a hotfix promotion that silently merged `release` into `main` would be the repository's worst automated write.
+
+A dispatched forward-port defaults to `dry_run: true` (it is a hand-run lever pointed at `main`); a called one defaults to `false` (its caller states its intent).
+
+#### The content gate — a runbook, not a flag
+
+After the merge, `git diff --stat origin/main` must be **empty**, and the job **fails** when it is not.
+Today the merge is content-empty by construction: `release` carries only `--no-ff` merges of beta tags that `promote-to-early-access.yml` already proved were ancestors of `origin/main`, and `release.config.js` loads no `@semantic-release/git` plugin, so nothing else is ever committed to `release`.
+A failure therefore means something changed that assumption — a stray direct commit on `release`, or a newly added plugin that commits back — and this push bypasses branch protection, so it would be an **unreviewed code path onto the default branch**.
+
+What the check is: read the printed diff and **confirm that every file in it was authored through a reviewed pull request**.
+That is the whole check; it is not "does this look harmless".
+
+How to recover, from a promotion:
+
+1. Dispatch `.github/workflows/forward-port.yml` manually with `allow_content: true` (and `dry_run: false`) once you have confirmed the content.
+2. Re-run the promotion.
+It will then take the already-forward-ported no-op.
+
+`allow_content` is settable only on `forward-port.yml`'s own dispatch, and deliberately so: `promote-to-public.yml`'s inputs are `version` / `source_channel` / `dry_run` only, and it will not grow a content override.
+That is the same composition the `override_hint` inputs carry into the failure message, so the message and this manual never disagree.
+
 ### Prerelease promotion (promote to early access)
 
 File: `.github/workflows/promote-to-early-access.yml`
@@ -917,6 +1083,13 @@ This is the **prerelease promotion**: it does the MERGE ONLY of a tested beta co
 It is a `git merge --no-ff` (**never a squash** — squashing collapses the Conventional Commit types semantic-release reads and mis-computes the version, per the **Version authority and promotion mechanics** requirement).
 Before merging it verifies the tag's shape, that it exists, that its commit is an ancestor of `origin/main`, and that **every** private `beta` target — the channel manifest AND every tester manifest — already advertises that version.
 Ancestry alone is not enough: the tag is pushed before the beta publish job, so a tag whose publish failed is still an ancestor of `main` yet leaves a stale head, which later turns a hotfix into a cohort defection (the **Registry lead prohibition** requirement).
+
+**The forward-port deliberately does NOT live here.**
+This workflow merges onto `release` and returns; it mints nothing.
+The stable tag is created asynchronously afterwards, by the `release.yml` run this push triggers.
+A forward-port here would push `main` *before* that tag exists, so the `beta.yml` run that push triggers would compute another version on the **old** line and publish it — re-arming the exact defect on the next cycle.
+It would also forward-port even when the mint or the early-access publish subsequently failed, advancing `main` past a version no channel carries.
+The seam is `release.yml`, after `verify-publish`, because that is where "a stable version was minted **and** published" is an established fact.
 
 ### Public promotion
 
@@ -929,8 +1102,15 @@ The promotion is **TOLD** its `source_channel` (a hotfix promotes with `source_c
 It is a four-job `needs:` chain, and the ordering is the whole point of the **Promotion-gated public availability** requirement — everything that can fail runs before the one step that cannot be undone:
 
 1. **guard** — verifies the `source_channel`, asserts the source channel advertises `version` across every private target, and performs the registry-lead read against every private target of `beta` and `early-access`.
-A lagging private head hard-fails the promotion **before** the registry POST, naming the remedy: advance that channel first (mint a newer beta on `main`; there is no bare-stable catch-up, which would defect the cohort).
-2. **forward-port** — merges `release` into `main` via the bypass actor for a release-line version, so `main`'s next version numbers above it; a hotfix no-ops this at step level.
+A lagging private head hard-fails the promotion **before** the registry POST, naming the remedy: advance that channel first.
+For a lagging `beta` head the remedy leads with the **forward-port** — bring the release line back into the prerelease line whenever the prerelease line is itself numbered below the version being promoted, which is the case whenever that head is a prerelease of a version at or below the released one.
+No amount of new work on `main` can raise it in that state, because every version `main` mints stays on the same line; only after the forward-port does the next prerelease number above the released version.
+Otherwise (the prerelease line is already numbered above it) push the feature work to `main` so `beta.yml` mints a newer beta.
+There is no bare-stable catch-up in either case, which would defect the cohort.
+2. **forward-port** — a **confirming backstop**, not the forward-port's scheduling point.
+It calls the shared `.github/workflows/forward-port.yml`, and because the forward-port is now performed at the *prerelease* promotion, `release` is normally already an ancestor of `main` by the time a release promotion runs, so this job takes the callee's ancestry no-op.
+It still performs the merge if it has not happened, which is what the **Version authority and promotion mechanics** requirement obliges a release promotion to do.
+It carries **no job-level `if:`** (a skipped job would report `skipped` and fail job 4's strict `if:`); the hotfix no-op runs through the callee's `enabled` input instead, and its `dry_run` is forwarded from the promotion's own input.
 3. **publish** — re-stages the `public` targets from the built `dist` (promotion is a **re-publish, never an S3 copy** — copying a private artefact would bake the secret cohort URL into the public build and sidegrade public installers onto the private feed).
 4. **readback-preflight-undraft-register** — reads back every written manifest, downloads the release assets to confirm both exist, **aggregates the notes of any superseded stable draft** strictly between the current public version and this one on the same line (without this the public changelog silently loses a whole feature set; the consumed drafts are left drafted as the record), builds and validates the registry payload (its `manifest` is CONSTRUCTED as the version-pinned `releases/download/v<version>/module.json`, never copied from the artefact), then performs the two irreversible steps LAST: `gh release edit --draft=false --latest` and the registry POST.
 

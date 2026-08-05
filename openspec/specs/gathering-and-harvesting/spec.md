@@ -887,6 +887,8 @@ GatheringNodeConfig = {
 5. Node availability is evaluated after environment/task visibility and before terminal resolution.
 6. Node depletion occurs only after an attempt is accepted according to the configured depletion timing.
 7. Supported depletion timing includes at least `onStart` and `onSuccess`.
+Depletion timing selects WHEN in a run the single unit is consumed, not how many are consumed: a run consumes at most one unit regardless of how many times its outcome is committed.
+A timed run commits twice — once when the wait starts and once when it matures — so `onStart` consumes at the start commit and `onSuccess` at the maturity commit; an immediate attempt has one commit and consumes there.
 8. If a task is blind, node count display to non-GM users uses generic availability copy unless revealing the count is explicitly safe for that environment.
 9. GM users can inspect and manually adjust node availability.
 10. A respawn policy may be `manual`, `overTime`, or `nonRegenerating`. `manual` means only a GM restock action changes available node count; `overTime` restores nodes once per elapsed world-time interval; `nonRegenerating` is a permanently depletable pool that never regrows over world time AND cannot be restocked, so once its `current` reaches 0 it is permanently exhausted (model a larger starting reserve with a bigger authored `max`, since `current` seeds to `max`).
@@ -897,6 +899,10 @@ A unit of `days` or `weeks` resolves its length from the active Foundry world ca
 Nodes authored before this schema may persist a raw `intervalSeconds`, which the runtime honours until a migration rewrites it to unit+amount.
 13. `chance`-mode respawn persists the evaluated roll/outcome so repeated listing refreshes do not reroll the same interval.
 14. Respawn advances its `lastEvaluatedWorldTime` anchor by exactly the consumed intervals, so a same-tick refresh never re-applies and the fractional remainder accrues toward the next interval.
+That anchor is an accrual anchor (see "World-Time Anchors and Rewind Policy") and is monotonic non-decreasing: a backward world-time delta leaves it untouched and writes no node state at all, so a rewind neither reduces a node count nor re-anchors the pool, and the anchor may legitimately sit ahead of the current world time.
+Because the backward branch performs no write, the library-config reconciliation that rides along on a write — including the clamp of a stored `current` down to the library `max` — does not run on a rewind either.
+This applies identically to a per-environment pool and to an interactable's OWN independent pool (issue 302), which share the same respawn arithmetic.
+A pool carrying no anchor — a missing value or a persisted `null` — is seeded at the current world time on its first evaluation, granting no backlog, and accrues normally from that instant.
 15. Respawn evaluation is deterministic from persisted state once evaluated.
 16. Respawn must not exceed the task's configured maximum node count unless a GM override explicitly changes the maximum or applies an overstock action.
 17. Respawn and restock events should be visible in GM logs or audit-style UI where practical.
@@ -910,6 +916,10 @@ The per-task node mechanics above are otherwise unchanged.
 A `nonRegenerating` node config normalizes to a bare `{ policy: "nonRegenerating" }`: the respawn-timing/gain fields (`gainMode`, `intervalUnit`/`intervalAmount`/`intervalSeconds`, `chance`, `amountExpression`, and the `lastEvaluatedWorldTime`/`nextEvaluationWorldTime`/`lastRoll` timing fields) are never persisted for it, since a pool that never regrows needs none of them.
 22. A permanently-exhausted `nonRegenerating` pool (`current <= 0`) blocks non-GM start attempts like any depleted pool, but surfaces a distinct *exhausted* state (a derived player-safe flag and a dedicated blocked reason/copy) rather than the "depleted — replenishes over time" copy, since it will never come back.
 23. Because a `nonRegenerating` pool can never be restocked, the GM admin UI REMOVES (does not merely disable) the restock/step controls for it and shows a read-only `current / max` count with a permanence hint; the regenerating policies keep the step controls.
+24. Environment node runtime state is world-scoped shared state that a non-GM client cannot write, so an accepted depletion from a player is applied by the active GM rather than by the acting client.
+The applier recomputes the single unit from its own stored state instead of accepting a node count from the requesting client, so concurrent gatherers are additive rather than last-write-wins, and a forged request can consume at most one unit of the pool it names.
+A client that did not apply the write must not report the resulting count as authoritative, since its own view can be stale.
+Where no GM is connected to apply it, the depletion is reported as unapplied rather than silently dropped.
 The player-facing detail UI surfaces a permanence line ("This resource will not replenish.") for a `nonRegenerating` pool BEFORE exhaustion (scarcity messaging while `current > 0`), and the exhausted permanence copy ("Exhausted — this resource will not replenish.") at `current <= 0`, kept visually distinct from the regenerating "depleted — replenishes over time" treatment and carrying no respawn ETA.
 Neither line repeats the node count, which is already shown on the available-nodes line.
 The rich-state listing payload exposes a player-safe `nonRegenerating` policy flag (no extra counts beyond the existing current/max) to drive this copy.
@@ -1037,6 +1047,43 @@ an absent, invalid, or wrong-shape value (including a stray `"simple"`) falls ba
 It is GM configuration and is not part of the player gathering listing payload.
 This is the system-level default gathering resolution and relates to the existing per-task `resolutionMode`:
 today only `d100` is honored at runtime, and `progressive`/`routed` are modelled but unimplemented (surfaced disabled in the GM UI as a "coming soon" affordance).
+27. A stamina pool persists a `lastRegenWorldTime` accrual anchor (see "World-Time Anchors and Rewind Policy") recording the instant up to which regeneration has already been granted.
+A backward world-time delta leaves that anchor untouched and writes no actor state at all, so rewinding refunds no spent stamina, grants no regeneration, and mints none on the way forward again.
+A pool materialized without an anchor — for example by a GM `setGatheringStamina` on an actor with no prior pool, which persists no `lastRegenWorldTime` key — is seeded at the current world time on its first evaluation and regenerates normally thereafter.
+
+## World-Time Anchors and Rewind Policy
+
+### Purpose
+
+Define how gathering state anchored to world time behaves when world time moves backward, so that a rewind can neither re-grant an entitlement nor re-impose a restriction that was already resolved in the discarded timeline.
+
+### Requirements
+
+1. Gathering state anchored to world time belongs to one of three families — accrual anchor, restriction anchor, or commitment deadline — classified by what the anchor RECORDS rather than by which subsystem owns it.
+Any new time-anchored gathering field must be classified into one of these families explicitly when it is introduced, so the rules cannot drift apart per field.
+2. The governing principle behind the three families is that a rewind must neither re-grant an entitlement nor re-impose a restriction resolved in the discarded timeline, while a commitment still in flight is simply not yet due.
+3. An accrual anchor is a high-water mark of entitlement already granted.
+A resource-node pool's `respawn.lastEvaluatedWorldTime` and an actor stamina pool's `lastRegenWorldTime` are accrual anchors.
+4. An accrual anchor is monotonic non-decreasing.
+A world-time delta that runs backward, or that does not move the anchor's own clock forward at all, leaves it untouched and performs no persisted write for that resource, because moving it back would re-grant every interval between the rewound instant and the anchor once world time runs forward again.
+5. An accrual anchor may therefore legitimately sit ahead of the current world time.
+That is a valid state rather than corruption, and every consumer must tolerate it: the resource accrues nothing until world time passes the anchor again, at which point it resumes normally.
+6. An ABSENT accrual anchor is seeded, not frozen.
+A pool whose anchor is missing or persisted as `null` is anchored at the current world time on its first evaluation, granting no backlog, and accrues normally from that instant onward.
+Seeding is distinct from re-anchoring: it establishes an anchor that never existed, rather than moving an existing one backward.
+7. A restriction anchor measures a penalty running FROM a recorded instant, such as an interactable's cooldown `lastUsedWorldTime`.
+A restriction anchor that sits ahead of the current world time is measuring a penalty imposed in a discarded timeline, so the rule for this family is the inverse of the accrual rule: clamp it forward to the current world time rather than leave it to re-impose itself.
+The cooldown clamp is specified here for taxonomy completeness and is tracked separately (issue 891); it is not applied by the accrual-anchor behaviour described above.
+8. A commitment deadline records an absolute maturity instant for work already in flight, and its classification implies no adjustment for a world-time move in either direction, since a rewound world genuinely has not reached that instant yet.
+This family exists for completeness of the taxonomy only.
+A gathering run's `timeGate.availableAt` is named here purely as an illustrative contrast; it is normatively specified in `openspec/specs/recipes-and-steps/spec.md` and `openspec/specs/data-models/spec.md`, and this section asserts no rule over it.
+9. A field that merely RECORDS when something happened is not an anchor at all and sits outside the taxonomy.
+`startedAtWorldTime`, `completedAtWorldTime`, `updatedAtWorldTime`, and the world time stamped onto a history event are records: nothing is gated on them, a world-time move never adjusts them, and they may legitimately read as later than the current world time.
+10. Rewinding world time is not an undo of what happened in the rewound interval.
+Spent stamina is not refunded, consumed nodes are not restored, attempts completed inside the interval are not reversed, and tools broken inside it are not repaired.
+11. Because a backward tick writes nothing, a rewind also emits no respawn or regeneration signal and performs no persisted document write for the affected pools, including the interactable-scoped pools whose respawn would otherwise write their region behaviour document.
+12. A deliberate large rewind, or an actor imported from a world whose timeline ran further ahead, leaves that pool's accrual anchor ahead of the current world time, and the pool accrues nothing until world time catches up.
+Restoring accrual is a GM remedy rather than something the rewind performs automatically (issue 894).
 
 ## Gathering Risk and Encounters
 
@@ -1217,6 +1264,37 @@ In `blind` mode:
 - blind task active runs, history, chat messages, and duplicate blockers use generic labels until the task is revealed for that viewer or the viewer is a GM
 
 Blind gathering simulates gathering from a place without player certainty about which hidden resource the environment will yield.
+
+### Blind Run Secret State
+
+Blind redaction is a persistence rule and not only a projection rule.
+A gathering run is stored in `flags.fabricate.gatheringRuns` on a gathering actor the player owns, and Foundry pushes an owned Actor's full source — flags included — to that client, so redacting a task identity only on the read path leaves it readable in clear text and, worse, writable by the player before any reveal policy discloses it.
+
+The boundary this specification draws is **integrity, not confidentiality**.
+Foundry performs no server-side read authorization, so no store exists that a player's client never receives; a determined player with a console can still read blind state.
+What they must not be able to do is **forge** it.
+
+1. The secret state of an in-flight blind run — the resolved task, its start-time snapshot, and its resource-node reservation — is held in world-scoped state keyed by run id, which only a GM may write.
+2. The actor-scoped run record carries an environment-scoped blind marker in place of the resolved task id, the time gate, and the non-secret economy evidence only.
+It carries no task identity, no start-time runtime snapshot, and the **environment's** risk rather than the task's `riskOverride`.
+3. Because the marker is environment-scoped, an actor holds at most one active blind run per blind environment, and a second attempt there is blocked with the generic `DUPLICATE_ACTIVE_RUN` reason.
+4. The task is resolved **at start**, not at maturity, and is recorded with the start-time snapshot of the environment, its rules, its events, and its conditions.
+A matured blind run resolves against that snapshot, so a task edited or deleted mid-run still completes as it was when the attempt began.
+5. A blind run **reserves** its resource node at start rather than decrementing the pool.
+The reservation is provisional: it never mutates `nodeRuntime`, so no "reserved but not consumed" limbo state appears in the pool, and a run that is cancelled, cleared, or orphaned releases it with nothing to give back.
+At maturity the reservation is converted into the single real decrement the run is owed, subject to the task's ordinary `onStart`/`onSuccess` depletion rule.
+6. Start-time node availability counts outstanding reservations against the pool, so a party can never hold more in-flight blind runs than the pool can pay out.
+A candidate whose pool is fully reserved is excluded from the blind candidate draw.
+7. Because only a GM may write world-scoped state, and because the draw must not run on a client the acting player controls, a player's blind start that would create a waiting run is routed to the active GM.
+The GM re-runs the whole attempt with the requesting user as the viewer — re-evaluating actor authorization, scene, visibility, tool, stamina, and reservation-aware node availability against that user — then resolves the task, takes the reservation, and writes both records.
+The requesting user is the server-attested socket sender, never a value carried in the request.
+8. Where no GM is connected the start is reported as blocked rather than silently dropped.
+9. A GM's run listing shows the real task behind an in-flight blind run, explicitly marked as a secret preview the acting player cannot see.
+Player-facing listings continue to show the generic blind label and no task identity.
+10. Runs persisted with a real task id and their own runtime snapshot — those written before this rule — keep resolving from their own record, need no world-scoped record, and are not charged a second node at maturity.
+No migration is required.
+
+Structurally player-observable channels remain outside this rule: a task-dependent wait duration, a task-dependent stamina cost, and a world-scoped node pool decrement are each visible to the acting player whatever the run record says.
 
 ### Blind Gathering Discovery
 
@@ -1411,6 +1489,7 @@ Tool requirements resolve from `task.toolIds` against `system.tools` at attempt 
 For a task-linked interactable the depletion/respawn happen in the normal gathering attempt against the environment; for an unlinked node the independent pool's `current`/respawn timers are written back onto the behaviour `system.node` through the active-GM behaviour-update edge (players cannot write a behaviour they do not own).
 When a player interacts and no active GM is connected, surface a graceful "a GM must be online to gather here" message rather than silently failing.
 A **denied** activation returns a localized reason (`FABRICATE.Canvas.Interactable.Denied.*`) to the requesting player.
+The validating GM's token-presence re-check is canvas-independent (it may run against a scene that GM is not viewing) and is defined in `openspec/specs/data-models/spec.md` (Canvas Interactables requirement 6).
 3. **Player-facing depleted state comes from the active node.** Depleted + calendar-aware respawn-ETA state is whatever the active node reports through the normal gathering listing — the environment's `nodeRuntime[taskId]` for a task-linked interactable, or the behaviour's independent `system.node` for an unlinked one.
 The interactable adds nothing to the listing on top of it.
 3a. **Node-driven linked-Tile marker swap (SHIPPED).** When the active node for a gathering task is depleted (`current <= 0`) AND the task/node configures a `depletedBehavior.swapImage`, the linked Tile marker swaps its texture to that image; when the node recharges (respawns above `0`) it flips back to the available image (stashed at `flags.fabricate.markerAvailableImg` on the first swap, restored on recharge).
@@ -1461,12 +1540,21 @@ threshold/outcome-tier configuration) drives resolution:
    lowest (closest) tier rather than yielding no tier name, so a `dcOverride` that
    raises the difficulty never leaves a rolled task unrouted.
    **Fixed** tiers keep the "outside every range → no tier name" behaviour.
-3. A failing tier, or no tier name, takes the failure path.
-4. A succeeding tier name must match exactly one `ResultGroup.name` under
+3. A trigger's `tierStep` effect may then move that rolled tier — routed gathering
+   checks step exactly as crafting and salvage do, in both tier types (issue 975).
+   See `resolution-modes/spec.md` § Routed Tier Stepping for the modes, the
+   composition rule and the disposition-preserving constraint.
+   The tier NAME that resolves the result group below is the **final** (post-step)
+   tier's name, and its `success` flag is the disposition, so a step changes which
+   result group a gather produces.
+   Stepping records `data.tierStepApplied` evidence on a real tier change; gathering
+   threads that evidence to no chat surface today.
+4. A failing tier, or no tier name, takes the failure path.
+5. A succeeding tier name must match exactly one `ResultGroup.name` under
    trim-normalized, case-insensitive comparison; the matched group is awarded.
-5. If a succeeding tier name matches no result group, the attempt resolves to a
+6. If a succeeding tier name matches no result group, the attempt resolves to a
    terminal failure (no group is awarded).
-6. A routed task with no system routed `rollFormula` reports a GM-fix-required
+7. A routed task with no system routed `rollFormula` reports a GM-fix-required
    misconfiguration diagnostic and does not resolve.
 
 ### Reserved Keywords
@@ -1583,7 +1671,7 @@ There is no multi-step gathering state in this phase.
 - do not create gathered result items when the outcome is `failed`,
 - apply tool usage/breakage for the terminal attempt after the outcome is known, terminal history persists, and only against the selected actor,
 - apply configured or default failure feedback on failed outcomes after terminal history persists,
-- apply accepted node depletion and encounter reporting only after the relevant state transition is persisted enough to avoid duplicate or uncommitted output,
+- apply accepted node depletion and encounter reporting only after the relevant state transition is persisted enough to avoid duplicate or uncommitted output; where the depletion is applied by the active GM on the acting client's behalf, "persisted enough" is satisfied by the terminal history write, and the relayed depletion is not awaited for the attempt to complete,
 - for non-GM blind attempts, redact task identity, result details, tool details, provider diagnostics, check internals, and sensitive encounter details from player-facing responses and persisted terminal history.
 
 1. If `task.timeRequirement` is present after all start guards and task validation pass:
@@ -1623,7 +1711,13 @@ Live Foundry validation remains conditional for future runtime-specific or scree
 
 When world time advances to or past a run's `timeGate.availableAt`, the backend gathering runtime resumes matured `waitingTime` runs through `GatheringEngine.processWorldTime(worldTime)`:
 
+0. Resume matured runs on exactly one client.
+`updateWorldTime` is a synced hook that fires everywhere and the matured-run scan is not restricted to the acting client's own actors, so resumption is gated to the primary GM.
+Resumption is not a read: it writes run flags, creates gathered result items, applies tool usage, posts chat, and depletes nodes, and a terminal-history write returning "already completed" is a race against a server round-trip rather than a lock, so an ungated scan double-applies every one of those effects.
+Where no GM is connected, matured runs stay waiting and resolve when one joins and world time next advances.
+
 1. Re-resolve the environment, task, crafting system, and actor.
+For a run persisted under the blind marker, the task and the start-time snapshot come from the world-scoped blind run record rather than the actor flag; a run whose record is gone resolves nothing and is cancelled through the missing-reference path with blind redaction, rather than resolving against an arbitrary task.
 2. If required references are missing, cancel the run and move it to history with a terminal status, with blind redaction where an opaque blind environment can still be resolved.
 3. If the task is misconfigured at resume time, clear the active run without terminal player history, result items, tool usage, or failure feedback, and require a fresh manual start after the task is repaired.
 4. Resolve completion-time condition/economy behavior from the persisted run snapshot unless the GM explicitly configured completion-time conditions.
@@ -1643,10 +1737,13 @@ When world time advances to or past a run's `timeGate.availableAt`, the backend 
 ### Rich Lifecycle Evidence
 
 1. Start guards evaluate node availability and stamina after existing environment/task/scene/visibility/tool guards pass and before terminal resolution begins.
+For blind runs, node availability is net of outstanding reservations.
 2. Timed runs preserve the condition/economy snapshot needed to resolve or explain the run at completion.
+For blind runs that snapshot is preserved in world-scoped state a player may not write, not on the actor's own run record.
 3. If conditions are intended to affect completion rather than start, that behavior must be configured explicitly and visible to the GM.
 4. History entries should include redaction-safe summaries of stamina spent, node availability changes, condition modifiers, risk, and encounter outcomes.
 5. Blind environments continue to redact real task identity, hidden results, provider diagnostics, and sensitive encounter details for non-GM users.
+That redaction applies to what is written as well as to what is read: a persisted blind run must not name its task, its result rows, or its tools.
 
 ## Rich Gathering APIs and Hooks
 
@@ -1707,7 +1804,8 @@ It complements `Integrations` (`openspec/specs/integrations/spec.md`), which gov
 8. The published hook names and payload shape are a public, backwards-compatible contract within a major version; the payload carries `schemaVersion` to signal future evolution.
 The payload exposes a public projection of gathered items and used tools and does not leak internal breakage diagnostics (`evidence`, `mode`).
 Under `checkDriven` authority a tool-breakage entry may carry a human-readable `reason` (e.g. "1d20 group rolled 1"); the `reason` is public-safe and may surface in run/chat output, but `evidence` and `mode` stay stripped from the public projection.
-9. Publication occurs on the client that resolved the attempt: immediate attempts publish on the acting client, while matured timed runs — processed on every client via the synced `updateWorldTime` hook — publish exactly once, on the primary GM client, to avoid multi-client duplication.
+9. Publication occurs on the client that resolved the attempt: immediate attempts publish on the acting client, while matured timed runs publish exactly once, on the primary GM client, to avoid multi-client duplication.
+Matured runs are themselves resolved only on the primary GM (see "Completion Flow"), so this is defence in depth rather than the sole guard.
 
 ## Gathering Chat Messages
 

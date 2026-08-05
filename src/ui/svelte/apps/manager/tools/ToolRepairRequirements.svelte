@@ -25,11 +25,18 @@
 <section class="manager-tool-repair" data-tool-repair-requirements>
   <div class="manager-tool-editor-card-heading">
     <div>
-      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Tools.Editor.Repair', 'Repair materials')}</p>
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Tools.Editor.Repair', 'Repair materials')}
+      </p>
       <h3>{text('FABRICATE.Admin.Manager.Tools.Editor.RepairTitle', 'Ingredient groups')}</h3>
     </div>
   </div>
-  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Tools.Editor.RepairHint', 'Every group is required (AND); any one option inside a group can satisfy it (OR).')}</p>
+  <p class="manager-muted">
+    {text(
+      'FABRICATE.Admin.Manager.Tools.Editor.RepairHint',
+      'Every group is required (AND); any one option inside a group can satisfy it (OR).'
+    )}
+  </p>
   <fieldset class="manager-tool-repair-content" {disabled}>
     <RecipeIngredientSetCard
       set={repairSet}

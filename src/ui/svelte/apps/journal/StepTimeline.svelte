@@ -26,7 +26,7 @@
     failed: 'fa-circle-xmark',
     waiting: 'fa-hourglass-half',
     current: 'fa-circle-dot',
-    pending: 'fa-circle'
+    pending: 'fa-circle',
   };
 </script>
 
@@ -38,7 +38,9 @@
         <span class="journal-step-node-marker">
           <i class={`fas ${NODE_ICON[state]}`} aria-hidden="true"></i>
         </span>
-        <span class="journal-step-node-name" title={step?.stepName ?? ''}>{step?.stepName ?? ''}</span>
+        <span class="journal-step-node-name" title={step?.stepName ?? ''}
+          >{step?.stepName ?? ''}</span
+        >
       </li>
     {/each}
   </ol>

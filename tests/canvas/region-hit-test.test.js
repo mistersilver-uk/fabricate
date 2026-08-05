@@ -15,8 +15,16 @@ import {
   sceneRegionUuidsContainingToken,
   tokenDocumentCenter,
   interactableBehaviorsContainingToken,
+  regionContainsTokenDocument,
   selectRepromptTokenDoc
 } from '../../src/canvas/regionHitTest.js';
+import {
+  rectRegion,
+  rectRegionWithoutTestPoint,
+  rectRegionThrowingTestPoint,
+  tokenDoc,
+  gridScene
+} from '../helpers/regionContainmentFakes.js';
 
 function region({ envId, contains }) {
   return {
@@ -180,4 +188,209 @@ test('tokenDocumentCenter falls back to getCenterPoint, then the placeable centr
   // No grid, no getCenterPoint, no placeable ⇒ document top-left.
   assert.deepEqual(tokenDocumentCenter({ x: 3, y: 4 }), { x: 3, y: 4 });
   assert.equal(tokenDocumentCenter({}), null);
+});
+
+// --- regionContainsTokenDocument: the canvas-free signal rule (issue 999) ----
+//
+// A 100x100 rect anchored at (100,100) covers 100..200 on both axes. On a 100px
+// grid a 1x1 token document at (60,60) has its TOP-LEFT outside that rect and its
+// CENTRE (110,110) inside — the exact shape that made a GM who is not viewing the
+// scene deny a player who is standing in the region.
+const RECT = { x: 100, y: 100, w: 100, h: 100 };
+const CENTRE_INSIDE = { x: 60, y: 60 };
+const FAR_OUTSIDE = { x: 600, y: 600 };
+
+/** A 1x1 token document parented to a grid-bearing scene (fixture fidelity). */
+function containmentToken(position, options = {}) {
+  return tokenDoc({ ...position, scene: gridScene(), ...options });
+}
+
+test('signal 1 (membership) alone admits, across every collection shape Foundry may hand back', () => {
+  const shapes = [
+    ['Set', (region) => new Set([region])],
+    ['EmbeddedCollection-like { contents }', (region) => ({ contents: [region] })],
+    ['array', (region) => [region]]
+  ];
+  for (const [label, build] of shapes) {
+    const region = rectRegion(RECT);
+    // Membership says inside; BOTH weaker signals say outside. Membership wins and
+    // neither weaker signal is even consulted.
+    const token = containmentToken(FAR_OUTSIDE, { regions: build(region), insideRegion: false });
+    assert.equal(regionContainsTokenDocument(region, token), true, `${label} membership admits`);
+    assert.equal(token.testInsideRegionCalls.length, 0, `${label}: signal 2 is not consulted`);
+    assert.equal(region.testPointCalls.length, 0, `${label}: signal 3 is not consulted`);
+  }
+});
+
+test('signal 1 tolerates a bare region-id membership entry (fixture-only tolerance)', () => {
+  // Foundry always hands back RegionDocuments; this only keeps a hand-written
+  // fixture from silently reading as "no membership".
+  const region = rectRegion(RECT);
+  const token = containmentToken(FAR_OUTSIDE, { regions: [region.id], insideRegion: false });
+  assert.equal(regionContainsTokenDocument(region, token), true);
+  assert.equal(region.testPointCalls.length, 0);
+});
+
+test('signal 2 (Foundry containment) alone admits, without consulting the centre-point test', () => {
+  const region = rectRegion(RECT);
+  const token = containmentToken(FAR_OUTSIDE, { regions: [], insideRegion: true });
+  assert.equal(regionContainsTokenDocument(region, token), true);
+  assert.equal(token.testInsideRegionCalls.length, 1, 'Foundry containment answered');
+  assert.equal(region.testPointCalls.length, 0, 'the weaker geometric signal is not consulted');
+});
+
+test('signal 3 (centre point) alone admits when membership is empty and Foundry containment is absent', () => {
+  const region = rectRegion(RECT);
+  const token = containmentToken(CENTRE_INSIDE, { regions: [], insideRegion: 'absent' });
+  assert.equal(regionContainsTokenDocument(region, token), true);
+  assert.deepEqual(
+    region.testPointCalls[0],
+    { x: 110, y: 110, elevation: 0 },
+    'the CENTRE is submitted, not the document top-left'
+  );
+});
+
+test('membership naming a DIFFERENT region falls through, and signal 3 answers both ways', () => {
+  const region = rectRegion(RECT);
+  const elsewhere = rectRegion({ ...RECT, id: 'region-elsewhere', uuid: 'Scene.s.Region.elsewhere' });
+
+  const inside = containmentToken(CENTRE_INSIDE, { regions: [elsewhere] });
+  assert.equal(regionContainsTokenDocument(region, inside), true, 'centre inside ⇒ admitted');
+  assert.equal(region.testPointCalls.length, 1, 'the foreign membership did not short-circuit');
+
+  const outsideRegion = rectRegion(RECT);
+  const outside = containmentToken(FAR_OUTSIDE, { regions: [elsewhere] });
+  assert.equal(regionContainsTokenDocument(outsideRegion, outside), false, 'centre outside ⇒ denied');
+});
+
+test('signal 3 tests the token elevation against a banded region, in both directions', () => {
+  const band = { ...RECT, elevationBand: { bottom: 10, top: 30 } };
+
+  const inBand = rectRegion(band);
+  const highToken = containmentToken(CENTRE_INSIDE, { elevation: 20 });
+  assert.equal(regionContainsTokenDocument(inBand, highToken), true, 'an in-band token is admitted');
+  assert.equal(inBand.testPointCalls[0].elevation, 20, 'the token elevation is submitted');
+
+  const outOfBand = rectRegion(band);
+  const groundToken = containmentToken(CENTRE_INSIDE, { elevation: 0 });
+  assert.equal(regionContainsTokenDocument(outOfBand, groundToken), false, 'elevation 0 is out of band');
+});
+
+test('signal 3 always submits a FINITE elevation, normalizing an absent or non-finite one to 0', () => {
+  // getCenterPoint() passes the document elevation through verbatim, so an absent
+  // elevation would reach testPoint as `undefined` — which Foundry reads as a
+  // silent false, i.e. a denial rather than an error.
+  const absent = rectRegion(RECT);
+  const noElevation = containmentToken(CENTRE_INSIDE);
+  assert.equal(noElevation.getCenterPoint().elevation, undefined, 'the fixture really has none');
+  assert.equal(regionContainsTokenDocument(absent, noElevation), true);
+  assert.equal(absent.testPointCalls[0].elevation, 0, 'absent ⇒ 0');
+
+  const notFinite = rectRegion(RECT);
+  const nanToken = containmentToken(CENTRE_INSIDE, { elevation: Number.NaN });
+  assert.equal(regionContainsTokenDocument(notFinite, nanToken), true);
+  assert.equal(notFinite.testPointCalls[0].elevation, 0, 'non-finite ⇒ 0');
+});
+
+test('a region with no testPoint and a token with no testInsideRegion ADMITS (every signal indeterminate)', () => {
+  const region = rectRegionWithoutTestPoint(RECT);
+  const token = containmentToken(FAR_OUTSIDE, { regions: [], insideRegion: 'absent' });
+  assert.equal(regionContainsTokenDocument(region, token), true, 'cannot locate ⇒ do not block');
+  assert.equal(region.testPointCalls.length, 0);
+});
+
+test('a region with no testPoint still DENIES when Foundry containment answered outside', () => {
+  // The "no testPoint" defensive case is NOT a blanket grant: it only makes the
+  // geometric signal unanswerable.
+  const region = rectRegionWithoutTestPoint(RECT);
+  const token = containmentToken(FAR_OUTSIDE, { regions: [], insideRegion: false });
+  assert.equal(regionContainsTokenDocument(region, token), false);
+  assert.equal(token.testInsideRegionCalls.length, 1);
+});
+
+test('an unresolvable centre does not deny, and submits nothing', () => {
+  const region = rectRegion(RECT);
+  assert.equal(regionContainsTokenDocument(region, {}), true);
+  assert.equal(region.testPointCalls.length, 0, 'no point is submitted when none can be built');
+});
+
+test('a THROWING testInsideRegion is indeterminate, not a denial', () => {
+  const region = rectRegionWithoutTestPoint(RECT);
+  const token = containmentToken(FAR_OUTSIDE, { regions: [], insideRegion: 'throws' });
+  assert.equal(regionContainsTokenDocument(region, token), true, 'a throw means "could not determine"');
+  assert.equal(token.testInsideRegionCalls.length, 1, 'and it really was consulted');
+});
+
+test('a THROWING testPoint is indeterminate, not a denial', () => {
+  const region = rectRegionThrowingTestPoint(RECT);
+  const token = containmentToken(FAR_OUTSIDE, { regions: [], insideRegion: 'absent' });
+  assert.equal(regionContainsTokenDocument(region, token), true);
+  assert.equal(region.testPointCalls.length, 1, 'and it really was consulted');
+});
+
+test('signal 2 is DEFINITIVE: an outside verdict denies and signal 3 never overrides it', () => {
+  // Foundry's own predicate knows about the token footprint, the elevation band
+  // and (on V14) scene levels; the centre-point test is a strictly worse
+  // approximation of it, so it must never overturn it. Here the centre IS inside
+  // the rect and the answer is still a denial.
+  const region = rectRegion(RECT);
+  const token = containmentToken(CENTRE_INSIDE, { regions: [], insideRegion: false });
+  assert.equal(regionContainsTokenDocument(region, token), false);
+  assert.equal(region.testPointCalls.length, 0, 'the weaker signal is never consulted');
+});
+
+// --- re-trigger elevation + the pinned scope-outs (issue 999, Phase 3) -------
+
+/** A rect region carrying one interactable behaviour, for the re-trigger path. */
+function rectRegionWithInteractable(options = {}) {
+  const region = rectRegion(options);
+  region.behaviors = { contents: [{ type: 'fabricate.interactable', id: 'b1' }] };
+  return region;
+}
+
+test('interactableBehaviorsContainingToken submits the token DOCUMENT elevation for a placeable', () => {
+  // The dominant caller (controlToken / "interact here") hands in a PLACEABLE,
+  // which has no `elevation` of its own — only `document.elevation`.
+  const region = rectRegionWithInteractable(RECT);
+  const token = { center: { x: 150, y: 150 }, document: { elevation: 20 } };
+  const matches = interactableBehaviorsContainingToken({
+    scene: { regions: [region] },
+    token,
+    isInteractableBehavior: isInteractable
+  });
+  assert.equal(matches.length, 1);
+  assert.equal(region.testPointCalls[0].elevation, 20, 'the placeable’s document elevation is used');
+});
+
+test('interactableBehaviorsContainingToken submits the elevation of a bare token document too', () => {
+  const region = rectRegionWithInteractable(RECT);
+  const matches = interactableBehaviorsContainingToken({
+    scene: { regions: [region] },
+    token: { x: 150, y: 150, elevation: 20 },
+    isInteractableBehavior: isInteractable
+  });
+  assert.equal(matches.length, 1);
+  assert.equal(region.testPointCalls[0].elevation, 20);
+});
+
+test('regionEnvironmentIdsAtPoint still submits elevation 0 (a drop point has no elevation)', () => {
+  const region = rectRegion(RECT);
+  const ids = regionEnvironmentIdsAtPoint({
+    scene: { regions: [region] },
+    point: { x: 150, y: 150, elevation: 20 }
+  });
+  // Guard first: both pinned functions skip a region BEFORE testPoint when it
+  // lacks the uuid / env-id flag, which would make the pin below vacuous.
+  assert.equal(region.testPointCalls.length, 1, 'the region really was tested');
+  assert.equal(region.testPointCalls[0].elevation, 0, 'the caller elevation is deliberately ignored');
+  assert.deepEqual(ids, ['env-1']);
+});
+
+test('sceneRegionUuidsContainingToken still submits elevation 0 (travel sensing is pinned)', () => {
+  const region = rectRegion(RECT);
+  const token = tokenDoc({ x: 100, y: 100, scene: gridScene(), elevation: 20 });
+  const uuids = sceneRegionUuidsContainingToken({ scene: { regions: [region] }, token });
+  assert.equal(region.testPointCalls.length, 1, 'the region really was tested');
+  assert.equal(region.testPointCalls[0].elevation, 0, 'realm sensing is unchanged by issue 999');
+  assert.deepEqual(uuids, [region.uuid]);
 });

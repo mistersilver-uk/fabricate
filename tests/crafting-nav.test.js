@@ -25,6 +25,7 @@ test('CRAFTING_VIEWS lists every crafting-group view', () => {
     'access',
     'books-scrolls',
     'recipe-item-edit',
+    'knowledge',
     'crafting-settings',
   ]);
 });
@@ -41,21 +42,100 @@ test('restricted mode inserts Access after Recipes, no Books & Scrolls', () => {
 
 test('item mode shows Books & Scrolls but not Access', () => {
   const items = buildCraftingNavItems({ visibilityMode: 'item', recipeCount: 3, recipeItemCount: 5 });
-  assert.deepEqual(ids(items), ['recipes', 'books-scrolls', 'settings']);
+  assert.deepEqual(ids(items), ['recipes', 'books-scrolls', 'knowledge', 'settings']);
 });
 
 test('knowledge mode shows Books & Scrolls but not Access', () => {
   const items = buildCraftingNavItems({ visibilityMode: 'knowledge', recipeCount: 3, recipeItemCount: 5 });
-  assert.deepEqual(ids(items), ['recipes', 'books-scrolls', 'settings']);
+  assert.deepEqual(ids(items), ['recipes', 'books-scrolls', 'knowledge', 'settings']);
 });
 
 test('an unknown/absent visibility mode falls back to knowledge (Books & Scrolls shown)', () => {
   assert.deepEqual(ids(buildCraftingNavItems({ visibilityMode: 'nope' })), [
     'recipes',
     'books-scrolls',
+    'knowledge',
     'settings',
   ]);
-  assert.deepEqual(ids(buildCraftingNavItems()), ['recipes', 'books-scrolls', 'settings']);
+  assert.deepEqual(ids(buildCraftingNavItems()), [
+    'recipes',
+    'books-scrolls',
+    'knowledge',
+    'settings',
+  ]);
+});
+
+// The Knowledge surface (issue 785) is gated on
+// `effect.showBooksScrolls || resolutionMode === 'alchemy'`, which is strictly
+// WIDER than the Books & Scrolls gate. All four cells of the gate matrix are
+// pinned below; `global` + alchemy is the cell that motivates the widening
+// (learned recipes are the sole reveal source there, so a showBooksScrolls-only
+// gate would leave the GM no lever at all) and `restricted` + alchemy is the cell
+// that shows Access and Knowledge but NOT Books & Scrolls.
+const KNOWLEDGE_GATE_CASES = [
+  { visibilityMode: 'global', resolutionMode: 'simple', expected: ['recipes', 'settings'] },
+  {
+    visibilityMode: 'global',
+    resolutionMode: 'alchemy',
+    expected: ['recipes', 'knowledge', 'settings'],
+  },
+  {
+    visibilityMode: 'restricted',
+    resolutionMode: 'simple',
+    expected: ['recipes', 'access', 'settings'],
+  },
+  {
+    visibilityMode: 'restricted',
+    resolutionMode: 'alchemy',
+    expected: ['recipes', 'access', 'knowledge', 'settings'],
+  },
+  {
+    visibilityMode: 'item',
+    resolutionMode: 'simple',
+    expected: ['recipes', 'books-scrolls', 'knowledge', 'settings'],
+  },
+  {
+    visibilityMode: 'item',
+    resolutionMode: 'alchemy',
+    expected: ['recipes', 'books-scrolls', 'knowledge', 'settings'],
+  },
+  {
+    visibilityMode: 'knowledge',
+    resolutionMode: 'simple',
+    expected: ['recipes', 'books-scrolls', 'knowledge', 'settings'],
+  },
+  {
+    visibilityMode: 'knowledge',
+    resolutionMode: 'alchemy',
+    expected: ['recipes', 'books-scrolls', 'knowledge', 'settings'],
+  },
+];
+
+for (const { visibilityMode, resolutionMode, expected } of KNOWLEDGE_GATE_CASES) {
+  test(`the ${visibilityMode} + ${resolutionMode} cell resolves the Knowledge gate`, () => {
+    const items = buildCraftingNavItems({ visibilityMode, resolutionMode, recipeCount: 2 });
+    assert.deepEqual(ids(items), expected);
+  });
+}
+
+test('the Knowledge entry carries no count badge and the brain icon', () => {
+  const items = buildCraftingNavItems({
+    visibilityMode: 'knowledge',
+    recipeCount: 7,
+    recipeItemCount: 3,
+  });
+  const knowledge = items.find((item) => item.id === 'knowledge');
+  assert.equal(knowledge.view, 'knowledge');
+  assert.equal(knowledge.icon, 'fas fa-brain');
+  assert.equal(knowledge.labelKey, 'FABRICATE.Admin.Manager.Nav.Knowledge');
+  assert.equal(knowledge.labelFallback, 'Knowledge');
+  // A count property would change the Crafting parent badge, which sums
+  // `item.count || 0` over its visible sub-tabs.
+  assert.equal('count' in knowledge, false);
+  assert.equal(
+    items.reduce((sum, item) => sum + (item.count || 0), 0),
+    10
+  );
 });
 
 test('Recipes and Books & Scrolls carry counts; Access and Settings do not', () => {
@@ -102,6 +182,8 @@ test('activeCraftingTab collapses editor views onto their parent tab', () => {
   assert.equal(activeCraftingTab('access'), 'access');
   assert.equal(activeCraftingTab('books-scrolls'), 'books-scrolls');
   assert.equal(activeCraftingTab('recipe-item-edit'), 'books-scrolls');
+  // Without this entry the sub-tab highlight never lights on the Knowledge route.
+  assert.equal(activeCraftingTab('knowledge'), 'knowledge');
   assert.equal(activeCraftingTab('crafting-settings'), 'settings');
 });
 

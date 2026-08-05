@@ -30,6 +30,57 @@ export function isNodeDepleted(node) {
 }
 
 /**
+ * Whether a pool's accrual anchor (`respawn.lastEvaluatedWorldTime`) is ABSENT —
+ * i.e. the pool has never been evaluated, so it must be seeded at `now` rather
+ * than read as anchored at some past instant.
+ *
+ * ONE shared definition for every site that does anchor ARITHMETIC (issues 403,
+ * 896): the respawn step below, {@link nextRespawnEta}, and the two expression
+ * pre-roll bounds in `GatheringNodeService` (`_respawnNode` and
+ * `respawnInteractableNode`).
+ *
+ * It deliberately does NOT cover `commitAcceptedAttempt`
+ * (`src/systems/GatheringRichStateService.js`), which tests `== null` alone. That
+ * site is a seed WRITER, not an arithmetic read: it stamps the anchor at
+ * depletion time so the first world-time advance gains instead of only
+ * re-anchoring, and a non-finite anchor there is simply seeded one tick later by
+ * this predicate's own seed branch. Benign, so it is recorded rather than
+ * changed. (Note that file carries a raw NUL byte in a string literal, so plain
+ * `grep` reports it as binary and prints no matches — use `grep -a`.)
+ *
+ * The predicate is nullish OR non-finite, and both halves are load-bearing:
+ *  - the nullish half, because `normalizeRespawn` emits `null` for an unevaluated
+ *    pool and `Number(null) === 0` is FINITE, so a laxer `Number.isFinite(...)`
+ *    test reads that `null` as "anchored at world time 0";
+ *  - the finiteness half, because it stops a garbage anchor persisting as `NaN`
+ *    and yielding a `NaN` count.
+ * Keeping the definition in one place is the point: issue 896 was two call sites
+ * that kept the laxer form after issue 403 replaced it everywhere else.
+ *
+ * Known limitation, inherited from issue 403 deliberately: `Number('') === 0` is
+ * finite, so an empty-string anchor still resolves to epoch zero.
+ *
+ * @param {*} storedAnchor The persisted `respawn.lastEvaluatedWorldTime`.
+ * @returns {boolean} True when the anchor must be seeded rather than read.
+ */
+export function isAccrualAnchorAbsent(storedAnchor) {
+  return storedAnchor == null || !Number.isFinite(Number(storedAnchor));
+}
+
+/**
+ * Resolve a pool's accrual anchor for arithmetic, falling back to `now` when the
+ * anchor is absent per {@link isAccrualAnchorAbsent} (so no elapsed time accrues
+ * on the tick that seeds it).
+ *
+ * @param {*} storedAnchor The persisted `respawn.lastEvaluatedWorldTime`.
+ * @param {number} now Current world time (seconds).
+ * @returns {number} The anchor to measure elapsed intervals from.
+ */
+export function resolveAccrualAnchor(storedAnchor, now) {
+  return isAccrualAnchorAbsent(storedAnchor) ? Number(now) : Number(storedAnchor);
+}
+
+/**
  * Resolve the respawn interval length in seconds from a normalized respawn block,
  * using the injected calendar seam for day/week lengths. Falls back to a legacy
  * raw `intervalSeconds` for nodes persisted before the unit+amount schema.
@@ -61,8 +112,24 @@ export function respawnIntervalSeconds(respawn, secondsPerUnit) {
  *                    authoritative per-environment respawn path)
  *  - `expression`  → roll per interval (`rollExpression(expr)` → integer)
  * clamped to `node.max`, advancing the `respawn.lastEvaluatedWorldTime` anchor by
- * the consumed intervals so a same-tick refresh never re-rolls. World time that
- * stands still or runs backwards only re-anchors (never gains).
+ * the consumed intervals so a same-tick refresh never re-rolls.
+ *
+ * `respawn.lastEvaluatedWorldTime` is an ACCRUAL anchor (issue 403): a high-water
+ * mark of the entitlement already granted, and therefore monotonic
+ * non-decreasing. Three cases, in this order:
+ *  - anchor ABSENT (nullish or non-finite) → seed it at `now` and report a change
+ *    so the caller persists it. This is a seed, not a re-anchor, and it must be
+ *    decided BEFORE the backward comparison: `normalizeRespawn` emits `null` for
+ *    an unevaluated pool and `Number(null) === 0` is finite, so a `null` anchor
+ *    otherwise reads as "anchored at world time 0" and takes the forward branch
+ *    for any `now > 0` — a spurious full restock on first evaluation.
+ *  - anchor present and `now < anchor` (world time ran backwards) → FREEZE:
+ *    report no change and write nothing, so no persisted state is rewritten and
+ *    no clamp rides along on the write. Re-anchoring here would re-grant every
+ *    interval between the rewound instant and the anchor on the way forward.
+ *  - anchor present and `now === anchor` → nothing to do.
+ * A consequence every consumer must tolerate: the anchor may legitimately sit
+ * AHEAD of `now`.
  *
  * @param {object} node Normalized node object (config + state).
  * @param {object} ctx
@@ -82,20 +149,21 @@ export function respawnNodeOnce(node, { now, secondsPerUnit, rollChance, rollExp
   if (!(interval > 0)) return { changed: false, node };
   const nowTime = Number(now);
   if (!Number.isFinite(nowTime)) return { changed: false, node };
-  const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-    ? Number(respawn.lastEvaluatedWorldTime)
-    : nowTime;
-
-  // World time stood still or ran backwards: re-anchor, never regenerate.
-  if (nowTime <= last) {
-    if (respawn.lastEvaluatedWorldTime !== nowTime) {
-      return {
-        changed: true,
-        node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: nowTime } },
-      };
-    }
-    return { changed: false, node };
+  // Absent anchor FIRST, ahead of the backward comparison: a `null` anchor (the
+  // shape `normalizeRespawn`/`_mergeNodeConfigState` persist for an unevaluated
+  // pool) coerces to a finite 0, so it would otherwise take the forward branch.
+  const storedAnchor = respawn.lastEvaluatedWorldTime;
+  if (isAccrualAnchorAbsent(storedAnchor)) {
+    return {
+      changed: true,
+      node: { ...node, respawn: { ...respawn, lastEvaluatedWorldTime: nowTime } },
+    };
   }
+  const last = Number(storedAnchor);
+
+  // World time stood still or ran backwards: freeze the accrual anchor and write
+  // nothing at all (no gain, no re-anchor, no persisted node state).
+  if (nowTime <= last) return { changed: false, node };
 
   const max = Number(node.max || 0);
   const before = Number(node.current || 0);
@@ -169,9 +237,13 @@ export function nextRespawnEta(node, secondsPerUnit, now) {
   if (!(interval > 0)) return null;
   const nowTime = Number(now);
   if (!Number.isFinite(nowTime)) return null;
-  const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-    ? Number(respawn.lastEvaluatedWorldTime)
-    : nowTime;
+  // An absent anchor resolves to `now` (issue 896): the pool seeds on the next
+  // tick and gains a whole interval after that, so the ETA must not count down
+  // against an epoch-zero grid. The `Math.max(0, ...)` clamp below is separate
+  // and stays: under issue 403's accrual policy the anchor may legitimately sit
+  // AHEAD of `now` (a world-time rewind freezes the pool), and the anchor-relative
+  // countdown it produces is what the frozen pool actually does.
+  const last = resolveAccrualAnchor(respawn.lastEvaluatedWorldTime, nowTime);
   // Next anchor strictly after `now`.
   const elapsed = Math.max(0, nowTime - last);
   const wholeIntervals = Math.floor(elapsed / interval) + 1;

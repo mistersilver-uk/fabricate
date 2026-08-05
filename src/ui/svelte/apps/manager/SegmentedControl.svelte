@@ -10,7 +10,12 @@
   (Per copy / Across all copies).
 
   Props:
-   - options: [{ value, labelKey, fallback, icon? }] — the segments, in order.
+   - options: [{ value, labelKey, fallback, icon?, variant?, disabled? }] — the
+     segments, in order. `variant` ('' | 'success' | 'danger' | 'neutral') tints the
+     ACTIVE segment only and defaults to the plain active tile, so a consumer that
+     sets none renders exactly as before. `disabled` is carried onto the segment's
+     radio ITSELF, not merely onto a class: `select()` only guards `next !== value`,
+     so a dimmed-but-live segment would still fire onChange.
    - value: the currently selected option `value`.
    - onChange(value): called with the chosen option's `value` on selection.
    - groupName: the shared radio `name` (must be unique per rendered control).
@@ -35,7 +40,7 @@
     ariaLabel = '',
     dataAttr = '',
     optionDataAttr = '',
-    fill = false
+    fill = false,
   } = $props();
 
   function text(key, fallback) {
@@ -47,6 +52,15 @@
   function select(next) {
     if (next !== value) onChange(next);
   }
+
+  // Class list for one segment. The variant tint applies to the ACTIVE segment only —
+  // an inactive segment stays the muted track colour whatever it would become when
+  // chosen, which is what keeps a three-way outcome toggle legible.
+  function segmentClass(option) {
+    const active = option.value === value;
+    const variant = active && option.variant ? ` is-${option.variant}` : '';
+    return `manager-segment ${active ? 'is-active' : ''}${variant}${option.disabled ? ' is-disabled' : ''}`;
+  }
 </script>
 
 <div
@@ -57,7 +71,7 @@
 >
   {#each options as option (option.value)}
     <label
-      class={`manager-segment ${option.value === value ? 'is-active' : ''}`}
+      class={segmentClass(option)}
       {...optionDataAttr ? { [optionDataAttr]: option.value } : {}}
     >
       <input
@@ -66,6 +80,7 @@
         name={groupName}
         value={option.value}
         checked={option.value === value}
+        disabled={option.disabled === true}
         onchange={() => select(option.value)}
       />
       {#if option.icon}<i class={option.icon} aria-hidden="true"></i>{/if}
@@ -121,8 +136,32 @@
     font-weight: 600;
   }
 
-  .manager-segment:hover:not(.is-active) {
+  /* Optional per-option tints for the ACTIVE segment (issue 975). `neutral` is the
+     plain active tile above and deliberately declares nothing — it exists so a
+     three-way good/neutral/bad control can name every segment rather than leaving
+     the middle one's intent implicit. */
+  .manager-segment.is-active.is-success {
+    border-color: var(--fab-success-border);
+    background: var(--fab-success-soft);
+    color: var(--fab-success-text);
+  }
+
+  .manager-segment.is-active.is-danger {
+    border-color: var(--fab-danger-border);
+    background: var(--fab-danger-soft);
+    color: var(--fab-danger-text);
+  }
+
+  /* `:not(.is-disabled)` is load-bearing: without it a disabled segment still
+     recolours under the pointer and reads as choosable. */
+  .manager-segment:hover:not(.is-active):not(.is-disabled) {
     color: var(--fab-text-secondary);
+  }
+
+  /* The radio itself carries `disabled`, so this is only the visual half. */
+  .manager-segment.is-disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   /* Visually hidden but focusable: the label segment is the visible control, the

@@ -129,6 +129,32 @@ test('expectedSelectorsForManagerSurface returns the pinned selectors for a mapp
   ]);
 });
 
+test('the Knowledge surface pins its owned-copy row at BOTH widths (issue 785)', () => {
+  // The narrow label is measured at ~880px — deliberately above the 831px collapse,
+  // the band where three columns still hold and the detail pane is at its narrowest.
+  assert.deepEqual(expectedSelectorsForManagerSurface('knowledge normal'), [
+    '.manager-knowledge-copy-row',
+  ]);
+  assert.deepEqual(expectedSelectorsForManagerSurface('knowledge narrow'), [
+    '.manager-knowledge-copy-row',
+  ]);
+  // The pinned selectors must be recoverable by the drift guard's `/'(\.[a-z-]+)'/g`
+  // scan, so they can carry neither a digit nor an uppercase letter. Asserted over the
+  // MAP's real values — matching a literal against a regex could never fail.
+  for (const label of ['knowledge normal', 'knowledge narrow']) {
+    for (const selector of expectedSelectorsForManagerSurface(label)) {
+      assert.match(selector, /^\.[a-z-]+$/, `${label}: ${selector} is not recoverable`);
+    }
+  }
+  assert.throws(() =>
+    assertExpectedSelectorsPresent(
+      elementMetrics('.manager-knowledge-learned-row'),
+      expectedSelectorsForManagerSurface('knowledge narrow'),
+      'knowledge narrow'
+    )
+  );
+});
+
 test('expectedSelectorsForManagerSurface returns [] for an unmapped label', () => {
   assert.deepEqual(expectedSelectorsForManagerSurface('checks validation tab'), []);
   assert.deepEqual(expectedSelectorsForManagerSurface('not a real surface'), []);

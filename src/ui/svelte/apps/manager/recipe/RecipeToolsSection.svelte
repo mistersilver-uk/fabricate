@@ -12,6 +12,7 @@
   empty copy (recipe / step / global).
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SearchablePopover from '../SearchablePopover.svelte';
 
@@ -22,7 +23,7 @@
     addLabel = '',
     onAddTool = () => {},
     onRemoveTool = () => {},
-    idPrefix = ''
+    idPrefix = '',
   } = $props();
 
   function text(key, fallback) {
@@ -30,35 +31,49 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const addToolLabel = $derived(addLabel || text('FABRICATE.Admin.Manager.Recipe.AddTool', 'Add tool'));
-  const emptyToolLabel = $derived(emptyLabel || text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyPanel', 'No tools required.'));
+  const addToolLabel = $derived(
+    addLabel || text('FABRICATE.Admin.Manager.Recipe.AddTool', 'Add tool')
+  );
+  const emptyToolLabel = $derived(
+    emptyLabel || text('FABRICATE.Admin.Manager.Recipe.ToolsEmptyPanel', 'No tools required.')
+  );
 
+  // Display precedence, per `data-models` `## Tool` requirement 13 and mirroring
+  // `toolStudio.js`'s `toolDisplayName`/`toolDisplayImage`: authored label, then the
+  // registration display SNAPSHOT (`name`/`img`), then the linked managed component,
+  // then the fallback. The snapshot rung is load-bearing — a first-class item-sourced
+  // tool carries `componentId: null` (issue 561), so a component-only resolver renders
+  // "Unnamed tool" and the item-bag sentinel for a fully-populated tool (issue 976).
+  // `componentName`/`componentImg` arrive pre-flattened from `recipeToolsLibrary`, so
+  // this re-derives the canonical ordering rather than importing the helper; the shared
+  // precedence table in `tests/helpers/toolDisplayPrecedenceCases.js` pins them equal.
   function toolDisplayLabel(tool) {
     return (
-      tool?.label ||
+      String(tool?.label || '').trim() ||
+      tool?.name ||
       tool?.componentName ||
       text('FABRICATE.Admin.Manager.Recipe.UnnamedTool', 'Unnamed tool')
     );
   }
 
   function toolLabel(toolId) {
-    const tool = (toolsLibrary || []).find(entry => entry.id === toolId);
+    const tool = (toolsLibrary || []).find((entry) => entry.id === toolId);
     return toolDisplayLabel(tool);
   }
 
   function toolImage(tool) {
-    return tool?.componentImg || 'icons/svg/item-bag.svg';
+    return tool?.img || tool?.componentImg || 'icons/svg/item-bag.svg';
   }
 
   function toolImageById(toolId) {
-    const tool = (toolsLibrary || []).find(entry => entry.id === toolId);
+    const tool = (toolsLibrary || []).find((entry) => entry.id === toolId);
     return toolImage(tool);
   }
 
   const availableToolOptions = $derived(
     (toolsLibrary || [])
-      .filter(tool => !(toolIds || []).includes(tool.id))
-      .map(tool => ({ id: tool.id, label: toolDisplayLabel(tool), img: toolImage(tool) }))
+      .filter((tool) => !(toolIds || []).includes(tool.id))
+      .map((tool) => ({ id: tool.id, label: toolDisplayLabel(tool), img: toolImage(tool) }))
   );
 
   const toolsEmptyHint = $derived(
@@ -70,14 +85,19 @@
 
 <div class="manager-recipe-tools-section" data-recipe-section={`${idPrefix}tools`}>
   {#if (toolIds || []).length === 0}
-    <div class="manager-recipe-tools-empty" data-recipe-tools-empty>
-      <p class="manager-muted">{emptyToolLabel}</p>
-    </div>
+    <EmptyState
+      compact
+      icon="fas fa-screwdriver-wrench"
+      title={emptyToolLabel}
+      dataAttr="data-recipe-tools-empty"
+    />
   {:else}
     <ul class="manager-recipe-tool-rows">
       {#each toolIds as toolId (toolId)}
         <li class="manager-recipe-tool-row" data-recipe-tool-id={toolId}>
-          <span class="manager-recipe-tool-medallion" aria-hidden="true"><img src={toolImageById(toolId)} alt="" /></span>
+          <span class="manager-recipe-tool-medallion" aria-hidden="true"
+            ><img src={toolImageById(toolId)} alt="" /></span
+          >
           <span class="manager-recipe-tool-name">{toolLabel(toolId)}</span>
           <button
             type="button"
@@ -86,7 +106,8 @@
             aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTool', 'Remove tool')}
             title={text('FABRICATE.Admin.Manager.Recipe.RemoveTool', 'Remove tool')}
             onclick={() => onRemoveTool(toolId)}
-          ><i class="fas fa-times" aria-hidden="true"></i></button>
+            ><i class="fas fa-times" aria-hidden="true"></i></button
+          >
         </li>
       {/each}
     </ul>
@@ -100,8 +121,14 @@
     triggerAriaLabel={addToolLabel}
     triggerAddMarker="tool"
     dialogAriaLabel={addToolLabel}
-    searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder', 'Search tools...')}
-    searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder', 'Search tools...')}
+    searchPlaceholder={text(
+      'FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder',
+      'Search tools...'
+    )}
+    searchAriaLabel={text(
+      'FABRICATE.Admin.Manager.Recipe.ToolSearchPlaceholder',
+      'Search tools...'
+    )}
     emptyHint={toolsEmptyHint}
     showChevron={false}
     onChoose={(id) => onAddTool(id)}

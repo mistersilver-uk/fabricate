@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cssPath = resolve(__dirname, '../../styles/fabricate.css');
@@ -12,14 +13,90 @@ const colorPickerPath = resolve(
   '../../src/ui/svelte/components/ManagerColorPicker.svelte'
 );
 const enPath = resolve(__dirname, '../../lang/en.json');
+// The shared no-state and standing-statement primitives keep their CSS in their own
+// scoped `<style>` blocks (issue 785), not in the global sheet, so the rules that used to
+// be read out of `styles/fabricate.css` are read out of the component source instead.
+const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/apps/manager/EmptyState.svelte');
+const calloutPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Callout.svelte');
+// The shared side-panel explainer card and icon fact row (issue 881) follow the same rule:
+// their appearance is in their own scoped block, so it is read out of the component.
+const explainerCardPath = resolve(
+  __dirname,
+  '../../src/ui/svelte/apps/manager/ExplainerCard.svelte'
+);
+const iconFactRowPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/IconFactRow.svelte');
+// The shared chip (issue 883) owns its appearance in its own scoped block for the same
+// reason, so its scale is read out of the component rather than the global sheet.
+const chipPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Chip.svelte');
+const managerComponentDir = resolve(__dirname, '../../src/ui/svelte/apps/manager');
 const css = readFileSync(cssPath, 'utf8');
 const colorPickerSource = readFileSync(colorPickerPath, 'utf8');
+const emptyStateSource = readFileSync(emptyStatePath, 'utf8');
+const calloutSource = readFileSync(calloutPath, 'utf8');
+const explainerCardSource = readFileSync(explainerCardPath, 'utf8');
+const iconFactRowSource = readFileSync(iconFactRowPath, 'utf8');
+const chipSource = readFileSync(chipPath, 'utf8');
 const en = JSON.parse(readFileSync(enPath, 'utf8'));
 
-function blockFor(selector) {
+// Only the scoped `<style>` block, with CSS comments stripped. Both primitives document the
+// global layout-context rules they deliberately left behind, and those doc comments quote
+// selectors (and the words `<style>`) — matching prose instead of a rule would assert
+// nothing, so the block is located by its column-0 delimiters rather than by a loose match.
+const STYLE_OPEN = '\n<style>\n';
+
+function scopedStyles(componentSource) {
+  const start = componentSource.lastIndexOf(STYLE_OPEN);
+  const end = componentSource.lastIndexOf('\n</style>');
+  if (start < 0 || end <= start) return '';
+  return componentSource
+    .slice(start + STYLE_OPEN.length, end)
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+const emptyStateStyles = scopedStyles(emptyStateSource);
+const calloutStyles = scopedStyles(calloutSource);
+const explainerCardStyles = scopedStyles(explainerCardSource);
+const iconFactRowStyles = scopedStyles(iconFactRowSource);
+const chipStyles = scopedStyles(chipSource);
+
+// "This name must not survive" assertions read component SOURCE, and this repo's components
+// carry long doc comments that name the very thing they replaced — which is the point of
+// them. Stripping HTML and block comments keeps such a guard pointed at markup and code.
+// `//` line comments are deliberately left in place: a URL contains `//`, so removing to
+// end-of-line would delete real code (`https://…/fabricate` in the checks rail, for one).
+function withoutComments(source) {
+  return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+function blockIn(source, selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`${escaped}\\s*\\{[\\s\\S]*?\\}`));
+  const match = source.match(new RegExp(`${escaped}\\s*\\{[\\s\\S]*?\\}`));
   return match?.[0] || '';
+}
+
+function blockFor(selector) {
+  return blockIn(css, selector);
+}
+
+// The global sheet no longer styles a chip at all — the base rule and its eight tone rules
+// were deleted with the last conversion (issue 883), because a surviving base is what the
+// next hand-rolled chip would land on. So a real-browser fixture that renders a chip and
+// loads only `styles/fabricate.css` now measures an UNSTYLED chip: no border, no padding,
+// no min-height. Every geometry assertion downstream of one would still pass, and would be
+// measuring something the app never renders.
+//
+// These two restore the truth by reproducing what Svelte actually ships: `chipCss` is the
+// component's real compiled CSS, which each fixture places AFTER the global sheet exactly
+// as `css: 'injected'` injects it, and `withChipHash` stamps the real scoping hash onto the
+// fixture's chips so the specificity matches too. Both halves are needed — the CSS without
+// the hash matches nothing, and the hash without the ordering proves the wrong winner.
+// `withScopeHash` matches the whole `manager-chip` token only, so a `manager-chip-row`
+// container is left alone.
+const chipScoped = scopedComponentCss(chipPath);
+const chipCss = chipScoped.css;
+
+function withChipHash(markup) {
+  return withScopeHash(markup, 'manager-chip', chipScoped.hashClass);
 }
 
 async function readRenderedToolGeometry(width, view) {
@@ -45,7 +122,9 @@ async function readRenderedToolGeometry(width, view) {
         </main>`
         : `<main class="manager-main manager-tools-main"><div class="manager-tools-library-list"><article data-manager-tool-id="hammer"><button class="manager-tools-select-target"><span></span><span class="manager-tools-library-copy"><strong>Smith's Hammer</strong></span></button><div class="manager-tools-library-actions"></div></article></div></main><aside class="manager-inspector"><section data-tool-browser-inspector>Inspector</section></aside>`;
     await page.setContent(
-      `<style>${css}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="${view}"><div class="manager-body"><aside class="manager-rail">Rail</aside>${editor}</div></div></div>`
+      withChipHash(
+        `<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="${view}"><div class="manager-body"><aside class="manager-rail">Rail</aside>${editor}</div></div></div>`
+      )
     );
     return await page.evaluate(() => {
       const rect = (selector) => {
@@ -961,31 +1040,107 @@ test('manager inspector count labels wrap without truncation', () => {
 });
 
 test('manager empty states use refined heading and setup-panel styling', () => {
-  const emptyIconBlock = blockFor('.fabricate-manager .manager-empty > div > i');
-  const emptyLayerIconBlock = blockFor(
-    '.fabricate-manager .manager-empty > div > i.fa-layer-group'
-  );
-  const emptyHeadingBlock = blockFor('.fabricate-manager .manager-empty h3');
+  // Read from the PRIMITIVE, not the global sheet (issue 785): `EmptyState.svelte` owns the
+  // appearance in its scoped block so a change to it maps to the views that render it
+  // rather than to the broad `theme-or-global-ui` screenshot recipe.
+  const emptyPanelBlock = blockIn(emptyStateStyles, '.manager-empty');
+  const emptyIconBlock = blockIn(emptyStateStyles, '.manager-empty > div > i');
+  const emptyHeadingBlock = blockIn(emptyStateStyles, '.manager-empty h3');
+  const emptyBodyBlock = blockIn(emptyStateStyles, '.manager-empty p');
+  const emptyCompactIconBlock = blockIn(emptyStateStyles, '.manager-empty.is-compact > div > i');
   const setupCardBlock = blockFor('.fabricate-manager .manager-setup-card');
   const setupHeaderBlock = blockFor('.fabricate-manager .manager-setup-card-header');
   const setupListBlock = blockFor('.fabricate-manager .manager-setup-list');
   const setupLinksBlock = blockFor('.fabricate-manager .manager-setup-links');
 
+  // Matched to the reference prototype: a 46px rounded tile holding an 18px SUBTLE glyph,
+  // a 13px/600 serif title in the secondary tone, and an 11px body capped at 280px. The
+  // icon is deliberately quieter than the title — it used to render at 1.55rem in the full
+  // text colour and was the loudest thing in an otherwise quiet panel.
   assert.ok(
-    emptyIconBlock.includes('font-size: 1.55rem;'),
-    'generic empty-state icons should be larger than body text'
+    emptyPanelBlock.includes('border: 1.5px dashed var(--fab-border);') &&
+      emptyPanelBlock.includes('border-radius: 12px;'),
+    'the no-state panel should be a rounded 1.5px dashed panel'
+  );
+  // A shared primitive must be portable across app areas. `--fab-mv2-*` is declared on
+  // `.fabricate-manager` only, so referencing it makes the declaration invalid at
+  // computed-value time anywhere else (`.fabricate-app`, `.fabricate-admin`,
+  // `.fabricate-interactables-manager`) and the colour silently falls back to inheritance.
+  // Nothing fails; it just looks wrong, and the trigger is the reuse the primitive exists
+  // to enable. Theme-root tokens (`:root` + all seven theme blocks) resolve everywhere.
+  for (const [name, styles] of Object.entries({
+    EmptyState: emptyStateStyles,
+    Callout: calloutStyles,
+    ExplainerCard: explainerCardStyles,
+    IconFactRow: iconFactRowStyles,
+    Chip: chipStyles,
+  })) {
+    assert.equal(
+      /--fab-mv2-/.test(styles),
+      false,
+      `${name} must reference theme-root tokens, not .fabricate-manager-scoped aliases`
+    );
+  }
+  assert.ok(
+    !emptyPanelBlock.includes('min-height:'),
+    'panel height should be padding-driven as in the prototype, not floored'
   );
   assert.ok(
-    emptyLayerIconBlock.includes('font-size: 1.9rem;'),
-    'no-systems empty icon should be more prominent'
+    !emptyPanelBlock.includes('background:'),
+    'the prototype panel carries no fill'
   );
   assert.ok(
-    emptyHeadingBlock.includes('font-weight: 600;'),
-    'empty-state headings should be lighter than heavy admin titles'
+    emptyIconBlock.includes('font-size: 18px;') &&
+      emptyIconBlock.includes('color: var(--fab-text-subtle);') &&
+      emptyIconBlock.includes('background: var(--fab-surface-soft);'),
+    'the glyph should be a small subtle icon on a soft rounded tile'
+  );
+  // A per-icon OR per-screen size exception would reintroduce the inconsistency the
+  // primitive exists to remove, so every empty state shares one tile and type scale. The
+  // global sheet is checked too: it may only carry LAYOUT-CONTEXT rules for the panel, and
+  // a `font-size` reaching it through an ancestor is how the Tool Studio inspector once
+  // grew a 2rem glyph and a 1.2rem title of its own (issue 785).
+  assert.equal(
+    css.includes('.manager-empty > div > i.fa-layer-group'),
+    false,
+    'no empty-state icon should carry its own size exception'
+  );
+  for (const [selector, block] of Object.entries({
+    '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty': blockFor(
+      '.fabricate-manager .manager-task-required-tools-scroll > .manager-empty'
+    ),
+    '.fabricate-manager .manager-tool-browser-inspector-empty': blockFor(
+      '.fabricate-manager .manager-tool-browser-inspector-empty'
+    ),
+    '.fabricate-manager .manager-recipe-tab-empty': blockFor(
+      '.fabricate-manager .manager-recipe-tab-empty'
+    ),
+    '.fabricate-manager .manager-vocabulary-empty-panel': blockFor(
+      '.fabricate-manager .manager-vocabulary-empty-panel'
+    ),
+  })) {
+    assert.ok(block, `${selector} should still carry its layout-context rule`);
+    assert.equal(
+      /font-size|font-family|font-weight|border-radius|border:|background:/.test(block),
+      false,
+      `${selector} may place the shared panel, never restyle it`
+    );
+  }
+  assert.ok(
+    emptyHeadingBlock.includes('font-weight: 600;') &&
+      emptyHeadingBlock.includes('font-size: 13px;') &&
+      emptyHeadingBlock.includes('font-family: var(--fab-font-serif);'),
+    'the title should be the prototype 13px/600 serif'
   );
   assert.ok(
-    emptyHeadingBlock.includes('font-size: 0.98rem;'),
-    'empty-state headings should stay compact'
+    emptyBodyBlock.includes('font-size: 11px;') && emptyBodyBlock.includes('max-width: 280px;'),
+    'the body should be 11px and capped so it wraps into a readable column'
+  );
+  // The sidebar/inline scale is the SAME vocabulary, not a second look.
+  assert.ok(
+    emptyCompactIconBlock.includes('width: 32px;') &&
+      emptyCompactIconBlock.includes('font-size: 14px;'),
+    'the compact variant should shrink the same tile rather than restyle it'
   );
   assert.ok(
     setupCardBlock.includes('display: grid;'),
@@ -1006,6 +1161,270 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   assert.ok(
     setupLinksBlock.includes('flex-wrap: wrap;'),
     'setup links should wrap in narrow inspectors'
+  );
+});
+
+// Issue 785: the two Knowledge tabs rendered the same standing statement at two sizes —
+// a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
+// `Callout` is ONE shape for both tones; a tone that also changed the geometry or the type
+// would put the drift straight back.
+test('the shared callout keeps one shape and lets tone change only its colours', () => {
+  const calloutBlock = blockIn(calloutStyles, '.manager-callout');
+  const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i');
+  const warningBlock = blockIn(calloutStyles, '.manager-callout.is-warning');
+  const warningIconBlock = blockIn(calloutStyles, '.manager-callout.is-warning > i');
+
+  // The taller treatment — the one already approved visually — is the ONLY shape.
+  for (const declaration of [
+    'padding: var(--fab-space-3);',
+    'font-size: 0.7rem;',
+    'font-weight: 500;',
+    'line-height: 1.45;',
+    'border-radius: 8px;',
+  ]) {
+    assert.ok(calloutBlock.includes(declaration), `the callout should declare ${declaration}`);
+  }
+  assert.ok(
+    calloutBlock.includes('border: 1px solid var(--fab-info-border);') &&
+      calloutBlock.includes('background: var(--fab-info-soft);'),
+    'the default tone is info, drawn from the info token ramp'
+  );
+  assert.ok(
+    calloutIconBlock.includes('color: var(--fab-info);'),
+    'the glyph carries the tone at full strength'
+  );
+
+  // Tone is a colour concern only.
+  assert.ok(
+    warningBlock.includes('border-color: var(--fab-warning-border);') &&
+      warningBlock.includes('background: var(--fab-warning-soft);'),
+    'the warning tone repaints the edge and the fill'
+  );
+  assert.ok(
+    warningIconBlock.includes('color: var(--fab-warning);'),
+    'the warning tone repaints the glyph'
+  );
+  assert.equal(
+    /padding|font-size|font-weight|line-height|gap:/.test(warningBlock),
+    false,
+    'a tone must not change the callout geometry or type scale'
+  );
+});
+
+// Issue 881: three surfaces explained themselves three ways. The Tool Studio preview
+// rendered `.manager-tool-how-it-works` (its own bordered card, its own 0.625rem heading,
+// a glyph-led list at 0.6875rem/1.5); the Tags & Categories inspector rendered the same
+// meaning as a disc-bulleted `.manager-evidence-list` at 0.82rem AND as a bare
+// `.manager-muted` paragraph. `ExplainerCard` is the one implementation, and it reuses the
+// manager's existing card shell and card-title contract rather than restating them.
+test('the shared explainer card reuses the card shell and owns only the explainer parts', () => {
+  const titleBlock = blockIn(explainerCardStyles, '.manager-explainer-card-title');
+  const listBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list');
+  const rowBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li');
+  const rowGlyphBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li > i');
+
+  // The card shell and the heading come from the manager's ONE contract for each, applied
+  // as classes on the primitive's own elements — not re-declared in this scoped block.
+  assert.ok(
+    explainerCardSource.includes('class="manager-inspector-card manager-explainer-card"'),
+    'the explainer wears the shared side-panel card shell'
+  );
+  assert.ok(
+    explainerCardSource.includes('class="manager-card-title manager-explainer-card-title"'),
+    'the explainer title wears the shared card-title contract'
+  );
+  assert.equal(
+    /padding:|border-radius:|border: 1px|font-weight:|text-transform:|font-family:/.test(
+      titleBlock + blockIn(explainerCardStyles, '.manager-explainer-card')
+    ),
+    false,
+    'the explainer must not restate the card shell or the heading scale, weight or family'
+  );
+
+  // The body treatment is the Tool Studio's, which issue 881 names as the reference.
+  for (const declaration of [
+    'grid-template-columns: 20px minmax(0, 1fr);',
+    'font-size: 0.6875rem;',
+    'line-height: 1.5;',
+    'color: var(--fab-text-muted);',
+  ]) {
+    assert.ok(rowBlock.includes(declaration), `an explainer row should declare ${declaration}`);
+  }
+  assert.ok(listBlock.includes('list-style: none;'), 'the explainer list drops disc markers');
+  assert.ok(
+    rowGlyphBlock.includes('color: var(--fab-accent);'),
+    'the row glyph is the accent, as in the Tool Studio reference'
+  );
+
+  // Issue 883: the primitive takes a LIST of links, because the Checks rail offers two ways
+  // out of its card and a one-link primitive is exactly the incompatibility that kept a
+  // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
+  // than kept alongside — two ways to express one link is the drift this pass removes.
+  assert.ok(
+    /\blinks = \[\]/.test(explainerCardSource),
+    'the explainer takes a list of docs links'
+  );
+  for (const dead of ['docsHref', 'docsLabel']) {
+    assert.equal(
+      withoutComments(explainerCardSource).includes(dead),
+      false,
+      `${dead} was replaced by the link list and must not survive as a second way in`
+    );
+  }
+  // The link ROW is the manager's existing `.manager-setup-links` contract, reused rather
+  // than re-derived: a scoped copy of its flex/wrap/gap would be a second declaration of
+  // the same values.
+  assert.ok(
+    explainerCardSource.includes('<div class="manager-setup-links">'),
+    'the explainer links reuse the shared card-link row'
+  );
+  assert.equal(
+    /manager-explainer-card-docs\s*\{/.test(explainerCardStyles),
+    false,
+    'the explainer must not re-derive the card-link row it now reuses'
+  );
+
+  // Every re-derivation is gone from the global sheet, not merely unused: a surviving
+  // rule is what the next copy gets written against.
+  for (const dead of [
+    'manager-tool-how-it-works',
+    'manager-tool-docs-link',
+    'manager-evidence-list',
+    'manager-tool-inspector-rule-card',
+  ]) {
+    assert.equal(css.includes(dead), false, `${dead} was replaced and must not survive as CSS`);
+  }
+});
+
+// The second half of the same change: the Tool Studio built one fact row twice, from the
+// SAME `projectToolBehaviorFacts` projection, at two geometries.
+test('the shared icon fact row is one well, used by every behavior-fact surface', () => {
+  const rowBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row');
+  const glyphBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row > i');
+  const titleBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row strong');
+  const subtitleBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row small');
+
+  for (const declaration of [
+    'grid-template-columns: 28px minmax(0, 1fr);',
+    'padding: 9px 11px;',
+    'border-radius: 6px;',
+    'background: var(--fab-bg-1);',
+    'border: 1px solid var(--fab-border);',
+  ]) {
+    assert.ok(rowBlock.includes(declaration), `the fact row should declare ${declaration}`);
+  }
+  assert.ok(glyphBlock.includes('color: var(--fab-accent);'), 'the leading glyph is the accent');
+  assert.ok(titleBlock.includes('font-size: 0.76rem;'), 'the fact title keeps the reference scale');
+  assert.ok(
+    subtitleBlock.includes('font-size: 0.64rem;') &&
+      subtitleBlock.includes('color: var(--fab-text-muted);'),
+    'the qualifying line is the muted micro scale'
+  );
+
+  // The container keeps only what a scoped block cannot reach: how rows are stacked.
+  const listBlock = blockFor('.fabricate-manager .manager-tool-preview-rules > li');
+  assert.equal(
+    /border|background|padding|grid-template-columns/.test(listBlock),
+    false,
+    'the rules list must not re-derive the row it now renders through the primitive'
+  );
+});
+
+// A primitive that coexists with unconverted duplicates is a fourth way of doing the same
+// thing, so the CONTRACT MARKUP must exist in exactly one place: the primitive itself.
+test('every explainer and fact-row site renders through the primitive, not by hand', () => {
+  const managerComponents = readdirSync(managerComponentDir, {
+    recursive: true,
+    withFileTypes: true,
+  })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.endsWith('.svelte') &&
+        entry.name !== 'ExplainerCard.svelte' &&
+        entry.name !== 'IconFactRow.svelte'
+    )
+    .map((entry) => readFileSync(resolve(entry.parentPath, entry.name), 'utf8'))
+    .join('\n');
+
+  for (const dead of [
+    'manager-tool-how-it-works',
+    'manager-tool-docs-link',
+    'manager-evidence-list',
+    'manager-tool-inspector-rule-card',
+    'manager-explainer-card-list',
+    'manager-icon-fact-row',
+  ]) {
+    assert.equal(
+      managerComponents.includes(dead),
+      false,
+      `${dead} should render through the shared primitive, not hand-rolled markup`
+    );
+  }
+
+  // And the converted sites really do import it — an assertion that only deleted the old
+  // class names would pass on a screen that had simply dropped the card.
+  for (const [componentPath, imports] of [
+    ['tools/ToolBehaviorPreview.svelte', ['ExplainerCard', 'IconFactRow']],
+    ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
+    ['CraftingSystemManagerRoot.svelte', ['ExplainerCard']],
+    ['checks/ChecksRightMenu.svelte', ['ExplainerCard']],
+  ]) {
+    const source = readFileSync(resolve(managerComponentDir, componentPath), 'utf8');
+    for (const primitive of imports) {
+      assert.ok(
+        new RegExp(`import ${primitive} from '[^']*${primitive}\\.svelte'`).test(source),
+        `${componentPath} should import the shared ${primitive}`
+      );
+    }
+  }
+});
+
+// Issue 883: the Checks rail was the last manager inspector still building its own cards.
+// It rendered the standing explanation as a `.manager-setup-card` — the format the numbered
+// first-run "Set up X" procedures use — so this one rail had a card shell, a 38px icon tile
+// and a 0.98rem heading no other inspector had, sitting directly beside a `.manager-inspector-card`.
+// `.manager-setup-card` itself is NOT dead: the first-run procedures still use it, which is
+// exactly why the rail could not simply be left alone.
+test('the checks rail builds no card of its own', () => {
+  const rightMenu = withoutComments(
+    readFileSync(resolve(managerComponentDir, 'checks/ChecksRightMenu.svelte'), 'utf8')
+  );
+
+  for (const dead of [
+    'manager-setup-card',
+    'manager-setup-card-header',
+    'manager-setup-links',
+    'manager-setup-list',
+  ]) {
+    assert.equal(
+      rightMenu.includes(dead),
+      false,
+      `${dead} is the first-run procedure format; the checks rail must not borrow it`
+    );
+  }
+
+  // Both cards on the rail wear the shared shell, and the Active card titles itself with
+  // the manager's one card-title contract rather than a second heading treatment.
+  assert.ok(
+    rightMenu.includes('<section class="manager-inspector-card" data-checks-active={activeTab}>'),
+    'the Active card wears the shared inspector-card shell'
+  );
+  assert.ok(
+    rightMenu.includes('<h3 class="manager-card-title">{activeTitle}</h3>'),
+    'the Active card titles itself with the shared card-title contract'
+  );
+  assert.equal(
+    rightMenu.includes('manager-kicker'),
+    false,
+    'the rail should carry no second heading treatment'
+  );
+
+  // The procedure format stays available to the surfaces it belongs to, so this is a
+  // conversion rather than a deletion.
+  assert.ok(
+    css.includes('.fabricate-manager .manager-setup-card {'),
+    'the first-run procedure card keeps its own format'
   );
 });
 
@@ -1301,9 +1720,13 @@ test('manager recipes browser defines a non-overflowing card row', () => {
     rowBlock.includes('padding: 11px 12px;'),
     'the recipe row uses the library card padding'
   );
-  assert.ok(
-    rowBlock.includes('border-radius: 9px;'),
-    'the recipe row uses the library card radius'
+  // The recipe row's own radius (9px) was retired by issue 883: the edge, corner and fill
+  // are the ONE browser-row treatment now, so the row block must declare none of them.
+  // Asserting their ABSENCE is what stops the copy being written back in.
+  assert.equal(
+    /border-radius:|border: 1px|background:/.test(rowBlock),
+    false,
+    'the recipe row must not restate the shared browser-row edge, corner or fill'
   );
 
   // A disabled row reads at .55, not .62 — far enough back that a page of rows separates
@@ -1345,10 +1768,14 @@ test('manager recipe row collapses in the specified order and never drops its co
   // is no longer rendered in the row at all — the track colour is the state, the aria-label
   // names it, and the Disabled pill says it in words — so the rung is gone rather than left
   // as a rule matching nothing.
+  // Each rung moved out by 34px for issue 1010 — the 22px bulk selection track plus one
+  // more 12px grid gap — so every band gives the identity cell exactly the room it did
+  // before. Holding the thresholds fixed would have spent the identity's own budget on the
+  // checkbox; the arithmetic is stated beside the ladder in the sheet.
   const LADDER = [
-    [680, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
-    [600, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
-    [520, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
+    [714, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
+    [634, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
+    [554, '.fabricate-manager .manager-recipe-row .manager-recipe-check'],
   ];
 
   for (const [width, selector] of LADDER) {
@@ -1386,6 +1813,82 @@ test('manager recipe row collapses in the specified order and never drops its co
   assert.ok(
     nameBlock.includes('flex: 0 1 auto;') && nameBlock.includes('min-width: 0;'),
     'the name is what gives way, so the pills stay readable'
+  );
+});
+
+// Issue 1010 — the bulk selection column. It is APPENDED to the cluster template rather
+// than prepended, and that is what makes the column header's four explicit `grid-column`
+// placements survive: a prepend would have shifted every one of them by a track.
+//
+// The ladder rewrites the template at each rung, so "appended" has to hold in ALL THREE
+// declarations — the base and the two rungs — or the checkbox lands under the edit pencil
+// at the very widths where the row is tightest.
+test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
+  const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(([, value]) =>
+    value.replace(/\s+/g, ' ').trim()
+  );
+  assert.equal(
+    declarations.length,
+    3,
+    'the base template plus the ladder\'s two rewrites — a fourth would be an unpinned band'
+  );
+
+  for (const declaration of declarations) {
+    const tracks = [...declaration.matchAll(/var\(--fab-recipe-col-([a-z]+)\)/g)].map(
+      ([, name]) => name
+    );
+    assert.equal(
+      tracks.at(-1),
+      'select',
+      `the select track must be LAST in "${declaration}" — the header placements assume an append`
+    );
+    // Never dropped: a truncated readout is a compromise, a selection the GM cannot reach
+    // is a control that has silently stopped working.
+    assert.equal(
+      tracks.filter((track) => track === 'select').length,
+      1,
+      'the select track appears exactly once in every band'
+    );
+  }
+
+  assert.ok(
+    blockFor('.fabricate-manager .manager-recipes-table').includes(
+      '--fab-recipe-col-select: 22px;'
+    ),
+    'the track is the SelectionCheckbox `lg` box, declared rather than derived'
+  );
+});
+
+// The two multi-select browsers state the ticked-row treatment ONCE. A per-studio copy is
+// the variant the shared-primitive rule refuses, and it would drift the moment either
+// surface is re-toned.
+test('the bulk-selected row state is one joined selector across both studios', () => {
+  assert.ok(
+    css.includes(
+      '.fabricate-manager .manager-component-row.is-bulk-selected,\n.fabricate-manager .manager-recipe-row.is-bulk-selected {'
+    ),
+    'the recipe row JOINS the component row rule rather than authoring a second block'
+  );
+  for (const row of ['manager-component-row', 'manager-recipe-row']) {
+    assert.equal(
+      (css.match(new RegExp(`\\.${row}\\.is-bulk-selected`, 'g')) || []).length,
+      1,
+      `${row}.is-bulk-selected must be written exactly once`
+    );
+  }
+
+  // The selection ROW joins the same way, for the same reason: one primitive renders it in
+  // both toolbars and its `rowClass` prop picks which half applies.
+  assert.ok(
+    css.includes(
+      '.fabricate-manager .manager-recipe-filter-row.is-selection,\n.fabricate-manager .manager-component-filter-row.is-selection {'
+    ),
+    'the recipe toolbar joins the selection-row block rather than authoring a second one'
+  );
+  assert.equal(
+    css.includes('has no selection row at all'),
+    false,
+    'that block\'s stated reason is retired by issue 1010 and must not survive as a false claim'
   );
 });
 
@@ -1505,13 +2008,19 @@ test('the typographic contract sets names in the serif and numerics in the mono 
   }
 
   const MONO = [
-    '.fabricate-manager .manager-chip.is-mono',
-    '.fabricate-manager .manager-editor-tab-badge',
+    // Read out of `Chip.svelte`'s scoped block, since the chip owns its own appearance
+    // (issue 883); everything else in this list is still global-sheet.
+    '.manager-chip.is-mono',
+    // Three classes deliberately, so it outranks the scoped chip block rather than tying
+    // with it and losing on source order (issue 883).
+    '.fabricate-manager .manager-chip.manager-editor-tab-badge',
     '.fabricate-manager .manager-environment-comp-order',
     '.fabricate-manager .manager-nav-count',
   ];
   for (const selector of MONO) {
-    const block = blockFor(selector);
+    const block = selector.startsWith('.manager-chip')
+      ? blockIn(chipStyles, selector)
+      : blockFor(selector);
     assert.ok(
       block.includes('font-family: var(--fab-font-mono);'),
       `${selector} renders a number and belongs in the mono face`
@@ -1736,7 +2245,11 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-tools-row-editor .manager-drop-rate-percent input[type="text"]'
   );
   const componentPillsBlock = blockFor('.fabricate-manager .manager-task-component-pills');
-  const selectedTagPillBlock = blockFor('.fabricate-manager .manager-selected-tag-pill');
+  // Three classes since issue 883: the pill is a `Chip`, whose scoped block also sits at
+  // two classes and is injected after this sheet, so the two-class form would lose.
+  const selectedTagPillBlock = blockFor(
+    '.fabricate-manager .manager-chip.manager-selected-tag-pill'
+  );
   const dropCardBlock = blockFor('.fabricate-manager .manager-task-drops-card');
   const dropHeaderBlock = blockFor(
     '.fabricate-manager .manager-task-drops-card .manager-task-card-header'
@@ -1868,13 +2381,13 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
   const dropEditorValuesBlock = blockFor('.fabricate-manager .manager-drop-editor-values');
   const dropEditorRatePercentBlock = blockFor(
-    '.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="text"]'
+    '.fabricate-manager .manager-drop-editor-card .manager-drop-rate-percent input[type="number"]'
   );
   const dropEditorRateValueBlock = blockFor(
     '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-value'
   );
   const dropEditorRateInputBlock = blockFor(
-    '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="text"]'
+    '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input[type="number"]'
   );
   const dropEditorRateSuffixBlock = blockFor(
     '.fabricate-manager .manager-drop-editor-card [data-gathering-drop-inspector-rate] .manager-drop-rate-percent > span[aria-hidden="true"]'
@@ -2944,9 +3457,12 @@ test('manager components browser defines drop target and compact responsive list
   }
   // The row geometry matches the recipe row, not the 76px group it left.
   assert.ok(rowBlock.includes('min-height: 62px;'), 'the component row is the denser ~62px card');
-  assert.ok(
-    rowBlock.includes('border-radius: 9px;'),
-    'the component row takes the recipe row radius'
+  // As for the recipe row: issue 883 retired the per-surface 9px corner in favour of the
+  // one shared browser-row treatment, so the row block declares size and nothing else.
+  assert.equal(
+    /border-radius:|border: 1px|background:/.test(rowBlock),
+    false,
+    'the component row must not restate the shared browser-row edge, corner or fill'
   );
   assert.ok(
     dropBlock.includes('grid-template-columns: 42px minmax(0, 1fr);'),
@@ -3902,8 +4418,11 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   // in the file, squared the dot and stretched it to fill the flex line.
   // `.manager-component-inline-control` joins it because it renders OUTSIDE a
   // `.manager-field` and would otherwise inherit Foundry's native control.
+  // `:not([type='range'])` (issue 883) excludes the chance slider, whose 6px track and
+  // coloured fill are painted BEHIND a transparent input that this rule was stretching to
+  // 36px and filling opaquely.
   const fieldInputBlock = blockFor(
-    ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']),\n" +
+    ".fabricate-manager .manager-field input:not(.fab-stepper-input):not([type='radio']):not([type='range']),\n" +
       '.fabricate-manager .manager-field select,\n' +
       '.fabricate-manager .manager-component-inline-control'
   );
@@ -4398,6 +4917,513 @@ test('every view-specific manager-body grid override narrows the rail column whe
   }
 });
 
+// The GM Knowledge surface (issue 785). Its layout is FIVE pieces, and the failure
+// mode of doing only some of them is silent: a dead 300px inspector strip, or an
+// action cluster clipped with no scrollbar. The paired `.is-rail-collapsed` sibling
+// is already covered by the generic guard above; the rest is pinned here.
+test('the Knowledge surface owns its third column and wraps its row action clusters', () => {
+  const bodyBlock = blockFor('.fabricate-manager[data-manager-view="knowledge"] .manager-body');
+  const collapsedBlock = blockFor(
+    '.fabricate-manager[data-manager-view="knowledge"] .manager-body.is-rail-collapsed'
+  );
+  // `display: contents` is authored ONCE for every view that owns its own columns,
+  // so the Knowledge main shares the Tool editor's rule rather than restating it.
+  const mainBlock = blockFor(
+    '.fabricate-manager .manager-tool-edit-main,\n.fabricate-manager .manager-knowledge-main'
+  );
+  const rowBlock = blockFor(
+    '.fabricate-manager .manager-knowledge-copy-row,\n.fabricate-manager .manager-knowledge-learned-row'
+  );
+  const copyColumnBlock = blockFor('.fabricate-manager .manager-knowledge-copy-identity');
+  const factBlock = blockFor('.fabricate-manager .manager-knowledge-fact-cluster .manager-fact');
+  const spentBlock = blockFor(
+    '.fabricate-manager .manager-knowledge-copy-row.is-spent .manager-knowledge-copy-name'
+  );
+
+  assert.ok(
+    bodyBlock.includes('grid-template-columns: 220px 250px minmax(0, 1fr);'),
+    'the knowledge route re-templates the body as rail, roster, detail'
+  );
+  assert.ok(
+    collapsedBlock.includes('grid-template-columns: 56px 250px minmax(0, 1fr);'),
+    'the collapsed rail keeps the roster and detail columns'
+  );
+  assert.ok(
+    mainBlock.includes('display: contents;'),
+    "the view's own main must not become a fourth grid item"
+  );
+  // The 832-1000px band is the real hazard: three columns still hold while the
+  // detail pane is at its narrowest, so the action cluster has to wrap.
+  assert.ok(rowBlock.includes('flex-wrap: wrap;'), 'rows wrap rather than clip');
+  assert.ok(copyColumnBlock.includes('min-width: 0;'), 'the copy column may shrink');
+  assert.ok(
+    factBlock.includes('width: auto;'),
+    '.manager-fact is authored width:100% for grids and must hug content in this flex cluster'
+  );
+  // A spent row is muted by COLOUR on its name, never by a group `opacity`: a group
+  // dim composites the chips — the row's only status signal — below the 4.5:1 floor
+  // their 10px text needs, in six of the seven themes. And `.manager-button:disabled`
+  // already carries opacity 0.62, so a row-level dim would take the disabled Expend
+  // button to about 0.38.
+  assert.ok(
+    spentBlock.includes('color: var(--fab-mv2-text-muted);'),
+    'the spent row is muted by colour on its name'
+  );
+  assert.equal(
+    spentBlock.includes('opacity'),
+    false,
+    'the spent state must not use a group opacity'
+  );
+  for (const forbidden of [
+    '.manager-knowledge-copy-row.is-spent .manager-knowledge-row-actions',
+    '.manager-knowledge-copy-row.is-spent .manager-knowledge-copy-identity',
+    '.manager-knowledge-copy-row.is-spent .manager-knowledge-copy-chips',
+  ]) {
+    assert.equal(css.includes(forbidden), false, `the spent mute must not reach ${forbidden}`);
+  }
+  assert.ok(
+    css.includes(
+      '  .fabricate-manager[data-manager-view="knowledge"] .manager-body,\n  .fabricate-manager[data-manager-view="knowledge"] .manager-body.is-rail-collapsed {'
+    ),
+    'the knowledge surface collapses to one column in the 831px container query'
+  );
+});
+
+// Every Knowledge rule that an existing rule already expressed is authored ONCE, as a
+// joined selector list. A byte-identical second block is what the maintainer's
+// "do not duplicate CSS for minor variations" instruction rules out, and it is also
+// what SonarCloud's duplication gate reads.
+test('the Knowledge surface joins the rules it shares instead of restating them', () => {
+  const occurrences = (needle) => css.split(needle).length - 1;
+
+  for (const [shared, ruleOpener, expected] of [
+    [
+      '.fabricate-manager .manager-tool-edit-main,\n.fabricate-manager .manager-knowledge-main {',
+      '.manager-knowledge-main {',
+      1,
+    ],
+    // The compact chip scale used to be a fourth entry here — an opt-in join listing the
+    // Tools library and the two Knowledge row containers. Issue 883 made the compact scale
+    // the ONLY scale, owned by `Chip.svelte`, so there is no join left to assert; its
+    // absence is checked by the chip's own contract test instead.
+    [
+      // The Tool Studio editor's Back/Delete/Save cluster is canonical for action-button
+      // scale; the Knowledge row actions and reset cluster join it rather than restating
+      // min-height/padding/font-size.
+      '.fabricate-manager .manager-tool-edit-actions .manager-button,\n' +
+        '.fabricate-manager .manager-knowledge-row-actions .manager-button,\n' +
+        '.fabricate-manager .manager-knowledge-reset-actions .manager-button {',
+      '.manager-knowledge-reset-actions .manager-button {',
+      1,
+    ],
+    [
+      '.fabricate-manager .manager-access-roster .manager-search,\n.fabricate-manager .manager-knowledge-roster .manager-search {',
+      // The class the markup used to carry solely to re-derive the Access roster's
+      // rule; it is gone from both the stylesheet and the component.
+      '.manager-knowledge-roster-search',
+      0,
+    ],
+  ]) {
+    assert.ok(css.includes(shared), `expected the joined rule ${shared}`);
+    assert.equal(
+      occurrences(ruleOpener),
+      expected,
+      `${ruleOpener} should appear ${expected} time(s) — a second block is a restatement`
+    );
+  }
+
+  // Class names that carry no CSS and no consumer: each sat beside a `data-knowledge-*`
+  // attribute already doing the hook job.
+  //
+  // The second block (issue 785) is the bespoke no-state and standing-statement classes the
+  // shared `EmptyState` / `Callout` primitives replaced. Each was a per-screen re-derivation
+  // of one meaning — a dashed panel, an icon tile, or a bare "nothing here" sentence — and
+  // leaving any of them in the sheet is how the next copy gets written against it.
+  const retired = [
+    'manager-knowledge-quantity-chip',
+    'manager-knowledge-type-pill',
+    'manager-knowledge-uses-chip',
+    'manager-knowledge-inert-chip',
+    'manager-knowledge-match-chip',
+    'manager-knowledge-category-pill',
+    'manager-knowledge-expend',
+    // Central no-state panels that were hand-rolled beside the primitive.
+    'manager-recipe-empty-filtered',
+    'manager-component-empty-filtered',
+    'manager-recipe-section-empty',
+    'manager-vocabulary-empty-icon',
+    'manager-vocabulary-noresults',
+    // Bare inline "nothing here" sentences with their own bespoke class.
+    'manager-travel-empty-hint',
+    'manager-environment-comp-empty',
+    'manager-character-modifier-empty',
+    'manager-character-modifier-row-empty',
+    'manager-condition-modifier-row-empty',
+    'manager-recipe-item-prereq-empty',
+    'manager-travel-map-links-empty',
+    'manager-travel-realms-empty',
+    'manager-travel-parties-empty',
+    'manager-recipe-tools-empty',
+    'manager-recipe-tags-empty',
+    // The per-screen re-size of the shared warning band.
+    'manager-knowledge-learned-band',
+    // The Knowledge page-header roll-up pill: every other browser surface reports its
+    // count in the nav-rail badge, so a header pill was a one-screen divergence.
+    'manager-knowledge-header-pills',
+    // The reserved row's inline explanatory sentence: ellipsised to fit one line it
+    // truncated to "Built…", so it became the row's tooltip instead (issue 878).
+    'manager-vocabulary-locked-hint',
+    // The third block (issue 772): classes retired by extracting three shared primitives
+    // and CONVERTING the duplicates that would otherwise have sat beside them. A primitive
+    // whose duplicate survives has added a variant rather than removed one, so each of
+    // these names is the proof that the conversion actually happened.
+    //
+    // The Tool Studio checklist row's hand-rolled check box, now `SelectionCheckbox`.
+    'manager-checklist-card-check',
+    // The component editor's hand-rolled tag pill, now `Chip tone="tag"`.
+    //
+    // The CONTAINER is retired with it, and that is not tidiness: this assertion is a bare
+    // `css.includes(dead)` substring test, and `manager-component-tag-toggles` (plural)
+    // CONTAINS `manager-component-tag-toggle`. Left in the sheet as layout context under
+    // the "layout stays global" rule, it would have kept the singular entry below true
+    // forever and made this ratchet impossible to satisfy. The surviving run is
+    // `manager-component-tag-run`.
+    'manager-component-tag-toggles',
+    'manager-component-tag-toggle',
+    // The component editor's hand-rolled −/input/+ essence row, now the shared `Stepper`
+    // inside `EssenceQuantityCard`. The card's own appearance classes are deliberately NOT
+    // here: they MOVED into that component's scoped block rather than dying, so they are
+    // absent from the sheet for a different reason and are still rendered.
+    'manager-component-essence-stepper',
+    'manager-component-essence-quantity',
+  ];
+  for (const dead of retired) {
+    assert.equal(css.includes(dead), false, `${dead} carries no CSS and should not exist`);
+  }
+
+  // And they must be gone from the MARKUP too, not merely unstyled: an unconverted site is
+  // what makes a primitive a fourth way of doing the same thing.
+  const managerComponents = readdirSync(managerComponentDir, {
+    recursive: true,
+    withFileTypes: true,
+  })
+    // The primitives themselves are the ONE place the contract markup may be written.
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.endsWith('.svelte') &&
+        entry.name !== 'EmptyState.svelte' &&
+        entry.name !== 'Callout.svelte'
+    )
+    // COMMENTS ARE NOT MARKUP. This half asks whether a retired class is still RENDERED;
+    // a component that documents why it stopped rendering one is the opposite of the
+    // failure, and several already do. Stripping the two block-comment forms — Svelte's
+    // `<!-- -->` doc block and the `/* */` used inside `<script>` — is what lets the list
+    // below be the ratchet's own list rather than a hardcoded pair (issue 772).
+    .map((entry) =>
+      readFileSync(resolve(entry.parentPath, entry.name), 'utf8')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+    )
+    .join('\n');
+  // The markup half used to walk a HARDCODED two-string list, which made it vacuous for
+  // every name added to the ratchet after it was written: a retired class could be deleted
+  // from the sheet and left rendering in a component, and both halves would still pass. It
+  // walks the SAME list now, so retiring a name is one edit and both halves bite.
+  for (const dead of [...retired, 'class="manager-empty', 'manager-recipe-section-empty"']) {
+    assert.equal(
+      managerComponents.includes(dead),
+      false,
+      `${dead} should render through the shared primitive, not hand-rolled markup`
+    );
+  }
+});
+
+// Issue 883: eight manager browser rows and value cards each declared their own edge,
+// corner and fill, and had already drifted to three corner radii (8px, 9px, 10px) and two
+// fills. The Tool Studio's row is canonical, and every other surface JOINS it.
+//
+// This guard is deliberately two-sided. Asserting the joined rule exists proves the shared
+// treatment is authored; asserting each row block no longer carries the properties proves
+// no surface kept a private copy, which is the failure mode a one-sided check misses.
+test('every manager browser row joins ONE edge, corner and fill treatment', () => {
+  const occurrences = (needle) => css.split(needle).length - 1;
+
+  const ROWS = [
+    // The canonical row, and the value card issue 883 names as the furthest drifted.
+    '.manager-tools-row',
+    '.manager-vocabulary-card',
+    '.manager-system-row',
+    '.manager-recipe-row',
+    '.manager-component-row',
+    '.manager-environment-row',
+    '.manager-gathering-task-row',
+    '.manager-gathering-event-row',
+    // Not in issue 883's list, but it shared the geometry group with the environment and
+    // gathering-task rows: converting those two and leaving it behind would have made it
+    // the one surviving per-surface copy of the very treatment being unified.
+    '.manager-essence-row',
+  ];
+
+  const shared = `${ROWS.map((row) => `.fabricate-manager ${row}`).join(',\n')} {`;
+  // Counted on the WHOLE selector list, not on its last selector. The Knowledge guard
+  // above can anchor on its last selector because that one is unique; every row class
+  // here legitimately opens other blocks too (a grid template, a responsive override),
+  // so only the full list identifies this rule.
+  assert.equal(
+    occurrences(shared),
+    1,
+    'the browser-row treatment should be authored exactly once, as one join'
+  );
+
+  const treatment = blockIn(css, shared.slice(0, -2));
+  for (const declaration of [
+    'border: 1px solid var(--fab-mv2-border);',
+    'border-radius: 8px;',
+    'background: var(--fab-overlay-light-03);',
+  ]) {
+    assert.ok(treatment.includes(declaration), `the shared row treatment declares ${declaration}`);
+  }
+
+  // No surface restates it, in ANY of its blocks — a private copy hiding in a later
+  // override is exactly what a first-match-only check would miss. The retired values were
+  // `border-radius: 9px` (recipe, component), `border-radius: 10px` (the vocabulary card)
+  // and a solid `--fab-mv2-surface-2` fill on six of the nine.
+  for (const row of ROWS) {
+    const escaped = row.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const blocks = [
+      ...css.matchAll(new RegExp(`\\.fabricate-manager ${escaped}\\s*\\{[\\s\\S]*?\\}`, 'g')),
+    ].map(([block]) => block);
+    for (const block of blocks) {
+      // The shared rule itself matches here, starting at whichever of its selectors this
+      // is, so every such match is a SUFFIX of the treatment block rather than equal to
+      // it. Skipping on containment covers both, and a genuine restatement can only be
+      // skipped by being byte-identical to a suffix of the shared rule — i.e. by being it.
+      if (treatment.includes(block)) continue;
+      assert.equal(
+        /border-radius:|border: 1px solid|background: var\(--fab-mv2-surface-2\);/.test(block),
+        false,
+        `${row} must not restate the shared browser-row treatment:\n${block}`
+      );
+    }
+  }
+
+  // The selected Tool Studio row moved the EDGE only. It used to repaint the identical
+  // fill, which is the same statement made twice.
+  assert.equal(
+    blockFor('.fabricate-manager .manager-tools-row.is-selected').includes('background:'),
+    false,
+    'selection changes the edge, not the fill it already shares'
+  );
+});
+
+// Issue 883: the chip had two scales. The base `.manager-chip` rule in the global sheet was
+// 24px/`0.75rem`/700, and the Tool Studio and Knowledge surfaces opted OUT of it through a
+// three-selector join restating a compact 20px/`0.62rem`/1 scale — so chips out-sized the
+// Tool Studio's everywhere else, and fixing a screen meant lengthening that join.
+//
+// `Chip.svelte` is the one implementation and the compact scale is simply what a chip is.
+test('the shared chip owns ONE scale, and no surface can opt into a second', () => {
+  const chipBlock = blockIn(chipStyles, '.manager-chip');
+
+  for (const declaration of [
+    'min-height: 20px;',
+    // Vertical padding is REAL, not min-height slack. At `padding: 0` the space above and
+    // below a single line was only the gap between the 20px min-height and a 9.92px line
+    // box; a wrapped label spent it and sat flush against the border. 4px keeps a
+    // single-line chip at 17.92px — under the min-height, so unchanged — while a wrapped
+    // one keeps its padding (issue 883).
+    'padding: var(--fab-space-1) var(--fab-space-chip);',
+    'font-size: 0.62rem;',
+    'line-height: 1;',
+  ]) {
+    assert.ok(chipBlock.includes(declaration), `the chip declares the compact ${declaration}`);
+  }
+
+  // 10px is the SAME as 999px at the 20px single-line height (999px clamps to half the
+  // shorter side), so a normal chip is unchanged; they diverge only once a chip wraps,
+  // where a stadium around two lines reads as broken. The pill returns for `truncate`,
+  // which is single-line by construction.
+  assert.ok(
+    chipBlock.includes('border-radius: 10px;'),
+    'the chip radius must follow a wrap rather than drawing a stadium around two lines'
+  );
+  assert.ok(
+    blockIn(chipStyles, '.manager-chip.is-truncated').includes('border-radius: 999px;'),
+    'a truncated chip is single-line, so it keeps the pill'
+  );
+
+  // The opt-in join is gone from the global sheet, not merely unused: a surviving rule is
+  // what the next screen gets added to.
+  assert.equal(
+    css.includes('.manager-tools-library-chips .manager-chip'),
+    false,
+    'the opt-in compact-scale join must not survive'
+  );
+  assert.equal(
+    css.includes('.manager-tool-inspector-hero .manager-chip'),
+    false,
+    'the Tool inspector hero must not keep its own copy of the compact scale'
+  );
+
+  // Tone is COLOUR only. A tone that resized would rebuild the very drift the primitive
+  // removes, so no tone rule may carry a size property.
+  for (const tone of ['is-active', 'is-warning', 'is-info', 'is-danger', 'is-neutral']) {
+    const toneBlock = blockIn(chipStyles, `.manager-chip.${tone}`);
+    assert.equal(
+      /min-height:|padding:|font-size:|line-height:/.test(toneBlock),
+      false,
+      `${tone} must change colour only, never the chip's size`
+    );
+  }
+
+  // Any global rule that still needs to beat a chip declaration must be written at three
+  // classes or more. At two it TIES with the scoped `.manager-chip.svelte-<hash>` block and
+  // loses on source order, because `css: 'injected'` puts component CSS after the sheet —
+  // a silent regression no mounted test can see. The tab badge is the live case: it is
+  // deliberately SMALLER than a chip (18px/0.56rem) and would otherwise grow back.
+  assert.ok(
+    css.includes('.fabricate-manager .manager-chip.manager-editor-tab-badge {'),
+    'the smaller tab badge must outrank the chip block on specificity, not source order'
+  );
+  assert.equal(
+    css.includes('.fabricate-manager .manager-editor-tab-badge {'),
+    false,
+    'the two-class form would tie with the scoped chip block and lose'
+  );
+});
+
+// A staged conversion needs a ratchet, or it stalls half-done and the primitive becomes a
+// fourth variant. This pinned the EXACT set of files still rendering a chip by hand: a new
+// hand-rolled site failed because the file was not on the list, and a converted one failed
+// because a listed file no longer matched. Both directions are what made it a ratchet
+// rather than a fading reminder — the list could only shrink, and it had to reach empty.
+//
+// It IS empty: every manager chip renders through `Chip.svelte`, and the global base rule
+// and its eight tone rules are gone from the sheet, so a hand-rolled `manager-chip` would
+// now render unstyled as well as failing here. The test STAYS at empty — that is what it
+// is for. It is the assertion that stops the next screen from starting the drift again.
+test('every remaining hand-rolled chip site is declared, so the migration can only shrink', () => {
+  const UNCONVERTED = [];
+
+  const remaining = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'))
+    .map((entry) => ({
+      path: resolve(entry.parentPath, entry.name),
+      // POSIX, relative to the manager directory, so the list reads the same on every OS.
+      name: relative(managerComponentDir, resolve(entry.parentPath, entry.name)).replaceAll(
+        '\\',
+        '/'
+      ),
+    }))
+    // `Chip.svelte` IS the contract markup and is the one place it may be written.
+    .filter(({ name }) => name !== 'Chip.svelte')
+    // Matched anywhere in the file, not just in a `class=` attribute: one site passes the
+    // chip classes to another component as a STRING prop (`RecipeIngredientGroupCard`'s
+    // `triggerClass`), and an attribute-shaped check silently missed it. `manager-chip-row`
+    // and `manager-chip-field` are CONTAINERS, not chips, so the token must not match those
+    // or the ratchet could never reach empty.
+    .filter(({ path }) => /\bmanager-chip\b(?!-)/.test(readFileSync(path, 'utf8')))
+    .map(({ name }) => name)
+    .sort();
+
+  assert.deepEqual(
+    remaining,
+    [...UNCONVERTED].sort(),
+    'the hand-rolled chip list may only shrink: convert the file and delete its entry'
+  );
+});
+
+test('the armed danger button paints a solid danger fill with its own readable foreground', () => {
+  const armedBlock = blockFor('.fabricate-manager .manager-button.is-danger.is-armed');
+  const rosterRowBlock = blockFor('.fabricate-manager .manager-knowledge-roster-row');
+  const rosterFocusBlock = blockFor(
+    '.fabricate-manager .manager-knowledge-roster-row:focus-visible'
+  );
+
+  assert.ok(armedBlock.includes('background: var(--fab-danger);'), 'armed uses the danger fill');
+  assert.ok(
+    armedBlock.includes('border-color: var(--fab-danger);'),
+    'armed uses the danger edge'
+  );
+  assert.ok(
+    armedBlock.includes('color: var(--fab-on-danger);'),
+    'armed text uses the dedicated on-danger token, not on-accent or danger-text'
+  );
+
+  // Without the reset, the host's fixed global button height crops the roster
+  // portrait — a defect no mounted test can see, because it does not compute the
+  // host cascade. Modelled on `.manager-tools-select-target`.
+  for (const declaration of [
+    'appearance: none;',
+    'height: auto;',
+    'min-height: 52px;',
+    'justify-content: flex-start;',
+  ]) {
+    assert.ok(
+      rosterRowBlock.includes(declaration),
+      `the roster row should reset ${declaration} like the tools select target`
+    );
+  }
+  assert.ok(
+    rosterFocusBlock.includes('outline: 2px solid var(--fab-mv2-accent);'),
+    'the roster row owns its keyboard focus ring'
+  );
+});
+
+// The one Knowledge hazard source text cannot prove: at 832-1000px three columns
+// still hold while the detail pane is at its narrowest, so a non-wrapping row clips
+// its action cluster with no scrollbar. Measured, not asserted from CSS text.
+async function readRenderedKnowledgeGeometry(width) {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width, height: 720 }, deviceScaleFactor: 1 });
+  try {
+    // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
+    // whole state vocabulary as chips on line 2.
+    const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="manager-button">Expend use</button><button class="manager-button is-danger">Delete</button></span></li>`;
+    await page.setContent(
+      withChipHash(`<style>${css}</style><style>${chipCss}</style><div style="width:${width}px;height:686px"><div class="fabricate-manager" data-manager-view="knowledge"><div class="manager-body"><aside class="manager-rail">Rail</aside><main class="manager-main manager-knowledge-main" data-knowledge-view><section class="manager-knowledge-roster"><label class="manager-search"><input type="search"></label><div class="manager-knowledge-roster-scroll"><div class="manager-knowledge-roster-list"><button class="manager-knowledge-roster-row"><span class="fab-medallion" style="width:34px;height:34px"></span><span class="manager-knowledge-roster-copy"><strong class="manager-knowledge-roster-name">Aria Thorn</strong><small class="manager-knowledge-roster-meta">2 item(s) · 3 learned</small></span></button></div></div></section><section class="manager-knowledge-detail"><header class="manager-knowledge-detail-header"><div class="manager-knowledge-detail-identity"><div class="manager-knowledge-detail-copy"><h2 class="manager-knowledge-detail-name">Aria Thorn</h2></div></div><div class="manager-knowledge-fact-cluster"><div class="manager-fact"><span class="manager-fact-line"><strong>2</strong> <span class="manager-fact-label">Recipe items</span></span></div><div class="manager-fact"><span class="manager-fact-line"><strong>3</strong> <span class="manager-fact-label">Learned recipes</span></span></div></div><div class="manager-knowledge-reset-actions"><button class="manager-button is-danger">Reset this system</button><button class="manager-button is-danger">Reset all systems</button></div></header><div class="manager-editor-tabs manager-knowledge-tabs"><button class="manager-editor-tab-button is-active">Recipe items</button><button class="manager-editor-tab-button">Learned recipes</button></div><section class="manager-editor-tab-panel manager-knowledge-panel"><div class="manager-knowledge-tab-body"><ul class="manager-knowledge-row-list">${row}</ul></div></section></section></main></div></div></div>`)
+    );
+    return await page.evaluate(() => {
+      const box = (selector) => {
+        const value = document.querySelector(selector)?.getBoundingClientRect();
+        return value ? { left: value.left, right: value.right, width: value.width } : null;
+      };
+      const root = document.querySelector('.fabricate-manager');
+      const rowNode = document.querySelector('.manager-knowledge-copy-row');
+      return {
+        rail: box('.manager-rail'),
+        roster: box('.manager-knowledge-roster'),
+        detail: box('.manager-knowledge-detail'),
+        row: box('.manager-knowledge-copy-row'),
+        actions: box('.manager-knowledge-row-actions'),
+        inspectorPresent: Boolean(document.querySelector('.manager-inspector')),
+        rowOverflow: rowNode.scrollWidth > rowNode.clientWidth + 1,
+        overflow: root.scrollWidth > root.clientWidth + 1,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+test('Knowledge keeps a rail/roster/detail triptych with unclipped row actions from 1000px to 832px', async () => {
+  for (const width of [1212, 1000, 880, 832]) {
+    const report = await readRenderedKnowledgeGeometry(width);
+    assert.equal(Math.round(report.rail.width), 220, `${width}px rail column`);
+    assert.equal(Math.round(report.roster.width), 250, `${width}px roster column`);
+    assert.ok(report.roster.left >= report.rail.right - 1, `${width}px roster follows the rail`);
+    assert.ok(report.detail.left >= report.roster.right - 1, `${width}px detail follows the roster`);
+    assert.equal(report.inspectorPresent, false, `${width}px no fourth inspector column`);
+    assert.ok(
+      report.actions.right <= report.row.right + 1,
+      `${width}px row actions stay inside the row`
+    );
+    assert.equal(report.rowOverflow, false, `${width}px row does not overflow`);
+    assert.equal(report.overflow, false, `${width}px surface does not overflow`);
+  }
+});
+
 test('recipe tag chips zero their list-item margins so a host list rule cannot inflate one chip', async () => {
   // Regression: chips are <li>s, and a host (Foundry) global list rule giving
   // non-last items a margin-bottom inflated only the first chip's box (e.g. it
@@ -4417,6 +5443,7 @@ test('recipe tag chips zero their list-item margins so a host list rule cannot i
           <meta charset="utf-8">
           <style>
             ${css}
+            ${chipCss}
             body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
             /* Simulate a host global list rhythm declared after our stylesheet. */
             li:not(:last-child) { margin-bottom: 4px; }
@@ -4481,6 +5508,7 @@ test('recipe tag list spans the full row width on its own line below the control
           <meta charset="utf-8">
           <style>
             ${css}
+            ${chipCss}
             body { margin: 0; padding: 24px; font-family: Arial, sans-serif; }
             .harness-row-width { width: 600px; }
             .fas::before, .fa-solid::before { content: "x"; }
@@ -4501,9 +5529,14 @@ test('recipe tag list spans the full row width on its own line below the control
                 </div>
                 <div class="manager-recipe-option-tags-detail">
                   <div class="manager-recipe-option-tags-controls">
-                    <div class="manager-recipe-tag-match-toggle">
-                      <button type="button" class="manager-recipe-tag-match-option is-selected">Any</button>
-                      <button type="button" class="manager-recipe-tag-match-option">All</button>
+                    <!-- The Any/All control is the shared SegmentedControl (issue 975).
+                         Its track/segment styling lives in that component's SCOPED style
+                         block, not in fabricate.css, so this fixture reproduces only the
+                         markup shape; the assertions below are about the tag detail's own
+                         full-width line, which fabricate.css does own. -->
+                    <div class="manager-segmented" role="radiogroup" aria-label="Tag match">
+                      <label class="manager-segment is-active"><input type="radio" name="tag-match-1" checked><span class="manager-segment-label">Any</span></label>
+                      <label class="manager-segment"><input type="radio" name="tag-match-1"><span class="manager-segment-label">All</span></label>
                     </div>
                     <button type="button" class="manager-button is-subtle manager-recipe-tag-trigger"><i class="fas fa-tag"></i><span>Add tag</span></button>
                   </div>
@@ -4556,4 +5589,617 @@ test('recipe tag list spans the full row width on its own line below the control
     await page.close();
     await browser.close();
   }
+});
+
+// Until issue 785 the Books & Scrolls surface carried its own duplicate page header, so it
+// had FOUR unconditional grid children against the shared three-track `auto auto 1fr`: the
+// `1fr` landed on the TOOLBAR — it swallowed every pixel of slack and floated mid-panel —
+// while the table fell into an implicit `auto` row pinned to the bottom of the view. The
+// header is gone (the shell renders one already) and the route names its own tracks. This
+// guard ties the template to the markup rather than to a literal value: adding a section
+// without widening the template reintroduces exactly that defect, and before this test no
+// coverage existed for this route at all.
+test('the Books & Scrolls route names one grid track per section and grows the table', () => {
+  const source = readFileSync(resolve(managerComponentDir, 'BooksScrollsView.svelte'), 'utf8');
+  // Matched as a pattern, not as `<main class="manager-main`: Prettier (issue 923) prints an
+  // element with several attributes one per line, so the class no longer sits on the open tag's
+  // own line. That miss failed LOUDLY but unhelpfully rather than silently: `indexOf` returned
+  // -1, `slice(-1)` kept only the file's last character, and the child count came out 0 against
+  // an expected 3. Anchoring on the tag name alone removes the dependence on attribute layout.
+  const mainIndex = source.search(/<main\b/);
+  assert.notEqual(mainIndex, -1, 'the route should render a <main> element');
+  // The grid tracks read below are declared against `.manager-main`, so the route carrying that
+  // class is half of this contract. Asserted separately rather than folded back into the slice
+  // anchor, so dropping the class fails here instead of quietly rebasing the child walk.
+  assert.ok(
+    /<main\b[^<]*class="manager-main[\s"]/.test(source),
+    'the books-scrolls route should render its content region as .manager-main'
+  );
+  const main = source.slice(mainIndex);
+  const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
+  assert.equal(children.length, 3, 'expected three unconditional top-level grid children');
+  assert.equal(
+    main.includes('manager-section-header'),
+    false,
+    'the view must not render a second page header (issue 676/785)'
+  );
+
+  const block = blockFor('.fabricate-manager[data-manager-view="books-scrolls"] .manager-main');
+  const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();
+  assert.ok(template, 'the books-scrolls route must declare its own grid-template-rows');
+
+  // Tracks are SPACE-separated, and `minmax(0, 1fr)` contains a space of its own, so
+  // tokenize functional notation as one unit rather than splitting on whitespace.
+  const tracks = template.match(/[a-z-]+\([^)]*\)|\S+/g) || [];
+  assert.equal(
+    tracks.length,
+    children.length,
+    `expected ${children.length} tracks for ${children.length} children, got "${template}"`
+  );
+  assert.equal(
+    tracks.at(-1),
+    'minmax(0, 1fr)',
+    'the scrolling table is the last child, so it must be the growing track'
+  );
+  assert.ok(
+    tracks.slice(0, -1).every((track) => track === 'auto'),
+    `only the table may grow; header/drop-zone/toolbar must be auto, got "${template}"`
+  );
+});
+
+// The same defect family on the Tags & Categories route (issue 878). It carried its own
+// duplicate page header until now, which happened to give it exactly three children for
+// the shared three-track `auto auto 1fr`. Deleting the header takes it to TWO, and the
+// shared template's `1fr` would then land on an EMPTY third row — the vocabulary
+// workspace would size to its content and the panel's remaining height would sit dead
+// below it, the mirror image of the books-scrolls toolbar float. The guard ties the
+// template to the markup rather than to a literal count, and pins the absence of a second
+// page header so it cannot come back unnoticed.
+test('the Tags & Categories route names one grid track per section and grows the workspace', () => {
+  const source = readFileSync(resolve(managerComponentDir, 'TagsCategoriesView.svelte'), 'utf8');
+  // This view's opening `<main>` tag is attribute-per-line, so it cannot be located by the
+  // one-line `<main class="manager-main` literal the books-scrolls guard above uses.
+  const mainStart = source.indexOf('<main');
+  assert.notEqual(mainStart, -1, 'the view must render a `.manager-main` grid');
+  const main = source.slice(mainStart);
+  const children = main.match(/^ {2}<(?:section|div|header|footer|nav)\b/gm) || [];
+  assert.equal(children.length, 2, 'expected two unconditional top-level grid children');
+  assert.equal(
+    main.includes('manager-section-header'),
+    false,
+    'the view must not render a second page header (issue 676/785/878)'
+  );
+
+  const block = blockFor('.fabricate-manager[data-manager-view="tags"] .manager-main');
+  const template = block.match(/grid-template-rows:([^;]+);/)?.[1]?.trim();
+  assert.ok(template, 'the tags route must declare its own grid-template-rows');
+
+  // Tracks are SPACE-separated, and `minmax(0, 1fr)` contains a space of its own, so
+  // tokenize functional notation as one unit rather than splitting on whitespace.
+  const tracks = template.match(/[a-z-]+\([^)]*\)|\S+/g) || [];
+  assert.equal(
+    tracks.length,
+    children.length,
+    `expected ${children.length} tracks for ${children.length} children, got "${template}"`
+  );
+  assert.equal(
+    tracks.at(-1),
+    'minmax(0, 1fr)',
+    'the scrolling vocabulary workspace is the last child, so it must be the growing track'
+  );
+  assert.ok(
+    tracks.slice(0, -1).every((track) => track === 'auto'),
+    `only the workspace may grow; the tab strip must be auto, got "${template}"`
+  );
+});
+
+// Rendered-geometry guard for the reserved General row (issue 878). Its explanatory
+// sentence used to stack under the name, making it the one card in an `align-items: start`
+// grid whose content exceeded the 34px icon tile — so it stood visibly taller than every
+// sibling. Source-reading cannot see that; only layout can, so this measures both cards.
+//
+// The fixture's tab strip and workspace are a `<div role="tablist">` / `<div role="tabpanel">`
+// because that is what the view now ships (issue 924 — the `<nav>`/`<section>` forms carried
+// implicit landmark roles for the ARIA roles to override). Every governing selector below is
+// class-based, so nothing here depends on the element; the fixture is updated so it keeps
+// MIRRORING shipped markup rather than quietly describing a shape that no longer exists.
+test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 760, height: 600 } });
+  try {
+    const lockedRow = `<div class="manager-vocabulary-row">
+      <span class="manager-vocabulary-icon is-locked-icon"><i class="fas fa-lock"></i></span>
+      <div class="manager-vocabulary-main is-inline" title="Built-in fallback &mdash; cannot be renamed or removed."><strong>General</strong></div>
+      <span class="manager-chip manager-vocabulary-chip-locked"><i class="fas fa-lock"></i>Locked</span>
+    </div>`;
+    const customRow = `<div class="manager-vocabulary-row">
+      <span class="manager-vocabulary-icon-picker" data-vocabulary-icon-picker="potions"><button type="button" class="essence-icon-picker-trigger icon-only manager-vocabulary-icon-trigger"><span class="essence-icon-picker-preview"><i class="fas fa-folder"></i></span><span class="essence-icon-picker-trigger-caret"><i class="fas fa-chevron-down"></i></span></button></span>
+      <div class="manager-vocabulary-main"><strong>Potions</strong></div>
+      <span class="manager-chip is-warning"><i class="fas fa-link"></i>8 references</span>
+      <button type="button" class="manager-icon-button"><i class="fas fa-trash"></i></button>
+    </div>`;
+    await page.setContent(
+      withChipHash(`<style>${css}</style><style>${chipCss}</style><div class="fabricate-manager" data-manager-view="tags"><div class="manager-body"><main class="manager-main manager-tags-categories"><div class="manager-editor-tabs manager-vocabulary-tabs" role="tablist"><button type="button" class="manager-editor-tab-button is-active"><span>Recipe categories</span><span class="manager-chip is-neutral manager-editor-tab-badge">17</span></button></div><div class="manager-tags-categories-workspace" role="tabpanel"><section class="manager-vocabulary-panel"><div class="manager-vocabulary-list"><div class="manager-vocabulary-card is-locked" data-vocabulary-locked-card>${lockedRow}</div><div class="manager-vocabulary-card" data-vocabulary-custom-card>${customRow}</div></div></section></div></main></div></div>`)
+    );
+    const geometry = await page.evaluate(() => {
+      const locked = document.querySelector('[data-vocabulary-locked-card]');
+      const custom = document.querySelector('[data-vocabulary-custom-card]');
+      const trigger = custom.querySelector('.manager-vocabulary-icon-trigger');
+      const triggerRect = trigger.getBoundingClientRect();
+      return {
+        lockedHeight: Math.round(locked.getBoundingClientRect().height),
+        customHeight: Math.round(custom.getBoundingClientRect().height),
+        hintRendered: Boolean(locked.querySelector('.manager-vocabulary-locked-hint')),
+        triggerWidth: Math.round(triggerRect.width),
+        triggerHeight: Math.round(triggerRect.height),
+        lockedChipHeight: Math.round(
+          locked.querySelector('.manager-chip').getBoundingClientRect().height
+        ),
+        lockedChipBackground: getComputedStyle(
+          locked.querySelector('.manager-chip')
+        ).backgroundColor,
+        defaultChipBackground: getComputedStyle(
+          document.querySelector('.manager-editor-tab-button .manager-chip')
+        ).backgroundColor,
+      };
+    });
+    // The IconPicker's own `.essence-icon-picker-trigger` block is a full-width, 36px-min
+    // three-column combo declared LATER in the sheet, so the row tile only stays a 34px
+    // square while the vocabulary override outranks it on specificity, not source order.
+    assert.deepEqual(
+      { width: geometry.triggerWidth, height: geometry.triggerHeight },
+      { width: 34, height: 34 },
+      'the row icon picker trigger must render as the 34px vocabulary tile'
+    );
+    assert.equal(
+      geometry.lockedHeight,
+      geometry.customHeight,
+      `the reserved row must match its siblings exactly (locked ${geometry.lockedHeight}px vs custom ${geometry.customHeight}px)`
+    );
+
+    // Two facts about the chip that ONLY a real browser can establish, and that the whole
+    // of issue 883 rests on.
+    //
+    // First, the row's chip renders at the primitive's compact 20px. The global sheet has
+    // no chip rule left at all, so this measures `Chip.svelte`'s own scoped block reaching
+    // a real page — if the injection or the scoping hash ever stopped matching, the chip
+    // would collapse to bare text and this drops well below 20.
+    assert.ok(
+      geometry.lockedChipHeight >= 20,
+      `the locked chip renders at the primitive's compact scale, got ${geometry.lockedChipHeight}px`
+    );
+    // Second, `manager-vocabulary-chip-locked` still WINS its fill. It is a global rule
+    // overriding a declaration the scoped block also makes, so it is written at three
+    // classes; at two it would tie and lose on source order, and the locked chip would
+    // silently repaint as an ordinary one. Comparing it against a default chip on the same
+    // page is what makes that a fact rather than a colour constant copied out of the sheet.
+    assert.notEqual(
+      geometry.lockedChipBackground,
+      geometry.defaultChipBackground,
+      'the locked chip must keep its own fill, not fall back to the default chip fill'
+    );
+    // The sentence itself is gone: ellipsised at real column widths it truncated to
+    // "Built…", which read as breakage beside untruncated custom rows. It survives as the
+    // row's tooltip, so the card carries the name alone and the height follows for free.
+    assert.equal(
+      geometry.hintRendered,
+      false,
+      'the reserved row must not render an inline explanatory sentence'
+    );
+  } finally {
+    await browser.close();
+  }
+});
+
+// The chance slider paints a coloured fill in a 6px track BEHIND a transparent range
+// input, so anything that gives that input a background hides the bar completely and
+// leaves only the thumb — which reads as "the slider renders a dot and no bar".
+//
+// The gathering edit views carry a blanket field rule over `:is(input…, select, textarea)`
+// that computes to (0,4,1) and outranks the slider's own (0,3,1) reset. It excluded
+// checkbox and radio but not range, so every drop row in the task and event editors lost
+// its bar while the inspector — whose twin rule already excluded range — kept it.
+//
+// Asserted on the RENDERED background rather than on the selector text, so a future rule
+// that reintroduces a background by some other route fails too (issue 883).
+test('a range input inside the gathering edit views stays transparent for the slider fill', async () => {
+  const browser = await chromium.launch();
+  try {
+    for (const view of ['manager-gathering-task-edit-view', 'manager-gathering-event-edit-view']) {
+      const page = await browser.newPage({ viewport: { width: 900, height: 200 } });
+      try {
+        await page.setContent(
+          `<style>${css}</style>` +
+            `<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate"><div class="${view}">` +
+            '<div class="manager-gathering-task-drop-row" role="row" style="width:640px">' +
+            '<span role="cell" class="manager-drop-cell manager-drop-rate-cell">' +
+            '<span class="manager-chance-slider manager-drop-rate-value">' +
+            '<span class="manager-chance-slider-control manager-drop-rate-control is-common" ' +
+            'style="--fab-drop-rate-value:90%; --fab-drop-rate-color:#5EC3B0;">' +
+            '<span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>' +
+            '<input type="range" min="0" max="100" step="1" value="90"/>' +
+            '</span></span></span></div></div></div>'
+        );
+        const seen = await page.evaluate(() => {
+          const input = document.querySelector('input[type="range"]');
+          const fill = document.querySelector('.manager-drop-rate-fill');
+          return {
+            inputBackground: getComputedStyle(input).backgroundColor,
+            fillWidth: Math.round(fill.getBoundingClientRect().width),
+            fillBackground: getComputedStyle(fill).backgroundColor,
+          };
+        });
+        assert.equal(
+          seen.inputBackground,
+          'rgba(0, 0, 0, 0)',
+          `${view}: the range input must stay transparent or it hides the slider fill, got ${seen.inputBackground}`
+        );
+        assert.ok(
+          seen.fillWidth > 0 && seen.fillBackground !== 'rgba(0, 0, 0, 0)',
+          `${view}: the slider fill must render, got ${seen.fillWidth}px ${seen.fillBackground}`
+        );
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+// The gathering task library's inspector rail stacks three cards: "Gathering task details",
+// "Drops summary" and "Used in environments". The middle one restated the whole
+// `.manager-inspector-card` contract and then diverged on the two values it changed — a
+// `--fab-mv2-surface-2` fill instead of the shell's, and 16px of horizontal padding instead
+// of 12px — so it read as a different KIND of card from its neighbours.
+//
+// Asserted on the RENDERED box rather than on the absence of a selector, so a fill
+// reintroduced by any route (a new rule, an ancestor, a different class) fails too, and so
+// this stays true if the shell's own values are ever retuned (issue 883).
+test('the gathering inspector rail cards render as one card, not three treatments', async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 420, height: 600 } });
+  try {
+    await page.setContent(
+      `<style>${css}</style>` +
+        '<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">' +
+        '<aside class="manager-inspector" style="width:320px">' +
+        '<section class="manager-inspector-card" data-card="details">' +
+        '<h3 class="manager-card-title">Gathering task details</h3><p>Three facts</p>' +
+        '</section>' +
+        '<section class="manager-inspector-card" data-task-drops-summary data-card="drops">' +
+        '<h3 class="manager-card-title">Drops summary</h3>' +
+        '<div class="manager-task-drops-summary-list"><span class="manager-task-drop-summary-chip">' +
+        '<span class="manager-task-drop-summary-label">Nightshade</span>' +
+        '<strong class="manager-task-drop-summary-percent">80%</strong></span></div>' +
+        '</section>' +
+        '<section class="manager-inspector-card manager-task-environment-usage-card" data-card="usage">' +
+        '<h3 class="manager-card-title">Used in environments</h3><p>Not used yet.</p>' +
+        '</section>' +
+        '</aside></div>'
+    );
+    const measured = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-card]')).map((card) => {
+        const style = getComputedStyle(card);
+        return {
+          card: card.dataset.card,
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderTopColor,
+          borderWidth: style.borderTopWidth,
+          borderRadius: style.borderTopLeftRadius,
+          padding: `${style.paddingTop} ${style.paddingRight} ${style.paddingBottom} ${style.paddingLeft}`,
+          width: Math.round(card.getBoundingClientRect().width),
+        };
+      })
+    );
+
+    const [details, drops, usage] = measured;
+    assert.equal(measured.length, 3, 'the fixture should render all three rail cards');
+    // A real fill, not a transparent card that trivially "matches".
+    assert.notEqual(
+      details.backgroundColor,
+      'rgba(0, 0, 0, 0)',
+      `the shared card shell should paint a fill, got ${details.backgroundColor}`
+    );
+    for (const property of [
+      'backgroundColor',
+      'borderColor',
+      'borderWidth',
+      'borderRadius',
+      'padding',
+      'width',
+    ]) {
+      assert.equal(
+        drops[property],
+        details[property],
+        `drops summary ${property} should match the details card, got ${drops[property]} vs ${details[property]}`
+      );
+      assert.equal(
+        usage[property],
+        details[property],
+        `environment usage ${property} should match the details card, got ${usage[property]} vs ${details[property]}`
+      );
+    }
+  } finally {
+    await page.close();
+    await browser.close();
+  }
+});
+
+// Issue 883 retired the last two hand-rolled copies of the chance slider — the gathering
+// drop INSPECTOR and the gathering EVENT editor — in favour of `ChanceSlider`. Both had
+// been surviving on unrelated CSS accidents: the inspector's fill was visible only because
+// `.manager-drop-editor-card` happened to exclude `[type="range"]` from its blanket field
+// rule, and the event editor's rows needed f4402c27 to add the same exclusion.
+//
+// This asserts the RENDERED result at both converted sites: a transparent range input, a
+// fill with real width and colour, and a number field that is actually sized — the last
+// because the conversion moved those fields from `[type="text"]` to `[type="number"]`, so a
+// stylesheet still keyed on the old type would leave them unstyled and this would catch it.
+const CHANCE_SLIDER_FIXTURE =
+  '<span class="manager-chance-slider manager-drop-rate-value" data-chance-slider>' +
+  '<span class="manager-chance-slider-number manager-drop-rate-percent">' +
+  '<input type="number" min="0" max="100" step="1" value="80" aria-label="Chance"/>' +
+  '<span aria-hidden="true">%</span></span>' +
+  '<span class="manager-chance-slider-control manager-drop-rate-control is-common" ' +
+  'style="--fab-drop-rate-value:80%; --fab-drop-rate-color:#5EC3B0;">' +
+  '<span class="manager-drop-rate-track"><span class="manager-drop-rate-fill"></span></span>' +
+  '<input type="range" min="0" max="100" step="1" value="80"/>' +
+  '</span></span>';
+
+test('both converted chance-slider sites render a real fill, not a bare thumb', async () => {
+  // The fixture is hand-written, so it is pinned to what the component actually renders —
+  // otherwise a renamed class would leave this measuring markup the app never produces.
+  const chanceSliderSource = readFileSync(
+    resolve(__dirname, '../../src/ui/svelte/components/ChanceSlider.svelte'),
+    'utf8'
+  );
+  for (const claim of [
+    'manager-chance-slider manager-drop-rate-value',
+    'manager-chance-slider-number manager-drop-rate-percent',
+    'manager-chance-slider-control manager-drop-rate-control',
+    'manager-drop-rate-track',
+    'manager-drop-rate-fill',
+    'type="number"',
+    'type="range"',
+  ]) {
+    assert.ok(
+      chanceSliderSource.includes(claim),
+      `the fixture assumes ChanceSlider renders ${claim}`
+    );
+  }
+
+  const sites = [
+    {
+      name: 'gathering drop inspector',
+      // The dense inspector treatment: 28px, matching the drop rows it mirrors.
+      percentHeight: 28,
+      markup:
+        '<aside class="manager-inspector manager-drop-inspector-stack" style="width:320px">' +
+        '<section class="manager-inspector-card manager-drop-editor-card">' +
+        '<div class="manager-drop-editor-values">' +
+        '<label class="manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>' +
+        `<span>Drop chance</span>${CHANCE_SLIDER_FIXTURE}</label>` +
+        '</div></section></aside>',
+    },
+    {
+      name: 'gathering event editor',
+      // 36px, and deliberately NOT normalised to the inspector's 28px. This field is a
+      // full-width form control in a normal editor card, so it takes the manager standard
+      // `.manager-field` height; 28px is the DENSE treatment for a table cell and the
+      // inspector rail. The divergence pre-dates this conversion and is a real difference
+      // of context, not a second spelling of one control (issue 883).
+      percentHeight: 36,
+      markup:
+        '<main class="manager-main manager-gathering-event-edit-view" style="width:640px">' +
+        '<section class="manager-task-availability-card" data-gathering-event-drop-rate>' +
+        '<div class="manager-task-availability-row">' +
+        '<label class="manager-field manager-drop-rate-editor">' +
+        `<span>Drop rate (%)</span>${CHANCE_SLIDER_FIXTURE}</label>` +
+        '</div></section></main>',
+    },
+  ];
+
+  const browser = await chromium.launch();
+  try {
+    for (const site of sites) {
+      const page = await browser.newPage({ viewport: { width: 900, height: 260 } });
+      try {
+        await page.setContent(
+          `<style>${css}</style>` +
+            `<div class="fabricate fabricate-manager" data-fabricate-theme="fabricate">${site.markup}</div>`
+        );
+        const seen = await page.evaluate(() => {
+          const range = document.querySelector('input[type="range"]');
+          const number = document.querySelector('.manager-drop-rate-percent input');
+          const track = document.querySelector('.manager-drop-rate-track');
+          const fill = document.querySelector('.manager-drop-rate-fill');
+          return {
+            rangeBackground: getComputedStyle(range).backgroundColor,
+            fillWidth: Math.round(fill.getBoundingClientRect().width),
+            trackWidth: Math.round(track.getBoundingClientRect().width),
+            fillBackground: getComputedStyle(fill).backgroundColor,
+            numberHeight: Math.round(number.getBoundingClientRect().height),
+            numberWidth: Math.round(number.getBoundingClientRect().width),
+          };
+        });
+
+        assert.equal(
+          seen.rangeBackground,
+          'rgba(0, 0, 0, 0)',
+          `${site.name}: the range input must stay transparent or it hides the fill, got ${seen.rangeBackground}`
+        );
+        assert.ok(
+          seen.trackWidth > 0,
+          `${site.name}: the slider track must have width, got ${seen.trackWidth}px`
+        );
+        // Not merely present: at 80% the fill must cover most of the track, in its colour.
+        assert.ok(
+          seen.fillWidth > seen.trackWidth * 0.7,
+          `${site.name}: the fill should span ~80% of the ${seen.trackWidth}px track, got ${seen.fillWidth}px`
+        );
+        assert.equal(
+          seen.fillBackground,
+          'rgb(94, 195, 176)',
+          `${site.name}: the fill should paint its tier colour, got ${seen.fillBackground}`
+        );
+        // The number field moved from `[type="text"]` to `[type="number"]` in this
+        // conversion; a rule still keyed on the old type leaves it at the unstyled default.
+        assert.equal(
+          seen.numberHeight,
+          site.percentHeight,
+          `${site.name}: the percent field should keep its ${site.percentHeight}px control height, got ${seen.numberHeight}px`
+        );
+        assert.ok(
+          seen.numberWidth > 20,
+          `${site.name}: the percent field should be laid out, got ${seen.numberWidth}px`
+        );
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+/*
+  The OPEN state of a manager `<select>` (issue 772).
+
+  `.fabricate-manager select` themes the CLOSED field, so a manager dropdown looks correct
+  until it is opened — and then the option list fell back to the browser's black-on-white
+  default, in every native select the manager renders. The player app has carried
+  `.fabricate-app select option` for a long time; the manager root is `.fabricate-manager`
+  and never inherited it.
+
+  This is asserted from the STYLESHEET rather than from a rendered frame because it cannot
+  be photographed: a native select's popup is painted by the browser, not into the page DOM,
+  so Playwright never sees it and no smoke screenshot can contain the defect. It was found
+  by opening the control by hand. A source assertion is therefore the only gate available,
+  and its job is to stop the rule being deleted as "unused".
+*/
+test('the manager themes select options, not just the closed select', () => {
+  const optionRule = blockFor('.fabricate-manager select option');
+  assert.ok(optionRule, 'the manager must theme its option list, not only the closed field');
+  assert.match(
+    optionRule,
+    /background:\s*var\(--fab-mv2-[a-z0-9-]+\)/,
+    'an option list without a painted background falls back to the browser default white'
+  );
+  assert.match(optionRule, /color:\s*var\(--fab-mv2-[a-z0-9-]+\)/);
+
+  // The selected row must be marked the SAME way on both rendering paths — the engines
+  // that paint the list in-page and the customizable-select picker. An accent-filled bar
+  // on one and a subtle overlay on the other is one control reading as two designs
+  // depending on which browser the GM happens to run.
+  const checkedRule = blockFor('.fabricate-manager select option:checked');
+  assert.ok(checkedRule, 'the selected row needs its own treatment');
+  assert.match(
+    checkedRule,
+    /background:\s*var\(--fab-overlay-light-08\)/,
+    'the checked row shares the picker treatment rather than painting a filled bar'
+  );
+  assert.match(checkedRule, /color:\s*var\(--fab-mv2-accent\)/);
+
+  // `color-scheme` is the only layer here that reaches every engine: it is what makes the
+  // platform-drawn popup dark at all, and without it the rules above are cosmetic.
+  assert.match(
+    blockFor('.fabricate-manager'),
+    /color-scheme:\s*dark/,
+    'the manager root must declare the dark UA scheme, as the player root already does'
+  );
+
+  // …and the opt-in that makes those colours visible at all. Without it the rules above
+  // are correct and inert on the engines most players use, because a legacy select popup
+  // is painted by the platform rather than the page.
+  assert.match(
+    css,
+    /@supports \(appearance: base-select\)/,
+    'the option colours only reach a Chromium popup through the customizable-select opt-in'
+  );
+  const picker = blockFor('.fabricate-manager select::picker(select)');
+  assert.ok(picker, 'the picker surface must be themed, not left as the platform default');
+  assert.match(picker, /background:\s*var\(--fab-mv2-surface-2\)/);
+});
+
+/*
+  Every manager `<select>` must carry an OPAQUE background (issue 772).
+
+  A native select's option popup is painted by the browser, which derives its surface from
+  the control's own computed background. A translucent background looks correct on the
+  CLOSED control — it composites over whatever dark surface it sits on — but the popup has
+  nothing to composite against, so it opens LIGHT while every other manager dropdown opens
+  dark. `color-scheme: dark` does not rescue it: an author background wins over the UA
+  scheme.
+
+  This shipped once. The bulk edit panel's category select used `--fab-surface-soft`, a
+  5%-alpha light tint, and opened light beside a pagination select that opened dark in the
+  same window. It is invisible to every other gate: the closed control looks correct in any
+  screenshot, and the popup is browser chrome that Playwright cannot photograph at all.
+
+  The scan covers component SCOPED styles as well as the global sheet, because that is
+  where it shipped — a global-sheet-only guard would have missed it entirely.
+*/
+test('every manager select paints an opaque background, so its popup opens dark', () => {
+  // `rgb(… / 5%)`, `rgba(…, 0.05)` — any alpha below 1.
+  const TRANSLUCENT = /(?:rgba?|hsla?)\([^)]*(?:\/\s*(?:0?\.\d+|[0-9]{1,2})%|,\s*0?\.\d+)\s*\)/i;
+
+  // Resolve `var(--a)` chains against the sheet's own token declarations.
+  const tokens = new Map(
+    [...css.matchAll(/^\s*(--fab-[\w-]+):\s*([^;]+);/gm)].map(([, name, value]) => [
+      name,
+      value.trim(),
+    ])
+  );
+  function resolveToken(value, depth = 0) {
+    if (depth > 8) return value;
+    const ref = /var\(\s*(--fab-[\w-]+)/.exec(value);
+    if (!ref) return value;
+    const next = tokens.get(ref[1]);
+    return next ? resolveToken(next, depth + 1) : value;
+  }
+  const backgroundOf = (body) => /background(?:-color)?:\s*([^;]+)/.exec(body)?.[1]?.trim() || '';
+
+  const offenders = [];
+
+  // 1. The global sheet: rules whose selector ends at a bare `select` under the manager.
+  for (const [, selector, body] of css.matchAll(
+    /(\.fabricate-manager[^{},]*select)\s*\{([^}]*)\}/g
+  )) {
+    const declared = backgroundOf(body);
+    if (declared && TRANSLUCENT.test(resolveToken(declared))) {
+      offenders.push(`styles/fabricate.css ${selector.trim()} -> ${declared}`);
+    }
+  }
+
+  // 2. Component scoped styles: correlate `<select class="x">` with `.x { background }` in
+  //    the same file's `<style>` block. This is the shape the defect actually took, so a
+  //    global-sheet-only scan would have missed it.
+  const managerFiles = readdirSync(managerComponentDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.svelte'));
+
+  for (const entry of managerFiles) {
+    const full = resolve(entry.parentPath, entry.name);
+    const source = readFileSync(full, 'utf8');
+    const style = /<style>([\s\S]*)<\/style>/.exec(source)?.[1];
+    if (!style) continue;
+    const shortPath = relative(managerComponentDir, full).replaceAll('\\', '/');
+    for (const [, classAttr] of source.matchAll(/<select[^>]*class="([^"]+)"/g)) {
+      for (const className of classAttr.split(/\s+/).filter(Boolean)) {
+        if (className.includes('{')) continue;
+        const rule = new RegExp(`\\.${className}\\s*\\{([^}]*)\\}`).exec(style);
+        if (!rule) continue;
+        const declared = backgroundOf(rule[1]);
+        if (declared && TRANSLUCENT.test(resolveToken(declared))) {
+          offenders.push(`${shortPath} .${className} -> ${declared}`);
+        }
+      }
+    }
+  }
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `a translucent select background opens a LIGHT popup:\n- ${offenders.join('\n- ')}`
+  );
 });

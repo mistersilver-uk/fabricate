@@ -14,12 +14,20 @@ name: "Promote to Public"
 # ── FOUR-JOB CHAIN ──────────────────────────────────────────────────────────────────────────────
 #   guard → forward-port → publish → readback-preflight-undraft-register
 #
+# Job 2 is a CONFIRMING BACKSTOP, not the forward-port's scheduling point. Since issue #1001 the
+# forward-port is performed at the PRERELEASE promotion (release.yml calls the shared
+# forward-port.yml once its early-access publish is verified), so `release` is normally already an
+# ancestor of `main` by the time a release promotion runs and this job takes the callee's ancestry
+# no-op. It delegates to the same reusable workflow rather than carrying its own copy of the merge.
+#
 # Jobs 2 (forward-port) and 3 (publish) carry NO job-level `if:` — a *skipped* job leaves
 # `result == 'skipped'`, and job 4's strict `if:` (VERBATIM from the issue) rejects anything but
-# `success`. So both jobs ALWAYS run and gate their mutations at STEP level (`if: ${{ !inputs.dry_run }}`),
-# printing their plan otherwise. Job 4 also RUNS on a dry run: its read-back / asset / payload steps
-# run and print, but every MUTATING step in it — the un-draft and the registry POST — is step-gated
-# on `!dry_run`. Everything that can fail precedes the un-draft.
+# `success`. So both jobs ALWAYS run and gate their mutations at STEP level, printing their plan
+# otherwise. Job 3 does that with its own `if: ${{ !inputs.dry_run }}` step gates; job 2 does it by
+# forwarding `dry_run` and a hotfix `enabled: false` into the callee, whose every post-notice step is
+# gated on `enabled`. Job 4 also RUNS on a dry run: its read-back / asset / payload steps run and
+# print, but every MUTATING step in it — the un-draft and the registry POST — is step-gated on
+# `!dry_run`. Everything that can fail precedes the un-draft.
 #
 # ── RE-PUBLISH, NEVER AN S3 CopyObject ──────────────────────────────────────────────────────────
 # The public S3 write RE-STAGES from the built `dist` via scripts/release-s3.js. A COPY of a private
@@ -122,7 +130,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Configure AWS credentials via OIDC
         # The guard reads private S3 heads (source channel + the registry-lead heads of beta and
@@ -256,78 +264,41 @@ jobs:
           console.log(`Guard passed. prev_public=${prevPublic || '(none)'} is_hotfix=${isHotfix}`);
           NODE
 
-  # ── JOB 2: FORWARD-PORT ─────────────────────────────────────────────────────────────────────────
-  # ALWAYS runs (no job-level `if:`). For a release-line version it merges `release` into `main` via
-  # the bypass App token (release-line only), so `main`'s next beta is numbered above the released
-  # version. A hotfix no-ops at STEP level; a re-run no-ops (release already an ancestor of main).
+  # ── JOB 2: FORWARD-PORT (a CONFIRMING BACKSTOP) ─────────────────────────────────────────────────
+  # ALWAYS runs (no job-level `if:`). Since issue #1001 the forward-port is performed at the
+  # PRERELEASE promotion — release.yml calls the same reusable workflow once its early-access publish
+  # is verified — so by the time a release promotion runs, `release` is normally ALREADY an ancestor
+  # of `main` and this job takes the callee's ancestry no-op. It stays here as the backstop that
+  # confirms the forward-port has happened and performs it if it has not, which is what the spec's
+  # `Version authority and promotion mechanics` requirement obliges a release promotion to do.
+  #
+  # There is deliberately NO job-level `if:` and NO `allow_content` input on this workflow:
+  #   * a *skipped* job leaves `result == 'skipped'`, and job 4's strict `if:` (VERBATIM from the
+  #     issue) rejects anything but `success` — so a job-level `if:` here would break every hotfix
+  #     promotion. The hotfix no-op runs through the callee's `enabled` input instead.
+  #   * a content-bearing forward-port must stop and involve a human. The remedy is the manual
+  #     forward-port.yml dispatch named in `override_hint` below, NOT a wider input surface on the
+  #     promotion.
   forward-port:
     needs: guard
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
     permissions:
       contents: read
-    steps:
-      - name: Explain a step-level no-op
-        if: ${{ inputs.dry_run || inputs.source_channel != 'early-access' }}
-        env:
-          DRY_RUN: ${{ inputs.dry_run }}
-          SOURCE_CHANNEL: ${{ inputs.source_channel }}
-        run: |
-          if [ "$SOURCE_CHANNEL" != "early-access" ]; then
-            echo "::notice::forward-port is a no-op for the hotfix line '$SOURCE_CHANNEL' — a hotfix leaves its line by cherry-pick, never a release→main merge."
-          fi
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "::notice::DRY RUN — would merge origin/release into main via the bypass App token (release-line only) unless already forward-ported."
-          fi
-
-      - uses: actions/checkout@v6
-        if: ${{ !inputs.dry_run && inputs.source_channel == 'early-access' }}
-        with:
-          fetch-depth: 0
-          ref: main
-          # The forward-port push authenticates as the bypass App, never as github-actions[bot].
-          # checkout stores its own credential as an http.extraheader, and an Authorization header
-          # BEATS the credential in a remote URL — so any persisted credential silently wins over
-          # the App token. Never persist it here. (checkout writes that header to a temp config
-          # file, not the local one, so a `git config --unset-all` in the push step cannot reach it.)
-          persist-credentials: false
-
-      - name: Mint an App installation token (bypass actor + workflow trigger)
-        id: apptoken
-        if: ${{ !inputs.dry_run && inputs.source_channel == 'early-access' }}
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.RELEASE_BOT_KEY }}
-
-      - name: Forward-port release into main
-        if: ${{ !inputs.dry_run && inputs.source_channel == 'early-access' }}
-        env:
-          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
-          VERSION: ${{ inputs.version }}
-        run: |
-          # The App token must be in place BEFORE the fetch: the checkout step persists no
-          # credential, so origin's default URL would otherwise fetch anonymously. That happens to
-          # work while this repo is public and would break the day it is not.
-          # The push MUST use the App token, not the default GITHUB_TOKEN:
-          #   1. GITHUB_TOKEN pushes do not trigger downstream workflows (beta.yml on push:[main]).
-          #   2. The App token is the ruleset bypass actor, so required_linear_history on main (which
-          #      forbids the --no-ff merge commit this creates) still lets it push.
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch origin main release --force
-          git checkout -B main origin/main
-          # Re-run safety: if release's tip is already an ancestor of main, the forward-port has
-          # already happened. No-op rather than create an empty merge.
-          if git merge-base --is-ancestor origin/release origin/main; then
-            echo "::notice::release is already an ancestor of main — forward-port already done, no-op."
-            exit 0
-          fi
-          git config user.name "fabricate-release-bot"
-          git config user.email "release-bot@users.noreply.github.com"
-          # --no-ff, NEVER a squash: `release` carries semantic-release's tags and notes.
-          git merge --no-ff origin/release -m "chore: forward-port release into main after promoting v${VERSION}"
-          git push origin HEAD:main
-          echo "Merged release into main and pushed (triggers beta.yml)."
+    uses: ./.github/workflows/forward-port.yml
+    with:
+      enabled: ${{ inputs.source_channel == 'early-access' }}
+      skip_reason: "forward-port is a no-op for a hotfix line — a hotfix leaves its line by cherry-pick, never a release-into-main merge."
+      # THE most fragile line in this call. workflow_call's `dry_run` default is FALSE, so if this
+      # line is ever dropped, a promotion run with dry_run: true would really push to main. It is
+      # pinned by a source-contract assertion in tests/forward-port-workflow.test.js.
+      dry_run: ${{ inputs.dry_run }}
+      reason: "after promoting v${{ inputs.version }}"
+      # Unguarded on purpose: the `guard` job above has already established, against the real channel
+      # heads, exactly what this promotion is promoting, so a second, weaker tag check adds nothing.
+      expected_tag: ""
+      override_hint: "dispatch .github/workflows/forward-port.yml manually with allow_content: true once the content has been reviewed, then re-run this promotion (it will then take the already-forward-ported no-op)."
+    secrets:
+      # Reusable workflows do not inherit repository secrets — pass the bypass App's key explicitly.
+      RELEASE_BOT_KEY: ${{ secrets.RELEASE_BOT_KEY }}
 
   # ── JOB 3: PUBLISH ──────────────────────────────────────────────────────────────────────────────
   # ALWAYS runs (no job-level `if:`). RE-STAGES from the built dist via release-s3.js, never an S3
@@ -338,9 +309,10 @@ jobs:
   # discard the prerelease-outranks-GA fail-safe and defect the cohort on the next public version).
   publish:
     # Linear chain (guard → forward-port → publish → job 4): waits for forward-port so the release
-    # line is merged into main BEFORE the version is made public — "a release promotion of a version
-    # built on the release line MUST forward-port that line into the prerelease line before any
-    # prerelease channel is written" (Version authority and promotion mechanics). A failed/skipped
+    # line is confirmed to be in main BEFORE the version is made public — "a release promotion of a
+    # version built on the release line MUST confirm that the forward-port has happened, and MUST
+    # perform it if it has not, before any prerelease channel is written" (Version authority and
+    # promotion mechanics). A failed/skipped
     # forward-port skips this job, which then fails job 4's strict `if:` — the un-draft is never
     # reached. It still needs `guard` for the prev_public re-run signal.
     needs: [guard, forward-port]
@@ -374,7 +346,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
         if: ${{ !inputs.dry_run }}
 
       - name: Configure AWS credentials via OIDC
@@ -427,7 +399,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: mkdir -p /tmp/promote
 
       - name: Configure AWS credentials via OIDC

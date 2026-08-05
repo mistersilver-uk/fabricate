@@ -154,6 +154,15 @@ function managerFixture(theme, width, height) {
           <h2 data-contrast-surface>Palette</h2>
           <p class="manager-empty-copy preview-copy">Shared theme tokens drive every mounted Fabricate surface.</p>
           <button type="button" class="manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
+          <!-- The armed half of the inline two-step row confirmation (issue 785). It is
+               the product's first SOLID fab-danger surface, so it carries its OWN
+               contrast probe: contrastSample reads the FIRST node matching a
+               selector, and data-contrast-solid already resolves to the primary
+               action up in the header, so reusing that hook would never sample this
+               node. The fab-on-accent token fails 4.5:1 against fab-danger in
+               foundry-native and is marginal in ironblood-forge, which is why
+               fab-on-danger exists at all. -->
+          <button type="button" class="manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
         </aside>
       </div>
     </section>`);
@@ -180,6 +189,7 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   assert.ok(contrastSample(result, '[data-contrast-surface]') >= 4.5, `${theme}/${surfaceId}/${width} primary surface text contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-soft]') >= 4.5, `${theme}/${surfaceId}/${width} chip/status text contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid]') >= 4.5, `${theme}/${surfaceId}/${width} solid action contrast should pass WCAG AA`);
+  assert.ok(contrastSample(result, '[data-contrast-solid-armed]') >= 4.5, `${theme}/${surfaceId}/${width} armed danger action contrast should pass WCAG AA`);
 }
 
 async function inspectRenderedSurface(page) {
@@ -213,7 +223,7 @@ async function inspectRenderedSurface(page) {
 
     const backdrop = document.querySelector('[data-surface-backdrop]');
     const backdropBackgroundColor = getComputedStyle(backdrop).backgroundColor;
-    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]'].map(selector => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {

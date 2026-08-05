@@ -17,6 +17,7 @@ import { migrateRecipeForModeChange } from '../migration/migrateRecipeForModeCha
 import { deriveToolSourceFromComponents } from '../migration/migrateToolsToFirstClass.js';
 import { getIngredientComponentId } from '../models/match/matchTypes.js';
 import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
+import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
 import {
   normalizeComponentCategory,
@@ -24,7 +25,11 @@ import {
 } from '../utils/componentCategories.js';
 import { parsePlainDiceGroups, parseDiceGroups } from '../utils/craftingCheckExpression.js';
 import { plainTextDescription, descriptionTextCandidate } from '../utils/plainTextDescription.js';
-import { normalizeCustomRecipeCategories } from '../utils/recipeCategories.js';
+import {
+  normalizeCustomRecipeCategories,
+  normalizeRecipeCategory,
+} from '../utils/recipeCategories.js';
+import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import {
   getCompendiumSourceUuid,
   getDuplicateSourceUuid,
@@ -38,6 +43,8 @@ import {
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
+import { RecipeActivationError } from './RecipeActivationError.js';
+import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 // Membership sets derived from the canonical Tool model vocabularies, so the
@@ -68,6 +75,15 @@ export class CraftingSystemManager {
     this.initialized = false;
     this._enrichToHtml = seams.enrichToHtml ?? ((text) => text);
     this._primeEnricherCache = seams.primeEnricherCache ?? (async () => {});
+    // Active-GM gate for the un-versioned legacy recipe-item backfill run from
+    // `initialize()`. Defaults to a globals probe so a real player client is gated
+    // without any wiring, while unit fixtures (no `game`) keep migrating: `activeGM`
+    // is undefined there, and `undefined === undefined` is true. See
+    // `_migrateLegacyRecipeItems` for why persistence — not the in-memory pass — is
+    // what must be gated.
+    this._isActiveGM =
+      seams.isActiveGM ??
+      (() => globalThis.game?.users?.activeGM?.id === globalThis.game?.user?.id);
   }
 
   async initialize() {
@@ -260,6 +276,21 @@ export class CraftingSystemManager {
       requirements: this._normalizeRequirements(system.requirements),
       essenceDefinitions: resolvedEssenceDefinitions,
       recipeItemDefinitions,
+      // Which basis resolves recipe-book membership for THIS system (issue 1011,
+      // landed with issue 1010). Monotonic: once set it is never cleared, so an empty
+      // `recipeIds` means "this book has no members" rather than "this system has not
+      // migrated". Backfilled here as a monotone OR over the PERSISTED value — never a
+      // bare `some(...)`, which would be the retired per-read inference byte for byte
+      // and would flip the basis back on every client the moment `reload()` saw the
+      // last array emptied. Normalize-on-read needs no versioned migration, matching
+      // `toolBreakage` and `visibilityMode` above; this literal has no `...system`
+      // spread, so the field must be listed here or the persisted `true` is destroyed
+      // on the next round-trip.
+      membershipResolvesByRecipeIds:
+        system.membershipResolvesByRecipeIds === true ||
+        recipeItemDefinitions.some(
+          (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
+        ),
       craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
@@ -560,7 +591,7 @@ export class CraftingSystemManager {
       },
       progressive: this._normalizeProgressiveCraftingCheck(check?.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
-      routed: this._normalizeRoutedCraftingCheck(check?.routed, { allowNatStepping: true }),
+      routed: this._normalizeRoutedCraftingCheck(check?.routed),
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
       // Per-recipe check-modifier catalogue + default policy (issue 770). A crafting-
       // owned aggregate (NOT gathering's `characterModifiers`), feeding the
@@ -574,7 +605,7 @@ export class CraftingSystemManager {
    * Normalize the crafting check-modifier catalogue + default resolution policy
    * (issue 770): `checkModifiers` is a named catalogue of `{id,label,icon?,expression}`
    * entries feeding the `@craftingmod` placeholder; `defaultModifierPolicy` is one of
-   * `addAll`/`highest`/`byRecipe` (default `addAll`); `defaultModifierIds` names the
+   * `addAll`/`highest`/`byRecipe`/`playerPicks` (default `addAll`); `defaultModifierIds` names the
    * catalogue entries applied by default. Malformed entries are dropped, a bad
    * expression coerces to an empty string, and a default id naming nothing in the
    * catalogue is dropped (order + de-dup preserved).
@@ -606,7 +637,7 @@ export class CraftingSystemManager {
       seenDefaults.add(id);
       return true;
     });
-    const defaultModifierPolicy = ['addAll', 'highest', 'byRecipe'].includes(
+    const defaultModifierPolicy = ['addAll', 'highest', 'byRecipe', 'playerPicks'].includes(
       check?.defaultModifierPolicy
     )
       ? check.defaultModifierPolicy
@@ -727,6 +758,9 @@ export class CraftingSystemManager {
           // state), so the disposition maps directly.
           outcome: crit.success === true ? 'success' : 'failure',
           breakTools: crit.breakTools === true,
+          // A legacy crit had no stepping effect, but the key must be present so a
+          // converted trigger re-normalizes to itself (issue 975).
+          tierStep: this._normalizeTierStep(),
         };
       })
       .filter(Boolean);
@@ -771,7 +805,7 @@ export class CraftingSystemManager {
   // deleting a tier in one mode never affects the other. Kept alongside the
   // legacy `outcomes` string list rather than replacing it, so the existing
   // routing engine is untouched.
-  _normalizeRoutedCraftingCheck(routed = {}, { allowNatStepping = false } = {}) {
+  _normalizeRoutedCraftingCheck(routed = {}) {
     const source = !routed || typeof routed !== 'object' ? {} : routed;
     const relative = Array.isArray(source.relativeOutcomes) ? source.relativeOutcomes : [];
     const fixed = Array.isArray(source.fixedOutcomes) ? source.fixedOutcomes : [];
@@ -786,9 +820,9 @@ export class CraftingSystemManager {
     } else if (typeof source.rollExpression === 'string') {
       rollFormula = source.rollExpression;
     }
+    const type = source.type === 'fixed' ? 'fixed' : 'relative';
     return {
-      type: source.type === 'fixed' ? 'fixed' : 'relative',
-      ...(allowNatStepping && { natStepping: source.natStepping === true }),
+      type,
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
@@ -799,10 +833,14 @@ export class CraftingSystemManager {
       fixedOutcomes: fixed
         .map((outcome) => this._normalizeRoutedOutcome(outcome, 'fixed'))
         .filter(Boolean),
+      // The legacy `natStepping` boolean (issue 975) converts to a pair of
+      // tier-stepping triggers on read and is dropped from the output, so the
+      // conversion runs once and the key never round-trips.
       checkBreakage: this._normalizeUnifiedTriggers(
         rollFormula,
         source.diceCrits,
-        source.checkBreakage
+        source.checkBreakage,
+        { natStepping: source.natStepping, type }
       ),
     };
   }
@@ -832,21 +870,82 @@ export class CraftingSystemManager {
    * Normalize the unified per-check trigger list (issue 419 recombine) carried by
    * each crafting/salvage/gathering check sub-object (simple/routed/progressive).
    * Migrates legacy data on read (no versioned migration): any legacy `diceCrits`
-   * are converted to `diceGroup` triggers and concatenated ahead of the normalized
-   * `checkBreakage.triggers`. Idempotent — a re-normalized block carries no
-   * `diceCrits` and its triggers already hold `outcome`/`breakTools`, so the second
-   * pass converts nothing and re-normalizes the triggers to themselves.
+   * are converted to `diceGroup` triggers and, for a routed check, a legacy
+   * `natStepping: true` is converted to the tier-stepping trigger pair (issue 975).
+   * Both conversions are concatenated ahead of the normalized
+   * `checkBreakage.triggers`, in the order `[...crits, ...natStep, ...authored]`.
+   * Idempotent — a re-normalized block carries neither `diceCrits` nor
+   * `natStepping` and its triggers already hold `outcome`/`breakTools`/`tierStep`,
+   * so the second pass converts nothing and re-normalizes the triggers to themselves.
    *
    * @param {string} rollFormula     Formula used to resolve a converted crit's groupId.
    * @param {Array<object>} [diceCrits]   Legacy per-die crit list (pre-recombine).
    * @param {object} [checkBreakage]      Existing `{ triggers }` block.
+   * @param {object} [legacyRouted]       Routed-only legacy fields; defaulted so the
+   *   simple and progressive call sites (which have neither) need not pass it.
+   * @param {boolean} [legacyRouted.natStepping] Legacy natural-stepping boolean.
+   * @param {string} [legacyRouted.type]  Normalized routed type (`relative`/`fixed`).
    * @returns {{ triggers: Array<object> }}
    * @private
    */
-  _normalizeUnifiedTriggers(rollFormula, diceCrits, checkBreakage) {
+  _normalizeUnifiedTriggers(rollFormula, diceCrits, checkBreakage, legacyRouted = {}) {
     const converted = this._convertDiceCritsToTriggers(diceCrits, rollFormula);
+    const convertedNatStep = this._convertNatSteppingToTriggers(
+      legacyRouted?.natStepping,
+      rollFormula,
+      legacyRouted?.type
+    );
     const { triggers } = this._normalizeCheckBreakage(checkBreakage);
-    return { triggers: [...converted, ...triggers] };
+    return { triggers: [...converted, ...convertedNatStep, ...triggers] };
+  }
+
+  /**
+   * Convert a routed check's legacy `natStepping: true` boolean into the pair of
+   * tier-stepping triggers that reproduce it (issue 975): a natural 20 steps the
+   * matched tier up one, a natural 1 steps it down one.
+   *
+   * Emitted only when stepping was actually live at conversion time — the boolean
+   * is `true`, the check is not `fixed` (the old runtime was relative-only, so a
+   * fixed check's flag was already inert), and the formula carries a d20 group.
+   * A formula with no d20 group synthesises nothing for the same reason.
+   *
+   * Notes on the shape, each of which is load-bearing:
+   * - The ids are stable literals rather than `randomID()`, because this conversion
+   *   has no source id and would otherwise re-mint ids on every read until a save
+   *   drops `natStepping` — and a trigger id reaches chat and captured result data.
+   * - `outcome` and `breakTools` are written EXPLICITLY so
+   *   {@link _normalizeUnifiedTrigger}'s legacy break-only test cannot mistake a
+   *   synthesised trigger for a pre-recombine one and start breaking tools on a
+   *   natural 20.
+   * - `allDice` rather than `anyDie`/`highestDie`: a non-`total` aggregate with no
+   *   per-die faces aggregates to `null` and the condition fails open (no match),
+   *   so a headless or stubbed roll cannot fire these triggers.
+   * - The {@link parsePlainDiceGroups} filter used by the crit conversion is
+   *   deliberately NOT applied: `2d20kh1` was the design target of the old
+   *   kept-face rule and must survive here even though it is crit-ineligible.
+   * - A duplicate-d20 formula (`1d20 + 1d20`) targets the first group only — the
+   *   accepted caveat the crit conversion already carries.
+   * @private
+   */
+  _convertNatSteppingToTriggers(natStepping, rollFormula, type) {
+    if (natStepping !== true || type === 'fixed') return [];
+    const d20GroupId = parseDiceGroups(rollFormula).findIndex((group) => group.sides === 20);
+    // -1 → natStepping was already inert; synthesise nothing.
+    if (d20GroupId === -1) return [];
+    const natStepTrigger = (id, face, mode) => ({
+      id,
+      condition: {
+        type: 'diceGroup',
+        groupId: d20GroupId,
+        aggregate: 'allDice',
+        operator: '==',
+        value: face,
+      },
+      outcome: 'none',
+      breakTools: false,
+      tierStep: { mode, steps: 1, tierId: null },
+    });
+    return [natStepTrigger('natstep-up', 20, 'up'), natStepTrigger('natstep-down', 1, 'down')];
   }
 
   /**
@@ -869,8 +968,8 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize a single unified trigger `{ id, condition, outcome, breakTools }`,
-   * dropping it (returning null) when its condition shape is malformed.
+   * Normalize a single unified trigger `{ id, condition, outcome, breakTools,
+   * tierStep }`, dropping it (returning null) when its condition shape is malformed.
    *
    * - `outcome` is one of `'success' | 'failure' | 'none'` (default `'none'`);
    *   pinned to `'none'` for an `outcomeTier` condition, whose match is resolved
@@ -878,6 +977,14 @@ export class CraftingSystemManager {
    * - `breakTools` defaults to `false`, EXCEPT a legacy break-only trigger (one
    *   carrying neither an `outcome` nor a `breakTools` prop, as authored before the
    *   recombine) is migrated to `breakTools: true` so it keeps breaking tools.
+   *   `tierStep` is deliberately absent from that test: adding it would flip every
+   *   pre-recombine break-only trigger into a non-breaking one.
+   * - `tierStep` is always present (issue 975), defaulting to the inert
+   *   `{ mode: 'none', steps: 1, tierId: null }`. Unlike `outcome` it is NOT pinned
+   *   to its inert value for an `outcomeTier` condition: that pin is the
+   *   circularity fix for FORCING an outcome, whereas a step reads the rolled tier
+   *   and produces the final one, so stepping on an `outcomeTier` condition is
+   *   deliberately allowed.
    * - The free-text `label` is dropped.
    * @private
    */
@@ -895,6 +1002,40 @@ export class CraftingSystemManager {
       condition,
       outcome,
       breakTools: isLegacyBreakOnly ? true : trigger.breakTools === true,
+      tierStep: this._normalizeTierStep(trigger.tierStep),
+    };
+  }
+
+  /**
+   * Normalize a trigger's `tierStep` effect (issue 975) — the third effect a
+   * unified trigger carries, alongside `outcome` and `breakTools`.
+   *
+   * Shape: `{ mode: 'none'|'target'|'up'|'down', steps: number, tierId: string|null }`.
+   * Flat rather than a discriminated union so switching mode in the editor never
+   * destroys the other mode's operand, mirroring the retention `_normalizeRoutedOutcome`
+   * already gives `dc` and `start`/`end` across a `type` switch.
+   *
+   * - An unknown or absent `mode` collapses to `'none'` (inert).
+   * - `steps` is the step MAGNITUDE (never a comparand — `condition.value` owns
+   *   that word), clamped to an integer `>= 1`: non-finite, zero, negative and
+   *   fractional values all resolve to a usable count.
+   * - `tierId` is a trimmed non-empty string or `null`, and is preserved VERBATIM
+   *   even when it names no tier: this normalizer cannot see the outcome lists
+   *   (simple and progressive checks have none at all), so a dangling id is left
+   *   for the editor to display and the runtime to no-op on, the same graceful
+   *   treatment `minOutcomeId` already documents.
+   * @param {object} [input] Raw `tierStep` sub-record.
+   * @returns {{ mode: string, steps: number, tierId: string|null }}
+   * @private
+   */
+  _normalizeTierStep(input) {
+    const source = !input || typeof input !== 'object' ? {} : input;
+    const steps = Number(source.steps);
+    const tierId = typeof source.tierId === 'string' ? source.tierId.trim() : '';
+    return {
+      mode: ['none', 'target', 'up', 'down'].includes(source.mode) ? source.mode : 'none',
+      steps: Number.isFinite(steps) ? Math.max(1, Math.trunc(steps)) : 1,
+      tierId: tierId || null,
     };
   }
 
@@ -965,9 +1106,7 @@ export class CraftingSystemManager {
       // the dynamic-DC macro are stored but hidden by the salvage editors (salvage
       // has no recipes to pick a tier from).
       simple: this._normalizeSimpleCraftingCheck(normalizedCheck.simple),
-      routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed, {
-        allowNatStepping: true,
-      }),
+      routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed),
       progressive: this._normalizeProgressiveCraftingCheck(normalizedCheck.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
     };
@@ -1121,7 +1260,29 @@ export class CraftingSystemManager {
     return normalized;
   }
 
+  /**
+   * The GM-authored per-essence colour (issue 917): a bare `--fab-tag-*` palette key,
+   * or null when unauthored. There is deliberately NO `customColor` sibling — the
+   * palette is the whole vocabulary, because a free hex cannot be guaranteed legible
+   * against all seven themes. Stored bare (the `--fab-tag-` prefix is stripped) so a
+   * round-trip through an export cannot accumulate prefixes.
+   *
+   * The palette itself is not validated here: an unrecognized token renders as the
+   * theme accent, which is what an unauthored essence renders as, so a hand-edited or
+   * imported value degrades rather than being silently discarded.
+   * @private
+   */
+  _normalizeEssenceColorToken(value) {
+    const token = String(value ?? '')
+      .trim()
+      .replace(/^--fab-tag-/, '');
+    return token || null;
+  }
+
   _normalizeEssenceDefinition(entry, usedIds = new Set()) {
+    // BOTH branches below are whitelist REBUILDS that drop any key they do not name,
+    // so every persisted field must appear in both or it is silently lost on the next
+    // save. `colorToken` is the newest such field (issue 917).
     if (typeof entry === 'string') {
       const base = entry.trim();
       if (!base) return null;
@@ -1130,6 +1291,7 @@ export class CraftingSystemManager {
         name: base,
         description: '',
         icon: 'fas fa-mortar-pestle',
+        colorToken: null,
         sourceComponentId: null,
         sourceItemUuid: null,
         associatedSystemItemId: null, // transitional alias
@@ -1153,6 +1315,7 @@ export class CraftingSystemManager {
       name: rawName || id,
       description: String(entry.description || '').trim(),
       icon: String(entry.icon || '').trim() || 'fas fa-mortar-pestle',
+      colorToken: this._normalizeEssenceColorToken(entry.colorToken),
       sourceComponentId,
       sourceItemUuid,
       associatedSystemItemId: sourceComponentId, // transitional alias
@@ -1876,7 +2039,12 @@ export class CraftingSystemManager {
     const checkMode = ['none', 'simple', 'tiered'].includes(c.checkMode) ? c.checkMode : 'none';
     return {
       checkMode,
-      learnOnCraft: c.learnOnCraft === true,
+      // Defaults ON (issue 966). Alchemy's `global` visibility mode reveals a recipe
+      // ONLY from `learnedRecipes`, which only this flag ever writes, so an absent
+      // flag left the most permissive-sounding visibility mode revealing nothing to
+      // any player, ever — the opposite of what its authoring copy promises. An
+      // explicitly stored `false` is still honoured.
+      learnOnCraft: c.learnOnCraft !== false,
       consumeOnFail: c.consumeOnFail !== false,
       showAttemptHistoryToPlayers: c.showAttemptHistoryToPlayers !== false,
     };
@@ -2005,6 +2173,30 @@ export class CraftingSystemManager {
     });
   }
 
+  /**
+   * Reconcile a recipe's legacy `recipeItemId` scalar against the many-to-many book
+   * membership that superseded it. Runs un-gated on every `initialize()`, so both halves
+   * must be idempotent and must converge on the first pass.
+   *
+   * Two halves, deliberately sharing one walk over systems -> definitions -> recipes:
+   *
+   * 1. **Mint and stamp** (pre-existing). A recipe retaining a standalone
+   *    `linkedRecipeItemUuid` with no valid `recipeItemId` gets a definition minted from
+   *    that uuid and the scalar stamped. This is the alchemy formula-item cohort the
+   *    1.13.0 migration deliberately preserved.
+   * 2. **Clear a leaked scalar** (issue 978). Until that issue, saving a recipe from the
+   *    manager persisted `containingDefinitions[0]` — an authoring accident of definition
+   *    order — onto the model, because the editor seeds its draft from a whole projected
+   *    row and Save posted the whole draft. For a recipe that IS a book member through
+   *    `recipeIds[]`, the scalar is pure noise, and four legacy `src/systems` resolvers
+   *    read it AHEAD of an authored `recipe.img` (issue 887).
+   *
+   * Half 2 never fires for the cohort half 1 maintains, and is unreachable in a fully
+   * un-migrated system — no definition carries `recipeIds` there, so no recipe is a
+   * member and the scalar is still the membership source.
+   *
+   * @returns {Promise<boolean>} Whether anything was persisted.
+   */
   async _migrateLegacyRecipeItems() {
     if (!this.recipeManager?.getRecipes || !this.recipeManager?.save) return false;
 
@@ -2024,6 +2216,22 @@ export class CraftingSystemManager {
 
       const recipes = this.recipeManager.getRecipes({ craftingSystemId: system.id });
       for (const recipe of recipes) {
+        // Half 2 (issue 978), before the mint-and-stamp read below so a cleared recipe
+        // falls straight through: it has no `linkedRecipeItemUuid`, so it is not a
+        // re-stamp candidate and the repair converges on this pass.
+        if (
+          recipe?.recipeItemId &&
+          !String(recipe?.linkedRecipeItemUuid || '').trim() &&
+          definitions.some((def) =>
+            (Array.isArray(def.recipeIds) ? def.recipeIds : []).some(
+              (id) => String(id) === String(recipe.id)
+            )
+          )
+        ) {
+          recipe.recipeItemId = null;
+          recipesChanged = true;
+        }
+
         const hasValidRecipeItemId =
           recipe?.recipeItemId && definitions.some((def) => def.id === recipe.recipeItemId);
         if (hasValidRecipeItemId) continue;
@@ -2065,6 +2273,17 @@ export class CraftingSystemManager {
       }
     }
 
+    // `save()` / `recipeManager.save()` write the `craftingSystems` and `recipes`
+    // WORLD settings, which Foundry lets only a GM update. This pass runs from
+    // `initialize()` — BEFORE `runStartupMaintenance`'s error isolation and before
+    // `ready` is set — so on a player client the rejection escapes `initialize()`,
+    // `this.initialized` never flips, and every facade method throws through
+    // `_requireReady()` for the rest of that session (the issue-970 failure mode).
+    // The versioned `MigrationRunner` is already active-GM gated; this un-versioned
+    // sibling was not. The in-memory pass above is deliberately left ungated so a
+    // player's loaded systems/recipes stay self-consistent for this session; the
+    // GM's write replicates the durable fix to them via the `updateSetting` bridge.
+    if (!this._isActiveGM()) return false;
     if (systemsChanged) await this.save();
     if (recipesChanged) await this.recipeManager.save();
     return systemsChanged || recipesChanged;
@@ -2474,14 +2693,22 @@ export class CraftingSystemManager {
     }
 
     // Book membership (issue 511 many-to-many): replace the contained-recipe id set.
+    //
+    // This is the SINGLE choke point for the membership-basis marker (issue 1011): the
+    // Contents tab (`CraftingSystemManagerRoot` → `adminStore.saveRecipeItem`),
+    // `adminStore.setRecipeBookMembership` and the recipe browser's bulk book axis all
+    // land here, and none of them re-runs `_normalizeSystem` — so setting the marker at
+    // a store instead would leave the writing client reading `false` against a
+    // non-empty array while every peer, catching up through `reload()`, read `true`.
     if (Object.prototype.hasOwnProperty.call(patch, 'recipeIds')) {
-      definition.recipeIds = [
-        ...new Set(
-          (Array.isArray(patch.recipeIds) ? patch.recipeIds : [])
-            .map((id) => String(id || '').trim())
-            .filter(Boolean)
-        ),
-      ];
+      // Seed BEFORE the marker flips and before this definition's array is replaced, so
+      // the legacy resolution is still the live basis while it is being read across.
+      // Without it the marker would close the revert direction but make the ORPHANING
+      // direction permanent: every OTHER definition's scalar-only members would be
+      // stranded by this one write, recoverable only by re-authoring each book by hand.
+      this._seedMembershipFromLegacyScalars(system);
+      definition.recipeIds = this._normalizeMembershipRecipeIds(patch.recipeIds);
+      system.membershipResolvesByRecipeIds = true;
     }
 
     const capsPatch = patch?.caps || {};
@@ -2497,6 +2724,140 @@ export class CraftingSystemManager {
 
     await this.save();
     return { item: { ...definition } };
+  }
+
+  /**
+   * Coerce a book-membership id list to the canonical persisted shape: trimmed,
+   * non-empty, deduped strings. Factored out of `updateRecipeItemDefinition` so every
+   * writer of `recipeItemDefinitions[].recipeIds` produces the same shape — the six
+   * membership readers all match by exact string equality (five compare
+   * `String(id) === rid` directly, and the book-side library enrichment in `adminStore`
+   * does the same through a `Map` keyed on the recipe id), so a whitespace-padded id
+   * written by a second path would simply stop matching.
+   *
+   * Deliberately NOT named `…IdList`: the imported `normalizeSelectionIds` coerces a
+   * SELECTION of recipe ids, and near-homographs on one class are invisible at a call
+   * site.
+   *
+   * @param {unknown} recipeIds Raw membership ids from a patch.
+   * @returns {string[]} Trimmed, deduped, non-empty ids.
+   * @private
+   */
+  _normalizeMembershipRecipeIds(recipeIds) {
+    return [
+      ...new Set(
+        (Array.isArray(recipeIds) ? recipeIds : [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+  }
+
+  /**
+   * Carry a system's legacy scalar membership across onto the canonical
+   * `recipeItemDefinitions[].recipeIds` arrays, in memory (issue 1011).
+   *
+   * Run by the write that FIRST sets `membershipResolvesByRecipeIds`, before the
+   * requested change is applied, so switching basis preserves the membership the
+   * legacy basis resolved instead of discarding it. A no-op once the marker is set, so
+   * a second write never re-seeds and a removal cannot be undone by the next write.
+   *
+   * This is `migrateInvertRecipeItemLink`'s PUSH half re-run at first-write time,
+   * WITHOUT its delete half: it mutates no legacy reference. That is the whole reason
+   * this approach was chosen over clearing the reverse refs — `_migrateLegacyRecipeItems`
+   * re-stamps `recipe.recipeItemId` from a surviving `linkedRecipeItemUuid` on every
+   * `initialize()` on every client, so no clear is durable, and the only clear that
+   * would be durable also severs the standalone alchemy formula-item links that the
+   * 1.13.0 migration deliberately preserved.
+   *
+   * Builds the legacy definition index (see
+   * {@link CraftingSystemManager#_indexRecipeItemDefinitionsForLegacySeed}), then
+   * resolves each recipe against it (see
+   * {@link CraftingSystemManager#_resolveLegacyMembershipDefinition} for the resolution
+   * order this seed relies on).
+   *
+   * @param {object} system A live normalized system from the in-memory map.
+   * @returns {boolean} `true` when at least one definition gained a member.
+   * @private
+   */
+  _seedMembershipFromLegacyScalars(system) {
+    if (!system || system.membershipResolvesByRecipeIds === true) return false;
+    const definitions = Array.isArray(system.recipeItemDefinitions)
+      ? system.recipeItemDefinitions
+      : [];
+    if (definitions.length === 0) return false;
+
+    const { byId, bySource } = this._indexRecipeItemDefinitionsForLegacySeed(definitions);
+
+    const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system.id }) ?? [];
+    let seeded = false;
+    for (const recipe of Array.isArray(recipes) ? recipes : []) {
+      const recipeId = String(recipe?.id || '').trim();
+      if (!recipeId) continue;
+
+      const definition = this._resolveLegacyMembershipDefinition(recipe, byId, bySource);
+      if (!definition || definition.recipeIds.includes(recipeId)) continue;
+
+      definition.recipeIds.push(recipeId);
+      seeded = true;
+    }
+    return seeded;
+  }
+
+  /**
+   * Index a system's recipe item definitions for
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}: by the definition's
+   * own id (for a recipe's `recipeItemId`) and by `originItemUuid` (for a recipe's
+   * `linkedRecipeItemUuid`). Also ensures every definition carries a `recipeIds` array
+   * before the caller seeds members into it.
+   *
+   * @param {object[]} definitions A system's `recipeItemDefinitions`.
+   * @returns {{byId: Map<string, object>, bySource: Map<string, object>}} The two
+   *   legacy-resolution indexes.
+   * @private
+   */
+  _indexRecipeItemDefinitionsForLegacySeed(definitions) {
+    const byId = new Map();
+    const bySource = new Map();
+    for (const def of definitions) {
+      if (!def || typeof def !== 'object') continue;
+      if (!Array.isArray(def.recipeIds)) def.recipeIds = [];
+      const id = String(def.id || '').trim();
+      if (id && !byId.has(id)) byId.set(id, def);
+      const source = String(def.originItemUuid || '').trim();
+      if (source && !bySource.has(source)) bySource.set(source, def);
+    }
+    return { byId, bySource };
+  }
+
+  /**
+   * Resolve which recipe item definition a recipe belongs to under the LEGACY scalar
+   * membership basis, for
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}.
+   *
+   * Resolution order mirrors the legacy READERS (see
+   * `_getRecipeObjectsReferencingRecipeItemDefinition`'s fallback, and the identical
+   * branch in `getRecipeItemDefinitionsContaining`, `RecipeVisibilityService` and
+   * `InventoryListingBuilder`): a present `recipeItemId` resolves by definition id and
+   * the uuid branch is NOT consulted even when that id names nothing, and only an
+   * ABSENT `recipeItemId` falls through to `linkedRecipeItemUuid` against a
+   * definition's `originItemUuid`. Falling through on a dangling id (as the 1.13.0
+   * migration does) would seed a membership the legacy basis never resolved, which is
+   * precisely the change of resolved membership this seed exists to prevent —
+   * deliberately, a dangling id does NOT fall through.
+   *
+   * @param {object} recipe A recipe object being resolved.
+   * @param {Map<string, object>} byId Definitions indexed by their own id.
+   * @param {Map<string, object>} bySource Definitions indexed by `originItemUuid`.
+   * @returns {object|null} The matching definition, or `null` when none resolves.
+   * @private
+   */
+  _resolveLegacyMembershipDefinition(recipe, byId, bySource) {
+    const recipeItemId = String(recipe?.recipeItemId || '').trim();
+    if (recipeItemId) return byId.get(recipeItemId) || null;
+
+    const legacyUuid = String(recipe?.linkedRecipeItemUuid || '').trim();
+    return legacyUuid ? bySource.get(legacyUuid) || null : null;
   }
 
   // Merge a caps patch over the stored caps sub-block while keeping the legacy/new
@@ -3113,8 +3474,8 @@ export class CraftingSystemManager {
 
   // The recipes a book/scroll contains. Canonical source is the definition's
   // `recipeIds[]` (issue 511 many-to-many). Falls back to the legacy reverse ref
-  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → originItemUuid`) only for
-  // un-migrated definitions that carry no `recipeIds` yet.
+  // (`recipe.recipeItemId`, or `linkedRecipeItemUuid → originItemUuid`) only while the
+  // system's `membershipResolvesByRecipeIds` marker is unset.
   _getRecipeObjectsReferencingRecipeItemDefinition(systemId, definition) {
     if (!definition || !this.recipeManager?.getRecipes) return [];
     const recipes = this.recipeManager.getRecipes({ craftingSystemId: systemId });
@@ -3125,17 +3486,13 @@ export class CraftingSystemManager {
       return recipes.filter((recipe) => idSet.has(String(recipe?.id)));
     }
 
-    // This definition carries no membership. Only reach for the legacy reverse ref when
-    // the WHOLE system is un-migrated; in a migrated system an empty `recipeIds` means an
-    // empty book, and a recipe's stale `recipeItemId`/`linkedRecipeItemUuid` must not
-    // resurrect a phantom membership (mirrors getRecipeItemDefinitionsContaining).
-    const definitions = Array.isArray(this.getSystem(systemId)?.recipeItemDefinitions)
-      ? this.getSystem(systemId).recipeItemDefinitions
-      : [];
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) return [];
+    // This definition carries no membership. Only reach for the legacy reverse ref while
+    // the system has not resolved by `recipeIds`; once the marker is set an empty
+    // `recipeIds` means an empty book, and a recipe's stale `recipeItemId`/
+    // `linkedRecipeItemUuid` must not resurrect a phantom membership. The marker is
+    // read, never re-derived from the arrays (issue 1011): that inference flipped in
+    // BOTH directions, so emptying the last array reverted the whole system.
+    if (this.getSystem(systemId)?.membershipResolvesByRecipeIds === true) return [];
 
     const definitionId = String(definition.id || '').trim();
     const originItemUuid = String(definition.originItemUuid || '').trim();
@@ -3150,9 +3507,9 @@ export class CraftingSystemManager {
   }
 
   // Forward membership query (issue 511 many-to-many): the definitions of `systemId`
-  // that contain `recipeId`. Canonical read is each definition's `recipeIds[]`; when a
-  // system carries no membership yet (fully un-migrated) it falls back to resolving the
-  // recipe's legacy reverse ref (`recipeItemId` / `linkedRecipeItemUuid`) to its book.
+  // that contain `recipeId`. Canonical read is each definition's `recipeIds[]`; while the
+  // system's `membershipResolvesByRecipeIds` marker is unset it falls back to resolving
+  // the recipe's legacy reverse ref (`recipeItemId` / `linkedRecipeItemUuid`) to its book.
   getRecipeItemDefinitionsContaining(systemId, recipeId) {
     const system = this.getSystem(systemId);
     if (!system || !recipeId) return [];
@@ -3166,11 +3523,9 @@ export class CraftingSystemManager {
     );
     if (byMembership.length > 0) return byMembership;
 
-    // Only fall back for a system that has no membership authored anywhere.
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) return [];
+    // Only fall back while the system has not resolved by `recipeIds` (issue 1011). Read
+    // the marker; never re-derive it from the arrays.
+    if (system.membershipResolvesByRecipeIds === true) return [];
 
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) return [];
@@ -4277,48 +4632,87 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Apply a category and/or a set of tags to a SET of components in one `save()`.
+   * Lowercase, trim and drop the empties from a caller-supplied tag list, matching the
+   * lowercase `itemTags` vocabulary. Order is preserved; de-duplication is the caller's
+   * job (the union path needs the incoming order, the removal path only needs the set).
+   *
+   * @param {unknown} tags
+   * @returns {string[]}
+   */
+  _normalizeBulkTagList(tags) {
+    if (!Array.isArray(tags)) return [];
+    return tags
+      .map((tag) =>
+        String(tag || '')
+          .trim()
+          .toLowerCase()
+      )
+      .filter(Boolean);
+  }
+
+  /**
+   * Apply a bulk edit — any of category, tag additions, tag removals, essences and
+   * progressive DC — to a SET of components in one `save()`.
    *
    * The shared set-apply primitive behind folder-aware import categorization (issue
-   * 771) and multi-select bulk edit (issue 772): both need "assign this category
-   * and/or these tags to these components" as a single persist rather than a
-   * per-component `updateItem` loop (N saves, N notifications).
+   * 771) and multi-select bulk edit (issue 772): both need "apply these changes to
+   * these components" as a single persist rather than a per-component `updateItem`
+   * loop (N saves, N notifications).
    *
-   * The two axes match `Component`'s own semantics (data-models spec):
+   * The axes match `Component`'s own semantics (data-models spec):
    *  - `category` is SINGLE-valued, so a provided category OVERWRITES each component's
    *    current one. Omitting it (or an empty/whitespace string) leaves the category
    *    untouched — a folder that maps to no category still applies its tags.
    *  - `tags` is many-valued and ADDITIVE, so `addTags` is unioned into each
    *    component's existing tags (case-insensitively de-duplicated, stored lowercase
    *    to match the `itemTags` vocabulary) rather than replacing them.
+   *  - `removeTags` is a lowercased set DIFFERENCE applied AFTER `addTags`, so a tag
+   *    supplied in both is removed. The bulk panel's tri-state chips make that
+   *    collision unreachable; the primitive defines it rather than leaving it undefined.
+   *  - `essences` REPLACES the whole `{essenceId: quantity}` map when the key is
+   *    PRESENT. `_normalizeEssenceQuantities` drops non-positive quantities and ids
+   *    outside the system's definitions, so an all-zero map clears essences and a
+   *    foreign id cannot be injected.
+   *  - `difficulty` is the progressive DC. `_normalizeComponent` keeps `>= 1` and
+   *    otherwise stores `undefined`, so `0`, `null`, `''` and `NaN` all CLEAR it.
    *
-   * A call that resolves to neither a category nor any tag is a no-op (no save).
+   * The guard tests a resolved non-empty `category`/`addTags`/`removeTags` and the
+   * PRESENCE — never the truthiness — of `essences` and `difficulty`: `{essences: {}}`
+   * and `{difficulty: 0}` are both real "clear this" edits, and a removal-only call is a
+   * real edit. #771's import caller supplies neither key, so a presence test is false
+   * for it and the guard behaves exactly as it did before issue 772.
+   *
+   * Every changed component is re-normalized under the owning system's essence AND
+   * salvage context, exactly as `updateItem` does. That is not inert for salvage: with a
+   * Simple-mode context `_normalizeSalvage` runs the success-first retain-one clamp
+   * (issue 764), which can re-order or drop result groups on a component whose salvage
+   * config predates it. That is correct, pre-existing behaviour shared with the
+   * single-component write — the bulk axes themselves never carry salvage.
    *
    * @param {string} systemId
    * @param {Iterable<string>} componentIds ids of the components to mutate.
-   * @param {{category?: string, addTags?: string[]}} [mapping]
+   * @param {{category?: string, addTags?: string[], removeTags?: string[],
+   *   essences?: Record<string, number>, difficulty?: number|null|string}} [edit]
    * @returns {Promise<{updated: number, componentIds: string[]}>} the ids actually changed.
    */
-  async applyCategoryAndTagsToComponents(systemId, componentIds, mapping = {}) {
-    this._assertGM('apply category and tags to components');
+  async applyBulkEditToComponents(systemId, componentIds, edit = {}) {
+    this._assertGM('apply a bulk edit to components');
     const system = this.getSystem(systemId);
     if (!system) throw new Error(`Crafting system not found: ${systemId}`);
 
     const targetIds = new Set(Array.from(componentIds || [], String));
     if (targetIds.size === 0) return { updated: 0, componentIds: [] };
 
-    const rawCategory = typeof mapping.category === 'string' ? mapping.category.trim() : '';
+    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
+    const rawCategory = typeof bulkEdit.category === 'string' ? bulkEdit.category.trim() : '';
     const hasCategory = rawCategory !== '';
-    const addTags = Array.isArray(mapping.addTags)
-      ? mapping.addTags
-          .map((tag) =>
-            String(tag || '')
-              .trim()
-              .toLowerCase()
-          )
-          .filter(Boolean)
-      : [];
-    if (!hasCategory && addTags.length === 0) return { updated: 0, componentIds: [] };
+    const addTags = this._normalizeBulkTagList(bulkEdit.addTags);
+    const removeTags = new Set(this._normalizeBulkTagList(bulkEdit.removeTags));
+    const hasEssences = Object.hasOwn(bulkEdit, 'essences');
+    const hasDifficulty = Object.hasOwn(bulkEdit, 'difficulty');
+    const staged =
+      hasCategory || addTags.length > 0 || removeTags.size > 0 || hasEssences || hasDifficulty;
+    if (!staged) return { updated: 0, componentIds: [] };
 
     const validEssenceIds = new Set((system.essenceDefinitions || []).map((def) => def.id));
     const salvageContext = this._salvageNormalizationContext(system);
@@ -4338,12 +4732,18 @@ export class CraftingSystemManager {
           nextTags.push(tag);
         }
       }
+      // AFTER the union, so a tag in both lists loses.
+      if (removeTags.size > 0) {
+        nextTags = nextTags.filter((tag) => !removeTags.has(String(tag).toLowerCase()));
+      }
 
       system.components[idx] = this._normalizeComponent(
         {
           ...component,
           category: hasCategory ? rawCategory : component.category,
           tags: nextTags,
+          essences: hasEssences ? bulkEdit.essences : component.essences,
+          difficulty: hasDifficulty ? bulkEdit.difficulty : component.difficulty,
           id: component.id,
         },
         { validEssenceIds, ...salvageContext }
@@ -4353,6 +4753,435 @@ export class CraftingSystemManager {
 
     if (changedIds.length > 0) await this.save();
     return { updated: changedIds.length, componentIds: changedIds };
+  }
+
+  /**
+   * Apply a bulk edit — any of category, status, lock, check tier and recipe-book
+   * membership — to a SET of recipes in one `recipes` write and one `craftingSystems`
+   * write (issue 1010).
+   *
+   * The recipe twin of {@link CraftingSystemManager#applyBulkEditToComponents}, mirrored
+   * rather than shared because recipes are not stored on the system. It lives HERE and not
+   * on `RecipeManager` because the book axis writes `system.recipeItemDefinitions[].recipeIds`
+   * and `RecipeManager` has no `save()` for that setting. It never touches `Recipe`
+   * internals: every recipe-field write goes through `recipeManager.updateRecipe`, so
+   * normalization, persistence validation and the activation gate all stay put.
+   *
+   * The `edit` contract is `toBulkRecipeEdit`'s six keys, each present IF AND ONLY IF its
+   * axis is staged. Three of them are FALSY BUT REAL — `enabled: false`, `locked: false`
+   * and `checkTierId: null` (Default DC) — so the staging guard tests `Object.hasOwn` and
+   * never truthiness, exactly as the component primitive's `essences`/`difficulty` guard
+   * does. A truthiness test would silently drop Disable, Unlock and Default DC.
+   *
+   * **Write order: books first, then recipes.** The two axes are independent — no book
+   * operation touches a `Recipe` field — so at most ONE in-memory map is dirty across any
+   * I/O await, and a rejected `save()` cannot leave both mutated against stale world
+   * settings. Books rather than recipes first because the membership-basis marker write is
+   * what makes every subsequent membership read well-defined: if it fails, nothing else
+   * should have happened, whereas recipes-first would leave a window in which recipes are
+   * persisted against an unmarked system. `SocketInterface.dispatch` rejects on any server
+   * error and that is reachable without a bug — `_assertGM` is `game.user.isGM`
+   * (`hasRole(ASSISTANT)`) while `SETTINGS_MODIFY` is revocable from assistants, so in a
+   * world that has revoked it the client-side gate passes and the server refuses.
+   *
+   * **Two `save()` calls, one per world SETTING — not a redundant pair to collapse.**
+   * `CraftingSystemManager.save()` writes the `craftingSystems` setting and
+   * `RecipeManager.save()` writes the `recipes` setting, and the book axis lives on the
+   * system while the recipe axes live on the recipes. The batch's guarantee is therefore
+   * at most ONE write of EACH, never one write in total, and each is skipped outright
+   * when its own half changed nothing: a recipe-only edit issues no `craftingSystems`
+   * write, and a book-only edit issues no `recipes` write.
+   *
+   * **The activation gate runs INSIDE `updateRecipe`, per recipe, in batch order — not as
+   * a batched pre-check.** That is the CORRECT evaluation for a batch rather than a cost
+   * this accepts: {@link RecipeManager#_validateSignatures} substitutes the candidate into
+   * the LIVE recipe list, so enabling sequentially is what lets the second alchemy
+   * candidate see the first one already enabled, and be refused for the collision it
+   * really does create. Hoisting the gate into one pre-pass would evaluate every candidate
+   * against a world in which none of its peers had been enabled yet, and the batch would
+   * persist a signature collision the single-recipe write refuses.
+   * {@link RecipeManager#canActivateRecipe} IS that pre-batch evaluation, which is exactly
+   * why a pre-flight count derived from it is a LOWER BOUND while this loop's
+   * `blockedEnables` is the authority.
+   *
+   * **This method maintains the membership-basis marker itself.** It mutates definitions
+   * directly and therefore BYPASSES the `updateRecipeItemDefinition` choke point, so it runs
+   * the same seed-then-set pair that choke point runs (see
+   * {@link CraftingSystemManager#_seedMembershipFromLegacyScalars}).
+   *
+   * @param {string} systemId
+   * @param {Iterable<string>} recipeIds ids of the recipes to mutate. A foreign or dangling
+   *   id is simply absent from the resolved cohort rather than an error.
+   * @param {{category?: string, enabled?: boolean, locked?: boolean, checkTierId?: ?string,
+   *   addBookIds?: string[], removeBookIds?: string[]}} [edit]
+   * @returns {Promise<{updated: number, recipeIds: string[], blockedEnables: number,
+   *   blockedRecipeIds: string[], rejected: number, rejectedRecipeIds: string[],
+   *   booksUpdated: number, bookIds: string[], bookAdditions: number, bookRemovals: number}>}
+   *   `recipeIds` are the recipes actually changed; `blockedRecipeIds` those whose enable
+   *   the activation gate refused (their other staged axes still landed); `rejectedRecipeIds`
+   *   those a `RecipePersistenceError` excluded from the batch entirely — a data-integrity
+   *   signal, not an expected outcome. `bookIds` are the definitions the requested
+   *   add/remove changed, which does NOT include a definition touched only by the
+   *   legacy-scalar seed.
+   *
+   *   `bookAdditions` / `bookRemovals` count membership EDGES — one per (recipe, book) pair
+   *   the write created or destroyed — while `booksUpdated` counts DEFINITIONS. Neither
+   *   derives from the other (one book over twelve recipes is 1 definition and 12 edges),
+   *   and the edge counts are what the post-apply notification reports, because "put these
+   *   recipes in that book" is the instruction the GM actually gave.
+   * @throws {Error} when the system does not resolve, or when `checkTierId` names a tier
+   *   this system's crafting check does not author — both BEFORE any write.
+   */
+  async applyBulkEditToRecipes(systemId, recipeIds, edit = {}) {
+    this._assertGM('apply a bulk edit to recipes');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const result = {
+      updated: 0,
+      recipeIds: [],
+      blockedEnables: 0,
+      blockedRecipeIds: [],
+      rejected: 0,
+      rejectedRecipeIds: [],
+      booksUpdated: 0,
+      bookIds: [],
+      bookAdditions: 0,
+      bookRemovals: 0,
+    };
+
+    // Resolves — and REJECTS — the staged check tier before anything is mutated.
+    const axes = this._resolveBulkRecipeAxes(system, edit);
+    if (!axes.staged) return result;
+
+    const targetIds = new Set(normalizeSelectionIds(recipeIds));
+    if (targetIds.size === 0) return result;
+
+    const cohort = (this.recipeManager?.getRecipes?.({ craftingSystemId: systemId }) ?? []).filter(
+      (recipe) => targetIds.has(String(recipe?.id ?? ''))
+    );
+
+    // ---- Books first -------------------------------------------------------
+    const books = this._applyBulkRecipeBookMembership(system, cohort, axes);
+    result.bookIds = books.bookIds;
+    result.booksUpdated = books.bookIds.length;
+    result.bookAdditions = books.additions;
+    result.bookRemovals = books.removals;
+    if (books.changed) {
+      system.membershipResolvesByRecipeIds = true;
+      await this.save();
+    }
+
+    // ---- Then recipes ------------------------------------------------------
+    const outcome = await this._applyBulkRecipePatches(cohort, axes);
+    result.recipeIds = outcome.recipeIds;
+    result.updated = outcome.recipeIds.length;
+    result.blockedRecipeIds = outcome.blockedRecipeIds;
+    result.blockedEnables = outcome.blockedRecipeIds.length;
+    result.rejectedRecipeIds = outcome.rejectedRecipeIds;
+    result.rejected = outcome.rejectedRecipeIds.length;
+
+    if (result.updated > 0) await this.recipeManager.save();
+
+    // At most one of EACH change hook, matching the at-most-one-save-of-each guarantee,
+    // and both are needed. On the writing client `reload()` returns `false`, so the
+    // `updateSetting` socket bridge deliberately re-emits nothing locally — a book change
+    // announced only as `recipesChanged` would be invisible to the GM's own other windows.
+    if (books.changed) this._notifySystemsChanged();
+    if (result.updated > 0) {
+      this.recipeManager.notifyRecipesChanged?.({
+        action: 'bulkEdit',
+        recipeIds: result.recipeIds,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Read the six-key bulk recipe `edit` into a resolved axis descriptor, testing PRESENCE
+   * and never truthiness, and resolving the staged check tier against THIS system's
+   * authored tiers.
+   *
+   * The tier resolution throws here — before the caller has mutated anything — because a
+   * bulk write's blast radius justifies being stricter than the single-recipe editor write,
+   * which tolerates a dangling `checkTierId` and falls back to the default DC at resolution
+   * time.
+   *
+   * @param {object} system a live normalized system.
+   * @param {object} edit the `toBulkRecipeEdit` projection.
+   * @returns {{staged: boolean, hasCategory: boolean, category: string, hasEnabled: boolean,
+   *   enabled: boolean, hasLocked: boolean, locked: boolean, hasCheckTier: boolean,
+   *   checkTierId: ?string, addBookIds: Set<string>, removeBookIds: Set<string>}}
+   * @private
+   */
+  _resolveBulkRecipeAxes(system, edit) {
+    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
+    const axes = {
+      hasCategory: Object.hasOwn(bulkEdit, 'category'),
+      category: bulkEdit.category,
+      hasEnabled: Object.hasOwn(bulkEdit, 'enabled'),
+      enabled: bulkEdit.enabled === true,
+      hasLocked: Object.hasOwn(bulkEdit, 'locked'),
+      locked: bulkEdit.locked === true,
+      hasCheckTier: Object.hasOwn(bulkEdit, 'checkTierId'),
+      checkTierId: null,
+      // The book axis's two disjoint id lists. `normalizeSelectionIds` is the same coercion
+      // the selection itself goes through — a staged book set IS a selection of books.
+      addBookIds: new Set(normalizeSelectionIds(bulkEdit.addBookIds)),
+      removeBookIds: new Set(normalizeSelectionIds(bulkEdit.removeBookIds)),
+    };
+    axes.staged =
+      axes.hasCategory ||
+      axes.hasEnabled ||
+      axes.hasLocked ||
+      axes.hasCheckTier ||
+      Object.hasOwn(bulkEdit, 'addBookIds') ||
+      Object.hasOwn(bulkEdit, 'removeBookIds');
+    if (axes.hasCheckTier)
+      axes.checkTierId = this._resolveBulkCheckTierId(system, bulkEdit.checkTierId);
+    return axes;
+  }
+
+  /**
+   * Resolve a staged bulk check-tier id against the tiers THIS system's crafting check
+   * actually authors, or throw.
+   *
+   * `null`/empty is the real instruction "Default DC" and resolves to `null`. Anything else
+   * must name a tier the panel could have offered, which is exactly
+   * `resolveRecipeCheckTierOptions` over the system's active crafting-check mode — the same
+   * helper the recipe editor's dropdown and the bulk panel's own gate read, so the three
+   * cannot disagree about which tiers exist.
+   *
+   * @param {object} system
+   * @param {?string} rawTierId
+   * @returns {?string} the trimmed tier id, or `null` for Default DC.
+   * @private
+   */
+  _resolveBulkCheckTierId(system, rawTierId) {
+    const tierId = typeof rawTierId === 'string' ? rawTierId.trim() : '';
+    if (!tierId) return null;
+
+    const options = resolveRecipeCheckTierOptions(
+      system?.craftingCheck,
+      this._craftingCheckModeFor(system)
+    );
+    const known = options.some((tier) => String(tier?.id ?? '') === tierId);
+    if (!known) {
+      throw new Error(`Check tier not authored by crafting system ${system?.id}: ${tierId}`);
+    }
+    return tierId;
+  }
+
+  /**
+   * The active CRAFTING-CHECK mode for a system's resolution mode — the manager-side twin
+   * of `CraftingSystemManagerRoot`'s `_craftingCheckMode`, kept structurally identical so
+   * the write and the panel that stages for it resolve the same tier list.
+   *
+   * `null` for an unrecognised mode is deliberately preserved from that original even
+   * though `_normalizeSystem` coerces every persisted `resolutionMode` to one of five
+   * tokens: `resolveRecipeCheckTierOptions(check, null)` is `[]`, so an unnormalized system
+   * offers no tier rather than silently accepting one.
+   *
+   * @param {object} system
+   * @returns {'simple'|'routed'|'progressive'|null}
+   * @private
+   */
+  _craftingCheckModeFor(system) {
+    const resolution = system?.resolutionMode || 'simple';
+    if (resolution === 'routedByCheck') return 'routed';
+    if (resolution === 'progressive') return 'progressive';
+    if (['simple', 'alchemy', 'routedByIngredients'].includes(resolution)) return 'simple';
+    return null;
+  }
+
+  /**
+   * Apply the book axis by iterating the DEFINITIONS rather than the recipes.
+   *
+   * `addBookIds` and `removeBookIds` are disjoint, so every touched definition takes exactly
+   * ONE operation — a union with the whole selection, or a difference against it — and is
+   * written exactly once. A definition named by neither list is left byte-identical (the
+   * legacy-scalar seed is the one exception, and it is a basis carry-across rather than a
+   * requested edit). A definition named by both would be a contract violation the panel's
+   * one-op-per-book staging makes unreachable; the REMOVE wins, mirroring the component
+   * primitive's removals-after-the-union rule, so the operation stays single and defined.
+   *
+   * **The EDGE counts are measured here, against the SEEDED arrays.** The seed runs first
+   * and rewrites `recipeIds` from the legacy scalars, so `current` is the book's true
+   * membership on either basis by the time the delta is taken — which is what makes an
+   * addition count honest on a legacy world, where an unseeded `recipeIds` would be empty
+   * and every member would read as newly added. The seed's own writes are deliberately NOT
+   * counted: they carry an existing membership across a basis switch rather than adding one,
+   * and reporting them would tell the GM they had added members to books they never named.
+   *
+   * @param {object} system a live normalized system.
+   * @param {object[]} cohort the resolved recipes of this system named by the selection.
+   * @param {{addBookIds: Set<string>, removeBookIds: Set<string>}} axes
+   * @returns {{changed: boolean, bookIds: string[], additions: number, removals: number}}
+   *   `changed` is true when this call mutated ANY definition — including one the seed alone
+   *   touched, which must be persisted rather than left diverging from the stored setting.
+   *   `additions` / `removals` are membership EDGES, not definitions.
+   * @private
+   */
+  _applyBulkRecipeBookMembership(system, cohort, axes) {
+    const bookIds = [];
+    let additions = 0;
+    let removals = 0;
+    const touched = axes.addBookIds.size > 0 || axes.removeBookIds.size > 0;
+    const selectedIds = cohort.map((recipe) => String(recipe?.id ?? '')).filter(Boolean);
+    if (!touched || selectedIds.length === 0) {
+      return { changed: false, bookIds, additions, removals };
+    }
+
+    // Seed BEFORE any array is replaced, while the legacy resolution is still the live
+    // basis. Without it the marker set below would close the revert direction but make the
+    // ORPHANING direction permanent: every OTHER definition's scalar-only members would be
+    // stranded by this one write.
+    const seeded = this._seedMembershipFromLegacyScalars(system);
+    const selected = new Set(selectedIds);
+
+    for (const definition of system.recipeItemDefinitions || []) {
+      const definitionId = String(definition?.id ?? '');
+      const remove = axes.removeBookIds.has(definitionId);
+      const add = !remove && axes.addBookIds.has(definitionId);
+      if (!add && !remove) continue;
+
+      const current = this._normalizeMembershipRecipeIds(definition.recipeIds);
+      const next = remove
+        ? current.filter((id) => !selected.has(id))
+        : this._normalizeMembershipRecipeIds([...current, ...selectedIds]);
+      if (next.length === current.length && next.every((id, index) => id === current[index])) {
+        continue;
+      }
+
+      definition.recipeIds = next;
+      bookIds.push(definitionId);
+      // One operation per definition, so exactly one of these can be non-zero per book and
+      // the delta IS the edge count: a union only grows, a difference only shrinks.
+      if (remove) removals += current.length - next.length;
+      else additions += next.length - current.length;
+    }
+
+    return { changed: seeded || bookIds.length > 0, bookIds, additions, removals };
+  }
+
+  /**
+   * Run the per-recipe half of the batch.
+   *
+   * **Loop atomicity here is MICROTASK-ONLY, and that differs from the mirrored precedent.**
+   * `applyBulkEditToComponents`'s loop is LITERALLY synchronous; this one awaits once per
+   * iteration and merely BEHAVES atomically, because `updateRecipe` with `persist: false`
+   * performs no real I/O — all three of its validators are synchronous — so the loop drains
+   * as microtasks and a socket-delivered `updateSetting` cannot interleave. The moment
+   * anything awaiting real I/O enters this loop, `reload()` can replace the recipes map
+   * wholesale between iterations and silently discard every staged edit; there is no
+   * compare-and-set anywhere in the settings path to catch it.
+   *
+   * @param {object[]} cohort
+   * @param {object} axes
+   * @returns {Promise<{recipeIds: string[], blockedRecipeIds: string[],
+   *   rejectedRecipeIds: string[]}>}
+   * @private
+   */
+  async _applyBulkRecipePatches(cohort, axes) {
+    const recipeIds = [];
+    const blockedRecipeIds = [];
+    const rejectedRecipeIds = [];
+
+    for (const recipe of cohort) {
+      const updates = this._buildBulkRecipePatch(recipe, axes);
+      if (Object.keys(updates).length === 0) continue;
+
+      const recipeId = String(recipe.id);
+      const outcome = await this._writeBulkRecipePatch(recipeId, updates);
+      if (outcome.updated) recipeIds.push(recipeId);
+      if (outcome.blocked) blockedRecipeIds.push(recipeId);
+      if (outcome.rejected) rejectedRecipeIds.push(recipeId);
+    }
+
+    return { recipeIds, blockedRecipeIds, rejectedRecipeIds };
+  }
+
+  /**
+   * The MINIMAL patch for one recipe: only the staged fields whose value actually differs.
+   * A recipe every staged axis already agrees with contributes no `updateRecipe` call at
+   * all, which is what lets a resolved no-op issue zero writes.
+   *
+   * The category is normalized first because `Recipe` normalizes it on construction, so a
+   * raw comparison would report a difference for `'General'` against the stored `'general'`
+   * and re-write every recipe in the selection.
+   *
+   * @param {object} recipe
+   * @param {object} axes
+   * @returns {{category?: string, enabled?: boolean, locked?: boolean, checkTierId?: ?string}}
+   * @private
+   */
+  _buildBulkRecipePatch(recipe, axes) {
+    const updates = {};
+    if (axes.hasCategory) {
+      const category = normalizeRecipeCategory(axes.category);
+      if (category !== recipe.category) updates.category = category;
+    }
+    if (axes.hasEnabled && (recipe.enabled === true) !== axes.enabled) {
+      updates.enabled = axes.enabled;
+    }
+    if (axes.hasLocked && (recipe.locked === true) !== axes.locked) {
+      updates.locked = axes.locked;
+    }
+    if (axes.hasCheckTier && (recipe.checkTierId ?? null) !== axes.checkTierId) {
+      updates.checkTierId = axes.checkTierId;
+    }
+    return updates;
+  }
+
+  /**
+   * Write one recipe's minimal patch, resolving BOTH error branches — which are different
+   * failures and are reported separately.
+   *
+   * `RecipeActivationError` is a refused ENABLE. The id is recorded, `enabled` is dropped
+   * and the patch is retried so the ungated axes still land on a recipe that stays off:
+   * `updateRecipe` throws at its activation gate strictly BEFORE `this.recipes.set`, so
+   * nothing partial was written and the retry is clean. The retry cannot itself throw —
+   * persistence was already validated by the first attempt and is independent of `enabled`,
+   * and with `enabled` gone the activation gate no longer runs.
+   *
+   * `RecipePersistenceError` is a recipe that cannot be saved AT ALL: `updateRecipe`
+   * validates persistence FIRST, and with `allowIncomplete: true` that still runs
+   * `validateStructure()`, which a structurally broken recipe fails. That class is precisely
+   * the one this change makes newly visible and selectable, so an uncaught throw would abort
+   * the whole batch on the first such recipe — AFTER the books save has already committed —
+   * leaving the recipes map partially mutated and never saved. It is logged (the post-apply
+   * notification tells the GM to see the console) and the batch continues.
+   *
+   * @param {string} recipeId
+   * @param {object} updates the minimal patch; mutated in place on the blocked retry.
+   * @returns {Promise<{updated: boolean, blocked: boolean, rejected: boolean}>}
+   * @private
+   */
+  async _writeBulkRecipePatch(recipeId, updates) {
+    // `persist: false` is the compendium-importer batch idiom: mutate the in-memory map per
+    // recipe, then issue ONE trailing `save()`. `allowIncomplete` keeps an authoring shell
+    // editable, matching the single-recipe browser writes.
+    const options = { persist: false, notify: false, emitChange: false, allowIncomplete: true };
+    try {
+      await this.recipeManager.updateRecipe(recipeId, updates, options);
+      return { updated: true, blocked: false, rejected: false };
+    } catch (error) {
+      if (error instanceof RecipePersistenceError) {
+        console.warn(
+          `Fabricate | bulk recipe edit could not save recipe ${recipeId}: ${error.message}`
+        );
+        return { updated: false, blocked: false, rejected: true };
+      }
+      if (!(error instanceof RecipeActivationError)) throw error;
+
+      delete updates.enabled;
+      if (Object.keys(updates).length === 0) {
+        return { updated: false, blocked: true, rejected: false };
+      }
+      await this.recipeManager.updateRecipe(recipeId, updates, options);
+      return { updated: true, blocked: true, rejected: false };
+    }
   }
 
   async deleteItem(systemId, itemId) {

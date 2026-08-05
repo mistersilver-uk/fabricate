@@ -27,18 +27,18 @@
     sort = 'newest',
     onSortChange = null,
     now = 0,
-    secondsPerDay = 86400
+    secondsPerDay = 86400,
   } = $props();
 
   const sortOptions = $derived([
     { value: 'newest', label: localize('FABRICATE.App.Journal.History.Sort.Newest') },
-    { value: 'oldest', label: localize('FABRICATE.App.Journal.History.Sort.Oldest') }
+    { value: 'oldest', label: localize('FABRICATE.App.Journal.History.Sort.Oldest') },
   ]);
 
   const relativeLabels = $derived({
     today: localize('FABRICATE.App.Journal.RelativeTime.Today'),
     yesterday: localize('FABRICATE.App.Journal.RelativeTime.Yesterday'),
-    daysAgo: (n) => localize('FABRICATE.App.Journal.RelativeTime.DaysAgo', { days: n })
+    daysAgo: (n) => localize('FABRICATE.App.Journal.RelativeTime.DaysAgo', { days: n }),
   });
 
   function relativeTimeFor(run) {

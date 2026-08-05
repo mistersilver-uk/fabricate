@@ -74,7 +74,7 @@ jobs:
       - uses: actions/checkout@v6
       # Shared Node + npm ci preamble (no OIDC — this job touches no bucket).
       - uses: ./.github/actions/release-setup
-      - run: npx playwright install chromium --with-deps
+      - run: ./node_modules/.bin/playwright install chromium --with-deps
       - run: npm test
       - run: npm run build
 
@@ -217,3 +217,52 @@ jobs:
             exit 1
           fi
           echo "$RELEASE_TAG published to its channel; the channel head now advertises it."
+
+  forward-port:
+    # THE forward-port seam (issue #1001): scheduled at the PRERELEASE PROMOTION, at the point where
+    # "a stable version was minted AND published to its channel" is an established fact. Without it
+    # the last stable tag reachable from `main` never moves, `main` keeps computing prereleases of a
+    # version number it minted long ago, and the promotion's registry-lead guard eventually refuses
+    # the very promotion whose job 2 would have performed the forward-port — a deadlock.
+    #
+    # STRICTLY AFTER verify-publish. The property being maintained is that the prerelease line is
+    # numbered above versions that are PUBLISHED, not merely minted: if the S3 publish failed no
+    # downstream head moved, there is nothing to be numbered above, and forward-porting would both
+    # mask the failure and fire a full beta.yml run off a broken release.
+    needs: [semantic-release, publish-s3, verify-publish]
+    # `always()` for the same reason publish-s3 and verify-publish already use it: on the
+    # workflow_dispatch(tag) re-entry path `semantic-release` is SKIPPED, and a skipped `need` fails
+    # the implicit `success()`. Because `always()` disables that implicit wrapping entirely, the
+    # `needs.verify-publish.result == 'success'` conjunct is LOAD-BEARING, not decorative — without
+    # it the forward-port would run after a FAILED publish. It is also sufficient on its own for "a
+    # version was minted or selected and its channel publish succeeded", because verify-publish is
+    # itself gated on `inputs.tag != '' || needs.semantic-release.outputs.next_version != ''` and is
+    # SKIPPED (result `skipped`, never `success`) when nothing was minted. Including the re-entry
+    # path is deliberate: re-entry is exactly the recovery case whose original run failed at the
+    # publish and therefore never forward-ported.
+    #
+    # `github.ref_name == 'release'` is the HOTFIX EXCLUSION — this workflow serves both `release`
+    # and `N.N.x` hotfix lines, and a hotfix leaves its line by cherry-pick, never a release-into-
+    # main merge. A job-level `if:` (which yields `skipped` here) is safe because nothing in this
+    # workflow depends on this job's result — unlike promote-to-public.yml, where job 4's strict
+    # `if:` rejects anything but `success` and the no-op therefore runs through the `enabled` input.
+    if: ${{ always() && github.ref_name == 'release' && needs.verify-publish.result == 'success' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/forward-port.yml
+    with:
+      # Not a dry run: this is the entry point that actually keeps `main` numbered above the
+      # released version.
+      dry_run: false
+      reason: "after publishing ${{ inputs.tag != '' && inputs.tag || needs.semantic-release.outputs.next_tag }} to early-access"
+      # The same expression shape publish-s3 and verify-publish already use. This job gates on THIS
+      # run's verify-publish, but the merge acts on origin/release's CURRENT tip, and those are not
+      # the same thing on the re-entry path — so tell the callee which tag was actually verified and
+      # let it skip (reporting success) if the tip has moved past it.
+      expected_tag: ${{ inputs.tag != '' && inputs.tag || needs.semantic-release.outputs.next_tag }}
+      # override_hint is deliberately NOT passed: the workflow_call default already names the manual
+      # forward-port.yml dispatch, which is the reachable remedy from here.
+    secrets:
+      # Reusable workflows do not inherit repository secrets. This is the ruleset bypass App's key;
+      # without it the callee's token mint fails closed rather than pushing anonymously.
+      RELEASE_BOT_KEY: ${{ secrets.RELEASE_BOT_KEY }}

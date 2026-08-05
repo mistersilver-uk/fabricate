@@ -8,6 +8,56 @@
  */
 
 /**
+ * Sentinel `taskId` prefix persisted on an opaque-blind WAITING run in place of
+ * the drawn task's real id (issue 901).
+ *
+ * A gathering run lives in `flags.fabricate.gatheringRuns` on the gathering
+ * actor, and Foundry pushes an owned Actor's full source — flags included — to
+ * that client, which made the drawn task both readable AND forgeable there. The
+ * real id now lives in the `fabricate.gatheringBlindRuns` WORLD setting, which
+ * only a GM may write.
+ *
+ * The marker is environment-scoped, so `findActiveRunForTask` still separates
+ * concurrent blind runs in different environments — that is what enforces "one
+ * active blind run per blind environment" ("you can't be in more than one place
+ * searching at once"). It cannot collide with a real task id unless an imported
+ * id literally starts with `blind:`.
+ *
+ * Lives here rather than in GatheringEngine because the engine, the gathering
+ * listing builder, and the Journal's RunJournalBuilder all have to recognise the
+ * marker, and the duplication gate forbids a second copy.
+ *
+ * @type {string}
+ */
+export const BLIND_WAITING_TASK_PREFIX = 'blind:';
+
+/**
+ * The environment-scoped sentinel an opaque-blind waiting run is persisted under.
+ *
+ * @param {object} environment
+ * @returns {string}
+ */
+export function blindWaitingTaskId(environment) {
+  return `${BLIND_WAITING_TASK_PREFIX}${stringOrEmpty(environment?.id)}`;
+}
+
+/**
+ * Whether a persisted run's `taskId` is the blind sentinel rather than a real
+ * task id.
+ *
+ * This is also the BACK-COMPAT switch. It is false for every run written before
+ * issue 901, so an in-flight run that already carries a real `taskId` and its own
+ * `economyEvidence.runtimeSnapshot` keeps resolving from those exactly as it did
+ * — no migration, and no blind-store record required.
+ *
+ * @param {*} taskId
+ * @returns {boolean}
+ */
+export function isBlindWaitingTaskId(taskId) {
+  return typeof taskId === 'string' && taskId.startsWith(BLIND_WAITING_TASK_PREFIX);
+}
+
+/**
  * Normalize an array / Map / iterable / Foundry collection into a plain array.
  * Returns an empty array for nullish or non-iterable input.
  *

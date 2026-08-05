@@ -436,6 +436,28 @@ describe('createAdminStore', () => {
       assert.deepEqual(check.defaultModifierIds, ['med']);
     });
 
+    it('projects every policy the manager accepts, including playerPicks (issue 855)', async () => {
+      // The projection normalized the policy through a LOCAL allowlist that predated
+      // `playerPicks`, so a stored `playerPicks` came back out as `addAll`: the GM
+      // clicked "Player picks", the card re-rendered on "Add all", and the system-level
+      // policy was unselectable through the UI even though the write itself was correct.
+      // Drive every accepted value, plus an unknown one, through the real projection.
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      const store = createAdminStore(services);
+      const projectPolicy = async (defaultModifierPolicy) => {
+        sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy };
+        await store.refresh();
+        return get(store.viewState).selectedSystem.craftingCheck.defaultModifierPolicy;
+      };
+
+      for (const policy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+        assert.equal(await projectPolicy(policy), policy, `${policy} survives the projection`);
+      }
+      assert.equal(await projectPolicy('bogus'), 'addAll', 'an unknown policy still falls back');
+      assert.equal(await projectPolicy(undefined), 'addAll', 'an absent policy still defaults');
+    });
+
     it('saveCraftingCheckModifiers preserves sibling check fields and replaces the catalogue array (issue 770 persistence trap)', async () => {
       // updateSystem shallow-merges only the top level, so a checkModifiers-only patch
       // that failed to spread `...existing` would drop every sibling check field. Capture
@@ -759,6 +781,128 @@ describe('createAdminStore', () => {
       assert.ok(sysId, 'should have a selectedSystemId after createSystem');
       const vs = get(store.viewState);
       assert.ok(vs.systems.some((s) => s.id === sysId));
+    });
+
+    // The manager root routes this through the same "did it happen?" helper as
+    // `selectSystem`, and that helper treats ONLY `false` as no — so the return value is a
+    // contract, not an incidental. On success it hands back the system; on a declined
+    // dirty-environment confirm it must be `false`, because a `null` would read as success
+    // and navigate the GM away from the very edit they just chose to keep.
+    it('createSystem returns the created system so the caller can open it', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+
+      const created = await store.createSystem();
+
+      assert.ok(created, 'a successful create reports the system back');
+      assert.equal(created.id, get(store.selectedSystemId));
+    });
+
+    // The reported case: a system is ALREADY selected when Create is pressed. The manager
+    // root opens the created system's overview off the back of this, so if the selection
+    // does not actually move, the GM is taken to the overview of the system they already
+    // had open — which is what a GM reported after the navigation landed.
+    it('createSystem selects the new system even when another one is already selected', async () => {
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      assert.equal(get(store.viewState).selectedSystem?.id, 'sys1', 'pre-condition: sys1 is open');
+
+      const created = await store.createSystem();
+
+      assert.equal(get(store.selectedSystemId), created.id, 'the store selects the new system');
+      assert.equal(
+        get(store.viewState).selectedSystem?.id,
+        created.id,
+        'and the published projection the rail reads names it too'
+      );
+    });
+
+    // The real `CraftingSystemManager.createSystem` fires `fabricate.craftingSystemsChanged`
+    // BEFORE it returns, and the store answers that hook by scheduling its own refresh. That
+    // refresh is therefore already in flight, holding the PREVIOUS selection, when
+    // `createSystem` goes on to select the new system — and `refresh` had no way to tell a
+    // stale run from a current one, so the older one could publish last and put the rail back
+    // on the system the GM started from.
+    it('createSystem survives the systems-changed refresh its own write triggers', async () => {
+      let dataChangedCallback = null;
+      const services = createMockServices({
+        onFabricateDataChanged: (callback) => {
+          dataChangedCallback = callback;
+          return () => {};
+        },
+      });
+      const manager = services.getCraftingSystemManager();
+      const create = manager.createSystem;
+      manager.createSystem = async (data) => {
+        const created = await create(data);
+        // Stand in for `_notifySystemsChanged()`: fired while the OLD id is still selected.
+        dataChangedCallback?.('systems');
+        return created;
+      };
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const created = await store.createSystem();
+      // Let every scheduled refresh — including the stale one — finish publishing.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      assert.equal(get(store.selectedSystemId), created.id);
+      assert.equal(
+        get(store.viewState).selectedSystem?.id,
+        created.id,
+        'a refresh that started before the new system was selected must not publish over it'
+      );
+    });
+
+    // The mechanism behind that, isolated: a refresh reads the selection once at the top and
+    // publishes after async work, so an OLDER run can finish last and put the previous
+    // selection back. A GM sees the new system appear and then flick away.
+    //
+    // The interleave is FORCED here rather than hoped for. Every awaited call in the mock
+    // resolves in queue order, so two refreshes started back-to-back always finish in order
+    // and the race cannot appear by itself. Holding the first run's environment lookup open
+    // until the second has finished reproduces what varying `fromUuid`/`enrichHTML` latency
+    // does in a real world.
+    it('a superseded refresh does not publish over a newer one', async () => {
+      let releaseFirst = null;
+      let held = false;
+      const services = createMockServices({
+        getGatheringEnvironmentStore: () => ({
+          list: () => [],
+          listBySystem: async () => {
+            if (held) return [];
+            held = true;
+            await new Promise((resolve) => {
+              releaseFirst = resolve;
+            });
+            return [];
+          },
+        }),
+      });
+      services.getCraftingSystemManager().getSystem('sys1').features = { gathering: true };
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // Run 1 stalls inside its environment lookup, still holding `sys1`.
+      const stale = store.refresh();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Run 2 selects and publishes the new system while run 1 is parked.
+      const created = await store.createSystem();
+      assert.equal(get(store.viewState).selectedSystem?.id, created.id, 'the new system is live');
+
+      // Now let the older run finish. It is holding `sys1` and must NOT publish it.
+      releaseFirst?.();
+      await stale;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      assert.equal(
+        get(store.viewState).selectedSystem?.id,
+        created.id,
+        'a superseded run must drop its work, not flick the selection back'
+      );
     });
 
     it('createSystem generates unique name when default already exists', async () => {
@@ -1331,6 +1475,31 @@ describe('createAdminStore', () => {
   // -------------------------------------------------------------------------
 
   describe('essence management', () => {
+    // The authored-colour cases (issue 917) all need the same rig: optionally seeded
+    // essence definitions, plus a capture of the definitions that actually reach
+    // updateSystem. Asserting the persisted payload — not that the store method was
+    // called — is the point: the GM control renders a colour that is worthless if the
+    // save path drops it.
+    function createEssenceColourRig(seeded = null) {
+      const captured = { essenceDefinitions: null };
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      const sys = origManager.getSystem('sys1');
+      if (sys && seeded) sys.essenceDefinitions = seeded;
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          if (updates.essenceDefinitions) captured.essenceDefinitions = updates.essenceDefinitions;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      return { services, manager: origManager, captured };
+    }
+
+    function storedEssence(manager, essenceId) {
+      return (manager.getSystem('sys1').essenceDefinitions || []).find((e) => e.id === essenceId);
+    }
+
     it('addEssence appends to essenceDefinitions', async () => {
       let savedEssences = null;
       const services = createMockServices();
@@ -1446,6 +1615,33 @@ describe('createAdminStore', () => {
       // The essence's OWN output key stays `sourceItemUuid` (kept).
       assert.equal(newEssence.sourceItemUuid, 'Compendium.fabricate.items.sunleaf');
       assert.ok(!('originItemUuid' in newEssence));
+    });
+
+    it('addEssence persists the authored colour token (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null, 'rose');
+
+      const saved = captured.essenceDefinitions?.find((e) => e.name === 'Fire');
+      assert.ok(saved, 'new essence should be persisted');
+      assert.equal(saved.colorToken, 'rose');
+      assert.equal(
+        (manager.getSystem('sys1').essenceDefinitions || []).find((e) => e.name === 'Fire')
+          ?.colorToken,
+        'rose'
+      );
+    });
+
+    it('addEssence stores a null colour token when none is authored (issue 917)', async () => {
+      const { services, captured } = createEssenceColourRig();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.addEssence('Fire', 'Burning essence', 'fas fa-fire', null);
+
+      const saved = captured.essenceDefinitions?.find((e) => e.name === 'Fire');
+      assert.ok(saved, 'new essence should be persisted');
+      assert.equal(saved.colorToken, null);
     });
 
     it('addEssence rejects duplicate name', async () => {
@@ -1718,6 +1914,81 @@ describe('createAdminStore', () => {
       assert.equal(savedEssences?.[0].sourceComponentId, null);
       assert.equal(savedEssences?.[0].sourceItemUuid, null);
       assert.equal(savedEssences?.[0].associatedSystemItemId, null);
+    });
+
+    it('updateEssence persists a newly authored colour token (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig([
+        {
+          id: 'ess1',
+          name: 'Fire',
+          description: 'Burning essence',
+          icon: 'fas fa-fire',
+          colorToken: null,
+          sourceComponentId: null,
+          sourceItemUuid: null,
+          associatedSystemItemId: null,
+        },
+      ]);
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', {
+        name: 'Fire',
+        description: 'Burning essence',
+        icon: 'fas fa-fire',
+        colorToken: 'sage',
+      });
+
+      // The value that reaches updateSystem, not merely that updateSystem was called.
+      assert.equal(captured.essenceDefinitions?.[0].colorToken, 'sage');
+      assert.equal(storedEssence(manager, 'ess1')?.colorToken, 'sage');
+    });
+
+    it('updateEssence clears an authored colour token when the editor sends null (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig([
+        {
+          id: 'ess1',
+          name: 'Fire',
+          description: 'Burning essence',
+          icon: 'fas fa-fire',
+          colorToken: 'rose',
+          sourceComponentId: null,
+          sourceItemUuid: null,
+          associatedSystemItemId: null,
+        },
+      ]);
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', { name: 'Fire', colorToken: null });
+
+      // An explicit null is the Clear control unsetting the colour, so the previous
+      // value must NOT survive the spread that preserves an untouched field.
+      assert.equal(captured.essenceDefinitions?.[0].colorToken, null);
+      assert.equal(storedEssence(manager, 'ess1')?.colorToken, null);
+    });
+
+    it('updateEssence leaves an authored colour token alone when the field is absent (issue 917)', async () => {
+      const { services, manager, captured } = createEssenceColourRig([
+        {
+          id: 'ess1',
+          name: 'Fire',
+          description: 'Burning essence',
+          icon: 'fas fa-fire',
+          colorToken: 'aqua',
+          sourceComponentId: null,
+          sourceItemUuid: null,
+          associatedSystemItemId: null,
+        },
+      ]);
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      await store.updateEssence('ess1', { name: 'Ember' });
+
+      assert.equal(captured.essenceDefinitions?.[0].name, 'Ember');
+      assert.equal(captured.essenceDefinitions?.[0].colorToken, 'aqua');
+      assert.equal(storedEssence(manager, 'ess1')?.colorToken, 'aqua');
     });
 
     it('updateEssence rejects duplicate names from another essence', async () => {
@@ -2120,6 +2391,78 @@ describe('createAdminStore', () => {
       assert.equal(projected.craftingModifier, null, 'no override projects as null (inherit)');
     });
 
+    it('viewState.recipes projects enableBlocked true for a STRUCTURALLY BROKEN recipe that reads incomplete false (issue 1010)', async () => {
+      // The case proving `incomplete` could not have served. `_isRecipeIncomplete` is
+      // `validate().valid === false && validateStructure().valid === true`, so a recipe
+      // that fails validateStructure() reads `incomplete: false` — wearing no pill —
+      // while activation still refuses it. Reading `incomplete` for the blocked-enable
+      // count would report zero for exactly the recipes the bulk write leaves off.
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const broken = makeRecipe({
+        id: 'r-broken',
+        craftingSystemId: 'sys1',
+        validate: () => ({ valid: false }),
+        validateStructure: () => ({ valid: false }),
+      });
+      const activationChecks = [];
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: () => [broken],
+        canActivateRecipe: (recipe) => {
+          activationChecks.push(recipe);
+          return { valid: false, issues: [{ code: 'resultGroupEmpty', params: {} }] };
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-broken');
+      assert.ok(projected, 'recipe should be projected');
+      assert.equal(projected.incomplete, false, 'a structurally broken recipe is NOT incomplete');
+      assert.equal(projected.enableBlocked, true, 'yet activation would still refuse it');
+      assert.ok(activationChecks.length > 0, 'the predicate is consulted');
+      assert.ok(
+        activationChecks.every((asked) => asked === broken),
+        'it is asked about the recipe MODEL, not the projected row'
+      );
+    });
+
+    it('viewState.recipes projects enableBlocked false for an activatable recipe (issue 1010)', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const healthy = makeRecipe({
+        id: 'r-ok',
+        craftingSystemId: 'sys1',
+        validate: () => ({ valid: true }),
+        validateStructure: () => ({ valid: true }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: () => [healthy],
+        canActivateRecipe: () => ({ valid: true }),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-ok');
+      assert.equal(projected.enableBlocked, false, 'nothing refuses an activatable recipe');
+      assert.equal(projected.incomplete, false);
+    });
+
+    it('viewState.recipes projects enableBlocked false when the recipe manager has no activation predicate (issue 1010)', async () => {
+      // The projection runs against injected services, so a manager without the
+      // predicate must not throw at projection time. Absent means "unknown", never
+      // "blocked" — an invalid RESULT is still honoured (the two cases above).
+      const services = createMockServices();
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r1');
+      assert.ok(projected, 'recipe should be projected');
+      assert.equal(projected.enableBlocked, false);
+    });
+
     it('updateRecipe threads a craftingModifier override through the save path (issue 770 round-trip)', async () => {
       // The editor saves the whole draft (seeded from the projection above). Assert the
       // store save path forwards craftingModifier to the recipe manager so an authored
@@ -2146,6 +2489,118 @@ describe('createAdminStore', () => {
         { policy: 'highest', modifierIds: ['med'] },
         'the override is threaded to recipeManager.updateRecipe, not stripped'
       );
+    });
+
+    // Issue 978. `_buildRecipeList` DERIVES `recipeItemId` from `containingDefinitions[0]`
+    // — definition order, an authoring accident. The editor seeds its draft from a whole
+    // projected row and Save posts the whole draft, so before this fix that derived
+    // scalar was persisted onto the model, arming the four legacy `src/systems` image
+    // resolvers (issue 887) for the ordinary cohort and not just the alchemy one.
+    it('updateRecipe strips the derived recipe-item projection fields from the save payload', async () => {
+      let updateArgs = null;
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      sys.recipeItemDefinitions = [
+        { id: 'def-tome', name: 'Tome', img: '', originItemUuid: '', recipeIds: ['r1'] },
+        { id: 'def-scroll', name: 'Scroll', img: '', originItemUuid: '', recipeIds: ['r1'] },
+      ];
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          updateArgs = { id, updates, options };
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      // Non-vacuity guard: the row must actually carry a leak candidate, or the strip
+      // assertion below would pass against a projection that never derived one.
+      const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+      assert.equal(row.recipeItemId, 'def-tome', 'the projection derives the FIRST book id');
+
+      const ok = await store.updateRecipe('r1', { ...row, name: 'Renamed' });
+      assert.equal(ok, true);
+      assert.equal(updateArgs.updates.name, 'Renamed', 'authored fields still reach the manager');
+      for (const field of [
+        'recipeItemId',
+        'recipeItemIds',
+        'recipeItemName',
+        'recipeItemSourceUuid',
+      ]) {
+        assert.equal(
+          field in updateArgs.updates,
+          false,
+          `${field} is OMITTED, not nulled — an explicit null would destroy the scalar the alchemy cohort relies on`
+        );
+      }
+    });
+
+    it('updateRecipe strips the derived scalar in either membership order', async () => {
+      // The leaked value tracked definition order, so a single-order assertion cannot
+      // distinguish "stripped" from "happened to derive nothing". Flip the order, confirm
+      // the projection's derived scalar genuinely flips, and assert neither save carries it.
+      const captured = [];
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      const tome = { id: 'def-tome', name: 'Tome', img: '', originItemUuid: '', recipeIds: ['r1'] };
+      const scroll = {
+        id: 'def-scroll',
+        name: 'Scroll',
+        img: '',
+        originItemUuid: '',
+        recipeIds: ['r1'],
+      };
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async (id, updates, options) => {
+          captured.push(updates);
+          return origManager.updateRecipe(id, updates, options);
+        },
+      });
+
+      const derivedScalars = [];
+      for (const [order, definitions] of [
+        ['tome first', [tome, scroll]],
+        ['scroll first', [scroll, tome]],
+      ]) {
+        sys.recipeItemDefinitions = definitions;
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+        const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+        derivedScalars.push(row.recipeItemId);
+        await store.updateRecipe('r1', { ...row, name: `Renamed (${order})` });
+      }
+
+      assert.deepEqual(
+        derivedScalars,
+        ['def-tome', 'def-scroll'],
+        'the derived scalar tracks definition order, so the strip is doing real work'
+      );
+      assert.equal(captured.length, 2, 'both saves reached the manager');
+      for (const updates of captured) {
+        assert.equal('recipeItemId' in updates, false);
+        assert.equal('recipeItemIds' in updates, false);
+      }
+    });
+
+    it('updateRecipe is a no-op when the payload is derived fields only', async () => {
+      let called = false;
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      services.getRecipeManager = () => ({
+        ...origManager,
+        updateRecipe: async () => {
+          called = true;
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const ok = await store.updateRecipe('r1', { recipeItemId: 'def-tome', recipeItemIds: [] });
+      assert.equal(ok, true, 'a derived-only payload succeeds rather than erroring');
+      assert.equal(called, false, 'nothing is authored, so the manager is never called');
     });
 
     it('addRecipeItemFromUuid passes through the manager result', async () => {
@@ -5820,7 +6275,13 @@ describe('createAdminStore', () => {
           'category',
           'enabled',
           'locked',
+          // The legacy book scalars issue 884 deliberately KEEPS. Named individually
+          // so deleting the whole legacy block, rather than the one image line, fails
+          // here instead of silently emptying the Books & Scrolls consumers.
           'recipeItemId',
+          'recipeItemIds',
+          'recipeItemName',
+          'recipeItemSourceUuid',
           'isSimple',
           'visibilitySummary',
           'stepCount',
@@ -5836,6 +6297,68 @@ describe('createAdminStore', () => {
           assert.ok(field in recipe, `recipe entry should have field: ${field}`);
         }
       }
+    });
+
+    // Issue 884. Book membership is many-to-many, so "the containing book" is not a
+    // well-defined thing to borrow an image from: which definition lands at index 0 is
+    // the order of `selectedSystem.recipeItemDefinitions`, an authoring accident. The
+    // projection therefore carries NO book image at all, and the four GM readers resolve
+    // `recipe.img` through the shared helper instead.
+    it('viewState.recipes projects no containing-book image, in either membership order', async () => {
+      const TOME_IMG = 'icons/sundries/books/book-tooled-eye-gold-red.webp';
+      const SCROLL_IMG = 'icons/sundries/scrolls/scroll-bound-blue.webp';
+      const services = createMockServices();
+      const sys = services.getCraftingSystemManager().getSystem('sys1');
+      // r1 belongs to BOTH books, and their artwork DIFFERS — so a borrowed icon would
+      // visibly change with nothing but the definition order.
+      sys.recipeItemDefinitions = [
+        { id: 'def-tome', name: 'Tome', img: TOME_IMG, originItemUuid: '', recipeIds: ['r1'] },
+        { id: 'def-scroll', name: 'Scroll', img: SCROLL_IMG, originItemUuid: '', recipeIds: ['r1'] },
+      ];
+
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      const assertOwnImageOnly = (order, expectedFirstBookName) => {
+        const row = get(store.viewState).recipes.find((r) => r.id === 'r1');
+        assert.ok(row, `the recipe row is projected (${order})`);
+        assert.equal(
+          'recipeItemImg' in row,
+          false,
+          `the book-image field is gone entirely, not merely emptied (${order})`
+        );
+        assert.equal(row.img, 'recipe.png', `the row carries the recipe's OWN image (${order})`);
+        assert.equal(
+          Object.values(row).some((value) => value === TOME_IMG || value === SCROLL_IMG),
+          false,
+          `no projected field smuggles a containing book's artwork through (${order})`
+        );
+        // Membership itself is untouched: both ids, plus the legacy first-book scalars.
+        assert.deepEqual(
+          [...row.recipeItemIds].sort(),
+          ['def-scroll', 'def-tome'],
+          `both containing books still project (${order})`
+        );
+        // Load-bearing for the SECOND phase: every other assertion here is
+        // order-insensitive (the id comparison is sorted), so on their own they would
+        // still pass if `refresh()` had silently re-published a cached projection —
+        // which is exactly what this case's title claims to rule out. `recipeItemName`
+        // is derived from `containingDefinitions[0]`, the same index the deleted
+        // `recipeItemImg` came from, so it is the field that genuinely flips with the
+        // reversal. It passes today by design: this guards the re-derivation, it does
+        // not chase a bug.
+        assert.equal(
+          row.recipeItemName,
+          expectedFirstBookName,
+          `the first book's name survives and tracks definition order (${order})`
+        );
+      };
+
+      assertOwnImageOnly('tome first', 'Tome');
+
+      sys.recipeItemDefinitions.reverse();
+      await store.refresh();
+      assertOwnImageOnly('scroll first', 'Scroll');
     });
 
     it('viewState.recipes entries project the raw visibility object for the restriction editor', async () => {

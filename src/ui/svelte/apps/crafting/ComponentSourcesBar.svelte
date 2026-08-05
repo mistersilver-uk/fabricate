@@ -68,9 +68,17 @@
 >
   <span class="crafting-sources-label">{localize('FABRICATE.App.Crafting.Sources.Label')}</span>
 
-  <div class="crafting-sources-avatars" role="group" aria-label={localize('FABRICATE.App.Crafting.Sources.Label')}>
+  <div
+    class="crafting-sources-avatars"
+    role="group"
+    aria-label={localize('FABRICATE.App.Crafting.Sources.Label')}
+  >
     {#each sources as source (source.id)}
-      <span class="crafting-source" data-source-id={source.id} data-source-removable={source.removable === false ? 'false' : 'true'}>
+      <span
+        class="crafting-source"
+        data-source-id={source.id}
+        data-source-removable={source.removable === false ? 'false' : 'true'}
+      >
         <button
           type="button"
           class="crafting-source-avatar"
@@ -127,7 +135,11 @@
         role="dialog"
         aria-label={localize('FABRICATE.App.Crafting.Sources.Edit')}
       >
-        <div class="crafting-source-options" role="listbox" aria-label={localize('FABRICATE.App.Crafting.Sources.Edit')}>
+        <div
+          class="crafting-source-options"
+          role="listbox"
+          aria-label={localize('FABRICATE.App.Crafting.Sources.Edit')}
+        >
           {#each available as actor (actor.id)}
             <button
               type="button"

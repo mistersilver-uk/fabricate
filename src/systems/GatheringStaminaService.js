@@ -295,8 +295,22 @@ export class GatheringStaminaService {
    * `regen.unit` elapsed since the last evaluation, clamps to the pool max, and
    * advances the persisted anchor by exactly the consumed intervals so the
    * fractional remainder accrues toward the next tick. No-ops when the system
-   * does not have stamina enabled, regen is off, the pool has no max, or world time
-   * has not advanced a full interval (re-anchoring on backwards jumps).
+   * does not have stamina enabled, regen is off, the pool has no max, or world
+   * time has not advanced a full interval.
+   *
+   * `lastRegenWorldTime` is an ACCRUAL anchor (issue 403) and is monotonic
+   * non-decreasing, in three cases:
+   *  - ABSENT (no key, or a non-finite value) → SEED it at `now` and persist. This
+   *    is the pool `setActorStamina` produces on an actor with no prior entry (it
+   *    carries the anchor forward only when a previous one existed), so a GM
+   *    `setGatheringStamina` on a fresh actor lands here. Freezing instead of
+   *    seeding would stop that pool regenerating permanently and invisibly.
+   *  - present and `now < anchor` (world time ran backwards) → FREEZE: write no
+   *    actor state at all. Re-anchoring would mint free stamina on the way
+   *    forward again.
+   *  - present and `now === anchor` → nothing to do.
+   * The anchor may therefore legitimately sit AHEAD of `now` — after a rewind, or
+   * on an actor imported from a world whose timeline ran further ahead.
    *
    * @param {object} payload
    * @returns {Promise<object|null>} The updated stamina entry, or null on no-op.
@@ -324,18 +338,22 @@ export class GatheringStaminaService {
     if (max == null) return null;
     const now = Number(worldTime);
     if (!Number.isFinite(now)) return null;
-    const last = Number.isFinite(Number(entry.lastRegenWorldTime))
-      ? Number(entry.lastRegenWorldTime)
-      : now;
-
-    // World time stood still or ran backwards: re-anchor, never regenerate.
-    if (now <= last) {
-      if (entry.lastRegenWorldTime !== now) {
-        state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: now } };
-        await writeState(actor, state);
-      }
-      return null;
+    // Absent anchor FIRST, ahead of the backward comparison (see the doc block):
+    // seed at `now` and persist, so a pool materialized without an anchor starts
+    // accruing from this instant instead of freezing forever. Nullish OR
+    // non-finite, mirroring `numberOrNull`, so a garbage anchor cannot persist as
+    // `NaN`.
+    const storedAnchor = entry.lastRegenWorldTime;
+    if (storedAnchor == null || !Number.isFinite(Number(storedAnchor))) {
+      state.stamina = { ...state.stamina, [key]: { ...entry, lastRegenWorldTime: now } };
+      await writeState(actor, state);
+      return null; // a seed is not a regeneration — it grants no backlog
     }
+    const last = Number(storedAnchor);
+
+    // World time stood still or ran backwards: freeze the accrual anchor and
+    // write no actor state at all.
+    if (now <= last) return null;
 
     const intervals = Math.floor((now - last) / interval);
     if (intervals <= 0) return null; // keep the anchor so the remainder accrues

@@ -26,10 +26,15 @@ import { resolveAdvanceSources } from './systems/advanceCraftingSources.js';
 import { GatheringEngine } from './systems/GatheringEngine.js';
 import { GatheringHookPublisher } from './systems/GatheringHookPublisher.js';
 import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessage } from './systems/eventSceneCoordinator.js';
+import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGatheringNodeDepleteMessage } from './systems/gatheringNodeSocket.js';
+import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
+import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
+import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
+import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
 import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
 import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
@@ -123,6 +128,14 @@ import './ui/InteractableConfigApp.svelte.js';
 import './ui/InteractablesManagerApp.svelte.js';
 
 let gatheringEngine = null;
+
+// Per-sender throttle for inbound gathering node depletions, held at module scope so
+// the window survives across socket messages (a per-message limiter would never
+// refuse anything). Only the active GM ever consults it.
+const gatheringDepletionRateLimiter = createDepletionRateLimiter();
+// Separate budget for the blind-start relay (issue 901) so a burst of gathers and
+// a burst of starts cannot starve one another through a shared allowance.
+const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
 
 // The GM-only crafting system manager app is deferred to a lazy chunk so
 // non-GM players never download/parse its subtree at module init. The dynamic
@@ -219,6 +232,42 @@ function getGatheringRunViewer({ run } = {}) {
 
 function isCurrentWorldPaused() {
   return game.paused === true;
+}
+
+/**
+ * ACTIVE-GM edge for a relayed BLIND gathering start (issue 901).
+ *
+ * The GM re-runs the WHOLE attempt with the REQUESTING USER as the viewer rather
+ * than itself. That matters twice over: every gate the player would have faced
+ * (actor ownership via `isActorSelectable`, scene presence, task visibility,
+ * tools, stamina, and node availability net of outstanding reservations) is
+ * re-evaluated GM-side against the player who asked, and `_isOpaqueBlindTask`
+ * stays TRUE so the run is persisted blind. Running it as the GM's own viewer
+ * would silently write the real task id back onto the actor flag.
+ *
+ * The `senderId` is Foundry's server-attested socket sender, never a payload
+ * field, so a forged message cannot impersonate another user.
+ *
+ * @param {object} payload Validated blind-start request plus the attested sender.
+ * @returns {Promise<object|null>} The start result, or null when unresolvable.
+ */
+async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, taskId = null, interactableRef = null } = {}) {
+  const requester = game.users?.get?.(senderId) ?? null;
+  if (!requester) return null;
+  const resolve = globalThis.fromUuidSync;
+  let startActor = null;
+  try { startActor = typeof resolve === 'function' ? resolve(String(actorUuid)) : null; } catch (_) { startActor = null; }
+  if (!startActor) return null;
+  // `interactive: false`: the situational-modifier dialog belongs to the player's
+  // client, never the GM's. A timed blind run does not roll at start anyway.
+  return gatheringEngine?.startAttempt({
+    viewer: requester,
+    actor: startActor,
+    environmentId,
+    taskId,
+    interactableRef,
+    interactive: false
+  });
 }
 
 /**
@@ -397,6 +446,9 @@ class Fabricate {
     this.salvageRunManager = null;
     this._runJournalBuilder = null;
     this.gatheringEnvironmentStore = null;
+    this.gatheringNodeDepletionWriter = null;
+    this.gatheringBlindRunStore = null;
+    this.gatheringBlindStartWriter = null;
     this.gatheringRichStateService = null;
     this.gatheringRunManager = null;
     this.gatheringGateAndCheckEvaluator = null;
@@ -456,9 +508,10 @@ class Fabricate {
       primeEnricherCache: (rawTexts) => primeEnricherCache(rawTexts)
     });
     // Wire the real primary-GM check into the timed world-time resume paths (issue
-    // 656). Both managers default `isPrimaryGM` to `() => true` (fail-open, so unit
-    // fixtures resume), so passing the real `activeGM` check here is load-bearing —
-    // it gates the synced-hook `setFlag` writes to exactly one client.
+    // 656). Both managers — and the gathering engine's `resumeTimedRuns` below —
+    // default this to `() => true` (fail-open, so unit fixtures resume), so passing
+    // the real `activeGM` check here is load-bearing: it gates the synced-hook
+    // `setFlag` writes, item creation and node depletion to exactly one client.
     const isPrimaryGM = () => game.users?.activeGM?.id === game.user?.id;
     this.craftingRunManager = new CraftingRunManager({ isPrimaryGM });
     this.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
@@ -567,8 +620,30 @@ class Fabricate {
         return uuids;
       }
     });
+    // Environment resource-node pools live in `environment.nodeRuntime[taskId]`,
+    // persisted in the `gatheringEnvironments` WORLD setting — and Foundry lets only
+    // a GM update a world Setting document. A player who gathers from a node-backed
+    // task therefore cannot write their own decrement; without this relay the write
+    // rejects with "User <name> lacks permission to update Setting [...]" and the
+    // pool never depletes. Route it to the active GM over the same `module.fabricate`
+    // channel issue 302 already uses for interactable-scoped pools. On a GM client
+    // the writer applies locally (a socket emit never reaches the emitter).
+    this.gatheringNodeDepletionWriter = createGatheringNodeDepletionWriter({
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      // `Users#activeGM` is null when no GM is connected, so nobody would apply the
+      // relayed write. Report it rather than emitting into the void: the gather still
+      // succeeds (it never gated on this write), the pool just does not deplete.
+      hasActiveGM: () => !!game.users?.activeGM,
+      onUnroutable: ({ environmentId, taskId }) => console.warn(
+        'Fabricate | Gathering node depletion was not applied: no active GM is connected to write the world setting',
+        { environmentId, taskId }
+      ),
+      emitDeplete: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+      applyDeplete: (payload) => this.gatheringRichStateService?.applyEnvironmentNodeDepletion(payload)
+    });
     this.gatheringRichStateService = new GatheringRichStateService({
       environmentStore: this.gatheringEnvironmentStore,
+      depleteEnvironmentNode: (payload) => this.gatheringNodeDepletionWriter.deplete(payload),
       getSetting,
       setSetting,
       settingKey: SETTING_KEYS.GATHERING_CONFIG,
@@ -586,6 +661,9 @@ class Fabricate {
       writeInteractableBehavior: (ref, patch) => writeInteractableBehaviorNode(ref, patch)
     });
     gatheringEngine = new GatheringEngine({
+      // Load-bearing: without it every connected client resumes the same matured
+      // timed run and double-applies its items, tool wear and node depletion.
+      resumeTimedRuns: isPrimaryGM,
       environmentStore: this.gatheringEnvironmentStore,
       runManager: this.gatheringRunManager,
       richState: this.gatheringRichStateService,
@@ -635,6 +713,56 @@ class Fabricate {
           update
         })
     });
+    // Issue 901. A blind run's secret state — the drawn task, its start-time
+    // snapshot, and its provisional node reservation — lives in the
+    // `gatheringBlindRuns` WORLD setting, which only a GM may update. That is the
+    // integrity boundary: a player can still READ world state (Foundry has no
+    // server-side read authorization) but can no longer FORGE the task their run
+    // will yield, which they could when it sat on an Actor flag they own.
+    this.gatheringBlindRunStore = new GatheringBlindRunStore({
+      getSetting,
+      setSetting,
+      settingKey: SETTING_KEYS.GATHERING_BLIND_RUNS,
+      // Load-bearing: the active GM is the SINGLE writer. `game.settings.set`
+      // replaces rather than merges and there is no compare-and-set anywhere, so a
+      // second concurrent writer would clobber another run's record.
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      // Liveness: a record only counts while its run is still active. This is what
+      // keeps a reservation PROVISIONAL under every path that never reaches the
+      // maturity release — a GM deleting the environment, task, or actor.
+      isRunActive: ({ actorUuid, runId }) => {
+        const resolve = globalThis.fromUuidSync;
+        if (typeof resolve !== 'function' || !actorUuid || !runId) return true;
+        let runActor = null;
+        try { runActor = resolve(String(actorUuid)); } catch (_) { runActor = null; }
+        if (!runActor) return false;
+        return Boolean(this.gatheringRunManager?.getActiveRun?.(runActor, runId));
+      },
+      nowWorldTime: () => Number(game.time?.worldTime || 0)
+    });
+    // Only a GM may write that setting, and — more importantly — the blind DRAW
+    // must happen somewhere the acting player cannot rig it. A player's blind
+    // timed start is therefore routed to the active GM over the same
+    // `module.fabricate` channel the node-depletion relay already uses (issue 983),
+    // and the GM re-runs the whole attempt with the requesting user as the viewer.
+    this.gatheringBlindStartWriter = createGatheringBlindStartWriter({
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      hasActiveGM: () => !!game.users?.activeGM,
+      onUnroutable: ({ environmentId }) => console.warn(
+        'Fabricate | Blind gathering start was not applied: no active GM is connected to write the world setting',
+        { environmentId }
+      ),
+      emitStart: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+      // The local-apply branch (this client IS the active GM) has no socket sender
+      // to attest, so supply the current user. Reached only if a GM ever routes its
+      // own start; the engine short-circuits before that, because a client that may
+      // write the setting never relays.
+      applyStart: (payload) => applyGatheringBlindStart({ senderId: game.user?.id, ...payload })
+    });
+    gatheringEngine.installBlindRunRelay({
+      store: this.gatheringBlindRunStore,
+      relayStart: (args) => this.gatheringBlindStartWriter.start(args)
+    });
     const validRecipes = new Set(this.recipeManager.getRecipes({}).map(r => r.id));
     const validSystems = new Set(this.craftingSystemManager.getSystems().map(s => s.id));
     const validSalvageComponentsBySystem = new Map(
@@ -643,26 +771,41 @@ class Fabricate {
         new Set((system.components || []).map(component => component.id))
       ])
     );
-    await this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems);
-    // Prune legacy phantom crafting runs: a single-step recipe with no time
-    // requirement can never legitimately persist an active run, so any such run left
-    // in the active store predates the craft() cleanup guard and is stranded.
-    await this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
-      this.recipeManager.getRecipe(id)
-    );
-    await this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem);
-    await this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes);
-    // Flatten the per-system salvage component sets the run cleanup above already
+    // Flatten the per-system salvage component sets the run cleanup below already
     // computed: the progressive-order map's `salvage:<componentId>` keys are not
     // system-scoped, so the prune needs one flat id set.
     const validComponentIds = new Set(
       [...validSalvageComponentsBySystem.values()].flatMap(ids => [...ids])
     );
-    await cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
-      resolveGatheringActor,
-      isSelectableGatheringActor,
-      validComponentIds
-    });
+    // Housekeeping that drops entries naming deleted content. Each pass is
+    // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
+    // refused or otherwise failed write must never prevent `this.ready` below —
+    // every facade method throws through `_requireReady()`, so one stale entry
+    // Foundry declined to clean would take the whole module down for that client.
+    // Each pass is also scoped to the actors this client owns (see
+    // `selectWritableActors`), so a refusal should no longer be reachable at all;
+    // this guard is the belt to that braces.
+    await runStartupMaintenance([
+      ['crafting runs', () =>
+        this.craftingRunManager.cleanupInvalidRuns(validRecipes, validSystems)],
+      // Prune legacy phantom crafting runs: a single-step recipe with no time
+      // requirement can never legitimately persist an active run, so any such run left
+      // in the active store predates the craft() cleanup guard and is stranded.
+      ['phantom crafting runs', () =>
+        this.craftingRunManager.pruneInstantaneousActiveRuns((id) =>
+          this.recipeManager.getRecipe(id)
+        )],
+      ['salvage runs', () =>
+        this.salvageRunManager.cleanupInvalidRuns(validSystems, validSalvageComponentsBySystem)],
+      ['learned recipes', () =>
+        this.recipeVisibilityService.cleanupLearnedRecipes(validRecipes)],
+      ['stale preferences', () =>
+        cleanupStalePreferences(validSystems, validRecipes, getSetting, setSetting, {
+          resolveGatheringActor,
+          isSelectableGatheringActor,
+          validComponentIds
+        })]
+    ]);
 
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
@@ -1216,6 +1359,11 @@ class Fabricate {
       recipeVisibility: this.recipeVisibilityService,
       resolutionModeService: this.resolutionModeService,
       craftingSystemManager: this.craftingSystemManager,
+      // Read ONLY for `findActiveRunForRecipe`, so the projection can name the step a
+      // run is parked on (issue 917). Safe to capture in the cached builder:
+      // `this.craftingRunManager` is constructed once during init and never
+      // reassigned, so a cached builder can never hold a stale manager.
+      craftingRunManager: this.craftingRunManager,
       localize: (key, data) =>
         data !== undefined
           ? (game.i18n?.format?.(key, data) ?? key)
@@ -1382,8 +1530,10 @@ class Fabricate {
   }
 
   /**
-   * GM-only crafting-knowledge reset (issue 773) — the interim macro/console access
-   * path until #785 ships the Books & Scrolls Knowledge tab. Clears one actor's
+   * GM-only crafting-knowledge reset (issue 773). This is the GM API that the
+   * Knowledge surface's per-character reset control routes through (issue 785, both
+   * the "This system" and "All systems" grains), and it remains available to macros
+   * and the console for the same reset outside the manager UI. Clears one actor's
    * learned recipes (and their scoped discovery progress) for one crafting system
    * (`systemId`) or, when `systemId` is null, across every system, delegating to the
    * shared {@link RecipeVisibilityService#forgetLearnedRecipes} deletion primitive.
@@ -1429,6 +1579,13 @@ class Fabricate {
    * @param {string|null} [options.actorId] Crafting actor id.
    * @param {string} options.recipeId Recipe id.
    * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
+   * @param {{stepId: string|null, ingredientSetId: string|null,
+   *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation]
+   *   The player's funding for the set's shared essence block (issue 917), scoped to
+   *   the step and set the rail was computed against. Passed straight through: the
+   *   ENGINE drops it when either id disagrees with the step it resolves from the
+   *   active run, because a facade-side guard would check an index that can move
+   *   between the derived rail and the click. Omitted (null) is today's behaviour.
    * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
    * @param {boolean} [options.interactive] When true, prompt the player with the
    *   confirm-roll dialog (optional situational modifier) and post the roll to chat
@@ -1438,7 +1595,7 @@ class Fabricate {
    *   mutation (no ingredients, currency, or tools consumed, no run created).
    * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
    */
-  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, componentSourceActorIds = null, interactive = false } = {}) {
+  async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false } = {}) {
     this._requireReady();
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
@@ -1455,6 +1612,8 @@ class Fabricate {
       ingredientSetId,
       // Per-group player option overrides (issue 552); null keeps default resolution.
       ingredientOptionOverrides,
+      // Scoped essence-block funding (issue 917); null keeps the allocator's suggestion.
+      ingredientEssenceAllocation,
       interactive,
     });
   }
@@ -1511,18 +1670,19 @@ class Fabricate {
    * @param {string|null} [options.recipeId]
    * @param {string|null} [options.setId] The ingredient set to re-evaluate.
    * @param {object|null} [options.optionOverrides] `{ [groupId]: {optionIndex, heldItemId?} }`.
+   * @param {object|null} [options.essenceAllocation] `{ [itemKey]: units }` — the
+   *   player's funding for the set's shared essence block (issue 917), so the rail
+   *   shows exactly what a craft would consume.
+   * @param {string|null} [options.stepId] Which execution step's set to resolve.
+   *   Omitted, the ACTIVE step decides (see below).
    * @param {string|null} [options.actorId] Crafting actor id (defaults to persisted).
    * @param {string[]|null} [options.componentSourceActorIds]
    * @returns {object|null} Fresh single-set craftability, or null when unresolvable.
    */
-  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, actorId = null, componentSourceActorIds = null } = {}) {
+  evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, essenceAllocation = null, stepId = null, actorId = null, componentSourceActorIds = null } = {}) {
     this._requireReady();
     const recipe = this.recipeManager?.getRecipe?.(recipeId);
     if (!recipe) return null;
-    const set = Array.isArray(recipe.ingredientSets)
-      ? recipe.ingredientSets.find((candidate) => String(candidate?.id) === String(setId))
-      : null;
-    if (!set) return null;
     const { craftingActor, componentSourceActors } = this._resolveCraftingSources({
       rememberedActorId: actorId,
       componentSourceActorIds,
@@ -1531,13 +1691,31 @@ class Fabricate {
       ? componentSourceActors
       : (craftingActor ? [craftingActor] : []);
     if (sources.length === 0) return null;
-    // Narrow the evaluation to the one selected set (mirrors CraftingListingBuilder's
-    // per-set copy): keeps the recipe's data fields + the IngredientSet instance
-    // methods while scoping craftability to this set.
-    const singleSetRecipe = { ...recipe, ingredientSets: [set] };
+    // Resolve through the EXECUTION STEPS, not `recipe.ingredientSets`. That array is
+    // EMPTY for every explicit multi-step recipe (its sets live on `steps[]`), so the
+    // previous top-level scan returned null for all of them and the issue-552 per-group
+    // option overrides were silently dead on stepped recipes. `resolveStepIngredientSet`
+    // also enforces the two rules that make this safe: with no `stepId` the ACTIVE step
+    // decides (never step 0), and a set id is only matched WITHIN the resolved step —
+    // set ids are `randomID()`, so a cross-step scan could evaluate a different step.
+    const resolved = resolveStepIngredientSet({
+      steps: this.resolutionModeService?.getExecutionSteps?.(recipe) ?? [],
+      stepId,
+      activeStepIndex: activeRunStepState(this.craftingRunManager, craftingActor, recipe.id).index,
+      setId,
+    });
+    if (!resolved) return null;
+    // Narrow the evaluation to the one selected set through the SHARED step view the
+    // engine crafts against (so the step's tool union applies), keeping the recipe's
+    // data fields and the IngredientSet instance methods.
+    const singleSetRecipe = {
+      ...buildStepRecipeView(recipe, resolved.step),
+      ingredientSets: [resolved.set],
+    };
     return this.recipeManager.evaluateCraftability(sources, singleSetRecipe, {
       craftingActor,
       optionOverrides,
+      essenceAllocation,
     }) ?? null;
   }
 
@@ -1889,7 +2067,10 @@ class Fabricate {
     // attempt — the player-app "nothing happens" bug. See _withRememberedActorDefault.
     const withRememberedActor = this._withRememberedActorDefault(options);
 
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'startAttempt', withRememberedActor, () => game.user);
+    // `requestStart`, not `startAttempt`: a blind timed start this client may not
+    // write is routed to the active GM before any task is drawn (issue 901). Every
+    // other start delegates straight to `startAttempt` and is unchanged.
+    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'requestStart', withRememberedActor, () => game.user);
   }
 
   /**
@@ -2140,8 +2321,10 @@ class Fabricate {
         getTool: (systemId, toolId) => this._resolveJournalTool(systemId, toolId),
         getGatheringTask: (environmentId, taskId) =>
           this._resolveJournalGatheringTask(environmentId, taskId),
-        getRecipeItemImg: (systemId, recipeItemId) =>
-          this.craftingSystemManager?.getRecipeItemDefinition?.(systemId, recipeItemId)?.img ?? null,
+        // GM-only secret preview of an in-flight blind run's drawn task (issue 901).
+        // The builder consults it only for a GM viewer; a player's journal shows the
+        // generic blind label, which is what the run record itself now carries.
+        getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
         getComponent: (systemId, componentId) =>
           this._resolveJournalComponent(systemId, componentId),
@@ -2263,16 +2446,23 @@ class Fabricate {
    * cannot advance the run — that case returns a clear "needs owner" message
    * instead of throwing.
    *
+   * The recipe comes from the RESOLVED RUN, never from the caller (issue 966). The
+   * Journal redacts `recipeId` to null for a run whose recipe the viewer cannot see,
+   * so a client-supplied id cannot be trusted to be present — and trusting it at all
+   * let a caller advance run X while naming recipe Y, resolving Y's steps against X's
+   * persisted state. The `recipeId` parameter is retained for macro back-compat and
+   * ignored.
+   *
    * @param {object} options
    * @param {string} options.actorId World-actor id the run is keyed to.
    * @param {string} options.runId Active run id.
-   * @param {string} options.recipeId Recipe id to craft.
+   * @param {string} [options.recipeId] Ignored; retained for back-compat.
    * @param {boolean} [options.interactive] When true (a player "Trigger Next Step"
    *   click), prompt the interactive roll dialog + post the roll to chat. Defaults
    *   false so automated/headless advances stay silent.
    * @returns {Promise<object>} The craft result, or a `{ success: false, message }`.
    */
-  async advanceCraftingRun({ actorId, runId, recipeId, interactive = false } = {}) {
+  async advanceCraftingRun({ actorId, runId, interactive = false } = {}) {
     this._requireReady();
     const actor = game.actors?.get(actorId);
     const run = actor ? (this.craftingRunManager?.getActiveRun(actor, runId) ?? null) : null;
@@ -2280,7 +2470,13 @@ class Fabricate {
     if (resolved.blocked) {
       return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NeedsOwner') };
     }
-    return this.craft(actor, recipeId, {
+    // A run that vanished between render and click (a concurrent cancel, a GM
+    // deleting the system) has no recipe to resolve. Report it rather than falling
+    // through to `craft()`, which would treat the missing run as a fresh craft.
+    if (!run?.recipeId) {
+      return { success: false, message: localizeGathering('FABRICATE.App.Journal.Actions.NoRun') };
+    }
+    return this.craft(actor, run.recipeId, {
       runId,
       componentSourceActors: resolved.componentSourceActors,
       interactive,
@@ -2342,11 +2538,14 @@ class Fabricate {
       throw new Error('Fabricate not initialized');
     }
 
-    // Get recipe object if ID was provided
+    // Get recipe object if ID was provided. Capture the id BEFORE the reassignment
+    // so the not-found message names it — reading `recipe` after the lookup always
+    // reported "Recipe undefined not found".
     if (typeof recipe === 'string') {
-      recipe = this.recipeManager.getRecipe(recipe);
+      const recipeId = recipe;
+      recipe = this.recipeManager.getRecipe(recipeId);
       if (!recipe) {
-        throw new Error(`Recipe ${recipe} not found`);
+        throw new Error(`Recipe ${recipeId} not found`);
       }
     }
 
@@ -2697,6 +2896,49 @@ Hooks.once('ready', async () => {
       // Defensive: an event-route throw must never block the Interactable payload
       // from reaching handleInteractableSocketMessage below.
     }
+    // Same channel carries the gathering ENVIRONMENT node depletion a player emits
+    // when they gather from a node-backed task: only the active GM may write the
+    // `gatheringEnvironments` world setting, so it applies the single-unit decrement
+    // here, recomputed from its own stored state. Guarded for the same reason as the
+    // event route above — a throw must not starve the Interactable payload.
+    try {
+      routeGatheringNodeDepleteMessage(payload, {
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+        senderId,
+        // Bounds the residual denial-of-resource surface: the applier re-checks the
+        // node economy but not whether the sender could actually reach that task, so
+        // throttle each sender to human gathering speed.
+        allowSender: gatheringDepletionRateLimiter,
+        applyDeplete: (args) => {
+          // The apply is async and nothing awaits a socket handler, so a failed
+          // world-setting write must be caught here or it lands as an unhandled
+          // rejection on the GM's client.
+          Promise.resolve(fabricate.gatheringRichStateService?.applyEnvironmentNodeDepletion(args))
+            .catch(error => console.warn('Fabricate | Gathering node depletion failed', error));
+        }
+      });
+    } catch (_error) {
+      // Defensive: never block the Interactable payload below.
+    }
+    // Same channel carries a player's BLIND gathering start (issue 901): only the
+    // active GM may write the `gatheringBlindRuns` world setting, and only a client
+    // the player does not control may draw the task without the player being able
+    // to rig it. Guarded for the same reason as the routes above.
+    try {
+      routeGatheringBlindStartMessage(payload, {
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+        senderId,
+        allowSender: gatheringBlindStartRateLimiter,
+        applyStart: (args) => {
+          // Nothing awaits a socket handler, so a rejected start must be caught
+          // here or it lands as an unhandled rejection on the GM's client.
+          Promise.resolve(applyGatheringBlindStart(args))
+            .catch(error => console.warn('Fabricate | Blind gathering start failed', error));
+        }
+      });
+    } catch (_error) {
+      // Defensive: never block the Interactable payload below.
+    }
     // Same `module.fabricate` channel also carries the canvas Interactable
     // node-update action (player → active GM token-flag write) AND the region-first
     // activation round-trip. Only the active GM applies node/behaviour writes +
@@ -2737,6 +2979,7 @@ Hooks.once('ready', async () => {
     handleFabricateSettingChange(key, {
       craftingSystemManager: fabricate.craftingSystemManager,
       recipeManager: fabricate.recipeManager,
+      gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
       callAll: (hook, payload) => Hooks.callAll(hook, payload),
     });
   });
@@ -3319,6 +3562,31 @@ export const __test = {
   createGatheringToolBreakage,
   createGatheringResultCreator,
   matchGatheringTools
+};
+
+/**
+ * The rest of the `ready` startup, exported so a Foundry-free host can run it.
+ *
+ * `initialize()` is not the whole of startup. The `ready` hook also matures world time and runs four
+ * flag auto-stamps, and those populate the tier-1 `roles` identity that `sourceUuid.js` resolves
+ * against before any name-matching fallback. A host that calls only `initialize()` gets a world
+ * where every tool and component resolves through a tier production never reaches.
+ *
+ * Exported as a BLOCK rather than by prefixing each declaration, deliberately: several tests assert
+ * against the literal source text of those functions, and moving the keyword onto the declaration
+ * line breaks those patterns for no behavioural gain.
+ *
+ * The View Lab calls these directly rather than dispatching `ready`, because the same hook body also
+ * injects a button into Foundry's Items sidebar, which a Foundry-free host cannot honestly provide.
+ * Call them in this order: the tool stamp reads refs the component stamp and the migration runner
+ * write, and the owned-item restamp reads what the component stamp produced.
+ */
+export {
+  processFabricateWorldTime,
+  runRecipeItemFlagAutoStamp,
+  runComponentFlagAutoStamp,
+  runToolFlagAutoStamp,
+  runOwnedItemComponentIdentityRestamp,
 };
 
 export default fabricate;

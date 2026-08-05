@@ -1,11 +1,12 @@
 // Flat ESLint config for Fabricate.
 //
 // Goals: maintainability, testability, ease of change, and a predictable file
-// structure. Rules are introduced staged-by-path — `npm run lint` (the CI gate)
-// only targets the `.js` paths that are green today; `.svelte` files and any
-// not-yet-clean `.js` paths are linted by the non-gating `lint:all` /
-// `lint:svelte` scripts until follow-ups fold them into the gate. See
-// CONTRIBUTING.md.
+// structure. Rules are introduced staged-by-path. Two scripts gate in CI:
+// `npm run lint` targets the `.js` paths that are green today, and
+// `npm run lint:svelte` targets every `.svelte` file under `src/` — both run as
+// separate steps of the required `lint` job. The remaining not-yet-clean `.js`
+// paths are linted only by the non-gating `lint:all` script until follow-ups
+// fold them into the gate. See CONTRIBUTING.md.
 //
 // Block order matters in flat config: later blocks override earlier ones, and
 // `eslint-config-prettier` MUST stay last so it can switch off the stylistic
@@ -224,16 +225,36 @@ export default [
   //    CLI entry points, so process control and console output are expected.
   //
   //    This block CONFIGURES every `scripts/` file, but the gated `lint` (and
-  //    `format:check`) script only passes it the release publish path — the
-  //    semver/release-tag/publish-guard libs, `release-s3.js`, and the tag-validator
-  //    CLI — named one by one. That is deliberate: `scripts/lib/zip.js` has lint
-  //    errors and fails Prettier, and its autofixes would land on the Windows
-  //    `Compress-Archive` path that builds the published artefact — with no test
-  //    coverage to catch a regression. Add new script files to the gate as they land;
-  //    do NOT widen the gate to `scripts/lib/**` until zip.js is cleaned up and
-  //    covered.
+  //    `format`/`format:check`) scripts only pass it a subset — the release publish
+  //    path, the smoke-harness libs, and a few others — named one by one.
+  //
+  //    That narrowness is measured, not habitual. ESLint over `scripts/**/*.{js,mjs}`
+  //    reports 993 findings across 15 of 33 files, and 844 of them are in
+  //    `scripts/foundry-test-run.mjs` alone — the Foundry smoke harness, whose Phase D0
+  //    pins selectors by class, `.nth(N)` index and visible button text with no unit
+  //    coverage over any of them. THAT is the blocker for a `scripts/**` glob, by two
+  //    orders of magnitude; `scripts/lib/zip.js` (6 findings, fails Prettier, autofixes
+  //    landing on the Windows `Compress-Archive` path that builds the published
+  //    artefact, also untested) is a real but secondary one.
+  //
+  //    Add new script files to the gate as they land — and note that this is now
+  //    ENFORCED rather than merely requested: `tests/scripts-lint-gate-coverage.test.js`
+  //    parses the paths out of the `lint` script and fails `npm test` on any ungated
+  //    `scripts/**` file that is not recorded as acknowledged debt in
+  //    `tests/scripts-known-ungated.js`, a baseline that may only shrink and whose
+  //    length is capped. Do NOT widen the gate to `scripts/lib/**` or `scripts/**` on
+  //    the strength of that guard; it tracks the debt, it does not clear it.
+  //
+  //    The `files` glob below and that test's `LINTED_EXTENSIONS` must name the same
+  //    extensions, or a newly configured file becomes invisible to the ratchet instead
+  //    of gated by it. That is not left to prose: the test PARSES this glob and fails
+  //    if it names an extension the enumeration would miss. `cjs` is listed because
+  //    this repository is `"type": "module"`, so `.cjs` is how CommonJS gets written
+  //    here — without it such a file would be forced into the `lint` list by the
+  //    ratchet and then fail `no-undef` on `require`, having missed this block's
+  //    Node globals.
   {
-    files: ['scripts/**/*.{js,mjs}', '*.config.js', 'eslint.config.js'],
+    files: ['scripts/**/*.{js,mjs,cjs}', '*.config.js', 'eslint.config.js'],
     languageOptions: {
       globals: { ...globals.node },
     },
@@ -275,17 +296,68 @@ export default [
     },
   },
 
-  // 8. Svelte components (Svelte 5 runes). Wired up so `lint:svelte` works, but
-  //    intentionally NOT part of the gated `lint` script yet — folded into the
-  //    required check in a follow-up once findings are triaged.
+  // 8. Svelte components (Svelte 5 runes). This block IS gated: `npm run
+  //    lint:svelte` runs it over every `.svelte` file under `src/` as its own
+  //    step of the required `lint` CI job, so a new finding here fails the
+  //    build. It runs with `--max-warnings=0`, which matters because
+  //    `svelte.configs.recommended` ships two WARN-level rules
+  //    (`svelte/no-at-debug-tags`, `svelte/no-inspect`) — without the flag a
+  //    stray `{@debug}` tag or a leftover `$inspect()` would report and the job
+  //    would still exit 0.
+  //
+  //    `svelte/no-unused-svelte-ignore` (from the recommended set) makes the
+  //    gate bidirectional: a `svelte-ignore` comment that no longer suppresses
+  //    anything is itself a failure, so suppressions must be removed once they
+  //    stop being needed.
+  //
+  //    A finding has three legitimate dispositions — fix the code, tune the
+  //    config here, or suppress with a stated rationale. Suppressions use
+  //    `eslint-disable-next-line` only (never a file-level disable) and carry a
+  //    one-line rationale; markup sites need the HTML-comment form
+  //    `<!-- eslint-disable-next-line <rule> -->`, since a `//` in markup
+  //    renders as literal on-screen text.
+  //
+  //    Note this gate covers the script and markup of a component only. Prettier
+  //    now formats `.svelte` too — `prettier-plugin-svelte` is registered in
+  //    `.prettierrc.json` and `format:check` covers `src/**/*.svelte`. Svelte
+  //    COMPILER warnings are gated separately as of issue 924 — `onwarn` in
+  //    `svelte.config.js` fails `npm run build`, and `npm run lint:svelte:warnings`
+  //    sweeps every component graph-independently as its own step of this same CI
+  //    job — so a11y and `css_unused_selector` findings are ESLint's business no
+  //    more than they were, but they no longer pass unnoticed either. Stylelint
+  //    (scoped `<style>` blocks) still excludes `.svelte`.
   ...svelte.configs.recommended.map((config) => ({
     ...config,
     files: ['**/*.svelte'],
   })),
   {
     files: ['**/*.svelte'],
+    // LOAD-BEARING, and pinned rather than left to ESLint's default. The ~42
+    // `eslint-disable-next-line` directives in these components are position-
+    // sensitive: they sit on the line above the code they suppress, and a
+    // reformat (Prettier now owns `.svelte` layout) moves lines. That is safe
+    // only because BOTH failure shapes are caught. If a directive slips off its
+    // violation, the violation resurfaces as an unsuppressed error. If it lands
+    // somewhere suppressing nothing, this option reports it AS AN ERROR and the
+    // job exits 1 on its own — at `'error'` the reporting does not go through
+    // `--max-warnings=0`, unlike ESLint's `'warn'` default. Leaving the second
+    // half to that implicit default would let an unrelated config change silently
+    // drop it with no test announcing the loss.
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
     languageOptions: {
       globals: { ...globals.browser, ...foundryGlobals },
+    },
+    rules: {
+      'no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
     },
   },
 

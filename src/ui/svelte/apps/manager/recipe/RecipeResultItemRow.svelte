@@ -42,7 +42,7 @@
     // rendered to the RIGHT of the difficulty badge — after the component's DC, before
     // the remove control — so a stage reads left-to-right as handle · component · DC ·
     // reorder · remove (issue 643). Absent (a flat row) in every other mode.
-    reorderControls = null
+    reorderControls = null,
   } = $props();
 
   function text(key, fallback) {
@@ -54,19 +54,27 @@
   const quantity = $derived(Number(item?.quantity) > 0 ? Number(item.quantity) : 1);
 
   const selectedComponent = $derived(
-    componentId ? (componentOptions || []).find(option => option.id === componentId) || null : null
+    componentId
+      ? (componentOptions || []).find((option) => option.id === componentId) || null
+      : null
   );
 
   // The picker lists every system component; the trigger resolves the current id
   // to its name/image so a chosen component reads back clearly.
   const componentPickerOptions = $derived(
-    (componentOptions || []).map(option => ({ id: option.id, label: option.name, img: option.img }))
+    (componentOptions || []).map((option) => ({
+      id: option.id,
+      label: option.name,
+      img: option.img,
+    }))
   );
 
   // `difficulty` is projected onto the component options; a component that has never
   // been given one reads as unset rather than as a fabricated 0.
   const difficulty = $derived(
-    Number.isFinite(Number(selectedComponent?.difficulty)) ? Number(selectedComponent.difficulty) : null
+    Number.isFinite(Number(selectedComponent?.difficulty))
+      ? Number(selectedComponent.difficulty)
+      : null
   );
 
   // Spread the existing item so a normalized id (and any unknown fields) survive.
@@ -100,14 +108,26 @@
         triggerClass={`manager-button manager-recipe-component-trigger${progressive ? ' manager-recipe-stage-trigger' : ''}`}
         triggerImg={selectedComponent?.img || ''}
         triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-        triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-        valueClass={progressive ? 'manager-recipe-stage-trigger-name' : 'manager-recipe-component-name'}
+        triggerLabel={selectedComponent?.name ||
+          text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+        valueClass={progressive
+          ? 'manager-recipe-stage-trigger-name'
+          : 'manager-recipe-component-name'}
         triggerTitle={selectedComponent?.name || ''}
         triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
         dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-        searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-        emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+        searchPlaceholder={text(
+          'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+          'Search components...'
+        )}
+        searchAriaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+          'Search components...'
+        )}
+        emptyHint={text(
+          'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
+          'No components defined'
+        )}
         onChoose={(id) => chooseComponent(id)}
       />
     </div>
@@ -126,9 +146,10 @@
       <span
         class="manager-recipe-stage-dc"
         data-recipe-result-difficulty={difficulty === null ? '' : String(difficulty)}
-      >{difficulty === null
+        >{difficulty === null
           ? text('FABRICATE.Admin.Manager.Recipe.DifficultyUnset', 'No difficulty')
-          : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span>
+          : `${text('FABRICATE.Admin.Manager.Recipe.DifficultyShort', 'DC')} ${difficulty}`}</span
+      >
 
       {#if selectedComponent}
         <button
@@ -136,7 +157,10 @@
           class="manager-recipe-stage-edit"
           data-recipe-result-edit={componentId}
           aria-label={`${text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')} — ${selectedComponent.name}`}
-          title={text('FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty', 'Edit difficulty on the component')}
+          title={text(
+            'FABRICATE.Admin.Manager.Recipe.OpenComponentDifficulty',
+            'Edit difficulty on the component'
+          )}
           onclick={() => onOpenComponent(componentId)}
         >
           <span>{text('FABRICATE.Admin.Manager.Recipe.EditDifficulty', 'Edit')}</span>
@@ -154,9 +178,18 @@
         min={1}
         max={9999}
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
-        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
-        inputProps={{ 'data-recipe-option-quantity': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        decrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityDecrement',
+          'Decrease quantity'
+        )}
+        incrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityIncrement',
+          'Increase quantity'
+        )}
+        inputProps={{
+          'data-recipe-option-quantity': '',
+          class: 'fab-stepper-input manager-recipe-option-quantity',
+        }}
         onChange={(value) => setQuantity(value)}
       />
     {/if}
@@ -172,7 +205,7 @@
       data-recipe-remove="result-item"
       aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
       title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultItem', 'Remove item')}
-      onclick={() => onRemove()}
-    ><i class="fas fa-times" aria-hidden="true"></i></button>
+      onclick={() => onRemove()}><i class="fas fa-times" aria-hidden="true"></i></button
+    >
   </div>
 </div>

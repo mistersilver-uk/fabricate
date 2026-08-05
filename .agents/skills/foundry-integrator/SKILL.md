@@ -40,7 +40,7 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 - the change under review — the issue's `openspec-delta` block at design time, and the assigned target's diff against the supplied base SHA at implementation review.
 - the Foundry-facing code involved: `src/integrations/`, `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
 - the `FoundryVTT Notes` section of `AGENTS.md` and the Foundry deep-dives now consolidated in `AGENTS.md` and `CONTRIBUTING.md`.
-- the target Foundry version declared in `module.json` (currently V13) — every finding is pinned to that version.
+- the Foundry compatibility range declared in `module.json` (currently `minimum: "13"`, `verified: "14"`) and the exact build the smoke boots (pinned in `docker-compose.foundry.yml`) — every finding is pinned to a named version rather than to "current".
 
 ## Research method (strict order of preference)
 
@@ -85,6 +85,8 @@ Check the assigned target's base-relative Foundry-facing diff against the real F
 A `DialogV2.confirm` dialog renders no window-title chrome, so a test or harness must assert on the body copy or the button labels, never on a window title.
 Wire `yes: { label, callback }` when an action verb is wanted on the confirm button (for example "Disable"); a bare `yes: () => …` renders a generic "Yes".
 - UUID resolution, flags (e.g. preserving `flags.core.sourceId`), and settings registration under the `fabricate.*` namespace.
+- Separate sequential settings, flag, or document API calls that together enforce one invariant: require a complete pre-state snapshot, ordered writes, reverse-order compensation that restores key presence as well as value, explicit reporting of compensation failures, and tests for same-primary-value repair plus every write and compensation boundary.
+A single atomic or batched document API operation does not require application-level compensation merely because it writes several documents.
 - compatibility metadata in `module.json` when new Foundry API requirements appear.
 - version-sensitive behaviour, deprecations, and removed APIs across Foundry releases.
 

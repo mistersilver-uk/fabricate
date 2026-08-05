@@ -65,7 +65,7 @@ A mutation that survives with the pure-helper tests still green is a test-gap fi
 - For UI screenshots, check first visible state, clipping, spacing, alignment, image fidelity, scroll containment, button visibility, and responsive window sizes.
 - Flag a validation gap when an image UI screenshot only exercises fallback art but the feature depends on linked scene, item, or external imagery.
 - For UI-changing PRs, treat unrelated image markdown, artifact names, and file lists as missing normal evidence.
-Expected evidence is an embedded screenshot image in the PR description with `pr-<number>` in its alt text, produced by `npm run screenshots:ui:publish` (uploaded to S3 under `pr-screenshots/<number>/`).
+Expected evidence is an embedded screenshot image in the PR description with `pr-<number>` in its alt text, uploaded to S3 under `pr-screenshots/<number>/` — published by the View Lab `capture` job for a view the case registry covers, or by `npm run screenshots:ui:publish` from a smoke run for one it does not.
 Uploaded screenshot artifacts, `test-results/` paths, and `user-attachments` embeds are accepted fallbacks.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label.
 PR-scoped screenshots are collected under `tmp/pr-screenshots/<number>/` (local temp cleaned after publish), not committed as assets.

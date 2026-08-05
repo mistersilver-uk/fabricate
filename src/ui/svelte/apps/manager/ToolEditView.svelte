@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import ToolBehaviorPreview from './tools/ToolBehaviorPreview.svelte';
   import ToolBreakageTab from './tools/ToolBreakageTab.svelte';
@@ -50,7 +51,13 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-  const displayName = $derived(toolDisplayName(tool, managedItems, text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled Tool')));
+  const displayName = $derived(
+    toolDisplayName(
+      tool,
+      managedItems,
+      text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled Tool')
+    )
+  );
   const displayImage = $derived(toolDisplayImage(tool, managedItems));
   const sourceContext = $derived(
     toolSourceUuid(tool) || tool?.componentId
@@ -68,12 +75,20 @@
 
 <main class="manager-main manager-tool-edit-main" data-tool-edit-view>
   <header class="manager-tool-edit-header" data-tool-editor-header>
-    <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
-      <button type="button" data-tool-editor-open-systems onclick={onOpenSystems}>{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button>
+    <nav
+      class="manager-breadcrumbs"
+      aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
+    >
+      <button type="button" data-tool-editor-open-systems onclick={onOpenSystems}
+        >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
+      >
       <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <button type="button" data-tool-editor-open-system onclick={onOpenSystem}>{systemName}</button>
+      <button type="button" data-tool-editor-open-system onclick={onOpenSystem}>{systemName}</button
+      >
       <i class="fas fa-chevron-right" aria-hidden="true"></i>
-      <button type="button" data-tool-editor-open-tools onclick={onOpenTools}>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button>
+      <button type="button" data-tool-editor-open-tools onclick={onOpenTools}
+        >{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button
+      >
       <i class="fas fa-chevron-right" aria-hidden="true"></i>
       <span title={displayName}>{displayName}</span>
     </nav>
@@ -86,16 +101,60 @@
         </div>
       </div>
       <div class="manager-header-actions manager-tool-edit-actions">
-        {#if dirty}<span class="manager-chip is-warning" data-tool-editor-status>{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</span>{/if}
+        {#if dirty}<Chip tone="warning" data-tool-editor-status
+            >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
+          >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
-        <button type="button" class="manager-button is-ghost" data-tool-editor-back aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')} onclick={onBack} disabled={saving}><i class="fas fa-arrow-left" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.BackToTools', 'Back to tools')}</span></button>
-        <button type="button" class="manager-button is-danger" data-tool-editor-delete aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.DeleteLabel', 'Delete Tool')} onclick={onDelete} disabled={saving}><i class="fas fa-trash" aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete')}</span></button>
-        <button type="button" class="manager-button is-primary" data-tool-editor-save aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool')} onclick={onSave} disabled={!dirty || !validation.valid || saving} title={validation.valid ? '' : text('FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation', 'Resolve validation issues before saving.')}><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span>{text('FABRICATE.Admin.Manager.Tools.Save', 'Save tool')}</span></button>
+        <button
+          type="button"
+          class="manager-button is-ghost"
+          data-tool-editor-back
+          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')}
+          title={text('FABRICATE.Admin.Manager.Tools.Editor.BackLabel', 'Back to Tools')}
+          onclick={onBack}
+          disabled={saving}
+          ><i class="fas fa-arrow-left" aria-hidden="true"></i><span
+            >{text('FABRICATE.Admin.Manager.Tools.BackToTools', 'Back to tools')}</span
+          ></button
+        >
+        <button
+          type="button"
+          class="manager-button is-danger"
+          data-tool-editor-delete
+          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.DeleteLabel', 'Delete Tool')}
+          onclick={onDelete}
+          disabled={saving}
+          ><i class="fas fa-trash" aria-hidden="true"></i><span
+            >{text('FABRICATE.Admin.Manager.Tools.Delete', 'Delete')}</span
+          ></button
+        >
+        <button
+          type="button"
+          class="manager-button is-primary"
+          data-tool-editor-save
+          aria-label={text('FABRICATE.Admin.Manager.Tools.Editor.SaveLabel', 'Save Tool')}
+          onclick={onSave}
+          disabled={!dirty || !validation.valid || saving}
+          title={validation.valid
+            ? ''
+            : text(
+                'FABRICATE.Admin.Manager.Tools.Editor.ResolveValidation',
+                'Resolve validation issues before saving.'
+              )}
+          ><i class={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i><span
+            >{text('FABRICATE.Admin.Manager.Tools.Save', 'Save tool')}</span
+          ></button
+        >
       </div>
     </div>
   </header>
 
-  <ToolEditorTabs {activeTab} errorCount={editorErrorCount} {requirementCount} onChange={onTabChange} />
+  <ToolEditorTabs
+    {activeTab}
+    errorCount={editorErrorCount}
+    {requirementCount}
+    onChange={onTabChange}
+  />
 
   <div class="manager-tool-edit-composition">
     <div
@@ -107,7 +166,17 @@
       tabindex="0"
     >
       {#if activeTab === 'overview'}
-        <ToolOverviewTab {tool} {worldItems} {managedItems} {persisted} {onPatch} {onToggleEnabled} {onSourceDrop} {onCopySourceUuid} {onUnlinkSource} />
+        <ToolOverviewTab
+          {tool}
+          {worldItems}
+          {managedItems}
+          {persisted}
+          {onPatch}
+          {onToggleEnabled}
+          {onSourceDrop}
+          {onCopySourceUuid}
+          {onUnlinkSource}
+        />
       {:else if activeTab === 'breakage'}
         <ToolBreakageTab
           {tool}
@@ -125,6 +194,6 @@
         <ToolValidationTab {tool} {authority} {validation} {saveError} {focusValidationNonce} />
       {/if}
     </div>
-    <ToolBehaviorPreview {tool} {authority} {managedItems} {activeTab} />
+    <ToolBehaviorPreview {tool} {authority} {managedItems} />
   </div>
 </main>

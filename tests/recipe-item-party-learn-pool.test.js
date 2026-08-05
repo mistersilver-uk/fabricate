@@ -67,3 +67,27 @@ test('773 pool.decrement is symmetric with increment across a round-trip', async
   await pool.decrement('system-1::book');
   assert.equal(pool.get('system-1::book'), 0);
 });
+
+// A `total`-scope budget lives in a WORLD setting, so a player cannot reserve a slot.
+// `writable()` exposes that refusal so the caller can report the real reason instead of
+// collapsing it into "no learning uses left" — which told players their shared budget
+// was spent while it sat untouched, silently blocking every `total`-scope book.
+
+test('pool.writable reports whether THIS client may mutate the shared budget', () => {
+  installGame({ isGM: true });
+  assert.equal(createDefaultPartyLearnPool().writable(), true);
+
+  installGame({ isGM: false });
+  assert.equal(createDefaultPartyLearnPool().writable(), false);
+});
+
+test('a refused increment is distinguishable from a spent budget', async () => {
+  // Both report `false` from increment — the caller must consult writable() to tell
+  // "you may not do this" apart from "there is nothing left".
+  const gameState = installGame({ isGM: false, initial: { 'system-1::book': 0 } });
+  const pool = createDefaultPartyLearnPool();
+
+  assert.equal(await pool.increment('system-1::book'), false);
+  assert.equal(pool.writable(), false, 'refused because this client is not a GM');
+  assert.equal(gameState.read()['system-1::book'], 0, 'the shared budget is untouched');
+});

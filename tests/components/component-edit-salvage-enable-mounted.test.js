@@ -43,11 +43,20 @@ const harness = createMountedComponentHarness({
   // A `.svelte` the tree RENDERS but this list omits does not fail — it HANGS, and is
   // reported as `# cancelled`, never `# fail`.
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     // The salvage result quantity + the progressive DC are the shared Stepper (issue
     // 676). Import-free leaf, so it needs no `rawModules` entry.
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared essence quantity card (issue 772). `ComponentEditView` renders it after
+    // the extraction, so it is in this tree's static import closure regardless of props.
+    'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],

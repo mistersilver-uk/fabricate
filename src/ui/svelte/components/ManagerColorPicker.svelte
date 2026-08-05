@@ -10,8 +10,22 @@
     buttonTitle = 'Choose colour',
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
-    onChange = () => {}
+    // Forwarded to the popover: false offers the preset palette only. See
+    // ManagerColorPopover for why the per-essence colour (issue 917) has no free hex.
+    allowCustom = true,
+    // TRUE when the caller's model holds no authored colour at all. `colorToken`
+    // normalizes an absent value to `sage`, so without this the trigger paints a Sage
+    // swatch and the popover marks Sage selected while the caller's own copy says "No
+    // colour" — the control would assert an authored choice nobody made. Unset paints a
+    // neutral swatch and selects no preset; picking any preset ends the unset state
+    // through the caller's own `onChange`.
+    unset = false,
+    onChange = () => {},
   } = $props();
+
+  // Neutral, from the theme's own border token: visibly a swatch, unmistakably not one
+  // of the eight saturated palette colours.
+  const UNSET_SWATCH = '--manager-color-swatch: var(--fab-border-strong)';
 
   let open = $state(false);
   let pickerRoot = $state(null);
@@ -21,7 +35,9 @@
 
   function normalizedToken(value) {
     const token = String(value || '').replace(/^--fab-tag-/, '');
-    return ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve'].includes(token) ? token : 'sage';
+    return ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve'].includes(token)
+      ? token
+      : 'sage';
   }
 
   function validCustomHex(value) {
@@ -57,7 +73,7 @@
 
     return {
       minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16
+      maxRight: mainPanelRect.right - hostRect.left - 16,
     };
   }
 
@@ -69,7 +85,7 @@
       left: 0,
       top: 0,
       width: window.innerWidth,
-      height: window.innerHeight
+      height: window.innerHeight,
     };
     const triggerRect = triggerButton.getBoundingClientRect();
     const horizontalBounds = getPopoverHorizontalBounds(hostRect);
@@ -81,7 +97,7 @@
         top: triggerRect.top - hostRect.top,
         bottom: triggerRect.bottom - hostRect.top,
         width: triggerRect.width,
-        height: triggerRect.height
+        height: triggerRect.height,
       },
       { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
       {
@@ -89,7 +105,7 @@
         minLeft: horizontalBounds.minLeft,
         maxRight: horizontalBounds.maxRight,
         minWidth: 220,
-        maxWidth: 220
+        maxWidth: 220,
       }
     );
 
@@ -98,16 +114,17 @@
       return;
     }
 
-    const verticalPosition = layout.placement === 'top'
-      ? `top: auto; bottom: ${layout.bottom}px;`
-      : `top: ${layout.top}px; bottom: auto;`;
+    const verticalPosition =
+      layout.placement === 'top'
+        ? `top: auto; bottom: ${layout.bottom}px;`
+        : `top: ${layout.top}px; bottom: auto;`;
 
     popoverStyle = [
       `left: ${layout.left}px;`,
       'right: auto;',
       `width: ${layout.width}px;`,
       `max-height: ${layout.maxHeight}px;`,
-      verticalPosition
+      verticalPosition,
     ].join(' ');
   }
 
@@ -140,17 +157,18 @@
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: closePicker,
-    additionalNodes: () => [popoverRoot]
+    additionalNodes: () => [popoverRoot],
   }}
 >
   <button
     type="button"
     bind:this={triggerButton}
     class="manager-color-picker-trigger"
+    class:is-unset={unset}
     aria-expanded={open}
     aria-label={buttonTitle}
     title={buttonTitle}
-    style={swatchStyle()}
+    style={unset ? UNSET_SWATCH : swatchStyle()}
     onclick={togglePicker}
   >
     <span class="manager-color-swatch" aria-hidden="true"></span>
@@ -161,8 +179,10 @@
       {customColor}
       {presetGridLabel}
       {customHexLabel}
+      {allowCustom}
+      {unset}
       {onChange}
-      popoverStyle={popoverStyle}
+      {popoverStyle}
       portalTarget={() => getPopoverHost()}
       {registerPopoverNode}
       manageDismiss={false}

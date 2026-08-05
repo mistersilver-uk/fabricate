@@ -19,6 +19,8 @@
   player-facing channel beyond what the GM is permitted to see.
 -->
 <script>
+  import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringRealmQuickList from './GatheringRealmQuickList.svelte';
@@ -53,7 +55,7 @@
     onToggleRealmEnabled = () => {},
     onUpdateRealm = () => {},
     onDeleteRealm = () => {},
-    onPickImagePath = null
+    onPickImagePath = null,
   } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
@@ -70,7 +72,7 @@
 
   let pendingOverrideIds = $state(null);
 
-  const selectedParty = $derived(parties.find(party => party.id === selectedPartyId) || null);
+  const selectedParty = $derived(parties.find((party) => party.id === selectedPartyId) || null);
   const hasActors = $derived(actorOptions.length > 0);
   const hasParties = $derived(parties.length > 0);
   const hasRealms = $derived(systemRealms.length > 0);
@@ -78,9 +80,7 @@
   // Realm selection for the override editor is local while the GM is choosing,
   // and falls back to the persisted override ids when not mid-edit.
   const overrideRealmIds = $derived(
-    pendingOverrideIds !== null
-      ? pendingOverrideIds
-      : (selectedParty?.overrideRealmIds || [])
+    pendingOverrideIds !== null ? pendingOverrideIds : selectedParty?.overrideRealmIds || []
   );
 
   function text(key, fallback, data) {
@@ -95,7 +95,9 @@
   function memberCountLabel(party) {
     return party.memberCount === 1
       ? text('FABRICATE.Admin.Manager.Travel.MemberCountOne', '1 member')
-      : text('FABRICATE.Admin.Manager.Travel.MemberCount', `${party.memberCount} members`, { count: party.memberCount });
+      : text('FABRICATE.Admin.Manager.Travel.MemberCount', `${party.memberCount} members`, {
+          count: party.memberCount,
+        });
   }
 
   function selectParty(partyId) {
@@ -112,13 +114,15 @@
 
   // --- Member picker (searchable popover, ActorSelectTopBar semantics) ---
   const availableMemberActors = $derived(
-    actorOptions.filter(actor => !(selectedParty?.memberActorUuids || []).includes(actor.uuid))
+    actorOptions.filter((actor) => !(selectedParty?.memberActorUuids || []).includes(actor.uuid))
   );
   const filteredMemberActors = $derived(
-    availableMemberActors.filter(actor => {
+    availableMemberActors.filter((actor) => {
       const term = memberSearch.trim().toLowerCase();
       if (!term) return true;
-      return String(actor?.name ?? '').toLowerCase().includes(term);
+      return String(actor?.name ?? '')
+        .toLowerCase()
+        .includes(term);
     })
   );
 
@@ -139,10 +143,12 @@
 
   // --- Travel actor picker ---
   const filteredTravelActors = $derived(
-    actorOptions.filter(actor => {
+    actorOptions.filter((actor) => {
       const term = travelSearch.trim().toLowerCase();
       if (!term) return true;
-      return String(actor?.name ?? '').toLowerCase().includes(term);
+      return String(actor?.name ?? '')
+        .toLowerCase()
+        .includes(term);
     })
   );
   function closeTravelPicker() {
@@ -179,9 +185,17 @@
     onClearRealmOverride(selectedParty.id, systemId);
   }
 
+  // No reader today. This component is imported by nothing under src/ (only mounted
+  // directly by tests), which is the unreachable-Travel-surface defect itself; these
+  // three travel EvidenceSource* lang keys have no other reader either, so deleting the
+  // helper would orphan them and fail the lang-keys-no-orphans ratchet. Kept until issue 920
+  // reconnects or removes the surface.
+  // eslint-disable-next-line no-unused-vars
   function evidenceSourceLabel(source) {
-    if (source === 'manualOverride') return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceManualOverride', 'GM override');
-    if (source === 'travelActor') return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceTravelActor', 'Travel actor');
+    if (source === 'manualOverride')
+      return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceManualOverride', 'GM override');
+    if (source === 'travelActor')
+      return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceTravelActor', 'Travel actor');
     return text('FABRICATE.Admin.Manager.Travel.EvidenceSourceUnresolved', 'No current realm');
   }
 
@@ -206,8 +220,17 @@
   });
 </script>
 
-<main class="manager-main manager-travel-view" data-manager-travel-view aria-label={text('FABRICATE.Admin.Manager.Travel.Title', 'Travel')}>
-  <p class="manager-travel-scope-note">{text('FABRICATE.Admin.Manager.Travel.WorldScopeNote', 'Parties are shared across every crafting system. Only the current-realm override below is specific to this system.')}</p>
+<main
+  class="manager-main manager-travel-view"
+  data-manager-travel-view
+  aria-label={text('FABRICATE.Admin.Manager.Travel.Title', 'Travel')}
+>
+  <p class="manager-travel-scope-note">
+    {text(
+      'FABRICATE.Admin.Manager.Travel.WorldScopeNote',
+      'Parties are shared across every crafting system. Only the current-realm override below is specific to this system.'
+    )}
+  </p>
 
   {#if error}
     <p class="manager-travel-error" role="alert">{error}</p>
@@ -215,17 +238,31 @@
 
   <div class="manager-travel-layout">
     <!-- Party list column -->
-    <section class="manager-travel-party-list" aria-label={text('FABRICATE.Admin.Manager.Travel.PartyListLabel', 'Parties')}>
+    <section
+      class="manager-travel-party-list"
+      aria-label={text('FABRICATE.Admin.Manager.Travel.PartyListLabel', 'Parties')}
+    >
       <div class="manager-travel-party-list-head">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.PartyListLabel', 'Parties')}</h3>
-        <button type="button" class="manager-button is-primary" disabled={saving} onclick={() => onCreateParty()}>
+        <h3 class="manager-card-title">
+          {text('FABRICATE.Admin.Manager.Travel.PartyListLabel', 'Parties')}
+        </h3>
+        <button
+          type="button"
+          class="manager-button is-primary"
+          disabled={saving}
+          onclick={() => onCreateParty()}
+        >
           <i class="fas fa-plus" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
         </button>
       </div>
 
       {#if !hasParties}
-        <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.PartyListEmpty', 'No parties yet.')}</p>
+        <EmptyState
+          compact
+          icon="fas fa-users"
+          title={text('FABRICATE.Admin.Manager.Travel.PartyListEmpty', 'No parties yet.')}
+        />
       {:else}
         <ul class="manager-travel-party-rows">
           {#each parties as party (party.id)}
@@ -239,14 +276,16 @@
               >
                 <span class="manager-travel-party-name">{party.name}</span>
                 <span class="manager-travel-party-meta">
-                  <span class={`manager-chip ${party.enabled ? 'is-active' : 'is-disabled'}`}>
+                  <Chip tone={party.enabled ? 'active' : 'disabled'}>
                     {party.enabled
                       ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
                       : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
-                  </span>
-                  <span class="manager-chip">{memberCountLabel(party)}</span>
+                  </Chip>
+                  <Chip>{memberCountLabel(party)}</Chip>
                   {#if party.hasStaleReference}
-                    <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Travel.StaleBadge', 'Needs repair')}</span>
+                    <Chip tone="warning"
+                      >{text('FABRICATE.Admin.Manager.Travel.StaleBadge', 'Needs repair')}</Chip
+                    >
                   {/if}
                 </span>
               </button>
@@ -260,23 +299,52 @@
     <section class="manager-travel-panel">
       {#if !hasParties}
         <!-- Setup checklist empty state -->
-        <div class="manager-travel-checklist" aria-label={text('FABRICATE.Admin.Manager.Travel.ChecklistTitle', 'Set up location-aware gathering')}>
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.ChecklistTitle', 'Set up location-aware gathering')}</h3>
+        <div
+          class="manager-travel-checklist"
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Travel.ChecklistTitle',
+            'Set up location-aware gathering'
+          )}
+        >
+          <h3 class="manager-card-title">
+            {text(
+              'FABRICATE.Admin.Manager.Travel.ChecklistTitle',
+              'Set up location-aware gathering'
+            )}
+          </h3>
           <ol class="manager-travel-checklist-steps">
-            <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep1', 'Create at least one realm.')}</li>
+            <li>
+              {text('FABRICATE.Admin.Manager.Travel.ChecklistStep1', 'Create at least one realm.')}
+            </li>
             <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep2', 'Create a party.')}</li>
             <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep3', 'Add actor members.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep4', 'Assign a travel actor.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.Travel.ChecklistStep5', "Set the party's current realm.")}</li>
+            <li>
+              {text('FABRICATE.Admin.Manager.Travel.ChecklistStep4', 'Assign a travel actor.')}
+            </li>
+            <li>
+              {text(
+                'FABRICATE.Admin.Manager.Travel.ChecklistStep5',
+                "Set the party's current realm."
+              )}
+            </li>
           </ol>
         </div>
       {:else if !selectedParty}
-        <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.SelectPartyHint', 'Select a party to manage its members, travel actor, and current realm.')}</p>
+        <EmptyState
+          compact
+          icon="fas fa-hand-pointer"
+          title={text(
+            'FABRICATE.Admin.Manager.Travel.SelectPartyHint',
+            'Select a party to manage its members, travel actor, and current realm.'
+          )}
+        />
       {:else}
         <!-- Rename + enable -->
         <div class="manager-travel-party-head">
           <label class="manager-field manager-travel-rename">
-            <span class="manager-field-label">{text('FABRICATE.Admin.Manager.Travel.RenameLabel', 'Party name')}</span>
+            <span class="manager-field-label"
+              >{text('FABRICATE.Admin.Manager.Travel.RenameLabel', 'Party name')}</span
+            >
             <input
               value={selectedParty.name}
               placeholder={text('FABRICATE.Admin.Manager.Travel.RenamePlaceholder', 'Party name')}
@@ -305,28 +373,52 @@
                 : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
             </button>
             {#if !selectedParty.travelActorUuid}
-              <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.EnableToggleHint', 'Assign a travel actor to enable this party.')}</p>
+              <p class="manager-travel-hint">
+                {text(
+                  'FABRICATE.Admin.Manager.Travel.EnableToggleHint',
+                  'Assign a travel actor to enable this party.'
+                )}
+              </p>
             {/if}
           </div>
 
-          <button type="button" class="manager-button is-danger" disabled={saving} onclick={() => onDeleteParty(selectedParty.id)}>
+          <button
+            type="button"
+            class="manager-button is-danger"
+            disabled={saving}
+            onclick={() => onDeleteParty(selectedParty.id)}
+          >
             <i class="fas fa-trash" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Travel.DeleteParty', 'Delete party')}</span>
           </button>
         </div>
 
         <!-- Members -->
-        <section class="manager-travel-members" aria-label={text('FABRICATE.Admin.Manager.Travel.MembersLabel', 'Members')}>
-          <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.MembersLabel', 'Members')}</h4>
+        <section
+          class="manager-travel-members"
+          aria-label={text('FABRICATE.Admin.Manager.Travel.MembersLabel', 'Members')}
+        >
+          <h4 class="manager-card-subtitle">
+            {text('FABRICATE.Admin.Manager.Travel.MembersLabel', 'Members')}
+          </h4>
           {#if fieldErrors.members}
-            <p class="manager-travel-field-error" id="manager-travel-member-error" role="alert">{fieldErrors.members}</p>
+            <p class="manager-travel-field-error" id="manager-travel-member-error" role="alert">
+              {fieldErrors.members}
+            </p>
           {/if}
           {#if selectedParty.memberCards.length === 0}
-            <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}</p>
+            <EmptyState
+              compact
+              icon="fas fa-user-plus"
+              title={text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}
+            />
           {:else}
             <ul class="manager-travel-member-list">
               {#each selectedParty.memberCards as member (member.uuid)}
-                <li class={`manager-travel-member-row ${member.stale ? 'is-stale' : ''}`} data-member-uuid={member.uuid}>
+                <li
+                  class={`manager-travel-member-row ${member.stale ? 'is-stale' : ''}`}
+                  data-member-uuid={member.uuid}
+                >
                   <span class="manager-travel-portrait" aria-hidden="true">
                     {#if hasImg(member)}
                       <img src={member.img} alt="" />
@@ -343,11 +435,18 @@
                     <button
                       type="button"
                       class="manager-icon-button"
-                      title={text('FABRICATE.Admin.Manager.Travel.MoveMemberLabel', 'Move member to party')}
-                      aria-label={text('FABRICATE.Admin.Manager.Travel.MoveMember', `Move ${member.name} to another party`, { name: member.name })}
+                      title={text(
+                        'FABRICATE.Admin.Manager.Travel.MoveMemberLabel',
+                        'Move member to party'
+                      )}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Travel.MoveMember',
+                        `Move ${member.name} to another party`,
+                        { name: member.name }
+                      )}
                       disabled={saving || parties.length < 2}
                       onclick={() => {
-                        const target = parties.find(p => p.id !== selectedParty.id);
+                        const target = parties.find((p) => p.id !== selectedParty.id);
                         if (target) onMoveMember(selectedParty.id, target.id, member.uuid);
                       }}
                     >
@@ -357,8 +456,16 @@
                   <button
                     type="button"
                     class="manager-icon-button is-danger"
-                    title={text('FABRICATE.Admin.Manager.Travel.RemoveMember', `Remove ${member.name}`, { name: member.name })}
-                    aria-label={text('FABRICATE.Admin.Manager.Travel.RemoveMember', `Remove ${member.name}`, { name: member.name })}
+                    title={text(
+                      'FABRICATE.Admin.Manager.Travel.RemoveMember',
+                      `Remove ${member.name}`,
+                      { name: member.name }
+                    )}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Travel.RemoveMember',
+                      `Remove ${member.name}`,
+                      { name: member.name }
+                    )}
                     disabled={saving}
                     onclick={() => onRemoveMember(selectedParty.id, member.uuid)}
                   >
@@ -369,7 +476,11 @@
             </ul>
           {/if}
 
-          <div class="manager-travel-picker" bind:this={memberPickerRoot} use:dismissOnOutsideClick={{ enabled: memberPickerOpen, onDismiss: closeMemberPicker }}>
+          <div
+            class="manager-travel-picker"
+            bind:this={memberPickerRoot}
+            use:dismissOnOutsideClick={{ enabled: memberPickerOpen, onDismiss: closeMemberPicker }}
+          >
             <!-- aria-invalid + aria-describedby intentionally associate the
                  store's duplicate-member validation error with the control that
                  triggers the offending mutation (the add-member picker), per the
@@ -389,29 +500,67 @@
               <span>{text('FABRICATE.Admin.Manager.Travel.AddMember', 'Add member')}</span>
             </button>
             {#if !hasActors}
-              <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.NoActorsInWorld', 'No actors exist in this world yet — create an Actor first.')}</p>
+              <p class="manager-travel-hint">
+                {text(
+                  'FABRICATE.Admin.Manager.Travel.NoActorsInWorld',
+                  'No actors exist in this world yet — create an Actor first.'
+                )}
+              </p>
             {/if}
             {#if memberPickerOpen}
-              <div class="manager-travel-popover" role="dialog" aria-label={text('FABRICATE.Admin.Manager.Travel.ActorPickerLabel', 'Choose an actor')}>
+              <div
+                class="manager-travel-popover"
+                role="dialog"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Travel.ActorPickerLabel',
+                  'Choose an actor'
+                )}
+              >
                 <div class="manager-travel-popover-search">
                   <input
                     bind:this={memberSearchInput}
                     bind:value={memberSearch}
                     type="text"
-                    placeholder={text('FABRICATE.Admin.Manager.Travel.ActorSearchPlaceholder', 'Search actors...')}
-                    aria-label={text('FABRICATE.Admin.Manager.Travel.ActorSearchLabel', 'Search actors')}
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.Travel.ActorSearchPlaceholder',
+                      'Search actors...'
+                    )}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Travel.ActorSearchLabel',
+                      'Search actors'
+                    )}
                   />
                 </div>
-                <div class="manager-travel-popover-options" role="listbox" aria-label={text('FABRICATE.Admin.Manager.Travel.ActorPickerLabel', 'Choose an actor')}>
+                <div
+                  class="manager-travel-popover-options"
+                  role="listbox"
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.Travel.ActorPickerLabel',
+                    'Choose an actor'
+                  )}
+                >
                   {#each filteredMemberActors as actor (actor.uuid)}
-                    <button type="button" class="manager-travel-option" role="option" aria-selected="false" title={actor.name} onclick={() => chooseMember(actor)}>
+                    <button
+                      type="button"
+                      class="manager-travel-option"
+                      role="option"
+                      aria-selected="false"
+                      title={actor.name}
+                      onclick={() => chooseMember(actor)}
+                    >
                       <span class="manager-travel-portrait" aria-hidden="true">
-                        {#if hasImg(actor)}<img src={actor.img} alt="" />{:else}<i class={FALLBACK_PORTRAIT_ICON}></i>{/if}
+                        {#if hasImg(actor)}<img src={actor.img} alt="" />{:else}<i
+                            class={FALLBACK_PORTRAIT_ICON}
+                          ></i>{/if}
                       </span>
                       <span class="manager-travel-option-name">{actor.name}</span>
                     </button>
                   {:else}
-                    <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-user-plus"
+                      title={text('FABRICATE.Admin.Manager.Travel.MembersEmpty', 'No members yet.')}
+                    />
                   {/each}
                 </div>
               </div>
@@ -420,11 +569,23 @@
         </section>
 
         <!-- Travel actor -->
-        <section class="manager-travel-actor" aria-label={text('FABRICATE.Admin.Manager.Travel.TravelActorLabel', 'Travel actor')}>
-          <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.TravelActorLabel', 'Travel actor')}</h4>
-          <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.TravelActorHint', 'The actor that represents the party on a campaign map.')}</p>
+        <section
+          class="manager-travel-actor"
+          aria-label={text('FABRICATE.Admin.Manager.Travel.TravelActorLabel', 'Travel actor')}
+        >
+          <h4 class="manager-card-subtitle">
+            {text('FABRICATE.Admin.Manager.Travel.TravelActorLabel', 'Travel actor')}
+          </h4>
+          <p class="manager-travel-hint">
+            {text(
+              'FABRICATE.Admin.Manager.Travel.TravelActorHint',
+              'The actor that represents the party on a campaign map.'
+            )}
+          </p>
           {#if fieldErrors.travelActor}
-            <p class="manager-travel-field-error" id="manager-travel-actor-error" role="alert">{fieldErrors.travelActor}</p>
+            <p class="manager-travel-field-error" id="manager-travel-actor-error" role="alert">
+              {fieldErrors.travelActor}
+            </p>
           {/if}
           <div
             class="manager-travel-actor-row"
@@ -433,23 +594,72 @@
           >
             {#if selectedParty.travelActor}
               <span class="manager-travel-portrait" aria-hidden="true">
-                {#if hasImg(selectedParty.travelActor)}<img src={selectedParty.travelActor.img} alt="" />{:else}<i class={FALLBACK_PORTRAIT_ICON}></i>{/if}
+                {#if hasImg(selectedParty.travelActor)}<img
+                    src={selectedParty.travelActor.img}
+                    alt=""
+                  />{:else}<i class={FALLBACK_PORTRAIT_ICON}></i>{/if}
               </span>
               <span class="manager-travel-member-name">{selectedParty.travelActor.name}</span>
-              <button type="button" class="manager-icon-button" title={text('FABRICATE.Admin.Manager.Travel.ClearTravelActor', 'Clear travel actor')} aria-label={text('FABRICATE.Admin.Manager.Travel.ClearTravelActor', 'Clear travel actor')} disabled={saving} onclick={() => onClearTravelActor(selectedParty.id)}>
+              <button
+                type="button"
+                class="manager-icon-button"
+                title={text(
+                  'FABRICATE.Admin.Manager.Travel.ClearTravelActor',
+                  'Clear travel actor'
+                )}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Travel.ClearTravelActor',
+                  'Clear travel actor'
+                )}
+                disabled={saving}
+                onclick={() => onClearTravelActor(selectedParty.id)}
+              >
                 <i class="fas fa-times" aria-hidden="true"></i>
               </button>
             {:else if selectedParty.staleTravelActor}
-              <span class="manager-travel-member-name is-stale">{text('FABRICATE.Admin.Manager.Travel.StaleTravelActorLabel', 'Stale travel actor')}</span>
-              <button type="button" class="manager-icon-button is-danger" title={text('FABRICATE.Admin.Manager.Travel.ClearStaleTravelActor', 'Clear stale travel actor')} aria-label={text('FABRICATE.Admin.Manager.Travel.ClearStaleTravelActor', 'Clear stale travel actor')} disabled={saving} onclick={() => onClearStaleTravelActor(selectedParty.id)}>
+              <span class="manager-travel-member-name is-stale"
+                >{text(
+                  'FABRICATE.Admin.Manager.Travel.StaleTravelActorLabel',
+                  'Stale travel actor'
+                )}</span
+              >
+              <button
+                type="button"
+                class="manager-icon-button is-danger"
+                title={text(
+                  'FABRICATE.Admin.Manager.Travel.ClearStaleTravelActor',
+                  'Clear stale travel actor'
+                )}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Travel.ClearStaleTravelActor',
+                  'Clear stale travel actor'
+                )}
+                disabled={saving}
+                onclick={() => onClearStaleTravelActor(selectedParty.id)}
+              >
                 <i class="fas fa-times" aria-hidden="true"></i>
               </button>
             {:else}
-              <span class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.TravelActorEmpty', 'No travel actor assigned.')}</span>
+              <!-- NOT a no-state panel: this is the inline VALUE slot of the current
+                   travel-actor row, sitting where the portrait + name would be, beside
+                   the row's clear button and the picker trigger. It stays a plain inline
+                   hint (`.manager-travel-hint`, the rule the deleted
+                   `.manager-travel-empty-hint` shared) rather than becoming an
+                   `EmptyState`, which would put a dashed panel inside a control row. -->
+              <span class="manager-travel-hint"
+                >{text(
+                  'FABRICATE.Admin.Manager.Travel.TravelActorEmpty',
+                  'No travel actor assigned.'
+                )}</span
+              >
             {/if}
           </div>
 
-          <div class="manager-travel-picker" bind:this={travelPickerRoot} use:dismissOnOutsideClick={{ enabled: travelPickerOpen, onDismiss: closeTravelPicker }}>
+          <div
+            class="manager-travel-picker"
+            bind:this={travelPickerRoot}
+            use:dismissOnOutsideClick={{ enabled: travelPickerOpen, onDismiss: closeTravelPicker }}
+          >
             <button
               type="button"
               class="manager-button manager-travel-picker-trigger"
@@ -459,32 +669,75 @@
               onclick={toggleTravelPicker}
             >
               <i class="fas fa-map-location-dot" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Travel.SetTravelActor', 'Set travel actor')}</span>
+              <span
+                >{text('FABRICATE.Admin.Manager.Travel.SetTravelActor', 'Set travel actor')}</span
+              >
             </button>
             {#if !hasActors}
-              <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.NoActorsInWorld', 'No actors exist in this world yet — create an Actor first.')}</p>
+              <p class="manager-travel-hint">
+                {text(
+                  'FABRICATE.Admin.Manager.Travel.NoActorsInWorld',
+                  'No actors exist in this world yet — create an Actor first.'
+                )}
+              </p>
             {/if}
             {#if travelPickerOpen}
-              <div class="manager-travel-popover" role="dialog" aria-label={text('FABRICATE.Admin.Manager.Travel.ActorPickerLabel', 'Choose an actor')}>
+              <div
+                class="manager-travel-popover"
+                role="dialog"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Travel.ActorPickerLabel',
+                  'Choose an actor'
+                )}
+              >
                 <div class="manager-travel-popover-search">
                   <input
                     bind:this={travelSearchInput}
                     bind:value={travelSearch}
                     type="text"
-                    placeholder={text('FABRICATE.Admin.Manager.Travel.ActorSearchPlaceholder', 'Search actors...')}
-                    aria-label={text('FABRICATE.Admin.Manager.Travel.ActorSearchLabel', 'Search actors')}
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.Travel.ActorSearchPlaceholder',
+                      'Search actors...'
+                    )}
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Travel.ActorSearchLabel',
+                      'Search actors'
+                    )}
                   />
                 </div>
-                <div class="manager-travel-popover-options" role="listbox" aria-label={text('FABRICATE.Admin.Manager.Travel.ActorPickerLabel', 'Choose an actor')}>
+                <div
+                  class="manager-travel-popover-options"
+                  role="listbox"
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.Travel.ActorPickerLabel',
+                    'Choose an actor'
+                  )}
+                >
                   {#each filteredTravelActors as actor (actor.uuid)}
-                    <button type="button" class="manager-travel-option" role="option" aria-selected={actor.uuid === selectedParty.travelActorUuid} title={actor.name} onclick={() => chooseTravelActor(actor)}>
+                    <button
+                      type="button"
+                      class="manager-travel-option"
+                      role="option"
+                      aria-selected={actor.uuid === selectedParty.travelActorUuid}
+                      title={actor.name}
+                      onclick={() => chooseTravelActor(actor)}
+                    >
                       <span class="manager-travel-portrait" aria-hidden="true">
-                        {#if hasImg(actor)}<img src={actor.img} alt="" />{:else}<i class={FALLBACK_PORTRAIT_ICON}></i>{/if}
+                        {#if hasImg(actor)}<img src={actor.img} alt="" />{:else}<i
+                            class={FALLBACK_PORTRAIT_ICON}
+                          ></i>{/if}
                       </span>
                       <span class="manager-travel-option-name">{actor.name}</span>
                     </button>
                   {:else}
-                    <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.NoActorsInWorld', 'No actors exist in this world yet — create an Actor first.')}</p>
+                    <EmptyState
+                      compact
+                      icon="fas fa-user-slash"
+                      title={text(
+                        'FABRICATE.Admin.Manager.Travel.NoActorsInWorld',
+                        'No actors exist in this world yet — create an Actor first.'
+                      )}
+                    />
                   {/each}
                 </div>
               </div>
@@ -493,14 +746,38 @@
         </section>
 
         <!-- Current-realm override (per selected system) -->
-        <section class="manager-travel-override" aria-label={text('FABRICATE.Admin.Manager.Travel.OverrideLabel', 'Current realm override')}>
-          <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.OverrideLabel', 'Current realm override')}</h4>
-          <p class="manager-travel-hint">{text('FABRICATE.Admin.Manager.Travel.OverrideHint', "Set the party's current realm for this crafting system.")}</p>
+        <section
+          class="manager-travel-override"
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Travel.OverrideLabel',
+            'Current realm override'
+          )}
+        >
+          <h4 class="manager-card-subtitle">
+            {text('FABRICATE.Admin.Manager.Travel.OverrideLabel', 'Current realm override')}
+          </h4>
+          <p class="manager-travel-hint">
+            {text(
+              'FABRICATE.Admin.Manager.Travel.OverrideHint',
+              "Set the party's current realm for this crafting system."
+            )}
+          </p>
 
           {#if !hasRealms}
-            <p class="manager-travel-empty-hint">{text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')}</p>
+            <EmptyState
+              compact
+              icon="fas fa-earth-americas"
+              title={text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')}
+            />
           {:else}
-            <div class="manager-travel-realm-chips" role="group" aria-label={text('FABRICATE.Admin.Manager.Travel.RealmSelectLabel', 'Override realms')}>
+            <div
+              class="manager-travel-realm-chips"
+              role="group"
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Travel.RealmSelectLabel',
+                'Override realms'
+              )}
+            >
               {#each systemRealms as realm (realm.id)}
                 {@const selected = overrideRealmIds.includes(realm.id)}
                 <button
@@ -513,7 +790,9 @@
                 >
                   <span>{realm.name}</span>
                   {#if !realm.enabled}
-                    <span class="manager-travel-realm-chip-flag">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</span>
+                    <span class="manager-travel-realm-chip-flag"
+                      >{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</span
+                    >
                   {/if}
                 </button>
               {/each}
@@ -521,40 +800,99 @@
           {/if}
 
           <div class="manager-travel-override-actions">
-            <button type="button" class="manager-button is-primary" disabled={saving || !hasRealms} onclick={commitOverride}>
+            <button
+              type="button"
+              class="manager-button is-primary"
+              disabled={saving || !hasRealms}
+              onclick={commitOverride}
+            >
               <span>{text('FABRICATE.Admin.Manager.Travel.SetOverride', 'Set current realm')}</span>
             </button>
             <button type="button" class="manager-button" disabled={saving} onclick={clearOverride}>
-              <span>{text('FABRICATE.Admin.Manager.Travel.ClearOverride', 'Clear current realm')}</span>
+              <span
+                >{text('FABRICATE.Admin.Manager.Travel.ClearOverride', 'Clear current realm')}</span
+              >
             </button>
           </div>
         </section>
 
         <!-- Stale references to repair -->
         {#if selectedParty.hasStaleReference}
-          <section class="manager-travel-stale" aria-label={text('FABRICATE.Admin.Manager.Travel.StaleSectionLabel', 'References to repair')}>
-            <h4 class="manager-card-subtitle">{text('FABRICATE.Admin.Manager.Travel.StaleSectionLabel', 'References to repair')}</h4>
+          <section
+            class="manager-travel-stale"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Travel.StaleSectionLabel',
+              'References to repair'
+            )}
+          >
+            <h4 class="manager-card-subtitle">
+              {text('FABRICATE.Admin.Manager.Travel.StaleSectionLabel', 'References to repair')}
+            </h4>
             <ul class="manager-travel-stale-list">
               {#each selectedParty.staleMembers as uuid (uuid)}
                 <li class="manager-travel-stale-row" data-stale-member={uuid}>
-                  <span>{text('FABRICATE.Admin.Manager.Travel.StaleMemberLabel', 'Stale member')}</span>
-                  <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Travel.RemoveStaleMember', 'Remove stale member', { uuid })} disabled={saving} onclick={() => onRemoveStaleMember(selectedParty.id, uuid)}>
+                  <span
+                    >{text('FABRICATE.Admin.Manager.Travel.StaleMemberLabel', 'Stale member')}</span
+                  >
+                  <button
+                    type="button"
+                    class="manager-icon-button is-danger"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Travel.RemoveStaleMember',
+                      'Remove stale member',
+                      { uuid }
+                    )}
+                    disabled={saving}
+                    onclick={() => onRemoveStaleMember(selectedParty.id, uuid)}
+                  >
                     <i class="fas fa-times" aria-hidden="true"></i>
                   </button>
                 </li>
               {/each}
               {#if selectedParty.staleTravelActor}
-                <li class="manager-travel-stale-row" data-stale-travel-actor={selectedParty.staleTravelActor}>
-                  <span>{text('FABRICATE.Admin.Manager.Travel.StaleTravelActorLabel', 'Stale travel actor')}</span>
-                  <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Travel.ClearStaleTravelActor', 'Clear stale travel actor')} disabled={saving} onclick={() => onClearStaleTravelActor(selectedParty.id)}>
+                <li
+                  class="manager-travel-stale-row"
+                  data-stale-travel-actor={selectedParty.staleTravelActor}
+                >
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Travel.StaleTravelActorLabel',
+                      'Stale travel actor'
+                    )}</span
+                  >
+                  <button
+                    type="button"
+                    class="manager-icon-button is-danger"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Travel.ClearStaleTravelActor',
+                      'Clear stale travel actor'
+                    )}
+                    disabled={saving}
+                    onclick={() => onClearStaleTravelActor(selectedParty.id)}
+                  >
                     <i class="fas fa-times" aria-hidden="true"></i>
                   </button>
                 </li>
               {/if}
               {#each selectedParty.staleRealmIds as realmId (realmId)}
                 <li class="manager-travel-stale-row" data-stale-realm={realmId}>
-                  <span>{text('FABRICATE.Admin.Manager.Travel.StaleRealmLabel', 'Stale override realm')}</span>
-                  <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Travel.RemoveStaleRealm', 'Remove stale override realm', { id: realmId })} disabled={saving} onclick={() => onDropStaleOverrideRealm(selectedParty.id, systemId, realmId)}>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Travel.StaleRealmLabel',
+                      'Stale override realm'
+                    )}</span
+                  >
+                  <button
+                    type="button"
+                    class="manager-icon-button is-danger"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Travel.RemoveStaleRealm',
+                      'Remove stale override realm',
+                      { id: realmId }
+                    )}
+                    disabled={saving}
+                    onclick={() => onDropStaleOverrideRealm(selectedParty.id, systemId, realmId)}
+                  >
                     <i class="fas fa-times" aria-hidden="true"></i>
                   </button>
                 </li>

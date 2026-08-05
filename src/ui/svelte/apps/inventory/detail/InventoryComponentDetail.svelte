@@ -39,7 +39,7 @@
     onReorderSalvageStage = () => {},
     onSalvageReorderSettled = () => {},
     salvageOrderIsCustom = false,
-    onResetSalvageOrder = () => {}
+    onResetSalvageOrder = () => {},
   } = $props();
 
   // Each detail list (sources, used-by, required-for, produced-by, contributors)
@@ -56,7 +56,9 @@
 
   const isEssence = $derived(item?.isEssenceSource === true);
   const isTool = $derived((active ? active.isTool : item?.isTool) === true);
-  const description = $derived(String((active ? active.description : item?.description) ?? '').trim());
+  const description = $derived(
+    String((active ? active.description : item?.description) ?? '').trim()
+  );
   // A read-only verdict decided builder-side, from a persisted `toolBroken` past fact
   // or a projected usage exhaustion. Nothing un-breaks a tool, so the banner states
   // that it is unusable and offers no action — and it does NOT gate salvage: recycling
@@ -74,20 +76,40 @@
     Array.isArray(scopedTags) ? scopedTags.filter((tag) => String(tag ?? '').trim() !== '') : []
   );
   const essences = $derived(
-    Array.isArray(active ? active.essences : item?.essences) ? (active ? active.essences : item.essences) : []
+    Array.isArray(active ? active.essences : item?.essences)
+      ? active
+        ? active.essences
+        : item.essences
+      : []
   );
   const sources = $derived(Array.isArray(item?.sources) ? item.sources : []);
-  const usedBy = $derived(Array.isArray(active ? active.usedBy : item?.usedBy) ? (active ? active.usedBy : item.usedBy) : []);
+  const usedBy = $derived(
+    Array.isArray(active ? active.usedBy : item?.usedBy)
+      ? active
+        ? active.usedBy
+        : item.usedBy
+      : []
+  );
   const requiredFor = $derived(
-    Array.isArray(active ? active.requiredFor : item?.requiredFor) ? (active ? active.requiredFor : item.requiredFor) : []
+    Array.isArray(active ? active.requiredFor : item?.requiredFor)
+      ? active
+        ? active.requiredFor
+        : item.requiredFor
+      : []
   );
   const producedBy = $derived(
-    Array.isArray(active ? active.producedBy : item?.producedBy) ? (active ? active.producedBy : item.producedBy) : []
+    Array.isArray(active ? active.producedBy : item?.producedBy)
+      ? active
+        ? active.producedBy
+        : item.producedBy
+      : []
   );
   const contributors = $derived(Array.isArray(item?.contributors) ? item.contributors : []);
   const scopedTier = $derived(active ? active.tier : item?.tier);
   const tierLabel = $derived(
-    scopedTier != null && scopedTier !== '' ? localize('FABRICATE.App.Inventory.Detail.Tier', { tier: scopedTier }) : null
+    scopedTier != null && scopedTier !== ''
+      ? localize('FABRICATE.App.Inventory.Detail.Tier', { tier: scopedTier })
+      : null
   );
   // Header identity re-derives from the SELECTED participation's component name/img — a GM
   // may know the same stack by a different name/icon in each system.
@@ -105,7 +127,7 @@
   const headerChips = $derived([
     { id: 'type', label: typeLabel, tone: 'quiet' },
     ...(tierLabel ? [{ id: 'tier', label: tierLabel }] : []),
-    ...tags.map((tag) => ({ id: `tag:${tag}`, label: tag }))
+    ...tags.map((tag) => ({ id: `tag:${tag}`, label: tag })),
   ]);
 
   // Per-section current page, keyed by section id, reset when the item changes.
@@ -172,7 +194,7 @@
 
   const TABS = [
     { id: 'info', icon: 'fas fa-circle-info', key: 'FABRICATE.App.Inventory.Detail.TabInfo' },
-    { id: 'salvage', icon: 'fas fa-recycle', key: 'FABRICATE.App.Inventory.Detail.TabSalvage' }
+    { id: 'salvage', icon: 'fas fa-recycle', key: 'FABRICATE.App.Inventory.Detail.TabSalvage' },
   ];
   let activeTab = $state('info');
   // Tab routing is driven by two events, resolved in ONE effect so their ordering is
@@ -300,206 +322,238 @@
       />
     </div>
   {:else}
-  <div
-    class="inventory-detail-panel"
-    id="inventory-detail-panel-info"
-    role={salvageable ? 'tabpanel' : undefined}
-    aria-labelledby={salvageable ? 'inventory-detail-tab-info' : undefined}
-  >
-  {#if broken}
-    <!-- Read-only: brokenness is a derived verdict, no engine method un-breaks a tool,
+    <div
+      class="inventory-detail-panel"
+      id="inventory-detail-panel-info"
+      role={salvageable ? 'tabpanel' : undefined}
+      aria-labelledby={salvageable ? 'inventory-detail-tab-info' : undefined}
+    >
+      {#if broken}
+        <!-- Read-only: brokenness is a derived verdict, no engine method un-breaks a tool,
          and the only "Repair" string in the codebase is a shopping-list label that
          repairs nothing. So this states the cause and offers NO action. -->
-    <p class="inventory-detail-broken-banner" data-inventory-broken-banner role="status">
-      <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-      <span>{localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}</span>
-    </p>
-  {/if}
+        <p class="inventory-detail-broken-banner" data-inventory-broken-banner role="status">
+          <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+          <span>{localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}</span>
+        </p>
+      {/if}
 
-  {#if description}
-    <p class="inventory-detail-description" data-inventory-description>{description}</p>
-  {/if}
+      {#if description}
+        <p class="inventory-detail-description" data-inventory-description>{description}</p>
+      {/if}
 
-  {#if essences.length > 0}
-    <section class="inventory-detail-section">
-      <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}</p>
-      <div class="inventory-detail-essences">
-        {#each essences as essence (essence.id)}
-          <span class="inventory-chip inventory-chip-essence">
-            {#if essence.icon}<i class={essence.icon} aria-hidden="true"></i>{/if}
-            <span>{essence.name}</span>
-            <span class="inventory-chip-qty">×{essence.quantity}</span>
-          </span>
-        {/each}
-      </div>
-    </section>
-  {/if}
+      {#if essences.length > 0}
+        <section class="inventory-detail-section">
+          <p class="inventory-detail-section-title">
+            {localize('FABRICATE.App.Inventory.Detail.EssenceContentTitle')}
+          </p>
+          <div class="inventory-detail-essences">
+            {#each essences as essence (essence.id)}
+              <span class="inventory-chip inventory-chip-essence">
+                {#if essence.icon}<i class={essence.icon} aria-hidden="true"></i>{/if}
+                <span>{essence.name}</span>
+                <span class="inventory-chip-qty">×{essence.quantity}</span>
+              </span>
+            {/each}
+          </div>
+        </section>
+      {/if}
 
-  <section class="inventory-detail-section">
-    <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}</p>
-    <ul class="inventory-detail-list">
-      {#each sliceOf(sources, 'sources') as source (source.actorId)}
-        <li class="inventory-detail-row">
-          <span class="inventory-detail-portrait" aria-hidden="true">
-            {#if hasImg(source.actorImg)}
-              <img src={source.actorImg} alt="" />
-            {:else}
-              <i class="fas fa-user"></i>
-            {/if}
-          </span>
-          <span class="inventory-detail-row-name">{source.actorName}</span>
-          <span class="inventory-detail-row-qty" data-inventory-source-qty>×{source.quantity}</span>
-        </li>
-      {/each}
-    </ul>
-    <InventoryDetailPager
-      list={sources}
-      sectionKey="sources"
-      page={pageOf(sources, 'sources')}
-      pageSize={PAGE_SIZE}
-      onPage={(value) => setPage('sources', value)}
-    />
-  </section>
-
-  {#if isEssence}
-    <section class="inventory-detail-section">
-      <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}</p>
-      {#if contributors.length > 0}
+      <section class="inventory-detail-section">
+        <p class="inventory-detail-section-title">
+          {localize('FABRICATE.App.Inventory.Detail.SourcesTitle')}
+        </p>
         <ul class="inventory-detail-list">
-          {#each sliceOf(contributors, 'contributors') as contributor (contributor.componentId)}
-            <li class="inventory-detail-row" data-inventory-contributor={contributor.componentId}>
-              <CraftingThumb src={contributor.img ?? ''} alt="" size={40} />
-              <span class="inventory-detail-row-name">{contributor.name}</span>
-              <span class="inventory-detail-row-qty">×{contributor.quantity}</span>
+          {#each sliceOf(sources, 'sources') as source (source.actorId)}
+            <li class="inventory-detail-row">
+              <span class="inventory-detail-portrait" aria-hidden="true">
+                {#if hasImg(source.actorImg)}
+                  <img src={source.actorImg} alt="" />
+                {:else}
+                  <i class="fas fa-user"></i>
+                {/if}
+              </span>
+              <span class="inventory-detail-row-name">{source.actorName}</span>
+              <span class="inventory-detail-row-qty" data-inventory-source-qty
+                >×{source.quantity}</span
+              >
             </li>
           {/each}
         </ul>
         <InventoryDetailPager
-          list={contributors}
-          sectionKey="contributors"
-          page={pageOf(contributors, 'contributors')}
+          list={sources}
+          sectionKey="sources"
+          page={pageOf(sources, 'sources')}
           pageSize={PAGE_SIZE}
-          onPage={(value) => setPage('contributors', value)}
+          onPage={(value) => setPage('sources', value)}
         />
-      {:else}
-        <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')}</p>
+      </section>
+
+      {#if isEssence}
+        <section class="inventory-detail-section">
+          <p class="inventory-detail-section-title">
+            {localize('FABRICATE.App.Inventory.Detail.ContributingTitle')}
+          </p>
+          {#if contributors.length > 0}
+            <ul class="inventory-detail-list">
+              {#each sliceOf(contributors, 'contributors') as contributor (contributor.componentId)}
+                <li
+                  class="inventory-detail-row"
+                  data-inventory-contributor={contributor.componentId}
+                >
+                  <CraftingThumb src={contributor.img ?? ''} alt="" size={40} />
+                  <span class="inventory-detail-row-name">{contributor.name}</span>
+                  <span class="inventory-detail-row-qty">×{contributor.quantity}</span>
+                </li>
+              {/each}
+            </ul>
+            <InventoryDetailPager
+              list={contributors}
+              sectionKey="contributors"
+              page={pageOf(contributors, 'contributors')}
+              pageSize={PAGE_SIZE}
+              onPage={(value) => setPage('contributors', value)}
+            />
+          {:else}
+            <p class="inventory-detail-empty-note">
+              {localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')}
+            </p>
+          {/if}
+        </section>
       {/if}
-    </section>
-  {/if}
 
-  <section class="inventory-detail-section">
-    <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}</p>
-    {#if usedBy.length > 0}
-      <ul class="inventory-detail-list">
-        {#each sliceOf(usedBy, 'used') as use (use.recipeId + ':' + use.role)}
-          <li>
-            <button
-              type="button"
-              class="inventory-detail-recipe"
-              data-inventory-used-by={use.recipeId}
-              onclick={() => openRecipe(use.recipeId)}
-            >
-              <CraftingThumb src={use.recipeImg ?? ''} alt="" size={40} />
-              <span class="inventory-detail-row-name">{use.recipeName}</span>
-              <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
-      <InventoryDetailPager
-        list={usedBy}
-        sectionKey="used"
-        page={pageOf(usedBy, 'used')}
-        pageSize={PAGE_SIZE}
-        onPage={(value) => setPage('used', value)}
-      />
-    {:else}
-      <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}</p>
-    {/if}
-  </section>
-
-  {#if isTool}
-    <section class="inventory-detail-section" data-inventory-section="required">
-      <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}</p>
-      {#if requiredFor.length > 0}
-        <ul class="inventory-detail-list">
-          {#each sliceOf(requiredFor, 'required') as req, index (req.kind + ':' + (req.recipeId ?? req.name) + ':' + index)}
-            <li>
-              {#if req.kind === 'recipe' && req.recipeId}
+      <section class="inventory-detail-section">
+        <p class="inventory-detail-section-title">
+          {localize('FABRICATE.App.Inventory.Detail.UsedByTitle')}
+        </p>
+        {#if usedBy.length > 0}
+          <ul class="inventory-detail-list">
+            {#each sliceOf(usedBy, 'used') as use (use.recipeId + ':' + use.role)}
+              <li>
                 <button
                   type="button"
                   class="inventory-detail-recipe"
-                  data-inventory-required-for={req.recipeId}
-                  onclick={() => openRecipe(req.recipeId)}
+                  data-inventory-used-by={use.recipeId}
+                  onclick={() => openRecipe(use.recipeId)}
                 >
-                  <CraftingThumb src={req.img ?? ''} alt="" size={40} />
-                  <span class="inventory-detail-row-name">{req.name}</span>
-                  <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
+                  <CraftingThumb src={use.recipeImg ?? ''} alt="" size={40} />
+                  <span class="inventory-detail-row-name">{use.recipeName}</span>
+                  <span class="inventory-chip inventory-chip-role">{roleLabel(use.role)}</span>
                 </button>
-              {:else}
-                <div class="inventory-detail-row" data-inventory-required-for-kind={req.kind}>
-                  <CraftingThumb src={req.img ?? ''} alt="" size={40} />
-                  <span class="inventory-detail-row-name">{req.name}</span>
-                  <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
-                </div>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-        <InventoryDetailPager
-          list={requiredFor}
-          sectionKey="required"
-          page={pageOf(requiredFor, 'required')}
-          pageSize={PAGE_SIZE}
-          onPage={(value) => setPage('required', value)}
-        />
-      {:else}
-        <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty')}</p>
-      {/if}
-    </section>
-  {/if}
+              </li>
+            {/each}
+          </ul>
+          <InventoryDetailPager
+            list={usedBy}
+            sectionKey="used"
+            page={pageOf(usedBy, 'used')}
+            pageSize={PAGE_SIZE}
+            onPage={(value) => setPage('used', value)}
+          />
+        {:else}
+          <p class="inventory-detail-empty-note">
+            {localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}
+          </p>
+        {/if}
+      </section>
 
-  {#if !isEssence}
-    <section class="inventory-detail-section">
-      <p class="inventory-detail-section-title">{localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}</p>
-      {#if producedBy.length > 0}
-        <ul class="inventory-detail-list">
-          {#each sliceOf(producedBy, 'produced') as producer, index (producer.kind + ':' + (producer.recipeId ?? producer.name) + ':' + index)}
-            <li>
-              {#if producer.kind === 'recipe' && producer.recipeId}
-                <button
-                  type="button"
-                  class="inventory-detail-recipe"
-                  data-inventory-produced-by={producer.recipeId}
-                  onclick={() => openRecipe(producer.recipeId)}
-                >
-                  <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
-                  <span class="inventory-detail-row-name">{producer.name}</span>
-                  <span class="inventory-chip inventory-chip-role">{kindLabel(producer.kind)}</span>
-                </button>
-              {:else}
-                <div class="inventory-detail-row" data-inventory-produced-by-kind={producer.kind}>
-                  <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
-                  <span class="inventory-detail-row-name">{producer.name}</span>
-                  <span class="inventory-chip inventory-chip-role">{kindLabel(producer.kind)}</span>
-                </div>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-        <InventoryDetailPager
-          list={producedBy}
-          sectionKey="produced"
-          page={pageOf(producedBy, 'produced')}
-          pageSize={PAGE_SIZE}
-          onPage={(value) => setPage('produced', value)}
-        />
-      {:else}
-        <p class="inventory-detail-empty-note">{localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')}</p>
+      {#if isTool}
+        <section class="inventory-detail-section" data-inventory-section="required">
+          <p class="inventory-detail-section-title">
+            {localize('FABRICATE.App.Inventory.Detail.RequiredForTitle')}
+          </p>
+          {#if requiredFor.length > 0}
+            <ul class="inventory-detail-list">
+              {#each sliceOf(requiredFor, 'required') as req, index (req.kind + ':' + (req.recipeId ?? req.name) + ':' + index)}
+                <li>
+                  {#if req.kind === 'recipe' && req.recipeId}
+                    <button
+                      type="button"
+                      class="inventory-detail-recipe"
+                      data-inventory-required-for={req.recipeId}
+                      onclick={() => openRecipe(req.recipeId)}
+                    >
+                      <CraftingThumb src={req.img ?? ''} alt="" size={40} />
+                      <span class="inventory-detail-row-name">{req.name}</span>
+                      <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
+                    </button>
+                  {:else}
+                    <div class="inventory-detail-row" data-inventory-required-for-kind={req.kind}>
+                      <CraftingThumb src={req.img ?? ''} alt="" size={40} />
+                      <span class="inventory-detail-row-name">{req.name}</span>
+                      <span class="inventory-chip inventory-chip-role">{kindLabel(req.kind)}</span>
+                    </div>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+            <InventoryDetailPager
+              list={requiredFor}
+              sectionKey="required"
+              page={pageOf(requiredFor, 'required')}
+              pageSize={PAGE_SIZE}
+              onPage={(value) => setPage('required', value)}
+            />
+          {:else}
+            <p class="inventory-detail-empty-note">
+              {localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty')}
+            </p>
+          {/if}
+        </section>
       {/if}
-    </section>
-  {/if}
-  </div>
+
+      {#if !isEssence}
+        <section class="inventory-detail-section">
+          <p class="inventory-detail-section-title">
+            {localize('FABRICATE.App.Inventory.Detail.ProducedByTitle')}
+          </p>
+          {#if producedBy.length > 0}
+            <ul class="inventory-detail-list">
+              {#each sliceOf(producedBy, 'produced') as producer, index (producer.kind + ':' + (producer.recipeId ?? producer.name) + ':' + index)}
+                <li>
+                  {#if producer.kind === 'recipe' && producer.recipeId}
+                    <button
+                      type="button"
+                      class="inventory-detail-recipe"
+                      data-inventory-produced-by={producer.recipeId}
+                      onclick={() => openRecipe(producer.recipeId)}
+                    >
+                      <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
+                      <span class="inventory-detail-row-name">{producer.name}</span>
+                      <span class="inventory-chip inventory-chip-role"
+                        >{kindLabel(producer.kind)}</span
+                      >
+                    </button>
+                  {:else}
+                    <div
+                      class="inventory-detail-row"
+                      data-inventory-produced-by-kind={producer.kind}
+                    >
+                      <CraftingThumb src={producer.img ?? ''} alt="" size={40} />
+                      <span class="inventory-detail-row-name">{producer.name}</span>
+                      <span class="inventory-chip inventory-chip-role"
+                        >{kindLabel(producer.kind)}</span
+                      >
+                    </div>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+            <InventoryDetailPager
+              list={producedBy}
+              sectionKey="produced"
+              page={pageOf(producedBy, 'produced')}
+              pageSize={PAGE_SIZE}
+              onPage={(value) => setPage('produced', value)}
+            />
+          {:else}
+            <p class="inventory-detail-empty-note">
+              {localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')}
+            </p>
+          {/if}
+        </section>
+      {/if}
+    </div>
   {/if}
 </InventoryDetailHeader>
 

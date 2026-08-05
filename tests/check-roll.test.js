@@ -106,7 +106,9 @@ test('rolledDiceGroups results are active-only raw faces (drops dropped dice)', 
 });
 
 test('rolledDiceGroups falls back to summing per-die results when total is absent', () => {
-  const groups = rolledDiceGroups({ dice: [{ number: 2, faces: 6, results: [{ result: 3 }, { result: 4 }] }] });
+  const groups = rolledDiceGroups({
+    dice: [{ number: 2, faces: 6, results: [{ result: 3 }, { result: 4 }] }],
+  });
   assert.deepEqual(groups, [{ groupId: 0, group: '2d6', sum: 7, results: [3, 4] }]);
 });
 
@@ -238,6 +240,346 @@ test('@craftingmod: runFormulaPassFail threads the modifier context through to t
   delete globalThis.Roll;
 });
 
+// ── interactive playerPicks: deferred @craftingmod substitution (issue 770 P2) ─
+
+// The interactive `playerPicks` descriptor: eligible modifiers + the highest-valued
+// pre-selection. Herbalism (5) is the default; Medicine (3) is the override option.
+const PICK_CHOICE = {
+  token: '@craftingmod',
+  modifiers: [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
+    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
+  ],
+  defaultSelectedId: 'herb',
+};
+
+test('playerPicks: the chosen modifier value substitutes @craftingmod before Roll (eval == display)', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  const rolled = await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
+  });
+  assert.equal(
+    rolledFormulas.at(-1),
+    '1d20 + (3)',
+    'chosen Medicine (3) substituted, not the default'
+  );
+  assert.equal(rolled.resolvedFormula, '1d20 + (3)', 'display equals what evaluated');
+  delete globalThis.Roll;
+});
+
+test('playerPicks: confirming the default pre-selection uses the highest value', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    // Headless-style confirm without an explicit selection → falls back to the default.
+    prompt: async () => ({ confirmed: true, advantage: 'normal' }),
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + (5)', 'default Herbalism (5) is used');
+  delete globalThis.Roll;
+});
+
+test('playerPicks: the prompt receives the descriptor and a neutral modifier placeholder', async () => {
+  stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  let promptedArgs = null;
+  await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async (args) => {
+      promptedArgs = args;
+      return { confirmed: true, chosenModifierId: 'herb', advantage: 'normal' };
+    },
+  });
+  assert.equal(
+    promptedArgs.modifierChoice,
+    PICK_CHOICE,
+    'the descriptor is threaded to the prompt'
+  );
+  // The `@craftingmod` slot shows a neutral `(modifier)` placeholder, NOT a static
+  // default number that a non-default radio pick would contradict; the radio value
+  // chips carry each option's value. No raw `@craftingmod` token leaks either.
+  assert.equal(promptedArgs.formula, '1d20 + (modifier)', 'modifier slot is a neutral placeholder');
+  assert.ok(
+    !/@craftingmod/.test(promptedArgs.formula),
+    'no raw @craftingmod token in the prompt formula'
+  );
+  assert.equal(promptedArgs.resolvedFormula, '1d20 + (modifier)', 'display shows the placeholder');
+  delete globalThis.Roll;
+});
+
+test('playerPicks: the chosen modifier is substituted BEFORE the advantage transform', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  const rolled = await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'advantage' }),
+  });
+  // Substitution (med → 3) precedes the plain-d20 advantage rewrite, so the modifier
+  // composes on top of the kept-highest pool: `2d20kh1 + (3)`, eval == display.
+  assert.equal(rolledFormulas.at(-1), '2d20kh1 + (3)', 'advantage composes on the chosen modifier');
+  assert.equal(rolled.resolvedFormula, '2d20kh1 + (3)', 'display equals what evaluated');
+  delete globalThis.Roll;
+});
+
+test('playerPicks: an unknown chosen id resolves @craftingmod to 0 (never left unresolved)', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async () => ({
+      confirmed: true,
+      chosenModifierId: 'not-a-real-id',
+      advantage: 'normal',
+    }),
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + (0)', 'unknown id → 0, token still substituted');
+  delete globalThis.Roll;
+});
+
+test('playerPicks: the chosen value composes UNDER a situational bonus', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async () => ({
+      confirmed: true,
+      chosenModifierId: 'med',
+      bonus: '2',
+      advantage: 'normal',
+    }),
+  });
+  assert.equal(
+    rolledFormulas.at(-1),
+    '1d20 + (3) + (2)',
+    'the modifier substitutes first, then the situational bonus appends'
+  );
+  delete globalThis.Roll;
+});
+
+test('playerPicks: a cancelled prompt aborts with zero substitution and no roll', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  const rolled = await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async () => ({ confirmed: false }),
+  });
+  assert.equal(rolled.cancelled, true);
+  assert.equal(rolledFormulas.length, 0, 'no formula ever rolled on cancel');
+  delete globalThis.Roll;
+});
+
+// eval == display is an acceptance criterion of #855, and the SITUATIONAL-BONUS branch
+// is where it can silently break: `effectiveFormula` gets the bonus appended, and only
+// the paired `resolved = resolveCheckFormulaDisplay(...)` recompute keeps the journal /
+// `resolvedFormula` in step. Without it a player who types `+2` sees `1d20 + (3)` while
+// `1d20 + (3) + (2)` actually rolls. Both tests assert the ROLLED string and the
+// DISPLAYED string are the same string.
+test('playerPicks: eval == display with a situational bonus (and advantage) composed on top', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  const rolled = await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    interactive: true,
+    modifierChoice: PICK_CHOICE,
+    prompt: async () => ({
+      confirmed: true,
+      chosenModifierId: 'med',
+      bonus: '2',
+      advantage: 'advantage',
+    }),
+  });
+  assert.equal(
+    rolledFormulas.at(-1),
+    '2d20kh1 + (3) + (2)',
+    'modifier, then advantage, then bonus'
+  );
+  assert.equal(
+    rolled.resolvedFormula,
+    '2d20kh1 + (3) + (2)',
+    'the journal/display formula equals the formula that actually evaluated'
+  );
+  delete globalThis.Roll;
+});
+
+test('interactive: eval == display when only a situational bonus is appended (no playerPicks)', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({}) };
+  const rolled = await evaluateCheckRoll('1d20 + 3', actor, {
+    interactive: true,
+    prompt: async () => ({ confirmed: true, bonus: '2', advantage: 'normal' }),
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + 3 + (2)');
+  assert.equal(rolled.resolvedFormula, '1d20 + 3 + (2)', 'display equals what evaluated');
+  delete globalThis.Roll;
+});
+
+// The chat-flavor thread: the chosen modifier's label rides the existing flavor so the
+// posted roll says WHICH modifier the player picked. `stubCraftingModRoll`'s evaluated
+// roll has no `toMessage`, and the post is wrapped in a swallow-everything try/catch, so
+// the append is only observable through a roll stub that records the payload.
+function stubCraftingModChatRoll() {
+  const posted = [];
+  stubCraftingModRoll();
+  const Base = globalThis.Roll;
+  // Static `replaceFormulaData` / `validate` are inherited through the class chain.
+  globalThis.Roll = class extends Base {
+    async evaluate(options) {
+      const rolled = await super.evaluate(options);
+      return {
+        ...rolled,
+        toMessage: async (data, messageOptions) => {
+          posted.push({ data, options: messageOptions });
+        },
+      };
+    }
+  };
+  return posted;
+}
+
+function withChatMessage(run) {
+  const previous = globalThis.ChatMessage;
+  globalThis.ChatMessage = { create: () => {} };
+  return run().finally(() => {
+    if (previous === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previous;
+  });
+}
+
+test('playerPicks: the chosen modifier label is appended to the chat flavor', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll('1d20 + @craftingmod', { getRollData: () => ({}) }, {
+      interactive: true,
+      modifierChoice: PICK_CHOICE,
+      flavor: 'Healing Salve — Crafting check (DC 10)',
+      prompt: async () => ({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
+    })
+  );
+  assert.equal(
+    posted.at(-1).data.flavor,
+    'Healing Salve — Crafting check (DC 10) · Medicine',
+    'the picked label rides the existing flavor behind a bullet'
+  );
+  delete globalThis.Roll;
+});
+
+test('playerPicks: an empty base flavor gets the label alone, never an orphan bullet', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll('1d20 + @craftingmod', { getRollData: () => ({}) }, {
+      interactive: true,
+      modifierChoice: PICK_CHOICE,
+      // No `flavor`: a direct caller / test path production never takes.
+      prompt: async () => ({ confirmed: true, chosenModifierId: 'herb', advantage: 'normal' }),
+    })
+  );
+  assert.equal(posted.at(-1).data.flavor, 'Herbalism', 'no leading "· " on an empty base');
+  delete globalThis.Roll;
+});
+
+test('playerPicks: an unlabelled chosen modifier leaves the flavor untouched', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll('1d20 + @craftingmod', { getRollData: () => ({}) }, {
+      interactive: true,
+      modifierChoice: {
+        token: '@craftingmod',
+        modifiers: [
+          { id: 'bare', label: '', icon: '', value: 3 },
+          { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
+        ],
+        defaultSelectedId: 'herb',
+      },
+      flavor: 'Crafting check',
+      prompt: async () => ({ confirmed: true, chosenModifierId: 'bare', advantage: 'normal' }),
+    })
+  );
+  assert.equal(posted.at(-1).data.flavor, 'Crafting check', 'no trailing "· " for a blank label');
+  delete globalThis.Roll;
+});
+
+test('playerPicks non-interactive: @craftingmod resolves deterministically as highest', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+  // No prompt / not interactive: the scalar path resolves playerPicks as highest.
+  await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    craftingModifier: { ...MOD_CONTEXT, systemPolicy: 'playerPicks' },
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + (5)', 'non-interactive playerPicks == highest(3,5)');
+  delete globalThis.Roll;
+});
+
+// Truth table: {default-select, pick-override, cancel, non-interactive} ×
+// {rolled/display formula, pass-fail mutation}. Threaded through runFormulaPassFail so
+// the cancel row also pins the zero-mutation contract.
+test('playerPicks truth table: selection state → substituted formula + pass/fail disposition', async () => {
+  const actor = { getRollData: () => ({}) };
+  const promptFor = (response) => async () => response;
+
+  // Default (Herbalism 5), confirmed → success at dc 10 (stub total 12).
+  let rolledFormulas = stubCraftingModRoll();
+  let r = await runFormulaPassFail({
+    formula: '1d20 + @craftingmod',
+    dc: 10,
+    thresholdMode: 'meet',
+    actor,
+    craftingModifier: MOD_CONTEXT,
+    rollOptions: {
+      interactive: true,
+      modifierChoice: PICK_CHOICE,
+      prompt: promptFor({ confirmed: true, chosenModifierId: 'herb', advantage: 'normal' }),
+    },
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + (5)');
+  assert.equal(r.data.resolvedFormula, '1d20 + (5)', 'eval == display for the default');
+  assert.equal(r.success, true);
+
+  // Override to Medicine (3), confirmed → still rolls the chosen scalar.
+  rolledFormulas = stubCraftingModRoll();
+  r = await runFormulaPassFail({
+    formula: '1d20 + @craftingmod',
+    dc: 10,
+    thresholdMode: 'meet',
+    actor,
+    craftingModifier: MOD_CONTEXT,
+    rollOptions: {
+      interactive: true,
+      modifierChoice: PICK_CHOICE,
+      prompt: promptFor({ confirmed: true, chosenModifierId: 'med', advantage: 'normal' }),
+    },
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + (3)');
+  assert.equal(r.data.resolvedFormula, '1d20 + (3)');
+
+  // Cancel → zero mutation: cancelled disposition, no value.
+  rolledFormulas = stubCraftingModRoll();
+  r = await runFormulaPassFail({
+    formula: '1d20 + @craftingmod',
+    dc: 10,
+    thresholdMode: 'meet',
+    actor,
+    craftingModifier: MOD_CONTEXT,
+    rollOptions: {
+      interactive: true,
+      modifierChoice: PICK_CHOICE,
+      prompt: promptFor({ confirmed: false }),
+    },
+  });
+  assert.equal(r.cancelled, true);
+  assert.equal(r.success, false);
+  assert.equal(r.value, null);
+  assert.equal(rolledFormulas.length, 0, 'cancel rolls nothing');
+  delete globalThis.Roll;
+});
+
 // ── evaluateCheckRoll: non-interactive option (defect 3) ────────────────────
 
 test('evaluateCheckRoll evaluates with { allowInteractive: false } (no fulfilment dialog)', async () => {
@@ -311,7 +653,12 @@ test('resolveForcedOutcome ignores outcomeTier conditions (circular) and outcome
 
 test('runFormulaPassFail: meet comparison passes at/above the DC', async () => {
   stubRoll(15, [{ number: 1, faces: 20, total: 15 }]);
-  const r = await runFormulaPassFail({ formula: '1d20', dc: 15, thresholdMode: 'meet', actor: ACTOR });
+  const r = await runFormulaPassFail({
+    formula: '1d20',
+    dc: 15,
+    thresholdMode: 'meet',
+    actor: ACTOR,
+  });
   assert.equal(r.success, true);
   assert.equal(r.outcome, 'pass');
   assert.equal(r.value, 15);
@@ -372,7 +719,11 @@ test('runFormulaPassFail: records the @-resolved formula + total + dc for the jo
     actor,
   });
 
-  assert.equal(r.data.resolvedFormula, '1d20 + 3', 'resolved formula recorded, not the placeholder');
+  assert.equal(
+    r.data.resolvedFormula,
+    '1d20 + 3',
+    'resolved formula recorded, not the placeholder'
+  );
   assert.equal(r.data.total, 18);
   assert.equal(r.data.dc, 16);
   delete globalThis.Roll;
@@ -386,21 +737,25 @@ test('runFormulaProgressive: the total is the value; success/failure triggers fo
 
   stubRoll(3, [{ number: 2, faces: 6, total: 12 }]);
   assert.equal(
-    (await runFormulaProgressive({
-      formula: '2d6',
-      triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })],
-      actor: ACTOR,
-    })).value,
+    (
+      await runFormulaProgressive({
+        formula: '2d6',
+        triggers: [totalTrigger({ groupId: 0, value: 12, outcome: 'success' })],
+        actor: ACTOR,
+      })
+    ).value,
     Number.MAX_SAFE_INTEGER
   );
 
   stubRoll(9, [{ number: 2, faces: 6, total: 2 }]);
   assert.equal(
-    (await runFormulaProgressive({
-      formula: '2d6',
-      triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })],
-      actor: ACTOR,
-    })).value,
+    (
+      await runFormulaProgressive({
+        formula: '2d6',
+        triggers: [totalTrigger({ groupId: 0, value: 2, outcome: 'failure' })],
+        actor: ACTOR,
+      })
+    ).value,
     0
   );
 });
@@ -617,7 +972,10 @@ test('runFormulaRouted fixed: a roll below the recipe minimum tier fails outrigh
   assert.equal(r.data.outcomeId, null);
   assert.equal(r.data.breakTools, false);
   assert.equal(r.data.minTierFailed, true);
-  assert.equal(r.data.rolledOutcomeId, 'mid', 'the rolled tier is surfaced for explanation');
+  // Issue 975 renamed this from `rolledOutcomeId`: with stepping placed before the
+  // gate, the tier the gate blocked is the FINAL (post-step) one, while "rolled" is
+  // now a term of art for the pre-step tier.
+  assert.equal(r.data.blockedOutcomeId, 'mid', 'the blocked tier is surfaced for explanation');
   assert.equal(r.value, 8);
 });
 
@@ -727,7 +1085,7 @@ test('runFormulaRouted fixed: a min-tier failure drops the rolled tier breakTool
   assert.equal(r.success, false);
   assert.equal(r.data.breakTools, false, 'no tier routes → the rolled tier breakTools is dropped');
   assert.equal(r.data.minTierFailed, true);
-  assert.equal(r.data.rolledOutcomeId, 'low');
+  assert.equal(r.data.blockedOutcomeId, 'low');
 });
 
 // ── interactive prompt DC seam (the fixed-check "no DC" contract) ────────────

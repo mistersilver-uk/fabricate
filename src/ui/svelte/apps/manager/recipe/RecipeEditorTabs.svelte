@@ -21,6 +21,7 @@
   select a tab that does not exist.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -30,7 +31,7 @@
     // NOT named `effect`: a variable of that name makes the compiler read `$effect(...)`
     // as a store subscription (`$` + `effect`).
     visibilityEffect = { showAccess: false, showBooksScrolls: true },
-    onSelect = () => {}
+    onSelect = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -47,34 +48,43 @@
       ? [{ id: 'access', icon: 'fas fa-user-shield', key: 'Access', fallback: 'Access' }]
       : []),
     ...(visibilityEffect?.showBooksScrolls
-      ? [{ id: 'books-scrolls', icon: 'fas fa-book', key: 'BooksScrolls', fallback: 'Books & Scrolls' }]
+      ? [
+          {
+            id: 'books-scrolls',
+            icon: 'fas fa-book',
+            key: 'BooksScrolls',
+            fallback: 'Books & Scrolls',
+          },
+        ]
       : []),
-    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' }
+    { id: 'validation', icon: 'fas fa-clipboard-check', key: 'Validation', fallback: 'Validation' },
   ]);
 
   function badgeList(tab) {
     const value = badges?.[tab.id];
-    const values = Array.isArray(value) ? value : (value ? [value] : []);
+    const values = Array.isArray(value) ? value : value ? [value] : [];
     return values
-      .map(badge => {
+      .map((badge) => {
         if (badge && typeof badge === 'object') {
           return {
             label: badge.label ?? badge.value ?? '',
-            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral')
+            tone: badge.tone || (tab.id === 'validation' ? 'danger' : 'neutral'),
           };
         }
         return {
           label: badge,
-          tone: tab.id === 'validation' ? 'danger' : 'neutral'
+          tone: tab.id === 'validation' ? 'danger' : 'neutral',
         };
       })
-      .filter(badge => badge.label !== '' && badge.label !== 0);
+      .filter((badge) => badge.label !== '' && badge.label !== 0);
   }
 
-  function badgeClass(tone) {
-    if (tone === 'danger') return 'is-danger';
-    if (tone === 'warning') return 'is-warning';
-    return 'is-neutral';
+  // A badge tone name is this component's own vocabulary; translate it to a `Chip`
+  // colour family rather than leaking one spelling into the other (issue 883).
+  function badgeTone(tone) {
+    if (tone === 'danger') return 'danger';
+    if (tone === 'warning') return 'warning';
+    return 'neutral';
   }
 
   function onKeydown(event, index) {
@@ -88,7 +98,11 @@
   }
 </script>
 
-<div class="manager-editor-tabs" role="tablist" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Label', 'Recipe editor sections')}>
+<div
+  class="manager-editor-tabs"
+  role="tablist"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Label', 'Recipe editor sections')}
+>
   {#each TABS as tab, index (tab.id)}
     <button
       type="button"
@@ -105,7 +119,7 @@
       <i class={tab.icon} aria-hidden="true"></i>
       <span>{text(`FABRICATE.Admin.Manager.Recipe.Tabs.${tab.key}`, tab.fallback)}</span>
       {#each badgeList(tab) as badge, badgeIndex (`${tab.id}-${badgeIndex}`)}
-        <span class={`manager-chip ${badgeClass(badge.tone)} manager-editor-tab-badge`}>{badge.label}</span>
+        <Chip tone={badgeTone(badge.tone)} class="manager-editor-tab-badge">{badge.label}</Chip>
       {/each}
     </button>
   {/each}

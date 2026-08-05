@@ -952,8 +952,8 @@ export class InventoryListingBuilder {
     // Group the system's recipes by the book that contains them. Canonical read is
     // each definition's `recipeIds[]` (many-to-many — a recipe may appear under several
     // books). Falls back to the legacy reverse ref (`recipe.recipeItemId`, or
-    // `linkedRecipeItemUuid → definition originItemUuid`) only when no book carries
-    // membership yet.
+    // `linkedRecipeItemUuid → definition originItemUuid`) only while the system's
+    // `membershipResolvesByRecipeIds` marker is unset.
     const recipes = this.recipeManager?.getRecipes?.({ craftingSystemId: system?.id }) ?? [];
     const recipeList = Array.isArray(recipes) ? recipes : [];
     // System-wide recipe index (by id) — used for book membership below AND to
@@ -966,10 +966,11 @@ export class InventoryListingBuilder {
       return !(allowedRecipeIds && !allowedRecipeIds.has(recipe?.id));
     };
     const recipesByDef = new Map();
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def?.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) {
+    // Player-facing basis read (issue 1011): the marker is READ from the system, never
+    // re-derived from the arrays. The retired inference flipped both ways, so the first
+    // membership write to a legacy system dropped every scalar-only recipe out of its
+    // book's listing, and emptying the last array put phantom members back into it.
+    if (system?.membershipResolvesByRecipeIds === true) {
       for (const def of definitions) {
         if (!def?.id) continue;
         const members = (Array.isArray(def.recipeIds) ? def.recipeIds : [])
@@ -1728,8 +1729,17 @@ export class InventoryListingBuilder {
   }
 
   /**
-   * Resolve a recipe's display image the way the GM Manager / Crafting tab do:
-   * the linked recipe-item image when present, else the recipe's own image.
+   * Resolve a recipe's display image: its OWN `img`, and nothing else.
+   *
+   * The canonical rule is `data-models/spec.md` `## Recipe` requirement 16. This method
+   * is one of that requirement's two mirrored chokepoints (the other is
+   * `resolveRecipeImage` in `src/ui/svelte/util/craftingImageDefaults.js`), so every
+   * player-surface recipe image resolves here rather than re-deriving the rule.
+   *
+   * The JSDoc previously claimed this preferred "the linked recipe-item image when
+   * present", contradicting its own body, which has always resolved the recipe's own
+   * image. Corrected with issue 887 rather than left as ubiquitous-language drift.
+   *
    * @private
    */
   _resolveRecipeImg(recipe) {
@@ -1862,7 +1872,10 @@ export class InventoryListingBuilder {
     recipe,
     { system, toolComponentById, componentUsedBy, essenceUsedBy, addProduced, addRequiredFor }
   ) {
-    const recipeImg = this._resolveIndexedRecipeImg(recipe, system);
+    // ONE recipe-image resolver for this class (issue 887). The used-by/produced-by index
+    // previously had its own, which borrowed the containing book's artwork ahead of an
+    // authored `recipe.img`; a recipe's icon is its own and never a containing book's.
+    const recipeImg = stringOrNull(this._resolveRecipeImg(recipe));
     const recipeEntry = {
       recipeId: stringOrNull(recipe?.id),
       recipeName: stringOrEmpty(recipe?.name),
@@ -1913,22 +1926,6 @@ export class InventoryListingBuilder {
         ctx.addRequiredFor(componentId, ctx.recipeSourceKey, ctx.recipeSourceValue);
       }
     }
-  }
-
-  /**
-   * Resolve a recipe's used-by/produced-by image the way the GM Manager / player
-   * Crafting tab do (recipeItemImg || recipe.img): a recipe whose icon lives on its
-   * linked recipe item keeps the model default `recipe.img` otherwise. `recipe.img` is
-   * itself model-defaulted to the alchemical blueprint, so the trailing fallback is the
-   * blueprint — never the generic component item-bag.
-   * @private
-   */
-  _resolveIndexedRecipeImg(recipe, system) {
-    const recipeItemImg = recipe?.recipeItemId
-      ? this.craftingSystemManager?.getRecipeItemDefinition?.(system?.id, recipe.recipeItemId)
-          ?.img || ''
-      : '';
-    return stringOrNull(recipeItemImg || recipe?.img);
   }
 
   /**

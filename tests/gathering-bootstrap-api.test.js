@@ -50,9 +50,13 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
     /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'listForActor', withRememberedActor, \(\) => game\.user\);/,
     'listGatheringForActor should delegate through current-user viewer enforcement (with the remembered-actor default)'
   );
+  // `requestStart`, not `startAttempt` (issue 901): the public entry must go
+  // through the routing wrapper, which hands a blind timed start to the active GM
+  // BEFORE any task is drawn. Delegating straight to `startAttempt` again would
+  // put the draw back on the player's own client, where it can be rigged.
   assert.match(
     mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'startAttempt', withRememberedActor, \(\) => game\.user\);/,
+    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'requestStart', withRememberedActor, \(\) => game\.user\);/,
     'startGatheringAttempt should delegate through current-user viewer enforcement (with the remembered-actor default)'
   );
   // The three wrappers (list, attempt, drop breakdown) MUST resolve the SAME actor

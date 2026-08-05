@@ -9,7 +9,12 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-item-page-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-  compiledModules: ['src/ui/svelte/apps/manager/ItemPageInspector.svelte'],
+  compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
+  ],
   componentPath: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte'
 });
 
@@ -56,7 +61,9 @@ describe('ItemPageInspector (mounted)', () => {
   it('renders the name, type, description, and a "recipes inside" preview with a +N more line', async () => {
     const root = await harness.mount({ item: makeItem(), visibilityMode: 'knowledge' });
     assert.equal(root.querySelector('[data-item-page-name]').textContent.trim(), "Journeyman's Primer");
-    assert.equal(root.querySelector('[data-item-page-type]').textContent.trim(), 'Book');
+    // The pill names the recipe count for a multi-recipe item (5 in this fixture),
+    // matching the Books & Scrolls library row and the Knowledge surface.
+    assert.equal(root.querySelector('[data-item-page-type]').textContent.trim(), '5 Recipe Book');
     assert.equal(root.querySelector('[data-item-page-desc]').textContent.trim(), 'Starter recipes for every apprentice.');
 
     // Only the first three recipes preview; the rest collapse into "+2 more".

@@ -19,15 +19,34 @@
   by the parent for a BARE (single-alternative) requirement, so it sits INLINE at the
   row's right end; a multi-alternative box renders it at the box bottom instead.
 -->
+<script module>
+  // Alternatives carry no id (the parent keys them by index), so the tag-match radio
+  // group's `name` is minted per INSTANCE here. Two tag rows sharing one `name` would
+  // be one radio group to the browser, and choosing Any in the second would silently
+  // uncheck the first.
+  let tagMatchGroupSeq = 0;
+</script>
+
 <script>
+  import Chip from '../Chip.svelte';
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import {
     currencyUnitLabel,
     currencyUnitIcon,
-    findCurrencyUnit
+    findCurrencyUnit,
   } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../SearchablePopover.svelte';
+  import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+
+  tagMatchGroupSeq += 1;
+  const tagMatchGroupId = tagMatchGroupSeq;
+
+  const TAG_MATCH_OPTIONS = [
+    { value: 'any', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAny', fallback: 'Any' },
+    { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.TagMatchAll', fallback: 'All' },
+  ];
 
   let {
     option = {},
@@ -49,7 +68,7 @@
     orControl = null,
     onChange = () => {},
     onRemove = () => {},
-    canRemove = true
+    canRemove = true,
   } = $props();
 
   function text(key, fallback) {
@@ -59,13 +78,15 @@
 
   const matchType = $derived(
     option?.match?.type === 'tags' ||
-    option?.match?.type === 'currency' ||
-    option?.match?.type === 'essence'
+      option?.match?.type === 'currency' ||
+      option?.match?.type === 'essence'
       ? option.match.type
       : 'component'
   );
   const quantity = $derived(Number(option?.quantity) > 0 ? Number(option.quantity) : 1);
-  const componentId = $derived(option?.match?.type === 'component' ? option.match.componentId || '' : '');
+  const componentId = $derived(
+    option?.match?.type === 'component' ? option.match.componentId || '' : ''
+  );
   const tags = $derived(
     option?.match?.type === 'tags' && Array.isArray(option.match.tags) ? option.match.tags : []
   );
@@ -77,11 +98,14 @@
       tagMatch === 'all'
         ? text('FABRICATE.Admin.Manager.Recipe.TagMatchAllWord', 'all')
         : text('FABRICATE.Admin.Manager.Recipe.TagMatchAnyWord', 'any');
-    if (tags.length === 0) return text('FABRICATE.Admin.Manager.Recipe.TagRowEmptyName', 'any tagged item');
+    if (tags.length === 0)
+      return text('FABRICATE.Admin.Manager.Recipe.TagRowEmptyName', 'any tagged item');
     return `${word} ${tags.map((tag) => `#${tag}`).join(' ')}`;
   });
 
-  const currencyUnitId = $derived(option?.match?.type === 'currency' ? option.match.unit || '' : '');
+  const currencyUnitId = $derived(
+    option?.match?.type === 'currency' ? option.match.unit || '' : ''
+  );
   const currencyAmount = $derived(
     option?.match?.type === 'currency' && Number(option.match.amount) > 0
       ? Number(option.match.amount)
@@ -101,7 +125,7 @@
     (currencyUnits || []).map((unit) => ({
       id: unit.id,
       label: currencyUnitLabel(currencyUnits, unit.id),
-      icon: currencyUnitIcon(currencyUnits, unit.id)
+      icon: currencyUnitIcon(currencyUnits, unit.id),
     }))
   );
 
@@ -118,25 +142,25 @@
     (essenceOptions || []).map((essence) => ({
       id: essence.id,
       label: essence.name,
-      icon: essence.icon || 'fas fa-flask-vial'
+      icon: essence.icon || 'fas fa-flask-vial',
     }))
   );
 
   const selectedComponent = $derived(
-    componentId ? (componentOptions || []).find(item => item.id === componentId) || null : null
+    componentId ? (componentOptions || []).find((item) => item.id === componentId) || null : null
   );
 
   // The picker lists every system component; the trigger resolves the current id
   // to its name/image so a chosen component reads back clearly.
   const componentPickerOptions = $derived(
-    (componentOptions || []).map(item => ({ id: item.id, label: item.name, img: item.img }))
+    (componentOptions || []).map((item) => ({ id: item.id, label: item.name, img: item.img }))
   );
 
   // The tag picker offers system tags not already on this option.
   const tagPickerOptions = $derived(
     (itemTags || [])
-      .filter(tag => !tags.includes(tag))
-      .map(tag => ({ id: tag, label: tag, icon: 'fas fa-tag' }))
+      .filter((tag) => !tags.includes(tag))
+      .map((tag) => ({ id: tag, label: tag, icon: 'fas fa-tag' }))
   );
 
   function emit(next) {
@@ -161,7 +185,7 @@
   }
 
   function removeTag(tag) {
-    emit({ match: { type: 'tags', tags: tags.filter(t => t !== tag), tagMatch } });
+    emit({ match: { type: 'tags', tags: tags.filter((t) => t !== tag), tagMatch } });
   }
 
   function setTagMatch(mode) {
@@ -180,8 +204,8 @@
       match: {
         type: 'currency',
         unit: currencyUnitId,
-        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1
-      }
+        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1,
+      },
     });
   }
 
@@ -197,8 +221,8 @@
       match: {
         type: 'essence',
         essenceId,
-        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1
-      }
+        amount: Number.isFinite(next) && next > 0 ? Math.min(9999, next) : 1,
+      },
     });
   }
 
@@ -251,20 +275,32 @@
           triggerClass="manager-button manager-recipe-component-trigger"
           triggerImg={selectedComponent?.img || ''}
           triggerIcon={selectedComponent ? '' : 'fas fa-cube'}
-          triggerLabel={selectedComponent?.name || text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+          triggerLabel={selectedComponent?.name ||
+            text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
           valueClass="manager-recipe-component-name"
           triggerTitle={selectedComponent?.name || ''}
           triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
           dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-          searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder', 'Search components...')}
-          emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+          searchPlaceholder={text(
+            'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+            'Search components...'
+          )}
+          searchAriaLabel={text(
+            'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+            'Search components...'
+          )}
+          emptyHint={text(
+            'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
+            'No components defined'
+          )}
           onChoose={(id) => chooseComponent(id)}
         />
       </div>
     {:else if matchType === 'tags'}
       <span class="manager-recipe-option-tag-name" data-recipe-tag-summary>{tagSummary}</span>
-      <span class="manager-recipe-req-tag is-tag" data-recipe-req-tag="tag">{text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}</span>
+      <span class="manager-recipe-req-tag is-tag" data-recipe-req-tag="tag"
+        >{text('FABRICATE.Admin.Manager.Recipe.TagTypeLabel', 'Tag')}</span
+      >
     {:else if matchType === 'essence'}
       <div class="manager-recipe-option-essence" data-recipe-option-essence>
         <span class="manager-recipe-essence-picker-wrap" data-recipe-essence-picker>
@@ -280,9 +316,18 @@
             triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
             triggerTitle={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
             dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickEssence', 'Pick essence')}
-            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
-            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder', 'Search essences...')}
-            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoEssencesDefined', 'No essences defined')}
+            searchPlaceholder={text(
+              'FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder',
+              'Search essences...'
+            )}
+            searchAriaLabel={text(
+              'FABRICATE.Admin.Manager.Recipe.EssenceSearchPlaceholder',
+              'Search essences...'
+            )}
+            emptyHint={text(
+              'FABRICATE.Admin.Manager.Recipe.NoEssencesDefined',
+              'No essences defined'
+            )}
             onChoose={(id) => chooseEssence(id)}
           />
         </span>
@@ -296,35 +341,45 @@
           <span
             class="manager-recipe-currency-unit is-readonly"
             data-recipe-currency-unit
-            data-recipe-currency-readonly
-            >{currencyUnitReadonlyLabel}</span
+            data-recipe-currency-readonly>{currencyUnitReadonlyLabel}</span
           >
           <span
             class="manager-recipe-req-tag is-disabled"
             data-recipe-currency-disabled
-            title={text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint', 'Currency is disabled for this system; this cost is inactive until it is re-enabled.')}
-            >{text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
+            title={text(
+              'FABRICATE.Admin.Manager.Recipe.CurrencyDisabledHint',
+              'Currency is disabled for this system; this cost is inactive until it is re-enabled.'
+            )}>{text('FABRICATE.Admin.Manager.Recipe.CurrencyDisabledTag', 'Currency off')}</span
           >
         {:else}
-        <span class="manager-recipe-currency-unit" data-recipe-currency-unit>
-          <SearchablePopover
-            options={currencyPickerOptions}
-            value={currencyUnitId}
-            pickerClass="manager-recipe-currency-picker"
-            triggerClass="manager-button is-subtle manager-recipe-currency-trigger"
-            triggerIcon={currencyUnitIcon(currencyUnits, currencyUnitId)}
-            triggerLabel={selectedCurrencyUnit
-              ? currencyUnitLabel(currencyUnits, currencyUnitId)
-              : text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-            triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-            triggerTitle={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-            dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-            searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-            searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
-            emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined', 'No currencies defined')}
-            onChoose={(unitId) => chooseCurrencyUnit(unitId)}
-          />
-        </span>
+          <span class="manager-recipe-currency-unit" data-recipe-currency-unit>
+            <SearchablePopover
+              options={currencyPickerOptions}
+              value={currencyUnitId}
+              pickerClass="manager-recipe-currency-picker"
+              triggerClass="manager-button is-subtle manager-recipe-currency-trigger"
+              triggerIcon={currencyUnitIcon(currencyUnits, currencyUnitId)}
+              triggerLabel={selectedCurrencyUnit
+                ? currencyUnitLabel(currencyUnits, currencyUnitId)
+                : text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+              triggerAriaLabel={text(
+                'FABRICATE.Admin.Manager.Recipe.PickCurrency',
+                'Pick currency'
+              )}
+              triggerTitle={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+              dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+              searchPlaceholder={text(
+                'FABRICATE.Admin.Manager.Recipe.PickCurrency',
+                'Pick currency'
+              )}
+              searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickCurrency', 'Pick currency')}
+              emptyHint={text(
+                'FABRICATE.Admin.Manager.Recipe.NoCurrencyDefined',
+                'No currencies defined'
+              )}
+              onChoose={(unitId) => chooseCurrencyUnit(unitId)}
+            />
+          </span>
         {/if}
       </div>
     {/if}
@@ -332,7 +387,9 @@
 
   <div class="manager-recipe-option-controls">
     {#if showRequiredTag}
-      <span class="manager-recipe-req-tag is-required" data-recipe-req-tag="required">{text('FABRICATE.Admin.Manager.Recipe.RequiredTag', 'Required')}</span>
+      <span class="manager-recipe-req-tag is-required" data-recipe-req-tag="required"
+        >{text('FABRICATE.Admin.Manager.Recipe.RequiredTag', 'Required')}</span
+      >
     {/if}
 
     <!-- EVERY row type edits its count through the SAME Stepper in the SAME end-of-row
@@ -354,9 +411,18 @@
         min={1}
         max={9999}
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
-        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
-        inputProps={{ 'data-recipe-essence-amount': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        decrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityDecrement',
+          'Decrease quantity'
+        )}
+        incrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityIncrement',
+          'Increase quantity'
+        )}
+        inputProps={{
+          'data-recipe-essence-amount': '',
+          class: 'fab-stepper-input manager-recipe-option-quantity',
+        }}
         onChange={(value) => setEssenceAmount(value)}
       />
     {:else if matchType === 'currency' && currencyReadonly}
@@ -365,8 +431,7 @@
       <span
         class="manager-recipe-option-quantity is-readonly"
         data-recipe-currency-amount
-        data-recipe-currency-readonly-amount
-        >{currencyAmount}</span
+        data-recipe-currency-readonly-amount>{currencyAmount}</span
       >
     {:else if matchType === 'currency'}
       <Stepper
@@ -374,9 +439,18 @@
         min={1}
         max={9999}
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
-        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
-        inputProps={{ 'data-recipe-currency-amount': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        decrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityDecrement',
+          'Decrease quantity'
+        )}
+        incrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityIncrement',
+          'Increase quantity'
+        )}
+        inputProps={{
+          'data-recipe-currency-amount': '',
+          class: 'fab-stepper-input manager-recipe-option-quantity',
+        }}
         onChange={(value) => setCurrencyAmount(value)}
       />
     {:else}
@@ -385,9 +459,18 @@
         min={1}
         max={9999}
         ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Quantity', 'Quantity')}
-        decrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityDecrement', 'Decrease quantity')}
-        incrementLabel={text('FABRICATE.Admin.Manager.Recipe.QuantityIncrement', 'Increase quantity')}
-        inputProps={{ 'data-recipe-option-quantity': '', class: 'fab-stepper-input manager-recipe-option-quantity' }}
+        decrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityDecrement',
+          'Decrease quantity'
+        )}
+        incrementLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.QuantityIncrement',
+          'Increase quantity'
+        )}
+        inputProps={{
+          'data-recipe-option-quantity': '',
+          class: 'fab-stepper-input manager-recipe-option-quantity',
+        }}
         onChange={(value) => setQuantity(value)}
       />
     {/if}
@@ -404,8 +487,8 @@
         data-recipe-remove="alternative"
         aria-label={removeLabel}
         title={removeLabel}
-        onclick={() => onRemove()}
-      ><i class="fas fa-xmark" aria-hidden="true"></i></button>
+        onclick={() => onRemove()}><i class="fas fa-xmark" aria-hidden="true"></i></button
+      >
     {/if}
   </div>
 
@@ -414,24 +497,14 @@
          the chosen tags in a full-width bordered area (chips or "No tags set"). -->
     <div class="manager-recipe-option-tags-detail">
       <div class="manager-recipe-option-tags-controls">
-        <div class="manager-recipe-tag-match-toggle" role="group" aria-label={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}>
-          <button
-            type="button"
-            class="manager-recipe-tag-match-option"
-            class:is-selected={tagMatch === 'any'}
-            data-recipe-tag-match="any"
-            aria-pressed={tagMatch === 'any'}
-            onclick={() => setTagMatch('any')}
-          >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAny', 'Any')}</button>
-          <button
-            type="button"
-            class="manager-recipe-tag-match-option"
-            class:is-selected={tagMatch === 'all'}
-            data-recipe-tag-match="all"
-            aria-pressed={tagMatch === 'all'}
-            onclick={() => setTagMatch('all')}
-          >{text('FABRICATE.Admin.Manager.Recipe.TagMatchAll', 'All')}</button>
-        </div>
+        <SegmentedControl
+          options={TAG_MATCH_OPTIONS}
+          value={tagMatch}
+          groupName={`tag-match-${tagMatchGroupId}`}
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.TagMatch', 'Tag match')}
+          optionDataAttr="data-recipe-tag-match"
+          onChange={(mode) => setTagMatch(mode)}
+        />
         <SearchablePopover
           options={tagPickerOptions}
           pickerClass="manager-recipe-tag-picker"
@@ -440,8 +513,14 @@
           triggerLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
           triggerAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
           dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.AddTag', 'Add tag')}
-          searchPlaceholder={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
-          searchAriaLabel={text('FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder', 'Search tags...')}
+          searchPlaceholder={text(
+            'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
+            'Search tags...'
+          )}
+          searchAriaLabel={text(
+            'FABRICATE.Admin.Manager.Recipe.TagSearchPlaceholder',
+            'Search tags...'
+          )}
           emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoTagsDefined', 'No tags defined')}
           onChoose={(tag) => addTag(tag)}
         />
@@ -450,7 +529,7 @@
         {#if tags.length > 0}
           <ul class="manager-recipe-tag-chips">
             {#each tags as tag (tag)}
-              <li class="manager-chip manager-recipe-tag-chip" data-recipe-tag={tag}>
+              <Chip tag="li" class="manager-recipe-tag-chip" data-recipe-tag={tag}>
                 <span>{tag}</span>
                 <button
                   type="button"
@@ -459,12 +538,18 @@
                   aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
                   title={text('FABRICATE.Admin.Manager.Recipe.RemoveTag', 'Remove tag')}
                   onclick={() => removeTag(tag)}
-                ><i class="fas fa-times" aria-hidden="true"></i></button>
-              </li>
+                  ><i class="fas fa-times" aria-hidden="true"></i></button
+                >
+              </Chip>
             {/each}
           </ul>
         {:else}
-          <span class="manager-recipe-tags-empty manager-muted" data-recipe-tags-empty>{text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}</span>
+          <EmptyState
+            compact
+            icon="fas fa-tags"
+            title={text('FABRICATE.Admin.Manager.Recipe.NoTagsSet', 'No tags set')}
+            dataAttr="data-recipe-tags-empty"
+          />
         {/if}
       </div>
     </div>

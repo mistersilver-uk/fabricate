@@ -1,5 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
 
@@ -9,7 +11,7 @@
     selectedEssenceId = '',
     onSelectEssence = () => {},
     onEditEssence = () => {},
-    onRemoveEssence = () => {}
+    onRemoveEssence = () => {},
   } = $props();
 
   let searchTerm = $state('');
@@ -19,23 +21,32 @@
 
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
   const filtersActive = $derived(normalizedSearchTerm.length > 0 || sourceFilter !== 'all');
-  const filteredEssences = $derived((essenceCards || []).filter(essence => {
-    const matchesSearch = !normalizedSearchTerm
-      || [
-        essence.name || '',
-        essence.description || '',
-        showSourceUi ? essence.sourceName || '' : '',
-        essence.id || ''
-      ].join(' ').toLowerCase().includes(normalizedSearchTerm);
-    const state = essence.sourceState || 'none';
-    const matchesSource = !showSourceUi
-      || sourceFilter === 'all'
-      || (sourceFilter === 'linked' && state === 'linked')
-      || (sourceFilter === 'needs-attention' && (state === 'stale' || state === 'missing'))
-      || (sourceFilter === 'none' && state === 'none');
-    return matchesSearch && matchesSource;
-  }));
-  const paginatedEssences = $derived(filteredEssences.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
+  const filteredEssences = $derived(
+    (essenceCards || []).filter((essence) => {
+      const matchesSearch =
+        !normalizedSearchTerm ||
+        [
+          essence.name || '',
+          essence.description || '',
+          showSourceUi ? essence.sourceName || '' : '',
+          essence.id || '',
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedSearchTerm);
+      const state = essence.sourceState || 'none';
+      const matchesSource =
+        !showSourceUi ||
+        sourceFilter === 'all' ||
+        (sourceFilter === 'linked' && state === 'linked') ||
+        (sourceFilter === 'needs-attention' && (state === 'stale' || state === 'missing')) ||
+        (sourceFilter === 'none' && state === 'none');
+      return matchesSearch && matchesSource;
+    })
+  );
+  const paginatedEssences = $derived(
+    filteredEssences.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
+  );
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredEssences.length) {
@@ -71,80 +82,145 @@
   }
 
   function sourceImageLabel(essence) {
-    return essence?.associatedItem?.name
-      || essence?.associatedItemName
-      || essence?.sourceName
-      || text('FABRICATE.Admin.Manager.Essence.Source', 'Source');
+    return (
+      essence?.associatedItem?.name ||
+      essence?.associatedItemName ||
+      essence?.sourceName ||
+      text('FABRICATE.Admin.Manager.Essence.Source', 'Source')
+    );
   }
 </script>
 
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Essence.Title', 'Essences')}>
   <section class="manager-section-header">
     <div class="manager-heading">
-      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Kicker', 'Essence definitions')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Essence.Library', 'Essence browser')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Essence.LibraryHint', 'Browse, create, and maintain essence definitions for the selected crafting system.')}</p>
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Essence.Kicker', 'Essence definitions')}
+      </p>
+      <h2 class="manager-title">
+        {text('FABRICATE.Admin.Manager.Essence.Library', 'Essence browser')}
+      </h2>
+      <p class="manager-subtitle">
+        {text(
+          'FABRICATE.Admin.Manager.Essence.LibraryHint',
+          'Browse, create, and maintain essence definitions for the selected crafting system.'
+        )}
+      </p>
     </div>
   </section>
 
-  <section class="manager-toolbar" aria-label={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}>
+  <section
+    class="manager-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Essence.Filters', 'Essence filters')}
+  >
     <label class="manager-search">
       <i class="fas fa-search" aria-hidden="true"></i>
       <input
         type="search"
         value={searchTerm}
-        oninput={(event) => searchTerm = event.currentTarget.value}
-        placeholder={text('FABRICATE.Admin.Manager.Essence.SearchPlaceholder', 'Search essences...')}
+        oninput={(event) => (searchTerm = event.currentTarget.value)}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Essence.SearchPlaceholder',
+          'Search essences...'
+        )}
         aria-label={text('FABRICATE.Admin.Manager.Essence.SearchLabel', 'Search essences')}
       />
     </label>
     {#if showSourceUi}
       <label class="manager-filter">
         <span>{text('FABRICATE.Admin.Manager.Essence.SourceFilter', 'Source')}</span>
-        <select value={sourceFilter} onchange={(event) => sourceFilter = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Essence.SourceFilterLabel', 'Filter essences by source state')}>
-          <option value="all">{text('FABRICATE.Admin.Manager.Essence.SourceAll', 'All sources')}</option>
-          <option value="linked">{text('FABRICATE.Admin.Manager.Essence.SourceLinkedFilter', 'Linked')}</option>
-          <option value="needs-attention">{text('FABRICATE.Admin.Manager.Essence.SourceNeedsAttention', 'Needs attention')}</option>
-          <option value="none">{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</option>
+        <select
+          value={sourceFilter}
+          onchange={(event) => (sourceFilter = event.currentTarget.value)}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Essence.SourceFilterLabel',
+            'Filter essences by source state'
+          )}
+        >
+          <option value="all"
+            >{text('FABRICATE.Admin.Manager.Essence.SourceAll', 'All sources')}</option
+          >
+          <option value="linked"
+            >{text('FABRICATE.Admin.Manager.Essence.SourceLinkedFilter', 'Linked')}</option
+          >
+          <option value="needs-attention"
+            >{text(
+              'FABRICATE.Admin.Manager.Essence.SourceNeedsAttention',
+              'Needs attention'
+            )}</option
+          >
+          <option value="none"
+            >{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</option
+          >
         </select>
       </label>
     {/if}
-    <span class="manager-chip">{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredEssences.length).replace('{total}', essenceCards.length)}</span>
+    <Chip
+      >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
+        .replace('{shown}', filteredEssences.length)
+        .replace('{total}', essenceCards.length)}</Chip
+    >
     {#if filtersActive}
-      <button type="button" class="manager-button manager-clear-filters" data-clear-filters="essences" onclick={clearSearch}>
+      <button
+        type="button"
+        class="manager-button manager-clear-filters"
+        data-clear-filters="essences"
+        onclick={clearSearch}
+      >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </button>
     {/if}
   </section>
 
-  <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Essence.Table', 'Essences table')}>
+  <section
+    class="manager-table-scroll"
+    aria-label={text('FABRICATE.Admin.Manager.Essence.Table', 'Essences table')}
+  >
     {#if essenceCards.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Essence.EmptyTitle', 'No essences yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Essence.EmptyHint', 'Create an essence definition to start assigning essence quantities to components.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-mortar-pestle"
+        title={text('FABRICATE.Admin.Manager.Essence.EmptyTitle', 'No essences yet')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Essence.EmptyHint',
+          'Create an essence definition to start assigning essence quantities to components.'
+        )}
+      />
     {:else if filteredEssences.length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Essence.EmptySearchTitle', 'No essences match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Essence.EmptySearchHint', 'Clear search and filters to show all essences in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearSearch}>{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-search"
+        title={text(
+          'FABRICATE.Admin.Manager.Essence.EmptySearchTitle',
+          'No essences match these filters'
+        )}
+        hint={text(
+          'FABRICATE.Admin.Manager.Essence.EmptySearchHint',
+          'Clear search and filters to show all essences in this system.'
+        )}
+      >
+        <button type="button" class="manager-button" onclick={clearSearch}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+        >
+      </EmptyState>
     {:else}
-      <div class={`manager-essences-table ${showSourceUi ? '' : 'has-no-source'}`} role="table" aria-label={text('FABRICATE.Admin.Manager.Essence.TableShort', 'Essences')}>
+      <div
+        class={`manager-essences-table ${showSourceUi ? '' : 'has-no-source'}`}
+        role="table"
+        aria-label={text('FABRICATE.Admin.Manager.Essence.TableShort', 'Essences')}
+      >
         <div class="manager-table-head manager-essence-table-head" role="row">
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Essence.ColumnEssence', 'Essence')}</span>
+          <span role="columnheader"
+            >{text('FABRICATE.Admin.Manager.Essence.ColumnEssence', 'Essence')}</span
+          >
           {#if showSourceUi}
-            <span role="columnheader">{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</span>
+            <span role="columnheader"
+              >{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</span
+            >
           {/if}
           <span role="columnheader">{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
+          <span role="columnheader"
+            >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
+          >
         </div>
         {#each paginatedEssences as essence (essence.id)}
           <div
@@ -157,18 +233,28 @@
             onkeydown={(event) => selectEssenceFromKeyboard(event, essence.id)}
           >
             <span class="manager-essence-identity" role="cell">
-              <span class="manager-essence-icon" aria-hidden="true"><i class={essence.icon || 'fas fa-mortar-pestle'}></i></span>
+              <span class="manager-essence-icon" aria-hidden="true"
+                ><i class={essence.icon || 'fas fa-mortar-pestle'}></i></span
+              >
               <span class="manager-system-copy">
                 <span class="manager-system-name" title={essence.name}>{essence.name}</span>
                 {#if essence.description}
-                  <span class="manager-system-description" title={essence.description}>{essence.description}</span>
+                  <span class="manager-system-description" title={essence.description}
+                    >{essence.description}</span
+                  >
                 {:else}
-                  <span class="manager-system-description">{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span>
+                  <span class="manager-system-description"
+                    >{text('FABRICATE.Admin.Manager.NoDescription', 'No description')}</span
+                  >
                 {/if}
               </span>
             </span>
             {#if showSourceUi}
-              <span role="cell" class="manager-labeled-cell manager-essence-source-cell" data-label={text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}>
+              <span
+                role="cell"
+                class="manager-labeled-cell manager-essence-source-cell"
+                data-label={text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
+              >
                 {#if essence.associatedItem}
                   <img
                     class="manager-essence-source-cell-image"
@@ -178,20 +264,57 @@
                     aria-label={sourceImageLabel(essence)}
                   />
                 {:else}
-                  <span class="manager-muted">{text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')}</span>
+                  <span class="manager-muted"
+                    >{text('FABRICATE.Admin.Manager.Essence.SourceNoneShort', 'None')}</span
+                  >
                 {/if}
               </span>
             {/if}
-            <span role="cell" class="manager-labeled-cell" data-label={text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}>
-              <span class={essence.deleteBlocked ? 'manager-chip is-warning' : 'manager-chip'}>
-                {text('FABRICATE.Admin.Manager.Essence.ComponentUsageCount', '{count} components').replace('{count}', essence.componentUsageCount || 0)}
-              </span>
+            <span
+              role="cell"
+              class="manager-labeled-cell"
+              data-label={text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}
+            >
+              <Chip tone={essence.deleteBlocked ? 'warning' : ''}>
+                {text(
+                  'FABRICATE.Admin.Manager.Essence.ComponentUsageCount',
+                  '{count} components'
+                ).replace('{count}', essence.componentUsageCount || 0)}
+              </Chip>
             </span>
-            <span role="cell" class="manager-action-group manager-labeled-cell" data-label={text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}>
-              <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}').replace('{name}', essence.name)} title={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')} onclick={(event) => editEssence(essence, event)}>
+            <span
+              role="cell"
+              class="manager-action-group manager-labeled-cell"
+              data-label={text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
+            >
+              <button
+                type="button"
+                class="manager-icon-button"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Essence.EditNamed',
+                  'Edit {name}'
+                ).replace('{name}', essence.name)}
+                title={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
+                onclick={(event) => editEssence(essence, event)}
+              >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </button>
-              <button type="button" class="manager-icon-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}').replace('{name}', essence.name)} title={essence.deleteBlocked ? text('FABRICATE.Admin.Manager.Essence.DeleteBlocked', 'Remove component usage before deleting this essence.') : text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')} disabled={essence.deleteBlocked} onclick={(event) => removeEssence(essence, event)}>
+              <button
+                type="button"
+                class="manager-icon-button is-danger"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Essence.DeleteNamed',
+                  'Delete {name}'
+                ).replace('{name}', essence.name)}
+                title={essence.deleteBlocked
+                  ? text(
+                      'FABRICATE.Admin.Manager.Essence.DeleteBlocked',
+                      'Remove component usage before deleting this essence.'
+                    )
+                  : text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}
+                disabled={essence.deleteBlocked}
+                onclick={(event) => removeEssence(essence, event)}
+              >
                 <i class="fas fa-trash" aria-hidden="true"></i>
               </button>
             </span>
@@ -205,7 +328,10 @@
     totalCount={filteredEssences.length}
     {pageSize}
     {pageIndex}
-    onPageChange={(next) => pageIndex = next}
-    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+    onPageChange={(next) => (pageIndex = next)}
+    onPageSizeChange={(next) => {
+      pageSize = next;
+      pageIndex = 0;
+    }}
   />
 </main>

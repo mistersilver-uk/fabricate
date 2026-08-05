@@ -28,6 +28,12 @@ const harness = createMountedComponentHarness({
     // importer is `inventoryStore.svelte.js`, which no mounted suite loads.
   ],
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
+    // omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // The salvage bodies render the house chip primitive. The preview never reaches them,
     // but the compiled router imports them statically, so it is still in the graph.

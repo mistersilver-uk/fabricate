@@ -16,7 +16,7 @@
     WEATHER_FALLBACK_ICON,
     TIME_OF_DAY_FALLBACK_ICON,
     getTimeOfDayLabelKey,
-    getWeatherLabelKey
+    getWeatherLabelKey,
   } from '../util/gatheringConditionIcons.js';
   import ComponentSourcesBar from '../apps/crafting/ComponentSourcesBar.svelte';
 
@@ -25,7 +25,7 @@
     services = null,
     activeTab = 'crafting',
     onActorChange = null,
-    activeCanvasTool = null
+    activeCanvasTool = null,
   } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
@@ -56,9 +56,9 @@
   // Empty when no station tool is active.
   const activeToolName = $derived(
     activeCanvasTool
-      ? (typeof activeCanvasTool.label === 'string' && activeCanvasTool.label.trim()
+      ? typeof activeCanvasTool.label === 'string' && activeCanvasTool.label.trim()
         ? activeCanvasTool.label.trim()
-        : localize('FABRICATE.App.ActiveTool.Label'))
+        : localize('FABRICATE.App.ActiveTool.Label')
       : ''
   );
 
@@ -75,7 +75,9 @@
     selectableActors.filter((actor) => {
       const term = searchTerm.trim().toLowerCase();
       if (!term) return true;
-      return String(actor?.name ?? '').toLowerCase().includes(term);
+      return String(actor?.name ?? '')
+        .toLowerCase()
+        .includes(term);
     })
   );
 
@@ -104,9 +106,11 @@
   const showRealm = $derived(store?.realmContext?.enabled === true);
   const realmNames = $derived(
     (store?.realmContext?.realms ?? [])
-      .map((realm) => (realm?.placeholder
-        ? localize(realm.labelKey || 'FABRICATE.Gathering.Realm.UndiscoveredPlaceholder')
-        : String(realm?.label ?? '')))
+      .map((realm) =>
+        realm?.placeholder
+          ? localize(realm.labelKey || 'FABRICATE.Gathering.Realm.UndiscoveredPlaceholder')
+          : String(realm?.label ?? '')
+      )
       .filter((name) => name.trim() !== '')
   );
   const realmLabel = $derived(
@@ -122,7 +126,9 @@
   // The selected character's stamina pool for the active stamina-mode system,
   // surfaced contextually on the gathering tab. Null in nodes/none mode.
   const staminaPool = $derived(store?.staminaPool ?? null);
-  const hasStamina = $derived(Boolean(staminaPool && staminaPool.current != null && staminaPool.max != null));
+  const hasStamina = $derived(
+    Boolean(staminaPool && staminaPool.current != null && staminaPool.max != null)
+  );
   const staminaPct = $derived(
     hasStamina && staminaPool.max > 0
       ? Math.max(0, Math.min(100, Math.round((staminaPool.current / staminaPool.max) * 100)))
@@ -169,7 +175,7 @@
     class="actor-bar-left"
     use:dismissOnOutsideClick={{
       enabled: pickerOpen,
-      onDismiss: closePicker
+      onDismiss: closePicker,
     }}
   >
     <button
@@ -265,7 +271,11 @@
       </span>
       {#if isGathering}
         {#if hasStamina}
-          <span class="actor-bar-stamina" title={localize('FABRICATE.App.ActorBar.Stamina')} data-actor-bar-stamina>
+          <span
+            class="actor-bar-stamina"
+            title={localize('FABRICATE.App.ActorBar.Stamina')}
+            data-actor-bar-stamina
+          >
             <i class="fas fa-bolt" aria-hidden="true"></i>
             <span class="actor-bar-stamina-track">
               <span class="actor-bar-stamina-fill" style={`width:${staminaPct}%`}></span>
@@ -417,7 +427,6 @@
     font-size: 13px;
     color: var(--fab-text-muted);
   }
-
 
   .actor-bar-condition-label {
     min-width: 0;

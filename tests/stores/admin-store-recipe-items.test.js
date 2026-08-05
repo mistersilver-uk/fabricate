@@ -10,78 +10,14 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
+import {
+  createServices,
+  makeFlaggedActor,
+  makeRecipe,
+  makeSystem,
+} from '../helpers/adminStoreServices.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
-
-function makeRecipe(overrides = {}) {
-  const id = overrides.id || `recipe-${Math.random().toString(36).slice(2)}`;
-  return {
-    id,
-    name: overrides.name || `Recipe ${id}`,
-    description: '',
-    img: 'recipe.png',
-    category: overrides.category || 'general',
-    enabled: overrides.enabled !== undefined ? overrides.enabled : true,
-    locked: false,
-    visibility: {},
-    ingredientSets: [],
-    recipeItemId: overrides.recipeItemId || '',
-    craftingSystemId: overrides.craftingSystemId || 'sys1',
-    isSimpleRecipe: () => true,
-    toJSON: () => ({ id, name: overrides.name || `Recipe ${id}`, craftingSystemId: overrides.craftingSystemId || 'sys1' }),
-    ...overrides
-  };
-}
-
-function makeSystem(overrides = {}) {
-  return {
-    id: 'sys1',
-    name: 'System One',
-    description: '',
-    resolutionMode: 'simple',
-    visibilityMode: 'item',
-    features: {},
-    categories: [],
-    itemTags: [],
-    essenceDefinitions: [],
-    items: [],
-    requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
-    craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
-    recipeVisibility: { listMode: 'global' },
-    recipeItemDefinitions: [],
-    ...overrides
-  };
-}
-
-function createServices(system, recipes, capture) {
-  const systems = [system];
-  const systemManager = {
-    getSystems: () => systems,
-    getSystem: (id) => systems.find((s) => s.id === id) || null,
-    getItems: () => [],
-    updateRecipeItemDefinition: async (systemId, recipeItemId, patch) => {
-      capture.push({ systemId, recipeItemId, patch });
-      const def = (system.recipeItemDefinitions || []).find((d) => d.id === recipeItemId);
-      if (def && Object.prototype.hasOwnProperty.call(patch, 'enabled')) def.enabled = patch.enabled;
-    }
-  };
-  const recipeManager = {
-    getRecipes: (filter) =>
-      filter?.craftingSystemId ? recipes.filter((r) => r.craftingSystemId === filter.craftingSystemId) : recipes,
-    getRecipe: (id) => recipes.find((r) => r.id === id) || null
-  };
-  return {
-    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
-    setSetting: async () => {},
-    getCraftingSystemManager: () => systemManager,
-    getRecipeManager: () => recipeManager,
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    getWorldUsers: () => [],
-    localize: (key) => key,
-    notify: { info: () => {}, warn: () => {}, error: () => {} }
-  };
-}
 
 function recipeItemById(vs, id) {
   return (vs.selectedSystem?.recipeItemDefinitions || []).find((d) => d.id === id);
@@ -98,13 +34,18 @@ beforeEach(() => {
     if (uuid === 'Item.bbb') return { name: 'Grand Codex', img: 'resolved-codex.png', type: 'book' };
     return null; // Item.zzz is a broken link
   };
+  // The learned map is persisted at the DOUBLY-nested `flags.fabricate.fabricate.
+  // learnedRecipes` path (issue 785): `normalizeFlagKey` prefixes `fabricate.` and
+  // the flattened update path nests it under the `fabricate` scope. These fixtures
+  // previously used the single-nested shape and their counts passed only because
+  // the reader was equally wrong; both are now correct together.
   globalThis.game = {
     i18n: { localize: (key) => key, format: (key) => key },
     actors: {
       contents: [
-        { id: 'a1', flags: { fabricate: { learnedRecipes: { r1: 1 } } } },
-        { id: 'a2', flags: { fabricate: { learnedRecipes: { r2: 1 } } } },
-        { id: 'a3', flags: { fabricate: { learnedRecipes: { r3: 1 } } } }
+        makeFlaggedActor({ id: 'a1', flags: { fabricate: { fabricate: { learnedRecipes: { r1: 1 } } } } }),
+        makeFlaggedActor({ id: 'a2', flags: { fabricate: { fabricate: { learnedRecipes: { r2: 1 } } } } }),
+        makeFlaggedActor({ id: 'a3', flags: { fabricate: { fabricate: { learnedRecipes: { r3: 1 } } } } })
       ]
     }
   };
@@ -273,6 +214,23 @@ describe('adminStore Books & Scrolls recipe-item projection', () => {
     assert.equal(recipeItemById(vs, 'codex').learnedByCount, 1);
     // gone links nothing → 0.
     assert.equal(recipeItemById(vs, 'gone').learnedByCount, 0);
+  });
+
+  it('counts ZERO for an actor whose learned map is only single-nested', async () => {
+    // The reader goes through `getFabricateFlag`, which resolves the real
+    // doubly-nested path. An actor carrying ONLY the legacy single-nested shape no
+    // writer ever produced must contribute nothing — this negative is the assertion
+    // a dual-read compatibility shim would fail, and the spec forbids such a shim.
+    globalThis.game.actors.contents = [
+      makeFlaggedActor({ id: 'a1', flags: { fabricate: { learnedRecipes: { r1: 1, r2: 1 } } } }),
+      makeFlaggedActor({ id: 'a2', flags: { fabricate: { learnedRecipes: { r3: 1 } } } })
+    ];
+    const store = buildStore();
+    await store.refresh();
+    const vs = get(store.viewState);
+
+    assert.equal(recipeItemById(vs, 'primer').learnedByCount, 0);
+    assert.equal(recipeItemById(vs, 'codex').learnedByCount, 0);
   });
 
   it('marks an unresolvable link as linkMissing and keeps the stored-name fallback', async () => {

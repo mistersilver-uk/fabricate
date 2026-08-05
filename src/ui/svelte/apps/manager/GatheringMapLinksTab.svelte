@@ -9,6 +9,7 @@
   regions".
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import MapRegionLinkPicker from './MapRegionLinkPicker.svelte';
 
@@ -19,7 +20,7 @@
     regions = [],
     saving = false,
     onSelect = () => {},
-    onSetLink = () => {}
+    onSetLink = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -42,13 +43,25 @@
   data-travel-panel="map"
 >
   {#if !sceneUuid}
-    <p class="manager-muted manager-travel-map-links-empty">
-      {text('FABRICATE.Admin.Manager.Travel.MapLinks.NoScene', 'Activate a scene to link its regions.')}
-    </p>
+    <EmptyState
+      compact
+      icon="fas fa-map"
+      title={text(
+        'FABRICATE.Admin.Manager.Travel.MapLinks.NoScene',
+        'Activate a scene to link its regions.'
+      )}
+      dataAttr="data-travel-map-links-empty"
+    />
   {:else if sceneRegions.length === 0}
-    <p class="manager-muted manager-travel-map-links-empty">
-      {text('FABRICATE.Admin.Manager.Travel.MapLinks.NoRegions', 'The active scene has no regions.')}
-    </p>
+    <EmptyState
+      compact
+      icon="fas fa-map-location-dot"
+      title={text(
+        'FABRICATE.Admin.Manager.Travel.MapLinks.NoRegions',
+        'The active scene has no regions.'
+      )}
+      dataAttr="data-travel-map-links-empty"
+    />
   {:else}
     <div class="manager-map-link-list" role="list">
       {#each sceneRegions as sceneRegion (sceneRegion.sceneRegionUuid)}
@@ -72,7 +85,8 @@
               aria-hidden="true"
             ></span>
             <span class="manager-map-link-name">
-              {sceneRegion.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}
+              {sceneRegion.name ||
+                text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}
             </span>
           </div>
           <div class="manager-map-link-picker-cell">

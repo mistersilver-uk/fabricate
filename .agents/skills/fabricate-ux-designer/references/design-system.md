@@ -185,13 +185,67 @@ sans; mono is only for dice formulas and run IDs.
   not in scoped Svelte `<style>` — see the "Foundry vs Fabricate CSS overrides" section of
   `CONTRIBUTING.md` and the focus-ring rule in the UX-designer `SKILL.md`.
 
-## 5. Components (copy-paste)
+## 5. Shipped primitive inventory
 
-All examples reference `var(--fab-*)` via short local aliases (`--sans` etc.); substitute the
-full token names in product.
-Assume a Font Awesome 6 `<link>` is present.
-These are illustrative shapes — a component's own runtime colour may be applied inline via
-`style=`, but never a source colour literal.
+Reuse shipped primitives before adapting the illustrative shapes below.
+The component and its live CSS are authoritative; examples in this document explain intent and are not copy-paste implementation templates.
+
+**The one-implementation-per-meaning rule.**
+Wherever two or more places perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component that every site imports — not a shared CSS class each site hand-rolls markup against, and not a copy.
+Prefer adding a prop, variant or slot to the primitive that already owns the meaning over introducing a second component that owns half of it.
+Creating a new primitive, or leaving a standalone implementation in place, requires explicit written justification naming the behavioural mismatch; "it is only used once" is not one.
+Extracting a primitive obliges you to convert the existing sites in the same change — a primitive with unconverted duplicates beside it has added a variant rather than removed one.
+
+**Put the primitive's CSS in its own scoped `<style>` block, not in `styles/fabricate.css`.**
+`VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs` maps changed file paths to the views whose screenshots a PR must publish.
+Global-stylesheet edits match the broad `theme-or-global-ui` recipe and demand a wide core set of frames regardless of what actually changed; CSS co-located in the component matches only the recipes naming that component, so the evidence set is the views that really render it.
+Keep in the global sheet only what must beat Foundry's host CSS (button geometry, focus rings) and the `:root`/theme token blocks.
+
+**A scoped rule and a two-class global rule tie, and the scoped one wins.**
+Svelte compiles a scoped selector to `.the-class.svelte-<hash>` — two classes, (0,2,0) — and `css: 'injected'` puts it in `document.head` AFTER Foundry's `<link>` for `styles/fabricate.css`.
+So a global rule such as `.fabricate-manager .manager-vocabulary-chip-locked` is also (0,2,0), ties, and loses on source order the moment the primitive owns that property.
+Any global rule that must still beat a primitive needs three classes — `.fabricate-manager .manager-chip.manager-vocabulary-chip-locked` — and what legitimately stays global is what a scoped block cannot reach: an ancestor-context rule, or the element's placement in a parent's layout.
+
+**A blanket field rule outranks a component's own reset.**
+`.fabricate-manager .some-view :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea)` computes to (0,4,1), because `:is()` takes the highest specificity among its arguments.
+A component that paints its own visuals BEHIND a native control — the chance slider draws a track and a coloured fill behind a transparent `input[type="range"]` — declares its reset at (0,3,1) and therefore loses, taking an opaque background that covers what it drew.
+Exclude the type from every such rule, and enumerate them all before declaring it fixed: this exact bug shipped three times because two rules were patched and a third, reachable through a different ancestor, was missed.
+
+**A primitive must reference theme-ROOT tokens only.**
+`--fab-mv2-*` and similar aliases are declared inside `.fabricate-manager`, so an area-agnostic component that references one is fine in the manager and silently wrong everywhere else: outside that area the property is not in scope, the declaration becomes invalid at computed-value time, and the colour falls back to inheritance.
+Nothing fails and no test catches it — the trigger is exactly the reuse the primitive exists to enable.
+Use tokens declared in `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, and say so in the component's `<style>` so the next editor does not reintroduce it.
+
+**Svelte trims whitespace at the end of a block.**
+A literal space as the last token inside `{#if}` never reaches the DOM, so a bold lead-in welds to the prose after it ("…game-world Item.Drag any Item…").
+Use the expression `{' '}`, which survives the trim.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Primitive or contract | Shipped source | Reuse for |
+|---|---|---|
+| `EmptyState` | `src/ui/svelte/apps/manager/EmptyState.svelte` | EVERY manager no-state message — a central panel, or `compact` for a sidebar/inline one. Never hand-roll a dashed panel, an icon tile, or a bare "nothing here" sentence |
+| `Callout` | `src/ui/svelte/apps/manager/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard. One shape; tone changes colour only, never geometry or type |
+| `ExplainerCard` | `src/ui/svelte/apps/manager/ExplainerCard.svelte` | EVERY side-panel "how this surface works" card — glyph-led card title, glyph-led guidance rows with optional bold lead-ins, an optional trailing row of ghost docs links. It wears `.manager-inspector-card` and `.manager-card-title`, so never restate the card shell or heading scale per surface |
+| `IconFactRow` | `src/ui/svelte/apps/manager/IconFactRow.svelte` | EVERY side-panel derived-fact row — leading accent glyph, bold statement, muted qualifying line. The stacking container owns the list gap; the row owns the well |
+| `Medallion` | `src/ui/svelte/components/Medallion.svelte` | Manager entity imagery with the canonical fallback icon, surface, radius, and sizing |
+| `StatusPill` | `src/ui/svelte/components/StatusPill.svelte` | Semantic icon-plus-label state chips; never hand-roll a local status ramp |
+| `DropZone` | `src/ui/svelte/components/DropZone.svelte` | Shared drag/drop activation, disabled state, label, and active-class behavior |
+| `ChanceSlider` | `src/ui/svelte/components/ChanceSlider.svelte` | Synchronized number/range input, normalized value, semantic thumb, value fill, or full-track semantic scale |
+| `CraftingThumb` | `src/ui/svelte/apps/crafting/CraftingThumb.svelte` | Player-facing item/recipe imagery and missing-art fallback |
+| `CraftButton` | `src/ui/svelte/apps/crafting/CraftButton.svelte` | Player craft-action treatment and disabled/action state |
+| `RollResultBox` | `src/ui/svelte/apps/crafting/detail/RollResultBox.svelte` | Post-roll result hierarchy, total, message, and awarded-item presentation |
+| Manager row/card selection | `.manager-recipe-row` and sibling manager selectors in `styles/fabricate.css` | One consistent selected-row signal, spacing, action placement, and host-CSS override |
+| Manager form/control shell | `.fabricate-manager` rules in `styles/fabricate.css` | Foundry-safe input, button, focus, range, and responsive behavior |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The reuse inventory is not limited to globally shared components.
+A feature-local primitive is the correct source when the new control belongs to that feature's vocabulary, such as `CraftButton` or `RollResultBox`.
+If reuse is impossible, record the behavioral mismatch in the plan's `Reference surfaces / reuse inventory` and prefer a shared extraction over duplicated scoped styles.
+
+The examples below reference `var(--fab-*)` via short local aliases such as `--sans`.
+A component's own runtime colour may be applied inline via `style=`, but never a source colour literal.
 
 ### 5.1 Buttons
 
@@ -286,7 +340,25 @@ The success bar gradients to guaranteed; loot bars take the rarity colour.
 <div style="height:5px;border-radius:999px;background:var(--fab-surface-active);overflow:hidden"><div style="width:40%;height:100%;background:var(--fab-drop-rate-uncommon)"></div></div>
 ```
 
-### 5.8 Nav rail item (Player, 60–84px)
+### 5.8 Semantic slider geometry
+
+Use the shipped `ChanceSlider` and its `.manager-drop-rate-control` contract in `styles/fabricate.css`.
+The visible track is inset from each input edge by the rendered thumb radius, so the thumb centre at `min` and `max` lands exactly on the visible track endpoints.
+The range input spans the full control width while the custom visible track owns the inset.
+
+Suppress native and host rendering on every engine path: the range input background and border are transparent, the WebKit runnable track is transparent, and both the Firefox track and progress pseudo-elements are transparent.
+Only the custom track and fill communicate the scale.
+The thumb colour resolves from the same semantic value function or tier as the track treatment.
+
+Distinguish the two supported track meanings:
+
+- A value-width fill sets the custom fill width to the normalized percentage and uses one semantic colour for the current tier.
+- A full-track semantic scale renders its meaningful gradient across the complete inset track and keeps the fill at 100%; it is not a progress fill.
+
+Do not apply a value-width clip to a green-to-red risk scale, because that falsely hides the future semantic range.
+Do not render a full-width solid tier colour for a progress-style chance control, because that falsely implies the entire scale has the current value.
+
+### 5.9 Nav rail item (Player, 60–84px)
 
 Active = accent-soft fill + accent-border.
 Count badge = success pill, top-right.
@@ -297,7 +369,7 @@ Count badge = success pill, top-right.
 <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:60px;padding:10px 0;border-radius:8px;color:var(--fab-text-muted);position:relative"><i class="fa-solid fa-book-open" style="font-size:16px"></i><span style="font:500 10px var(--sans)">Journal</span><span style="position:absolute;top:6px;right:8px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--fab-success);border:1px solid var(--fab-success-border);color:var(--fab-on-accent);font:700 9px/16px var(--sans);text-align:center">2</span></div>
 ```
 
-### 5.9 Stat box
+### 5.10 Stat box
 
 Icon · serif number · tiny label.
 The border turns **danger** when the count is a problem.
@@ -306,7 +378,7 @@ The border turns **danger** when the count is a problem.
 <div style="flex:1;padding:12px 8px;background:var(--fab-bg-1);border:1px solid var(--fab-border);border-radius:9px;text-align:center"><i class="fa-solid fa-scroll" style="color:var(--fab-accent);font-size:13px"></i><div style="font:700 17px/1.1 var(--serif);color:var(--fab-text);margin-top:6px">1</div><div style="font:500 9px var(--sans);color:var(--fab-text-subtle);margin-top:2px">Planned</div></div>
 ```
 
-### 5.10 Labeled cell (world conditions / run meta)
+### 5.11 Labeled cell (world conditions / run meta)
 
 An uppercase micro-label over a value or meter.
 
@@ -480,3 +552,13 @@ Critical/Warning count pills + a green-check / red-x checklist.
    Space in 4px steps; radius 5 / 8 / 10 / 12 / 999; controls on the 34 / 40 / 42 rhythm.
 7. **No colour literals in UI.**
    Only `var(--fab-*)`; verify the screen reskins under all six themes before calling it done.
+8. **When it renders correctly in isolation but wrong in Foundry, read the runtime.**
+   A Playwright repro that loads only `styles/fabricate.css` — or even Foundry's and the
+   system's stylesheets too — omits the ancestor a view-scoped rule needs, so it renders
+   correctly and proves nothing.
+   Ask for `getComputedStyle` from the live app instead, and query the OCCLUDING element
+   rather than the one that looks wrong: an element can compute a perfect size and colour
+   while something above it paints over the result.
+   Rule out a stale module chunk first with a hard reload, since Foundry caches it
+   aggressively and a scope-hash mismatch between cached JS and injected CSS renders correct
+   structure with no styling at all.

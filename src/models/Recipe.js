@@ -87,9 +87,11 @@ export class Recipe {
         ? data.checkTierId.trim()
         : null;
     // Optional reference to a fixed-type routed check's success outcome tier (its
-    // id). When set, a craft whose rolled tier ranks below this tier fails outright,
-    // letting recipes on a shared fixed check carry different difficulty. Null/unknown
-    // ids impose no override (outcome = the tier actually rolled) at resolution time.
+    // id). When set, a craft whose FINAL (post-step) tier ranks below this tier fails
+    // outright, letting recipes on a shared fixed check carry different difficulty.
+    // Null/unknown ids impose no override (outcome = that same final tier) at
+    // resolution time. The gate runs AFTER tier stepping (issue 975), so it judges the
+    // stepped tier and not the one the dice landed on.
     this.minSuccessOutcomeId =
       typeof data.minSuccessOutcomeId === 'string' && data.minSuccessOutcomeId.trim()
         ? data.minSuccessOutcomeId.trim()
@@ -126,8 +128,8 @@ export class Recipe {
    * Normalize the optional per-recipe crafting-check modifier override (issue 770) to
    * `{ policy?, modifierIds? } | null`. A non-object, or an object that carries neither
    * a known policy nor a non-empty `modifierIds` array, normalizes to `null` (inherit
-   * the system default). `policy` keeps only the three known values (`addAll`,
-   * `highest`, `byRecipe`); an unknown/absent policy is dropped. `modifierIds` keeps
+   * the system default). `policy` keeps only the four known values (`addAll`,
+   * `highest`, `byRecipe`, `playerPicks`); an unknown/absent policy is dropped. `modifierIds` keeps
    * only non-empty string ids, de-duplicated in order; catalogue membership is NOT
    * checked here (the resolver drops unknown ids against the live system catalogue).
    * @param {unknown} craftingModifier
@@ -136,7 +138,7 @@ export class Recipe {
    */
   _normalizeCraftingModifier(craftingModifier) {
     if (!craftingModifier || typeof craftingModifier !== 'object') return null;
-    const validPolicies = ['addAll', 'highest', 'byRecipe'];
+    const validPolicies = ['addAll', 'highest', 'byRecipe', 'playerPicks'];
     const policy = validPolicies.includes(craftingModifier.policy) ? craftingModifier.policy : null;
     const seen = new Set();
     const modifierIds = (

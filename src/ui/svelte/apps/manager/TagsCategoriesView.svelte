@@ -6,8 +6,13 @@
   add form, and rows. The right inspector rail (stat tiles, contextual help,
   reference-safe reassurance) lives in the shared manager inspector slot in
   CraftingSystemManagerRoot, not here.
+
+  The strip uses the shared `.manager-editor-tab*` treatment every other manager tab
+  bar uses (issue 878) rather than its own vocabulary-only look, and the view renders
+  NO page header of its own — the shell's `.manager-header` is the only one.
 -->
 <script>
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import VocabularyPanel from './VocabularyPanel.svelte';
 
@@ -35,7 +40,9 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const generalCategory = $derived((categoryRows || []).find((row) => row.id === 'general') || null);
+  const generalCategory = $derived(
+    (categoryRows || []).find((row) => row.id === 'general') || null
+  );
   const customCategoryRows = $derived((categoryRows || []).filter((row) => row.id !== 'general'));
   const generalComponentCategory = $derived(
     (componentCategoryRows || []).find((row) => row.id === 'general') || null
@@ -54,7 +61,9 @@
       id: 'recipe',
       icon: 'fas fa-scroll',
       label: text('FABRICATE.Admin.Manager.TagsCategories.Categories', 'Recipe categories'),
-      count: counts.customCategories || 0,
+      // Whole-vocabulary counts, General included — the same total the panel's own entry
+      // chip and the inspector's at-a-glance tile report (issue 878).
+      count: counts.recipeCategories || 0,
     },
     {
       id: 'component',
@@ -63,7 +72,7 @@
         'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
         'Component categories'
       ),
-      count: counts.customComponentCategories || 0,
+      count: counts.componentCategories || 0,
     },
     {
       id: 'tag',
@@ -72,6 +81,26 @@
       count: counts.itemTags || 0,
     },
   ]);
+
+  // Roving-tabindex arrow/Home/End focus move, matching `knowledge/KnowledgeTabs` and
+  // `recipe-item/RecipeItemEditorTabs` (issue 878) — this strip now shares their
+  // `.manager-editor-tab*` treatment, so it shares their keyboard contract too.
+  function handleTabKeydown(event, index) {
+    const lastIndex = tabs.length - 1;
+    let nextIndex = null;
+    if (event.key === 'ArrowRight') nextIndex = index === lastIndex ? 0 : index + 1;
+    if (event.key === 'ArrowLeft') nextIndex = index === 0 ? lastIndex : index - 1;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = lastIndex;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex].id;
+    onTabChange(nextTab);
+    event.currentTarget
+      .closest('[role="tablist"]')
+      ?.querySelector(`#vocabulary-tab-${nextTab}`)
+      ?.focus();
+  }
 
   function existsIn(rows, value) {
     const normalized = String(value || '')
@@ -188,50 +217,52 @@
   class="manager-main manager-tags-categories"
   aria-label={text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.TagsCategories.Kicker', 'System vocabulary')}
-      </p>
-      <h2 class="manager-title">
-        {text('FABRICATE.Admin.Manager.TagsCategories.Library', 'Tags & Categories')}
-      </h2>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.TagsCategories.LibraryHint',
-          'Define the recipe categories, component categories and component tags the rest of the system references.'
-        )}
-      </p>
-    </div>
-  </section>
-
-  <nav
-    class="manager-tabs manager-vocabulary-tabs"
+  <!-- No per-view page header: the shell's `.manager-header` already renders the
+       "Tags & Categories" title and its subtitle, so a second one restated the title
+       inside the panel. Removed for the same reason as the components and recipes
+       libraries (issue 676) and Books & Scrolls (issue 785). -->
+  <!-- A `<div>`, not a `<nav>`: `role="tablist"` on a `<nav>` overrides its implicit
+       `navigation` landmark, which the compiler reports. The ROLE is what matters and it
+       is unchanged — `handleTabKeydown` resolves the strip with
+       `.closest('[role="tablist"]')`, and the 37 other `<div role="tablist">` elements
+       across `src/` warn zero times, because a `<div>` has no implicit role to conflict
+       with. -->
+  <div
+    class="manager-editor-tabs manager-vocabulary-tabs"
     role="tablist"
     aria-label={text('FABRICATE.Admin.Manager.TagsCategories.TabList', 'Vocabulary tabs')}
   >
-    {#each tabs as tab (tab.id)}
+    {#each tabs as tab, index (tab.id)}
       <button
         type="button"
         role="tab"
-        class={`manager-tab ${activeTab === tab.id ? 'is-active' : ''}`}
+        id={`vocabulary-tab-${tab.id}`}
+        class="manager-editor-tab-button"
+        class:is-active={activeTab === tab.id}
         aria-selected={activeTab === tab.id}
+        aria-controls={`vocabulary-panel-${tab.id}`}
+        tabindex={activeTab === tab.id ? 0 : -1}
         data-vocabulary-tab={tab.id}
         onclick={() => onTabChange(tab.id)}
+        onkeydown={(event) => handleTabKeydown(event, index)}
       >
         <i class={tab.icon} aria-hidden="true"></i>
         <span>{tab.label}</span>
-        <span class="manager-tab-count">{tab.count}</span>
+        <Chip tone="neutral" class="manager-editor-tab-badge">{tab.count}</Chip>
       </button>
     {/each}
-  </nav>
+  </div>
 
-  <section
+  <!-- Same rule for the panel: an `aria-label` promotes a `<section>` from generic to
+       the `region` landmark, which `role="tabpanel"` then overrides. A `<div>` has
+       nothing to override. The panel is named by ITS OWN TAB rather than by a standalone
+       label — matching `KnowledgeView`, `RecipeEditView` and `ChecksView` — so the
+       accessible name tracks the tab the reader just activated. -->
+  <div
     class="manager-tags-categories-workspace"
-    aria-label={text(
-      'FABRICATE.Admin.Manager.TagsCategories.Workspace',
-      'Tags and categories workspace'
-    )}
+    role="tabpanel"
+    id={`vocabulary-panel-${activeTab}`}
+    aria-labelledby={`vocabulary-tab-${activeTab}`}
   >
     {#if activeTab === 'recipe'}
       <VocabularyPanel
@@ -260,7 +291,7 @@
         )}
         emptyTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneral',
-          'No recipe categories yet'
+          'Only General so far'
         )}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralHint',
@@ -294,15 +325,7 @@
         )}
         showIcon={true}
         iconLabel={text('FABRICATE.Admin.Manager.TagsCategories.IconLabel', 'Icon')}
-        iconPlaceholder={text(
-          'FABRICATE.Admin.Manager.TagsCategories.IconPlaceholder',
-          'e.g. fas fa-flask'
-        )}
-        changeIconLabel={text(
-          'FABRICATE.Admin.Manager.TagsCategories.ChangeIcon',
-          'Change icon'
-        )}
-        saveIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.SaveIcon', 'Save icon')}
+        changeIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.ChangeIcon', 'Change icon')}
         onAdd={onAddCategory}
         onRemove={(row) => onRemoveCategory(row.name)}
         onSetIcon={onSetCategoryIcon}
@@ -343,7 +366,7 @@
         )}
         emptyTitle={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralComponent',
-          'No component categories yet'
+          'Only General so far'
         )}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.OnlyGeneralComponentHint',
@@ -377,15 +400,7 @@
         )}
         showIcon={true}
         iconLabel={text('FABRICATE.Admin.Manager.TagsCategories.IconLabel', 'Icon')}
-        iconPlaceholder={text(
-          'FABRICATE.Admin.Manager.TagsCategories.IconPlaceholder',
-          'e.g. fas fa-flask'
-        )}
-        changeIconLabel={text(
-          'FABRICATE.Admin.Manager.TagsCategories.ChangeIcon',
-          'Change icon'
-        )}
-        saveIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.SaveIcon', 'Save icon')}
+        changeIconLabel={text('FABRICATE.Admin.Manager.TagsCategories.ChangeIcon', 'Change icon')}
         onAdd={onAddComponentCategory}
         onRemove={(row) => onRemoveComponentCategory(row.name)}
         onSetIcon={onSetComponentCategoryIcon}
@@ -399,7 +414,10 @@
         )}
         inputId="manager-tag-add"
         inputLabel={text('FABRICATE.Admin.Manager.TagsCategories.TagName', 'Tag name')}
-        inputPlaceholder={text('FABRICATE.Admin.Manager.TagsCategories.TagPlaceholder', 'e.g. herb')}
+        inputPlaceholder={text(
+          'FABRICATE.Admin.Manager.TagsCategories.TagPlaceholder',
+          'e.g. herb'
+        )}
         addLabel={text('FABRICATE.Admin.Manager.TagsCategories.AddTag', 'Add tag')}
         rowAttr="data-tag-id"
         rows={decoratedTagRows}
@@ -412,10 +430,7 @@
           'FABRICATE.Admin.Manager.TagsCategories.SearchTagsLabel',
           'Search item tags'
         )}
-        emptyTitle={text(
-          'FABRICATE.Admin.Manager.TagsCategories.NoTags',
-          'No component tags yet'
-        )}
+        emptyTitle={text('FABRICATE.Admin.Manager.TagsCategories.NoTags', 'No component tags yet')}
         emptyHint={text(
           'FABRICATE.Admin.Manager.TagsCategories.NoTagsHint',
           'Tags let a recipe require any component that carries them. Add a tag above, then apply it to components.'
@@ -448,5 +463,5 @@
         onRemove={(row) => onRemoveTag(row.name)}
       />
     {/if}
-  </section>
+  </div>
 </main>

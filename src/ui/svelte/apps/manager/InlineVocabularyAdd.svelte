@@ -11,8 +11,15 @@
   and the localized labels. Emits the normalized value (and trimmed icon, when shown) to
   `onAdd`; an `onAdd` that returns `false` renders the failure feedback and keeps focus.
   The markup preserves VocabularyPanel's exact classes so both callers style identically.
+
+  The icon field is the shared searchable `IconPicker` (issue 878), the same control the
+  gathering time-of-day / weather / biome fields use — not a free-text Font Awesome class
+  box. It stays UNSET until the GM picks one (the trigger previews `defaultIcon`), so an
+  untouched form still emits an empty icon and the row falls back to the default.
 -->
 <script>
+  import IconPicker from '../../components/IconPicker.svelte';
+
   let {
     inputId = '',
     inputLabel = '',
@@ -27,7 +34,7 @@
     addFailedFeedback = '',
     showIcon = false,
     iconLabel = '',
-    iconPlaceholder = '',
+    changeIconLabel = '',
     defaultIcon = 'fas fa-folder',
     onAdd = () => {},
   } = $props();
@@ -100,18 +107,21 @@
       />
     </label>
     {#if showIcon}
-      <label class="manager-field manager-vocabulary-icon-field" for={`${inputId}-icon`}>
+      <!--
+        A `<div>`, not a `<label>`: the control is a button that opens the icon popover,
+        and a button is not a labelable element, so a wrapping label would name nothing.
+        The picker carries its own accessible name through `buttonTitle`.
+      -->
+      <div class="manager-field manager-vocabulary-icon-field" data-vocabulary-add-icon>
         <span>{iconLabel}</span>
-        <span class="manager-vocabulary-icon-input">
-          <i class={iconValue.trim() || defaultIcon} aria-hidden="true"></i>
-          <input
-            id={`${inputId}-icon`}
-            type="text"
-            bind:value={iconValue}
-            placeholder={iconPlaceholder}
-          />
-        </span>
-      </label>
+        <IconPicker
+          value={iconValue.trim() || defaultIcon}
+          iconOnly={true}
+          triggerClass="manager-vocabulary-icon-trigger"
+          buttonTitle={changeIconLabel || iconLabel}
+          onChange={(icon) => (iconValue = icon)}
+        />
+      </div>
     {/if}
     <button
       type="submit"

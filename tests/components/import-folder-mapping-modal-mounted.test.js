@@ -14,12 +14,30 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    // InlineVocabularyAdd imports IconPicker STATICALLY (issue 878), so the picker's own
+    // dependencies are in this graph even though this modal never sets `showIcon` and so
+    // never renders the field. Membership follows the import graph, not the rendered tree.
+    'src/ui/svelte/util/essenceIcons.js',
+    'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
     'src/utils/matchFolderVocabulary.js',
   ],
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // The manager's ONE selection control (issue 772). The match-by-name toggle renders
+    // through it now rather than as a raw checkbox wearing Foundry's control chrome.
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
+    'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
+    // The shared modal chrome (issue 877): portal, centring, title/subtitle, close and
+    // footer rail. This modal renders THROUGH it, so omitting it breaks the mount.
+    'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte',
@@ -128,10 +146,22 @@ describe('ImportFolderMappingModal (mounted)', () => {
     assert.equal(commitButton().disabled, true);
   });
 
-  it('calls onClose from the close button', async () => {
+  // The close control now belongs to the shared ManagerModal chrome (issue 877), so it
+  // is located by the primitive's hook rather than a mapping-specific one.
+  it('calls onClose from the shared modal close button', async () => {
     let closed = 0;
     await harness.mount({ open: true, folders: FOLDERS, ...VOCAB, onClose: () => (closed += 1) });
-    document.querySelector('[data-import-mapping-close]').click();
+    document.querySelector('[data-manager-modal-close]').click();
     assert.equal(closed, 1);
+  });
+
+  // The smoke harness pins `[data-import-mapping]` on the dialog ROOT; the root is now
+  // rendered by ManagerModal, so the hook survives only via its `rootAttributes` prop.
+  it('keeps the mapping automation hook on the shared modal root', async () => {
+    await harness.mount({ open: true, folders: FOLDERS, ...VOCAB });
+    const root = dialog();
+    assert.ok(root, 'expected the dialog root');
+    assert.ok(root.hasAttribute('data-manager-modal'), 'renders through the shared chrome');
+    assert.equal(root.getAttribute('role'), 'dialog');
   });
 });

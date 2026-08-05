@@ -53,10 +53,21 @@ export const COMPONENT_DEFAULT_PAGE_SIZE = 25;
  * editor round-trip) is not misread as a system switch and does not wipe the page/filters
  * this object otherwise preserves. See the reset effect in each browser view.
  *
+ * `bulkSelectedComponentIds` (issue 772) is the bulk edit SELECTION, lifted for the same
+ * reason everything else here is: it must survive the editor round-trip. It is
+ * `bulkSelectedComponentIds`, NOT `selectedComponentIds` — `selectedComponentId`
+ * (singular) already means *the row whose single-component inspector is open* and is
+ * user-visible copy, and two meanings one character apart threaded into the same
+ * component is a defect waiting to happen. Deliberately a bare `new Set()` literal and
+ * NOT an import from `componentBulkEditModel.js`: a new import in this module would force
+ * matching mount-harness allowlist edits in two suites, where an omission hangs the suite
+ * as `# cancelled` rather than failing.
+ *
  * @returns {{
  *   categoryFilter: string, essenceFilter: string, groupByCategory: boolean,
  *   sortKey: ComponentSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string
+ *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string,
+ *   bulkSelectedComponentIds: Set<string>
  * }}
  */
 export function createComponentBrowserState() {
@@ -70,6 +81,7 @@ export function createComponentBrowserState() {
     pageSize: COMPONENT_DEFAULT_PAGE_SIZE,
     collapsedCategories: new Set(),
     systemId: '',
+    bulkSelectedComponentIds: new Set(),
   };
 }
 

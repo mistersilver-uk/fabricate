@@ -16,7 +16,7 @@
     subscribeWorldTime,
     subscribeInventoryChange,
     subscribeCraftingDataChange,
-    subscribeActorRunFlagChange
+    subscribeActorRunFlagChange,
   } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
@@ -33,7 +33,7 @@
     activeCanvasTool = null,
     scopedEnvironmentId = null,
     scopedTaskId = null,
-    scopedActorId = null
+    scopedActorId = null,
   } = $props();
 
   // The scoped interacting actor most recently applied to the selection, so an
@@ -63,16 +63,16 @@
     { id: 'alchemy', icon: 'fa-flask', label: 'FABRICATE.App.Nav.Alchemy', requires: 'alchemy' },
     { id: 'gathering', icon: 'fa-leaf', label: 'FABRICATE.App.Nav.Gathering' },
     { id: 'journal', icon: 'fa-book-open', label: 'FABRICATE.App.Nav.Journal' },
-    { id: 'inventory', icon: 'fa-boxes-stacked', label: 'FABRICATE.App.Nav.Inventory' }
+    { id: 'inventory', icon: 'fa-boxes-stacked', label: 'FABRICATE.App.Nav.Inventory' },
   ];
 
   // The Journal nav entry carries a live active-run count badge fed by the shared
   // journal store's reactive `navCount` rune getter.
   const journalNavCount = $derived(Number(services?.journal?.navCount ?? 0));
   const tabs = $derived(
-    ALL_TABS
-      .filter(tab => tab.requires !== 'alchemy' || showAlchemy)
-      .map(tab => (tab.id === 'journal' ? { ...tab, count: journalNavCount } : tab))
+    ALL_TABS.filter((tab) => tab.requires !== 'alchemy' || showAlchemy).map((tab) =>
+      tab.id === 'journal' ? { ...tab, count: journalNavCount } : tab
+    )
   );
 
   // Shell-level Journal refresh: keep the store (and thus the nav badge) fresh
@@ -96,7 +96,7 @@
       isRelevantActor: (actorId) => {
         const selected = services?.getSelectedActorId?.() || null;
         return Boolean(selected) && String(selected) === String(actorId);
-      }
+      },
     })
   );
 
@@ -143,7 +143,16 @@
   );
 </script>
 
-<div class="fabricate-app-shell">
+<!-- `data-active-tab` publishes the route, mirroring what the manager root already does with
+     `data-manager-view`. It is a zero-behaviour attribute: nothing reads it at runtime, no style
+     binds to it, and removing it would change nothing a user sees.
+
+     It exists because the screenshot harness had no way to tell which tab a captured frame is
+     showing. Every player case shared one readiness selector — this element's class — which is
+     present on every tab in every state, so a case whose navigation silently no-oped still
+     published a frame and still passed. The manager half has been held to its route from the
+     start; this gives the player half the same footing. -->
+<div class="fabricate-app-shell" data-active-tab={activeTab}>
   <div class="fabricate-app-nav" role="tablist" aria-orientation="vertical">
     {#each tabs as tab (tab.id)}
       <button

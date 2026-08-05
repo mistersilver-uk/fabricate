@@ -156,6 +156,25 @@ Players activate an interactable by **walking a controlled token into its region
 {: .note }
 > Only the controlling player sees the prompt, so a single token entering a region never fires a prompt for everyone at the table.
 
+### The "still inside" check
+
+Step 2 above ends with the GM's client confirming your token is still inside the region.
+That confirmation runs on the GM's client for **every** player request, including requests about a scene that GM is not currently looking at.
+
+It asks Foundry directly which regions the token is standing in, rather than measuring against what happens to be drawn on the GM's screen.
+So the answer is the same whether or not the GM has your scene open, whether or not the GM is on the same scene level as you, and whether your token is one square or four.
+
+It also honours **elevation**.
+If the GM has given the region an explicit elevation range, your token has to be standing *within* that range, not merely over the region's footprint.
+This cuts both ways.
+A token standing inside a raised region, such as a platform or an upper floor, is now let in where it used to be turned away.
+A token far above or below a region's configured range is now correctly turned away where it used to be let in.
+A region with no elevation range set (the default) is unaffected: every elevation is inside it, exactly as before.
+
+{: .note }
+> If Fabricate genuinely cannot work out where a token is, it lets the interaction through rather than blocking it.
+> A player is never stuck because of a lookup Fabricate could not answer.
+
 ### Tokens already inside on load
 
 Foundry does not raise the region-enter event for a token that is already standing in a region when the scene loads.
@@ -163,6 +182,14 @@ Fabricate covers this two ways:
 
 - **Control re-trigger** means taking control of a token that is already inside a region the interactable does not conceal re-raises the prompt (a locked interactable still re-prompts, and the lock is still enforced at Interact time).
 - **Keybinding** means the client keybinding *Fabricate: interact here* (default **E**) re-raises the prompt for the controlled token's current region.
+
+Both re-trigger paths also honour the token's elevation, so an elevation-ranged region re-prompts a token standing in it.
+The two checks are not quite the same at the **bottom** edge of a range, though.
+The "still inside" check measures the token's whole height, so a token whose feet are below the range but whose head reaches up into it counts as inside, which is also how Foundry itself decides the token is in the region.
+The re-trigger paths look only at where the token's feet are.
+So a token standing less than its own height below a raised region's floor is genuinely in the region and would be allowed to interact, but is not re-prompted on scene load or when you take control of it.
+Every token has a height (one grid space by default, so 5 ft on a typical map), so this is not confined to unusually tall tokens.
+Walk the token out and back in, or raise it into the range, to get the prompt.
 
 ### A GM must be online
 

@@ -515,6 +515,106 @@ test('migrateLegacyRecipeItems reuses one recipe item definition for shared lega
   assert.equal(recipesSaved, true);
 });
 
+// Issue 978. A manager save persisted `containingDefinitions[0]` onto the recipe. Book
+// membership lives on the definition, so for a recipe that IS a member through
+// `recipeIds[]` the scalar is noise that arms the four legacy image resolvers (issue 887).
+// The same un-gated pass that mints-and-stamps the alchemy cohort now clears it.
+test('migrateLegacyRecipeItems clears a leaked recipeItemId but spares the alchemy cohort', async () => {
+  let recipesSaved = false;
+  const recipes = [
+    {
+      // Leaked: a book member through `recipeIds[]`, no standalone formula link.
+      id: 'recipe-leaked',
+      name: 'Kite Shield',
+      img: 'icons/shield.webp',
+      description: '',
+      craftingSystemId: 'sys-1',
+      recipeItemId: 'book-1',
+      linkedRecipeItemUuid: '',
+      toJSON() {
+        return { ...this };
+      },
+    },
+    {
+      // The alchemy cohort: a standalone formula-item link the 1.13.0 migration
+      // deliberately preserved, and which the mint-and-stamp half maintains.
+      id: 'recipe-formula',
+      name: 'Potion of Healing',
+      img: 'icons/potion.webp',
+      description: '',
+      craftingSystemId: 'sys-1',
+      recipeItemId: 'book-1',
+      linkedRecipeItemUuid: 'Compendium.world.formulas.formula-1',
+      toJSON() {
+        return { ...this };
+      },
+    },
+    {
+      // Not a member of anything: nothing to reconcile against, so it is left alone.
+      id: 'recipe-unlinked',
+      name: 'Iron Sword',
+      img: 'icons/sword.webp',
+      description: '',
+      craftingSystemId: 'sys-1',
+      recipeItemId: 'book-1',
+      linkedRecipeItemUuid: '',
+      toJSON() {
+        return { ...this };
+      },
+    },
+  ];
+
+  const recipeManager = {
+    getRecipes: ({ craftingSystemId } = {}) =>
+      craftingSystemId
+        ? recipes.filter((recipe) => recipe.craftingSystemId === craftingSystemId)
+        : recipes,
+    save: async () => {
+      recipesSaved = true;
+    },
+  };
+
+  const manager = new CraftingSystemManager(recipeManager);
+  manager.save = async () => {};
+  manager.systems.set(
+    'sys-1',
+    manager._normalizeSystem({
+      id: 'sys-1',
+      name: 'Smithing',
+      recipeItemDefinitions: [
+        {
+          id: 'book-1',
+          name: 'Forgecraft Handbook',
+          originItemUuid: 'Compendium.world.books.book-1',
+          recipeIds: ['recipe-leaked', 'recipe-formula'],
+        },
+      ],
+    })
+  );
+
+  await manager._migrateLegacyRecipeItems();
+
+  assert.equal(recipes[0].recipeItemId, null, 'the leaked scalar is cleared for a book member');
+  assert.equal(
+    recipes[1].recipeItemId,
+    'book-1',
+    'a recipe retaining a standalone formula link keeps its scalar'
+  );
+  assert.equal(
+    recipes[2].recipeItemId,
+    'book-1',
+    'a recipe that is a member of nothing is left untouched'
+  );
+  assert.equal(recipesSaved, true, 'the clear is persisted');
+
+  // Idempotent: a cleared recipe carries no `linkedRecipeItemUuid`, so it is not a
+  // re-stamp candidate and a second pass must not resurrect the scalar.
+  recipesSaved = false;
+  await manager._migrateLegacyRecipeItems();
+  assert.equal(recipes[0].recipeItemId, null, 'a second pass leaves the cleared recipe cleared');
+  assert.equal(recipesSaved, false, 'a converged pass persists nothing');
+});
+
 test('deleteRecipeItemDefinition removes the system recipe item and clears affected recipe references', async () => {
   let systemsSaved = false;
   let recipesSaved = false;
@@ -685,4 +785,78 @@ test('RecipeVisibilityService matches recipeItemId through the system recipe ite
   };
 
   assert.equal(service._isMatchingRecipeItem(recipe, item), true);
+});
+
+// `_migrateLegacyRecipeItems` runs from `initialize()` — BEFORE runStartupMaintenance's
+// error isolation and before `ready` is set — and its two saves write the
+// `craftingSystems` and `recipes` WORLD settings. On a player client that rejection
+// escapes `initialize()`, so `initialized` never flips and every facade method throws
+// through `_requireReady()` for the whole session (the issue-970 failure mode).
+
+function legacyMigrationFixture() {
+  const saves = { systems: 0, recipes: 0 };
+  const recipes = [
+    {
+      id: 'recipe-1',
+      name: 'Potion A',
+      img: 'icons/svg/item-bag.svg',
+      description: '',
+      craftingSystemId: 'sys-1',
+      recipeItemId: '',
+      linkedRecipeItemUuid: 'Compendium.world.formulas.book-1',
+      toJSON() {
+        return { ...this };
+      },
+    },
+  ];
+  const recipeManager = {
+    getRecipes: () => recipes,
+    save: async () => {
+      saves.recipes += 1;
+    },
+  };
+  return { saves, recipes, recipeManager };
+}
+
+function migrationManager({ recipeManager, saves, isActiveGM }) {
+  const manager = new CraftingSystemManager(recipeManager, { isActiveGM });
+  manager.save = async () => {
+    saves.systems += 1;
+  };
+  manager.systems.set('sys-1', manager._normalizeSystem({ id: 'sys-1', name: 'Alchemy' }));
+  return manager;
+}
+
+test('the legacy recipe-item migration writes no world setting off the active GM', async () => {
+  const { saves, recipes, recipeManager } = legacyMigrationFixture();
+  const manager = migrationManager({ recipeManager, saves, isActiveGM: () => false });
+
+  const result = await manager._migrateLegacyRecipeItems();
+
+  assert.equal(result, false, 'reports no persistence rather than throwing');
+  assert.equal(saves.systems, 0, 'craftingSystems world setting untouched');
+  assert.equal(saves.recipes, 0, 'recipes world setting untouched');
+  // The in-memory pass is deliberately NOT gated, so this client's own view stays
+  // self-consistent for the session; the GM's write replicates the durable fix.
+  assert.equal(manager.getRecipeItemDefinitions('sys-1').length, 1);
+  assert.equal(recipes[0].recipeItemId, manager.getRecipeItemDefinitions('sys-1')[0].id);
+});
+
+test('the legacy recipe-item migration still persists on the active GM', async () => {
+  const { saves, recipeManager } = legacyMigrationFixture();
+  const manager = migrationManager({ recipeManager, saves, isActiveGM: () => true });
+
+  assert.equal(await manager._migrateLegacyRecipeItems(), true);
+  assert.equal(saves.systems, 1);
+  assert.equal(saves.recipes, 1);
+});
+
+test('initialize completes on a player client instead of leaving the manager unready', async () => {
+  const { saves, recipeManager } = legacyMigrationFixture();
+  const manager = migrationManager({ recipeManager, saves, isActiveGM: () => false });
+  manager.systems.clear();
+
+  await manager.initialize();
+
+  assert.equal(manager.initialized, true, 'ready is reached, so the facade works all session');
 });

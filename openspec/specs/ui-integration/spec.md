@@ -37,6 +37,17 @@ Fabricate's Foundry-facing product UI must use a clean flat visual style.
 - Changing the theme setting applies a stable theme attribute to `document.documentElement` and open Fabricate app roots so already-open Fabricate UI surfaces that consume `--fab-*` tokens update without requiring a reload or reopen cycle.
 - Generated documentation output and third-party/vendor theme assets are out of scope for this rule unless they are explicitly restyled as Fabricate product UI.
 
+### Semantic slider geometry
+
+Shared semantic sliders MUST define one canonical geometry in which the custom visible track is inset by the rendered thumb radius and the range input spans the full control width.
+At the minimum and maximum values, the thumb centre MUST coincide with the corresponding visible track endpoint.
+Native and Foundry-host track rendering MUST be suppressed for the range input, including transparent WebKit runnable-track rendering and transparent Firefox track and progress rendering, so only the custom track communicates the scale.
+The thumb MUST resolve its colour or semantic tier from the same normalized value scale as the visible track treatment.
+
+A value-width fill MUST set its width from the normalized current percentage and use the current semantic colour.
+A full-track semantic scale MUST render its semantic gradient across the complete inset track and MUST keep the custom fill at full width rather than clipping the gradient at the current value.
+Controls MUST distinguish those meanings explicitly: a full-track scale describes the semantics available across the range, while a value-width fill describes progress to the current value.
+
 ### Typographic contract
 
 Product UI type must come from a shared, self-hosted three-family contract declared in the `:root` block of `styles/fabricate.css`, alongside the theme tokens and the spacing scale.
@@ -63,6 +74,84 @@ Product UI padding, margin, and gap spacing must derive from a shared 4px-based 
 - Documented literal exemptions that must NOT be tokenized: `1px` hairlines (borders, dividers, and `-1px` overlap bleeds) and one-off fixed dimensions in the 34–42px range (search-input icon clearances and grid-alignment offsets) where the value reserves space for a fixed element rather than expressing spacing rhythm.
 - Positioning offsets (`left`/`right`/`top`/`bottom`), `width`/`height`, `border-*` widths, `border-radius`, `grid-template-columns` track sizes, `@container`/media breakpoints, and font sizes are not spacing-scale members and remain literal.
 
+### Shared product UI primitives
+
+Wherever two or more product UI surfaces perform the same function, represent the same knowledge, or implement the same layout, that thing MUST be a single shared primitive Svelte component every site imports.
+The subject is every product surface — the GM manager and the player crafting, alchemy, gathering, inventory, and Journal surfaces alike — because two surfaces rendering the same meaning are duplicates whichever audience they face.
+A shared CSS class that each site hand-rolls markup against does not satisfy this, and neither does a copy.
+Adding flexibility to the primitive that already owns the meaning takes precedence over introducing a second component that owns half of it.
+A primitive that coexists with unconverted duplicates has added a variant rather than removed one.
+
+A primitive's CSS MUST live in its own scoped `<style>` block rather than in `styles/fabricate.css`.
+Required-screenshot detection maps changed file paths to affected views, so global-sheet styling makes every tweak look like a global change and demands a wide core frame set, while co-located styling scopes the evidence to the views that actually render the component.
+Only two kinds of rule for a primitive stay in the global sheet: what must beat Foundry's host CSS (button geometry, focus rings) and LAYOUT-CONTEXT rules whose subject is reached through an ancestor the component does not render, such as how a specific container places, stretches, or spans the panel.
+A layout-context rule places the primitive and MUST NOT restyle it: no `font-size`, `font-family`, `font-weight`, `border`, `border-radius`, or `background`.
+The player crafting app's requirement rail, requirement tile, essence pool, consumption-plan panel, and essence-contribution chip are held to that CSS rule as player-side primitives, which is why they added no rules to `styles/fabricate.css`.
+
+Two live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+
+- The repo carries five hand-rolled horizontal fill bars: `src/ui/svelte/apps/gathering/ChanceBar.svelte`, `src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte`, `src/ui/svelte/apps/journal/RunCard.svelte`, `src/ui/svelte/components/ActorSelectTopBar.svelte`, and now `src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte`.
+  The primitive that should exist is a shared `FillBar` leaf that `ChanceBar` is itself rebuilt on: `ChanceBar` is a percentage instrument and does not own the have/need meaning, so widening it in place would make it the second component owning half a meaning rather than the primitive that owns one.
+  Conversion is deferred because converting the other four would drag their screenshot-label sets into a single evidence run.
+- `tests/components/mounted-harness-primitive-allowlist.test.js` requires every `SHARED_PRIMITIVES` entry to be reachable from `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`, so the allowlist that encodes "this is a shared primitive" is structurally manager-scoped in exactly the way this rule is not.
+  Only its second test carries that assumption; the fix is to widen it to a declared root set rather than one root.
+
+#### No-state messages
+
+Every manager "nothing here" message renders through one shared no-state primitive, in one of three treatments.
+
+- The central panel is a dashed, unfilled, rounded panel holding an optional rounded icon tile, an optional serif title, an optional capped body sentence, and optional trailing content.
+- The `compact` treatment is the same vocabulary at a smaller scale for a sidebar, a dropdown popover, or an inline panel; it changes size, never the vocabulary.
+- The `filtered` treatment is the filtered-to-nothing case, which is not an absence of content: it deliberately omits the icon and title apparatus and states the miss in one sentence beside its way out.
+
+Trailing content inside the panel — a Clear-filters control, a primary CTA, or a docs link — is part of the primitive, because a no-state message that offers no way out is a dead end.
+An inline value slot is NOT a no-state message: text standing where a value would be inside a control row (an unassigned travel actor beside its clear button and picker) stays an inline hint, since a dashed panel inside a control row is a layout defect rather than reuse.
+A single per-screen size override of the shared panel is a second empty-state design and is forbidden; every no-state message shares one tile and type scale.
+
+#### Modal dialogs
+
+Every centred manager modal renders through one shared modal-chrome primitive.
+The chrome is the dialog surface itself, portaled into the manager area with Escape and outside-click dismissal, and it owns exactly four things: the panel, a compact heading of a title over an optional muted subtitle, a round close control aligned with the title, and a right-aligned footer rail for the dialog's actions.
+Everything between the heading and the footer belongs to the feature and carries that feature's own scoped styling.
+
+A manager modal MUST NOT be assembled from a raw HTML string handed to a Foundry dialog.
+Such a dialog inherits Foundry's page-title headings, unstyled list markup, and full-width footer button, which is a second modal design standing beside the shared one; it also cannot use any shared primitive, since a string is not a component.
+The post-import reference report and the bulk-import folder-categorization step are both import-flow modals and MUST therefore be visually indistinguishable in chrome.
+
+#### Standing statements
+
+A permanent explanation of how a surface behaves and a conditional hazard warning are the same layout and render through one shared callout primitive: a leading semantic glyph plus one sentence in a tinted, rounded strip.
+The callout has exactly ONE shape.
+Tone is purely a colour concern and changes the edge, the fill, and the glyph, never the padding or the type scale.
+
+Tone carries meaning and is chosen deliberately.
+`info` states how the surface works and is permanent; `warning` marks a conditional hazard the GM can still avoid.
+A surface that paints its permanent hint in `warning` alongside a conditional `warning` has spent the colour that was supposed to make the hazard stand out, so a permanent hint takes `info` unless something is genuinely at risk.
+
+#### Selection controls
+
+Every multi-select affordance in the manager renders through one shared selection-control primitive: a square custom control with a checked, unchecked and indeterminate state, at the sizes its host row needs.
+A host-supplied `<input type="checkbox">` rendered with Foundry's default control chrome is a second selection design and is not an acceptable rendering.
+A multi-select surface's SELECTION TOOLBAR — the tri-state control over the rendered rows, the selected-count readout, the select-all-results action and Clear — likewise renders through one shared toolbar primitive that every browser imports.
+Its test and screenshot hook names, its host row class and its labels are parameters of that primitive, not a reason to fork it.
+
+#### Bulk edit panels
+
+A bulk edit panel's CHROME renders through one shared panel-chrome primitive set that every browser imports: the panel container, its header eyebrow and Clear, the selected-count hero, the section headings with their inline-hint and standing sub-hint scales, the staged single-valued select, and the Apply action.
+The noun-bearing strings (the hero's count sentence, the Apply label), the axes a studio stages, and the test and screenshot hook names are parameters of those primitives — what a studio STAGES is its own, the chrome around it is not.
+A studio that hand-rolls its own header, hero, section scale or Apply is a second bulk-edit panel design and is not an acceptable rendering, however closely it copies the first.
+
+#### Segmented controls
+
+Every mutually-exclusive inline choice in the manager renders through one shared segmented-control primitive: real radios in a `role="radiogroup"`, visually hidden but focusable, with `<label>` segments as the visible surface.
+A hand-rolled `aria-pressed` button group is a second design for the same affordance and is not an acceptable rendering.
+
+The primitive takes two optional PER-OPTION fields alongside the existing icon (issue 975).
+`variant` (`success` / `danger` / `neutral`) tints the ACTIVE segment only, defaulting to the plain active tile so a consumer that sets none renders unchanged, and an inactive segment keeps the muted track colour whatever it would become when chosen.
+`neutral` IS that plain active tile and declares no tint of its own; it exists so a three-way good/neutral/bad control can name every segment rather than leaving the middle one's intent implicit.
+`disabled` is carried onto the segment's radio INPUT rather than only onto a class, because the control's change handler guards only "the chosen value differs" and a dimmed-but-live segment would still emit a change; a disabled segment also suppresses the hover recolour, or it still reads as choosable.
+Each rendered control takes a radio group name unique per CONTROL, since a host that renders two of them in one card would otherwise have the browser treat both radio sets as one group.
+
 ## Responsive Product UI
 
 Foundry ApplicationV2 windows can be resized independently of the browser viewport.
@@ -73,6 +162,7 @@ Responsive layout rules for application bodies must therefore be keyed to the ap
 - The player `Gathering` app responds to its own app container width: active/history regions collapse to one column, task rows reserve icon width, and row metadata stacks without horizontal overflow.
 - The player `Gathering` view's three columns (environments list, centre detail, right inspector) all carry the same non-zero minimum width so the centre column cannot collapse to nothing ahead of the side columns; the three columns scale down together proportionally as the window narrows.
   Below the combined three-column minimum the columns reflow into a single vertical stack so the view stays usable instead of clipping or overflowing.
+- The player `Crafting` view's requirement rail responds to its own app container width: slot tiles wrap onto further rows rather than shrinking below their minimum tile size, and the essence pool's carrier and requirement bars reflow rather than crushing when a set carries three or more essence requirements.
 - The unified Fabricate window enforces a minimum window width and height, derived from the gathering view's column minimums plus the navigation rail and chrome, so a resize can never shrink the window below the size where the columns would be clipped.
 - These responsive rules are presentation-only.
   They must not change gathering runtime semantics, validation behavior, task visibility, attemptability, or persistence.
@@ -306,20 +396,34 @@ The DC-hiding note applies to `routedByCheck + fixed` in the `CraftingCheckEdito
 `routedByIngredients` no longer renders the tier `CraftingCheckEditor` at all — it authors its optional pass/fail check via the shared `SimpleCraftingCheckEditor` (bound to `craftingCheck.simple`), which shows the DC, the meet/exceed comparison, the static/dynamic DC source, and the recipe DC tiers.
 
 Mode semantics are defined in `resolution-modes/spec.md`.
-The routed crafting and salvage editors expose a default-off Natural 20/1 tier-stepping toggle only while their routed check type is `relative`.
-The control writes `craftingCheck.routed.natStepping` or `salvageCraftingCheck.routed.natStepping`; it is absent for fixed checks and for gathering.
+There is no check-wide tier-stepping toggle: stepping is authored per trigger in the `CheckTriggers` editor below, and the retired routed `natStepping` card has been removed from the crafting and salvage editors.
 
-##### Check Tool-Breakage Controls
+##### Check Trigger Controls
 
 All three check editors (simple, routed, and progressive) ALWAYS render a single unified `CheckTriggers` editor (issue 419 recombine) — one trigger list per check, replacing the former separate per-die crit table and tool-breakage trigger card.
-Each trigger pairs an expressive dice-matching condition with two effects: a themed outcome `<select>` and (under `checkDriven` authority) a break-tools pill.
+Each trigger pairs an expressive dice-matching condition with three effects (issue 975): an outcome segmented control, a routed tier-step row, and (under `checkDriven` authority) a break-tools pill.
 
-- The outcome select forces the check to Automatic success / Automatic failure / No effect (relabelled Award all / Award none / No effect on a progressive editor, reusing the existing award keys), and is disabled + pinned to No effect for an `outcomeTier` condition.
+- The outcome control forces the check to Automatic success / Automatic failure / No effect (relabelled Award all / Award none / No effect on a progressive editor, reusing the existing award keys), and is disabled + pinned to No effect for an `outcomeTier` condition.
+  It is a three-segment button group, not a `<select>` — it is rendered through the shared `SegmentedControl` primitive with a per-option `variant` tinting the active segment success/neutral/danger.
+  The `outcomeTier` pin is carried on the segment's radio INPUT (`disabled`), not merely as a dimmed class, so the pinned segments are genuinely non-interactive.
   Outcome forcing applies under BOTH authorities.
 - The per-trigger break-tools pill (and the routed per-tier `outcome.breakTools` column) renders ONLY under `checkDriven` authority (`showBreakTools={checkDriven}`); under `toolSpecific` it is hidden and a check never breaks tools.
 - There is no free-text trigger label, no per-block enable toggle, and no natural-1 auto-seed; an empty trigger list is inert and the GM adds triggers explicitly.
   Condition types are `rollTotal`, `progressiveValue` (progressive editors only), `diceGroup` aggregate, and `outcomeTier` (routed editors only); dice groups are labelled from the formula, with duplicate `NdS` groups disambiguated (`#1` / `#2`).
 - This authority gate applies per subsystem: crafting honours the system authority; salvage is gated on `features.salvage` identically to gathering — its checks tab hides when the feature is off and `salvageBreakageAuthority` falls back to `toolSpecific` (consistent with the gate acknowledged at lines 163 and 960); gathering exposes the per-trigger break-tools control only when `features.gathering === true`, otherwise it stays `toolSpecific`.
+- **The tier-step effect gets its OWN row inside the trigger card**, below the outcome/break row rather than as a third field in it: at the pinned 1280x820 manager geometry the outcome control and the break pill already spend most of the trigger card's width, and a four-segment control plus an operand does not fit what is left.
+  The row renders on **routed** check editors only (there are no tiers to step on a simple or progressive check) and is explicitly **not** gated on tool-breakage authority the way the break pill is — stepping is not a breakage concept.
+  This is a control that routed **gathering** checks and **fixed**-type routed checks have never had: the retired toggle was relative crafting/salvage only, so those screens gain an effect they previously could not author at all.
+- The row carries a four-segment `SegmentedControl` (No step / Step up / Step down / Target tier) and a **stable operand slot** at one pinned width whose contents swap by mode — a `min="1"` number input for `up`/`down`, a tier `<select>` for `target`, and an inert disabled placeholder for `none` — so changing mode never moves the control out from under the GM's pointer in a wrapping row.
+  Every rendered `SegmentedControl` takes a radio `name` unique per CONTROL, not per trigger: a trigger card renders two of them, and a shared group name would make choosing a tier-step mode uncheck the outcome radio.
+- **The `target` select never displays a tier it has not persisted.**
+  `tierId` defaults to `null` and a `<select>` whose value matches no option renders its FIRST option as selected, so the select carries a disabled placeholder option ("Choose a tier…") selected while `tierId` is `null`, and renders a dangling id as an appended disabled "Missing tier" option plus an invalid-field treatment on the operand slot.
+  A dangling target is reachable by ordinary authoring, not only by import: the relative↔fixed type switch swaps the whole tier list and dangles every authored `tierId` at once.
+- When the check has no named outcome tiers, the `target` branch shows its own muted guidance cue rather than hiding the control — a GM authoring top-down configures triggers before tiers, and hiding it would make an authored target invisible.
+  It carries a hook and a lang key distinct from the `outcomeTier` condition's no-tiers cue, because a trigger that is both `outcomeTier`-conditioned and `target`-stepping on a tier-less check would otherwise render two identically-hooked nodes in one card.
+- Two readiness rules back the control, both `warning` severity and both reported only once at least one trigger sets `target`: `danglingTierStepTarget` (the target names no tier on the active list, including "no tier chosen at all") and `multipleTierStepTargets` (two or more triggers set a target; if more than one matches, the lowest-ranked wins).
+  The second is guidance rather than breakage — it is a static authoring count that cannot know which conditions will match or whether a roll will be forced.
+  Both are satisfied by a single paired check entry (`tierStepTargetsResolve`), because to a GM they assert one thing: the targets on this check name exactly one existing tier.
 
 #### Requirements Controls
 
@@ -517,9 +621,9 @@ Capabilities:
 - Edit managed item essences (if enabled).
 - Edit managed item difficulty: the component editor's body exposes an editable
   progressive-difficulty stepper, titled "This component's Progressive DC".
-  It is shown only when the system's crafting resolution mode is `progressive` (parity with the
-  read-only badge on the components-browser row).
-  It accepts an integer of 1 or greater; zero clears the value.
+  It is shown when the system is progressive on any axis that reads component difficulty — crafting resolution mode, salvage resolution mode, or the system's gathering economy resolution mode.
+  The read-only badge on the components-browser row and the browser's bulk-edit progressive-DC section obey the same condition, so all three appear together.
+  It accepts an integer from 0 to 35; zero clears the value.
   The stepper is staged into the component editor's draft and persisted with the rest of the edit on Save (not written on change), contributing to the editor's dirty state and unsaved-changes guard.
 - Replace associated source item by drag/drop.
 
@@ -536,6 +640,8 @@ Capabilities:
 
 - Browse, create, edit, duplicate when supported, and delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
+- Set an optional colour for an essence, chosen from the shared token palette through the manager's existing colour picker with custom hex entry disabled.
+  The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
 - Set optional source component identity by picker/drag-drop only when effect transfer is enabled.
   The source component may in turn expose a source item UUID.
 - In Manager, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
@@ -616,21 +722,24 @@ The library does not render a page header of its own.
 
 Rows are **cards, not table columns**.
 A card row has no columns, so the list is a real list (`ul` / `li`, `role="list"`), not a table/row/cell structure with column headers.
-Each row shows the recipe's image medallion (the resolved recipe image, falling back to a glyph), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle, and the Edit / Duplicate / Delete action group.
+Each row shows the recipe's image medallion (the recipe's own image, resolved through `resolveRecipeImage`, falling back to `DEFAULT_RECIPE_IMAGE` — never a containing book's artwork), its name, its authoring-state pills, a one-line description, an I/O readout, a check pill, a lock toggle, a keyboard-reachable on/off toggle, an `Edit` pencil, and a bulk-selection control.
 
 The row's on/off toggle carries **no On/Off text**.
 The track colour is the state, its `aria-label` names the state for assistive tech, and the `Disabled` pill states it in words — a third copy on every row only crowds the description out.
 The label is retained on every other `manager-status-toggle` in the manager, where the switch has no pill beside it.
 
-The row's three actions are **borderless ghost icons** that take a background on hover.
-Delete and Duplicate are preserved capabilities, but three bordered buttons beside a bordered lock, a switch and a pill make the row read as a toolbar rather than as a recipe.
+The row's `Edit` pencil is a **borderless ghost icon** that takes a background on hover.
+Delete and Duplicate are preserved capabilities, but they are inspector-only rather than row actions: three bordered buttons beside a bordered lock, a switch and a pill make the row read as a toolbar rather than as a recipe.
 
 Row authoring-state pills — at most one authoring state applies to a row:
 
 - `Disabled` — the GM has switched the recipe off.
 - `Locked` — the recipe stays visible to players, but only a GM can craft it.
-- `Can't enable` — the recipe is an incomplete shell (missing ingredient sets and/or result groups) **and** is currently off, so enabling it would be refused.
-- `Incomplete` — an incomplete shell that is already on: unfinished, but nothing is being refused.
+- `Can't enable` — the activation check would refuse to enable this recipe **and** it is currently off.
+  The activation check is the full completeness contract plus the alchemy signature scan, so an incomplete shell, a structurally broken recipe, a dangling essence or tag reference, an unmet resolution-mode requirement and an alchemy signature conflict all qualify.
+  The pill, the bulk panel's pre-flight count and the write read that ONE predicate, so no two surfaces can disagree about whether a given recipe is currently enableable.
+- `Incomplete` — the same activation blocker on a recipe that is already ON: unfinished or conflicting work a GM should still resolve, but nothing is being refused, because the activation check runs only on a transition into the enabled state.
+  `Can't enable` and `Incomplete` read ONE predicate and differ only in whether the recipe is currently off.
 
 The **I/O readout** always shows the ingredient count (`N in`).
 It shows an output item count (`N out`) **only** in the `simple` and `progressive` resolution modes.
@@ -709,7 +818,7 @@ Actions:
 - Delete
 
 In Manager, the recipes browser header offers a single primary `Create recipe` action (no crafting-system import/export on the recipes header); creating a recipe follows a create-then-edit model — `store.createRecipe` persists a new identity-only _incomplete shell_ in the selected system via `RecipeManager.createRecipe({ craftingSystemId }, { allowIncomplete: true })` (it saves because persistence gates on structural validity only, not completeness) and the manager immediately opens the recipe-edit view on it.
-The new shell carries the default recipe name and image until edited, and the browse row surfaces a derived `Incomplete` chip until ingredient sets and result groups are added.
+The new shell carries the default recipe name and image until edited, and the browse row surfaces a derived authoring-state pill — `Incomplete` while the shell is on, `Can't enable` while it is off — until the activation check would accept it (see the row authoring-state pills above; missing ingredient sets and result groups are the commonest, not the only, reason it would not).
 The recipe browse row `Edit` action opens that same dedicated recipe-edit view rather than editing inline, and that Edit action is available regardless of the recipe's `locked` state.
 The recipe-edit view is the **five-tab editor** specified in `## Recipe Editor` below — Overview, Ingredients, Results, Tools and Validation — over a controlled local draft in the central `manager-main`, with the GM manager's right-hand context inspector panel (the global `manager-inspector` aside) carrying that editor's context rail.
 Ingredients, essences, tools, steps and results are all authored there; none of them is deferred, and there is no _Catalyst_ concept in the editor (Tools replaced it).
@@ -721,15 +830,52 @@ The layout collapses to a single column at the Manager container's narrow breakp
 The recipe editor carries **no** per-recipe visibility editor: the legacy `recipe.visibility { restricted, allowedUserIds }` card is retired (see `### Visibility Form`), and the canonical `recipe.access` grant is authored on the Access tab.
 The `recipe == null` form of this view shows a `Select a recipe` empty state.
 
-Recipe browse row quick-actions (`Edit`, `Duplicate`, `Delete`) render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
+Recipe browse row quick-actions render in a single non-wrapping action group, consistent with the environment and gathering-task browse rows.
+That group is the `Edit` pencil alone: `Duplicate` and `Delete` are inspector-only, because three ghost icons on every row read as a toolbar and truncated the description.
+
+**Recipe Studio — bulk selection.**
+
+The GM recipe browser supports multi-select bulk editing.
+Each row carries a selection control at its TRAILING edge, as the LAST cell of the row's action cluster after the `Edit` pencil, rendered through the shared selection-control primitive.
+It is appended to that cluster rather than prepended: the cluster's column track list gains the selection track at its END, and the column header's explicit `grid-column` placements survive an append while a prepend would shift every one of them by a track.
+A selection toolbar sits directly above the list carrying a tri-state control over the CURRENTLY RENDERED rows, a selected-count readout, a `Select all {N} results` action over ALL filtered rows, and a Clear action, rendered through the shared bulk-selection toolbar primitive.
+The rendered-rows control and the results action are distinct operations and are never conflated; a collapsed category's rows are not rendered and are never selected by the former.
+The selection is scoped to the selected crafting system, survives an editor round-trip exactly as the browser's other view state does, is cleared by a crafting-system switch, and never retains an id that no longer resolves to a recipe.
+
+**Recipe Studio — bulk edit.**
+
+While the selection is non-empty, the recipe browser's inspector rail renders the bulk edit panel IN PLACE OF the single-recipe inspector.
+The panel stages changes without writing: category (single-valued, overwriting, with an explicit leave-unchanged option), status (leave unchanged / enable / disable), lock (leave unchanged / lock / unlock), check tier, and recipe-book membership.
+The recipe-book axis is a search-and-pick control over the system's AUTHORED recipe items — never a vocabulary derived from the items the selected recipes already belong to, which would make an item holding no recipes unreachable as an add target.
+Picking one shows how many of the selected recipes it holds and offers add and remove, each labelled with the number of recipes it would actually affect and each unavailable when that number is zero.
+The held count is resolved on the same basis every other membership reader uses (see `### Books & Scrolls Surface`), so a system on the legacy basis reports its real membership rather than reporting none and making removal unavailable.
+Staging accumulates across recipe items rather than being limited to the one on screen: each staged item appears in a list stating its operation, the number of recipes it affects, and its own control to leave that item unchanged.
+This axis deliberately differs from the Component Studio's tag axis, which is a run of tri-state controls; the divergence is in the staged axis only, and both panels render the same shared bulk-edit chrome.
+The check tier axis carries THREE distinct instructions and never collapses two of them: leave the recipe's tier alone, clear it to the system's default DC, and set a named tier.
+Where the system's crafting check carries no recipe-level tier — a progressive system, a dynamically resolved DC, a fixed-type routed check whose per-recipe difficulty is its minimum success tier instead, or a check with no tiers authored — the panel states which of those it is in place of the control rather than hiding it.
+That is not the same fact as the system having no usable check at all, which the row's own check pill already reports, and the two are never conflated.
+When Enable is staged, the panel states before applying how many selected recipes cannot currently be enabled and will stay off, read from the SAME activation predicate as the row's `Can't enable` pill, so the pilled rows and the counted rows are one set by construction.
+The write applies that same predicate but evaluates it per recipe in batch order, and alchemy signature uniqueness is order-dependent: two selected recipes that collide only with each other both read as enableable, and the write enables the first and refuses the second.
+The pre-flight count is therefore a LOWER BOUND on what a batch may refuse and is worded as one; the post-apply report is the authority.
+One action applies every staged axis to every selected recipe; it names the number of recipes it will affect and is inert until at least one axis is staged, including a removal-only book draft.
+Applying persists through a single set-apply write — at most one `recipes` world write and at most one `craftingSystems` world write, and none for an axis that changed nothing — applies every ungated axis to a recipe whose enable is refused, reports the number of recipes changed, the number of enables refused, and the recipe-item memberships added and removed, then clears the selection and the staged changes, returning the rail to the single-recipe inspector.
+The membership figures count MEMBERSHIP EDGES — one per recipe added to or removed from an item — not the number of items whose membership changed, and they exclude the basis-carry-across the first membership write performs.
+Every part of that report composes; none replaces another, so a batch that moved membership still reports any enables the activation gate refused.
 
 ### Books & Scrolls Surface
 
 `Books & Scrolls` is the `Crafting` group's recipe-item management surface, available whenever a crafting system is selected (the `Crafting` group is unconditional as of issue 745).
 It is a display name only: the surface manages every recipe item in the selected system regardless of the item's Foundry item type (book, scroll, ring, wand, gem, note), and `recipe item` remains the canonical noun.
 
-The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership, with a legacy `recipe.recipeItemId` fallback for un-migrated systems) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
-Membership is authored on the item's **Contents** tab (writing the definition's `recipeIds`), not on the recipe editor.
+The surface lists every recipe item in the selected system (from `selectedSystem.recipeItemDefinitions`), and for each item shows its identity (image and name), the recipes it contains (its canonical `recipeIds[]` membership) as a count plus the linked recipe names, and that item's OWN use/learn caps (read from `item.caps`) as read-only chips: a use-cap chip (craft charges) and a learn-cap chip.
+
+Which basis resolves membership is recorded on the system, not inferred per read.
+A system carries a monotonic `membershipResolvesByRecipeIds` marker: it is set by the first write to any definition's `recipeIds` and is never cleared, and on load it is set for any system that does not already carry it and has at least one definition with a non-empty `recipeIds`, so an existing marker is preserved rather than recomputed.
+The write that first sets it seeds every definition in the system from the legacy scalars in the same write, so switching basis carries existing membership across rather than discarding it.
+While the marker is unset, membership resolves through the legacy `recipe.recipeItemId` scalar; once set, only `recipeIds` resolves it, so an empty `recipeIds` array means "this book has no members" rather than "this system has not migrated".
+Re-deriving the basis per read — "any definition has a non-empty `recipeIds`" — is forbidden: it flips in both directions, so the first membership write to a legacy system would orphan every scalar-only member, and emptying the last array would revert the whole system and resurrect phantom memberships on player-facing reads.
+
+Membership is authored on the item's **Contents** tab (writing the definition's `recipeIds`) or, for a multi-row selection, on the recipe browser's bulk edit panel — never on the recipe editor.
 The caps are per recipe item, not a shared system-wide rule, so two recipe items in one system may show different chips (a one-recipe scroll beside a three-recipe tome).
 When the selected system has no recipe items, the surface shows an empty state.
 
@@ -762,8 +908,8 @@ The component branch owns the salvage surface, and the preview never **renders**
 It is a Crafting nav sub-item that appears **only** while `visibilityMode === "restricted"` (`craftingEffect.showAccess`); the other modes do not list it.
 It authors the canonical `Recipe.access = { characterIds, playerIds }` grant, replacing the legacy `visibility.allowedUserIds` player list.
 
-The list (`AccessTabView`) shows the selected system's recipes with a search box, a Category filter, and an Access filter (`all` / granted / no-access); each row shows the recipe icon, name, category, and a grant chip (`N char · N player`, or a danger `No access` chip when no character or player is granted).
-Selecting a row opens the `GrantAccessInspector` for that recipe.
+The list (`AccessTabView`) shows the selected system's recipes with a search box, a Category filter, and an Access filter (`all` / granted / no-access); each row shows the recipe's **own** icon — resolved through the shared `resolveRecipeImage` helper, per `data-models/spec.md` `## Recipe` requirement 16, never a containing book's artwork — plus its name, category, and a grant chip (`N char · N player`, or a danger `No access` chip when no character or player is granted).
+Selecting a row opens the `GrantAccessInspector` for that recipe, whose header thumbnail resolves the same way.
 
 The inspector authors the grant through **two independent rosters** — Characters and Players — each with its own search box and pager:
 
@@ -773,6 +919,77 @@ The inspector authors the grant through **two independent rosters** — Characte
 - Each toggle persists the **full** `{ characterIds, playerIds }` snapshot via `adminStore.saveRecipeAccess` (live-apply, no dirty draft), so searching or paging never loses a grant.
 
 Grant state is read from `recipe.access`, and the surface stages no dirty draft, so it is not part of the Manager confirm-discard route-exit chain.
+
+### Knowledge Surface
+
+`Knowledge` is the `Crafting` group's per-character **runtime** knowledge audit: which owned copies of the selected system's recipe items each character carries, and which recipes each character has learned.
+It is the play-state counterpart to the Books & Scrolls Surface (which authors recipe items) and the Access Surface (which grants visibility), and it operates on per-character **owned copies**, never on definitions.
+It audits **world actors only**; the knowledge state of an unlinked-token synthetic actor is out of scope.
+"Surface" rather than "Tab" is deliberate: `Tab` in this spec names top-level manager tabs, which Knowledge is not.
+
+**Membership gate.** The rail entry is shown when `craftingEffect(visibilityMode).showBooksScrolls` is true **OR** the selected system's `resolutionMode === "alchemy"`, and is absent otherwise.
+That gate is deliberately wider than Books & Scrolls': `learnRecipeOnCraft` writes `learnedRecipes` under **every** visibility mode, and under `global` + alchemy those entries are the sole reveal source, so a `showBooksScrolls`-only gate would leave the GM no lever at all in that documented discovery-only configuration.
+Two consequences follow and are stated rather than discovered: under `global` + alchemy the Recipe items tab is legitimately empty and the Learned recipes tab carries everything; under `restricted` + alchemy the rail shows Access **and** Knowledge but **not** Books & Scrolls.
+The entry carries **no count badge** — the count would require the tab-gated projection, which is a no-op precisely while the rail is rendered, and the sibling Access entry is count-less for the same reason.
+
+**Layout and roster.** Three panes: rail, searchable character roster, detail pane.
+The roster is **player characters only** — the same player-character predicate the Access Surface roster applies — with no show-NPCs toggle; an NPC's knowledge state stays reachable through the GM Knowledge Reset API.
+The two rosters share the predicate, not the accessor: Access projects each actor into a display record, while this surface enumerates the LIVE actor documents, because the projection reads each actor's owned items and flags.
+Each roster row carries the actor's portrait, name and an "N item(s) · M learned" meta line, with a dimmed "Nothing tracked" row for a character carrying neither.
+
+**Default tab.** The surface opens on Recipe items, except when the selected system has **zero recipe item definitions**, in which case it opens on Learned recipes.
+The rule keys on the definition count, never on the selected character's row counts, so the tab does not shift as the GM moves down the roster; and it is resolved **once on surface entry**, never as a live derivation over that count — a GM authoring the system's first recipe item elsewhere would otherwise flip the count and yank the open tab.
+
+**Projected owned-copy row fields.** Identity (image, name, quantity), the Book / Scroll / Incomplete type derived from the recipe count, the contained-recipe count, `timesUsed` and `maxUses`, the derived remaining charges, `spent`, `inert`, `canExpend`, the resolved `learnScope`, and `matchTier` — the GM diagnostic tier from recipe-item matching.
+`matchTier` is a **provenance** label, not an ambiguity report: its `duplicate` value names the weakest link (the copy reached its definition only through `_stats.duplicateSource`, the tier the bulk auto-learn gate refuses) and is reachable from a single definition, so the surface MUST NOT present it as a duplicate, conflicting, or ambiguous match.
+
+**Rendering rules.**
+
+- The uses chip has exactly three states: unlimited (info tone, "Unlimited"), remaining, and spent.
+`remaining === null` means UNLIMITED and MUST render as "Unlimited", never "0 left".
+`timesUsed` is shown before `maxUses` so a post-hoc cap change stays legible.
+- `inert` renders as a **second, independent** chip whenever the flag is set, and is never folded into the uses chip.
+That yields five renderable combinations, including **inert-but-not-spent** — the visible form of the "nothing ever clears `inert`" gap.
+- Expend is **disabled** for a spent copy and for an uncapped copy (which would write nothing), and is **not** gated on `inert`: an inert-but-not-spent copy still has charges the runtime will spend, so disabling it there would apply a gate the engine does not.
+**Known gap, recorded not fixed** (the sibling of "nothing ever clears `inert`"): "uncapped" is read from `limitUses` alone here, while the Unlimited chip is read from the derived remaining charges, and cap resolution passes `maxUses` through unnormalized.
+A copy with `limitUses: true` and a `maxUses` that is not a finite number greater than zero therefore renders the **Unlimited** chip — correctly, by the fail-open convention — while Expend stays **enabled** and the engine core still increments a `timesUsed` that can never reach exhaustion.
+That state is unreachable through the Books & Scrolls authoring UI and arises only from imported or hand-edited data, which is why it is recorded rather than gated: adding a `maxUses` test to the affordance alone would diverge the surface from `_applyRecipeItemUse`, and the real fix is to decide whether cap resolution normalizes `maxUses` or the engine treats that shape as uncapped on both axes.
+A follow-up owns that decision.
+- Delete deletes the **whole document** even for a stacked copy, behind a `services.confirmDialog` naming the quantity when `quantity > 1`.
+- A spent row is muted by **colour on its name only**, never by a group `opacity`.
+The chips are the row's only status signal, and compositing them through a group dim drops them below the 4.5:1 floor their 10px text needs; the disabled action button already carries its own reduced opacity, so the mute MUST NOT reach the action cluster either.
+- `matchTier` earns a chip only for the actionable `duplicate` tier, which additionally carries a title naming the consequence (bulk auto-learn refuses that link).
+The other tiers are diagnostic rather than actionable and are carried in the row's title, so the narrowest pane is not given a bare fourth chip on every row.
+- Expend does **not** move focus: the row survives, so its own button keeps focus and a keyboard GM can walk a multi-use copy without re-tabbing.
+Only the destructive actions, whose row unmounts, move focus to the owning tab panel.
+- A learned row whose erase will free no budget states WHY as a single icon-led clause appended to its source line, rather than a banner promise the erase cannot keep.
+It MUST NOT be a second sub-label: the previous pairing stated one fact twice, because a source line reading "(copy no longer owned)" was itself the cause of a separate "Frees no slot".
+The clause is cause-SPECIFIC and MUST NOT collapse to one string, because the condition is the full four-condition rule in Knowledge Reset / Erase: a still-owned source copy whose definition carries no learn cap frees nothing, so a clause claiming there is no owned copy would be false for that row.
+
+**Confirmation affordance.** The two high-frequency row actions (Delete a copy, Erase a memory) use an inline two-step arm rather than a modal: the first click arms the control, the second executes.
+It is a real focusable `button`, its icon swaps as well as its label so the state survives greyscale, its `aria-label` carries the full consequence sentence, and `data-armed` is the test hook.
+The armed token is keyed on the **target document id**, never a row index, because the projection re-publishes asynchronously from actor and item hooks.
+Exactly one armed token exists at a time, and it is dropped on: character selection change, tab switch, roster search-query change, any executed action (including Expend, which clears the token but deliberately leaves focus alone), `Escape`, `blur`, arming a different row, and any projection publish that no longer contains the armed id.
+There is no auto-disarm timer.
+`services.confirmDialog` is retained for the heavyweight cases: a stacked delete and both reset grains.
+For the stacked delete the dialog is **additional to** the arm, never a substitute for it: the Delete control is the same armed button on every row regardless of quantity, and the dialog is raised by the store action the armed second click invokes, so the sequence is arm, confirm, dialog.
+Branching the control itself on quantity is forbidden — it would make an armed row's affordance depend on a projected field that a re-publish can change underneath the GM.
+Any consumer describing this to a GM MUST describe three steps, not a dialog replacing the arm.
+
+**Per-character reset.** The detail header offers **both** grains — "this system" and "all systems" — routed through the GM Knowledge Reset API with and without a `systemId`, each behind a `confirmDialog`.
+Both are required: reset-one-system deliberately leaves orphan learned keys in place, so only the all-systems grain can clear them and give the surfaced orphan roll-up a reachable lever.
+The dialog body is where the erase-versus-reset discovery-progress asymmetry is disclosed.
+
+**Disclosure placement — one idea per strip, never a banner stack.**
+The Recipe items tab carries one persistent info banner naming what its two row actions do — expending a use spends one charge as if the character read the item, and deleting removes the copy from their pack entirely.
+It is not a restatement of the page subtitle two rows above it.
+The party-pool ordering hazard renders as a **conditional** warning band, raised only when the selected character owns a `learnScope: "total"` copy that is the source of a still-learned entry; a permanent band for a conditional hazard is noise.
+The Learned recipes tab's band states the general rule without promising slot recovery, and the per-row no-refund clause carries the per-row truth.
+
+**Refresh and reference contract.** The projection MUST NOT join the shared admin-store `refresh()`, which ~40 mutation paths invoke and which has no cheap invalidation signature for a whole-world actors-by-items scan.
+It is computed by a separate refresh gated on a `knowledgeActive` flag, so it is a total no-op while the surface is closed, and while the surface is open the externally-driven actor/item hooks coalesce into one refresh through the existing microtask scheduler.
+Each store action awaits its seam call and then re-runs the knowledge refresh, never the shared `refresh()`.
+The result is published as a top-level `viewState.knowledge` and is **always a new object**; it MUST NOT hang off `selectedSystem`, which would force a `selectedSystem` reference rebuild on every knowledge publish and let a late second-phase publish clobber freshly projected rows.
 
 ### Environments Tab
 
@@ -960,7 +1177,7 @@ Scoped to a single crafting system.
 The Manager recipe-edit view is a **five-tab editor** — Overview, Ingredients, Results, Tools, Validation — over a controlled local draft.
 Every edit stages into that draft and commits in one `updateRecipe` call on Save (through the `allowIncomplete` authoring path, which gates on structural validity only); the `enabled` toggle is the single immediate exception, because enabling validates against the persisted recipe.
 The shared header carries an `Unsaved` chip, `Back to recipes`, `Delete recipe` and `Save`, and every route exit runs the Manager confirm-discard guard.
-A recipe whose ingredients or results are still empty is a persistable _incomplete shell_: it stays non-craftable (the engine gates on completeness) and the browse row shows a derived `Incomplete` chip.
+A recipe whose ingredients or results are still empty is a persistable _incomplete shell_: it stays non-craftable (the engine gates on completeness) and the browse row shows the derived authoring-state pill for a recipe the activation check would refuse — `Incomplete` while it is on, `Can't enable` while it is off.
 
 ### Resolution-mode banner
 
@@ -1015,7 +1232,7 @@ In Manager, the recipe-edit identity card additionally edits a player-facing ima
 The editor header shows the recipe's image, its name, and a `⟨category⟩ · ⟨resolution mode⟩` sub-line.
 
 The Overview tab additionally offers an optional **Minimum success tier** dropdown, shown only when the selected system runs a `routedByCheck` check whose routed `type` is `fixed`.
-Its options are that fixed check's success outcome tiers ranked ascending by `start`, preceded by a default `No override (use rolled tier)` entry, and it authors the recipe's `minSuccessOutcomeId`.
+Its options are that fixed check's success outcome tiers ranked ascending by `start`, preceded by a default `No override (use final tier)` entry, and it authors the recipe's `minSuccessOutcomeId`.
 Selecting a tier makes a craft that rolls below it fail outright (see `resolution-modes/spec.md`); the control is hidden for relative-type checks and for non-`routedByCheck` systems.
 Note: alchemy `checkMode: tiered` dispatches through the same routed-check runner but the engine forces `minOutcomeId: null` on that path, so a `minSuccessOutcomeId` carried on an alchemy tiered brew is inert at runtime — matching this control's hiding for alchemy (a value the GM cannot edit or clear here is also one the runtime ignores; see `resolution-modes/spec.md`).
 
@@ -1029,10 +1246,12 @@ If the system's visibility mode consumes an item or teaches by knowledge (`item`
 
 - The recipe's context rail lists **every** book/scroll that teaches it, because recipe↔book membership is **many-to-many** (`RecipeItemDefinition.recipeIds`, projected onto the recipe row as `recipe.recipeItemIds`).
   There is no book/scroll `kind` — `RecipeItemDefinition` manages every recipe item regardless of Foundry item type.
-- Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only for a fully un-migrated system), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
+- Each row previews that book's name/image/source status (falling back to the legacy scalar `recipe.recipeItemId` only while the system's membership-basis marker is unset), offers Open item, and offers a per-book **remove**, which removes the recipe from **that** book's membership only and does **not** delete the shared definition.
+  A multi-row selection can remove membership the same way from the recipe browser's bulk edit panel.
   A row whose definition's `originItemUuid` no longer resolves shows a missing/stale state and retains the link.
-- **Adding** a recipe to a book is authored from the book's side (Books & Scrolls → the recipe-item editor stages `recipeIds` and persists on Save).
-  The recipe editor carries no drop zone and no "link another" affordance: a second authoring path for the same many-to-many is duplication, not a capability.
+- **Adding** a recipe to a book is authored from the book's side (Books & Scrolls → the recipe-item editor stages `recipeIds` and persists on Save), or, for a multi-row selection, from the recipe browser's bulk edit panel.
+  The recipe EDITOR still carries no drop zone and no "link another" affordance: a second SINGLE-recipe authoring path for the same many-to-many is duplication, not a capability.
+  The bulk panel is admitted because it expresses an operation neither surface can — one membership change applied across a whole selection — rather than a second way to do what the Contents tab already does.
 - Membership changes apply immediately (through `setRecipeBookMembership`), independently of the recipe draft's Save.
 
 Owned copies match by UUID or resolved source UUID of the linked recipe item definition.
@@ -1042,7 +1261,7 @@ If the required linkage is missing, show a validation warning.
 
 `recipe.locked` is persisted and engine-honoured (`guardCraftStart` refuses a locked craft), and the Overview tab is where it is written.
 
-A locked recipe stays **visible** to players but only a GM can craft it — a different concept from the Overview's recipe-item _image_ lock (which merely means the image comes from a linked recipe item), so it carries its own copy and its own hooks.
+A locked recipe stays **visible** to players but only a GM can craft it, a distinct concept that carries its own copy and its own hooks.
 
 The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
 The change persists immediately (like `enabled`), outside the recipe draft's Save.
@@ -1053,6 +1272,7 @@ The recipe editor's Tools tab authors Tool references only.
 Recipe-wide Tools are available in every resolution mode, and explicit multi-step recipes may author additional Tool references per step.
 Named ingredient sets receive their own Tool card only when the Crafting System uses `routedByIngredients`; unnamed sets and every other resolution mode expose no per-set Tool authoring.
 The per-set card reuses the Results tab's result-set outer card, header, and static-label hierarchy.
+A row and the add-a-tool picker both resolve the Tool's name and image through the single precedence in `data-models/spec.md` `## Tool` requirement 13, so an item-sourced Tool renders its own snapshot rather than a placeholder.
 Rows contain Tool identity and removal only: Recipe data exposes no breakage, consumption, prerequisite, or bonus policy control because those behaviors belong to Tool Studio and Crafting System check settings.
 
 ### Ingredients tab
@@ -1066,7 +1286,7 @@ Currency-cost affordances — the set-level "Add cost" button, the requirement-l
 Essence appears when the system enables essences.
 An essence alternative may repeat across groups, so it is gated on the system HAVING essences (not on system-minus-already-required).
 A currency requirement persisted while currency was enabled remains **visible** when the feature is later disabled, but renders read-only (its unit and amount as static text, flagged inactive) rather than being silently hidden.
-The per-option `tagMatch` (any / all) control is retained on every tag alternative.
+The per-option `tagMatch` (any / all) control is retained on every tag alternative, and renders through the shared segmented-control primitive rather than a hand-rolled toggle-button pair.
 The set-level **"Add essence requirement"** control is retained and now appends a single-option essence GROUP (an AND-required requirement), the only way to author a fresh essence-only requirement.
 
 Multi-set authoring is gated by **`Recipe.complex`** plus the mode's structural constraints (`simple` and `progressive` are one set to one group; alchemy forces a single set) — never by `resolutionMode` alone.
@@ -1096,7 +1316,7 @@ The GM component surfaces: the component browser and the component editor.
 ### Requirements
 
 1. The GM component browser groups and filters by `Component.category`.
-   Tags are edited only in the component editor and must not be rendered as row chips; rows show a single-line description, mirroring the Recipe Studio.
+   Tags are edited in the component editor and, for a multi-row selection, in the browser's bulk edit panel; they must not be rendered as row chips, and rows show a single-line description, mirroring the Recipe Studio.
 2. The GM component editor is a single scrolling column with no right rail.
    Back sits beside Save in the header.
    Source actions (replace by drop, unlink, open item sheet, copy UUID) are reachable from the identity strip; the component's progressive difficulty is authored in the body.
@@ -1114,6 +1334,17 @@ The GM component surfaces: the component browser and the component editor.
 7. The component browser's category group headers obey the shared GM-library group-header rule specified under Recipe Studio: the header pairs what the group renders with the category's total across the filtered rows (`25 of 282 components`) whenever the two differ, reports one number for a wholly-shown group, and localizes both singulars.
 8. The component browser preserves the identical view-state across an editor round-trip specified under Recipe Studio, including its **essence** filter alongside category, page, sort, group-by-category, page size, and per-category collapse state; opening a component editor and returning restores exactly what the GM left.
    A genuine crafting-system switch resets category + essence + page + collapse, while keeping sort, group-by-category, and page size as cross-system preferences.
+9. The GM component browser supports multi-select bulk editing.
+   Each row carries a selection control at its TRAILING edge, after the essence chips and the Edit action, rendered through the shared selection-control primitive.
+   A selection toolbar sits directly above the list carrying a tri-state control over the CURRENTLY RENDERED rows, a selected-count readout, a "Select all {N} results" action over ALL filtered rows, and a Clear action.
+   The rendered-rows control and the results action are distinct operations and must not be conflated; a collapsed category's rows are not rendered and are never selected by the former.
+   The selection is scoped to the selected crafting system, survives an editor round-trip exactly as the browser's other view-state does, is cleared by a crafting-system switch, and never retains an id that no longer resolves to a component.
+10. While the selection is non-empty, the component browser's right inspector rail renders the bulk edit panel IN PLACE OF the single-component inspector, from the first selected row.
+    The panel stages changes without writing: category (single-valued, overwriting, with an explicit "leave unchanged" option), tags (a flat run of tri-state controls over the system's tag vocabulary cycling leave -> add -> remove -> leave), essences (one quantity control per system essence, shown only when the system enables essences, with OVERWRITE semantics), and the component progressive DC (shown under the same condition as the single-component control and the row badge).
+    An axis whose staged value cannot be distinguished from its unstaged value — an all-zero essence map, a zero DC — carries a visible staged indicator that also unstages it, so a destructive edit is never indistinguishable from no edit.
+    The panel states permanently that applying essences overwrites the values on every selected component, and additionally warns when the staged overwrite would in fact change or remove authored essence values on at least one selected component.
+    One action applies every staged axis to every selected component; it names the number of components it will affect and is inert until at least one axis is staged.
+    Applying persists through a single set-apply write, then clears the selection and the staged changes, returning the rail to the single-component inspector.
 
 ## Step Editor
 
@@ -1302,6 +1533,13 @@ A check-bearing execution accepts a per-call `interactive` flag (default `false`
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
+- **Crafting-only "Check modifier" pick-one group.**
+When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one **radio** per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
+The highest-valued option is pre-checked, and the confirmed choice returns the checked radio's id as `chosenModifierId` (falling back to the descriptor's `defaultSelectedId` when the field is absent, as on the headless no-`DialogV2` path).
+It is a pick-one control (radios, never checkboxes), so the player selects exactly one modifier and cannot sum a subset.
+This group is only the presentation of the crafting-check `playerPicks` modifier policy: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the pick substitutes `@craftingmod` are normative in `resolution-modes/spec.md` §Check Source, not here.
+Only crafting ever supplies `modifierChoice`; salvage and gathering never author `@craftingmod` and never pass it, so their dialog is unchanged, as is a crafting roll under any other modifier policy — no `modifierChoice`, no fieldset.
+
 ### Result Chat Cards
 
 - Crafting and salvage share one card format (built by `buildResultCard`): the subject, recovered/produced results, consumed/forfeited items, broken tools, and failure reason.
@@ -1401,6 +1639,13 @@ Alchemy is the only conditional entry; the others are always present.
   Each block renders inputs only; intermediate step yields are not shown.
   A single-step recipe, and any recipe outside `simple` mode, carries `steps: []` and renders unchanged.
   A Discovery-Mode teaser surfaces no step data (`steps: []`), redacted exactly as `result` and `outcomeTiers` are.
+- Only the **active** execution step's requirement block is interactive; every other step stays a read-only preview, consistent with the static-preview contract above.
+  The active step is derived the way the engine derives it — the recipe's active run's `currentStepIndex` (`0` when there is no active run) indexed into `Recipe.getExecutionSteps()` — and is baked onto the projected model as `activeStepId` / `activeStepIndex`, so the rendered rail and the executing engine resolve the same step from the same reads.
+  Without this, a player whose run is parked at a later step edits a step-0 rail that drives a later step's craft: group ids are randomly generated and so survive a step mismatch by luck, but item references are not step-scoped and would actively steer the wrong step's consumption.
+  A projection that renders no step list at all (a single-step recipe, or any non-`simple` mode) is covered by the same rule, because its displayed step is read-only whenever it is not the active step.
+- A step's requirement block is also read-only while its **time gate is armed** — an in-progress timed step whose availability time has not been reached.
+  That step's consumption is already committed, so offering a selection would misrepresent what the craft will spend.
+- The projection is presentation-only and is never the enforcement point: the engine remains authoritative and drops any player allocation whose step does not match the step it actually resolved, because the displayed index can move between render and click (a time gate maturing on a world-time tick, or another owner advancing the run).
 - A fully revealed timed implicit recipe projects its positive authored
   `timeRequirement` as `RecipeListingModel.duration`.
   For a fully revealed `simple` recipe with more than one execution step, each
@@ -1514,6 +1759,36 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - A set's craftability folds in its essence requirements, its **per-set** Tool
   requirements (Tools are per-set, not recipe-global), and the actor-bound
   currency probe, reusing the recipe manager's `evaluateCraftability` per-set pass.
+- A set's craftability also carries an `essencePool` describing the shared essence
+  funding for that set: `requirements` (per essence group — `groupId`, `essenceId`,
+  name, icon, `colorToken`, `need`, `delivered`, `owned`, `satisfied`), `carriers`
+  (per held item — `itemKey`, `componentId`, name, image, `ownedUnits`,
+  `allocatedUnits`, `perUnit`), the resolved `allocation`, its `totals`, and the
+  `suggested` allocation.
+- `carriers[].ownedUnits` is the units remaining AFTER the set's non-essence
+  consumption plan has claimed, derived from the resolver's own ledger.
+  No UI or helper re-reads `item.system.quantity` to compute it: that field is
+  game-system-specific and can be absent or `NaN`, and a raw stack count would
+  offer the player units the craft cannot spend.
+- `requirements[].delivered` and `requirements[].owned` are named apart
+  deliberately.
+  `delivered` is the essence amount the resolved allocation supplies to that
+  requirement — the tile's numerator — while `owned` is the essence amount held
+  across every matching carrier.
+  In this projection and the rail it feeds, neither is reported as the
+  component/tag `have`, which is not net of plan and would read off a different
+  denominator in a rail whose invariant is that the tiles show what the craft
+  consumes.
+  The session shopping aggregation is the one deliberate exception, for a reason
+  that does not apply here (see §Shopping List Panel).
+  An essence requirement's own ingredient state carries `delivered` for the same
+  reason and by the same rule.
+  The key is renamed rather than aliased: leaving it named `have` while changing
+  what it means would re-create the ambiguity inside a single array, where a
+  component/tag entry's `have` and an essence entry's would answer different
+  questions under one name.
+- `essencePool` is `null` when the crafting system has essences disabled, matching
+  the existing per-set essence-state projection.
 
 ##### Check Descriptor
 
@@ -1581,8 +1856,48 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - Show blocking reasons when not craftable (derived from `browseStatus`).
 - Essence requirements use the GM-authored `EssenceDefinition.icon` after canonical icon normalization for legacy set-level requirements, first-class essence ingredient tiles, and essence choices within mixed alternatives.
   Missing or unusable icons use `DEFAULT_ESSENCE_ICON`.
+  An essence's authored `EssenceDefinition.colorToken` additionally tints its glyph and its pool bar through the shared `--fab-tag-*` palette, and a `null` or unrecognized token falls back to the theme accent — which is what every essence renders as today, so an unauthored system is unchanged.
+  The tint is scoped to the glyph and the bar; label text keeps the standard body/muted text colours, so an authored colour can never reduce label contrast.
   Non-essence images and the existing accessible labels and selection semantics remain unchanged.
+- A component or tag requirement tile treats Foundry's generic `icons/svg/item-bag.svg` sentinel as "no image" and renders the tile's fallback glyph, never the bag itself.
+  The sentinel reaches a tile two ways — a tag requirement with nothing matching in inventory has no item to read an image from, and a matched item may carry the bag literal as its own `img` — and both resolve to the glyph.
+  It never falls back to `DEFAULT_RECIPE_IMAGE`: the blueprint is the _recipe's_ fallback (see `data-models` §Recipe requirement 16) and is not a material's fallback.
+  The recipe-image chokepoints and the tool-state image path keep their existing fallbacks unchanged.
 - (No learn action on the Crafting tab: recipe learning is wired through the Inventory surface only — see §Books & Scrolls learning.)
+
+##### Requirement Rail
+
+- A set's fixed, choice and essence requirements render in ONE rail of uniform slot tiles, replacing the separate image grid, the stacked alternatives picker, and the essence list.
+  Three disconnected surfaces cannot tell a player which requirement still needs attention, which is the whole job of this area.
+- Every slot carries one of three states — **met**, **partial**, **short** — because a two-state surface renders an untouched choice and a genuinely unaffordable one identically, and marks a half-filled essence as an error.
+  A fixed requirement is met at or above its need and short below it; an unchosen choice slot is **partial** (a to-do, never an error); a chosen choice slot is met or short on its own numbers; an essence requirement is short at zero delivered, partial while partly delivered, and met when fully delivered.
+- At most ONE chooser is open at a time; the open slot is the rail's single point of interaction.
+- Focus auto-advances to the first unsatisfied slot until the player opens a slot themselves, after which the player's choice sticks.
+  The remembered slot is re-validated on every read against the live slot list, falling back to the first unsatisfied slot and then to the first slot, so changing set, step or recipe can never leave a stale or absent chooser open.
+  Clicking the open slot's tile again closes the chooser instead of reopening it, and the closed choice is remembered the same scoped way: it stays closed until the player opens a slot again (including re-clicking the same tile), while changing set, step or recipe re-derives the default open slot as before.
+- Auto-advance never steals focus, and it announces through its **own** live region rather than the progressive stage list's reorder region, because a progressive recipe renders both surfaces at once.
+- The rail is a **disclosure**, not a tablist: fixed slots are not selectable, so tab semantics would promise a selection the surface does not offer.
+  A choice or essence slot is a `<button>` carrying `aria-expanded` and `aria-controls` over the whole tile column, and the panel it opens is labelled back at its tile.
+  That panel is itself an exposed named `role="region"`, because `aria-labelledby` on a roleless element exposes nothing to assistive technology.
+  A fixed slot is `role="img"` with a label, because an `aria-label` on a non-focusable span exposes nothing.
+- Open state is drawn as an accent-soft fill plus a caption line, never as an accent ring: the app already paints an accent ring for `:focus-visible`, so a ring would make "focused" and "open" indistinguishable to a keyboard user.
+  Open state and satisfaction are independent, so the open treatment sits on top of the status border rather than replacing it.
+- "Pick for me" fills the set's unmade choices and suggests an essence allocation.
+  It lives in the rail header, scoped to the rail, rather than in the app footer: the rail renders inside step and routed bodies while Craft sits in a fixed footer outside the scrolling body.
+  On an infeasible inventory it returns the best partial suggestion and an honest shortfall rather than throwing or looping.
+- Every rail control is keyboard-operable and named for assistive technology, and bar transitions honour `prefers-reduced-motion`.
+
+##### Essence Pool and Consumption Plan
+
+- A set's essence requirements are funded from one shared, player-editable **essence pool**, scoped to a single ingredient set on a single step, because that is the granularity at which the engine consumes.
+- Each carrier row offers a keyboard-operable stepper allocating units of one held item to the pool, and the allocation the player sees is exactly what the craft consumes.
+- A carrier's allocatable maximum is its `ownedUnits` — the units left AFTER the set's non-essence plan has claimed — never the raw stack quantity, so the stepper cannot allocate the player into an infeasible state.
+- A requirement's ratio reports `delivered / need` as essence amounts, so a satisfied requirement reads exactly `need / need` rather than the whole matching inventory.
+  Unit-granular overshoot is visible in the per-carrier allocation, never in a requirement's ratio.
+- The **consumption-plan panel** states what the craft will spend before it is spent: one row per planned item with the quantity that item contributes, plus a pending line naming the requirements still to choose.
+  That "still to choose" list is joined with the platform list formatter rather than an authored separator key, so the join is correct in every locale.
+- Legacy set-level essence requirements (`IngredientSet.essences`) are threshold-only and never consumed, so they cannot enter the pool.
+  They keep their existing requirement-row presentation.
 
 #### Shopping List Panel
 
@@ -1591,6 +1906,8 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
 - Essence shortages from first-class ingredient states and legacy set-level essence states retain the first nonblank GM-authored icon across aggregation.
   Later blank values do not erase it.
   Render-time canonical normalization uses `DEFAULT_ESSENCE_ICON` when the retained value is missing or unusable, without changing need/have totals.
+- The aggregation shops an essence requirement against the amount **held**, not the amount the plan delivers: `RecipeManager.evaluateShoppingRequirement` deliberately restates an essence state's `owned` as the `have` it aggregates on.
+  This is the one place `owned` is reported as `have` (see §Per-Set Craftability), because `delivered` is capped at `need` and a shortage shopped against it would always read satisfied.
 
 #### Right Rail (Run Summary or Shopping List)
 
@@ -2116,6 +2433,12 @@ Runs of recipes the viewer cannot see are redacted, mirroring the gathering blin
 - A crafting or alchemy run whose recipe is undiscovered or knowledge-gated for the viewer, or whose recipe no longer resolves, is shown with a generic localized title (`FABRICATE.App.Journal.Redacted.Title`), a default image, and no recipe id, steps, results, or failure detail.
 - GM viewers and globally-visible recipes are never redacted.
 - The redaction is enforced in the projection (`data-models/spec.md` _Run Journal Projection_), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
+- **Redaction hides IDENTITY ONLY and is never an authorization gate** (issue 966).
+A redacted run still projects `manualAdvance: true` and, for an owner, `canCancel: true`, so its owner can finish it and abandon it exactly as they could a visible one.
+Nothing resolves a crafting run automatically — `CraftingRunManager.processWorldTime` only flips a matured `waitingTime` step to `inProgress` — so suppressing the affordance stranded every timed craft of a recipe the crafter cannot see, with its inputs already consumed at START.
+Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and discovery lands at FINISH, so an undiscovered timed brew could never reach the FINISH that would have revealed it.
+- Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
+The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
 
 ## Data Storage (UI-relevant)
 

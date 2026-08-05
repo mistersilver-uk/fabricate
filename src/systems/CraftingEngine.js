@@ -1,6 +1,5 @@
 import { getFabricateFlag, setFabricateFlag, stampItemDataRoleIdentity } from '../config/flags.js';
 import { isToolBroken, resolvePresentComponentIds } from '../gatheringToolRuntime.js';
-import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
 import { Tool } from '../models/Tool.js';
 import {
   applyToolUsageAndBreakage,
@@ -8,6 +7,7 @@ import {
   evaluateCheckBreakage,
 } from '../toolBreakageRuntime.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { matchComponentByName } from '../utils/componentNameMatch.js';
@@ -30,6 +30,12 @@ import {
 } from './componentStacking.js';
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
+  buildCraftingModifierChoice,
+  CRAFTING_MOD_TOKEN,
+  makeRollDataExpressionEvaluator,
+  resolveModifierPolicy,
+} from './craftingModifierResolver.js';
+import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
   refundCurrencySpends,
@@ -37,6 +43,7 @@ import {
 } from './currencyAffordance.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
+import { buildStepRecipeView } from './stepRecipeView.js';
 import {
   appendToolBonusTerms,
   composeToolBonusTerms,
@@ -122,9 +129,14 @@ export function rollTotalForCard(checkResult) {
   return checkResult?.data?.total ?? checkResult?.value ?? null;
 }
 
-/** Actual routed natural-step evidence for result chat, or null when unchanged. */
-function natStepForCard(checkResult) {
-  return checkResult?.data?.natStep ?? null;
+/**
+ * Realized routed tier-step evidence for result chat, or null when the roll's tier
+ * was never moved. `runFormulaRouted` emits `data.tierStepApplied` only on an actual
+ * tier change (issue 975), so an absent key is the "nothing moved" case and the card
+ * renders no note.
+ */
+function tierStepForCard(checkResult) {
+  return checkResult?.data?.tierStepApplied ?? null;
 }
 
 /**
@@ -335,6 +347,14 @@ export class CraftingEngine {
    *   choice blocks with the missing-materials message). For a time-gated step the
    *   override is applied at START, so the consumed-item snapshot the FINISH resume
    *   replays already encodes the chosen option/stack.
+   * @param {{stepId: string|null, ingredientSetId: string|null,
+   *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation]
+   *   The player's funding for the set's shared essence block (issue 917), SCOPED to
+   *   the step and set it was computed against. Dropped wholesale — never clamped
+   *   into the wrong step — when either id disagrees with what this call resolved.
+   *   There is no timed snapshot for it: the source Items are deleted at START, so an
+   *   item-keyed map is stale by the time FINISH resumes, and FINISH never re-resolves
+   *   ingredients.
    * @param {boolean} [options.interactive] When true, the crafting check prompts the
    *   player with the confirm-roll dialog (optional situational modifier) and posts
    *   the roll to chat so Dice So Nice animates it. Defaults to false so automation
@@ -365,6 +385,20 @@ export class CraftingEngine {
     const ingredientOptionOverrides =
       options?.ingredientOptionOverrides && typeof options.ingredientOptionOverrides === 'object'
         ? options.ingredientOptionOverrides
+        : null;
+    // The player's essence-block funding (issue 917). SCOPED, not a bare map: a
+    // `{ stepId, ingredientSetId, allocation }` payload the engine drops unless it
+    // names the step AND set this call actually resolved. Item uuids are not
+    // step-scoped, so a step-1 allocation arriving while the run has advanced to
+    // step 2 would actively steer that step's consumption. The check must happen
+    // HERE and not in the UI or the facade: the run's step index can move between
+    // the `$derived` that built the payload and the click that sends it — a time
+    // gate maturing on `updateWorldTime`, or another owner calling
+    // `advanceCraftingRun`. See {@link _scopedEssenceAllocation}.
+    const ingredientEssenceAllocation =
+      options?.ingredientEssenceAllocation &&
+      typeof options.ingredientEssenceAllocation === 'object'
+        ? options.ingredientEssenceAllocation
         : null;
     // Validate inputs
     if (!craftingActor) {
@@ -535,6 +569,7 @@ export class CraftingEngine {
             stepIndex,
             ingredientSetId,
             ingredientOptionOverrides,
+            ingredientEssenceAllocation,
             presentTools,
             options,
             runManager,
@@ -623,14 +658,28 @@ export class CraftingEngine {
       // consumption (its item `plan`) and the currency gate/spend (its `currencySpends`)
       // read THIS selection — never a recompute — so item mutation mid-craft can never
       // diverge the gated spend from the consumed plan.
+      const essenceAllocation = this._scopedEssenceAllocation(
+        ingredientEssenceAllocation,
+        step,
+        ingredientSet
+      );
       const craftSelection = this._resolveCraftSelection(
         componentSourceActors,
         ingredientSet,
         executionRecipe,
         craftingActor,
         resolveComponent,
-        ingredientOptionOverrides
+        ingredientOptionOverrides,
+        essenceAllocation
       );
+      const shortAllocation = this._allocationShortfallMessage(
+        essenceAllocation,
+        craftSelection,
+        executionRecipe
+      );
+      if (shortAllocation) {
+        return { success: false, results: null, message: shortAllocation };
+      }
       const currencySpends = craftSelection.currencySpends || [];
 
       // Validate tools: the recipe's resolved library Tools must be present
@@ -803,7 +852,7 @@ export class CraftingEngine {
           createdResults: [],
           failureReason: checkResult.message || 'Crafting check failed',
           rollValue: rollTotalForCard(checkResult),
-          natStep: natStepForCard(checkResult),
+          tierStep: tierStepForCard(checkResult),
         });
         return {
           success: false,
@@ -873,7 +922,7 @@ export class CraftingEngine {
           createdResults: [],
           failureReason: message,
           rollValue: rollTotalForCard(checkResult),
-          natStep: natStepForCard(checkResult),
+          tierStep: tierStepForCard(checkResult),
         });
         return {
           success: false,
@@ -926,7 +975,7 @@ export class CraftingEngine {
             createdResults: [],
             failureReason: message,
             rollValue: rollTotalForCard(checkResult),
-            natStep: natStepForCard(checkResult),
+            tierStep: tierStepForCard(checkResult),
           });
           return {
             success: false,
@@ -1032,7 +1081,7 @@ export class CraftingEngine {
         tools: toolValidation.tools,
         createdResults: resultItems,
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
 
       // Collapsed chain (issue 710): a non-final step just succeeded and the run is
@@ -1042,6 +1091,11 @@ export class CraftingEngine {
       // set / cleared per-step overrides so each later step auto-resolves its own
       // satisfiable set rather than reusing the step-0 selection. The returned result
       // is the FINAL step's — the chain's effective outcome.
+      //
+      // `ingredientEssenceAllocation` MUST be nulled here for the same reason
+      // (issue 917), and the entry-time step scoping does NOT cover it: the chain
+      // enters at step 0, so a step-0-scoped allocation passes that check and would
+      // then be spread into every later step's call by `...options`.
       if (
         collapsedChain &&
         runManager &&
@@ -1052,6 +1106,7 @@ export class CraftingEngine {
           ...options,
           runId: run.id,
           ingredientOptionOverrides: null,
+          ingredientEssenceAllocation: null,
           resultGroupId: null,
         });
       }
@@ -1090,6 +1145,13 @@ export class CraftingEngine {
    * Tool BREAKAGE is intentionally NOT applied here — it is tied to the crafting
    * check outcome, which happens at FINISH.
    *
+   * `ingredientEssenceAllocation` is an explicit named parameter (like
+   * `ingredientOptionOverrides`), NOT an `options` passthrough, because it is applied
+   * exactly once — HERE, at START, where consumption happens. It is deliberately NOT
+   * snapshotted onto `preparedConsumption`: the source Items are deleted before the
+   * gate is armed, so an item-keyed map is stale by the time FINISH resumes, and
+   * FINISH never re-resolves ingredients anyway.
+   *
    * @private
    * @returns {Promise<{ resolved: boolean, result: object }>}
    */
@@ -1101,6 +1163,7 @@ export class CraftingEngine {
     stepIndex,
     ingredientSetId,
     ingredientOptionOverrides = null,
+    ingredientEssenceAllocation = null,
     presentTools,
     options,
     runManager,
@@ -1150,14 +1213,26 @@ export class CraftingEngine {
     // SINGLE SELECTION SOURCE (mirrors craft()): the item plan and currencySpends
     // both come from ONE _resolveCraftSelection call so consumption never diverges
     // from the gated/spent currency.
+    const essenceAllocation = this._scopedEssenceAllocation(
+      ingredientEssenceAllocation,
+      step,
+      ingredientSet
+    );
     const craftSelection = this._resolveCraftSelection(
       componentSourceActors,
       ingredientSet,
       executionRecipe,
       craftingActor,
       resolveComponent,
-      ingredientOptionOverrides
+      ingredientOptionOverrides,
+      essenceAllocation
     );
+    const shortAllocation = this._allocationShortfallMessage(
+      essenceAllocation,
+      craftSelection,
+      executionRecipe
+    );
+    if (shortAllocation) return abort(shortAllocation);
     const currencySpends = craftSelection.currencySpends || [];
 
     const toolsForSet =
@@ -1193,7 +1268,14 @@ export class CraftingEngine {
 
     // Consume NOW (at START): items first, then currency (both gates passed).
     const consumedItems = await this._consumeIngredients(craftSelection.plan);
-    await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
+    // The deduction deliberately does not abort the craft on failure (clause 4 forbids
+    // both aborting and rolling back), so the run must record what SETTLED rather than
+    // what was planned — otherwise a cancel refunds currency the actor never paid.
+    const currencySettlement = await this._spendCraftCurrency(
+      craftingActor,
+      executionRecipe,
+      currencySpends
+    );
     await this._deductItemPilesCurrencyCost(craftingActor, recipe);
 
     // Snapshot for the FINISH resume: essence quantities are precomputed here
@@ -1220,7 +1302,7 @@ export class CraftingEngine {
 
     await runManager.markStepPrepared(craftingActor, run, stepIndex, {
       selectedIngredientSetId: ingredientSet.id,
-      currencySpends,
+      currencySpends: currencySettlement.settledSpends,
       resolvedEssences,
       consumedSummary,
     });
@@ -1244,6 +1326,12 @@ export class CraftingEngine {
         success: false,
         results: null,
         message: `Step "${stepLabel}" is still in progress (${remaining}s remaining)`,
+        // A START is a SUCCESSFUL arming, not a failure: inputs are secured and the
+        // run is live. `success` stays false because nothing was produced, so the
+        // disposition is what tells a caller the two apart (issue 966). Without it
+        // the alchemy workbench read this as a no-signature fizzle and told the
+        // player their brew had failed while their ingredients were being consumed.
+        disposition: 'timed-start',
       },
     };
   }
@@ -1410,7 +1498,7 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
       return { resolved: true, result: { success: false, results: null, message } };
     };
@@ -1419,10 +1507,14 @@ export class CraftingEngine {
       // Matched Simple alchemy attempt (timed twin): produce the reserved failure
       // group + learn WITHOUT re-consuming (components were spent at START). Tiered
       // alchemy failure still fizzles via `recordFailure` (routedByCheck).
-      if (
-        options?.isAlchemyAttempt === true &&
-        this._getAlchemyCheckMode(executionRecipe) === 'simple'
-      ) {
+      //
+      // Keyed on the RECIPE'S SYSTEM, never on `options.isAlchemyAttempt` (issue
+      // 966): that flag is set once, by `craftAlchemy` on the initial submit, and a
+      // time-gated brew resolves LATER through `advanceCraftingRun`, which cannot
+      // carry it. Gating on it here silently degraded every matured Simple brew
+      // failure to a generic fizzle. `_getAlchemyCheckMode` returns null for a
+      // non-alchemy system, so the mode test alone is the complete condition.
+      if (this._getAlchemyCheckMode(executionRecipe) === 'simple') {
         return this._finishAlchemySimpleFailure({
           craftingActor,
           componentSourceActors,
@@ -1510,7 +1602,7 @@ export class CraftingEngine {
         createdResults: [],
         failureReason: message,
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
       return {
         resolved: true,
@@ -1551,8 +1643,11 @@ export class CraftingEngine {
         componentSourceActors,
       });
       // Learn on match for a matured timed alchemy brew too (gated inside
-      // `learnRecipeOnCraft` on `alchemy.learnOnCraft === true`).
-      if (options?.isAlchemyAttempt === true) {
+      // `learnRecipeOnCraft` on `alchemy.learnOnCraft === true`). Keyed on the
+      // recipe's own system rather than `options.isAlchemyAttempt` for the reason
+      // given at the Simple-failure branch above: the resume path cannot carry that
+      // flag, so this learn never fired for a time-gated brew (issue 966).
+      if (this._getAlchemyCheckMode(recipe) !== null) {
         await visibilityService.learnRecipeOnCraft(recipe, craftingActor);
       }
     }
@@ -1565,7 +1660,7 @@ export class CraftingEngine {
       tools: toolItems,
       createdResults: resultItems,
       rollValue: rollTotalForCard(checkResult),
-      natStep: natStepForCard(checkResult),
+      tierStep: tierStepForCard(checkResult),
     });
 
     const stepLabel = step.name || `step ${stepIndex + 1}`;
@@ -1691,7 +1786,7 @@ export class CraftingEngine {
       createdResults: resultItems,
       failureReason: checkResult.message || 'Crafting check failed',
       rollValue: rollTotalForCard(checkResult),
-      natStep: natStepForCard(checkResult),
+      tierStep: tierStepForCard(checkResult),
     });
 
     return {
@@ -1971,6 +2066,12 @@ export class CraftingEngine {
       ...options,
       isAlchemyAttempt: true,
       alchemySubmittedItems: submissionItems,
+      // An alchemy brew has no requirement rail and no player-chosen essence
+      // funding: the recipe and its ingredient set are DISCOVERED by matching the
+      // submission, so any allocation riding on `options` was scoped to something
+      // else entirely. Strip it rather than relying on the scope check downstream
+      // (issue 917).
+      ingredientEssenceAllocation: null,
     });
   }
 
@@ -2266,10 +2367,22 @@ export class CraftingEngine {
    * already confirmed affordability, so this runs after item consumption. A spend
    * failure here is logged (mirroring the Item-Piles deduct-error handling) and never
    * refunded — it does not abort the craft, matching the no-refund policy.
+   *
+   * It RETURNS the settlement (issue 902). The four terminal-craft call sites keep
+   * ignoring it and keep their non-aborting behaviour: they hold no run record, so a
+   * spend that fails there loses money but can never mint it. Only the time-gated
+   * START path ({@link _startTimedStep}) consumes the return, because only it persists
+   * a record that a later cancel reversal would otherwise hand back.
+   *
+   * Never throws: a thrown deduction reports total non-settlement, so nothing is
+   * recorded and nothing can be refunded.
+   *
    * @private
+   * @returns {Promise<{ valid: boolean, message?: string, groups: object[],
+   *   settledSpends: Array<{unit: string, amount: number}> }>}
    */
   async _spendCraftCurrency(craftingActor, recipe, currencySpends) {
-    if (!currencySpends?.length) return;
+    if (!currencySpends?.length) return { valid: true, groups: [], settledSpends: [] };
     try {
       const result = await spendCurrencySpends(
         craftingActor,
@@ -2280,8 +2393,15 @@ export class CraftingEngine {
       if (!result?.valid) {
         console.error('Fabricate | Currency deduction reported failure', result?.message);
       }
+      return {
+        valid: result?.valid === true,
+        message: result?.message,
+        groups: Array.isArray(result?.groups) ? result.groups : [],
+        settledSpends: Array.isArray(result?.settledSpends) ? result.settledSpends : [],
+      };
     } catch (error) {
       console.error('Fabricate | Currency deduction error', error);
+      return { valid: false, groups: [], settledSpends: [] };
     }
   }
 
@@ -2290,10 +2410,17 @@ export class CraftingEngine {
    * {@link _spendCraftCurrency}. A failure is logged (never thrown) so a cancel that
    * cannot refund currency still removes the run. Shared by the player-cancel path
    * (issue 848) and reusable by the GM cancel/reverse (issue 847).
+   *
+   * FAILS CLOSED (issue 902): a refund that throws reports total failure with NO group
+   * detail, and absent detail must be read as unknown-and-failed. Inferring "no failed
+   * groups listed, therefore everything refunded" would reproduce this issue's own
+   * defect class one level up.
+   *
    * @private
+   * @returns {Promise<{ valid: boolean, message?: string, groups: object[] }>}
    */
   async _refundCraftCurrency(craftingActor, recipe, currencySpends) {
-    if (!currencySpends?.length) return { valid: true };
+    if (!currencySpends?.length) return { valid: true, groups: [] };
     try {
       const result = await refundCurrencySpends(
         craftingActor,
@@ -2304,10 +2431,14 @@ export class CraftingEngine {
       if (!result?.valid) {
         console.error('Fabricate | Currency refund reported failure', result?.message);
       }
-      return result;
+      return {
+        valid: result?.valid === true,
+        message: result?.message,
+        groups: Array.isArray(result?.groups) ? result.groups : [],
+      };
     } catch (error) {
       console.error('Fabricate | Currency refund error', error);
-      return { valid: false };
+      return { valid: false, groups: [] };
     }
   }
 
@@ -2437,16 +2568,25 @@ export class CraftingEngine {
    * ingredient restored AND every attempted currency refund succeeded — so the caller can
    * report the truthful outcome rather than the refund policy's intent.
    *
+   * The currency half reports a `currencyRefund` VALUE rather than a boolean (issue 902),
+   * because "one terminal base unit returned, another failed" and "nothing returned"
+   * require different operator responses. Read `currencyRefund.status` or its counts —
+   * never the value itself in boolean context, since an object is always truthy.
+   *
    * @param {Actor} craftingActor
    * @param {object} run The active run whose consumption should be reversed.
    * @returns {Promise<{ restored: object[], restoreFailures: number,
-   *   currencyAttempted: boolean, currencyRefunded: boolean, ok: boolean }>}
+   *   currencyAttempted: boolean,
+   *   currencyRefund: { attempted: boolean, refundedGroups: number,
+   *     status: 'none'|'full'|'partial'|'failed' },
+   *   ok: boolean }>}
    */
   async reverseRunConsumption(craftingActor, run) {
     const restored = [];
     let restoreFailures = 0;
     let currencyAttempted = false;
-    let currencyRefunded = true;
+    let currencyFailed = false;
+    let refundedGroups = 0;
     const recipe = this.recipeManager?.getRecipe?.(run?.recipeId) ?? {
       craftingSystemId: run?.craftingSystemId ?? null,
     };
@@ -2463,6 +2603,8 @@ export class CraftingEngine {
       );
       restored.push(...outcome.restored);
       restoreFailures += outcome.failures;
+      // The record holds only the spends that SETTLED, so an empty array correctly skips
+      // the refund: there is nothing the actor paid and nothing to hand back.
       if (Array.isArray(prepared.currencySpends) && prepared.currencySpends.length > 0) {
         currencyAttempted = true;
         const refund = await this._refundCraftCurrency(
@@ -2470,14 +2612,37 @@ export class CraftingEngine {
           recipe,
           prepared.currencySpends
         );
+        // Count the groups that DEMONSTRABLY came back. Absent group detail (a refund that
+        // threw) therefore counts zero — unknown-and-failed, never "all refunded".
+        refundedGroups += (refund?.groups || []).filter((group) => group.refunded === true).length;
         // Any failed refund makes the whole reversal incomplete (fail-closed on truth).
-        if (refund?.valid !== true) currencyRefunded = false;
+        if (refund?.valid !== true) currencyFailed = true;
       }
     }
+    const currencyRefund = this._currencyRefundOutcome({
+      attempted: currencyAttempted,
+      failed: currencyFailed,
+      refundedGroups,
+    });
     // A refund that was never attempted is not a failure; the reversal is complete only
     // when nothing failed to restore and no attempted currency refund reported failure.
-    const ok = restoreFailures === 0 && (!currencyAttempted || currencyRefunded);
-    return { restored, restoreFailures, currencyAttempted, currencyRefunded, ok };
+    const ok =
+      restoreFailures === 0 &&
+      (currencyRefund.status === 'none' || currencyRefund.status === 'full');
+    return { restored, restoreFailures, currencyAttempted, currencyRefund, ok };
+  }
+
+  /**
+   * Classify a reversal's currency refund (issue 902). `none` means it was never
+   * attempted (nothing settled, so nothing was recorded), which is NOT a success and
+   * NOT a failure; `partial` requires at least one group demonstrably back.
+   * @private
+   */
+  _currencyRefundOutcome({ attempted, failed, refundedGroups }) {
+    let status = 'full';
+    if (!attempted) status = 'none';
+    else if (failed) status = refundedGroups > 0 ? 'partial' : 'failed';
+    return { attempted, refundedGroups, status };
   }
 
   /**
@@ -2525,8 +2690,12 @@ export class CraftingEngine {
         restoredCount = reversal.restored.length;
         reversalOk = reversal.ok;
         // A partial reversal (some inputs back, some lost) is worth flagging distinctly
-        // from a total failure so callers can message honestly.
-        partialRefund = !reversal.ok && (reversal.restored.length > 0 || reversal.currencyRefunded);
+        // from a total failure so callers can message honestly. Both operands must be
+        // re-derived rather than read from `currencyRefund` directly: it is an OBJECT and
+        // would collapse this whole expression to `!reversal.ok` in boolean context. A
+        // refund that was never attempted recovered nothing, so it is not partial either.
+        const currencyRecovered = reversal.currencyRefund.refundedGroups > 0;
+        partialRefund = !reversal.ok && (reversal.restored.length > 0 || currencyRecovered);
       }
     } finally {
       // Always archive the run, even if the reversal threw or partially failed, so the
@@ -2572,6 +2741,10 @@ export class CraftingEngine {
    *   standard-craft resolver via {@link RecipeManager#ingredientMatchesItem}.
    * @param {object|null} [optionOverrides] - Per-group player option overrides
    *   (issue 552) forwarded to the resolver so consumption matches the chosen option.
+   * @param {Record<string, number>|null} [essenceAllocation] - The player's
+   *   `{ itemKey: units }` funding for the set's shared essence block (issue 917),
+   *   ALREADY scoped to this step and set by {@link _scopedEssenceAllocation}.
+   *   Forwarded so the consumed plan is exactly what the requirement rail displayed.
    * @returns {{ success: boolean, plan: Array, currencySpends: Array, missingGroups: Array }}
    */
   _resolveCraftSelection(
@@ -2580,7 +2753,8 @@ export class CraftingEngine {
     recipe,
     craftingActor,
     resolveComponent,
-    optionOverrides = null
+    optionOverrides = null,
+    essenceAllocation = null
   ) {
     const availableItems = componentSourceActors.flatMap((actor) => [...actor.items]);
     const matcher = (ingredient, item) =>
@@ -2596,6 +2770,7 @@ export class CraftingEngine {
       return ingredientSet.resolveIngredientSelection(availableItems, matcher, {
         affordCurrency,
         optionOverrides,
+        essenceAllocation,
         resolveItemEssences,
       });
     }
@@ -2610,6 +2785,57 @@ export class CraftingEngine {
       };
     }
     return { success: true, plan: [], currencySpends: [], missingGroups: [] };
+  }
+
+  /**
+   * The player's essence allocation IF it was computed for the step and ingredient
+   * set this craft actually resolved, else null (issue 917).
+   *
+   * The payload is `{ stepId, ingredientSetId, allocation }` rather than a bare
+   * `{ itemKey: units }` map precisely so this check is possible. `step` here is the
+   * step resolved from `run.currentStepIndex`, not the one the UI believed was
+   * active: the index can move between the `$derived` that built the payload and the
+   * click that sent it, so a UI-side or facade-side guard is stale by construction.
+   *
+   * On a mismatch the allocation is DROPPED, never clamped into the resolved step —
+   * item uuids carry no step identity, so a step-1 map applied to step 2 would look
+   * plausible while steering the wrong consumption.
+   *
+   * @private
+   * @param {object|null} payload
+   * @param {object|null} step - The execution step this call resolved.
+   * @param {object|null} ingredientSet - The ingredient set this call resolved.
+   * @returns {Record<string, number>|null}
+   */
+  _scopedEssenceAllocation(payload, step, ingredientSet) {
+    const allocation = payload?.allocation;
+    if (!allocation || typeof allocation !== 'object') return null;
+    if (String(payload.stepId ?? '') !== String(step?.id ?? '')) return null;
+    if (String(payload.ingredientSetId ?? '') !== String(ingredientSet?.id ?? '')) return null;
+    return allocation;
+  }
+
+  /**
+   * The missing-materials message for a craft whose PLAYER-SUPPLIED essence
+   * allocation does not fund the set, else null (issue 917).
+   *
+   * A short allocation is honoured and never topped up, so the resolved selection
+   * comes back `success: false` with a partial plan. `RecipeManager.canCraft` ran
+   * BEFORE the allocation was applied (it gates on the allocator's own suggestion),
+   * so without this the engine would consume the partial plan and still award the
+   * result — a craft for less than the recipe costs. Scoped to the supplied-allocation
+   * case so the default path keeps its existing behaviour byte-for-byte.
+   *
+   * @private
+   */
+  _allocationShortfallMessage(essenceAllocation, craftSelection, executionRecipe) {
+    if (!essenceAllocation || craftSelection?.success !== false) return null;
+    const missing = {
+      ingredients: Array.isArray(craftSelection.missingGroups) ? craftSelection.missingGroups : [],
+      essences: [],
+      tools: [],
+    };
+    return `Missing required items:\n${this._formatMissingItems(missing, executionRecipe)}`;
   }
 
   /**
@@ -3582,6 +3808,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
+    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
     const result = await runFormulaPassFail({
       formula,
       dc,
@@ -3589,7 +3816,7 @@ export class CraftingEngine {
       triggers: checkConfig.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
-      craftingModifier: this._buildCraftingModifierContext(system, recipe),
+      craftingModifier,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
@@ -3597,6 +3824,12 @@ export class CraftingEngine {
         activity: 'Crafting',
         img: this._resolveRecipePromptImg(recipe),
         dc,
+        modifierChoice: this._buildInteractiveModifierChoice(
+          formula,
+          craftingModifier,
+          craftingActor,
+          interactive
+        ),
       }),
     });
     return this._markEngineEvaluated(result);
@@ -3641,6 +3874,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
+    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
     const result = await runFormulaRouted({
       formula,
       dc,
@@ -3649,10 +3883,9 @@ export class CraftingEngine {
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
       triggers: routed.checkBreakage?.triggers,
-      natStepping: routed.natStepping === true,
       actor: craftingActor,
       label: 'Crafting',
-      craftingModifier: this._buildCraftingModifierContext(system, recipe),
+      craftingModifier,
       // A total below every relative threshold clamps to the lowest tier, so a
       // recipe-tier / dynamic DC bump never leaves a craft rolled-but-unrouted.
       clampToNearest: true,
@@ -3669,6 +3902,12 @@ export class CraftingEngine {
         // Fixed-type routed checks match by value range, not DC, so the prompt must
         // not advertise a (meaningless) DC. Undefined suppresses the chip + flavor.
         dc: routed.type === 'fixed' ? undefined : dc,
+        modifierChoice: this._buildInteractiveModifierChoice(
+          formula,
+          craftingModifier,
+          craftingActor,
+          interactive
+        ),
       }),
     });
     return this._markEngineEvaluated(result);
@@ -3705,24 +3944,54 @@ export class CraftingEngine {
   }
 
   /**
-   * Resolve the recipe icon for the interactive roll prompt with the SAME
-   * precedence the GM editor and player listings use — the recipe-item
-   * definition's image wins over the recipe's own `img` (which is itself
-   * model-defaulted to `DEFAULT_RECIPE_IMAGE`, so it already supplies the trailing
-   * default). Raw `recipe.img` alone shows the generic blueprint for a
-   * recipe-item-backed recipe; mirror `CraftingListingBuilder`'s precedence here.
+   * Build the deferred interactive `playerPicks` modifier-choice descriptor (issue 770
+   * Phase 2) for an interactive craft. Returns the descriptor ONLY when the effective
+   * modifier policy is `playerPicks` AND this is an interactive roll AND the formula
+   * references `@craftingmod` AND at least TWO modifiers are eligible (the two-option
+   * rule is enforced by {@link buildCraftingModifierChoice}); otherwise `null`, so every
+   * deterministic-policy and non-interactive craft threads a byte-identical `rollOptions`
+   * bag (no `modifierChoice` key). The descriptor is threaded onto
+   * `rollOptions.modifierChoice` and resolved to a single value inside the roll prompt —
+   * the non-interactive `playerPicks` path keeps resolving `@craftingmod`
+   * deterministically as `highest`.
+   * @private
+   * @returns {{token: string, modifiers: Array<{id: string, label: string, icon: string,
+   *   value: number}>, defaultSelectedId: string}|null}
+   */
+  _buildInteractiveModifierChoice(formula, craftingModifierContext, craftingActor, interactive) {
+    if (interactive !== true) return null;
+    // A formula that never references `@craftingmod` has nowhere to spend the picked
+    // modifier, so offering the player a radio would be a meaningless choice (the
+    // deterministic policies silently no-op the same case). Gate on token presence.
+    if (!String(formula ?? '').includes(CRAFTING_MOD_TOKEN)) return null;
+    if (resolveModifierPolicy(craftingModifierContext) !== 'playerPicks') return null;
+    // Returns the descriptor, or null when fewer than two modifiers are eligible (a
+    // one-option radio is not a choice — the deterministic `highest` scalar IS the only
+    // possible pick, so the prompt falls through to it);
+    // `buildInteractiveRollOptions` omits the `modifierChoice` key for a falsy value.
+    return buildCraftingModifierChoice(
+      craftingModifierContext,
+      makeRollDataExpressionEvaluator(craftingActor)
+    );
+  }
+
+  /**
+   * Resolve the recipe icon for the interactive roll prompt: the recipe's OWN `img`,
+   * per `data-models/spec.md` `## Recipe` requirement 16.
+   *
+   * This previously preferred the linked recipe-item definition's image, keyed on the
+   * legacy `recipe.recipeItemId` scalar. Book membership is many-to-many, so "the
+   * containing book" tracked definition order rather than anything the GM authored, and
+   * the borrow outranked an authored `recipe.img` (issue 887).
+   *
+   * `resolveRecipeImage` treats Foundry's generic item-bag as "no image", so the prompt
+   * icon still never falls back to the bag — the explicit product requirement recorded
+   * in the header of `tests/recipe-prompt-img.test.js`.
+   *
    * @private
    */
   _resolveRecipePromptImg(recipe) {
-    const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
-    const recipeItemImg = recipe?.recipeItemId
-      ? systemManager?.getRecipeItemDefinition?.(recipe.craftingSystemId, recipe.recipeItemId)
-          ?.img || ''
-      : '';
-    // The final fallback is ALWAYS the recipe default (blueprint), matching the GM
-    // editor — never a generic item bag. `recipe.img` is itself model-defaulted to
-    // DEFAULT_RECIPE_IMAGE, so this is belt-and-braces for a plain-object recipe.
-    return recipeItemImg || recipe?.img || DEFAULT_RECIPE_IMAGE;
+    return resolveRecipeImage(recipe);
   }
 
   /**
@@ -3745,18 +4014,25 @@ export class CraftingEngine {
   ) {
     const progressive = system?.craftingCheck?.progressive || {};
     const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
+    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
     const result = await runFormulaProgressive({
       formula,
       triggers: progressive.checkBreakage?.triggers,
       actor: craftingActor,
       label: 'Crafting',
-      craftingModifier: this._buildCraftingModifierContext(system, recipe),
+      craftingModifier,
       rollOptions: buildInteractiveRollOptions({
         interactive,
         actor: craftingActor,
         name: recipe?.name,
         activity: 'Crafting',
         img: this._resolveRecipePromptImg(recipe),
+        modifierChoice: this._buildInteractiveModifierChoice(
+          formula,
+          craftingModifier,
+          craftingActor,
+          interactive
+        ),
       }),
     });
     return this._markEngineEvaluated(result);
@@ -4029,7 +4305,8 @@ export class CraftingEngine {
    * @param {string}  [params.failureReason]     - Human-readable failure reason (failure only).
    * @param {number|null} [params.rollValue]      - The crafting check total (`checkResult.value`),
    *   or null when no check ran; the card renders it only when finite.
-   * @param {object|null} [params.natStep]         - Actual routed natural-step evidence.
+   * @param {object|null} [params.tierStep]        - Realized routed tier-step evidence
+   *   (`data.tierStepApplied`), or null when the rolled tier was never moved.
    * @private
    */
   async _postCraftChatMessage({
@@ -4041,7 +4318,7 @@ export class CraftingEngine {
     createdResults,
     failureReason,
     rollValue = null,
-    natStep = null,
+    tierStep = null,
   }) {
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(recipe?.craftingSystemId);
@@ -4070,7 +4347,7 @@ export class CraftingEngine {
         })),
         tools: toolEntries,
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
-        natStep,
+        tierStep,
         failureReason: failureReason || '',
       },
       localize
@@ -4170,7 +4447,8 @@ export class CraftingEngine {
    * @param {string}  [params.failureReason] - Human-readable reason (failure only).
    * @param {number|null} [params.rollValue]  - The salvage check total (`checkResult.value`),
    *   or null when no check ran; the card renders it only when finite.
-   * @param {object|null} [params.natStep]     - Actual routed natural-step evidence.
+   * @param {object|null} [params.tierStep]    - Realized routed tier-step evidence
+   *   (`data.tierStepApplied`), or null when the rolled tier was never moved.
    * @private
    */
   async _postSalvageChatMessage({
@@ -4183,7 +4461,7 @@ export class CraftingEngine {
     usedTools,
     failureReason,
     rollValue = null,
-    natStep = null,
+    tierStep = null,
   }) {
     if (!system || system.features?.chatOutput !== true) return;
 
@@ -4212,7 +4490,7 @@ export class CraftingEngine {
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
-        natStep,
+        tierStep,
         failureReason: failureReason || '',
       },
       localize
@@ -4412,23 +4690,23 @@ export class CraftingEngine {
     return lines.join('\n');
   }
 
+  /**
+   * The recipe narrowed to one execution step. The sets/result-groups narrowing and
+   * the recipe+step `toolIds` UNION come from the SHARED {@link buildStepRecipeView}
+   * that `CraftingListingBuilder` also uses (issue 917), so the read side evaluates
+   * craftability against exactly the view this engine crafts against.
+   *
+   * The engine layers two execution-only concerns on top: `toolBonusModes` is dropped
+   * (the step view must not carry the recipe-level bonus modes into a check), and
+   * routing/selection take step-else-recipe precedence.
+   * @private
+   */
   _buildStepRecipeView(recipe, step) {
-    const recipeWithoutToolBonusModes = { ...recipe };
-    delete recipeWithoutToolBonusModes.toolBonusModes;
-    return {
-      ...recipeWithoutToolBonusModes,
-      ingredientSets: step?.ingredientSets || recipe.ingredientSets || [],
-      resultGroups: step?.resultGroups || recipe.resultGroups || [],
-      outcomeRouting: step?.outcomeRouting || recipe.outcomeRouting || null,
-      resultSelection: step?.resultSelection || recipe.resultSelection || null,
-      // Merge step-level toolIds with recipe-level so the union flows to
-      // RecipeManager.getToolsForSet via recipe.toolIds. getToolsForSet dedupes
-      // by id, so recipe/step overlap resolves once.
-      toolIds: [
-        ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
-        ...(Array.isArray(step?.toolIds) ? step.toolIds : []),
-      ],
-    };
+    const view = buildStepRecipeView(recipe, step);
+    delete view.toolBonusModes;
+    view.outcomeRouting = step?.outcomeRouting || recipe.outcomeRouting || null;
+    view.resultSelection = step?.resultSelection || recipe.resultSelection || null;
+    return view;
   }
 
   _getSalvageRunManager() {
@@ -4765,7 +5043,7 @@ export class CraftingEngine {
         usedTools,
         failureReason: checkResult.message || 'Salvage check failed',
         rollValue: rollTotalForCard(checkResult),
-        natStep: natStepForCard(checkResult),
+        tierStep: tierStepForCard(checkResult),
       });
 
       return {
@@ -4870,7 +5148,7 @@ export class CraftingEngine {
       usedTools,
       failureReason: '',
       rollValue: rollTotalForCard(checkResult),
-      natStep: natStepForCard(checkResult),
+      tierStep: tierStepForCard(checkResult),
     });
 
     return {
@@ -5215,7 +5493,6 @@ export class CraftingEngine {
       relativeOutcomes: routed.relativeOutcomes,
       fixedOutcomes: routed.fixedOutcomes,
       triggers: routed.checkBreakage?.triggers,
-      natStepping: routed.natStepping === true,
       actor,
       label: 'Salvage',
       // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-

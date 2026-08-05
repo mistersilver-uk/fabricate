@@ -18,10 +18,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
 
-  let {
-    effect = {},
-    summary = ''
-  } = $props();
+  let { effect = {}, summary = '' } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -36,34 +33,49 @@
       on: effect?.showAccess === true,
       label: text('FABRICATE.Admin.Manager.CraftingEffect.AccessSubTab', 'Access sub-tab'),
       onWord: text('FABRICATE.Admin.Manager.CraftingEffect.Visible', 'Visible'),
-      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden')
+      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden'),
     },
     {
       key: 'books-scrolls',
       on: effect?.showBooksScrolls === true,
-      label: text('FABRICATE.Admin.Manager.CraftingEffect.BooksScrollsSubTab', 'Books & Scrolls sub-tab'),
+      label: text(
+        'FABRICATE.Admin.Manager.CraftingEffect.BooksScrollsSubTab',
+        'Books & Scrolls sub-tab'
+      ),
       onWord: text('FABRICATE.Admin.Manager.CraftingEffect.Visible', 'Visible'),
-      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden')
+      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden'),
     },
     {
       key: 'limited-use',
       on: effect?.showLimitedUse === true,
-      label: text('FABRICATE.Admin.Manager.CraftingEffect.LimitedUseControl', 'Limited use control'),
+      label: text(
+        'FABRICATE.Admin.Manager.CraftingEffect.LimitedUseControl',
+        'Limited use control'
+      ),
       onWord: text('FABRICATE.Admin.Manager.CraftingEffect.Shown', 'Shown'),
-      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden')
+      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden'),
     },
     {
       key: 'learning-limits',
       on: effect?.showLearningLimits === true,
-      label: text('FABRICATE.Admin.Manager.CraftingEffect.LearningLimitsControl', 'Learning limits control'),
+      label: text(
+        'FABRICATE.Admin.Manager.CraftingEffect.LearningLimitsControl',
+        'Learning limits control'
+      ),
       onWord: text('FABRICATE.Admin.Manager.CraftingEffect.Shown', 'Shown'),
-      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden')
-    }
+      offWord: text('FABRICATE.Admin.Manager.CraftingEffect.Hidden', 'Hidden'),
+    },
   ]);
 </script>
 
-<section class="manager-crafting-effect" data-crafting-effect aria-label={text('FABRICATE.Admin.Manager.CraftingEffect.Title', 'Effect on this system')}>
-  <p class="manager-crafting-effect-kicker">{text('FABRICATE.Admin.Manager.CraftingEffect.Title', 'Effect on this system')}</p>
+<section
+  class="manager-crafting-effect"
+  data-crafting-effect
+  aria-label={text('FABRICATE.Admin.Manager.CraftingEffect.Title', 'Effect on this system')}
+>
+  <p class="manager-crafting-effect-kicker">
+    {text('FABRICATE.Admin.Manager.CraftingEffect.Title', 'Effect on this system')}
+  </p>
 
   <div class="manager-crafting-effect-rows">
     {#each rows as row (row.key)}

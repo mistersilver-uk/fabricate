@@ -17,10 +17,26 @@
   icons on every row turned it into a toolbar and truncated the description, which is
   the finding the Recipe Studio already recorded and ruling 1 makes binding here.
 
+  ── THE BULK SELECTION BOX (issue 772) ───────────────────────────────────────────
+  A `SelectionCheckbox` at the row's TRAILING edge, AFTER the `fa-pen`, per the prototype
+  — not a raw `<input type="checkbox">` at the leading edge wearing Foundry's default
+  control chrome, which is a second selection design.
+
+  It is a SIBLING of the row's identity `<button>`, never nested in it, so clicking the box
+  selects the row for bulk edit and clicking the row still opens it in the inspector.
+  `SelectionCheckbox` renders NO `<button>`, which is load-bearing: the Foundry smoke walk
+  reaches Edit through `.manager-component-row … button:has(i.fa-pen)` and a looser
+  `.manager-component-row button` selector elsewhere must not start matching this control.
+
+  `.is-bulk-selected` is a DIFFERENT question from `.is-selected` — "this row is in the set
+  the Apply will write to" versus "you are here" — and a row can carry both.
+
   Strings arrive pre-localized — this is a presentational leaf.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import Medallion from '../../../components/Medallion.svelte';
+  import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
 
   let {
@@ -38,23 +54,27 @@
     editLabel = '',
     editTitle = '',
     noDescriptionText = '',
+    // Whether this row is ticked for BULK edit (issue 772), and the pre-localized
+    // accessible name for the box that ticks it.
+    bulkSelected = false,
+    selectLabel = '',
     onSelect = () => {},
-    onEdit = () => {}
+    onEdit = () => {},
+    onToggleSelect = () => {},
   } = $props();
 
   const essences = $derived(Array.isArray(component?.essences) ? component.essences : []);
 </script>
 
 <li
-  class={`manager-component-row ${selected ? 'is-selected' : ''}`}
+  class="manager-component-row"
+  class:is-selected={selected}
+  class:is-bulk-selected={bulkSelected}
   data-component-id={component?.id}
+  data-component-bulk-selected={bulkSelected}
   aria-current={selected ? 'true' : undefined}
 >
-  <button
-    type="button"
-    class="manager-component-identity"
-    onclick={() => onSelect(component?.id)}
-  >
+  <button type="button" class="manager-component-identity" onclick={() => onSelect(component?.id)}>
     <!-- The shared Medallion, as the recipe row uses: a flat fill on the surface ramp
          with a real glyph fallback, rather than a hand-rolled chip whose fallback was a
          private `icons/svg/item-bag.svg` path. Gradients stay forbidden. -->
@@ -71,13 +91,19 @@
     {#if categoryBadge}
       <!-- Suppressed for `general` by the caller: no redundant "General" chip, mirroring
            the Recipe Studio's badge-vs-filter asymmetry. `general` stays a FILTER option. -->
-      <span class="manager-chip manager-component-category-badge" data-component-category={categoryBadge}>{categoryBadge}</span>
+      <Chip class="manager-component-category-badge" data-component-category={categoryBadge}
+        >{categoryBadge}</Chip
+      >
     {/if}
     {#if difficultyBadge}
-      <span class="manager-chip is-info manager-component-difficulty-badge" data-component-difficulty>
-        <i class="fas fa-gauge-high" aria-hidden="true"></i>
+      <Chip
+        tone="info"
+        icon="fas fa-gauge-high"
+        class="manager-component-difficulty-badge"
+        data-component-difficulty
+      >
         <span>{difficultyBadge}</span>
-      </span>
+      </Chip>
     {/if}
     <!-- Source origin is a real STATE, so it wears the shared StatusPill the recipe row's
          states use, not a raw chip. -->
@@ -85,13 +111,13 @@
     {#if essences.length > 0}
       <span class="manager-chip-row manager-component-essence-dots">
         {#each essences as essence (essence.id)}
-          <span
-            class="manager-chip manager-essence-compact-chip"
+          <Chip
+            class="manager-essence-compact-chip"
+            icon={essence.icon || 'fas fa-mortar-pestle'}
             title={`${essence.name || essence.id} ${essence.quantity}`}
             aria-label={`${essence.name || essence.id} ${essence.quantity}`}
+            >{essence.quantity}</Chip
           >
-            <i class={essence.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>{essence.quantity}
-          </span>
         {/each}
       </span>
     {/if}
@@ -108,5 +134,16 @@
     >
       <i class="fas fa-pen" aria-hidden="true"></i>
     </button>
+    <!-- AFTER the pen, per the prototype. `.manager-action-group` is a `<span>`, so the
+         primitive renders its own `<label>` (`wrapper="label"`) — without it the visible
+         box would have no label association and no click target. -->
+    <SelectionCheckbox
+      size="lg"
+      wrapper="label"
+      checked={bulkSelected}
+      ariaLabel={selectLabel}
+      data-component-select={component?.id}
+      onChange={() => onToggleSelect(component?.id)}
+    />
   </span>
 </li>

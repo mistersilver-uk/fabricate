@@ -25,6 +25,8 @@
   Strings arrive pre-localized — this is a presentational leaf.
 -->
 <script>
+  import Chip from '../Chip.svelte';
+
   let {
     dirty = false,
     saving = false,
@@ -33,12 +35,12 @@
     dirtyLabel = '',
     backLabel = '',
     saveLabel = '',
-    onBack = () => {}
+    onBack = () => {},
   } = $props();
 </script>
 
 {#if dirty}
-  <span class="manager-chip is-warning" data-component-edit-dirty>{dirtyLabel}</span>
+  <Chip tone="warning" data-component-edit-dirty>{dirtyLabel}</Chip>
 {/if}
 <!-- Ghost, matching the recipe editor's Back (ruling 1): Back is not a peer of Save, and
      at the base `.manager-button` weight it competed with it. -->

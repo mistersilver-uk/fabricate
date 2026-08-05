@@ -33,8 +33,9 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   consumed: 'FABRICATE.Chat.Consumed',
   tools: 'FABRICATE.Chat.Tools',
   roll: 'FABRICATE.Chat.Roll',
-  natStepUp: 'FABRICATE.Chat.NaturalStepUp',
-  natStepDown: 'FABRICATE.Chat.NaturalStepDown',
+  tierStepUp: 'FABRICATE.Chat.TierStepUp',
+  tierStepDown: 'FABRICATE.Chat.TierStepDown',
+  tierStepTarget: 'FABRICATE.Chat.TierStepTarget',
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
 });
@@ -79,11 +80,34 @@ function renderRollTotal(value, label) {
   ].join('');
 }
 
-/** Render localized natural-step evidence only for a completed up/down step. */
-function renderNaturalStep(natStep, keys, localize) {
-  if (natStep?.direction !== 'up' && natStep?.direction !== 'down') return '';
-  const key = natStep.direction === 'up' ? keys.natStepUp : keys.natStepDown;
-  return `<div class="fabricate-craft-chat__notice fabricate-craft-chat__nat-step">${esc(localize(key))}</div>`;
+/**
+ * Render localized tier-step evidence (issue 975) for a realized tier change, as a
+ * three-way dispatch on the resolved NET `mode`. A `target` step is directionless
+ * and countless — "you were placed on Masterwork" has no magnitude — so it renders
+ * its own key; a relative `up`/`down` step renders the realized magnitude.
+ *
+ * The `{steps}` placeholder is substituted HERE rather than by the caller: both card
+ * modules take `localize` as a key-only `(key) => string` (its default is identity),
+ * so it cannot format, and widening that signature would ripple through both modules,
+ * their two wrappers and their tests for one string.
+ */
+function renderTierStep(tierStep, keys, localize) {
+  const mode = tierStep?.mode;
+  let text;
+  if (mode === 'target') {
+    text = localize(keys.tierStepTarget);
+  } else if (mode === 'up' || mode === 'down') {
+    // Evidence is present only on a REALIZED move, so a relative step always carries a
+    // positive magnitude; anything else is malformed and renders no note at all rather
+    // than a broken "stepped up  tiers" sentence.
+    const steps = Number(tierStep.steps);
+    if (!Number.isFinite(steps) || steps <= 0) return '';
+    const key = mode === 'up' ? keys.tierStepUp : keys.tierStepDown;
+    text = String(localize(key)).replace('{steps}', String(steps));
+  } else {
+    return '';
+  }
+  return `<div class="fabricate-craft-chat__notice fabricate-craft-chat__tier-step">${esc(text)}</div>`;
 }
 
 /** Render a titled section with an icon grid; returns '' when there are no entries. */
@@ -120,7 +144,8 @@ function renderSection({ heading, entries, modifier }) {
  * @param {Array<{name:string,img:string}>}                 [model.tools]
  * @param {number}  [model.rollValue] - The rolled check total; rendered only when
  *   finite (a no-check "Guaranteed" craft/salvage omits it).
- * @param {{direction:'up'|'down'}} [model.natStep] - Actual routed natural step evidence.
+ * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
+ *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
  * @param {string}  [model.failureReason]
  * @param {object}  keys - The label-key map (e.g. {@link CRAFTING_CHAT_KEYS}).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
@@ -138,7 +163,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
   }
 
   const rollTotal = renderRollTotal(model.rollValue, loc(keys.roll));
-  const naturalStep = renderNaturalStep(model.natStep, keys, loc);
+  const tierStep = renderTierStep(model.tierStep, keys, loc);
 
   const notice =
     !succeeded && model.failureReason
@@ -179,7 +204,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     `<div class="fabricate-craft-chat__subtitle">${subtitleParts.join(' · ')}</div>`,
     '</header>',
     rollTotal,
-    naturalStep,
+    tierStep,
     notice,
     ...sections,
     '</div>',
@@ -208,7 +233,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       consumed: model.consumed,
       tools: model.tools,
       rollValue: model.rollValue,
-      natStep: model.natStep,
+      tierStep: model.tierStep,
       failureReason: model.failureReason,
     },
     CRAFTING_CHAT_KEYS,

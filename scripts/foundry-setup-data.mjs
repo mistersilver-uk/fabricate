@@ -12,7 +12,7 @@
  * the Docker container.
  */
 
-import { mkdirSync, cpSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, cpSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -25,6 +25,21 @@ const DIST_DIR = join(ROOT, 'dist');
 const WORLDS_SRC = join(ROOT, '.foundry-e2e', 'worlds');
 const SYSTEMS_SRC = join(ROOT, '.foundry-e2e', 'systems');
 
+/**
+ * Read a package version out of a Foundry `system.json` / `module.json`.
+ *
+ * @param {string} manifestPath Absolute path to the manifest.
+ * @returns {string|null} The declared version, or null when it cannot be read — an unreadable
+ *   manifest is treated as "not what we want" so the copy is redone rather than trusted.
+ */
+function manifestVersion(manifestPath) {
+  try {
+    return JSON.parse(readFileSync(manifestPath, 'utf8')).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function main() {
   // Create the base directory structure Foundry expects
   for (const sub of ['modules', 'worlds', 'systems']) {
@@ -32,7 +47,7 @@ function main() {
   }
 
   // Create the container cache directory so Docker doesn't create it as root.
-  // The v13 felddy/foundryvtt image runs as the host user (via `user:` in
+  // The felddy/foundryvtt image runs as the host user (via `user:` in
   // docker-compose) and needs write access to both /data and /data/container_cache.
   const cacheDir = join(ROOT, '.foundry-e2e', 'cache');
   mkdirSync(cacheDir, { recursive: true });
@@ -69,17 +84,33 @@ function main() {
     process.stdout.write('Copied smoke world: fabricate-smoke-ci\n');
   }
 
-  // Copy each downloaded game system
+  // Copy each downloaded game system.
+  //
+  // Compared by VERSION, not by mere presence. Presence alone meant a system bump in
+  // `foundry-fetch-systems.mjs` never reached the assembled data directory, so the container went
+  // on running the old release while the world manifest declared the new one. That is not a
+  // cosmetic mismatch: a dnd5e built for the previous core generation loads under the new one and
+  // then fails data preparation on every actor ("Cannot read properties of undefined"), which
+  // surfaces two phases later as an empty compendium rather than as a version problem.
   if (existsSync(SYSTEMS_SRC)) {
     for (const entry of readdirSync(SYSTEMS_SRC, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
+      const source = join(SYSTEMS_SRC, entry.name);
       const dest = join(DATA_DIR, 'systems', entry.name);
-      if (!existsSync(dest)) {
-        cpSync(join(SYSTEMS_SRC, entry.name), dest, { recursive: true });
-        process.stdout.write(`Copied system: ${entry.name}\n`);
-      } else {
-        process.stdout.write(`System ${entry.name} already in data dir, skipping.\n`);
+      const wanted = manifestVersion(join(source, 'system.json'));
+      const installed = existsSync(dest) ? manifestVersion(join(dest, 'system.json')) : null;
+      if (installed !== null && installed === wanted) {
+        process.stdout.write(`System ${entry.name}@${wanted ?? 'unknown'} already in data dir, skipping.\n`);
+        continue;
       }
+      if (installed !== null) {
+        process.stdout.write(
+          `System ${entry.name}@${installed ?? 'unknown'} in data dir differs from ${wanted ?? 'unknown'}; replacing.\n`
+        );
+        rmSync(dest, { recursive: true, force: true });
+      }
+      cpSync(source, dest, { recursive: true });
+      process.stdout.write(`Copied system: ${entry.name}@${wanted ?? 'unknown'}\n`);
     }
   }
 

@@ -19,8 +19,11 @@
  * browse status so no ingredient/result/check detail leaks.
  */
 
+import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
+
+import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 
 /**
  * Resolution-mode → localization key map. Kept in lockstep with the GM manager's
@@ -97,6 +100,11 @@ export class CraftingListingBuilder {
    * @param {object} deps.recipeVisibility - `RecipeVisibilityService` (visibility/knowledge/teaser).
    * @param {object} deps.resolutionModeService - `ResolutionModeService` (mode + result routing).
    * @param {object} deps.craftingSystemManager - System/component library reads.
+   * @param {object} [deps.craftingRunManager] - `CraftingRunManager`, read ONLY through
+   *   its synchronous `findActiveRunForRecipe` so the projection can name the step a
+   *   run is actually parked on (issue 917). A constructor dependency rather than an
+   *   import, mirroring `GatheringListingBuilder`'s `runManager`. Omitted (null) every
+   *   recipe reports `activeStepIndex: 0` — today's behaviour.
    * @param {Function} [deps.getViewer] - Fallback viewer accessor when `buildListing` omits one.
    * @param {Function} [deps.localize] - `(key, data?) => string`.
    * @param {Function} [deps.nowWorldTime] - `() => number` current world time.
@@ -108,6 +116,7 @@ export class CraftingListingBuilder {
     recipeVisibility = null,
     resolutionModeService = null,
     craftingSystemManager = null,
+    craftingRunManager = null,
     getViewer = null,
     localize = (key) => key,
     nowWorldTime = () => 0,
@@ -118,6 +127,7 @@ export class CraftingListingBuilder {
     this.recipeVisibility = recipeVisibility;
     this.resolutionModeService = resolutionModeService;
     this.craftingSystemManager = craftingSystemManager;
+    this.craftingRunManager = craftingRunManager;
     this._getViewer = typeof getViewer === 'function' ? getViewer : null;
     this.localize = typeof localize === 'function' ? localize : (key) => key;
     this._nowWorldTime = typeof nowWorldTime === 'function' ? nowWorldTime : () => 0;
@@ -225,24 +235,25 @@ export class CraftingListingBuilder {
       : [];
     const hidden = new Set(hiddenFields);
 
-    // Match the GM Manager's icon precedence (recipeItemImg || img || default): a recipe
-    // whose icon lives on a linked recipe item keeps the default `recipe.img`, so resolve
-    // the linked item definition's image the same way adminStore does. `recipe.img` is
-    // itself model-defaulted to DEFAULT_RECIPE_IMAGE, so it already supplies the Manager's
-    // trailing default fallback without importing the heavy models/Recipe.js graph here.
-    // Skip the resolved item image for a redacted teaser so an undiscovered recipe's item
-    // icon never leaks.
-    const recipeItemImg = recipe.recipeItemId
-      ? this.craftingSystemManager?.getRecipeItemDefinition?.(
-          recipe.craftingSystemId,
-          recipe.recipeItemId
-        )?.img || ''
-      : '';
-
     const base = {
       id: stringOrNull(recipe.id),
       name: stringOrEmpty(recipe.name),
-      img: stringOrNull(redacted ? recipe.img : recipeItemImg || recipe.img),
+      // A recipe's icon is its OWN `img` and nothing else — `data-models/spec.md`
+      // `## Recipe` requirement 16. This previously borrowed the containing book's
+      // artwork ahead of an authored image, keyed on the legacy `recipe.recipeItemId`
+      // scalar; book membership is many-to-many, so "the containing book" tracked
+      // definition order rather than anything the GM authored (issue 887).
+      //
+      // `resolveRecipeImage` rather than `recipe.img` directly: Foundry's generic
+      // item-bag is the "no image" sentinel, and collapsing without it would render the
+      // BAG for a bag-valued recipe — which `tests/recipe-prompt-img.test.js` records as
+      // an explicit product requirement never to do. The helper is an import-free leaf
+      // already in `CRAFTING_APP_RAW_MODULES`, so this import adds no harness edge; do
+      // NOT reach for `models/Recipe.js` here, which would.
+      //
+      // Redaction no longer needs a branch: with no borrowed item image there is nothing
+      // for an undiscovered recipe's teaser to leak.
+      img: stringOrNull(resolveRecipeImage(recipe)),
       systemId: stringOrNull(recipe.craftingSystemId),
       systemName: stringOrEmpty(system?.name),
       // GM-authored grouping metadata. `category` is the raw normalized token
@@ -269,6 +280,14 @@ export class CraftingListingBuilder {
     // generalization, not a special case. See the Multi-Step Recipe Presentation spec.
     const firstStep = this._firstStep(recipe);
     const firstStepSets = Array.isArray(firstStep?.ingredientSets) ? firstStep.ingredientSets : [];
+
+    // Where the actor's active run has this recipe parked (issue 917). The
+    // projection below deliberately keeps reading the FIRST step: a routed or
+    // progressive multi-step recipe surfaces no `steps[]` at all, so re-pointing the
+    // top-level rail mid-run would silently swap the requirements under the player.
+    // The model NAMES both steps instead, and the UI renders the rail read-only
+    // whenever they differ.
+    const activeStep = this._activeStepState(recipe, craftingActor);
 
     // Per-set craftability (essences + per-set tools + actor-bound currency probe
     // all folded in by evaluateCraftability's per-set pass).
@@ -332,6 +351,18 @@ export class CraftingListingBuilder {
       blockingReasons,
       ingredientSets,
       defaultSetId,
+      // Multi-step run position (issue 917). `activeStepId` names the step the engine
+      // would execute for this actor's active run; `displayedStepId` names the step
+      // whose sets `ingredientSets` above projects. When they differ the requirement
+      // rail must render read-only — what is shown does not drive the craft the
+      // button fires, and the engine drops any allocation sent for the wrong step.
+      // `activeStepTimeGateArmed` forces read-only for the same reason: the inputs
+      // were consumed when the gate was ARMED, a craft click hits the engine's "still
+      // in progress" early return, and the finish path never re-resolves ingredients.
+      activeStepIndex: activeStep.index,
+      activeStepId: stringOrNull(activeStep.step?.id),
+      displayedStepId: stringOrNull(firstStep?.id),
+      activeStepTimeGateArmed: activeStep.timeGateArmed,
       check: this._buildCheck(system, mode, recipe, craftingActor),
       outcomeTiers: this._buildOutcomeTiers({ recipe, system, mode }),
       duration: this._buildDuration({ recipe, system, mode }),
@@ -382,6 +413,13 @@ export class CraftingListingBuilder {
           }))
         : [],
       defaultSetId: null,
+      // A teaser is never craftable, so it carries no run position: the fields are
+      // present (uniform model shape) but inert. Redacted for the same reason
+      // `steps` is — a teaser exposes no step structure at all.
+      activeStepIndex: 0,
+      activeStepId: null,
+      displayedStepId: null,
+      activeStepTimeGateArmed: false,
       // Timing is always spoiler detail for a Discovery-Mode teaser, independent
       // of the configurable result-field redaction list.
       duration: null,
@@ -433,26 +471,38 @@ export class CraftingListingBuilder {
   }
 
   /**
-   * A read-side mirror of `CraftingEngine._buildStepRecipeView`: a shallow copy of
-   * the recipe narrowed to one execution step's sets/result groups, with the tool
-   * ids as the UNION of recipe-level and step-level ids (deduped downstream by
-   * `RecipeManager.getToolsForSet`). The union — NOT a step-else-recipe fallback —
-   * is what the engine consumes at craft time, so the projection must evaluate
-   * against the same tool set or the tile would disagree with the craft (D1).
+   * The recipe narrowed to one execution step, through the SHARED
+   * {@link buildStepRecipeView} the engine also uses (issue 917) — the read side and
+   * the write side previously carried private twins of this projection and must not
+   * drift. The tool ids are the UNION of recipe-level and step-level ids (deduped
+   * downstream by `RecipeManager.getToolsForSet`); the union — NOT a step-else-recipe
+   * fallback — is what the engine consumes at craft time, so the projection must
+   * evaluate against the same tool set or the tile would disagree with the craft (D1).
    * @private
    */
   _stepRecipeView(recipe, step) {
-    return {
-      ...recipe,
-      ingredientSets: Array.isArray(step?.ingredientSets)
-        ? step.ingredientSets
-        : recipe.ingredientSets,
-      resultGroups: Array.isArray(step?.resultGroups) ? step.resultGroups : recipe.resultGroups,
-      toolIds: [
-        ...(Array.isArray(recipe?.toolIds) ? recipe.toolIds : []),
-        ...(Array.isArray(step?.toolIds) ? step.toolIds : []),
-      ],
-    };
+    return buildStepRecipeView(recipe, step);
+  }
+
+  /**
+   * The execution step this actor's active run has the recipe parked on, plus
+   * whether that step's world-time gate is already armed (issue 917). Both come from
+   * the SHARED {@link activeRunStepState}, which performs exactly the reads
+   * `CraftingEngine.craft` performs before it resolves the step it will execute.
+   *
+   * `step` is null when the index names no execution step (a run left pointing past
+   * the end of a re-authored recipe) — the engine aborts that craft with "No active
+   * crafting step available", so a null here correctly reads as "nothing the player
+   * sees drives a craft".
+   * @private
+   */
+  _activeStepState(recipe, craftingActor) {
+    const { index, timeGateArmed } = activeRunStepState(
+      this.craftingRunManager,
+      craftingActor,
+      recipe?.id
+    );
+    return { index, timeGateArmed, step: this._executionSteps(recipe)[index] ?? null };
   }
 
   /**

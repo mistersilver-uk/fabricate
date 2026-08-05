@@ -1,4 +1,5 @@
 import { RunContainerManagerBase } from './runContainerStore.js';
+import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -80,6 +81,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       // by markStepPrepared; read by the engine at FINISH so the resume can
       // transfer essences and build results/chat/history without re-reading the
       // (now-deleted) source items. Undefined for non-timed / instant steps.
+      // Its `currencySpends` holds the SETTLED deductions only (issue 902), because the
+      // cancel reversal refunds exactly what it finds there.
       preparedConsumption: undefined,
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,
@@ -166,10 +169,17 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * the resume can transfer essences and build the result / chat / history entry
    * without re-reading the source items (which are already deleted).
    *
+   * `currencySpends` records what the deduction ACTUALLY SETTLED, never what was intended
+   * (issue 902). It is the sole input to the cancel reversal's refund, so a spend that did
+   * not settle must not appear here — otherwise cancelling hands back currency the actor
+   * never paid. An empty array is the correct record for a step whose currency deduction
+   * settled nothing, and the reversal's own `length > 0` guard then skips the refund.
+   *
    * @param {Actor} actor
    * @param {object} run
    * @param {number} stepIndex
-   * @param {{ selectedIngredientSetId?: string|null, currencySpends?: Array,
+   * @param {{ selectedIngredientSetId?: string|null,
+   *   currencySpends?: Array<{unit: string, amount: number}>,
    *   resolvedEssences?: object, consumedSummary?: Array }} prepared
    * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
    */
@@ -178,6 +188,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     if (!step) return null;
     step.preparedConsumption = {
       selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
+      // SETTLED spends only — see the note above.
       currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
       resolvedEssences:
         prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
@@ -451,8 +462,17 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }
   }
 
+  /**
+   * Startup maintenance: drop active runs and history entries naming a deleted
+   * recipe or crafting system.
+   *
+   * Scoped to the actors THIS client may write (issue 970). It runs on every client
+   * at `initialize()`, and a player owns only their own characters, so an
+   * un-filtered walk made a single stale entry on someone else's character reject
+   * the whole startup sequence.
+   */
   async cleanupInvalidRuns(validRecipeIds = new Set(), validSystemIds = new Set()) {
-    for (const actor of game.actors || []) {
+    for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
       let dirty = false;
 
@@ -493,13 +513,16 @@ export class CraftingRunManager extends RunContainerManagerBase {
    *
    * Unknown recipes are left alone here — {@link cleanupInvalidRuns} owns those.
    *
+   * Scoped to the actors THIS client may write, for the reason given on
+   * {@link cleanupInvalidRuns} (issue 970).
+   *
    * @param {(recipeId: string) => (object|null)} resolveRecipe
    * @returns {Promise<number>} the number of phantom runs pruned
    */
   async pruneInstantaneousActiveRuns(resolveRecipe) {
     if (typeof resolveRecipe !== 'function') return 0;
     let pruned = 0;
-    for (const actor of game.actors || []) {
+    for (const actor of selectWritableActors(game.actors)) {
       const container = this._getContainer(actor);
       let dirty = false;
 

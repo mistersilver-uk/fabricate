@@ -31,9 +31,27 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
   ],
   compiledModules: [
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // The shared side-panel explainer card and icon fact row (issue 881); the behavior
+    // preview renders both.
+    'src/ui/svelte/apps/manager/ExplainerCard.svelte',
+    'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    // The shared chip (issue 883); the library rows, the browser inspector, the editor
+    // tab bar and the behavior preview all render it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared selection control (issue 772). `ChecklistCardRow` below renders it after
+    // the conversion, so it is in this tree's static graph; the harness's closure validator
+    // throws for a shared-harness suite that omits it.
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // The shipped segmented primitive (issue 975): `RecipeIngredientOption` below
+    // renders it for the tag-match Any/All control, so it is in this tree's static
+    // import graph and the closure validator throws without it.
+    'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ChecklistCardRow.svelte',
     'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
@@ -216,6 +234,36 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(sourceCard.querySelector('[data-tool-source-picker]'), null);
     assert.equal(sourceCard.querySelector('.manager-tool-source-replace'), null);
     assert.equal(root.querySelectorAll('[data-tool-how-it-works] li').length, 6);
+    // The bold lead-in and its prose are one sentence and need a separator between them.
+    // A literal space in the template is the last token inside the `{#if}`, and Svelte
+    // trims block-trailing whitespace, so they rendered welded: "…game-world Item.Drag any
+    // Item…". Every existing assertion here matches MID-sentence and so cannot see the
+    // join; this one straddles it. Found in a screenshot, not by a test (issue 881).
+    for (const row of root.querySelectorAll('[data-tool-how-it-works] li')) {
+      const prose = row.querySelector('span');
+      // The row's ONE leading space is the other half of that fix and is just as fragile.
+      // The `{' '}` separator carries an `eslint-disable-next-line
+      // svelte/no-useless-mustaches` directive that MUST stay welded to the preceding
+      // markup comment's `-->`: moved onto its own line it splits the surrounding markup
+      // whitespace into two runs, Svelte collapses each to one space, and the row renders
+      // with a DOUBLE space between the glyph and the prose. The `<span>` text is byte-identical
+      // either way, so only an assertion over the whole ROW text can see it — and reflowing
+      // that one line is the likeliest way a human silently undoes the fix.
+      assert.equal(
+        row.textContent,
+        ` ${prose.textContent}`,
+        `explainer row must render exactly one space before its prose, got ${JSON.stringify(row.textContent.slice(0, 60))}`
+      );
+
+      const lead = row.querySelector('strong')?.textContent;
+      if (!lead) continue;
+      // Asserted on the span rather than the row, so the leading whitespace above does not
+      // have to be restated here; `startsWith` pins the lead-in join at exactly one space.
+      assert.ok(
+        prose.textContent.startsWith(`${lead} `) && !prose.textContent.startsWith(`${lead}  `),
+        `explainer lead-in "${lead}" must be followed by exactly one space, got ${JSON.stringify(prose.textContent.slice(0, 60))}`
+      );
+    }
     assert.match(
       root.querySelector('[data-tool-how-it-works] li:nth-child(1)').textContent,
       /supplies the name, art, and description/
@@ -242,7 +290,9 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelector('[data-tool-how-it-works] button'), null);
     assert.equal(
-      root.querySelector('[data-tool-how-it-works] a.manager-tool-docs-link')?.textContent.trim(),
+      root
+        .querySelector('[data-tool-how-it-works] a.manager-explainer-card-docs')
+        ?.textContent.trim(),
       'Read the docs'
     );
     assert.equal(root.querySelector('[data-tool-name]'), null);
@@ -668,6 +718,71 @@ describe('Tool Studio editor (mounted)', () => {
     assert.equal(document.querySelector('[data-recipe-add="alternative-currency"]'), null);
   });
 
+  // Whitespace between sibling elements is significant in Svelte markup: a newline in the
+  // template becomes a text node in the DOM. Adding `.svelte` to Prettier's scope (issue 923)
+  // reflowed 211 components, and these two tabs are the only ones whose compiled template
+  // changed — eight whitespace text nodes appeared between the kicker/heading/prose blocks
+  // and between the info strip's glyph and its paragraph. A Chromium geometry comparison of
+  // the pre- and post-format renders showed no layout difference (block containers collapse
+  // the run, and the one node that lands directly in a flex container generates no flex item),
+  // so the reformat shipped rather than being fenced off with `<!-- prettier-ignore -->`.
+  //
+  // Nothing else in the suite can see that class of change: every other assertion here reads a
+  // single element's own text, and `manager-layout.test.js` exercises a hand-authored fixture
+  // rather than these components. This pins the joins so the NEXT reflow cannot move them
+  // unnoticed. Expectations are derived from the children rather than written out, so a copy
+  // change does not fail the test but a whitespace change does — the same shape as the
+  // `ExplainerCard` row assertion above.
+  //
+  // The `data-*-copy` hooks exist for this test. `.manager-kicker` is not usable as a selector
+  // here: `ToolBreakageTab` renders four of them, and `:nth-of-type` scoping would silently
+  // follow the wrong node the moment the markup is reordered.
+  const joinedByOneSpace = (element, hook) => {
+    const children = [...element.children];
+    assert.ok(children.length > 1, `${hook} must have sibling children to join`);
+    assert.equal(
+      element.textContent,
+      children.map((child) => child.textContent).join(' '),
+      `${hook} must separate each pair of sibling blocks with exactly one space, got ${JSON.stringify(element.textContent.slice(0, 80))}`
+    );
+  };
+
+  it('separates the breakage tab sibling blocks with exactly one whitespace run', async () => {
+    const root = await harness.mount(props({ activeTab: 'breakage' }));
+
+    for (const hook of [
+      '[data-tool-authority-copy]',
+      '[data-tool-limited-uses-copy]',
+      '[data-tool-limited-uses-info]',
+    ]) {
+      const element = root.querySelector(hook);
+      assert.ok(element, `${hook} must render`);
+      joinedByOneSpace(element, hook);
+    }
+
+    // The on-break legend is the one join in these files with an inline element on BOTH sides
+    // — `<span>` then `<small>`, with no block box to collapse a run against. Prettier leaves
+    // it welded today; if a later reflow split it, the newline would become a text node this
+    // assertion sees. Kept deliberately opposite to the rule above: NO separator here.
+    const legend = root.querySelector('[data-tool-on-break-legend]');
+    assert.ok(legend, 'the on-break legend must render');
+    assert.equal(
+      legend.textContent,
+      [...legend.children].map((child) => child.textContent).join(''),
+      `the on-break legend must keep its label and badge welded, got ${JSON.stringify(legend.textContent)}`
+    );
+  });
+
+  it('separates the requirements tab sibling blocks with exactly one whitespace run', async () => {
+    const root = await harness.mount(props({ activeTab: 'requirements' }));
+
+    for (const hook of ['[data-tool-prerequisites-copy]', '[data-tool-bonus-copy]']) {
+      const element = root.querySelector(hook);
+      assert.ok(element, `${hook} must render`);
+      joinedByOneSpace(element, hook);
+    }
+  });
+
   it('authors prerequisite AND gates, gate mode, and a hint-led bonus expression', async () => {
     const patches = [];
     const root = await harness.mount(
@@ -722,6 +837,52 @@ describe('Tool Studio editor (mounted)', () => {
     assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('strong')));
     assert.ok(patches.some((patch) => patch.prerequisites?.gateMode === 'bonus'));
     assert.ok(patches.some((patch) => patch.bonus?.expression === '1d4'));
+  });
+
+  // Issue 772, acceptance 11 — the ONLY proof that extracting the check box out of
+  // `ChecklistCardRow` left this tab rendering what it rendered before. There is no Tool
+  // Studio screenshot recipe that `ChecklistCardRow.svelte` matches (it routes to the
+  // broad theme-or-global-ui recipe only), so no published frame can show it either.
+  //
+  // The three things a conversion of this shape can silently break: the box stops being a
+  // real `<input type="checkbox">` (killing the keyboard, the label association and every
+  // `input[value=…]` selector this suite already uses); the checked state stops rendering;
+  // or the change callback stops firing. Each is asserted below.
+  it('renders the prerequisite row through the shared selection control after the conversion', async () => {
+    const patches = [];
+    const root = await harness.mount(
+      props({
+        activeTab: 'requirements',
+        tool: tool({ prerequisites: { enabled: true, ids: ['expert'], gateMode: 'block' } }),
+        onPatch: (patch) => patches.push(patch),
+      })
+    );
+
+    const rows = [...root.querySelectorAll('[data-tool-prerequisite-row]')];
+    assert.equal(rows.length, 5);
+
+    // The real control survives the extraction, and the row still owns the `<label>` — the
+    // primitive is rendered in `contents` mode precisely so no second label is nested here.
+    for (const row of rows) {
+      assert.equal(row.tagName, 'LABEL');
+      assert.equal(row.querySelectorAll('label').length, 0);
+      const box = row.querySelector('input[type="checkbox"]');
+      assert.ok(box, 'every prerequisite row renders a real checkbox');
+      // A bare Foundry-chromed checkbox is a SECOND selection design; the custom box has
+      // to be there beside the hidden input.
+      assert.ok(row.querySelector('.fab-selection-check.is-sm'));
+    }
+
+    // Checked state reaches the visible box, not just the input.
+    const expertRow = rows[0];
+    assert.equal(expertRow.querySelector('input[value="expert"]').checked, true);
+    assert.equal(expertRow.querySelector('.fab-selection-check').classList.contains('is-checked'), true);
+    assert.equal(rows[1].querySelector('input[value="smith"]').checked, false);
+    assert.equal(rows[1].querySelector('.fab-selection-check').classList.contains('is-checked'), false);
+
+    // And the change callback still reaches the tab's patch handler through the primitive.
+    root.querySelector('.manager-tool-prerequisite-list input[value="smith"]').click();
+    assert.ok(patches.some((patch) => patch.prerequisites?.ids?.includes('smith')));
   });
 
   it('renders the recipe-style grouped validation surface and Validation-only live preview note', async () => {
@@ -784,6 +945,12 @@ describe('Tool Studio editor (mounted)', () => {
       null
     );
     assert.equal(root.querySelectorAll('[data-tool-preview-rule] i').length, 4);
+    // Issue 881: every effective-rule row is the shared icon fact row, so the preview and
+    // the library inspector cannot drift back into two geometries for one projection.
+    assert.equal(
+      root.querySelectorAll('[data-tool-preview-rule] > .manager-icon-fact-row').length,
+      4
+    );
     assert.ok(root.querySelector('[data-tool-preview-live-update]'));
   });
 
@@ -864,7 +1031,7 @@ describe('Tool Studio editor (mounted)', () => {
     );
   });
 
-  it('uses prototype preview copy and omits the live-update note outside Validation', async () => {
+  it('uses prototype preview copy and shows the live-update note on every tab', async () => {
     const root = await harness.mount(props({ activeTab: 'breakage' }));
 
     assert.equal(
@@ -882,7 +1049,20 @@ describe('Tool Studio editor (mounted)', () => {
     );
     assert.equal(root.querySelector('[data-tool-preview-bonus]').textContent, 'Adds @prof');
     assert.match(root.querySelector('[data-tool-preview-identity]').textContent, /5 uses.*@prof/);
-    assert.equal(root.querySelector('[data-tool-preview-live-update]'), null);
+    // The note stands on EVERY tab (issue 883). The preview updates live whichever tab you
+    // are editing, so gating the statement on Validation understated it — the maintainer
+    // moved it above Effective rules and dropped the condition, which retires the
+    // prototype's tab-scoped placement deliberately.
+    //
+    // Asserted as a boolean rather than by comparing the node to `null`/an element: on
+    // failure node:assert serialises the actual value for its diff, and walking a mounted
+    // happy-dom element's circular tree exhausts the heap. The suite then reports
+    // `# cancelled` with no message, which reads like a hang rather than a failed
+    // expectation — this exact assertion cost an OOM to diagnose.
+    assert.ok(
+      !!root.querySelector('[data-tool-preview-live-update]'),
+      'the live-update note renders on every tab, not only Validation'
+    );
   });
 
   it('localizes effective behavior states instead of exposing stored mode tokens', async () => {

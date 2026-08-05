@@ -82,6 +82,7 @@ import {
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
 } from '../../../systems/currencyProfile.js';
+import { normalizeModifierPolicy } from '../../../systems/craftingModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
@@ -98,6 +99,13 @@ import {
 } from '../../../utils/recipeActivationMessages.js';
 import { craftingEffect } from '../apps/manager/crafting/craftingVisibility.js';
 import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
+import { getFabricateFlag } from '../../../config/flags.js';
+import {
+  defaultKnowledgeTab,
+  projectKnowledgeSnapshot,
+  recipeItemLabelFromUuid as _recipeItemLabelFromUuid,
+  recipeItemTypeFromRecipeCount as _recipeItemTypeFromRecipeCount,
+} from '../apps/manager/knowledge/knowledgeStudio.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -443,6 +451,32 @@ function _isRecipeIncomplete(recipe) {
     return recipe.validate().valid === false && recipe.validateStructure().valid === true;
   }
   return _isRecipeIncompleteByCounts(recipe);
+}
+
+/**
+ * Derive whether ACTIVATION would refuse this recipe (issue 1010) — the ONE predicate
+ * behind the row's `Can't enable` pill, the bulk panel's pre-flight count and the bulk
+ * write's `blockedEnables`. `RecipeManager.canActivateRecipe` runs the same
+ * `_validateRecipeForActivation` the write runs, against a clone with `enabled: true`.
+ *
+ * It CANNOT be derived from {@link _isRecipeIncomplete}, which is
+ * `validate().valid === false && validateStructure().valid === true`. A STRUCTURALLY
+ * BROKEN recipe therefore reads `incomplete: false` while still being un-enableable, and
+ * none of the essence-reference, tag-placeholder, resolution-mode or alchemy-signature
+ * blockers move it either. Reading `incomplete` here would let the panel warn that three
+ * selected recipes will stay off while zero rows wear the pill — two contradicting
+ * statements about one fact, on one screen.
+ *
+ * The guard covers only a recipe manager that does not implement the predicate (an
+ * injected test seam); an invalid RESULT is never swallowed.
+ *
+ * @param {object} recipeManager
+ * @param {Recipe} recipe
+ * @returns {boolean}
+ */
+function _isRecipeEnableBlocked(recipeManager, recipe) {
+  if (typeof recipeManager?.canActivateRecipe !== 'function') return false;
+  return !recipeManager.canActivateRecipe(recipe).valid;
 }
 
 function _buildRecipeBrowserDisplay(recipe, craftingSystem = null) {
@@ -1629,10 +1663,16 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
   const prepared = recipes.map((recipe) => {
     const display = _buildRecipeBrowserDisplay(recipe, selectedSystem);
     // Book membership (many-to-many): the books that contain this recipe. The
-    // legacy scalar `recipeItemId`/name/img reflect the FIRST containing book.
+    // legacy scalars `recipeItemId`/name/source reflect the FIRST containing book —
+    // an accident of definition order, which is exactly why NO image is derived from
+    // them (issue 884): a recipe's icon is its own `img` and nothing else.
+    // `selectedSystem` here is the RAW manager system (`getSystems()`), not the
+    // hand-built viewState projection, so the membership-basis marker is reachable
+    // without adding it to that allowlist (issue 1011).
     const containingDefinitions = _recipeItemDefinitionsContaining(
       selectedSystem.recipeItemDefinitions,
-      recipe
+      recipe,
+      selectedSystem.membershipResolvesByRecipeIds
     );
     const recipeItemIds = containingDefinitions.map((def) => String(def.id));
     const recipeItemDefinition = containingDefinitions[0] || null;
@@ -1706,12 +1746,19 @@ function _buildRecipeList(systemManager, recipeManager, selectedSystem, recipeSe
       // Derived (no stored flag): a shell missing ingredient sets / result groups is
       // persistable but not craftable. Surfaced as an "Incomplete" chip in the browser.
       incomplete: _isRecipeIncomplete(recipe),
+      // Derived (no stored flag): would ACTIVATION refuse this recipe? See
+      // `_isRecipeEnableBlocked` for why `incomplete` above could NOT have served — a
+      // structurally broken recipe reads `incomplete: false` and still cannot be enabled.
+      // This projection is a hand-built ALLOWLIST, so omitting the field would leave it
+      // invisible to the row pill and every downstream blocked-enable count silently zero.
+      enableBlocked: _isRecipeEnableBlocked(recipeManager, recipe),
       // Book membership: all books containing this recipe (many-to-many), plus the
-      // first book's id/name/img/source for legacy single-link consumers.
+      // first book's id/name/source for legacy single-link consumers. Deliberately no
+      // book IMAGE among them (issue 884): the GM readers resolve `recipe.img` through
+      // the shared `resolveRecipeImage` helper, never a containing book's artwork.
       recipeItemIds,
       recipeItemId,
       recipeItemName: recipeItemDefinition?.name || '',
-      recipeItemImg: recipeItemDefinition?.img || '',
       recipeItemSourceUuid: recipeItemDefinition?.originItemUuid || '',
       // The row's check pill: the system check's DC resolved through this recipe's
       // `checkTierId`, or `{ kind: 'none' }` when the system has no USABLE check
@@ -1840,41 +1887,114 @@ async function _documentDescriptionCandidate(doc, enrichToHtml) {
 // batched with `Promise.all` (never inside a Svelte `$derived`/`$effect`).
 // ---------------------------------------------------------------------------
 
-// Human label for a recipe item whose linked game-world item has not resolved
-// yet (or was deleted) — the trailing UUID segment, matching the manager's own
-// `_labelFromUuid`.
-function _recipeItemLabelFromUuid(uuid) {
-  if (!uuid) return '';
-  const parts = String(uuid).split('.');
-  return parts.at(-1) || '';
+// `_recipeItemLabelFromUuid` and `_recipeItemTypeFromRecipeCount` now live in the
+// pure `knowledge/knowledgeStudio.js` projection and are imported back at the top
+// of this module (issue 785). The Books & Scrolls Type pill and the Knowledge
+// surface's Type column read the SAME derivation, so the two cannot drift.
+
+/**
+ * Fields `_buildRecipeList` DERIVES onto a projected recipe row that are not authored
+ * recipe state (issue 978).
+ *
+ * They exist for display — the browser's book column, the editor's Books & Scrolls tab,
+ * and `handleRemoveRecipeItem`'s post-unlink refresh all read them — but the editor
+ * seeds its draft from a whole projected row and Save posts the whole draft, so without
+ * a strip at the write boundary `recipeItemId` (the only one of the four that is also a
+ * real `Recipe` field) is persisted onto the model. Its value is
+ * `containingDefinitions[0]`, i.e. definition order — an authoring accident.
+ *
+ * The other three are dropped today by `Recipe.fromJSON`, which reconstructs from named
+ * fields. That is a property of the model's current field list rather than a guarantee,
+ * so the whole derived set is stripped and named once here.
+ */
+export const DERIVED_RECIPE_PROJECTION_FIELDS = Object.freeze([
+  'recipeItemId',
+  'recipeItemIds',
+  'recipeItemName',
+  'recipeItemSourceUuid',
+]);
+
+/**
+ * Drop the derived projection fields from a recipe update payload.
+ *
+ * OMITS the keys rather than nulling them. `RecipeManager.updateRecipe` merges
+ * `{ ...recipe.toJSON(), ...updates }`, so an absent key preserves the persisted value
+ * while an explicit `null` would DESTROY the scalar that `_migrateLegacyRecipeItems`
+ * maintains for the standalone alchemy formula-item cohort the 1.13.0 migration
+ * deliberately preserved.
+ *
+ * @param {object} updates A recipe update payload, possibly a whole projected row.
+ * @returns {object} The payload without any derived projection field.
+ */
+export function withoutDerivedRecipeProjectionFields(updates) {
+  if (!updates || typeof updates !== 'object') return updates;
+  if (!DERIVED_RECIPE_PROJECTION_FIELDS.some((field) => field in updates)) return updates;
+  const stripped = { ...updates };
+  for (const field of DERIVED_RECIPE_PROJECTION_FIELDS) delete stripped[field];
+  return stripped;
 }
 
-// Best-effort Book / Scroll / Tome label inferred from the linked item's type
-// and name. Defaults to 'Book' when nothing more specific is detectable.
-// Recipe-item "type" is derived purely from how many recipes it grants, so the
-// Books & Scrolls Type pill/filter is diagnostic: a multi-recipe tome is a "Book",
-// a single-recipe item is a "Scroll", and an item with no recipes linked yet is
-// "Incomplete" (distinct from the `linkMissing` broken-link state). Display strings
-// mirror the existing un-localised `derivedType`.
-function _recipeItemTypeFromRecipeCount(count) {
-  const n = Number(count) || 0;
-  if (n >= 2) return 'Book';
-  if (n === 1) return 'Scroll';
-  return 'Incomplete';
+/**
+ * The result shape of `CraftingSystemManager.applyBulkEditToRecipes` (issue 1010), split
+ * by kind so {@link _normalizeBulkRecipeEditResult} stays a two-line loop rather than an
+ * eight-way object literal of near-identical coercions.
+ */
+const BULK_RECIPE_EDIT_RESULT_COUNTS = Object.freeze([
+  'updated',
+  'blockedEnables',
+  'rejected',
+  'booksUpdated',
+  'bookAdditions',
+  'bookRemovals',
+]);
+const BULK_RECIPE_EDIT_RESULT_ID_LISTS = Object.freeze([
+  'recipeIds',
+  'blockedRecipeIds',
+  'rejectedRecipeIds',
+  'bookIds',
+]);
+
+/**
+ * Coerce the bulk-recipe write result into its full shape so the bulk panel's post-apply
+ * notification can read every count unconditionally.
+ *
+ * All six counts are distinct and none is derivable from another: `updated` counts
+ * recipes that genuinely changed, `blockedEnables` those activation refused (still off,
+ * other axes applied), `rejected` those a persistence failure excluded from the batch
+ * entirely, `booksUpdated` the recipe-book DEFINITIONS whose membership changed, and
+ * `bookAdditions` / `bookRemovals` the membership EDGES it created and destroyed. The last
+ * pair is what the post-apply notification reports: one book over twelve recipes is one
+ * definition and twelve edges, and the GM asked for the twelve.
+ *
+ * @param {object} result
+ * @returns {object} every count as a number and every id list as an array.
+ */
+function _normalizeBulkRecipeEditResult(result) {
+  const normalized = {};
+  for (const key of BULK_RECIPE_EDIT_RESULT_COUNTS) normalized[key] = Number(result?.[key]) || 0;
+  for (const key of BULK_RECIPE_EDIT_RESULT_ID_LISTS) {
+    normalized[key] = Array.isArray(result?.[key]) ? result[key] : [];
+  }
+  return normalized;
 }
 
 // The recipe-item definitions of a system that CONTAIN a recipe (issue 511
-// many-to-many). Canonical read is each definition's `recipeIds[]`; only a system
-// with no membership authored yet falls back to the recipe's book-only `recipeItemId`.
-function _recipeItemDefinitionsContaining(definitions, recipe) {
+// many-to-many). Canonical read is each definition's `recipeIds[]`; only while the
+// system's membership-basis marker is unset does it fall back to the recipe's book-only
+// `recipeItemId`.
+//
+// The basis is a PARAMETER, not re-derived here (issue 1011). This is a module-scope
+// pure helper with no system in scope, and the "any definition has a non-empty
+// recipeIds" inference it used to run flipped in both directions — so the caller threads
+// `system.membershipResolvesByRecipeIds` down from the raw manager system.
+function _recipeItemDefinitionsContaining(definitions, recipe, membershipResolvesByRecipeIds) {
   const defs = Array.isArray(definitions) ? definitions : [];
   const rid = String(recipe?.id || '');
   const byMembership = defs.filter((def) =>
     (Array.isArray(def.recipeIds) ? def.recipeIds : []).some((id) => String(id) === rid)
   );
   if (byMembership.length > 0) return byMembership;
-  const anyMigrated = defs.some((def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0);
-  if (anyMigrated) return [];
+  if (membershipResolvesByRecipeIds === true) return [];
   const recipeItemId = String(recipe?.recipeItemId || '').trim();
   return recipeItemId ? defs.filter((def) => String(def.id) === recipeItemId) : [];
 }
@@ -1916,6 +2036,14 @@ async function _resolveRecipeItemSource(uuid) {
 
 // Build a `recipeId -> Set(actorId)` index of learned recipes across every world
 // actor (best-effort; `game.*` may be unavailable in headless contexts → empty).
+//
+// The learned map MUST be read through `getFabricateFlag` (issue 785). Every
+// writer persists it at the doubly-nested `flags.fabricate.fabricate.learnedRecipes`
+// path (`normalizeFlagKey` prefixes `fabricate.`, then the flattened update path
+// nests it under the `fabricate` scope), so the old hand-written single-nested
+// `actor.flags.fabricate.learnedRecipes` read resolved to `undefined` in a real
+// world and "Learned by" was permanently 0. `getFabricateFlag` also try/catches
+// `getFlag`'s inactive-scope throw.
 function _buildLearnedRecipeActorIndex() {
   const index = new Map();
   const raw = globalThis.game?.actors;
@@ -1927,7 +2055,7 @@ function _buildLearnedRecipeActorIndex() {
         ? [...raw]
         : [];
   for (const actor of actors) {
-    const learned = actor?.flags?.fabricate?.learnedRecipes;
+    const learned = getFabricateFlag(actor, 'learnedRecipes', null);
     if (!learned || typeof learned !== 'object') continue;
     const actorId = actor.id || actor._id || '';
     for (const recipeId of Object.keys(learned)) {
@@ -1938,24 +2066,52 @@ function _buildLearnedRecipeActorIndex() {
   return index;
 }
 
+// The legacy reverse-ref index: `recipeItemId -> rows`. Built ONLY while the system's
+// membership-basis marker is unset, so it costs nothing on a system that has switched
+// basis and cannot be consulted there by accident.
+function _legacyRecipeItemIndex(recipeList) {
+  const index = new Map();
+  for (const recipe of recipeList) {
+    const key = String(recipe?.recipeItemId || '');
+    if (!key) continue;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key).push(recipe);
+  }
+  return index;
+}
+
 // Enrich the synchronously-projected recipe items with async-resolved
 // name/img/type plus their derived `recipes[]` and `learnedByCount`. Called once
 // per refresh from the async phase; `fromUuid` resolution is batched.
-async function _enrichRecipeItemLibrary(projectedItems, recipes) {
+//
+// This is the SIXTH recipe-book membership reader, and the second in this file: it
+// answers the same many-to-many from the BOOK's side. Like
+// `_recipeItemDefinitionsContaining`, it takes the basis as a PARAMETER threaded from
+// the raw manager system rather than inferring it — the inference available here would
+// have been per DEFINITION ("this book's `recipeIds` is empty, so it must be
+// un-migrated"), which is the retired system-wide predicate at definition scope.
+//
+// The parameter is BELT AND BRACES at this call site, and saying so is more useful than
+// overstating it: `recipes` is the PROJECTED recipe list, whose `recipeItemId`
+// `_buildRecipeList` derives from `_recipeItemDefinitionsContaining` rather than copying
+// the raw legacy scalar. So on a marked system an emptied book's former members already
+// carry `recipeItemId: ''`, and `_legacyRecipeItemIndex` could not resurrect them even if
+// this guard were dropped — the basis decision has already been taken upstream. What the
+// parameter buys is that this function does not have a SECOND, differently-shaped opinion
+// about the basis for a future caller to hand a rawer list to
+// (`ui-integration/spec.md`, the membership-basis paragraph).
+async function _enrichRecipeItemLibrary(projectedItems, recipes, membershipResolvesByRecipeIds) {
   const items = Array.isArray(projectedItems) ? projectedItems : [];
   if (items.length === 0) return [];
 
   const recipeList = Array.isArray(recipes) ? recipes : [];
   const recipeById = new Map();
-  // Legacy reverse-ref index — fallback for definitions with no `recipeIds` yet.
-  const recipesByItemId = new Map();
-  for (const recipe of recipeList) {
-    recipeById.set(String(recipe?.id), recipe);
-    const key = String(recipe?.recipeItemId || '');
-    if (!key) continue;
-    if (!recipesByItemId.has(key)) recipesByItemId.set(key, []);
-    recipesByItemId.get(key).push(recipe);
-  }
+  for (const recipe of recipeList) recipeById.set(String(recipe?.id), recipe);
+  // `=== true` exactly as `_recipeItemDefinitionsContaining` tests it: a missing boolean
+  // fails to LEGACY, which is the safe direction, and `null` is what the index being
+  // absent means downstream.
+  const legacyIndex =
+    membershipResolvesByRecipeIds === true ? null : _legacyRecipeItemIndex(recipeList);
   const toRecipeRef = (recipe) => ({
     id: recipe.id,
     name: recipe.name,
@@ -1969,8 +2125,9 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
 
   return items.map((item, index) => {
     const { doc, missing } = resolved[index];
-    // Canonical membership: the book's `recipeIds`. Fall back to the legacy reverse
-    // ref only for a definition that carries none yet (un-migrated).
+    // Canonical membership: the book's `recipeIds`. `legacyIndex` is null once the
+    // system resolves by `recipeIds`, so an empty array then means "this book has no
+    // members" — full stop — rather than "this book has not migrated".
     const memberIds = Array.isArray(item.recipeIds) ? item.recipeIds : [];
     const linkedRecipes =
       memberIds.length > 0
@@ -1978,7 +2135,7 @@ async function _enrichRecipeItemLibrary(projectedItems, recipes) {
             .map((id) => recipeById.get(String(id)))
             .filter(Boolean)
             .map(toRecipeRef)
-        : (recipesByItemId.get(String(item.id)) || []).map(toRecipeRef);
+        : (legacyIndex?.get(String(item.id)) || []).map(toRecipeRef);
     const learnedActors = new Set();
     for (const recipe of linkedRecipes) {
       const actorsForRecipe = actorIndex.get(recipe.id);
@@ -2368,11 +2525,14 @@ function _buildSelectedSystemViewData(
       checkModifiers: Array.isArray(selectedSystem.craftingCheck?.checkModifiers)
         ? selectedSystem.craftingCheck.checkModifiers.map((modifier) => _clonePlain(modifier))
         : [],
-      defaultModifierPolicy: ['addAll', 'highest', 'byRecipe'].includes(
-        selectedSystem.craftingCheck?.defaultModifierPolicy
-      )
-        ? selectedSystem.craftingCheck.defaultModifierPolicy
-        : 'addAll',
+      // Normalized through the resolver's OWN policy vocabulary rather than a local
+      // copy of it: this projection used to inline `['addAll','highest','byRecipe']`,
+      // which silently rewrote a stored `playerPicks` to `addAll` on the way out, so the
+      // GM's radio selection came back as "Add all" and the policy was unselectable
+      // (issue 855). A fifth hand-maintained allowlist is exactly the drift that caused
+      // that, so read the single source of truth instead. Unknown → `addAll`, unchanged.
+      defaultModifierPolicy:
+        normalizeModifierPolicy(selectedSystem.craftingCheck?.defaultModifierPolicy) ?? 'addAll',
       defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
         ? [...selectedSystem.craftingCheck.defaultModifierIds]
         : [],
@@ -2499,6 +2659,26 @@ export function createAdminStore(services) {
   let externalRefreshScheduled = false;
   let destroyed = false;
 
+  // --- GM Knowledge surface state (issue 785) ---
+  //
+  // `refresh()` is invoked by ~40 mutation paths and a whole-world `actors × items`
+  // scan has no cheap invalidation signature, so the knowledge projection MUST NOT
+  // join it. `knowledgeActive` makes `refreshKnowledge()` a total no-op while the
+  // surface is closed, and the cached raw snapshot is dropped on a system change.
+  //
+  // This shape is UNPRECEDENTED in this store, not borrowed: the graph tab is
+  // computed inside `refresh()` gated on `activeTab === 'graph'`, with no separate
+  // flag and no separate refresh function.
+  let knowledgeActive = false;
+  let knowledgeSnapshot = null;
+  let knowledgeSelectedActorId = '';
+  let knowledgeRefreshScheduled = false;
+  // Resolved ONCE per surface entry from the DEFINITION count, never as a live
+  // derivation — a GM authoring the system's first recipe item elsewhere would
+  // otherwise flip 0 → 1, yank the open tab mid-task and disarm an armed row.
+  let knowledgeDefaultTab = defaultKnowledgeTab(0);
+  let knowledgeDefaultTabResolved = false;
+
   // Per-store item-card memo (store-instance scope, NEVER module-global — avoids
   // cross-app/test bleed). See `_buildItemCards` for the signature shape and the
   // disclosed source-document freshness trade. Cleared in `refresh()` on a
@@ -2545,6 +2725,11 @@ export function createAdminStore(services) {
       typeof services.getFoundrySystemId === 'function'
         ? String(services.getFoundrySystemId() || '')
         : '',
+    // The GM Knowledge surface projection (issue 785). A TOP-LEVEL sibling key,
+    // deliberately NEVER hung off `selectedSystem`: that would force a
+    // `selectedSystem` reference rebuild on every knowledge publish and let a
+    // late phase-2 `refresh()` publish clobber freshly projected rows.
+    knowledge: projectKnowledgeSnapshot(null, { active: false }),
     ..._emptyEnvironmentState(false),
     ..._emptyTravelState(),
   });
@@ -4676,14 +4861,20 @@ export function createAdminStore(services) {
     });
   }
 
-  function _scheduleExternalRefresh() {
-    if (destroyed || externalRefreshScheduled) return;
-    externalRefreshScheduled = true;
+  // The coalescing primitive both external-change schedulers share: collapse a
+  // burst of hook callbacks in one turn into a single refresh.
+  function _onMicrotask(callback) {
     const schedule =
       typeof queueMicrotask === 'function'
         ? queueMicrotask
-        : (callback) => Promise.resolve().then(callback);
-    schedule(async () => {
+        : (task) => Promise.resolve().then(task);
+    schedule(callback);
+  }
+
+  function _scheduleExternalRefresh() {
+    if (destroyed || externalRefreshScheduled) return;
+    externalRefreshScheduled = true;
+    _onMicrotask(async () => {
       externalRefreshScheduled = false;
       if (destroyed) return;
       await refresh();
@@ -4930,7 +5121,27 @@ export function createAdminStore(services) {
   }
 
   // --- refresh ---
+  /**
+   * Refreshes overlap, and the later one is not necessarily the one that finishes last.
+   *
+   * `refresh` reads the selected system ONCE at the top and then does async work — item
+   * enrichment, environment state, the graph — before publishing. Two runs can therefore be
+   * in flight together, each holding the selection as it was when IT started, and whichever
+   * finishes last wins. `createSystem` produces exactly that overlap on its own: the manager
+   * fires `fabricate.craftingSystemsChanged` from inside the write, the store answers it by
+   * scheduling a refresh, and only then does `createSystem` select the new system and
+   * refresh again. The older run is holding the PREVIOUS selection, so when it published
+   * last the new system appeared briefly and then flicked back to the one the GM started on.
+   *
+   * Each run takes a ticket and publishes only while it is still the newest. A superseded
+   * run finishes its work and drops its result, which is correct: a newer run is already
+   * producing the state that replaces it.
+   */
+  let refreshTicket = 0;
+
   async function refresh() {
+    const ticket = ++refreshTicket;
+    const isCurrent = () => ticket === refreshTicket;
     const systemManager = services.getCraftingSystemManager();
     const recipeManager = services.getRecipeManager();
     if (!_fabricateReady(systemManager, recipeManager)) {
@@ -5037,6 +5248,7 @@ export function createAdminStore(services) {
     // Phase 1: publish all synchronous selected-system context immediately so
     // manager can paint its selected rail, menu, and inspector before slower
     // item/environment work finishes.
+    if (!isCurrent()) return;
     viewState.update((prev) => ({
       ...prev,
       systems: systemList,
@@ -5089,9 +5301,15 @@ export function createAdminStore(services) {
       // empty projection after any refresh (e.g. switching visibility mode).
       selectedSystemData = {
         ...selectedSystemData,
+        // The basis marker comes from `selectedSystem` — the RAW manager system — and
+        // NOT from `selectedSystemData`, which is the hand-built viewState projection
+        // and does not carry the field. Reading it from the projection would yield a
+        // silently `undefined` marker that fails open to the legacy index, which is
+        // exactly the failure the parameter exists to prevent (issue 1011).
         recipeItemDefinitions: await _enrichRecipeItemLibrary(
           selectedSystemData.recipeItemDefinitions,
-          recipeListData.recipes
+          recipeListData.recipes,
+          selectedSystem?.membershipResolvesByRecipeIds
         ),
       };
     }
@@ -5114,6 +5332,8 @@ export function createAdminStore(services) {
       graphData = filterGraph(layoutResult, { searchTerm: get(graphSearch) });
     }
 
+    // A newer refresh has already taken over; publishing here would put its work back.
+    if (!isCurrent()) return;
     viewState.update((prev) => ({
       ...prev,
       systems: systemList,
@@ -5138,6 +5358,263 @@ export function createAdminStore(services) {
       ...environmentState,
       ...travel.buildState(),
     }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // GM Knowledge surface (issue 785)
+  //
+  // Read path: the seam enumerates actors/items and resolves definitions; this
+  // store caches the RAW snapshot and publishes the PURE projection as top-level
+  // `viewState.knowledge` — always a new object, never on `selectedSystem`.
+  //
+  // Write path: every action awaits its seam call, notifies, then calls
+  // `refreshKnowledge({ force: true })` and NEVER `refresh()`. GM gating lives at
+  // the top of each seam method; this store never touches `game.*`.
+  // ---------------------------------------------------------------------------
+
+  function _knowledgeRawCharacter(actorId) {
+    const characters = Array.isArray(knowledgeSnapshot?.characters)
+      ? knowledgeSnapshot.characters
+      : [];
+    return characters.find((character) => String(character?.id) === String(actorId)) || null;
+  }
+
+  function _knowledgeRawOwnedCopy(actorId, itemId) {
+    const copies = _knowledgeRawCharacter(actorId)?.ownedCopies || [];
+    return copies.find((copy) => String(copy?.itemId) === String(itemId)) || null;
+  }
+
+  // Localized copy for the Knowledge surface's two heavyweight confirms. Every key
+  // is a STATIC literal at its call site (an interpolated key is invisible to both
+  // `ui-lang-keys-resolve` and `lang-keys-no-orphans`, so a missing message would
+  // ship silently); `data` is passed to the localizer and interpolated into the
+  // English fallback only when no localizer is present.
+  function _knowledgeText(key, fallback, data = null) {
+    const localized = data ? services.localize?.(key, data) : services.localize?.(key);
+    if (localized) return localized;
+    if (!data) return fallback;
+    return Object.entries(data).reduce(
+      (text, [name, value]) => text.replace(`{${name}}`, String(value)),
+      fallback
+    );
+  }
+
+  function _notifyKnowledgeResult(result) {
+    const message = result?.message;
+    if (!message) return;
+    const text = services.localize?.(message, result?.messageData) || message;
+    if (result?.success === true) services.notify?.info?.(text);
+    else services.notify?.error?.(text);
+  }
+
+  function _publishKnowledge() {
+    viewState.update((prev) => ({
+      ...prev,
+      knowledge: projectKnowledgeSnapshot(knowledgeSnapshot, {
+        active: knowledgeActive,
+        selectedActorId: knowledgeSelectedActorId,
+        defaultTab: knowledgeDefaultTab,
+      }),
+    }));
+  }
+
+  function _clearKnowledgeCache() {
+    knowledgeSnapshot = null;
+    knowledgeDefaultTabResolved = false;
+    knowledgeSelectedActorId = '';
+  }
+
+  /**
+   * Re-read the Knowledge snapshot. A TOTAL no-op while the surface is closed —
+   * that gate is what keeps the noisy item hooks free and keeps the whole-world
+   * scan off every one of `refresh()`'s ~40 callers.
+   *
+   * @param {{force?: boolean}} [options] `force` re-reads the seam; otherwise a
+   *   cached snapshot is simply re-published.
+   * @returns {Promise<boolean>} whether a projection was published.
+   */
+  async function refreshKnowledge({ force = false } = {}) {
+    if (!knowledgeActive) return false;
+    if (force || !knowledgeSnapshot) {
+      const systemId = get(selectedSystemId);
+      knowledgeSnapshot = (await services.getKnowledgeSnapshot?.(systemId)) || null;
+      if (!knowledgeDefaultTabResolved) {
+        knowledgeDefaultTab = defaultKnowledgeTab(knowledgeSnapshot?.definitionCount || 0);
+        knowledgeDefaultTabResolved = true;
+      }
+    }
+    _publishKnowledge();
+    return true;
+  }
+
+  /**
+   * Hook entry point. Coalesces a burst of externally-driven actor/item writes
+   * into ONE `refreshKnowledge` through the same microtask pattern
+   * `_scheduleExternalRefresh` uses, which also collapses the echo a store
+   * action's own write produces into its explicit refresh.
+   */
+  function scheduleKnowledgeRefresh() {
+    if (destroyed || !knowledgeActive || knowledgeRefreshScheduled) return;
+    knowledgeRefreshScheduled = true;
+    _onMicrotask(async () => {
+      knowledgeRefreshScheduled = false;
+      if (destroyed) return;
+      await refreshKnowledge({ force: true });
+    });
+  }
+
+  /**
+   * Enter or leave the Knowledge surface. Entering resolves the default inner tab
+   * once from the definition count; leaving drops the cache so a later entry
+   * re-resolves both.
+   *
+   * @param {boolean} active
+   * @returns {Promise<boolean>} the resolved active state.
+   */
+  async function setKnowledgeActive(active) {
+    const next = active === true;
+    knowledgeActive = next;
+    if (!next) {
+      _clearKnowledgeCache();
+      _publishKnowledge();
+      return false;
+    }
+    await refreshKnowledge({ force: true });
+    return true;
+  }
+
+  /**
+   * Select a roster character. Pure re-publication — no seam read.
+   *
+   * @param {string} actorId
+   * @returns {boolean}
+   */
+  function selectKnowledgeActor(actorId) {
+    knowledgeSelectedActorId = String(actorId || '');
+    if (!knowledgeActive) return false;
+    _publishKnowledge();
+    return true;
+  }
+
+  async function _runKnowledgeMutation(call) {
+    const result = (await call()) || {
+      success: false,
+      message: 'FABRICATE.Knowledge.Manage.Failed',
+    };
+    _notifyKnowledgeResult(result);
+    await refreshKnowledge({ force: true });
+    return result;
+  }
+
+  /**
+   * Spend one charge of an owned recipe-item copy. The seam anchors the write to
+   * the definition the projected row already resolved, so the GM's click acts on
+   * exactly the book the row displayed.
+   *
+   * @param {string} actorId
+   * @param {string} itemId
+   */
+  async function expendRecipeItemUse(actorId, itemId) {
+    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
+    return _runKnowledgeMutation(() =>
+      services.expendRecipeItemUse?.({
+        actorId,
+        itemId,
+        definitionId: copy?.definitionId || '',
+        systemId: get(selectedSystemId),
+      })
+    );
+  }
+
+  /**
+   * Delete one owned copy. A stacked copy (`quantity > 1`) deletes the WHOLE
+   * document behind a confirm naming the quantity: `recipeItemUsage.timesUsed`
+   * and `recipeItemLearning.learnedCount` are per-DOCUMENT counters shared by
+   * every unit, so decrementing a stack would leave one set of counters attached
+   * to fewer units and falsify every derived `remaining`.
+   *
+   * @param {string} actorId
+   * @param {string} itemId
+   */
+  async function deleteOwnedRecipeItem(actorId, itemId) {
+    const copy = _knowledgeRawOwnedCopy(actorId, itemId);
+    const quantity = Number(copy?.quantity) || 1;
+    if (quantity > 1) {
+      const confirmed = await services.confirmDialog?.({
+        title: _knowledgeText(
+          'FABRICATE.Admin.Manager.Knowledge.DeleteStackTitle',
+          'Delete the whole stack?'
+        ),
+        content: `<p>${_knowledgeText(
+          'FABRICATE.Admin.Manager.Knowledge.DeleteStackContent',
+          'This copy is a stack of {quantity}. Deleting removes every unit, because uses and learns are tracked per document.',
+          { quantity }
+        )}</p>`,
+        yes: () => true,
+        no: () => false,
+      });
+      if (!confirmed) return { success: false, cancelled: true };
+    }
+    return _runKnowledgeMutation(() => services.deleteOwnedRecipeItem?.({ actorId, itemId }));
+  }
+
+  /**
+   * Erase one learned recipe. Frees the learn budget but deliberately LEAVES
+   * discovery progress intact — an erase is an un-learn, a reset is an amnesia.
+   *
+   * @param {string} actorId
+   * @param {string} recipeId
+   */
+  async function eraseLearnedRecipe(actorId, recipeId) {
+    return _runKnowledgeMutation(() => services.eraseLearnedRecipe?.({ actorId, recipeId }));
+  }
+
+  async function _confirmKnowledgeReset(titleKey, titleFallback, contentKey, contentFallback) {
+    const note = _knowledgeText(
+      'FABRICATE.Admin.Manager.Knowledge.ResetDiscoveryNote',
+      'Erasing a single memory leaves discovery progress intact; a reset also clears it.'
+    );
+    return services.confirmDialog?.({
+      title: _knowledgeText(titleKey, titleFallback),
+      content: `<p>${_knowledgeText(contentKey, contentFallback)}</p><p>${note}</p>`,
+      yes: () => true,
+      no: () => false,
+    });
+  }
+
+  /**
+   * Reset this character's learned knowledge for the SELECTED system.
+   *
+   * @param {string} actorId
+   */
+  async function resetActorSystemKnowledge(actorId) {
+    const confirmed = await _confirmKnowledgeReset(
+      'FABRICATE.Admin.Manager.Knowledge.ResetSystemTitle',
+      'Reset this system?',
+      'FABRICATE.Admin.Manager.Knowledge.ResetSystemContent',
+      'Clear every recipe this character has learned in the selected crafting system.'
+    );
+    if (!confirmed) return { success: false, cancelled: true };
+    const systemId = get(selectedSystemId);
+    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId }));
+  }
+
+  /**
+   * Reset this character's learned knowledge across EVERY system. The only grain
+   * that can clear orphan learned keys, which `forgetSystemLearnedRecipes`
+   * deliberately leaves in place because they cannot be attributed to a system.
+   *
+   * @param {string} actorId
+   */
+  async function resetActorAllKnowledge(actorId) {
+    const confirmed = await _confirmKnowledgeReset(
+      'FABRICATE.Admin.Manager.Knowledge.ResetAllTitle',
+      'Reset every system?',
+      'FABRICATE.Admin.Manager.Knowledge.ResetAllContent',
+      'Clear every recipe this character has learned across all crafting systems, including entries whose recipe no longer exists.'
+    );
+    if (!confirmed) return { success: false, cancelled: true };
+    return _runKnowledgeMutation(() => services.resetActorKnowledge?.({ actorId, systemId: null }));
   }
 
   // ---------------------------------------------------------------------------
@@ -5171,6 +5648,9 @@ export function createAdminStore(services) {
 
     selectedSystemId.set(systemId);
     _clearSystemScopedSearches();
+    // The Knowledge snapshot is scoped to ONE system's recipe-item definitions
+    // (identity is system-scoped), so it can never survive a system change.
+    _clearKnowledgeCache();
     selectedEnvironmentId.set('');
     selectedEnvironmentSystemId.set(systemId || '');
     _setEnvironmentDraftState(null, { persistedDraft: null });
@@ -5179,8 +5659,19 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * Create a crafting system, select it, and report it back so the caller can navigate.
+   *
+   * Returns the created system on success and `false` when the GM backed out of the
+   * dirty-environment confirm — `false` specifically, because the manager root routes
+   * this through the same "did it happen?" helper as `selectSystem`, and that helper
+   * treats only `false` as "no". Returning `null` here would read as success and
+   * navigate away from an edit the GM just chose to keep.
+   *
+   * @returns {Promise<object|false>}
+   */
   async function createSystem() {
-    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return null;
+    if (!(await _proceedAfterDirtyEnvironmentConfirm())) return false;
 
     const systemManager = services.getCraftingSystemManager();
     const name = _nextSystemName(systemManager);
@@ -5192,6 +5683,7 @@ export function createAdminStore(services) {
     activeTab.set('systems');
     await services.setSetting('lastManagedCraftingSystem', system.id);
     await refresh();
+    return system;
   }
 
   async function deleteSystem(systemId) {
@@ -6261,7 +6753,10 @@ export function createAdminStore(services) {
 
   // --- Essence management ---
 
-  async function addEssence(name, description, icon, sourceComponentId) {
+  // `colorToken` is the optional GM-authored per-essence colour (issue 917). It is a
+  // bare `--fab-tag-*` key or null; `CraftingSystemManager` owns the palette
+  // validation, so the store only has to carry the authored value through.
+  async function addEssence(name, description, icon, sourceComponentId, colorToken) {
     const normalizedName = String(name || '').trim();
     if (!normalizedName) return false;
     const systemManager = services.getCraftingSystemManager();
@@ -6287,6 +6782,7 @@ export function createAdminStore(services) {
         name: normalizedName,
         description: String(description || ''),
         icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
+        colorToken: colorToken || null,
         ...sourceFields,
       },
     ];
@@ -6330,6 +6826,12 @@ export function createAdminStore(services) {
     const nextIcon = Object.prototype.hasOwnProperty.call(updates, 'icon')
       ? normalizeEssenceIcon(updates.icon)
       : normalizeEssenceIcon(current.icon);
+    // The authored colour (issue 917) is nullable BY DESIGN, so absence and null are
+    // different instructions: an absent `colorToken` leaves the stored value alone (the
+    // spread below preserves it), while an explicit null is the editor's Clear control
+    // unsetting the colour. Palette validation belongs to `CraftingSystemManager`.
+    const hasColorTokenUpdate = Object.prototype.hasOwnProperty.call(updates, 'colorToken');
+    const nextColorToken = hasColorTokenUpdate ? updates.colorToken || null : null;
     const hasSourceUpdate =
       Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId') ||
       Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid');
@@ -6353,6 +6855,7 @@ export function createAdminStore(services) {
         description: nextDescription,
         icon: nextIcon,
       };
+      if (hasColorTokenUpdate) nextDefinition.colorToken = nextColorToken;
       if (!hasSourceUpdate) return nextDefinition;
       return {
         ...nextDefinition,
@@ -8217,13 +8720,21 @@ export function createAdminStore(services) {
     if (!updates || typeof updates !== 'object') return false;
     if (Object.keys(updates).length === 0) return true;
 
+    // This store DERIVES the recipe-item fields onto every projected row, and the editor
+    // saves a whole row, so this store also strips them on the way back out (issue 978).
+    // Symmetric by design: the projection's producer owns its write boundary. Stripping
+    // here rather than in the editor keeps the draft carrying them for display.
+    const modelUpdates = withoutDerivedRecipeProjectionFields(updates);
+    // A payload that was ONLY derived fields has nothing left to author.
+    if (Object.keys(modelUpdates).length === 0) return true;
+
     try {
       // The recipe editor only edits identity + the linked recipe item; a shell's
       // ingredients/results may still be empty. allowIncomplete keeps those
       // identity-only saves from being blocked by completeness validation.
       // notify defaults on; step authoring passes notify:false to avoid a toast
       // per keystroke-committed edit / reorder.
-      await recipeManager.updateRecipe(recipeId, updates, {
+      await recipeManager.updateRecipe(recipeId, modelUpdates, {
         allowIncomplete: true,
         notify: options.notify !== false,
       });
@@ -8312,8 +8823,12 @@ export function createAdminStore(services) {
     services.notify.info(`Exported "${system.name}" (${recipes.length} recipes).`);
   }
 
+  // Resolves to the post-import report content when an import ran to completion, and
+  // to null otherwise (cancelled, failed, or an existing system that was skipped). The
+  // manager root renders that content in `ImportReportModal`; before issue 877 the app
+  // shell rendered a raw-HTML DialogV2 itself and this returned nothing.
   async function importSystem() {
-    await services.renderSystemImportDialog();
+    return (await services.renderSystemImportDialog()) ?? null;
   }
 
   // --- Item/Component management ---
@@ -8356,6 +8871,118 @@ export function createAdminStore(services) {
     }
   }
 
+  /**
+   * Apply one staged bulk edit to a SET of components in the selected system (issue 772)
+   * through the manager's set-apply primitive: ONE persist and ONE refresh for the whole
+   * selection, rather than N `updateComponent` round trips.
+   *
+   * `edit` carries only the STAGED axes — `category`, `addTags`, `removeTags`, `essences`,
+   * `difficulty`. Presence is meaningful for the last two: an empty `essences` map and a
+   * zero `difficulty` are instructions to CLEAR, so this passes the caller's object through
+   * untouched rather than pruning "empty" keys.
+   *
+   * `refresh()` republishes `itemCards` and the `selectedSystem` projection, so the browser
+   * rows re-render with no bespoke invalidation.
+   *
+   * Returns the write RESULT rather than a boolean, for two reasons. A boolean cannot
+   * distinguish "wrote nothing" from "wrote", so an empty edit had to report `true` — a
+   * success for a write that never happened. And the primitive already counts honestly:
+   * it compares each component before and after and only counts the ones that genuinely
+   * changed, so selecting five components and adding a tag three already carry is an
+   * `updated` of two. Discarding that left the caller able to name only the SELECTION
+   * size, which overstates what happened.
+   *
+   * `null` means nothing was written, for any reason — a bad or empty argument, no
+   * selected system, or a throw that has already been reported to the GM.
+   *
+   * @param {Iterable<string>} componentIds
+   * @param {object} [edit]
+   * @returns {Promise<{updated: number, componentIds: string[]}|null>} the write result, or
+   *   `null` when no write happened.
+   */
+  async function applyComponentBulkEdit(componentIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    const ids = Array.from(componentIds || [], String).filter(Boolean);
+    if (ids.length === 0 || !sysId) return null;
+    if (!edit || typeof edit !== 'object') return null;
+    if (Object.keys(edit).length === 0) return null;
+
+    try {
+      const result = await systemManager.applyBulkEditToComponents(sysId, ids, edit);
+      await refresh();
+      return {
+        updated: Number(result?.updated) || 0,
+        componentIds: Array.isArray(result?.componentIds) ? result.componentIds : [],
+      };
+    } catch (err) {
+      console.error('Fabricate | Failed to apply component bulk edit:', err);
+      services.notify?.error?.(err?.message || 'Failed to apply component bulk edit');
+      return null;
+    }
+  }
+
+  /**
+   * Apply one staged bulk edit to a SET of recipes in the selected system (issue 1010)
+   * through the manager's set-apply primitive: at most ONE `recipes` world write, at most
+   * ONE `craftingSystems` world write, and ONE refresh for the whole selection.
+   *
+   * Those are TWO settings, not a redundant pair: recipe-book membership is persisted on
+   * the system and the recipe fields are persisted with the recipes, so a book axis and a
+   * recipe axis staged together genuinely cost one write each.
+   *
+   * `edit` carries only the STAGED axes — `category`, `enabled`, `locked`, `checkTierId`,
+   * `addBookIds`, `removeBookIds` — and is forwarded VERBATIM. Three of the six keys are
+   * falsy but REAL: `enabled: false` (disable), `locked: false` (unlock) and
+   * `checkTierId: null` (clear to the system default). Pruning "empty" keys would collapse
+   * a present `checkTierId: null` into an absent one, and those are different instructions
+   * — "clear the tier" versus "leave the tier alone". Everything downstream tests key
+   * presence, never truthiness.
+   *
+   * Deliberately NOT routed through {@link withoutDerivedRecipeProjectionFields}. That
+   * strip guards payloads built from a WHOLE projected recipe row, which carries
+   * `recipeItemId` and its derived siblings; this edit is a hand-built six-key allowlist
+   * emitted by `toBulkRecipeEdit` that can never carry one. A strip here would only
+   * suggest otherwise.
+   *
+   * Returns the write RESULT rather than a boolean: a blocked enable is a PARTIAL success
+   * — the recipe stays off while its other staged axes still land — which a boolean cannot
+   * express, and the panel's post-apply notification is the authority on both counts.
+   * `null` means nothing was written, for any reason: a bad or empty argument, no selected
+   * system, or a throw that has already been reported to the GM.
+   *
+   * @param {Iterable<string>} recipeIds
+   * @param {object} [edit]
+   * @returns {Promise<object|null>} the normalized write result, or `null` when no write
+   *   happened.
+   */
+  async function applyRecipeBulkEdit(recipeIds, edit = {}) {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    const ids = Array.from(recipeIds || [], String).filter(Boolean);
+    if (ids.length === 0 || !sysId) return null;
+    if (!edit || typeof edit !== 'object') return null;
+    if (Object.keys(edit).length === 0) return null;
+
+    try {
+      const result = await systemManager.applyBulkEditToRecipes(sysId, ids, edit);
+      await refresh();
+      return _normalizeBulkRecipeEditResult(result);
+    } catch (err) {
+      console.error('Fabricate | Failed to apply recipe bulk edit:', err);
+      // The batch fails as a whole through the same two coded error classes the
+      // single-recipe writes raise, so reuse their localizers: the GM gets the coded,
+      // id-free copy rather than a raw English aggregate naming internal ids.
+      services.notify?.error?.(
+        localizeRecipeActivationError(err, services.localize) ||
+          localizeRecipePersistenceError(err, services.localize) ||
+          err?.message ||
+          'Failed to apply recipe bulk edit'
+      );
+      return null;
+    }
+  }
+
   // --- Search ---
 
   async function setRecipeSearch(term) {
@@ -8385,6 +9012,9 @@ export function createAdminStore(services) {
     unsubscribeTravelMarkerMove = null;
     readyRefreshScheduled = false;
     externalRefreshScheduled = false;
+    knowledgeRefreshScheduled = false;
+    knowledgeActive = false;
+    _clearKnowledgeCache();
   }
 
   unsubscribeFabricateDataChanged = _subscribeExternalDataChanges();
@@ -8591,6 +9221,8 @@ export function createAdminStore(services) {
     importSystem,
     deleteComponent,
     updateComponent,
+    applyComponentBulkEdit,
+    applyRecipeBulkEdit,
     setRecipeSearch,
     setItemSearch,
     setGraphSearch,
@@ -8619,6 +9251,16 @@ export function createAdminStore(services) {
     setMapRegionLink: travel.setMapRegionLink,
     deleteRealm: travel.deleteRealm,
     setGatheringRealmsEnabled: travel.setGatheringRealmsEnabled,
+    // --- GM Knowledge surface (issue 785) ---
+    setKnowledgeActive,
+    refreshKnowledge,
+    scheduleKnowledgeRefresh,
+    selectKnowledgeActor,
+    expendRecipeItemUse,
+    deleteOwnedRecipeItem,
+    eraseLearnedRecipe,
+    resetActorSystemKnowledge,
+    resetActorAllKnowledge,
     refresh,
     refreshGatheringConfig,
     refreshAccessRosters,

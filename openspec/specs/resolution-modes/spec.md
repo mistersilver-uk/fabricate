@@ -1,16 +1,5 @@
 # Resolution Modes
 
-## Relative Routed Natural Stepping
-
-`craftingCheck.routed.natStepping` and `salvageCraftingCheck.routed.natStepping` are default-off booleans owned by their relative routed check configurations.
-Fixed routed checks ignore the setting, and gathering exposes and persists no corresponding setting.
-
-After relative-margin matching and before result delivery, the shared check runner inspects the kept active face of the first d20 dice group.
-A kept natural 20 steps the matched tier once toward the next higher tier, and a kept natural 1 steps it once toward the next lower tier.
-A forced outcome takes precedence and bypasses natural stepping.
-Fixed tiers never step, and a natural at the existing cap or floor is a no-op.
-Only an actual tier change records `data.natStep` evidence and produces the localized crafting or salvage chat note.
-
 ## Purpose
 
 Define semantics and validation rules for crafting-system resolution modes.
@@ -77,11 +66,26 @@ This built-in dice-expression check is the low-complexity path for GMs who do no
 - A check is **usable** IFF its mode's `rollFormula` is authored.
 The historical macro-as-check-source and the `checkSource: "builtIn"` game-system adapter (`builtIn: { ability, skill, dc, advantage }`) were removed in 1.8.0 and are not part of the model; see `data-models` requirement 30 and its *Crafting Check Macro Contract* section.
 - The legacy `craftingCheck.mode` discriminator has the single valid value `passFail` and drives nothing; the active check sub-object is selected by `resolutionMode` (see `data-models` requirement 29).
-- A check roll formula MAY reference **`@craftingmod`**, a Fabricate-resolved scalar computed from the system's **`checkModifiers`** catalogue (`{id,label,icon?,expression}[]`) under a **`defaultModifierPolicy`** (`addAll` → sum, `highest` → deterministic `max(...)` scalar, `byRecipe` → the recipe's own set summed), optionally overridden per recipe by **`Recipe.craftingModifier`** (`{policy?, modifierIds?}`; absent = inherit the system default policy + `defaultModifierIds`).
+- A check roll formula MAY reference **`@craftingmod`**, a Fabricate-resolved scalar computed from the system's **`checkModifiers`** catalogue (`{id,label,icon?,expression}[]`) under a **`defaultModifierPolicy`** (`addAll` → sum, `highest` → deterministic `max(...)` scalar, `byRecipe` → the recipe's own set summed, `playerPicks` → the player selects one at roll time; see below), optionally overridden per recipe by **`Recipe.craftingModifier`** (`{policy?, modifierIds?}`; absent = inherit the system default policy + `defaultModifierIds`).
 Each eligible entry's `expression` is a roll-data fragment (e.g. `@abilities.med.mod`) evaluated against the crafter's roll data to a number (a missing/failed expression contributes 0, never NaN).
-Resolution is **deterministic** in Phase 1 (no new interactive branch — whether the player is prompted stays governed by the existing `interactive` flag); `@craftingmod` is resolved to a scalar and substituted **before** the string reaches Foundry's `Roll` (Foundry would otherwise treat an unresolved `@craftingmod` as 0), feeding **both** evaluation (`checkRoll.js` `evaluateCheckRoll`) and display (`resolveCheckFormulaDisplay`) so the shown formula equals what evaluates.
+Resolution is **deterministic** for `addAll`/`highest`/`byRecipe`, and for `playerPicks` whenever the deferred pick-one control below is not offered; `@craftingmod` is resolved to a scalar and substituted **before** the string reaches Foundry's `Roll` (Foundry would otherwise treat an unresolved `@craftingmod` as 0), feeding **both** evaluation (`checkRoll.js` `evaluateCheckRoll`) and display (`resolveCheckFormulaDisplay`) so the shown formula equals what evaluates.
 A formula with no `@craftingmod` token is unchanged (full single-formula back-compat).
-The interactive `playerPicks` selection policy is out of scope for this phase (Phase 2).
+- The crafting-check modifier policy (`defaultModifierPolicy`, per-recipe `Recipe.craftingModifier.policy`) supports a fourth value **`playerPicks`** (crafting only; salvage and gathering never author `@craftingmod` and never build a modifier choice).
+It is the one **deferred** policy: the eligible set becomes a pick-one control inside the interactive roll prompt, and `@craftingmod` is substituted only once the player has answered.
+- The deferred pick-one control is offered ONLY when all four of these hold — the call is **interactive** (`interactive === true`), the check's roll formula literally contains the `@craftingmod` token, the **effective** policy (recipe override, else system default) is `playerPicks`, and **at least two** modifiers are eligible after catalogue validation.
+`CraftingEngine._buildInteractiveModifierChoice` enforces the first three and `buildCraftingModifierChoice` the fourth.
+The token condition exists because a formula that never references `@craftingmod` has nowhere to spend the pick, and the two-modifier condition because a pick-one control over zero or one option presents no choice at all.
+When any one of the four fails, no choice descriptor is built, the roll prompt renders no modifier fieldset, and `@craftingmod` resolves through the deterministic scalar path above.
+- When the control IS offered, it renders the eligible modifiers as radio options (icon + label + resolved numeric value) and `@craftingmod` resolves to the value of the **single modifier the player selects**.
+The highest-valued eligible modifier is pre-selected, tie-broken by eligible-set order (first-listed among equal-highest wins), so a player who simply confirms the roll gets exactly the `highest` result.
+- On any craft where the control is not offered — including every **non-interactive** call (API / macro / headless) — `playerPicks` resolves deterministically as `highest`, so `@craftingmod` is never left unresolved and API results stay deterministic.
+A prompt that confirms without returning a selection (a headless dialog stand-in) falls back to the pre-selected default, which is that same highest-valued eligible modifier.
+- **eval == display holds for the posted roll, with one deliberate pre-roll exception.**
+The chosen modifier's value is substituted into the working formula **before** the advantage transform, before the situational-bonus append, and before `Roll`, and the displayed formula is recomputed from that same substituted string — so the posted roll message and the run journal show exactly what evaluated.
+The **pre-roll dialog** is the exception: it renders the `@craftingmod` slot as the literal text `(modifier)` rather than a number, because the value is not knowable until the player picks and Foundry's `cleanHTML` strips the inline handlers a live-updating preview would need.
+Showing the pre-selected default's number there would misrepresent every non-default pick, so the slot stays neutral; every OTHER `@` placeholder in the dialog formula still resolves to a number, and each radio option carries its own signed value chip.
+- The posted roll's chat flavor is suffixed with the chosen modifier's label (`<flavor> · <label>`) so the chat log records which modifier was picked; a label-less modifier leaves the flavor unchanged, and an empty base flavor yields the bare label with no orphan separator.
+- A cancelled prompt aborts with zero mutation and no substitution.
 
 ## Player-Facing Mode Labels
 
@@ -163,9 +167,10 @@ Fixed outcome tiers own explicit, non-overlapping `[start, end]` value ranges an
 The DC still governs `routedByIngredients` (whose pass/fail gate compares the roll against it — that DC now lives on its simple check, `craftingCheck.simple.dc`) and relative-type routed checks (which read `craftingCheck.routed.dc`); only `routedByCheck` with `type: "fixed"` drops it.
 - **Per-recipe minimum success tier (fixed only).**
 A `routedByCheck` recipe MAY carry an optional `minSuccessOutcomeId` referencing a fixed success outcome tier id; fixed tiers rank by their `start` value.
-When set, a craft whose naturally-rolled tier ranks below the required tier — or whose total lands outside every fixed range, so no tier matched at all — fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
-Because no tier routes on this failure, the rolled tier's own `breakTools` flag is dropped (the per-tier breakage bridge fires only for a routed tier); independent dice-group / roll-total breakage triggers are unaffected.
-The default (null/unset) imposes no override, so the outcome is the tier actually rolled.
+When set, a craft whose **final (post-step) tier** ranks below the required tier — or whose total lands outside every fixed range, so no tier matched at all — fails outright: `success: false`, no outcome routes, and the recipe takes its normal failure/consumption path with no success result.
+The gate judges the final tier because tier stepping is applied before it (see *Routed Tier Stepping* below), so a `down` step can drop a craft below the recipe minimum and an `up` step can lift it over.
+Because no tier routes on this failure, the blocked tier's own `breakTools` flag is dropped (the per-tier breakage bridge fires only for a routed tier); independent dice-group / roll-total breakage triggers are unaffected.
+The default (null/unset) imposes no override, so the outcome is the final tier.
 A forced-outcome trigger (a natural crit) bypasses the gate — a natural crit is never downgraded by a recipe minimum.
 A stale or unknown `minSuccessOutcomeId` no-ops.
 The gate is fixed-type only; relative-type routed checks ignore it.
@@ -179,7 +184,9 @@ A persisted alchemy `minSuccessOutcomeId` is left inert by the dispatch guard ra
 A non-failure outcome produces that single group (`disposition: success`); a failure/miss keyword produces nothing (failure path).
 Resolution never aborts with a misconfiguration for an unmatched success outcome when there is exactly one result group.
 - **Routing is success-disposition-gated.**
-A check result whose matched tier has `success: false` takes the failure/consumption path regardless of the tier's name — the engine short-circuits on `!checkResult.success` before routing runs.
+A check result whose final tier has `success: false` takes the failure/consumption path regardless of the tier's name — the engine short-circuits on `!checkResult.success` before routing runs.
+**Invariant:** `data.success` and the final tier's own `success` can never disagree.
+Without a forced outcome `data.success` simply IS the final tier's flag; under a forced outcome the disposition is authoritative and tier stepping is confined to that disposition's tier subset (see *Routed Tier Stepping* below), so a forced success can never surface a failing tier's name and a forced failure can never surface a succeeding tier's name.
 Routing via `checkOutcomeIds` resolves only `success === true` tiers (a `success: false` tier must never produce a `disposition: 'success'` result), and validation/authoring offer success tiers only for assignment.
 So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a GM or import placed in a group's `checkOutcomeIds` never routes and never produces a success result.
 - Resolution rules (applied per step/scope; "exactly one result group" is evaluated per step for multi-step recipes):
@@ -191,6 +198,53 @@ So a relative check's non-keyword-named failure tier (e.g. "Botch") whose id a G
      For an instant (non-timed) step this is a zero-mutation abort: it happens BEFORE any consumption, so no ingredients, currency, or tools are consumed or broken, and the craft reports failure (never a player success with zero items).
      A resolved-but-unassigned outcome tier (`unrouted-tier`) is treated identically.
      Timed exception: a time-gated `routedByCheck` step consumes its inputs at START (the check outcome is unknowable until the gate matures), so a routing misconfiguration detected at FINISH cannot un-consume — it records a step FAILURE with no refund and still reports failure (never a false success with zero items), rather than a true zero-mutation abort.
+
+#### Routed Tier Stepping
+
+**Tier stepping** is a per-trigger EFFECT on the unified `checkBreakage.triggers[]` list (`tierStep`), not a check-wide policy.
+It is available on every routed check — crafting, salvage AND gathering — in both the `relative` and `fixed` tier types, and it is not gated on the tool-breakage authority (unlike a trigger's `breakTools` effect).
+It supersedes the retired `natStepping` boolean, which hard-coded the die (d20), the faces (1 and 20), the magnitude (±1) and the scope (relative crafting and salvage only); a persisted `natStepping: true` converts to an equivalent trigger pair on read (see `data-models`).
+
+**Two named tiers.**
+The **rolled tier** is what relative-margin or fixed-range matching produced, after any forced reroute; it is what step CONDITIONS read.
+The **final tier** is what remains after stepping; it is what routes to a result group, what the per-recipe minimum-success-tier gate judges, what tool-breakage conditions read, and whose `success` and `breakTools` apply.
+A step condition asks about the tier the dice landed on, never about the tier the step produces, so the pass is a pure function of (rolled tier, triggers, roll) with no feedback edge — an `outcomeTier`-conditioned step cannot iterate and no evaluation order can leak into the result.
+**Acknowledged limit:** stepping reads the rolled tier while tool breakage reads the final tier, so a single trigger carrying an `outcomeTier` condition, `breakTools: true` and a `tierStep` may step without breaking.
+
+**The three modes.**
+`target` names the tier id to land on; `up` and `down` move by `steps` tiers (an integer `>= 1`); `none` is inert.
+Composition runs over every trigger whose condition matched and whose mode is not `none`.
+Relative steps sum as signed integers (`Σ up.steps − Σ down.steps`), summation being the only commutative composition: two `up 1` triggers make `up 2`, and `up 1` plus `down 1` is a deliberate no-op rather than an order-dependent coin flip.
+A `target` trigger is ELIGIBLE only when its `tierId` names a tier present in the ranked array in play; an ineligible target — a dangling id, or one naming the opposite disposition under a forced outcome — is discarded BEFORE the comparison rather than winning and then no-opping, and is not a runtime misconfiguration.
+Among the eligible targets the one naming the LOWEST-ranked tier wins, which is order-independent and pessimistic (trigger array order is deliberately not load-bearing).
+The winning target sets the base index and the net relative offset applies from there.
+
+**Placement.**
+Stepping is applied AFTER any forced reroute and BEFORE the fixed-only minimum-success-tier gate.
+Forcing picks an extreme tier while a step is relative, so stepping first would be silently discarded; the gate asks whether the craft reached the recipe's minimum, so it must judge the final tier.
+There is no forced-outcome bypass — the retired boolean was a check-wide policy the GM could not scope, whereas a `tierStep` is something the GM opted into on one trigger.
+
+**Stepping is disposition-preserving.**
+When a forced outcome is in play, the array in play is the ranked SUBSET of tiers whose `success` matches the forced disposition — the same subset the forced reroute selects from — and every index, "lowest-ranked" and the clamp are computed over that subset.
+The forced disposition therefore stays authoritative and `data.success` can never disagree with the final tier's own `success`.
+With NO forced outcome the array in play is the whole ranked tier list, and both `success` and `breakTools` follow the final tier across it — including a step that crosses from a succeeding tier onto a failing one, which is the retired boolean's pre-existing behaviour.
+
+**Clamping.**
+An out-of-range step clamps to the extremes of the array in play rather than no-opping, so `up 3` from the second-highest tier lands on the highest.
+This clamp is explicitly unrelated to the **Relative tier clamp** above: `clampToNearest` decides WHETHER a tier matched at all, whereas the step clamp decides WHERE an out-of-range step lands, and the evidence field is named `stepClamped` so the two never read as one concept.
+
+**Evidence.**
+Only a REAL tier change records `data.tierStepApplied` evidence and produces the localized crafting or salvage chat note.
+A fully clamped move and a cancelling `up 1` plus `down 1` both leave the rolled tier standing and emit nothing.
+Gathering emits the same evidence from the shared runner but threads it to no chat surface.
+
+**No match, no step.**
+When no tier matched at all, nothing steps — `target` included — because a routed check that matched nothing is the deliberate "no route" path and a trigger must not conjure a tier there.
+On a fixed check whose total falls outside every authored range this is the ordinary outcome; a GM wanting a floor for un-ranged totals authors a covering range, not a step.
+
+**One ranking.**
+Tier order is derived in exactly one place (`rankedRoutedOutcomes`), shared by the forced reroute, the minimum-success-tier gate and the step pass: ascending by `dc` (relative) or `start` (fixed), dropping any tier whose rank is not a finite number, and keeping the FIRST authored tier among equal ranks in both directions.
+The minimum-success-tier gate consumes that ranking only to LOCATE the required tier and continues to compare threshold VALUES, so two fixed tiers sharing a `start` compare equal and the craft passes.
 
 ### Validation
 
@@ -317,6 +371,9 @@ This reserved failure-group mechanism is **shared** with plain `simple` resoluti
 Tiered has NO `role: 'failure'` group.
 - Multi-step recipes are not supported.
 - `consumeOnFail` defaults to true; a matched Simple fail consumes via `alchemy.consumeOnFail`, consistent with a no-match fizzle (NOT the crafting-check consumption policy).
+- An alchemy recipe MAY carry a time requirement, in which case the brew is TWO-PHASE: START consumes the submission and arms the world-time gate; FINISH runs the check and produces.
+A matured FINISH resolves through the SAME alchemy tail as an immediate brew — brew-discovery (`learnRecipeOnCraft`) and the reserved `role: 'failure'` group on a matched Simple failure — and both are keyed on the RECIPE'S OWN SYSTEM, never on a per-call submission flag (issue 966).
+The brew resumes through `advanceCraftingRun`, which knows only the run, so an `isAlchemyAttempt`-style option cannot reach it; gating on one silently dropped every matured brew's discovery and degraded its Simple failure to a generic fizzle.
 
 ### Signature Resolution
 
@@ -332,6 +389,10 @@ This preserves the existing exclusivity rule (a `roles[systemId].componentId = B
 This parity spans the entire alchemy craft path — signature matching, the craftability ingredient and essence checks, ingredient selection for consumption, the essence context built for result effect transfer and property macros, and the timed (time-gated) START/FINISH twin — so a purely-tier-4 submission that matches a signature also passes craftability, is consumed, and contributes its component's essences to both success and reserved-failure crafted results.
 An item's own `flags.fabricate.essences` still take precedence over any component-defined essences.
 This alchemy-scoped resolution MUST NOT be pushed into the shared `findMatchingComponent`, `resolveComponentForItem`, or `getItemSourceReferences`; gathering, inventory, and standard crafting keep the narrower ladder unchanged, so the same tier-4-only item remains unrecognized in a standard (non-alchemy) craft.
+- Alchemy essence attribution and standard-craft essence resolution **agree on one axis and still differ on another**, and the agreement must not be overstated as "the two matchers agree".
+They agree that essence requirements share units **with each other**: alchemy credits every submitted unit's essences to every essence requirement, and standard craft resolves an ingredient set's essence options as one joint block over a shared draw (`data-models` §Essence-Alternative Consumption).
+They still differ on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy credits it (the whole submission is pooled with no draw-down, and extras are consumed as essence contributors), while standard craft does not, because that unit has already been spent through the set's `remaining`/`_commitItemPlan` ledger.
+The same Duskcrystal therefore satisfies `Radiant 2 + Shadow 1` in both paths, but a Duskcrystal consumed by a component/tag requirement contributes its essences only in alchemy.
 - A group is satisfied only when one of its options has its required `Ingredient.quantity` met by the available submitted quantity matching that option's components; submitting fewer than the required quantity does NOT satisfy the group and yields a no-signature-match failure.
 - Submitted quantity is counted per submission (one submission = one unit), not by reading an item's stack `system.quantity`; the workbench is responsible for expanding a stack into one submission per unit, consistent with occurrence-based essence accumulation and submitted-ingredient consumption.
 - The runtime matcher resolves a submission to the **most-specific matching set**, not the first authored match.
@@ -376,7 +437,9 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
 - **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
 It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
-- **Brew-result banner status enum.** A resolved brew reports one of four banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
+- **Brew-result banner status enum.** A brew reports one of five banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `brewing` (a TIME-GATED brew that STARTED — the signature matched, the inputs are consumed, and the run is live in the Journal awaiting world time; styled informationally, never as a failure, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
+A started time-gated brew is identified by the engine's `disposition: 'timed-start'`, NOT by `success` — which is `false` for it, because nothing has been produced yet (issue 966).
+Without that disposition the workbench read a successfully started brew as a no-signature fizzle and told the player it had failed while their ingredients were being consumed.
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).
 The same caveat applies to select-to-load auto-fill.
 - **Hidden dead-end rule.** Non-revealed recipes and never-tried dead-ends BOTH present as `untried`.

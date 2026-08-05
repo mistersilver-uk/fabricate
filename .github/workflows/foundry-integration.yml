@@ -43,7 +43,7 @@ permissions:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 29           # Full pipeline: up + smoke + down (22-min run watchdog + cold setup/teardown)
+    timeout-minutes: 34           # Full pipeline: up + smoke + down (28-min rc run watchdog + cold setup/teardown)
     env:
       FOUNDRY_USERNAME: ${{ secrets.FOUNDRY_USERNAME }}
       FOUNDRY_PASSWORD: ${{ secrets.FOUNDRY_PASSWORD }}
@@ -56,10 +56,11 @@ jobs:
       # screenshot budget. Full screenshot regeneration runs in `full`
       # (local + the scheduled visual-regression workflow).
       FOUNDRY_SMOKE_PROFILE: rc
-      # Hosted-runner rc runs have been observed at ~1100s (phase-C settings persists
-      # dominate on slow runners); the 18-min script default watchdog fired on an
-      # otherwise-passing run. Keep CI headroom above observed peaks.
-      FOUNDRY_RUN_TIMEOUT_MS: '1320000'
+      # No FOUNDRY_RUN_TIMEOUT_MS pin: `defaultRunTimeoutMs('rc')` in
+      # scripts/lib/foundryRunBudget.js derives 28 min from a MEASURED walk. This job
+      # used to pin 1320000 against a stale "~1100s observed" note, and beta run #144
+      # then walked 1344.3s and was killed after passing (issue #987). One source of
+      # truth; set the env var here only for a deliberate one-off.
 
     steps:
       - uses: actions/checkout@v6
@@ -86,7 +87,7 @@ jobs:
 
       - name: Install dependencies
         if: env.SKIP_SMOKE != 'true'
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Cache the Playwright Chromium download keyed on package-lock so the
       # ~30 MB install only runs when playwright itself bumps. Saves

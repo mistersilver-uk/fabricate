@@ -24,6 +24,7 @@
      with all players", never "Played by <one name>".
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -32,7 +33,7 @@
     // read-only.
     accessPlayers = [],
     accessCharacters = [],
-    onOpenAccess = () => {}
+    onOpenAccess = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -45,7 +46,10 @@
   // actor and naming one player would tell the GM the opposite of the truth.
   function controllerSubline(character) {
     if (character?.sharedWithAllPlayers === true) {
-      return text('FABRICATE.Admin.Manager.Recipe.AccessTab.SharedWithAllPlayers', 'Shared with all players');
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.AccessTab.SharedWithAllPlayers',
+        'Shared with all players'
+      );
     }
     const controllers = Array.isArray(character?.controlledBy) ? character.controlledBy : [];
     if (controllers.length === 0) return '';
@@ -70,23 +74,45 @@
   );
 </script>
 
-<section class="manager-recipe-tab manager-recipe-access-tab" data-recipe-tab="access" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Access', 'Access')}>
+<section
+  class="manager-recipe-tab manager-recipe-access-tab"
+  data-recipe-tab="access"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Access', 'Access')}
+>
   <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.Title', 'Who can craft this')}</h2>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.Intro', 'This system grants recipes per player and character. Grants are authored on the Access screen.')}</p>
+    <h2 class="manager-recipe-tab-title">
+      {text('FABRICATE.Admin.Manager.Recipe.AccessTab.Title', 'Who can craft this')}
+    </h2>
+    <p class="manager-muted">
+      {text(
+        'FABRICATE.Admin.Manager.Recipe.AccessTab.Intro',
+        'This system grants recipes per player and character. Grants are authored on the Access screen.'
+      )}
+    </p>
   </div>
 
   <div class="manager-recipe-access-body" data-recipe-section="access">
     {#if hasAccessGrants}
       {#if (accessPlayers || []).length > 0}
-        <p class="manager-kicker" id="manager-recipe-access-players">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.PlayersWithAccess', 'Players with access')}</p>
-        <ul class="manager-recipe-access-list" data-recipe-access-players aria-labelledby="manager-recipe-access-players">
+        <p class="manager-kicker" id="manager-recipe-access-players">
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.AccessTab.PlayersWithAccess',
+            'Players with access'
+          )}
+        </p>
+        <ul
+          class="manager-recipe-access-list"
+          data-recipe-access-players
+          aria-labelledby="manager-recipe-access-players"
+        >
           {#each accessPlayers as player (player.id)}
             <li class="manager-recipe-access-row" data-recipe-access-player={player.id}>
               {#if player.avatar}
                 <img class="manager-recipe-access-avatar" src={player.avatar} alt="" />
               {:else}
-                <span class="manager-recipe-access-avatar is-placeholder" aria-hidden="true"><i class="fas fa-user"></i></span>
+                <span class="manager-recipe-access-avatar is-placeholder" aria-hidden="true"
+                  ><i class="fas fa-user"></i></span
+                >
               {/if}
               <span class="manager-recipe-access-name">{player.name}</span>
             </li>
@@ -95,15 +121,26 @@
       {/if}
 
       {#if (accessCharacters || []).length > 0}
-        <p class="manager-kicker" id="manager-recipe-access-characters">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.CharactersWithAccess', 'Characters with access')}</p>
-        <ul class="manager-recipe-access-list" data-recipe-access-characters aria-labelledby="manager-recipe-access-characters">
+        <p class="manager-kicker" id="manager-recipe-access-characters">
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.AccessTab.CharactersWithAccess',
+            'Characters with access'
+          )}
+        </p>
+        <ul
+          class="manager-recipe-access-list"
+          data-recipe-access-characters
+          aria-labelledby="manager-recipe-access-characters"
+        >
           {#each accessCharacters as character (character.id)}
             {@const subline = controllerSubline(character)}
             <li class="manager-recipe-access-row" data-recipe-access-character={character.id}>
               {#if character.img}
                 <img class="manager-recipe-access-avatar" src={character.img} alt="" />
               {:else}
-                <span class="manager-recipe-access-avatar is-placeholder" aria-hidden="true"><i class="fas fa-user"></i></span>
+                <span class="manager-recipe-access-avatar is-placeholder" aria-hidden="true"
+                  ><i class="fas fa-user"></i></span
+                >
               {/if}
               <span class="manager-recipe-access-copy">
                 <span class="manager-recipe-access-name">{character.name}</span>
@@ -111,8 +148,8 @@
                   <span
                     class="manager-recipe-access-subline manager-muted"
                     data-recipe-access-subline
-                    title={controllerTitle(character) || undefined}
-                  >{subline}</span>
+                    title={controllerTitle(character) || undefined}>{subline}</span
+                  >
                 {/if}
               </span>
             </li>
@@ -120,17 +157,28 @@
         </ul>
       {/if}
     {:else}
-      <!-- The tab's OWN empty primitive (`.manager-recipe-section-empty`), the one the
-           Results/Ingredients tabs use — not the rail's medallion card. A rail card and
-           a tab empty-state are different surfaces, and re-homing the rail's version
-           verbatim would have put a second empty-state design on the same tab strip. -->
-      <div class="manager-recipe-section-empty" data-recipe-access-empty>
-        <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.EmptyTitle', 'No access granted')}</p>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.AccessTab.NoAccessGrants', 'No player or character has been granted this recipe yet.')}</p>
-      </div>
+      <!-- The shared no-state primitive at the sidebar/inline scale. This tab used to
+           carry its own `.manager-recipe-section-empty` panel; that was a second
+           empty-state design sitting beside the manager's one, so it is gone. -->
+      <EmptyState
+        compact
+        icon="fas fa-user-shield"
+        title={text('FABRICATE.Admin.Manager.Recipe.AccessTab.EmptyTitle', 'No access granted')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Recipe.AccessTab.NoAccessGrants',
+          'No player or character has been granted this recipe yet.'
+        )}
+        contextClass="manager-recipe-tab-empty"
+        dataAttr="data-recipe-access-empty"
+      />
     {/if}
 
-    <button type="button" class="manager-button manager-recipe-tab-action" data-recipe-open-access onclick={() => onOpenAccess()}>
+    <button
+      type="button"
+      class="manager-button manager-recipe-tab-action"
+      data-recipe-open-access
+      onclick={() => onOpenAccess()}
+    >
       <i class="fas fa-user-shield" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AccessTab.ManageAccess', 'Manage access')}</span>
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>

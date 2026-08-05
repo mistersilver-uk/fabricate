@@ -1,8 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
-  let { activeTab = 'overview', errorCount = 0, requirementCount = 0, onChange = () => {} } = $props();
+  let {
+    activeTab = 'overview',
+    errorCount = 0,
+    requirementCount = 0,
+    onChange = () => {},
+  } = $props();
   const tabs = [
     ['overview', 'Overview', 'fas fa-circle-info'],
     ['breakage', 'Breakage', 'fas fa-heart-crack'],
@@ -42,14 +48,15 @@
     event.preventDefault();
     const nextTab = tabs[nextIndex][0];
     onChange(nextTab);
-    event.currentTarget
-      .closest('[role="tablist"]')
-      ?.querySelector(`#tool-tab-${nextTab}`)
-      ?.focus();
+    event.currentTarget.closest('[role="tablist"]')?.querySelector(`#tool-tab-${nextTab}`)?.focus();
   }
 </script>
 
-<div class="manager-tool-editor-tabs manager-editor-tabs" role="tablist" aria-label={text('Tabs', 'Tool editor sections')}>
+<div
+  class="manager-tool-editor-tabs manager-editor-tabs"
+  role="tablist"
+  aria-label={text('Tabs', 'Tool editor sections')}
+>
   {#each tabs as tab (tab[0])}
     <button
       type="button"
@@ -67,12 +74,15 @@
       <i class={tab[2]} aria-hidden="true"></i>
       <span>{text(`Tab${tab[0][0].toUpperCase()}${tab[0].slice(1)}`, tab[1])}</span>
       {#if tab[0] === 'requirements' && requirementCount > 0}
-        <span class="manager-chip is-neutral manager-editor-tab-badge">{requirementCount}</span>
+        <Chip tone="neutral" class="manager-editor-tab-badge">{requirementCount}</Chip>
       {:else if tab[0] === 'validation'}
-        <span
-          class={`manager-chip manager-editor-tab-badge ${errorCount > 0 ? 'is-danger' : 'is-positive is-valid'}`}
-          aria-label={errorCount > 0 ? issueCountText(errorCount) : text('AllValid', 'All checks pass')}
-        >{errorCount > 0 ? errorCount : '✓'}</span>
+        <Chip
+          tone={errorCount > 0 ? 'danger' : 'positive'}
+          class={`manager-editor-tab-badge ${errorCount > 0 ? '' : 'is-valid'}`}
+          aria-label={errorCount > 0
+            ? issueCountText(errorCount)
+            : text('AllValid', 'All checks pass')}>{errorCount > 0 ? errorCount : '✓'}</Chip
+        >
       {/if}
     </button>
   {/each}

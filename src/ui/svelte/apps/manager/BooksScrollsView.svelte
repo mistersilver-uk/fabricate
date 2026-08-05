@@ -20,7 +20,6 @@
   Props:
    - recipeItems: projected recipe items ({ id, resolvedName, resolvedImg,
      derivedType, enabled, caps, recipes, learnedByCount, linkMissing }).
-   - selectedSystemName: the system's display name (kicker).
    - visibilityMode: 'item' | 'knowledge' — chooses the use vs learning chip.
    - selectedRecipeItemId: the row currently open in the inspector.
    - onSelectRecipeItem(id): select a row (opens the inspector).
@@ -38,6 +37,8 @@
   recipe-item Overview tab use) and hands it upstream to create + link the definition.
 -->
 <script>
+  import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
@@ -45,14 +46,13 @@
 
   let {
     recipeItems = [],
-    selectedSystemName = '',
     visibilityMode = 'knowledge',
     selectedRecipeItemId = '',
     onSelectRecipeItem = () => {},
     onOpenRecipeItem = () => {},
     onDropRecipeItem = () => {},
     dropEnabled = false,
-    onToggleEnabled = () => {}
+    onToggleEnabled = () => {},
   } = $props();
 
   let statusFilter = $state('all');
@@ -97,7 +97,26 @@
     const count = recipeCount(item);
     if (count === 0) return text('FABRICATE.Admin.Manager.BooksScrolls.NoRecipes', 'No recipes');
     if (count === 1) return text('FABRICATE.Admin.Manager.BooksScrolls.OneRecipe', '1 recipe');
-    return text('FABRICATE.Admin.Manager.BooksScrolls.RecipeCount', '{n} recipes').replace('{n}', count);
+    return text('FABRICATE.Admin.Manager.BooksScrolls.RecipeCount', '{n} recipes').replace(
+      '{n}',
+      count
+    );
+  }
+
+  // The type pill names the kind AND, for a multi-recipe item, how many recipes it
+  // holds ("3 Recipe Book"), matching the Knowledge surface so one recipe item is not
+  // described two different ways on two screens. `derivedType` stays the bare enum
+  // because the type FILTER above builds its options from those values.
+  function typePillLabel(item) {
+    const count = recipeCount(item);
+    if (count >= 2) {
+      return text(
+        'FABRICATE.Admin.Manager.BooksScrolls.TypeRecipeBook',
+        '{count} Recipe Book'
+      ).replace('{count}', count);
+    }
+    if (count === 1) return text('FABRICATE.Admin.Manager.BooksScrolls.TypeScroll', 'Scroll');
+    return text('FABRICATE.Admin.Manager.BooksScrolls.TypeIncomplete', 'Incomplete');
   }
 
   // Use cap chip (item visibility mode). Reads the new `caps.item` shape; falls
@@ -112,7 +131,8 @@
   }
 
   function useChipLabel(item) {
-    if (!useLimited(item)) return text('FABRICATE.Admin.Manager.BooksScrolls.Unlimited', 'Unlimited');
+    if (!useLimited(item))
+      return text('FABRICATE.Admin.Manager.BooksScrolls.Unlimited', 'Unlimited');
     const max = maxUses(item);
     return max === 1
       ? text('FABRICATE.Admin.Manager.BooksScrolls.OneUse', '1 use')
@@ -140,12 +160,16 @@
   }
 
   function learnChipLabel(item) {
-    if (!learnLimited(item)) return text('FABRICATE.Admin.Manager.BooksScrolls.LearnFreely', 'Learn freely');
+    if (!learnLimited(item))
+      return text('FABRICATE.Admin.Manager.BooksScrolls.LearnFreely', 'Learn freely');
     const n = learnsAllowed(item);
     if (learnScopeOf(item) === 'total') {
       return text('FABRICATE.Admin.Manager.BooksScrolls.LearnTotal', '{n} total').replace('{n}', n);
     }
-    return text('FABRICATE.Admin.Manager.BooksScrolls.LearnPerCopy', '{n} / copy').replace('{n}', n);
+    return text('FABRICATE.Admin.Manager.BooksScrolls.LearnPerCopy', '{n} / copy').replace(
+      '{n}',
+      n
+    );
   }
 
   function capChipLabel(item) {
@@ -160,16 +184,20 @@
     Array.from(new Set((recipeItems || []).map((item) => item?.derivedType || 'Book'))).sort()
   );
 
-  const filteredItems = $derived((recipeItems || []).filter((item) => {
-    const matchesStatus = statusFilter === 'all'
-      || (statusFilter === 'enabled' && item.enabled !== false)
-      || (statusFilter === 'disabled' && item.enabled === false);
-    const matchesType = typeFilter === 'all' || (item.derivedType || 'Book') === typeFilter;
-    const matchesCap = capFilter === 'all'
-      || (capFilter === 'limited' && capLimited(item))
-      || (capFilter === 'unlimited' && !capLimited(item));
-    return matchesStatus && matchesType && matchesCap;
-  }));
+  const filteredItems = $derived(
+    (recipeItems || []).filter((item) => {
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'enabled' && item.enabled !== false) ||
+        (statusFilter === 'disabled' && item.enabled === false);
+      const matchesType = typeFilter === 'all' || (item.derivedType || 'Book') === typeFilter;
+      const matchesCap =
+        capFilter === 'all' ||
+        (capFilter === 'limited' && capLimited(item)) ||
+        (capFilter === 'unlimited' && !capLimited(item));
+      return matchesStatus && matchesType && matchesCap;
+    })
+  );
 
   const filtersActive = $derived(
     statusFilter !== 'all' || typeFilter !== 'all' || capFilter !== 'all'
@@ -196,92 +224,193 @@
   }
 </script>
 
-<main class="manager-main manager-books-scrolls-main" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls')} data-books-scrolls>
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">{selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.BooksScrolls.Library', 'Books & Scrolls')}</h2>
-      <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.BooksScrolls.LibraryHint', 'Recipe items that grant recipes when read. Set their contents, uses and learning limits.')}</p>
-    </div>
-  </section>
-
+<main
+  class="manager-main manager-books-scrolls-main"
+  aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls')}
+  data-books-scrolls
+>
+  <!-- No per-view page header: the shell's `.manager-header` already renders the system
+       kicker, the "Books & Scrolls" title and a subtitle, so a second one restated the
+       title inside the panel. Removed for the same reason as the components and recipes
+       libraries (issue 676). -->
   <section
     class={`manager-books-scrolls-drop-zone ${dropError ? 'is-error' : ''}`}
     data-books-scrolls-drop-zone
-    use:dragDrop={{ onDrop: handleRecipeItemDrop, disabled: !dropEnabled, activeClass: 'is-drop-active' }}
-    aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneLabel', 'Drop a world or compendium item to create a recipe item')}
+    use:dragDrop={{
+      onDrop: handleRecipeItemDrop,
+      disabled: !dropEnabled,
+      activeClass: 'is-drop-active',
+    }}
+    aria-label={text(
+      'FABRICATE.Admin.Manager.BooksScrolls.DropZoneLabel',
+      'Drop a world or compendium item to create a recipe item'
+    )}
   >
-    <i class={dropError ? 'fas fa-triangle-exclamation' : 'fas fa-hand-pointer'} aria-hidden="true"></i>
+    <i class={dropError ? 'fas fa-triangle-exclamation' : 'fas fa-hand-pointer'} aria-hidden="true"
+    ></i>
     <span class="manager-books-scrolls-drop-copy">
-      <strong>{text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneTitle', 'Drop an item to create a recipe item')}</strong>
+      <strong
+        >{text(
+          'FABRICATE.Admin.Manager.BooksScrolls.DropZoneTitle',
+          'Drop an item to create a recipe item'
+        )}</strong
+      >
       {#if dropError}
-        <small class="manager-books-scrolls-drop-error" data-books-scrolls-drop-error>{text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneError', 'That drop was not a game-world or compendium item. Drag an Item (book, scroll, or any item) here.')}</small>
+        <small class="manager-books-scrolls-drop-error" data-books-scrolls-drop-error
+          >{text(
+            'FABRICATE.Admin.Manager.BooksScrolls.DropZoneError',
+            'That drop was not a game-world or compendium item. Drag an Item (book, scroll, or any item) here.'
+          )}</small
+        >
       {:else}
-        <small>{text('FABRICATE.Admin.Manager.BooksScrolls.DropZoneHint', 'Drag a world or compendium item here to make it a book or scroll that teaches recipes.')}</small>
+        <small
+          >{text(
+            'FABRICATE.Admin.Manager.BooksScrolls.DropZoneHint',
+            'Drag a world or compendium item here to make it a book or scroll that teaches recipes.'
+          )}</small
+        >
       {/if}
     </span>
   </section>
 
-  <section class="manager-toolbar" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}>
+  <section
+    class="manager-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
+  >
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-      <select value={statusFilter} onchange={(event) => statusFilter = event.currentTarget.value} data-books-scrolls-status-filter aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.StatusFilterLabel', 'Filter recipe items by status')}>
-        <option value="all">{text('FABRICATE.Admin.Manager.BooksScrolls.StatusAll', 'All statuses')}</option>
+      <select
+        value={statusFilter}
+        onchange={(event) => (statusFilter = event.currentTarget.value)}
+        data-books-scrolls-status-filter
+        aria-label={text(
+          'FABRICATE.Admin.Manager.BooksScrolls.StatusFilterLabel',
+          'Filter recipe items by status'
+        )}
+      >
+        <option value="all"
+          >{text('FABRICATE.Admin.Manager.BooksScrolls.StatusAll', 'All statuses')}</option
+        >
         <option value="enabled">{text('FABRICATE.Admin.Manager.StatusOn', 'On')}</option>
         <option value="disabled">{text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</option>
       </select>
     </label>
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.TypeFilter', 'Type')}</span>
-      <select value={typeFilter} onchange={(event) => typeFilter = event.currentTarget.value} data-books-scrolls-type-filter aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.TypeFilterLabel', 'Filter recipe items by type')}>
-        <option value="all">{text('FABRICATE.Admin.Manager.BooksScrolls.TypeAll', 'All types')}</option>
+      <select
+        value={typeFilter}
+        onchange={(event) => (typeFilter = event.currentTarget.value)}
+        data-books-scrolls-type-filter
+        aria-label={text(
+          'FABRICATE.Admin.Manager.BooksScrolls.TypeFilterLabel',
+          'Filter recipe items by type'
+        )}
+      >
+        <option value="all"
+          >{text('FABRICATE.Admin.Manager.BooksScrolls.TypeAll', 'All types')}</option
+        >
         {#each typeOptions as option (option)}
           <option value={option}>{option}</option>
         {/each}
       </select>
     </label>
     <label class="manager-filter">
-      <span>{isItemMode ? text('FABRICATE.Admin.Manager.BooksScrolls.UsesFilter', 'Uses') : text('FABRICATE.Admin.Manager.BooksScrolls.LearningFilter', 'Learning')}</span>
-      <select value={capFilter} onchange={(event) => capFilter = event.currentTarget.value} data-books-scrolls-cap-filter aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.CapFilterLabel', 'Filter recipe items by limits')}>
+      <span
+        >{isItemMode
+          ? text('FABRICATE.Admin.Manager.BooksScrolls.UsesFilter', 'Uses')
+          : text('FABRICATE.Admin.Manager.BooksScrolls.LearningFilter', 'Learning')}</span
+      >
+      <select
+        value={capFilter}
+        onchange={(event) => (capFilter = event.currentTarget.value)}
+        data-books-scrolls-cap-filter
+        aria-label={text(
+          'FABRICATE.Admin.Manager.BooksScrolls.CapFilterLabel',
+          'Filter recipe items by limits'
+        )}
+      >
         <option value="all">{text('FABRICATE.Admin.Manager.BooksScrolls.CapAll', 'All')}</option>
-        <option value="limited">{isItemMode ? text('FABRICATE.Admin.Manager.BooksScrolls.LimitedUse', 'Limited use') : text('FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning', 'Limited learning')}</option>
-        <option value="unlimited">{isItemMode ? text('FABRICATE.Admin.Manager.BooksScrolls.Unlimited', 'Unlimited') : text('FABRICATE.Admin.Manager.BooksScrolls.LearnFreely', 'Learn freely')}</option>
+        <option value="limited"
+          >{isItemMode
+            ? text('FABRICATE.Admin.Manager.BooksScrolls.LimitedUse', 'Limited use')
+            : text(
+                'FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning',
+                'Limited learning'
+              )}</option
+        >
+        <option value="unlimited"
+          >{isItemMode
+            ? text('FABRICATE.Admin.Manager.BooksScrolls.Unlimited', 'Unlimited')
+            : text('FABRICATE.Admin.Manager.BooksScrolls.LearnFreely', 'Learn freely')}</option
+        >
       </select>
     </label>
-    <span class="manager-chip" data-books-scrolls-count>{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}').replace('{shown}', filteredItems.length).replace('{total}', (recipeItems || []).length)}</span>
+    <Chip data-books-scrolls-count
+      >{text('FABRICATE.Admin.Manager.SearchCount', '{shown} of {total}')
+        .replace('{shown}', filteredItems.length)
+        .replace('{total}', (recipeItems || []).length)}</Chip
+    >
     {#if filtersActive}
-      <button type="button" class="manager-button manager-clear-filters" data-clear-filters="books-scrolls" onclick={clearFilters}>
+      <button
+        type="button"
+        class="manager-button manager-clear-filters"
+        data-clear-filters="books-scrolls"
+        onclick={clearFilters}
+      >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
       </button>
     {/if}
   </section>
 
-  <section class="manager-table-scroll manager-books-scrolls-scroll" aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Table', 'Recipe items')}>
+  <section
+    class="manager-table-scroll manager-books-scrolls-scroll"
+    aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Table', 'Recipe items')}
+  >
     {#if (recipeItems || []).length === 0}
-      <div class="manager-empty" data-books-scrolls-empty>
-        <div>
-          <i class="fas fa-book-sparkles" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyHint', 'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-book-sparkles"
+        title={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}
+        hint={text(
+          'FABRICATE.Admin.Manager.BooksScrolls.EmptyHint',
+          'Drag a world or compendium item onto the drop-zone above to create your first recipe item, then link recipes to it.'
+        )}
+        dataAttr="data-books-scrolls-empty"
+      />
     {:else if filteredItems.length === 0}
-      <div class="manager-empty" data-books-scrolls-empty-filtered>
-        <div>
-          <i class="fas fa-filter" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterTitle', 'No recipe items match these filters')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint', 'Clear the filters to show every recipe item in this system.')}</p>
-          <button type="button" class="manager-button" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-filter"
+        title={text(
+          'FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterTitle',
+          'No recipe items match these filters'
+        )}
+        hint={text(
+          'FABRICATE.Admin.Manager.BooksScrolls.EmptyFilterHint',
+          'Clear the filters to show every recipe item in this system.'
+        )}
+        dataAttr="data-books-scrolls-empty-filtered"
+      >
+        <button type="button" class="manager-button" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        >
+      </EmptyState>
     {:else}
       <div class="manager-books-scrolls-list" role="list">
         <div class="manager-books-scrolls-head" aria-hidden="true">
-          <span class="manager-books-scrolls-head-cell is-item">{text('FABRICATE.Admin.Manager.BooksScrolls.ColItem', 'Recipe item')}</span>
-          <span class="manager-books-scrolls-head-cell">{text('FABRICATE.Admin.Manager.BooksScrolls.ColRecipes', 'Recipes')}</span>
-          <span class="manager-books-scrolls-head-cell">{isItemMode ? text('FABRICATE.Admin.Manager.BooksScrolls.ColUses', 'Uses') : text('FABRICATE.Admin.Manager.BooksScrolls.ColLearning', 'Learning')}</span>
-          <span class="manager-books-scrolls-head-cell is-status">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+          <span class="manager-books-scrolls-head-cell is-item"
+            >{text('FABRICATE.Admin.Manager.BooksScrolls.ColItem', 'Recipe item')}</span
+          >
+          <span class="manager-books-scrolls-head-cell"
+            >{text('FABRICATE.Admin.Manager.BooksScrolls.ColRecipes', 'Recipes')}</span
+          >
+          <span class="manager-books-scrolls-head-cell"
+            >{isItemMode
+              ? text('FABRICATE.Admin.Manager.BooksScrolls.ColUses', 'Uses')
+              : text('FABRICATE.Admin.Manager.BooksScrolls.ColLearning', 'Learning')}</span
+          >
+          <span class="manager-books-scrolls-head-cell is-status"
+            >{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span
+          >
         </div>
         {#each paginatedItems as item (item.id)}
           <div
@@ -294,36 +423,63 @@
               class="manager-books-scrolls-identity"
               data-books-scrolls-select={item.id}
               aria-pressed={isSelected(item)}
-              aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.SelectItem', 'Select {name}').replace('{name}', item.resolvedName)}
+              aria-label={text(
+                'FABRICATE.Admin.Manager.BooksScrolls.SelectItem',
+                'Select {name}'
+              ).replace('{name}', item.resolvedName)}
               onclick={() => onSelectRecipeItem(item.id)}
             >
               <img class="manager-books-scrolls-thumb" src={recipeItemImage(item)} alt="" />
-              <span class="manager-books-scrolls-name" data-books-scrolls-name={item.id} title={item.resolvedName}>{item.resolvedName}</span>
-              <span class={`manager-chip manager-books-scrolls-type-pill ${recipeCount(item) === 0 ? 'is-danger' : 'is-neutral'}`} data-books-scrolls-type={item.id}>{item.derivedType || text('FABRICATE.Admin.Manager.BooksScrolls.TypeBook', 'Book')}</span>
+              <span
+                class="manager-books-scrolls-name"
+                data-books-scrolls-name={item.id}
+                title={item.resolvedName}>{item.resolvedName}</span
+              >
+              <Chip
+                tone={recipeCount(item) === 0 ? 'danger' : 'neutral'}
+                class="manager-books-scrolls-type-pill"
+                data-books-scrolls-type={item.id}>{typePillLabel(item)}</Chip
+              >
               {#if item.linkMissing}
-                <span class="manager-chip is-danger manager-books-scrolls-link-chip" data-books-scrolls-link-missing={item.id}>
-                  <i class="fas fa-link-slash" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.BooksScrolls.LinkMissing', 'Item missing')}</span>
-                </span>
+                <Chip
+                  tone="danger"
+                  icon="fas fa-link-slash"
+                  class="manager-books-scrolls-link-chip"
+                  data-books-scrolls-link-missing={item.id}
+                >
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.BooksScrolls.LinkMissing',
+                      'Item missing'
+                    )}</span
+                  >
+                </Chip>
               {/if}
             </button>
 
-            <span
-              class={`manager-chip manager-books-scrolls-recipe-chip ${recipeCount(item) === 0 ? 'is-danger' : ''}`}
+            <Chip
+              tone={recipeCount(item) === 0 ? 'danger' : ''}
+              icon={recipeCount(item) === 0 ? 'fas fa-circle-exclamation' : 'fas fa-scroll'}
+              class="manager-books-scrolls-recipe-chip"
               data-books-scrolls-recipe-count={item.id}
             >
-              <i class={recipeCount(item) === 0 ? 'fas fa-circle-exclamation' : 'fas fa-scroll'} aria-hidden="true"></i>
               <span>{recipeCountLabel(item)}</span>
-            </span>
+            </Chip>
 
-            <span
-              class={`manager-chip manager-books-scrolls-cap-chip ${capLimited(item) ? 'is-limited' : 'is-unlimited'}`}
+            <!-- A limited cap reads as a "waiting/attention" warning tint; an uncapped item
+                 (Unlimited / Learn freely) reads as a neutral informational blue. Those were
+                 hand-written `is-limited` / `is-unlimited` rules restating the primitive's own
+                 warning and info tokens exactly, so they are tones now (issue 883); the state
+                 stays readable through `data-books-scrolls-cap-limited`. -->
+            <Chip
+              tone={capLimited(item) ? 'warning' : 'info'}
+              icon={isItemMode ? 'fas fa-fire-flame-curved' : 'fas fa-graduation-cap'}
+              class="manager-books-scrolls-cap-chip"
               data-books-scrolls-cap-chip={item.id}
               data-books-scrolls-cap-limited={capLimited(item)}
             >
-              <i class={isItemMode ? 'fas fa-fire-flame-curved' : 'fas fa-graduation-cap'} aria-hidden="true"></i>
               <span>{capChipLabel(item)}</span>
-            </span>
+            </Chip>
 
             <div class="manager-books-scrolls-actions">
               <button
@@ -332,18 +488,36 @@
                 aria-pressed={item.enabled !== false}
                 data-books-scrolls-toggle={item.id}
                 aria-label={item.enabled === false
-                  ? text('FABRICATE.Admin.Manager.BooksScrolls.EnableNamed', 'Enable {name}').replace('{name}', item.resolvedName)
-                  : text('FABRICATE.Admin.Manager.BooksScrolls.DisableNamed', 'Disable {name}').replace('{name}', item.resolvedName)}
-                onclick={(event) => { event.stopPropagation(); onToggleEnabled(item.id, item.enabled === false); }}
+                  ? text(
+                      'FABRICATE.Admin.Manager.BooksScrolls.EnableNamed',
+                      'Enable {name}'
+                    ).replace('{name}', item.resolvedName)
+                  : text(
+                      'FABRICATE.Admin.Manager.BooksScrolls.DisableNamed',
+                      'Disable {name}'
+                    ).replace('{name}', item.resolvedName)}
+                onclick={(event) => {
+                  event.stopPropagation();
+                  onToggleEnabled(item.id, item.enabled === false);
+                }}
               >
-                <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                <span class="manager-status-toggle-label">{item.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span>
+                <span class="manager-status-toggle-track" aria-hidden="true"
+                  ><span class="manager-status-toggle-knob"></span></span
+                >
+                <span class="manager-status-toggle-label"
+                  >{item.enabled === false
+                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span
+                >
               </button>
               <button
                 type="button"
                 class="manager-icon-button manager-books-scrolls-edit"
                 data-books-scrolls-edit={item.id}
-                aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.EditNamed', 'Edit {name}').replace('{name}', item.resolvedName)}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.BooksScrolls.EditNamed',
+                  'Edit {name}'
+                ).replace('{name}', item.resolvedName)}
                 title={text('FABRICATE.Admin.Manager.BooksScrolls.Edit', 'Edit recipe item')}
                 onclick={() => onOpenRecipeItem(item.id)}
               >
@@ -360,8 +534,11 @@
     totalCount={filteredItems.length}
     {pageSize}
     {pageIndex}
-    onPageChange={(next) => pageIndex = next}
-    onPageSizeChange={(next) => { pageSize = next; pageIndex = 0; }}
+    onPageChange={(next) => (pageIndex = next)}
+    onPageSizeChange={(next) => {
+      pageSize = next;
+      pageIndex = 0;
+    }}
   />
 </main>
 
@@ -540,12 +717,14 @@
     min-width: 0;
   }
 
-  .manager-books-scrolls-type-pill {
+  /* All three are `Chip`s (issue 883), so this component's scoping hash is not on them.
+     Reach them through `:global`, nested under a selector that DOES carry the hash. */
+  .manager-books-scrolls-identity :global(.manager-books-scrolls-type-pill) {
     flex: none;
   }
 
-  .manager-books-scrolls-recipe-chip,
-  .manager-books-scrolls-cap-chip {
+  .manager-books-scrolls-listitem :global(.manager-books-scrolls-recipe-chip),
+  .manager-books-scrolls-listitem :global(.manager-books-scrolls-cap-chip) {
     justify-self: start;
     white-space: nowrap;
   }
@@ -555,20 +734,5 @@
     align-items: center;
     justify-self: end;
     gap: var(--fab-space-2);
-  }
-
-  /* Limited caps read as a "waiting/attention" warning tint; an uncapped item
-     (Unlimited / Learn freely) reads as a neutral informational blue. Both use
-     semantic tokens only — no literals. */
-  .manager-books-scrolls-cap-chip.is-limited {
-    color: var(--fab-warning-text);
-    background: var(--fab-warning-soft);
-    border-color: var(--fab-warning-border);
-  }
-
-  .manager-books-scrolls-cap-chip.is-unlimited {
-    color: var(--fab-info-text);
-    background: var(--fab-info-soft);
-    border-color: var(--fab-info-border);
   }
 </style>

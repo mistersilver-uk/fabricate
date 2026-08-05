@@ -448,7 +448,7 @@ Fabricate stores data in Foundry's settings and flags:
 | Actor flag | `fabricate.discoveredGatheringRealms` | Per-system gathering realm discovery entries for the actor (legacy `fabricate.discoveredGatheringRegions` flag read as a fallback) |
 | Item flag | `fabricate.toolUsage` | `{ timesUsed }` for `limitedUses` tool tracking (falls back to legacy `fabricate.catalystItemUsage` when absent) |
 | Item flag | `fabricate.toolBroken` | `true` when a tool's `flagBroken` on-break action has fired |
-| Item flag | `fabricate.recipeItemUsage` | `{ timesUsed }` for recipe item tracking |
+| Item flag | `fabricate.recipeItemUsage` | `{ timesUsed, inert? }` for recipe item tracking. `inert` records that the copy exhausted while its book was set to become inert rather than be destroyed, and nothing in Fabricate clears it once set |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 

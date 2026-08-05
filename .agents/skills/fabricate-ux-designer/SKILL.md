@@ -29,27 +29,33 @@ For read-only UX review, return verdicts, findings, and recommended text; only w
 
 - `openspec/specs/ui-integration/spec.md` first, then other UI-related specs as needed
 - `.agents/skills/fabricate-ux-designer/references/design-system.md` — the `--fab-*` token, component, and pattern reference — when proposing or reviewing visual design or building a new surface
+- `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md` — the mandatory reference matrix, reuse-inventory, provenance, and maintainer-manual-evidence procedure for non-trivial UI work
 - relevant files under `src/ui/`, `src/ui/svelte/`, `styles/`, and `lang/`
 - the active Vite dev URL when available, or a prompt to ask the user for it before using container-backed flows
-- embedded screenshot images in the PR description (S3-hosted, from `npm run screenshots:ui:publish`) and smoke screenshots when no live dev session is available
+- embedded screenshot images in the PR description (S3-hosted; the View Lab capture job publishes these on every push), View Lab frames you render yourself, and smoke screenshots for views outside the case registry
 
 ## Workflow
 
 1. Read the relevant UI spec before making recommendations.
 2. Complete the assigned worktree identity checks before reviewing or editing, and stop with `BLOCKED` on any mismatch.
 3. Inspect the current Svelte components, stores, styles, and localized strings.
-4. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
-5. If no live dev session is available, check the PR body/comments/artifacts for recent smoke evidence before trying to generate fresh screenshots.
-6. Ask the workflow driver for container-backed Foundry validation when UI PR screenshot evidence must be created from real smoke artifacts, then inspect the returned evidence.
-7. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main` and ask the workflow driver to run the authoritative smoke, collection, publication, and cleanup commands from the integrated coordinator branch.
-Review the resulting `npm run test:foundry` output and the S3-hosted images embedded by `npm run screenshots:ui:publish`.
+4. For non-trivial UI work, open every supplied prototype, screenshot, defect matrix, named sibling, and CSS record, then complete the per-control/state reference matrix and `Reference surfaces / reuse inventory` before approval.
+5. Use the active Vite dev server first for live UI inspection; ask the user for the URL if it is not known.
+6. If no live dev session is available, generate fresh frames yourself with the **View Lab** — it is the default producer and needs no container, no driver hand-off, and no Docker: `node scripts/view-lab-screenshots.mjs apps <comma-separated-case-ids>` writes PNGs into `ui-screenshot-artifact/apps/` in seconds (one case ~22s, five ~36s), and `ui-screenshot-artifact/apps/index.html` browses them grouped by screen with a multi-tag filter.
+Pick the case ids from `scripts/lib/viewLabCases.js`; an unknown id aborts immediately naming it.
+The lab needs harvested chrome (`npm run viewlab:chrome:harvest`, one-off) and fails closed without it rather than approximating.
+7. Ask the workflow driver for container-backed Foundry validation ONLY when the view is outside the case registry, or when the question is about real Foundry runtime behaviour the lab does not model — not to re-photograph a view the registry covers.
+The smoke's `screenshots` profile costs ~31s per frame against the lab's ~5s, cannot run on a GitHub Actions runner, and serialises on one machine, so asking for it by default stalls the lane for half an hour to produce what the lab produces in seconds.
+8. For UI-changing PRs, verify the planned evidence from `npm run screenshots:ui:plan -- --base origin/main` against the frames CI published into the PR body — the View Lab capture job renders and publishes the changed-file-affected cases on every push, so evidence usually already exists before you ask for any.
+Ask the driver for collection, publication and cleanup only for views the lab does not cover.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label.
-8. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
+An issue-specific maintainer instruction may replace the producer, but visual approval stays pending until qualifying evidence is embedded and inspected, and the instruction does not waive the gate.
+9. Compare screenshots against explicit visual acceptance criteria, not just against whether the screen rendered.
 Verify the published evidence against the fix itself: at least one frame must show the changed state, and you judge that frame for both correctness (it does what the change claims) and polish.
 A frame that only satisfies the `check-screenshots` gate without depicting the changed state is missing evidence — call for a capture state that reaches it rather than approving on an unrelated frame.
-9. Compare the implementation against the spec and against Foundry-native interaction patterns.
-10. Turn confirmed problems into specific design guidance or backlog issues.
-11. For explicitly assigned mutable work, commit only owned spec, design, or workflow paths locally and return the commit handoff to the workflow driver.
+10. Compare the implementation against the spec and against Foundry-native interaction patterns.
+11. Turn confirmed problems into specific design guidance or backlog issues.
+12. For explicitly assigned mutable work, commit only owned spec, design, or workflow paths locally and return the commit handoff to the workflow driver.
 
 ## Review checklist
 
@@ -59,7 +65,8 @@ Check:
 - spacing, typography, and information hierarchy
 - compact navigation, headers, cards, and fact components with long names or localized strings
 - contrast, focus states, and keyboard accessibility
-- empty states, loading states, and error states
+- empty states, loading states, and error states — each rendered through its shared primitive, not hand-rolled per screen
+- duplicate implementations of one meaning: a second component, a copied markup block, or a per-screen style override that re-derives a shipped primitive is a finding, and the fix is a prop or variant on the primitive rather than the copy
 - Svelte 5 rune usage and avoidable side effects
 - localization readiness for longer strings
 - screenshot artifacts for first visible state, clipping, spacing, alignment, image/content scale, scroll containment, and visible controls
@@ -75,6 +82,18 @@ See the CSS section of `CONTRIBUTING.md`
 
 ## Rules
 
+- **One implementation per meaning — this is mandatory, not a preference.**
+Wherever two or more places perform the same function, represent the same knowledge, or implement the same layout, that thing MUST exist as a single shared primitive Svelte component.
+Not a shared CSS class that each site hand-rolls markup against, and not a copy: a component, imported.
+A shared primitive that coexists with unconverted duplicates is not a primitive, it is a fourth way of doing the same thing — so extracting one obliges you to convert every existing site in the same change, or to state in the plan which sites are deferred and why.
+- **Prefer adding flexibility to an existing shared primitive over creating a new one.**
+A new prop, a variant class, or a slot on the primitive that already owns the meaning beats a second component that owns half of it.
+Creating a new primitive, or leaving a standalone/one-off implementation in place, requires EXPLICIT written justification in the plan or the review — name the behavioural mismatch that makes the existing primitive unusable.
+"It is only used once" is not a justification; "it is used once today" is how the second copy gets written.
+- **Prefer the primitive's own scoped `<style>` block over `styles/fabricate.css`, because it makes required-screenshot detection accurate.**
+`VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs` maps changed FILE PATHS to affected views.
+Styling that lives in the global stylesheet makes every tweak look like a global change, which matches the broad `theme-or-global-ui` recipe and demands a wide core set of frames; styling co-located in the component matches only the recipes that name that component, so the evidence is scoped to the views that actually render it.
+Two standing exceptions keep their rules in the global sheet: anything that must beat Foundry's host CSS (button geometry, focus rings — see the focus-ring rule below and `CONTRIBUTING.md`), and `:root`/theme token blocks.
 - Prefer Foundry-native patterns over novelty.
 - For popovers/dropdowns in the player app, prefer rendering in-place with `position: absolute` anchored to a `position: relative` ancestor over portaling with `position: fixed`.
 A portaled `position: fixed` element fed host-relative coordinates mis-positions (shifts by the window's viewport offset), and outside-click dismissal that relies on the portal escape hatch is fragile.
@@ -87,6 +106,7 @@ When reviewing a plan, audit the UI portion of the issue delta against these con
 - Name the screenshot file, viewport/window size, and concrete pass/fail criteria when giving screenshot feedback.
 - Treat unrelated image markdown, artifact names, and file lists in a PR as missing normal UI evidence; screenshots must be embedded images of the changed view (produced by `npm run screenshots:ui:publish`, S3-hosted).
 There is no `SCREENSHOTS_NEEDED:` handoff; only a maintainer-applied `screenshots-exempt` label can waive the requirement.
+- Validate every automated affected view against the provenance procedure in `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`; generic provenance is mandatory and any view-specific parity constraints remain stricter additions.
 - Do not implement production UI changes unless the user explicitly switches to implementation work.
 
 ## PR description template

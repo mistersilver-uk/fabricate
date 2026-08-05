@@ -16,6 +16,8 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
+import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
+import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -26,10 +28,25 @@ const RECIPE_RAW_MODULES = [
   'src/utils/recipeBrowserModel.js',
   // recipeBrowserModel imports the shared category totals (issue 676); omitting it here
   // HANGS this suite (`# cancelled`) rather than failing it.
-  'src/utils/browserGroupCounts.js'
+  'src/utils/browserGroupCounts.js',
+  // The pure bulk selection + staging model (issue 1010). The browser imports it for the
+  // four selection helpers and the toolbar reads the description it returns.
+  'src/utils/recipeBulkEditModel.js',
+  // Its shared leaf: those selection helpers live here and `recipeBulkEditModel.js`
+  // re-exports them, so it is a STATIC import of that module. Naming only the model HANGS
+  // the suite (`# cancelled`) rather than failing it.
+  'src/utils/bulkSelectionModel.js'
 ];
 
 const RECIPE_PRIMITIVES = [
+  // The manager's ONE chip (issue 883). Both harnesses below render it now that the
+  // browser's filter and check pills are `Chip`s, so it is hoisted here rather than
+  // repeated: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
+  // reads the WHOLE file, so naming it in only one of two harnesses reads as covered.
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+  // the harness omits HANGS the suite (# cancelled) rather than failing it.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
@@ -43,6 +60,11 @@ const browser = createMountedComponentHarness({
   compiledModules: [
     ...RECIPE_PRIMITIVES,
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // The manager's ONE selection control and its ONE multi-select toolbar row (issue
+    // 1010). The inspector harness below does not render either, so they are named here
+    // rather than hoisted into RECIPE_PRIMITIVES.
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
@@ -294,6 +316,71 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
   });
 });
 
+// Issue 1010 — the recipe half of the manager's multi-select contract. The cases are the
+// shared, parameterised run in `browserBulkSelectionCases.js`, instantiated here and in
+// `components-browser-view-mounted.test.js` alike: the two studios render the SAME
+// `BulkSelectionToolbar` over the SAME `bulkSelectionModel.js`, so a second hand-copied
+// run of the same seven bodies would be duplication rather than coverage.
+//
+// The eighth shipped Component Studio case — the focus-ring adjacency contract (issue
+// 924) — is deliberately NOT twinned: issue 1010 relocated it to
+// `tests/components/bulk-selection-toolbar-mounted.test.js`, which owns it for both
+// studios at once along with the drift assertion over the tokens inside the toolbar's
+// `:global()`.
+describeBrowserBulkSelection({
+  label: 'RecipesBrowserView',
+  prefix: 'recipe',
+  rowClass: 'manager-recipe-row',
+  rowIdKey: 'recipeId',
+  selectionKey: 'bulkSelectedRecipeIds',
+  rowsProp: 'recipes',
+  harness: browser,
+  createBrowserState: createRecipeBrowserState,
+  makeFlatRows: (count) =>
+    Array.from({ length: count }, (_, index) =>
+      makeRecipe({
+        id: `f${index + 1}`,
+        // Zero-padded so name-ascending order is also numeric order, which is what makes
+        // `flatId(1)` reliably the first row of page 1.
+        name: `Flask ${String(index + 1).padStart(2, '0')}`,
+        category: 'general'
+      })
+    ),
+  flatId: (index) => `f${index}`,
+  makeGroupedRows: () => [
+    makeRecipe({ id: 'a1', name: 'Acid Flask', category: 'alchemy' }),
+    makeRecipe({ id: 'a2', name: 'Alkahest', category: 'alchemy' }),
+    makeRecipe({ id: 's1', name: 'Bronze Ingot', category: 'smithing' }),
+    makeRecipe({ id: 's2', name: 'Steel Ingot', category: 'smithing' })
+  ],
+  grouped: {
+    // The header's `data-group-header` is the DISPLAY name, and a custom recipe category
+    // is its own label — only the reserved `general` is localized.
+    collapseHeader: 'alchemy',
+    hiddenIds: ['a1', 'a2'],
+    visibleIds: ['s1', 's2']
+  },
+  props: (recipes, extra = {}) => ({
+    recipes,
+    // Grouping is ON by default but the recipe browser also gates it on the system
+    // actually having a category vocabulary, so both must be supplied or the grouped
+    // branch of `pageIds` is never exercised.
+    showRecipeCategories: true,
+    recipeCategories: [...new Set(recipes.map((recipe) => recipe.category))].map((name) => ({
+      name,
+      count: recipes.filter((recipe) => recipe.category === name).length
+    })),
+    ...extra
+  }),
+  rowControls: {
+    scope: '.manager-recipe-cluster',
+    count: 3,
+    why:
+      'the row still carries exactly its three cluster buttons — lock, enable and edit — ' +
+      'so the smoke walk that reaches Edit through them is undisturbed by the new control'
+  }
+});
+
 describe('RecipesBrowserView filtering and sorting', () => {
   it('filters by status and by lock state, each with a clearable chip', async () => {
     const rows = [
@@ -438,6 +525,58 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
   });
 });
 
+// Issue 1010 — the row's two AUTHORING-state pills read ONE predicate: `deriveRecipeStatuses`
+// over the projected `enableBlocked`, "would activation refuse this recipe?". That is the same
+// predicate the bulk panel's pre-flight count and the set-apply write run, so the pilled rows
+// and the counted rows are one set by construction. The pre-1010 predicate was `incomplete`
+// (`validate() === false && validateStructure() === true`), which a STRUCTURALLY broken recipe
+// does not trip — so the reddest rows in the library wore no pill at all.
+//
+// These are MOUNTED rather than asserted against the component's source, and that is the whole
+// point of them: `enableBlocked` is read inside `recipeBrowserModel.js` and never appears in
+// this component's markup, so a source-text pin on the field name is satisfied by the comment
+// above `STATUS_LABELS` and by nothing else. Reverting the predicate reds every case below
+// while changing not one character of the component.
+describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
+  const pills = (root, id) =>
+    [
+      ...root.querySelectorAll(
+        `[data-recipe-id="${id}"] .manager-recipe-name-row [data-status-pill]`
+      )
+    ].map((pill) => [pill.dataset.statusPill, pill.textContent.trim()]);
+
+  it('paints an off, blocked recipe RED and says enabling would be refused', async () => {
+    // `incomplete: false` is the load-bearing half: this is the structurally-broken row the
+    // narrower predicate reads as fine, and it is exactly what the bulk panel forecasts.
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: false, enableBlocked: true })]
+    });
+    assert.deepEqual(pills(root, 'r1'), [
+      ['subtle', 'Disabled'],
+      ['danger', "Can't enable"]
+    ]);
+  });
+
+  it('paints an ON, blocked recipe AMBER — unfinished, but nothing is being refused', async () => {
+    // The activation gate fires only on the transition INTO enabled, so an already-on blocked
+    // recipe is authoring work outstanding rather than a refusal. Two tones, one predicate.
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', enabled: true, incomplete: false, enableBlocked: true })]
+    });
+    assert.deepEqual(pills(root, 'r1'), [['warning', 'Incomplete']]);
+  });
+
+  // The mirror, and the case that makes the two above non-vacuous: `incomplete` alone paints
+  // NOTHING now. Without this a predicate reading `incomplete || enableBlocked` would satisfy
+  // both cases above and still let the browser and the panel disagree.
+  it('paints no authoring pill on a row only the narrower incomplete predicate flags', async () => {
+    const root = await browser.mount({
+      recipes: [makeRecipe({ id: 'r1', enabled: false, incomplete: true, enableBlocked: false })]
+    });
+    assert.deepEqual(pills(root, 'r1'), [['subtle', 'Disabled']]);
+  });
+});
+
 // The count is quiet right-aligned METADATA and reports the page WINDOW. As a bordered
 // mono chip reading "6 of 6" it looked like a control and never told the GM which page
 // they were on.
@@ -538,6 +677,16 @@ describe('RecipesBrowserView column header (issue 643)', () => {
   it('renders no column header when the library is empty', async () => {
     const root = await browser.mount({ recipes: [] });
     assert.equal(root.querySelector('.manager-recipe-table-head'), null);
+  });
+});
+
+// Issue 884 — the row medallion is the recipe's own icon, resolved through the shared
+// helper. It used to prefer the first containing book's artwork.
+describe('RecipesBrowserView row medallion (issue 884)', () => {
+  itResolvesTheRecipesOwnImage({
+    harness: browser,
+    mountProps: (imageOverrides) => ({ recipes: [makeRecipe({ id: 'r1', ...imageOverrides })] }),
+    selectImg: (root) => root.querySelector('[data-recipe-id="r1"] .fab-medallion-img').getAttribute('src')
   });
 });
 
@@ -1095,7 +1244,16 @@ describe('RecipeBrowserInspector (mounted)', () => {
 
   it("says a locked, incomplete, disabled recipe can't be enabled", async () => {
     const root = await inspector.mount({
-      selectedRecipe: makeRecipe({ id: 'r1', enabled: false, locked: true, incomplete: true }),
+      // `enableBlocked` is the projection field the pill now reads (issue 1010); this
+      // fixture is hand-built, so it has to state it. `incomplete` stays because the row
+      // is genuinely both — an incomplete shell IS one of the things activation refuses.
+      selectedRecipe: makeRecipe({
+        id: 'r1',
+        enabled: false,
+        locked: true,
+        incomplete: true,
+        enableBlocked: true
+      }),
       recipeCount: 1
     });
 
@@ -1456,5 +1614,19 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
     assert.equal(root.querySelector('[data-recipe-produces-outcome]'), null, 'no outcome sections without a check');
     assert.match(root.querySelector('.manager-recipe-flow-list').textContent, /Healing Potion/);
+  });
+
+  // Issue 884 — the hero medallion is the recipe's own icon, resolved through the
+  // shared helper. It used to prefer the first containing book's artwork.
+  itResolvesTheRecipesOwnImage({
+    harness: inspector,
+    mountProps: (imageOverrides) => ({
+      selectedRecipe: makeRecipe({ id: 'r1', ...imageOverrides }),
+      recipeCount: 1
+    }),
+    selectImg: (root) =>
+      root
+        .querySelector('.manager-recipe-browser-inspector-hero .fab-medallion-img')
+        .getAttribute('src')
   });
 });

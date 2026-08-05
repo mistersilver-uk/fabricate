@@ -2,6 +2,9 @@
 // per-recipe `craftingModifier` override (Recipe model) — issue 770.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 globalThis.foundry = {
   utils: { randomID: () => Math.random().toString(36).slice(2) },
@@ -55,10 +58,42 @@ test('_normalizeCraftingCheck keeps only known policies + catalogue-valid defaul
   assert.deepEqual(result.defaultModifierIds, ['med', 'alch'], 'unknown + duplicate dropped');
 });
 
-test('_normalizeCraftingCheck coerces an unknown policy (incl. Phase-2 playerPicks) to addAll', () => {
+test('_normalizeCraftingCheck accepts the Phase-2 playerPicks policy', () => {
   assert.equal(
     makeManager()._normalizeCraftingCheck({ defaultModifierPolicy: 'playerPicks' })
       .defaultModifierPolicy,
+    'playerPicks'
+  );
+});
+
+// ── policy copy: the card's English fallbacks mirror lang/en.json ────────────
+//
+// `CraftingModifierCatalogueCard.svelte` hard-codes an English `fallback`/`descFallback`
+// beside every `labelKey`/`descKey`, so the same sentence lives in two files. Nothing
+// renders the fallback while en.json resolves, so a one-sided edit ships two different
+// descriptions of the same policy and no gate notices. Assert the mirror.
+test('the modifier-policy card fallbacks match lang/en.json exactly', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const source = readFileSync(
+    join(root, 'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'),
+    'utf8'
+  );
+  const lang = JSON.parse(readFileSync(join(root, 'lang/en.json'), 'utf8'));
+  const resolve = (key) =>
+    key.split('.').reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
+
+  const pairs = [
+    ...source.matchAll(/(labelKey|descKey):\s*'([^']+)',\s*\w*[Ff]allback:\s*'((?:[^'\\]|\\.)*)'/g),
+  ];
+  assert.equal(pairs.length, 8, 'expected a key + fallback pair for each of the four policies');
+  for (const [, kind, key, fallback] of pairs) {
+    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${kind} ${key} drifted`);
+  }
+});
+
+test('_normalizeCraftingCheck coerces a genuinely unknown policy to addAll', () => {
+  assert.equal(
+    makeManager()._normalizeCraftingCheck({ defaultModifierPolicy: 'bogus' }).defaultModifierPolicy,
     'addAll'
   );
 });
@@ -95,10 +130,21 @@ test('Recipe.craftingModifier keeps a valid policy and de-duplicated id subset',
   assert.deepEqual(recipe.craftingModifier, { policy: 'byRecipe', modifierIds: ['alch', 'herb'] });
 });
 
+test('Recipe.craftingModifier accepts the Phase-2 playerPicks policy', () => {
+  assert.deepEqual(
+    new Recipe({ name: 'r', craftingModifier: { policy: 'playerPicks', modifierIds: ['med'] } })
+      .craftingModifier,
+    { policy: 'playerPicks', modifierIds: ['med'] }
+  );
+});
+
 test('Recipe.craftingModifier allows a policy-only or ids-only override', () => {
-  assert.deepEqual(new Recipe({ name: 'r', craftingModifier: { policy: 'highest' } }).craftingModifier, {
-    policy: 'highest',
-  });
+  assert.deepEqual(
+    new Recipe({ name: 'r', craftingModifier: { policy: 'highest' } }).craftingModifier,
+    {
+      policy: 'highest',
+    }
+  );
   assert.deepEqual(
     new Recipe({ name: 'r', craftingModifier: { modifierIds: ['med'] } }).craftingModifier,
     { modifierIds: ['med'] }

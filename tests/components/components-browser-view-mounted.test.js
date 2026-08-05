@@ -18,6 +18,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
+import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -31,13 +32,30 @@ const browser = createMountedComponentHarness({
     'src/utils/componentBrowserModel.js',
     // componentBrowserModel imports the shared category totals; omitting it HANGS this
     // suite (`# cancelled`) rather than failing it.
-    'src/utils/browserGroupCounts.js'
+    'src/utils/browserGroupCounts.js',
+    // The pure bulk selection + staging model (issue 772). The view imports it for the
+    // selection helpers and its toolbar reads the description it returns.
+    'src/utils/componentBulkEditModel.js',
+    // Its shared leaf (issue 1010): those selection helpers now live here and
+    // `componentBulkEditModel.js` re-exports them, so it is a STATIC import of that module.
+    'src/utils/bulkSelectionModel.js'
   ],
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
+    // The manager's ONE selection control and the manager's ONE multi-select row
+    // (issue 772; the row extracted to a shared primitive under `apps/manager/` for
+    // issue 1010, so this path moved out of the browser's own `components/` directory).
+    'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     'src/ui/svelte/apps/manager/components/ComponentRow.svelte',
     'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte'
   ],
@@ -295,5 +313,99 @@ describe('ComponentsBrowserView category-major grouped pagination (issue 801)', 
     root.querySelector('[data-pagination-next]').click();
     flushSync();
     assert.deepEqual(groupsOnPage(root), [['general', '2 of 4 components']]);
+  });
+});
+
+// Issue 772 — the multi-select. The rendered-rows control and the whole-results action are
+// DISTINCT operations and these cases keep them distinct, because conflating them is the
+// defect: a collapsed group's rows are not rendered, so the page control must never reach
+// them while the results link must.
+//
+// Issue 1010 lifted the seven cases into `tests/helpers/browserBulkSelectionCases.js` and the
+// Recipe Studio joined them there. They are stated ONCE and instantiated per studio, because
+// both browsers render the same `BulkSelectionToolbar` over the same `bulkSelectionModel.js`
+// — one contract, two consumers. Keeping a literal copy here as well would leave the contract
+// single-sourced in name only: a case tightened on one studio and not the other is exactly the
+// per-studio drift the extraction exists to prevent, and it is also the near-identical
+// assertion block SonarCloud's new-code duplication gate counts (it analyses `tests/**` and
+// ignores `cpd.exclusions`).
+//
+// Issue 924's focus-ring contract used to be asserted here too, against this view's rendered
+// toolbar. It belongs to the primitive rather than to one of its two consumers, so it
+// RELOCATED — unchanged in substance and widened in strength — to
+// `tests/components/bulk-selection-toolbar-mounted.test.js`, which owns both the adjacency
+// case and the drift assertion over the class tokens inside the toolbar's `:global()`.
+// Do not re-add a per-studio copy of either; the primitive is what both studios render.
+describeBrowserBulkSelection({
+  label: 'ComponentsBrowserView',
+  prefix: 'component',
+  rowClass: 'manager-component-row',
+  rowIdKey: 'componentId',
+  selectionKey: 'bulkSelectedComponentIds',
+  rowsProp: 'itemCards',
+  harness: browser,
+  createBrowserState: createComponentBrowserState,
+  // `manyGeneral` zero-pads its names, so name-ascending order is also numeric order — which
+  // is what makes `flatId(1)` reliably the first row of page 1.
+  makeFlatRows: (count) => manyGeneral(count),
+  flatId: (index) => `g${index}`,
+  makeGroupedRows: () => [
+    makeComponent({ id: 'm1', name: 'Copper Ore', category: 'Metal' }),
+    makeComponent({ id: 'm2', name: 'Tin Ore', category: 'Metal' }),
+    makeComponent({ id: 'h1', name: 'Sage', category: 'Herb' }),
+    makeComponent({ id: 'h2', name: 'Thyme', category: 'Herb' })
+  ],
+  grouped: {
+    collapseHeader: 'Metal',
+    hiddenIds: ['m1', 'm2'],
+    visibleIds: ['h1', 'h2']
+  },
+  props: (itemCards, extra = {}) => ({
+    itemCards,
+    // Derived from the rows rather than hard-coded, because the same `props` builds both the
+    // flat fixtures (which carry no category and must land in the reserved `general` bucket,
+    // vocabulary empty) and the grouped one (which must offer both categories or the grouped
+    // branch of `pageIds` is never exercised).
+    categoryVocabulary: [...new Set(itemCards.map((item) => item.category).filter(Boolean))],
+    ...extra
+  }),
+  rowControls: {
+    scope: '.manager-action-group',
+    count: 1,
+    why: 'the row still carries exactly ONE button — the smoke walk reaches Edit through it'
+  }
+});
+
+// Issue 772, acceptance 13 (row half). The badge used to gate on the CRAFTING resolution
+// mode alone, so on a salvage-only or gathering-only progressive system the bulk panel
+// would have offered a Progressive DC control whose result NO row could display. Nothing
+// asserted the badge's absence before, so the re-gate breaks no test — and gains none
+// unless these two cases are stated.
+describe('ComponentsBrowserView progressive DC badge re-gate (issue 772)', () => {
+  const withDifficulty = [makeComponent({ id: 'd1', name: 'Brass Casing', difficulty: 8 })];
+
+  it('renders the row DC badge on a system progressive for SALVAGE only', async () => {
+    const root = await browser.mount({
+      itemCards: withDifficulty,
+      selectedSystemResolutionMode: 'simple',
+      difficultyAxisProgressive: true
+    });
+
+    const badge = root.querySelector('[data-component-id="d1"] [data-component-difficulty]');
+    assert.ok(Boolean(badge), 'the row badge follows the shared three-axis predicate');
+    assert.match(badge.textContent, /8/, 'and shows the authored value');
+  });
+
+  it('omits the badge when no axis is progressive, whatever the crafting mode says', async () => {
+    const root = await browser.mount({
+      itemCards: withDifficulty,
+      selectedSystemResolutionMode: 'progressive',
+      difficultyAxisProgressive: false
+    });
+
+    assert.ok(
+      !root.querySelector('[data-component-id="d1"] [data-component-difficulty]'),
+      'the badge reads ONE predicate — an unforwarded prop must not fall back to the old axis'
+    );
   });
 });

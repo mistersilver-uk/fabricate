@@ -37,6 +37,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
   ],
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
   ],

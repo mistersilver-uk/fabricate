@@ -17,6 +17,8 @@
   the legacy `.manager-travel-party-*` rules from the superseded travel view.
 -->
 <script>
+  import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmOverridePicker from './RealmOverridePicker.svelte';
@@ -37,7 +39,7 @@
     onRemoveMember = () => {},
     onMoveMember = () => {},
     onSetTravelActor = () => {},
-    onClearTravelActor = () => {}
+    onClearTravelActor = () => {},
   } = $props();
 
   const PAGE_SIZE = 6;
@@ -53,7 +55,11 @@
   const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
   const filteredParties = $derived(
     normalizedSearch
-      ? parties.filter(party => String(party.name || '').toLowerCase().includes(normalizedSearch))
+      ? parties.filter((party) =>
+          String(party.name || '')
+            .toLowerCase()
+            .includes(normalizedSearch)
+        )
       : parties
   );
 
@@ -64,7 +70,9 @@
     }
   });
 
-  const pagedParties = $derived(filteredParties.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE));
+  const pagedParties = $derived(
+    filteredParties.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE)
+  );
 
   function selectRow(party) {
     onSelectParty(party.id === selectedPartyId ? '' : party.id);
@@ -77,7 +85,11 @@
   }
 
   function overrideValue(party) {
-    if (party?.overrideMode === 'manual' && Array.isArray(party.overrideRealmIds) && party.overrideRealmIds.length > 0) {
+    if (
+      party?.overrideMode === 'manual' &&
+      Array.isArray(party.overrideRealmIds) &&
+      party.overrideRealmIds.length > 0
+    ) {
       return party.overrideRealmIds[0];
     }
     return '';
@@ -94,7 +106,10 @@
   function memberCountLabel(party) {
     const count = party?.memberCount ?? 0;
     if (count === 1) return text('FABRICATE.Admin.Manager.Travel.MemberCountOne', '1 member');
-    return text('FABRICATE.Admin.Manager.Travel.MemberCount', '{count} members').replace('{count}', String(count));
+    return text('FABRICATE.Admin.Manager.Travel.MemberCount', '{count} members').replace(
+      '{count}',
+      String(count)
+    );
   }
 </script>
 
@@ -105,24 +120,33 @@
   aria-labelledby="travel-tab-parties"
   data-travel-panel="parties"
 >
-  <section class="manager-toolbar manager-travel-parties-toolbar" aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.Filters', 'Party filters')}>
+  <section
+    class="manager-toolbar manager-travel-parties-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.Filters', 'Party filters')}
+  >
     <label class="manager-search">
       <i class="fas fa-search" aria-hidden="true"></i>
       <input
         type="search"
         bind:value={searchTerm}
-        placeholder={text('FABRICATE.Admin.Manager.Travel.Parties.SearchPlaceholder', 'Search parties...')}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Travel.Parties.SearchPlaceholder',
+          'Search parties...'
+        )}
         aria-label={text('FABRICATE.Admin.Manager.Travel.Parties.SearchLabel', 'Search parties')}
       />
     </label>
   </section>
 
   {#if filteredParties.length === 0}
-    <p class="manager-muted manager-travel-parties-empty">
-      {parties.length === 0
+    <EmptyState
+      compact
+      icon={parties.length === 0 ? 'fas fa-users' : 'fas fa-magnifying-glass'}
+      title={parties.length === 0
         ? text('FABRICATE.Admin.Manager.Travel.Parties.Empty', 'No parties yet.')
         : text('FABRICATE.Admin.Manager.Travel.Parties.NoMatches', 'No parties match your search.')}
-    </p>
+      dataAttr="data-travel-parties-empty"
+    />
   {:else}
     <div class="manager-travel-parties-list" role="list">
       {#each pagedParties as party (party.id)}
@@ -145,20 +169,28 @@
               {#if party.travelActor?.img}
                 <img class="manager-travel-parties-thumb" src={party.travelActor.img} alt="" />
               {:else}
-                <span class="manager-travel-parties-thumb manager-travel-parties-thumb-fallback" aria-hidden="true">
+                <span
+                  class="manager-travel-parties-thumb manager-travel-parties-thumb-fallback"
+                  aria-hidden="true"
+                >
                   <i class="fas fa-user"></i>
                 </span>
               {/if}
               <span class="manager-travel-parties-name">{party.name}</span>
-              <span class={`manager-chip ${party.enabled ? 'is-active' : 'is-disabled'}`}>
+              <Chip tone={party.enabled ? 'active' : 'disabled'}>
                 {party.enabled
                   ? text('FABRICATE.Admin.Manager.Travel.EnabledChip', 'Enabled')
                   : text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}
-              </span>
-              <span class="manager-chip is-neutral manager-travel-parties-members-chip" title={memberCountLabel(party)} aria-label={memberCountLabel(party)}>
-                <i class="fas fa-users" aria-hidden="true"></i>
+              </Chip>
+              <Chip
+                tone="neutral"
+                icon="fas fa-users"
+                class="manager-travel-parties-members-chip"
+                title={memberCountLabel(party)}
+                aria-label={memberCountLabel(party)}
+              >
                 <span>{party.memberCount ?? 0}</span>
-              </span>
+              </Chip>
             </div>
 
             <div class="manager-travel-parties-right">
@@ -199,7 +231,7 @@
       pageSize={PAGE_SIZE}
       {pageIndex}
       pageSizeOptions={[PAGE_SIZE]}
-      onPageChange={(next) => pageIndex = next}
+      onPageChange={(next) => (pageIndex = next)}
     />
   {/if}
 </div>

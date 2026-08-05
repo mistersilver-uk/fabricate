@@ -11,8 +11,13 @@ function read(relPath) {
   return readFileSync(resolve(repoRoot, relPath), 'utf8');
 }
 
+// Prettier formats components as of issue 923, so a source-contract assertion must not depend
+// on where the formatter chose to break a line. Match against a whitespace-collapsed copy and
+// write needles in the formatter's own idiom — `arrowParens: 'always'` means `(tab) =>`.
+const squish = (value) => value.replace(/\s+/g, ' ');
+
 const environmentsBrowserSource = read('src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte');
-const managerRootSource = read('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
+const managerRootSource = squish(read('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'));
 const adminStoreSource = read('src/ui/svelte/stores/adminStore.js');
 const lang = JSON.parse(read('lang/en.json'));
 
@@ -49,18 +54,18 @@ describe('Travel nav gating', () => {
   it('hides the Travel nav item when the flag is off and validates tab resolution against the visible list', () => {
     assert.ok(managerRootSource.includes('const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true)'), 'root derives the gate flag');
     assert.ok(
-      managerRootSource.includes("gatheringRealmsEnabled ? gatheringNavItems : gatheringNavItems.filter(tab => tab.id !== 'travel')"),
+      managerRootSource.includes("gatheringRealmsEnabled ? gatheringNavItems : gatheringNavItems.filter((tab) => tab.id !== 'travel')"),
       'visible nav items drop Travel when disabled'
     );
     assert.ok(managerRootSource.includes('{#each visibleGatheringNavItems as gatheringItem'), 'nav render uses the filtered list');
     // Tab-resolution guards validate against the filtered list, not the static one.
-    assert.ok(managerRootSource.includes('activeGatheringTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : \'environments\''), 'selectGatheringTab validates against the visible list');
-    assert.ok(managerRootSource.includes("const nextTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments'"), 'openGatheringSection validates against the visible list');
+    assert.ok(managerRootSource.includes('activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId) ? tabId : \'environments\''), 'selectGatheringTab validates against the visible list');
+    assert.ok(managerRootSource.includes("const nextTab = visibleGatheringNavItems.some((tab) => tab.id === tabId) ? tabId : 'environments'"), 'openGatheringSection validates against the visible list');
   });
 
   it('falls back to environments when the active tab is no longer visible (stale travel tab)', () => {
     assert.ok(
-      managerRootSource.includes("if (!visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)) {") &&
+      managerRootSource.includes("if (!visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)) {") &&
       /activeGatheringTab\s*=\s*'environments'/.test(managerRootSource),
       'a stale active tab falls back to environments'
     );

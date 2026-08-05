@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabricate View Lab</title>
+    <!--
+      Foundry serves the game view from the web ROOT, so module code that references an asset the
+      Foundry way - `icons/svg/item-bag.svg`, no leading slash - resolves against `/`. The lab page
+      lives at /tests/view-lab/, so without this those paths would resolve against that directory
+      and 404. Setting the base is what makes a production-shaped relative path behave as it does in
+      production; the `/icons/` mount below then serves it from the harvested core art.
+    -->
+    <base href="/" />
+    <!--
+      Stylesheet order reproduces Foundry's own game view (templates/views/layouts/main.hbs plus
+      Express.CORE_VIEW_STYLES). It is load-bearing, and NOT the order a bundler would pick:
+
+        1. foundry2.css   - CORE_VIEW_STYLES[0] declares no layer, so Foundry emits a plain
+                            <link>. It is UNLAYERED, and unlayered beats every layer.
+        2. Font Awesome   - CORE_VIEW_STYLES[1] declares layer "variables".
+        3. fabricate.css  - module.json declares "styles" with no per-entry `layer`, and
+                            View._getStaticContent defaults an unlayered module sheet to
+                            layer(modules). Loading it unlayered (as the first View Lab attempt
+                            did) lets rules win here that LOSE in production - the exact class
+                            of lie this harness exists to remove.
+        4. Component CSS  - svelte.config.js sets css: 'injected', so component <style> blocks
+                            become unlayered runtime <style> elements in the lab and in
+                            production alike. Nothing to do.
+
+      The system stylesheet (production: layer(system)) is deliberately absent - see the
+      fidelity register in scripts/README.md.
+    -->
+    <link rel="stylesheet" href="/@foundry-chrome/css/foundry2.css" media="all" />
+    <link rel="stylesheet" href="/@view-lab/cascade.css" />
+    <style>
+      /*
+        A flat, deterministic page backdrop. The capture is element-clipped to `.application`,
+        whose 6px corner radius samples whatever is behind it, so the backdrop has to be stable.
+        There is no canvas here - that is a disclosed fidelity gap, not an oversight.
+      */
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #0b0a13;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="/tests/view-lab/mount.js"></script>
+  </body>
+</html>

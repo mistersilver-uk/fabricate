@@ -2,10 +2,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EditorValidationSurface from '../EditorValidationSurface.svelte';
-  import {
-    toolEditorValidation,
-    toolValidationPresentation,
-  } from './toolStudio.js';
+  import { toolEditorValidation, toolValidationPresentation } from './toolStudio.js';
 
   let {
     tool = null,
@@ -28,21 +25,23 @@
     if (presentation.key === 'ValidationErrorRepair') {
       return `Repair group ${presentation.data.group} is incomplete.`;
     }
-    return {
-      ValidationErrorSource: 'Link an Item or managed Component.',
-      ValidationErrorRequirement: 'Enter a Tool requirement formula.',
-      ValidationErrorMaxUses: 'Maximum uses must be blank or a positive whole number.',
-      ValidationErrorChance: 'Break chance must be between 0% and 100%.',
-      ValidationErrorFormula: 'Enter a breakage dice formula.',
-      ValidationErrorThreshold: 'Enter a valid breakage threshold.',
-      ValidationErrorBreakageMode: 'Choose a valid breakage mode.',
-      ValidationErrorOnBreakMode: 'Choose a valid on-break action.',
-      ValidationErrorReplacement: 'Choose a replacement target.',
-      ValidationErrorReplacementSame: 'Choose a replacement that differs from this Tool.',
-      ValidationErrorPrerequisites: 'Choose at least one prerequisite or turn prerequisites off.',
-      ValidationErrorBonus: 'Enter a bonus expression or turn the bonus off.',
-      ValidationErrorGeneric: 'Some Tool settings are incomplete.',
-    }[presentation.key] || 'Some Tool settings are incomplete.';
+    return (
+      {
+        ValidationErrorSource: 'Link an Item or managed Component.',
+        ValidationErrorRequirement: 'Enter a Tool requirement formula.',
+        ValidationErrorMaxUses: 'Maximum uses must be blank or a positive whole number.',
+        ValidationErrorChance: 'Break chance must be between 0% and 100%.',
+        ValidationErrorFormula: 'Enter a breakage dice formula.',
+        ValidationErrorThreshold: 'Enter a valid breakage threshold.',
+        ValidationErrorBreakageMode: 'Choose a valid breakage mode.',
+        ValidationErrorOnBreakMode: 'Choose a valid on-break action.',
+        ValidationErrorReplacement: 'Choose a replacement target.',
+        ValidationErrorReplacementSame: 'Choose a replacement that differs from this Tool.',
+        ValidationErrorPrerequisites: 'Choose at least one prerequisite or turn prerequisites off.',
+        ValidationErrorBonus: 'Enter a bonus expression or turn the bonus off.',
+        ValidationErrorGeneric: 'Some Tool settings are incomplete.',
+      }[presentation.key] || 'Some Tool settings are incomplete.'
+    );
   }
 
   const labels = {
@@ -68,13 +67,19 @@
           status: 'block',
           icon: 'fas fa-circle-exclamation',
           title: text('FABRICATE.Admin.Manager.Tools.ValidationNeedsAttention', 'Needs attention'),
-          sub: text('FABRICATE.Admin.Manager.Tools.Editor.ValidationBlockingSub', 'Clear every blocking issue before saving this Tool.'),
+          sub: text(
+            'FABRICATE.Admin.Manager.Tools.Editor.ValidationBlockingSub',
+            'Clear every blocking issue before saving this Tool.'
+          ),
         }
       : {
           status: 'pass',
           icon: 'fas fa-circle-check',
           title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClear', 'All clear'),
-          sub: text('FABRICATE.Admin.Manager.Tools.Editor.ValidationAllClearSub', 'Every Tool check passes. Ready to save.'),
+          sub: text(
+            'FABRICATE.Admin.Manager.Tools.Editor.ValidationAllClearSub',
+            'Every Tool check passes. Ready to save.'
+          ),
         }
   );
 
@@ -84,16 +89,34 @@
       .map((check) => ({
         id: check.id,
         status: check.valid ? 'pass' : 'block',
-        title: text(`FABRICATE.Admin.Manager.Tools.Editor.Check${check.id[0].toUpperCase()}${check.id.slice(1)}`, labels[check.id]),
+        title: text(
+          `FABRICATE.Admin.Manager.Tools.Editor.Check${check.id[0].toUpperCase()}${check.id.slice(1)}`,
+          labels[check.id]
+        ),
         detail: check.errors?.length ? validationErrorText(check.errors[0]) : '',
       }));
   }
 
   const groups = $derived.by(() => {
     const result = [
-      { id: 'source', label: text('FABRICATE.Admin.Manager.Tools.Editor.Source', 'Source'), icon: icons.source, rows: rows(['source']) },
-      { id: 'breakage', label: text('FABRICATE.Admin.Manager.Tools.Breakage', 'Breakage'), icon: icons.breakage, rows: rows(['breakage', 'onBreak', 'repair']) },
-      { id: 'requirements', label: text('FABRICATE.Admin.Manager.Tools.Editor.TabRequirements', 'Requirements'), icon: icons.requirements, rows: rows(['prerequisites', 'bonus']) },
+      {
+        id: 'source',
+        label: text('FABRICATE.Admin.Manager.Tools.Editor.Source', 'Source'),
+        icon: icons.source,
+        rows: rows(['source']),
+      },
+      {
+        id: 'breakage',
+        label: text('FABRICATE.Admin.Manager.Tools.Breakage', 'Breakage'),
+        icon: icons.breakage,
+        rows: rows(['breakage', 'onBreak', 'repair']),
+      },
+      {
+        id: 'requirements',
+        label: text('FABRICATE.Admin.Manager.Tools.Editor.TabRequirements', 'Requirements'),
+        icon: icons.requirements,
+        rows: rows(['prerequisites', 'bonus']),
+      },
     ];
     if (editorValidation.unknownErrors.length > 0) {
       result.push({
@@ -103,7 +126,10 @@
         rows: editorValidation.unknownErrors.map((_, index) => ({
           id: `unknown-${index}`,
           status: 'block',
-          title: text('FABRICATE.Admin.Manager.Tools.Editor.ValidationErrorGeneric', 'Some Tool settings are incomplete.'),
+          title: text(
+            'FABRICATE.Admin.Manager.Tools.Editor.ValidationErrorGeneric',
+            'Some Tool settings are incomplete.'
+          ),
         })),
       });
     }
@@ -121,10 +147,17 @@
   }
 </script>
 
-<div class="manager-tool-tab-stack" data-tool-validation-tab use:focusFirstFailure={focusValidationNonce}>
+<div
+  class="manager-tool-tab-stack"
+  data-tool-validation-tab
+  use:focusFirstFailure={focusValidationNonce}
+>
   <EditorValidationSurface
     title={text('FABRICATE.Admin.Manager.Tools.Editor.Validation', 'Validation')}
-    intro={text('FABRICATE.Admin.Manager.Tools.Editor.ValidationIntro', 'A Tool saves only when every blocking issue is cleared.')}
+    intro={text(
+      'FABRICATE.Admin.Manager.Tools.Editor.ValidationIntro',
+      'A Tool saves only when every blocking issue is cleared.'
+    )}
     {summary}
     counts={{ passing, warnings: 0, blocking }}
     countLabels={{
@@ -141,6 +174,11 @@
     }}
   />
   {#if saveError && saveError !== 'invalid'}
-    <p class="manager-validation-error" role="alert" data-tool-save-error>{text('FABRICATE.Admin.Manager.Tools.Editor.SaveFailed', 'The Tool could not be saved. Try again.')}</p>
+    <p class="manager-validation-error" role="alert" data-tool-save-error>
+      {text(
+        'FABRICATE.Admin.Manager.Tools.Editor.SaveFailed',
+        'The Tool could not be saved. Try again.'
+      )}
+    </p>
   {/if}
 </div>

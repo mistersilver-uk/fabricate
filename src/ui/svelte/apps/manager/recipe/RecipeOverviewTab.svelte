@@ -12,13 +12,14 @@
   exception and emits `onToggleEnabled()`.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
   import {
     GENERAL_RECIPE_CATEGORY,
     getEffectiveRecipeCategories,
     getRecipeCategoryLabel,
-    normalizeRecipeCategory
+    normalizeRecipeCategory,
   } from '../../../../../utils/recipeCategories.js';
   import { formatTimeRequirementCompact } from '../../../util/recipeDuration.js';
   import ToggleCard from '../ToggleCard.svelte';
@@ -91,7 +92,7 @@
     onAddStep = () => {},
     onReorderSteps = () => {},
     onUpdateStep = () => {},
-    onDeleteStep = () => {}
+    onDeleteStep = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -104,8 +105,11 @@
   // per-modifier picker shows. Writing null clears the override entirely (inherit).
   const MODIFIER_POLICY_LABELS = {
     addAll: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll', 'Add all'),
-    highest: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Pick highest'),
-    byRecipe: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe', 'By recipe')
+    highest: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Highest'),
+    byRecipe: () =>
+      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe', 'By recipe'),
+    playerPicks: () =>
+      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicks', 'Player picks'),
   };
   const overridePolicy = $derived(recipe?.craftingModifier?.policy || '');
   const overrideModifierIds = $derived(recipe?.craftingModifier?.modifierIds || []);
@@ -121,7 +125,7 @@
     }
     const modifierIds = recipe?.craftingModifier?.modifierIds || [];
     onUpdateRecipe({
-      craftingModifier: { policy: value, ...(modifierIds.length ? { modifierIds } : {}) }
+      craftingModifier: { policy: value, ...(modifierIds.length ? { modifierIds } : {}) },
     });
   }
 
@@ -141,14 +145,14 @@
       value: 'single',
       icon: 'fas fa-square',
       labelKey: 'FABRICATE.Admin.Manager.Recipe.SingleStep',
-      fallback: 'Single step'
+      fallback: 'Single step',
     },
     {
       value: 'multi',
       icon: 'fas fa-list-ol',
       labelKey: 'FABRICATE.Admin.Manager.Recipe.MultiStep',
-      fallback: 'Multi-step'
-    }
+      fallback: 'Multi-step',
+    },
   ];
 
   // Reverting to single-step DISCARDS the per-step authoring, so the handler confirms
@@ -179,7 +183,9 @@
         ? effectiveCategories
         : [...effectiveCategories, currentCategory]
   );
-  const selectedCategory = $derived(hasCustomCategories ? currentCategory : GENERAL_RECIPE_CATEGORY);
+  const selectedCategory = $derived(
+    hasCustomCategories ? currentCategory : GENERAL_RECIPE_CATEGORY
+  );
 
   function changeCategory(event) {
     const next = String(event.currentTarget.value || GENERAL_RECIPE_CATEGORY);
@@ -188,7 +194,11 @@
   }
 </script>
 
-<section class="manager-recipe-tab manager-recipe-overview" data-recipe-tab="overview" aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Overview', 'Overview')}>
+<section
+  class="manager-recipe-tab manager-recipe-overview"
+  data-recipe-tab="overview"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Tabs.Overview', 'Overview')}
+>
   <div class="manager-recipe-overview-identity" data-recipe-section="identity">
     <div class="manager-recipe-overview-media">
       <!-- Always editable: a recipe can belong to many books & scrolls, so its image
@@ -207,32 +217,62 @@
     </div>
     <div class="manager-recipe-overview-fields">
       <label class="manager-recipe-field" for="manager-recipe-edit-name">
-        <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.NameLabel', 'Recipe name')}</span>
-        <input id="manager-recipe-edit-name" class="manager-recipe-name-input" data-recipe-field="name" type="text" value={name} oninput={(event) => onNameInput(event.currentTarget.value)} disabled={saving} required />
+        <span class="manager-recipe-micro-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.NameLabel', 'Recipe name')}</span
+        >
+        <input
+          id="manager-recipe-edit-name"
+          class="manager-recipe-name-input"
+          data-recipe-field="name"
+          type="text"
+          value={name}
+          oninput={(event) => onNameInput(event.currentTarget.value)}
+          disabled={saving}
+          required
+        />
       </label>
       <label class="manager-recipe-field" for="manager-recipe-edit-description">
-        <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.FlavourLabel', 'Flavour text')}</span>
-        <textarea id="manager-recipe-edit-description" class="manager-recipe-flavour-input" data-recipe-field="description" rows="3" value={description} oninput={(event) => onDescriptionInput(event.currentTarget.value)} disabled={saving}></textarea>
+        <span class="manager-recipe-micro-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.FlavourLabel', 'Flavour text')}</span
+        >
+        <textarea
+          id="manager-recipe-edit-description"
+          class="manager-recipe-flavour-input"
+          data-recipe-field="description"
+          rows="3"
+          value={description}
+          oninput={(event) => onDescriptionInput(event.currentTarget.value)}
+          disabled={saving}></textarea>
       </label>
     </div>
   </div>
 
   {#if saveFailed}
-    <p class="manager-muted manager-form-warning">{text('FABRICATE.Admin.Manager.Recipe.SaveFailed', 'Save failed. Check for duplicate or blank names and try again.')}</p>
+    <p class="manager-muted manager-form-warning">
+      {text(
+        'FABRICATE.Admin.Manager.Recipe.SaveFailed',
+        'Save failed. Check for duplicate or blank names and try again.'
+      )}
+    </p>
   {/if}
 
   <!-- Select row: Category, then the conditional DC-check + Minimum-success-tier
        selects that only a fixed-type routed check surfaces (prototype §5.1). -->
   <div class="manager-recipe-overview-selects">
     <label class="manager-recipe-field" data-recipe-field-category>
-      <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
+      <span class="manager-recipe-micro-label"
+        >{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span
+      >
       <select
         data-recipe-category-select
         value={selectedCategory}
         disabled={saving || !hasCustomCategories}
         title={hasCustomCategories
           ? text('FABRICATE.Admin.Manager.Recipe.CategorySelectLabel', 'Select recipe category')
-          : text('FABRICATE.Admin.Manager.Recipe.CategoryNoneHint', 'No categories defined. Add some under Tags and Categories.')}
+          : text(
+              'FABRICATE.Admin.Manager.Recipe.CategoryNoneHint',
+              'No categories defined. Add some under Tags and Categories.'
+            )}
         onchange={changeCategory}
       >
         {#each categoryOptions as category (category)}
@@ -242,62 +282,100 @@
     </label>
     {#if checkTierOptions.length > 0}
       <label class="manager-recipe-field" data-recipe-check-tier>
-        <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}</span>
+        <span class="manager-recipe-micro-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.CheckTier', 'Check tier')}</span
+        >
         <select
           data-recipe-field="checkTierId"
           value={recipe?.checkTierId || ''}
           onchange={(event) => onUpdateRecipe({ checkTierId: event.currentTarget.value || null })}
           disabled={saving}
         >
-          <option value="">{text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC')}</option>
+          <option value=""
+            >{text('FABRICATE.Admin.Manager.Recipe.CheckTierDefault', 'Default DC')}</option
+          >
           {#each checkTierOptions as tier (tier.id)}
-            <option value={tier.id}>{(tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')) + ` (DC ${tier.dc})`}</option>
+            <option value={tier.id}
+              >{(tier.name ||
+                text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')) +
+                ` (DC ${tier.dc})`}</option
+            >
           {/each}
         </select>
       </label>
     {/if}
     {#if minSuccessTierOptions.length > 0}
       <label class="manager-recipe-field" data-recipe-min-success-tier>
-        <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTier', 'Minimum success tier')}</span>
+        <span class="manager-recipe-micro-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTier', 'Minimum success tier')}</span
+        >
         <select
           data-recipe-field="minSuccessOutcomeId"
           value={recipe?.minSuccessOutcomeId || ''}
-          onchange={(event) => onUpdateRecipe({ minSuccessOutcomeId: event.currentTarget.value || null })}
+          onchange={(event) =>
+            onUpdateRecipe({ minSuccessOutcomeId: event.currentTarget.value || null })}
           disabled={saving}
         >
-          <option value="">{text('FABRICATE.Admin.Manager.Recipe.MinSuccessTierNone', 'No override (use rolled tier)')}</option>
+          <option value=""
+            >{text(
+              'FABRICATE.Admin.Manager.Recipe.MinSuccessTierNone',
+              'No override (use final tier)'
+            )}</option
+          >
           {#each minSuccessTierOptions as tier (tier.id)}
-            <option value={tier.id}>{tier.name || text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')}</option>
+            <option value={tier.id}
+              >{tier.name ||
+                text('FABRICATE.Admin.Manager.Recipe.CheckTierUnnamed', 'Unnamed tier')}</option
+            >
           {/each}
         </select>
       </label>
     {/if}
     {#if craftingModifierOptions.length > 0}
       <label class="manager-recipe-field" data-recipe-crafting-modifier>
-        <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}</span>
+        <span class="manager-recipe-micro-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}</span
+        >
         <select
           data-recipe-field="craftingModifierPolicy"
           value={overridePolicy}
           onchange={(event) => changeModifierPolicy(event.currentTarget.value || null)}
           disabled={saving}
         >
-          <option value="">{text('FABRICATE.Admin.Manager.Recipe.CraftingModifierInherit', 'Inherit system default') + ` (${defaultPolicyLabel})`}</option>
+          <option value=""
+            >{text(
+              'FABRICATE.Admin.Manager.Recipe.CraftingModifierInherit',
+              'Inherit system default'
+            ) + ` (${defaultPolicyLabel})`}</option
+          >
           <option value="addAll">{MODIFIER_POLICY_LABELS.addAll()}</option>
           <option value="highest">{MODIFIER_POLICY_LABELS.highest()}</option>
           <option value="byRecipe">{MODIFIER_POLICY_LABELS.byRecipe()}</option>
+          <option value="playerPicks">{MODIFIER_POLICY_LABELS.playerPicks()}</option>
         </select>
       </label>
       {#if hasModifierOverride}
         <div class="manager-recipe-field" data-recipe-crafting-modifier-picker>
-          <span class="manager-recipe-micro-label">{text('FABRICATE.Admin.Manager.Recipe.CraftingModifierPick', 'Eligible modifiers')}</span>
+          <span class="manager-recipe-micro-label"
+            >{text(
+              'FABRICATE.Admin.Manager.Recipe.CraftingModifierPick',
+              'Eligible modifiers'
+            )}</span
+          >
           <ModifierPillSelect
             options={craftingModifierOptions}
             selectedIds={overrideModifierIds}
             disabled={saving}
             testId="recipe-crafting-modifier"
             menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
-            allSelectedLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected', 'All modifiers selected.')}
-            noneSelectedLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierInheritDefaults', 'Inheriting the system default modifiers.')}
+            allSelectedLabel={text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
+              'All modifiers selected.'
+            )}
+            noneSelectedLabel={text(
+              'FABRICATE.Admin.Manager.Recipe.CraftingModifierInheritDefaults',
+              'Inheriting the system default modifiers.'
+            )}
             onToggle={toggleModifierId}
           />
         </div>
@@ -316,12 +394,18 @@
       icon="fas fa-power-off"
       title={text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}
       sub={enableBlocked
-        ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedHint', 'Resolve the issues on the Validation tab before enabling.')
+        ? text(
+            'FABRICATE.Admin.Manager.Recipe.EnableBlockedHint',
+            'Resolve the issues on the Validation tab before enabling.'
+          )
         : text('FABRICATE.Admin.Manager.Recipe.EnabledSub', 'Craftable by players')}
       on={enabled}
       disabled={saving || enableBlocked}
       toggleTitle={enableBlocked
-        ? text('FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip', 'Resolve the issues on the Validation tab before enabling this recipe.')
+        ? text(
+            'FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip',
+            'Resolve the issues on the Validation tab before enabling this recipe.'
+          )
         : ''}
       onToggle={() => onToggleEnabled()}
     />
@@ -350,8 +434,15 @@
          reverted — its steps are preserved and restored when the feature is re-enabled. -->
     <section class="manager-recipe-step-mode-card" data-recipe-section="recipe-step-mode">
       <div>
-        <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}</h3>
-        <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.StepModeHint', 'A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.')}</p>
+        <h3 class="manager-recipe-section-title">
+          {text('FABRICATE.Admin.Manager.Recipe.StepMode', 'Step mode')}
+        </h3>
+        <p class="manager-muted">
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.StepModeHint',
+            'A multi-step recipe crafts its ordered steps in sequence, each with its own ingredients, results and tools.'
+          )}
+        </p>
       </div>
       <SegmentedControl
         options={STEP_MODE_OPTIONS}
@@ -369,14 +460,30 @@
          preserved verbatim and listed here for reference; the chain's effective output
          is edited on the Results tab. Turning multi-step recipes back on for this
          system restores the full step editor with every step intact. -->
-    <section class="manager-recipe-duration-card manager-recipe-collapsed-steps-card" data-recipe-section="collapsed-steps">
+    <section
+      class="manager-recipe-duration-card manager-recipe-collapsed-steps-card"
+      data-recipe-section="collapsed-steps"
+    >
       <div>
-        <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsTitle', 'Steps (multi-step disabled)')}</h3>
-        <p class="manager-muted" data-recipe-collapsed-note>{text('FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote', 'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.')}</p>
+        <h3 class="manager-recipe-section-title">
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.CollapsedStepsTitle',
+            'Steps (multi-step disabled)'
+          )}
+        </h3>
+        <p class="manager-muted" data-recipe-collapsed-note>
+          {text(
+            'FABRICATE.Admin.Manager.Recipe.CollapsedStepsNote',
+            'This recipe keeps its steps but runs as one combined action while multi-step recipes are disabled for this system. Turn multi-step recipes back on to edit steps.'
+          )}
+        </p>
       </div>
       <ol class="manager-recipe-collapsed-step-list">
         {#each recipe?.steps || [] as step, index (step.id ?? index)}
-          <li class="manager-recipe-collapsed-step">{step.name || `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${index + 1}`}</li>
+          <li class="manager-recipe-collapsed-step">
+            {step.name ||
+              `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${index + 1}`}
+          </li>
         {/each}
       </ol>
     </section>
@@ -393,13 +500,23 @@
     <section class="manager-recipe-duration-card" data-recipe-section="duration">
       <div class="manager-recipe-duration-card-head">
         <div>
-          <h3 class="manager-recipe-section-title">{text('FABRICATE.Admin.Manager.Recipe.Duration', 'Duration')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.DurationHint', 'How long this recipe takes to craft. Leave at zero for an instant craft.')}</p>
+          <h3 class="manager-recipe-section-title">
+            {text('FABRICATE.Admin.Manager.Recipe.Duration', 'Duration')}
+          </h3>
+          <p class="manager-muted">
+            {text(
+              'FABRICATE.Admin.Manager.Recipe.DurationHint',
+              'How long this recipe takes to craft. Leave at zero for an instant craft.'
+            )}
+          </p>
         </div>
-        <span class="manager-chip manager-recipe-duration-pill" data-recipe-duration-summary>
-          <i class="fa-solid fa-clock" aria-hidden="true"></i>
+        <Chip
+          class="manager-recipe-duration-pill"
+          icon="fa-solid fa-clock"
+          data-recipe-duration-summary
+        >
           <span>{formatTimeRequirementCompact(recipe?.timeRequirement || null)}</span>
-        </span>
+        </Chip>
       </div>
       <RecipeDurationSteppers
         timeRequirement={recipe?.timeRequirement || null}

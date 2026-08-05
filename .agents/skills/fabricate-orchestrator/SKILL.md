@@ -18,6 +18,7 @@ Make behavior changes here, not in the bindings.
 - the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills, together with its `Family` table for a model-tiered family
 - the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder, its stage thresholds, the model-tier floors, the `HIGH_RISK_PATHS` list, and the `ESCALATE_TIER` protocol
 - `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for isolated lane assignment, integration, artifacts, feedback, and cleanup
+- `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md` for interrupted or stale per-worktree Foundry recovery and local/CI lifecycle semantics
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, or test seams
 
 ## Workflow
@@ -72,7 +73,8 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
    - verification plan
    - acceptance criteria
    - the canonical spec that owns any durable product behavior
-   - for UI work: screenshot acceptance criteria, representative smoke coverage, pointer hit-test needs, a UX review gate, expected smoke screenshot evidence from `npm run screenshots:ui:plan -- --base origin/main`, the scoped `npm run test:foundry:screenshots` producer (which captures only the changed-file-affected views; `full` stays the outer-loop suite), `npm run screenshots:ui -- --base origin/main --pr <number>`, and `npm run screenshots:ui:publish -- --pr <number>`, expected S3-hosted screenshot image embeds in the PR description, and whether smoke data needs Foundry/dnd5e non-SVG raster imagery
+   - for UI work: a `Reference surfaces / reuse inventory` naming every supplied prototype, screenshot, defect matrix, named shipped sibling or CSS record, the per-control/state authority and expected deviations, analogous shipped surfaces, selected primitives/contracts, and justified non-reuse; screenshot acceptance criteria; representative coverage; pointer hit-test needs; a UX review gate; the View Lab case ids the change's files map to (`mapChangedFilesToCases` in `scripts/lib/viewLabCases.js`), which the `capture` CI job renders and publishes automatically; whether any affected view is OUTSIDE the registry and therefore needs the smoke producer (`npm run screenshots:ui:plan -- --base origin/main`, then the scoped `npm run test:foundry:screenshots`, `npm run screenshots:ui -- --base origin/main --pr <number>`, `npm run screenshots:ui:publish -- --pr <number>`); expected S3-hosted screenshot image embeds in the PR description; and whether smoke data needs Foundry/dnd5e non-SVG raster imagery
+   - when an issue-specific maintainer instruction replaces automated screenshot production: the affected views, the manual-test candidate handoff, the pending maintainer visual gate, and the unchanged requirement for qualifying embedded evidence or a maintainer-applied `screenshots-exempt` label
    - the resolved agent roster from step 4, including which roles will review the plan and which will review the implementation and docs
 7. **Plan review loop.** From a clean committed coordinator baseline, the driver may create detached planning and plan-review lanes using the preliminary roster derived from the current affected-file proposal; approval is not a prerequisite for these read-only lanes.
 The driver runs the plan-review agents in parallel against the issue delta.
@@ -99,6 +101,7 @@ Hard cap: 3 docs revisions.
 1. Ensure the driver has integrated the completed lane commits into the coordinator branch and represented them with a draft PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.
 2. Run the final maintainer-handoff loop in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
 Finalize PR metadata before the final run, rebase onto fetched `origin/main`, rerun authoritative gates and commitlint, preserve valid approval across metadata-only edits or a patch-equivalent rebase, push with the exact expected-head lease, mark the PR ready, and require all post-undraft exact-head checks including both SonarCloud checks.
+Marking the PR ready is part of that loop and needs no maintainer prompt: run it as soon as the loop's preconditions hold, and hold at draft only when the user asked to hold or a precondition is unmet.
 When the reviewed concern materially changed or a finding remains unresolved, obtain repeat review from a fresh detached lane pinned to the exact target with an immutable artifact before pushing.
 Return the PR to draft and repeat the mandatory delivery steps after any failure or movement of main or the PR head, repeating review only when its material-change rule applies.
 3. Surface a final summary including the resolved roster, completed loop iteration counts, reused approvals and their evidence basis, any repeated reviews, exact-head CI result, PR ready state, and any escalations to the user.
@@ -117,9 +120,11 @@ A second escalation in the same revision, or one from a lane already at the most
 - Do not allow mutable agent work to continue on `main`.
 - Do not let spawned agents share the coordinator checkout or another lane, push, mutate GitHub state, integrate commits, or manage worktrees.
 - Require the full assignment and handoff contract from `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for every spawned role.
+- Follow its manual-test candidate proof and feedback-batching procedure whenever a maintainer is asked to test or explicitly asks to batch findings.
 - Parallelize only disjoint lanes with integrated dependencies, and serialize resource-heavy and authoritative gates in the coordinator checkout.
 - Preserve a valid approval across issue or PR metadata edits and patch-equivalent rebases; repeat a reviewer only for a materially changed owned concern or unresolved finding, using a fresh exact-target detached lane and immutable artifact when repetition is required.
 - Treat draft CI as preflight only and never hand a PR to the maintainer until post-undraft checks, both SonarCloud checks, exact-head identity, current-main ancestry, and ready state are simultaneously verified.
+- Drive that transition rather than requesting it: leaving a fully gated PR in draft awaiting permission to undraft is an incomplete handoff, because the checks that decide the handoff only run once the PR is ready.
 - Prefer one issue per PR.
 When a change unavoidably ships as a stack of dependent PRs (one branch based on another), expect squash-merge to break the descendants: squashing a base relands its commits on `main` under a *new* SHA, so every child still carrying the originals conflicts the moment its base merges (and GitHub retargets the child to `main`).
 Resolve by restacking bottom-up — after each base merges, rebase the next child onto `main` dropping the now-squashed commits (`git rebase --onto origin/main <old-base-tip> <child>`), force-push, and let CI re-run, before merging it.
@@ -128,15 +133,24 @@ Parallel (not stacked) PRs need the same care for a different reason: when two i
 Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
 - For quick-start docs work, route changes only to `docs/quickstart.md`.
-- For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first and reserve `npm run test:foundry` for runtime-sensitive or reproducibility-focused validation.
+- For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first, then the View Lab for reproducible full-window frames, and reserve `npm run test:foundry` for runtime-sensitive validation or a view the case registry does not cover.
 - For UI work, do not let “screenshot captured” stand as acceptance.
 Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.
+- Require the UX reference comparison and reuse inventory before approving a non-trivial UI plan; authority is per control and state, not per whole artifact.
 - Keep screen-specific UI behavior in canonical specs (or, while still being planned, the issue's `openspec-delta` block).
 Skills and agents should point to those documents instead of carrying detailed product contracts.
-- For UI-changing PRs, plan real smoke-run screenshot evidence before PR creation or update.
-The producer is the scoped `screenshots` profile (`npm run test:foundry:screenshots`), which captures the changed-file-affected views (from `mapChangedFilesToViews`, via `npm run screenshots:ui:targets`) as full real-Foundry app windows; `full` stays the occasional outer-loop suite.
-Screenshots are collected under `tmp/pr-screenshots/<number>/`, uploaded and embedded by `npm run screenshots:ui:publish -- --pr <number>` (which uploads to S3 and produces `![pr-<number> ...]` markdown in a managed PR-body block), then cleaned with `npm run screenshots:ui:clean -- --pr <number>`.
+- For UI-changing PRs, plan screenshot evidence before PR creation or update.
+**The default producer is the View Lab, and for a registry-covered view you usually plan NO capture work at all**: the `capture` CI job maps the PR's changed files to cases and publishes the affected frames into the PR body on every push, so evidence exists before anyone asks.
+Plan a local run only when you need frames before pushing or want to inspect a state directly: `node scripts/view-lab-screenshots.mjs apps <comma-separated-case-ids>` writes into `ui-screenshot-artifact/apps/` in seconds, and `ui-screenshot-artifact/apps/index.html` browses them by screen with a multi-tag filter.
+Targeting is per changed file: a typical UI file selects two or three cases (~11-17s), the widest selects 27 (~2.5 min).
+A change to the lab's own fixture world or registry selects all 150 by design, because such a change can reflow every frame.
+Do NOT plan the smoke as the routine producer.
+Its `screenshots` profile costs ~31s per frame against the lab's ~5s, needs Docker and a licensed container, and cannot run on a GitHub Actions runner at all — so it produces nothing per-PR and serialises the lane on one machine.
+Reserve it for a view the registry does not cover, or for a question about real Foundry runtime behaviour: `npm run test:foundry:screenshots` captures the changed-file-affected views (from `mapChangedFilesToViews`, via `npm run screenshots:ui:targets`) as full real-Foundry app windows; `full` stays the occasional outer-loop suite.
+Those smoke screenshots are collected under `tmp/pr-screenshots/<number>/`, uploaded and embedded by `npm run screenshots:ui:publish -- --pr <number>` (which uploads to S3 and produces `![pr-<number> ...]` markdown in a managed PR-body block), then cleaned with `npm run screenshots:ui:clean -- --pr <number>`.
+The live smoke remains the FIDELITY AUTHORITY: where a lab frame and a smoke frame of the same view disagree, the smoke is right and the lab is defective.
 The `check-screenshots` gate has no `SCREENSHOTS_NEEDED:` bypass; when capture is genuinely impossible, only a maintainer may apply the `screenshots-exempt` label.
+An explicit issue-specific maintainer instruction may replace the automated producer, but it leaves agent visual approval pending and does not satisfy or waive the evidence gate.
 - For smoke screenshot data, require Foundry VTT core or dnd5e non-SVG raster image paths when previews need imagery; do not invent SVG preview art.
 - For latest beta manifest/version questions across Fabricate and the premium sibling modules, route the work to `node scripts/latest-module-versions.mjs --profile fabricate-beta` instead of planning a custom S3 listing flow; substitute another `--profile <name>` when the local AWS profile differs.
 The script uses exact manifest keys and does not require `s3:ListBucket`.

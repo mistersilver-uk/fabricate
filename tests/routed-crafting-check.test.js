@@ -14,6 +14,7 @@ const {
   defaultRouted,
   makeRoutedEngine,
   runRoutedCheck,
+  craftForChatCard,
 } = await import('./helpers/routedCheckEngine.js');
 
 installRoutedCheckEnv();
@@ -325,6 +326,93 @@ test('no Roll engine does not block the craft and fabricates no route', async ()
   assert.equal(r.value, null);
 });
 
+
+// ── Tier-step evidence reaches the result chat card (issue 975) ──────────────
+// The engine's `tierStepForCard` mapping had NO coverage: the chat-card suites feed
+// the presentation model directly and the suites above stop at the check result, so
+// every `_postCraftChatMessage` call site could silently drop the routed evidence and
+// still ship green. These drive a whole `craft()` so the note asserted on came from
+// the runtime's own `data.tierStepApplied`.
+
+/** The text of the rendered tier-step notice on a posted card, or null when absent. */
+function tierStepNoteOf(content) {
+  const match = /fabricate-craft-chat__tier-step">([^<]*)</.exec(content);
+  return match ? match[1] : null;
+}
+
+/** A trigger stepping the rolled tier by `tierStep` when the d20 group totals `value`. */
+function stepTrigger({ id = 'step', groupId = 0, value, tierStep }) {
+  return {
+    id,
+    condition: { type: 'diceGroup', groupId, aggregate: 'total', operator: '==', value },
+    outcome: 'none',
+    breakTools: false,
+    tierStep,
+  };
+}
+
+test('a stepped routed craft posts the tier-step note the runtime actually produced', async () => {
+  // 16 matches Fine (threshold 15); the trigger steps down one rank onto Botch, which
+  // fails — so the craft takes its check-failure path and posts the failure card.
+  stubRoll(16, [{ number: 1, faces: 20, total: 16, results: [{ result: 16, active: true }] }]);
+  const { result, chatMessages } = await craftForChatCard(
+    defaultRouted({
+      relativeOutcomes: RELATIVE_TIERS,
+      dc: 15,
+      ...breakage(stepTrigger({ value: 16, tierStep: { mode: 'down', steps: 1, tierId: null } })),
+    })
+  );
+
+  assert.equal(result.success, false, 'the step landed on a failing tier');
+  assert.equal(chatMessages.length, 1, 'exactly one result card posted');
+  assert.equal(
+    tierStepNoteOf(chatMessages[0].content),
+    'FABRICATE.Chat.TierStepDown',
+    'the engine threaded data.tierStepApplied into the chat model (identity localize)'
+  );
+});
+
+test('a stepped-up routed craft posts the note on the SUCCESS card too', async () => {
+  // The failure and success branches map the evidence at separate call sites, so a
+  // rename that missed one would still pass the failure case above. 16 matches Fine;
+  // the trigger steps up one rank onto Mythic, which succeeds.
+  stubRoll(16, [{ number: 1, faces: 20, total: 16, results: [{ result: 16, active: true }] }]);
+  const { result, chatMessages } = await craftForChatCard(
+    defaultRouted({
+      relativeOutcomes: RELATIVE_TIERS,
+      dc: 15,
+      ...breakage(stepTrigger({ value: 16, tierStep: { mode: 'up', steps: 1, tierId: null } })),
+    })
+  );
+
+  assert.equal(result.success, true, 'the step landed on a succeeding tier');
+  assert.equal(chatMessages.length, 1, 'exactly one result card posted');
+  assert.ok(
+    chatMessages[0].content.includes('fabricate-craft-chat--success'),
+    'the success card, not the failure card'
+  );
+  assert.equal(
+    tierStepNoteOf(chatMessages[0].content),
+    'FABRICATE.Chat.TierStepUp',
+    'the success call site maps the evidence too'
+  );
+});
+
+test('an unstepped routed craft posts a card with no tier-step note', async () => {
+  // The same failing roll with NO stepping trigger: `data.tierStepApplied` is absent,
+  // so the card must carry no note at all — the negative control for the test above.
+  stubRoll(6, [{ number: 1, faces: 20, total: 6, results: [{ result: 6, active: true }] }]);
+  const { result, chatMessages } = await craftForChatCard(
+    defaultRouted({ relativeOutcomes: RELATIVE_TIERS, dc: 15 })
+  );
+
+  assert.equal(result.success, false, '6 lands on the failing Botch tier unaided');
+  assert.equal(chatMessages.length, 1);
+  assert.ok(
+    !chatMessages[0].content.includes('fabricate-craft-chat__tier-step'),
+    'no note when nothing moved'
+  );
+});
 
 // ── checkDriven outcomeTier (issue 419) ──────────────────────────────────────
 

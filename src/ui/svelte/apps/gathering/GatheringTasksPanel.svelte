@@ -34,7 +34,7 @@
     envId = '',
     eventVisibility = 'full',
     eventChance = 0,
-    hasEvent = false
+    hasEvent = false,
   } = $props();
 
   const pageSizeOptions = [6, 9, 12];
@@ -43,13 +43,20 @@
   // mirroring the left column's environment search.
   let taskSearchTerm = $state('');
   const normalizedTaskSearch = $derived(taskSearchTerm.trim().toLowerCase());
-  const filteredTasks = $derived(activeTasks.filter(task =>
-    !normalizedTaskSearch
-    || `${task?.name ?? ''} ${task?.description ?? ''}`.toLowerCase().includes(normalizedTaskSearch)
-  ));
+  const filteredTasks = $derived(
+    activeTasks.filter(
+      (task) =>
+        !normalizedTaskSearch ||
+        `${task?.name ?? ''} ${task?.description ?? ''}`
+          .toLowerCase()
+          .includes(normalizedTaskSearch)
+    )
+  );
   let taskPageIndex = $state(0);
   let taskPageSize = $state(6);
-  const paginatedTasks = $derived(filteredTasks.slice(taskPageIndex * taskPageSize, (taskPageIndex + 1) * taskPageSize));
+  const paginatedTasks = $derived(
+    filteredTasks.slice(taskPageIndex * taskPageSize, (taskPageIndex + 1) * taskPageSize)
+  );
 
   // Reset search + pagination when the selected environment changes.
   $effect(() => {
@@ -60,7 +67,8 @@
 
   // Snap the list back to its first page if a search shrinks it past the offset.
   $effect(() => {
-    if (taskPageIndex > 0 && taskPageIndex * taskPageSize >= filteredTasks.length) taskPageIndex = 0;
+    if (taskPageIndex > 0 && taskPageIndex * taskPageSize >= filteredTasks.length)
+      taskPageIndex = 0;
   });
 </script>
 
@@ -113,7 +121,7 @@
         <h3 class="gathering-detail-section-title">
           {localize('FABRICATE.App.Gathering.Detail.DiscoveredHeading', {
             x: discoveredTaskCount,
-            y: composedTaskCount
+            y: composedTaskCount,
           })}
         </h3>
       {:else}
@@ -162,8 +170,11 @@
           pageSize={taskPageSize}
           pageIndex={taskPageIndex}
           {pageSizeOptions}
-          onPageChange={(n) => taskPageIndex = n}
-          onPageSizeChange={(n) => { taskPageSize = n; taskPageIndex = 0; }}
+          onPageChange={(n) => (taskPageIndex = n)}
+          onPageSizeChange={(n) => {
+            taskPageSize = n;
+            taskPageIndex = 0;
+          }}
         />
       </div>
     {/if}

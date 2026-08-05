@@ -77,6 +77,11 @@ The tier-4 `_stats.duplicateSource` condition was matched at runtime before issu
 There is no clone-gate in this matcher: tier 3 is always trusted at match time, because an actor-owned copy legitimately carries both an inherited `_stats.compendiumSource` (provenance) and a `_stats.duplicateSource` (Foundry stamps it on every non-compendium drag-drop).
 The clone-gate is a REGISTRATION and source-repair rule only (see the data-models spec) and must never reach this matcher.
 
+**A tier is a provenance label, never an ambiguity signal.**
+The matcher returns exactly one definition and one tier, never a set and never a count, so no tier value can report that an owned copy matched more than one definition.
+In particular `duplicate` says only that the copy reached its definition through `_stats.duplicateSource`; a candidate set holding a single definition can produce it, and a copy that would satisfy two definitions is resolved silently by tier precedence and then candidate order without any distinguishing output.
+Any consumer surfacing `duplicate` MUST describe it as the weakest provenance link (the tier the bulk auto-learn confidence gate below refuses), and MUST NOT describe it as a duplicate, conflicting, or ambiguous match.
+
 ### Bulk auto-learn confidence gate (tier 4)
 
 The `createItem` bulk on-drop auto-learn path (`mode: 'auto'`) must NOT auto-grant a recipe whose owned item matches a **registered** definition (one that carries an `id`) ONLY via tier 4 (the un-migrated `_stats.duplicateSource` fallback).
@@ -109,7 +114,8 @@ The player book affordances (Learn vs Craft) are classified from this flat mode 
 ## Recipe↔Book Membership
 
 The recipes a book/scroll contains are the canonical many-to-many membership `RecipeItemDefinition.recipeIds[]` (issue 511, PR-B) — a recipe may belong to several books, and each book carries its own caps.
-The runtime reads `recipeIds[]`; it falls back to the legacy scalar reverse ref (`recipe.recipeItemId`, or `recipe.linkedRecipeItemUuid` → a definition `originItemUuid`) **only** for a fully un-migrated system where no book carries `recipeIds` yet.
+The runtime reads `recipeIds[]`; it falls back to the legacy scalar reverse ref (`recipe.recipeItemId`, or `recipe.linkedRecipeItemUuid` → a definition `originItemUuid`) **only** while the system's monotonic `membershipResolvesByRecipeIds` marker is unset (issue 1010).
+Once that marker is set, only `recipeIds` resolves membership, so an empty `recipeIds` array means "this book has no members" rather than "this system has not migrated"; the basis is recorded on the system and is never re-derived per read.
 The `1.13.0` migration inverts each recipe's former book onto `recipeIds` and strips `recipe.recipeItemId` unconditionally; it strips `recipe.linkedRecipeItemUuid` only when that uuid itself resolved a book, preserving a `linkedRecipeItemUuid` that instead links a standalone alchemy formula item.
 
 ## Recipe-Item Cap Resolution
@@ -249,8 +255,12 @@ Alchemy visibility is **reveal-not-gate**: `visibilityMode` selects which source
    - `knowledge` — a recipe learned via the Inventory learn path (`learnedRecipes`).
    - `restricted`/Manual — the per-recipe `access` grant admits the viewer (`_isRecipeVisibleByAccessGrant`).
 2. Discovery-by-brew reveal is unioned across ALL modes and is on a MATCHED SIGNATURE, decoupled from check success (issue 554):
+   - `alchemy.learnOnCraft` DEFAULTS ON (issue 966): `_normalizeAlchemyConfig` reads `!== false`, so only an explicitly stored `false` disables it.
+Under `global` the learned map is the ONLY reveal source, so an off default left the most permissive-sounding mode revealing nothing to any player; `systemValidation` raises the non-blocking `alchemyGlobalNoDiscovery` warning for a `global` alchemy system that turns it off.
    - if `alchemy.learnOnCraft === true`, a matched-signature attempt writes `learnedRecipes` REGARDLESS of the check outcome — a passed OR failed Simple brew (and any matched Tiered brew) learns it; the recipe is then revealed under any mode.
    - if `alchemy.learnOnCraft !== true`, a brew writes nothing to `learnedRecipes`; `learnOnCraft` governs ONLY the brew-discovery union, not whether anything is revealed (a book/grant/learn under item/knowledge/Manual still reveals independent of `learnOnCraft`).
+   - The write happens wherever the brew RESOLVES, which for a time-gated brew is the matured FINISH, not the START that armed the gate.
+Both alchemy tails at FINISH (`learnRecipeOnCraft` and the reserved-failure-group branch) derive alchemy-ness from the RECIPE'S OWN SYSTEM, never from a per-call submission flag: a matured brew resumes through `advanceCraftingRun`, which carries no `isAlchemyAttempt` (issue 966).
 3. Learning is never granted by a NO-SIGNATURE fizzle (which still grants nothing — dead-end/`no-reaction` memory only).
 A matched-signature check FAILURE is a genuine discovery, not a fizzle.
 4. No-signature attempts are treated as failed attempts (fizzles, not misconfiguration errors).
@@ -358,7 +368,31 @@ When the recipe item's `caps.item.limitUses === true` (resolved per Recipe-Item 
 - Uses are tracked on the matched owned item instance via `timesUsed`.
 - An item is exhausted when `timesUsed >= caps.item.maxUses`.
 - Exhausted items are ignored for item-based access.
-On exhaustion the item's `caps.item.whenSpent` decides its fate: `"destroyed"` (the legacy `destroyWhenExhausted === true`) removes the item, while `"inert"` (the default) keeps it but records the exhaustion so it stops granting craftability.
+On exhaustion the item's `caps.item.whenSpent` decides its fate: `"destroyed"` (the legacy `destroyWhenExhausted === true`) removes the item, while `"inert"` (the default) keeps it and **records** the exhaustion.
+The `inert` flag is a record, not a gate.
+Access filtering is on `timesUsed >= caps.item.maxUses` alone, which the same write sets at the moment of exhaustion, so the flag and the filter agree at write time and can diverge only if a GM later changes `maxUses` **in either direction**.
+Raising it re-admits an `inert` copy that is no longer spent, so a copy can be simultaneously `inert: true` and craftable.
+Lowering it below a copy's `timesUsed` makes the filter treat that copy as spent without any disposal branch re-running, so a `whenSpent: "inert"` copy can be spent while carrying no `inert` flag and never acquire one.
+No Fabricate writer ever clears the flag (see the Recipe Item Usage Flag clause in `data-models`).
+
+### Item-Anchored Use Expenditure
+
+`RecipeVisibilityService._applyRecipeItemUse(item, itemCaps)` is the **single decision point** for the use increment, the exhaustion test and the `whenSpent` disposal.
+It is shared by the recipe-driven craft path (`applyRecipeItemUseOnCraft`, which keeps its candidate-selection logic and collapses its disposal branch onto the core) and the GM-driven Knowledge surface (`expendRecipeItemUse`), so the two can never diverge.
+
+- The GM path applies **no** visibility-mode or knowledge-mode gate: the GM named the copy.
+- An **uncapped** book (`caps.item.limitUses !== true`) performs **zero** writes on either path — not a zero-delta write.
+A surface offering the action MUST therefore render it disabled rather than as a silent no-op.
+- An **already-spent** copy performs zero writes too, and the guard is the exact complement of `_filterNonExhausted`: a capped book whose `maxUses` is a finite number greater than zero and whose current `timesUsed` is at or above it is refused inside the core.
+This is behaviour-preserving on the craft path, which only ever reaches the core with a candidate that predicate already kept.
+It is load-bearing on the GM path, which has no such pre-filter: without it a stale row — an asynchronous re-projection, a second GM window, a macro spending the last charge — would drive one further increment and, under `whenSpent: "destroyed"`, silently delete the copy while reporting success.
+The guard MUST be evaluated against the count the core itself re-reads from the document, never against a caller-supplied snapshot, because the stale row is exactly the case it exists to refuse.
+The refusal MUST be reported distinctly from the uncapped refusal, because the two are different facts about the copy: one says the book has no charges to spend at all, the other says this copy has none left.
+- Caps MUST come from `_getRecipeItemCaps` (via `_capsForDefinition` when only a definition is in hand), never a raw `definition.caps` read, so the legacy `destroyWhenExhausted` / `limitRecipes` / `learningMode` derivations stay applied.
+- The current count is re-read from the document inside the core rather than taken from a caller-supplied candidate snapshot.
+On the craft path the two are provably equal today (nothing awaits between candidate collection and the write), so the re-read is strictly safer and never behaviour-changing: it closes a staleness window that would open the moment an `await` is inserted between the two.
+That equality is conditional on one coercion rule, and the rule is normative rather than incidental: the shared read MUST collapse a non-numeric `timesUsed` to `0`, exactly as the craft path's historical outer `Number(<snapshot> || 0)` did over an already-coerced value.
+A truthy but unparseable stored count (`"abc"`) otherwise reads as `NaN`, which forces the exhaustion test false, writes `null` as the new count, and leaves a copy that can never reach any `whenSpent` disposal branch.
 
 ### Deterministic Item Selection
 
@@ -400,6 +434,15 @@ Actor.flags.fabricate.learnedRecipes[recipe.id] = {
 
 1. If the recipe item's `caps.learn.consumeOnLearn === true`, consume selected item.
 2. Return the updated access state.
+
+### Learned-Entry Durability
+
+A learned entry **survives deletion of the copy it was learned from**.
+`sourceItemUuid` is the actor-owned item uuid, so it dangles forever once that copy is gone; the entry itself is never pruned by the deletion, and no learn budget is freed (see Knowledge Reset / Erase).
+Learned entries are therefore INDEPENDENT of currently-owned copies, and a surface presenting both MUST NOT couple the two lists.
+
+A UI surfacing learned knowledge MUST resolve the source display name through the recipe's **member recipe-item definition** when the copy is gone.
+The full ladder is: a still-owned copy's name, else the member definition's name rendered as "no longer owned", else the trailing uuid segment, else a "learned by crafting" statement for the `null` `sourceItemUuid` every `learnRecipeOnCraft` entry carries.
 
 ### Learn Prerequisite
 
@@ -568,7 +611,7 @@ In mixed-system worlds, the manual path only includes recipes from systems where
 ### Knowledge Reset / Erase
 
 A single knowledge-deletion primitive (`RecipeVisibilityService.forgetLearnedRecipes`) serves three grains from one code path: **erase one** learned recipe, **reset one system**, and **reset all systems** for one actor.
-It is the shared mutation behind the GM reset API and #785's per-recipe "Erase memory" action.
+It is the shared mutation behind the GM reset API and the Knowledge surface's per-recipe "Erase memory" action.
 
 - Deletion is an explicit, reload-safe `-=` flag-key removal at the **full doubly-nested** path `Actor.flags.fabricate.fabricate.learnedRecipes.-=<recipeId>` (and, when clearing discovery, `Actor.flags.fabricate.fabricate.discoveryProgress.-=<recipeId>`), batched into a single `Actor#update`.
 It must NOT prune by rebuilding a filtered map through `setFlag` as the sole write — that merge never removes keys, so the entry resurrects on reload (the `deleteRemovedActiveRunFlags` doctrine); a shallow `flags.fabricate.learnedRecipes.-=<id>` silently no-ops.
@@ -578,20 +621,48 @@ The same two-step applies to `discoveryProgress` when clearing discovery and any
 A retained entry whose own id contains a dot re-splits on the step-2 rewrite exactly as the original learn write did — a known fidelity limit of dotted retained ids, not an expandObject-safe guarantee.
 - `freeLearnBudget` defaults ON for the reset/erase grains (respec/amnesia must let the actor re-learn) and is passed OFF for the recipe-deletion cleanup path.
 When on, each cleared learned entry frees one consumed learn slot against a **still-held** source copy, reading its **current** `learnScope`: `perInstance` decrements the held item's `Item.flags.fabricate.recipeItemLearning.learnedCount`; `total` decrements the `recipeItemPartyLearnPool` key (a new GM-authoritative `decrement`, symmetric with `increment`, floored at 0, non-GM degrades safely).
-- **Unresolvable / orphan entries free nothing.** An entry with no `sourceItemUuid` (auto-learn), a source book the actor no longer holds, or a recipe id that no longer resolves gets no budget math at all — in particular a `total` pool key is unreconstructable once the recipe/definition is gone, so it is deliberately left as-is (no decrement, never a wrong-key decrement).
-- **Grain composition.** Erase-one clears only the learned entry and leaves `discoveryProgress` untouched by default (an off-by-default `clearDiscovery` option, which GM-gated #785 consumers may opt into, also clears the recipe's discovery key).
+- **A slot is freed only when FOUR conditions all hold**, and an entry failing any one of them frees nothing: the entry names a `sourceItemUuid`, the actor still holds that copy, the recipe id still resolves, AND that copy's resolved definition actually caps learning (`caps.learn.limitRecipes`).
+The first three are unresolvable/orphan cases and get no budget math at all — in particular a `total` pool key is unreconstructable once the recipe/definition is gone, so it is deliberately left as-is (no decrement, never a wrong-key decrement).
+The fourth is NOT an orphan case and must not be described as one: the source copy is present and the recipe resolves, so the refund arithmetic runs, but it has nothing to give back because the learn counter is only ever incremented for a capped book and the setter clamps at zero.
+Any surface that predicts the outcome per row MUST test all four, not the three early-returns, or it will promise a slot recovery an uncapped source book can never deliver.
+- **Grain composition.** Erase-one clears only the learned entry and leaves `discoveryProgress` untouched by default.
+The off-by-default `clearDiscovery` option also clears the recipe's discovery key, and the Knowledge surface's per-row erase **declines** it — an erase is an un-learn, a reset is an amnesia — while both reset grains pass it.
+That asymmetry is deliberate and MUST be disclosed to the GM at the point the reset grain is chosen.
 Reset-one-system clears every learned entry whose recipe belongs to the system (via `getRecipe(id).craftingSystemId`) plus its scoped `discoveryProgress`, and **leaves orphan learned keys (unresolvable recipe) in place** — they cannot be attributed to a system.
 Reset-all-systems clears every learned key **including orphans**, plus every `discoveryProgress` entry.
 
 ### GM-Only Knowledge Reset API
 
-`game.fabricate.resetActorKnowledge({ actorId, systemId, freeLearnBudget })` is the interim GM macro/console access path until #785's Knowledge tab ships.
+`game.fabricate.resetActorKnowledge({ actorId, systemId, freeLearnBudget })` is the GM API the Knowledge surface's per-character reset routes through — both grains, with and without `systemId` — and it remains available to macros and the console.
 It is explicitly GM-gated (a non-GM returns the `FABRICATE.Knowledge.Reset.GMOnly` outcome and never mutates), takes an `actorId` (never an actor uuid, resolved via `game.actors.get`; a missing actor returns `FABRICATE.Knowledge.Reset.NoActor`), delegates the scoped id set to `forgetLearnedRecipes` with `clearDiscovery: true`, and returns `{ success, message, messageData }` without throwing.
 
 ### Auto-Relearn Semantics
 
 A reset does not spontaneously re-learn on refresh or reopen: auto-learn fires only from the `createItem` hook, so a still-held auto-learn book re-grants the recipe only on a fresh `createItem` (remove and re-add) or an explicit learn affordance — never from a render or reload.
 Separately, in `item` / `knowledge` visibility modes, *holding* a matching book makes a recipe visible/craftable via `evaluateKnowledgeAccess().hasMatchedItem` independent of the learned map, so clearing learned knowledge does not hide a recipe reachable purely by possessing the book; the reset clears the durable **learned** grant while item-possession access persists while the book is held.
+
+## GM Knowledge Management
+
+The GM may audit and correct a character's **runtime** knowledge state directly: the owned copies of a system's recipe items a character carries, and the recipes they have learned.
+Three operations exist — **expend one use**, **delete one owned copy**, and **erase one learned recipe** — alongside the per-character reset grains of the GM Knowledge Reset API.
+
+- All three are **GM-only**, gated on `game.user.isGM` at the top of each mutating seam method.
+`isGM` rather than `activeGM`: each is a single-client, user-initiated mutation from a GM-only application, so there is no N-client duplicate-execution risk, and `activeGM` would lock out assistant GMs whom the application already admits.
+No player-reachable facade is added for any of them.
+Each takes document **ids**, never uuids, and returns a `{ success, message }` result rather than throwing when its target document has vanished between render and click.
+- **Expend** routes through `_applyRecipeItemUse` (see Item-Anchored Use Expenditure) and applies no visibility or knowledge-mode gate.
+- **Erase** calls `forgetLearnedRecipes(actor, [recipeId], { freeLearnBudget: true, clearDiscovery: false })`.
+Both option values are pinned: `freeLearnBudget` must be passed explicitly even though it already defaults true, and `clearDiscovery` is deliberately declined.
+The erase semantics themselves are defined once in Knowledge Reset / Erase and are not restated here.
+- **Delete** removes one owned copy and nothing else.
+It MUST NOT free learn budget and MUST NOT modify `learnedRecipes`.
+It MUST delete the **whole document** rather than decrementing the stack-quantity path, even for a stacked copy.
+This is a deliberate exception to the component-consumption convention: `recipeItemUsage.timesUsed` and `recipeItemLearning.learnedCount` are per-**document** counters shared by every unit in the stack, so decrementing the quantity would leave one set of counters attached to fewer units and silently falsify every derived remaining-uses figure.
+Whole-document deletion is also what all three existing recipe-item disposal paths already do (`whenSpent: "destroyed"`, `consumeOnLearn`, and `destroyWhenSpent` each delete the item and none reads a quantity).
+
+**Ordering hazard for a party-pool book.** Under `caps.learn.learnScope === "total"` the budget refund resolves the shared pool key through a **still-owned** source copy, so the order of the two GM actions is load-bearing.
+Erase-then-Delete reclaims the slot; Delete-then-Erase never can, and the world pool is permanently short one learn.
+A surface offering both operations MUST warn that Erase memory precedes Delete for a party-pool book.
 
 ## Edge Cases
 

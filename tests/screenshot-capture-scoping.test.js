@@ -32,9 +32,19 @@ import {
   D0_SKIPPABLE_SECTIONS,
   isD0SectionNeededForTargets,
 } from '../scripts/lib/screenshotCaptureMap.js';
+import { runFixturedScreenshotSection } from '../scripts/lib/smokeSectionFixture.js';
 
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
+const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', 'utf8');
+const KNOWLEDGE_LABELS = [
+  'manager-knowledge-owned-copies',
+  'manager-knowledge-empty-tab',
+  'manager-knowledge-learned-lost-copy',
+  'manager-knowledge-party-pool-warning',
+  'manager-knowledge-delete-armed',
+  'manager-knowledge-narrow',
+];
 const TOOL_STUDIO_LABELS = [
   'manager-tool-parity-01-library-1280x720',
   'manager-tool-zero-state-empty-library-1280x720',
@@ -50,6 +60,41 @@ const TOOL_STUDIO_LABELS = [
   'manager-tool-parity-06-breakage-900x700',
   'manager-tool-stress-wrapping-680',
 ];
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
+function writeScopedRunEvidence(results, changedFiles, frames = []) {
+  const runId = 'scoped-capture-test-run';
+  const headSha = 'scope123';
+  const targetLabels = mapChangedFilesToViews(changedFiles)
+    .flatMap(view => view.smokeLabels);
+  const captures = frames.map(({ file, label }) => ({
+    file,
+    label,
+    width: 1,
+    height: 1,
+  }));
+  for (const { file } of captures) {
+    writeFileSync(join(results, file), ONE_PIXEL_PNG);
+  }
+  writeFileSync(join(results, 'summary.json'), JSON.stringify({
+    passed: true,
+    stepFailures: 0,
+    consoleErrorCount: 0,
+    degraded: false,
+    rendererCrashed: false,
+    screenshotRun: { runId, headSha, targetLabels },
+  }));
+  writeFileSync(join(results, 'screenshot-manifest.json'), JSON.stringify({
+    runId,
+    headSha,
+    targetLabels,
+    captures,
+  }));
+  return headSha;
+}
 
 function harnessFunctionSpan(start, end) {
   const match = HARNESS.match(new RegExp(
@@ -87,43 +132,71 @@ test('Fabricate ApplicationV2 cleanup awaits close and guards Manager detachment
 
 // ── Scoping map: a changed-file set → the EXACT captured-label set ──────────────
 
-test('a broad styles/theme.css change scopes to theme-or-global-ui (6 labels), NOT the full set', () => {
+test('a broad styles/theme.css change scopes to theme-or-global-ui (6 core windows), NOT the full set', () => {
   const views = mapChangedFilesToViews(['styles/theme.css']);
   assert.deepEqual(views.map(v => v.id), ['theme-or-global-ui']);
   const labels = smokeLabelsForChangedFiles(['styles/theme.css']);
+  // One frame per app-AREA shell plus the two manager archetypes (library vs editor),
+  // rather than several frames from one area. See the recipe's comment for why each
+  // earns its place; adding to this set costs every global change.
   assert.deepEqual(labels, [
     'manager-default-selection',
     'manager-components-normal',
-    'manager-environments-browse-normal',
     'manager-gathering-task-editor-normal',
-    'manager-gathering-events-normal',
-    'manager-essences-normal',
+    'player-crafting-simple',
+    'player-inventory',
+    'interactables-manager-list',
   ]);
   // The scoped set is a tiny fraction of the full capture catalogue, never all of it.
   assert.equal(labels.length, 6);
   assert.ok(labels.length < SCREENSHOT_CAPTURE_ORDER.length);
 });
 
-test('styles/fabricate.css scopes to the Tool parity/stress set, two rail frames, and global fallback', () => {
+test('the global set spans every app-area shell, not just the manager', () => {
+  const themeView = VIEW_RECIPES.find(v => v.id === 'theme-or-global-ui');
+  // The regression this guards: the set was once manager-only, so a global stylesheet
+  // change published six frames and verified the player app not at all — even though
+  // `.fabricate-app` carries its own global rules and its own Foundry-override block.
+  assert.ok(themeView.smokeLabels.some(l => l.startsWith('manager-')), 'no manager frame');
+  assert.ok(themeView.smokeLabels.some(l => l.startsWith('player-')), 'no player-app frame');
+  assert.ok(
+    themeView.smokeLabels.some(l => l.startsWith('interactables-')),
+    'no interactables-window frame'
+  );
+});
+
+test('styles/fabricate.css scopes to the two rail frames and the global core set — NOT Tool Studio', () => {
   const views = mapChangedFilesToViews(['styles/fabricate.css']);
   assert.deepEqual(views.map(v => v.id).sort(), [
-    '01-library-1280x720',
-    '02-overview-1280x720',
-    '03-breakage-1280x720',
-    '04-requirements-1280x720',
-    '05-validation-1280x720',
-    '06-breakage-900x700',
     'manager-rail-collapsed',
     'manager-rail-expanded',
-    'stress-immune',
-    'stress-invalid-validation',
-    'stress-long-name',
-    'stress-repair',
-    'stress-replacement',
-    'stress-wrapping-680',
     'theme-or-global-ui',
-    'zero-state-empty-library-1280x720',
   ]);
+  // The regression this guards: the global stylesheet used to be a Tool Studio trigger,
+  // so every CSS edit anywhere demanded all 12 Tool Studio parity and stress frames.
+  const ids = views.map(v => v.id);
+  assert.ok(
+    !ids.some(id => /library-1280x720|overview|breakage|requirements|validation|stress-/.test(id)),
+    'a global stylesheet change must not pull in Tool Studio frames'
+  );
+});
+
+test('Tool Studio frames are triggered only by Tool Studio files', () => {
+  const own = mapChangedFilesToViews([
+    'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte',
+  ]).map(v => v.id);
+  assert.ok(own.includes('01-library-1280x720'), 'its own file must still trigger the set');
+  assert.ok(own.includes('stress-wrapping-680'), 'stress frames too');
+  // The manager ROUTER hosts every manager view, so it is a global change, not a Tool
+  // Studio one.
+  const root = mapChangedFilesToViews([
+    'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  ]).map(v => v.id);
+  assert.ok(root.includes('theme-or-global-ui'), 'the router must route to the global set');
+  assert.ok(
+    !root.some(id => /1280x720|stress-/.test(id)),
+    'the router must not pull in Tool Studio frames'
+  );
 });
 
 test('a scoped non-UI change yields an empty target set (skip the capture run)', () => {
@@ -143,16 +216,19 @@ test('every VIEW_RECIPES smoke label is a capturable routine in the pure map', (
   }
 });
 
-test("theme-or-global-ui's six labels are all reachable and live in phase-D0", () => {
+test("theme-or-global-ui's six labels are all reachable and span phase-D0 and phase-E", () => {
   const themeView = VIEW_RECIPES.find(v => v.id === 'theme-or-global-ui');
   for (const label of themeView.smokeLabels) {
     assert.ok(isCapturableLabel(label), `${label} unreachable`);
-    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0);
   }
-  // A scoped run for these captures phase-D0 only; phase-E is safely skipped.
+  // A scoped global run now needs BOTH phases, because the set covers the player app as
+  // well as the manager. That is the deliberate cost of the coverage: the old
+  // manager-only set could skip phase E precisely because it never looked at
+  // `.fabricate-app`.
   const phases = phasesForTargetLabels(themeView.smokeLabels);
-  assert.deepEqual([...phases], [CAPTURE_PHASE_D0]);
-  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_E, themeView.smokeLabels), false);
+  assert.deepEqual([...phases].sort(), [CAPTURE_PHASE_D0, CAPTURE_PHASE_E].sort());
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_D0, themeView.smokeLabels), true);
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_E, themeView.smokeLabels), true);
 });
 
 test('a player/craft target set needs phase-E; collect throws when a mapped view has zero candidates', () => {
@@ -162,14 +238,18 @@ test('a player/craft target set needs phase-E; collect throws when a mapped view
 
   const root = mkdtempSync(join(tmpdir(), 'fabricate-scope-'));
   try {
-    mkdirSync(join(root, 'test-results'), { recursive: true });
+    const results = join(root, 'test-results');
+    mkdirSync(results, { recursive: true });
+    const changedFiles = ['src/ui/svelte/apps/inventory/InventoryView.svelte'];
+    const headSha = writeScopedRunEvidence(results, changedFiles);
     // No frame for the mapped view → collect throws (a silently-empty scoped run
     // must fail loudly, never publish a missing view).
     assert.throws(
       () => collectScreenshotEvidence({
-        changedFiles: ['src/ui/svelte/apps/inventory/InventoryView.svelte'],
+        changedFiles,
         prNumber: 826,
         root,
+        headSha,
       }),
       /Missing smoke screenshots/,
     );
@@ -193,23 +273,91 @@ test('a scoped run renumbers the counter yet still selects the intended candidat
   try {
     const results = join(root, 'test-results');
     mkdirSync(results, { recursive: true });
+    const changedFiles = ['src/ui/svelte/apps/manager/SystemsBrowserView.svelte'];
     // A scoped `screenshots` run captures ONLY manager-systems' three labels and
     // renumbers the screenshot counter from 01 — a different absolute number than the
     // full walk, but the SAME relative capture order (filtering never reorders).
-    writeFileSync(join(results, 'screenshot-01-manager-default-selection.png'), 'default');
-    writeFileSync(join(results, 'screenshot-02-manager-selected-normal.png'), 'normal');
-    writeFileSync(join(results, 'screenshot-03-manager-selected-stacked.png'), 'stacked');
+    const frames = [
+      {
+        file: 'screenshot-01-manager-default-selection.png',
+        label: 'manager-default-selection',
+      },
+      {
+        file: 'screenshot-02-manager-selected-normal.png',
+        label: 'manager-selected-normal',
+      },
+      {
+        file: 'screenshot-03-manager-selected-stacked.png',
+        label: 'manager-selected-stacked',
+      },
+    ];
+    const headSha = writeScopedRunEvidence(results, changedFiles, frames);
 
     const result = collectScreenshotEvidence({
-      changedFiles: ['src/ui/svelte/apps/manager/SystemsBrowserView.svelte'],
+      changedFiles,
       prNumber: 826,
       root,
+      headSha,
     });
     assert.equal(result.copied.length, 1);
     // candidates[0] is the lowest-numbered = first-captured = manager-default-selection.
-    assert.equal(readFileSync(result.copied[0].destination, 'utf8'), 'default');
+    assert.match(result.copied[0].source, /screenshot-01-manager-default-selection\.png$/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── Requirement-rail capture states (issue 917) ────────────────────────────────
+
+// Walk order, which is also the order they must appear in SCREENSHOT_CAPTURE_ORDER:
+// scoping only FILTERS labels, never reorders them, so the relative order here is what
+// keeps each view's single frame the one `collect` picks.
+const REQUIREMENT_RAIL_LABELS = [
+  'player-crafting-slot-rail',
+  'player-crafting-tag-unmatched',
+  'player-crafting-essence-pool',
+  'player-crafting-pick-for-me',
+  'player-crafting-essence-pool-shared',
+  'player-crafting-consumption-plan',
+];
+
+test('every requirement-rail label is a capturable phase-E routine in walk order', () => {
+  for (const label of REQUIREMENT_RAIL_LABELS) {
+    assert.ok(isCapturableLabel(label), `${label} is not registered in SCREENSHOT_CAPTURE_ORDER`);
+    // These frames are captured in the player-app walk, never the manager walk, so a
+    // rail-only PR must be able to skip phase-D0's sections entirely.
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_E, label);
+    // The generic drift guard below proves every map label has a harness literal; this
+    // states the stronger fact for these six — the literal is a real capture call.
+    assert.match(HARNESS, new RegExp(`screenshot\\(page, '${label}'\\)`), label);
+  }
+  // The block sits between the existing essence frames and the multi-step frame, which
+  // is where the walk actually captures it.
+  assert.ok(
+    captureOrderIndex('player-crafting-essence-shopping') < captureOrderIndex(REQUIREMENT_RAIL_LABELS[0]),
+  );
+  assert.ok(
+    captureOrderIndex(REQUIREMENT_RAIL_LABELS.at(-1)) < captureOrderIndex('player-crafting-multistep'),
+  );
+  for (let i = 1; i < REQUIREMENT_RAIL_LABELS.length; i += 1) {
+    assert.ok(
+      captureOrderIndex(REQUIREMENT_RAIL_LABELS[i - 1]) < captureOrderIndex(REQUIREMENT_RAIL_LABELS[i]),
+      `${REQUIREMENT_RAIL_LABELS[i - 1]} must be captured before ${REQUIREMENT_RAIL_LABELS[i]}`,
+    );
+  }
+});
+
+test('a requirement-rail-only change needs phase-E and NO phase-D0 section', () => {
+  const targets = smokeLabelsForChangedFiles(['src/ui/svelte/util/requirementSlots.js']);
+  assert.deepEqual(targets, REQUIREMENT_RAIL_LABELS);
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_E, targets), true);
+  assert.equal(isPhaseNeededForTargets(CAPTURE_PHASE_D0, targets), false);
+  for (const section of D0_SKIPPABLE_SECTIONS) {
+    assert.equal(
+      isD0SectionNeededForTargets(section.name, targets),
+      false,
+      `a rail-only target incorrectly kept D0 section '${section.name}'`,
+    );
   }
 });
 
@@ -304,7 +452,7 @@ test('spine labels are ALWAYS-run — none is gated by a skippable section', () 
 test('a recipe-only target set runs ONLY the recipes section; component/tag/gathering/etc. are skippable', () => {
   const targets = ['manager-recipe-edit-ingredients', 'manager-recipes-normal'];
   assert.equal(isD0SectionNeededForTargets('recipes', targets), true);
-  for (const name of ['components-checks', 'tags-essences', 'gathering', 'overview-interactables', 'import-alchemy-experimental']) {
+  for (const name of ['components-checks', 'tags-essences', 'gathering', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
     assert.equal(isD0SectionNeededForTargets(name, targets), false, `recipe-only target should skip '${name}'`);
   }
 });
@@ -316,9 +464,352 @@ test('a component-only target set runs ONLY components-checks; recipes is skippa
   assert.equal(isD0SectionNeededForTargets('gathering', targets), false);
 });
 
+// The bulk panel has FOUR sections and no single frame can hold them all, so issue 772
+// ships three: the staged frame and the pristine/unstaged frame on the essence-bearing
+// Arcane Forge, and the Progressive DC frame on the progressive system. The first two are
+// components-checks captures; the third rides the existing progressive walk position.
+const BULK_EDIT_LABELS = [
+  'manager-components-bulk-edit',
+  'manager-components-bulk-edit-unstaged',
+  'manager-components-bulk-edit-progressive',
+];
+// Issue 1010 twins the surface in the Recipe Studio, whose panel has five axes and the same
+// impossibility: the pristine draft and a staged one are the same controls in exclusive
+// states, and the blocked-enable Callout exists only over a selection containing a refused
+// recipe. All three are recipes-section captures.
+const RECIPE_BULK_EDIT_LABELS = [
+  'manager-recipes-bulk-edit',
+  'manager-recipes-bulk-edit-unstaged',
+  'manager-recipes-bulk-edit-blocked',
+];
+// The ONE shared scaffold all six route through (issue 1010 generalised it). The properties
+// that survive parameterisation are asserted against THIS body; the ones that became studio
+// data are asserted against the studio descriptors below, per studio.
+const BULK_EDIT_SCAFFOLD = HARNESS.match(
+  /async function captureBulkEditFrame\([\s\S]*?\n\}\n/,
+)?.[0];
+
+/**
+ * One studio descriptor's source text.
+ *
+ * The selectors, the layout pin and the row-selection strategy moved OUT of the scaffold and
+ * into these objects, so an assertion left pointing at the scaffold would pass by construction
+ * — the literal it looks for can no longer appear there whatever the walk does. Each is
+ * re-pinned here against the studio that owns it instead.
+ *
+ * @param {string} name The exported const name.
+ * @returns {string|undefined} The `Object.freeze({ … })` body, or undefined when absent.
+ */
+const bulkEditStudio = (name) =>
+  HARNESS.match(new RegExp(String.raw`const ${name} = Object\.freeze\(\{[\s\S]*?\n\}\);\n`))?.[0];
+
+const COMPONENT_BULK_EDIT_STUDIO_SRC = bulkEditStudio('COMPONENT_BULK_EDIT_STUDIO');
+const RECIPE_BULK_EDIT_STUDIO_SRC = bulkEditStudio('RECIPE_BULK_EDIT_STUDIO');
+
+test('the issue-772 bulk-edit frames are scoped to the sections that can render them', () => {
+  for (const label of BULK_EDIT_LABELS) {
+    assert.equal(isCapturableLabel(label), true, label);
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0, label);
+  }
+
+  // The two Arcane Forge frames belong to the components section — a bulk-edit target must
+  // not resurrect the recipes, tools or gathering walks.
+  const arcaneTargets = ['manager-components-bulk-edit', 'manager-components-bulk-edit-unstaged'];
+  assert.equal(isD0SectionNeededForTargets('components-checks', arcaneTargets), true);
+  for (const name of ['recipes', 'tags-essences', 'gathering', 'tools', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, arcaneTargets), false, name);
+  }
+
+  // The Progressive DC frame is gated on `componentDifficultyAxisProgressive`, which is
+  // false on Arcane Forge (routedByCheck crafting, routed salvage, d100 gathering) and
+  // true only on the deliberately-broken progressive system. That system already has a
+  // walk position in `overview-interactables`, so the frame reuses it rather than
+  // reconfiguring a system mid-walk — and therefore scopes to THAT section, not this one.
+  const progressiveTargets = ['manager-components-bulk-edit-progressive'];
+  assert.equal(isD0SectionNeededForTargets('overview-interactables', progressiveTargets), true);
+  assert.equal(isD0SectionNeededForTargets('components-checks', progressiveTargets), false);
+  // It sits immediately after the browser frame that establishes that context, so a scoped
+  // run reaches it without a second system switch.
+  assert.equal(
+    captureOrderIndex('manager-components-bulk-edit-progressive'),
+    captureOrderIndex('manager-components-progressive') + 1,
+  );
+
+  // The staged frame is still captured immediately after the plain browser frame, so
+  // `manager-components` keeps winning its own `candidates[0]` with
+  // `manager-components-normal`; the unstaged frame follows it.
+  assert.equal(
+    captureOrderIndex('manager-components-bulk-edit'),
+    captureOrderIndex('manager-components-normal') + 1,
+  );
+  assert.equal(
+    captureOrderIndex('manager-components-bulk-edit-unstaged'),
+    captureOrderIndex('manager-components-bulk-edit') + 1,
+  );
+});
+
+test('the issue-1010 recipe bulk-edit frames are scoped to the recipes section', () => {
+  for (const label of RECIPE_BULK_EDIT_LABELS) {
+    assert.equal(isCapturableLabel(label), true, label);
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0, label);
+  }
+
+  assert.equal(isD0SectionNeededForTargets('recipes', RECIPE_BULK_EDIT_LABELS), true);
+  for (const name of ['components-checks', 'tags-essences', 'gathering', 'tools', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, RECIPE_BULK_EDIT_LABELS), false, name);
+  }
+
+  // Captured immediately after the plain browser frame and BEFORE the narrow one, so
+  // `manager-recipes` keeps winning its own `candidates[0]` with `manager-recipes-normal`
+  // (`collect` takes the lowest capture counter among a view's labels) and all three are
+  // taken at the width the shared scaffold's `recipes normal` layout pin is measured against.
+  assert.equal(
+    captureOrderIndex('manager-recipes-bulk-edit'),
+    captureOrderIndex('manager-recipes-normal') + 1,
+  );
+  for (let i = 1; i < RECIPE_BULK_EDIT_LABELS.length; i += 1) {
+    assert.equal(
+      captureOrderIndex(RECIPE_BULK_EDIT_LABELS[i]),
+      captureOrderIndex(RECIPE_BULK_EDIT_LABELS[i - 1]) + 1,
+      `${RECIPE_BULK_EDIT_LABELS[i]} must follow ${RECIPE_BULK_EDIT_LABELS[i - 1]}`,
+    );
+  }
+  assert.ok(
+    captureOrderIndex(RECIPE_BULK_EDIT_LABELS.at(-1)) < captureOrderIndex('manager-recipes-narrow'),
+    'the bulk frames precede the narrow frame, which re-measures the row at 900px',
+  );
+});
+
+test('the shared bulk-edit capture scaffold writes nothing and hands the rail back', () => {
+  assert.ok(BULK_EDIT_SCAFFOLD, 'the bulk-edit capture scaffold was not found in the harness');
+
+  // NET-ZERO: the walk stages through the shipped controls and never presses Apply, so no
+  // component and no recipe is written and no later frame in the section sees a mutated
+  // fixture.
+  //
+  // Asserted over the WHOLE harness, per studio, rather than over the scaffold body. Under
+  // issue 1010's parameterisation the scaffold no longer names either Apply hook at all, so
+  // the shipped scaffold-scoped assertion became one that cannot fail however the walk
+  // behaves — and an Apply click would in any case be written in a `stage` callback at a call
+  // site, which is outside the scaffold. Both hooks are named because a guard that forbade
+  // only the component one would let a recipe-studio Apply through, which is the same defect
+  // one studio later.
+  for (const applyHook of ['data-component-bulk-apply', 'data-recipe-bulk-apply']) {
+    assert.equal(
+      new RegExp(String.raw`${applyHook}\]'\)(?:\s*\.\w+\([^()]*\))*\s*\.click\(`).test(HARNESS),
+      false,
+      `the capture must never press Apply (${applyHook}) — it would rewrite the shared fixtures`,
+    );
+  }
+  // Driven through the real controls, not seeded: `page.evaluate` here would touch
+  // `game.` / settings / flags and photograph a state no GM can reach.
+  assert.equal(
+    /page\.evaluate\(/.test(BULK_EDIT_SCAFFOLD),
+    false,
+    'the bulk-edit state must be driven through the UI',
+  );
+  // It goes through `captureStableManagerView`, as the plain browser frame beside it does, so
+  // the overflow and overlay guards run on the bulk state too rather than only the bare
+  // `screenshot()`. The layout itself is now the studio's, and is pinned per studio below.
+  assert.match(BULK_EDIT_SCAFFOLD, /captureStableManagerView\(page, \{ layout: studio\.layout, label \}\)/);
+  // The panel REPLACES the single-row inspector; a rail rendering both is a failure, not a
+  // frame. Nothing asserted this before it became shared, and it is the one property a
+  // second studio could plausibly get wrong.
+  assert.match(BULK_EDIT_SCAFFOLD, /studio\.displacedInspectorSelector\)\.count\(\) > 0/);
+  // The selection is cleared in a `finally`, so a failed capture cannot leave the rail
+  // showing the bulk panel for every following frame in the section — and a failed CLEAR is
+  // recorded as its own failed step rather than swallowed, because that leak is silent
+  // evidence corruption. It is recorded rather than thrown: throwing from this `finally`
+  // would mask an in-flight capture error and abort the rest of the section, while a
+  // recorded step failure is already fatal to the run.
+  assert.match(BULK_EDIT_SCAFFOLD, /\} finally \{[\s\S]*?studio\.clearSelector/);
+  assert.match(
+    BULK_EDIT_SCAFFOLD,
+    /\} finally \{[\s\S]*?results\.steps\.push\(\{ step: `\$\{stepName\}-cleared`, passed: false/,
+  );
+  assert.equal(
+    /state: 'detached', timeout: 5_000 \}\)\.catch\(/.test(BULK_EDIT_SCAFFOLD),
+    false,
+    'a failed clear must not be swallowed by a bare .catch()',
+  );
+});
+
+test('each bulk-edit studio pins its own layout, selection control and teardown hooks', () => {
+  // The three literals the shipped scaffold-scoped assertions pinned — the layout, the row
+  // box selector and the `finally` clear — are studio DATA now, so they are re-pinned here
+  // against the studio that owns each one. Stated as a table so neither studio can be
+  // dropped by an edit that only remembers the other.
+  const studios = [
+    {
+      name: 'COMPONENT_BULK_EDIT_STUDIO',
+      source: COMPONENT_BULK_EDIT_STUDIO_SRC,
+      layout: 'components normal',
+      rowBox: 'label:has(input[data-component-select])',
+      clear: 'data-component-clear-selection',
+      panel: 'data-component-bulk-panel',
+      inspector: 'data-component-inspector',
+    },
+    {
+      name: 'RECIPE_BULK_EDIT_STUDIO',
+      source: RECIPE_BULK_EDIT_STUDIO_SRC,
+      layout: 'recipes normal',
+      rowBox: 'label:has(input[data-recipe-select])',
+      clear: 'data-recipe-clear-selection',
+      panel: 'data-recipe-bulk-panel',
+      inspector: 'data-recipe-inspector',
+    },
+  ];
+
+  for (const studio of studios) {
+    assert.ok(studio.source, `${studio.name} was not found in the harness`);
+    // The bulk state reuses the plain browser frame's pinned selectors — only the RAIL swaps
+    // the inspector for the panel — so a layout name no guard knows would silently skip the
+    // overflow measurement this capture depends on.
+    assert.ok(
+      studio.source.includes(`layout: '${studio.layout}'`),
+      `${studio.name} must measure against the '${studio.layout}' layout pins`,
+    );
+    // The selection control is an `<input>` inside a `<label>`, never a `<button>`, which is
+    // what keeps this walk's row-action button selectors resolving to one control per row.
+    assert.ok(
+      studio.source.includes(studio.rowBox),
+      `${studio.name} must click the label wrapping its hidden selection input`,
+    );
+    for (const hook of [studio.clear, studio.panel, studio.inspector]) {
+      assert.ok(studio.source.includes(hook), `${studio.name} must name ${hook}`);
+      assert.ok(HARNESS.includes(hook), `${hook} is not reachable in the harness`);
+    }
+  }
+});
+
+test('the recipe bulk-edit frames pin their rows by NAME, not by position', () => {
+  // The failure this exists to refuse: `manager-recipes-bulk-edit-blocked` is about ONE row —
+  // the seeded off-and-un-enableable recipe that makes the panel's blocked count non-zero.
+  // Selecting positionally would stage Enable over two ordinary recipes and publish the frame
+  // with no Callout in it, while still satisfying every guard the scaffold has (two rows
+  // selected, a visible count readout, a mounted panel).
+  const blocked = HARNESS
+    .split('await captureBulkEditFrame(page, results, {')
+    .slice(1)
+    .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === 'manager-recipes-bulk-edit-blocked');
+  assert.ok(blocked, 'the blocked recipe bulk-edit call site was not found');
+  const body = blocked.slice(0, blocked.search(/\n *\}\);/));
+
+  assert.match(
+    body,
+    /selectRows: selectRecipeRowsByName\('Temper a Blade'/,
+    'the blocked frame must select the refused recipe by name, or it photographs no Callout',
+  );
+  // And it is held to what it claims: the panel's warning AND the row pill the warning is
+  // counting, in the frame. Either alone publishes a lie.
+  assert.match(body, /data-recipe-bulk-blocked-warning/);
+  assert.match(body, /Temper a Blade"\) \[data-status-pill="danger"\]/);
+
+  // `selectRecipeRowsByName` fails loudly on a name that matches no row rather than
+  // degrading to whatever happened to be first — the degradation IS the defect.
+  const strategy = HARNESS.match(/function selectRecipeRowsByName\([\s\S]*?\n\}\n/)?.[0];
+  assert.ok(strategy, 'the by-name row selection strategy was not found');
+  assert.match(strategy, /throw new Error\(`Recipe browser rendered no row named/);
+});
+
+// A real smoke failure, not a hypothetical: the two recipe bulk-edit frames staged their
+// segmented axes with `[data-recipe-bulk-lock-option="lock"] input`, and both steps timed out
+// after 30s with `<span class="manager-segment-label">Lock</span> intercepts pointer events`.
+// `SegmentedControl.svelte` hides its real radio at 1x1 under `clip: rect(0 0 0 0)`, and an
+// absolutely-positioned child of a `justify-content: center` flex container takes its static
+// position at that container's CENTRE — so the radio's 1px box sits directly beneath the middle
+// of the visible span. Playwright does not fall back to the enclosing label; it fails the step.
+//
+// The harness had no working precedent to copy, which is how the wrong shape got in: the
+// Component Studio's bulk panel renders NO segmented control (its axes are a select, a stepper,
+// tri-state tag chips and a number field), and the harness's only other `-option=` selector
+// merely counts `.is-active`. So no smoke step had ever successfully clicked a segment.
+//
+// This is a source-text guard because `npm test` cannot run the harness — it top-level-imports
+// Playwright and launches Docker — and `scripts/foundry-test-run.mjs` is outside the ESLint and
+// Prettier globs too, so nothing else here would catch the regression before a 13-minute run.
+test('a segmented-control smoke step clicks the LABEL, never the hidden radio inside it', () => {
+  const helper = HARNESS.match(/async function clickSegment\([\s\S]*?\n\}\n/)?.[0];
+  assert.ok(helper, 'the segment-click helper was not found in the harness');
+  assert.match(
+    helper,
+    /locator\(`label\[\$\{optionDataAttr\}="\$\{value\}"\]`\)/,
+    'the helper must target the wrapping label, which is what carries `optionDataAttr`',
+  );
+  // A missing segment must report as a missing segment, not as a 30s actionability timeout —
+  // that indistinguishability is what let the defect sit unread in the run output.
+  assert.match(helper, /waitFor\(\{ state: 'visible'/);
+
+  // Both recipe frames route through it rather than hand-rolling a selector again.
+  assert.match(HARNESS, /clickSegment\(bulkPanel, 'data-recipe-bulk-lock-option', 'lock'\)/);
+  assert.match(HARNESS, /clickSegment\(bulkPanel, 'data-recipe-bulk-status-option', 'enable'\)/);
+
+  // And the shape itself is banned harness-wide. `input:checked` is deliberately still legal:
+  // the unstaged frame asserts the sentinel radio is checked with `waitFor({state:'attached'})`,
+  // which reads the a11y tree and never hit-tests, so it needs the input and cannot intercept.
+  const offenders = HARNESS.match(/-option="[^"]*"\] input['"`]/g) ?? [];
+  assert.deepEqual(
+    offenders,
+    [],
+    'a `-option="…"] input` click target is the segmented-control interception trap',
+  );
+});
+
+test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
+  // Split rather than one lazy regex per label: a `[\s\S]*?label: '<wanted>'` starts at the
+  // EARLIEST call site and happily swallows the two before it, which would let a staging
+  // control from the staged frame satisfy — or here, break — an assertion about another.
+  // Each segment is then truncated at its own `});` terminator, which is the first line in
+  // it that is nothing but indentation and the closer.
+  const callOf = (label) => {
+    const segment = HARNESS
+      .split('captureBulkEditFrame(page, results, {')
+      .slice(1)
+      .find((candidate) => candidate.match(/label: '([^']+)'/)?.[1] === label);
+    if (!segment) return null;
+    const end = segment.search(/\n *\}\);/);
+    return end === -1 ? null : segment.slice(0, end);
+  };
+
+  // STAGED: a category, both tag tri-states, and the essence axis armed.
+  const staged = callOf('manager-components-bulk-edit');
+  assert.ok(staged, 'the staged bulk-edit call site was not found');
+  assert.match(staged, /data-bulk-tag-state="\$\{state\}"/);
+  assert.match(staged, /data-component-bulk-essences\] \[data-component-edit-essence\] \[data-stepper-increment\]/);
+
+  // UNSTAGED: the pristine draft. Nothing is staged, so the ASSERTIONS are the state —
+  // Apply inert, and the essence chip on the unstaged face that is the only route to
+  // "clear essences on every selected component". It must not touch a staging control, or
+  // it would photograph the frame it exists to be the opposite of.
+  const unstaged = callOf('manager-components-bulk-edit-unstaged');
+  assert.ok(unstaged, 'the unstaged bulk-edit call site was not found');
+  assert.match(unstaged, /data-component-bulk-essences-staged="false"/);
+  assert.match(unstaged, /if \(!await bulkPanel\.locator\('\[data-component-bulk-apply\]'\)\.first\(\)\.isDisabled\(\)\)/);
+  for (const stagingControl of [
+    'data-component-bulk-category',
+    'data-bulk-tag',
+    'data-stepper-increment',
+    'data-component-bulk-difficulty',
+  ]) {
+    assert.equal(
+      unstaged.includes(stagingControl),
+      false,
+      `the unstaged frame must not drive ${stagingControl}`,
+    );
+  }
+
+  // PROGRESSIVE: the fourth section, plus the empty item-tag copy that only a system with
+  // no authored tags can show. Both are why this frame exists at all.
+  const progressive = callOf('manager-components-bulk-edit-progressive');
+  assert.ok(progressive, 'the progressive bulk-edit call site was not found');
+  assert.match(progressive, /data-component-bulk-tags-empty/);
+  assert.match(progressive, /data-component-bulk-difficulty\]'\)\.first\(\)\.fill\('12'\)/);
+  assert.match(progressive, /data-component-bulk-difficulty-staged="true"/);
+});
+
 test('a Tool Studio target runs only the dedicated persisted-net-zero tools section', () => {
   assert.equal(isD0SectionNeededForTargets('tools', TOOL_STUDIO_LABELS), true);
-  for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'overview-interactables', 'import-alchemy-experimental']) {
+  for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'knowledge', 'overview-interactables', 'import-alchemy-experimental']) {
     assert.equal(isD0SectionNeededForTargets(name, TOOL_STUDIO_LABELS), false, name);
   }
   for (const label of TOOL_STUDIO_LABELS) {
@@ -596,7 +1087,232 @@ test('the Tool Studio walk pins shipped selectors, viewport evidence, pointer co
     HARNESS,
     /\[data-manager-tools-authority\] label\.is-selected:has\(input\[value="checkDriven"\]\)/,
   );
-  assert.match(HARNESS, /finally\s*\{[\s\S]*?restoreToolStudioFixture/);
+  // The setup → exercise → finally-restore scaffold now lives in the shared
+  // `runFixturedScreenshotSection` helper (the Knowledge section reuses it), so what
+  // the harness must still prove is that the Tool Studio section routes its restore
+  // through that helper's `restore` slot — never that it merely mentions the function.
+  assert.match(
+    HARNESS,
+    /runFixturedScreenshotSection\(\{[\s\S]*?step: 'tool-studio-evidence',[\s\S]*?restore: \(fixture\) => restoreToolStudioFixture\(/,
+    'the Tool Studio section must hand its restore to the shared fixtured-section helper',
+  );
+  assert.match(
+    HARNESS,
+    /step: 'tool-studio-evidence',\s*rethrow: true,/,
+    'a Tool Studio failure must still abort the phase rather than reporting a green run',
+  );
+});
+
+// ── The Phase-D0 tier-step walk (issue 975) ────────────────────────────────────
+
+const CHECK_TRIGGERS_SRC = readFileSync(
+  'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
+  'utf8',
+);
+
+test('the Phase D0 tier-step walk drives hooks the trigger component still emits', () => {
+  // `scripts/foundry-test-run.mjs` is entry #4 in `KNOWN_UNGATED_SCRIPTS`, so neither
+  // `npm run lint` nor `npm run format:check` reads it and this file is the walk's only
+  // gate. Issue 975 deleted the `[data-check-nat-stepping]` card the walk used to
+  // round-trip and replaced it with a trigger-authoring walk over the tier-step row, so
+  // these selectors are a hand-maintained mirror of `CheckTriggers.svelte`.
+  //
+  // BOTH sides are asserted, not just the harness: a harness-only pin stays green
+  // through a rename in the component, which is exactly the drift that would surface as
+  // a post-merge beta smoke break rather than a red PR.
+  for (const hook of [
+    'data-trigger-tier-step',
+    'data-trigger-tier-step-steps',
+    'data-trigger-tier-step-target',
+    'data-triggers-empty',
+  ]) {
+    assert.ok(HARNESS.includes(hook), `the Phase D0 walk no longer drives [${hook}]`);
+    assert.ok(
+      CHECK_TRIGGERS_SRC.includes(hook),
+      `CheckTriggers.svelte no longer emits [${hook}], so the walk points at nothing`,
+    );
+  }
+
+  // The mode segments are stamped by `SegmentedControl`'s `optionDataAttr`, so the
+  // attribute NAME and the option VALUE are authored apart and only the harness pairs
+  // them into one selector — which is the pairing that can rot silently.
+  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="up"]'), 'the up segment');
+  assert.ok(HARNESS.includes('[data-trigger-tier-step-mode="target"]'), 'the target segment');
+  assert.match(CHECK_TRIGGERS_SRC, /optionDataAttr="data-trigger-tier-step-mode"/);
+  const tierStepModes = CHECK_TRIGGERS_SRC.match(/const TIER_STEP_MODES = \[[\s\S]*?\n {2}\];/)?.[0];
+  assert.ok(tierStepModes, 'the TIER_STEP_MODES declaration was not found');
+  for (const mode of ['up', 'target']) {
+    assert.ok(
+      tierStepModes.includes(`value: '${mode}'`),
+      `TIER_STEP_MODES no longer offers a '${mode}' segment for the walk to click`,
+    );
+  }
+
+  // The walk AUTHORS a trigger, so it must remove it again: a left-behind trigger
+  // dirties the Checks draft and the next navigation raises a discard prompt mid-phase.
+  assert.ok(HARNESS.includes('[data-add-trigger]'), 'the walk must add a trigger');
+  assert.ok(
+    HARNESS.includes('[data-trigger] [data-remove-trigger]'),
+    'the walk must remove the trigger it authored',
+  );
+});
+
+// ── The shared fixtured-section lifecycle (issues #784 / 785) ──────────────────
+
+test('the shared fixtured-section helper always restores, even when setup or the walk throws', async () => {
+  const calls = [];
+  const results = { steps: [] };
+  const ok = await runFixturedScreenshotSection({
+    results,
+    step: 'demo',
+    setup: async () => { calls.push('setup'); return { id: 'fixture' }; },
+    exercise: async (fixture) => { calls.push(`exercise:${fixture.id}`); },
+    restore: async (fixture) => { calls.push(`restore:${fixture?.id ?? 'null'}`); },
+  });
+  assert.deepEqual(calls, ['setup', 'exercise:fixture', 'restore:fixture']);
+  assert.deepEqual(results.steps, [{ step: 'demo', passed: true }]);
+  assert.equal(ok.passed, true);
+
+  // A failing walk still restores the fixture it seeded, and rethrows by default.
+  const failing = [];
+  const failingResults = { steps: [] };
+  await assert.rejects(
+    () => runFixturedScreenshotSection({
+      results: failingResults,
+      step: 'demo',
+      setup: async () => ({ id: 'seeded' }),
+      exercise: async () => { throw new Error('capture blew up'); },
+      restore: async (fixture) => { failing.push(`restore:${fixture?.id ?? 'null'}`); },
+    }),
+    /capture blew up/,
+  );
+  assert.deepEqual(failing, ['restore:seeded']);
+  assert.equal(failingResults.steps[0].passed, false);
+
+  // A failing SETUP still calls restore, with a null handle it must tolerate.
+  const setupFailed = [];
+  const evidential = await runFixturedScreenshotSection({
+    results: { steps: [] },
+    step: 'demo',
+    rethrow: false,
+    setup: async () => { throw new Error('seed blew up'); },
+    exercise: async () => { setupFailed.push('exercise'); },
+    restore: async (fixture) => { setupFailed.push(`restore:${fixture === null ? 'null' : 'handle'}`); },
+  });
+  assert.deepEqual(setupFailed, ['restore:null']);
+  assert.equal(evidential.passed, false);
+  assert.match(evidential.error.message, /seed blew up/);
+});
+
+test('the shared fixtured-section helper is a pure, playwright-free scripts/lib module', () => {
+  assert.equal(/import[^;\n]*['"]playwright['"]/.test(SECTION_FIXTURE_SRC), false);
+  assert.equal(/import[^;\n]*foundry-test-run/.test(SECTION_FIXTURE_SRC), false);
+  // The restore MUST sit in a `finally`, not on the success path: these fixtures write
+  // real actor flags and delete owned Items in a persisted world that later smoke runs
+  // reuse, so a half-failed section that skipped its restore poisons unrelated PRs.
+  assert.match(SECTION_FIXTURE_SRC, /\} finally \{\s*(?:\/\/[^\n]*\n\s*)*await restore\(fixture\);/);
+});
+
+// ── D0 section: the GM Knowledge surface (issue 785) ──────────────────────────
+
+test('a Knowledge target runs only the dedicated persisted-net-zero knowledge section', () => {
+  assert.equal(isD0SectionNeededForTargets('knowledge', KNOWLEDGE_LABELS), true);
+  for (const name of ['recipes', 'components-checks', 'tags-essences', 'gathering', 'tools', 'overview-interactables', 'import-alchemy-experimental']) {
+    assert.equal(isD0SectionNeededForTargets(name, KNOWLEDGE_LABELS), false, name);
+  }
+  for (const label of KNOWLEDGE_LABELS) {
+    assert.equal(phaseForCaptureLabel(label), CAPTURE_PHASE_D0);
+    assert.ok(HARNESS.includes(`'${label}'`), `${label} is not reachable in the harness`);
+  }
+  // Both Knowledge view ids resolve to real labels, and the armed frame owns its own
+  // view id: `collect` publishes only `candidates[0]`, so appending its label to the
+  // main view would publish the un-armed frame forever.
+  const armed = VIEW_RECIPES.find((view) => view.id === 'manager-knowledge-delete-armed');
+  const surface = VIEW_RECIPES.find((view) => view.id === 'manager-knowledge');
+  assert.deepEqual(armed.smokeLabels, ['manager-knowledge-delete-armed']);
+  assert.equal(surface.smokeLabels.includes('manager-knowledge-delete-armed'), false);
+  assert.ok(
+    captureOrderIndex('manager-knowledge-owned-copies')
+      < Math.min(...surface.smokeLabels.slice(1).map(captureOrderIndex)),
+    'the owned-copies frame must be captured first so it wins the surface view\'s candidates[0]',
+  );
+});
+
+test('the Knowledge walk seeds every projected state, proves the inert merge, and restores net-zero', () => {
+  const setup = harnessFunctionSpan('setupKnowledgeFixture', 'restoreKnowledgeFixture');
+  const restore = harnessFunctionSpan('restoreKnowledgeFixture', 'assertKnowledgeInertSurvivesExpend');
+  const merge = harnessFunctionSpan('assertKnowledgeInertSurvivesExpend', 'exerciseKnowledgeSurface');
+
+  // The five seeded copy states, including the two the delta calls out explicitly: an
+  // UNCAPPED copy (so Expend renders disabled) and the inert-but-not-spent fifth state.
+  assert.match(setup, /key: 'limited'[\s\S]*?limitUses: true, maxUses: 3/);
+  assert.match(setup, /key: 'uncapped'[\s\S]*?limitUses: false/);
+  assert.match(setup, /key: 'inert'[\s\S]*?maxUses: 5[\s\S]*?usage: \{ timesUsed: 1, inert: true \}/);
+  assert.match(setup, /key: 'spent'[\s\S]*?maxUses: 2[\s\S]*?usage: \{ timesUsed: 2, inert: true \}/);
+  assert.match(setup, /key: 'partyPool'[\s\S]*?learnScope: 'total'/);
+  // A learned entry whose source copy is no longer owned, and an empty-inventory
+  // character for the dimmed "Nothing tracked" roster row.
+  assert.match(setup, /sourceItemUuid: `Actor\.\$\{learnedOnlyActor\.id\}\.Item\.\$\{foundry\.utils\.randomID\(\)\}`/);
+  assert.match(setup, /untrackedActor = grantOnlyActors\[1\]/);
+  // Owned copies claim their definition through the durable per-system roles map.
+  assert.match(setup, /roles: \{ \[systemId\]: \{ recipeItemDefinitionId: definition\.id \} \}/);
+  // Membership is linked in a SECOND pass, AFTER every owned copy exists.
+  // `RecipeItemLearningHook` fires on `createItem`, and for an uncapped book
+  // `caps.learn.consumeOnLearn` DEFAULTS TO TRUE — so seeding `recipeIds` first made
+  // the auto-learn path delete the first granted copy outright and leave an
+  // auto-learned entry on the holder that the fixture never cleaned up.
+  const grantAt = setup.indexOf("createEmbeddedDocuments('Item'");
+  const membershipAt = setup.indexOf('recipeIds: [recipeId]');
+  assert.ok(grantAt > 0, 'the fixture grants owned copies');
+  assert.ok(
+    membershipAt > grantAt,
+    'recipe membership must be linked only after every owned copy exists, or the createItem auto-learn consumes one',
+  );
+  assert.match(
+    setup,
+    /a createItem consumer \(auto-learn consumeOnLearn\) destroyed it/,
+    'seeding must fail loudly, naming the cause, if a copy is ever consumed again',
+  );
+  // Every actor the section can touch has its learned map snapshotted, not only the
+  // two it seeds, so nothing it gains mid-run survives the restore.
+  assert.match(setup, /const learnedRestores = \[\s*chipStatesActor,\s*partyPoolActor,\s*learnedOnlyActor,\s*untrackedActor,\s*\]/);
+
+  // The seeded learned entry is removed by a real KEY DELETION, never a merge rewrite
+  // (which would resurrect it on reload and leave the section not net-zero).
+  assert.match(restore, /await actor\.unsetFlag\('fabricate', 'fabricate\.learnedRecipes'\)/);
+  const unsetAt = restore.indexOf("unsetFlag('fabricate', 'fabricate.learnedRecipes')");
+  const rewriteAt = restore.indexOf("'flags.fabricate.fabricate.learnedRecipes': learnedRecipes");
+  assert.ok(unsetAt > 0 && rewriteAt > unsetAt, 'any pre-existing map must be written back only AFTER the deletion lands');
+  assert.match(restore, /deleteEmbeddedDocuments\('Item', itemIds\)[\s\S]*?unsetFlag/, 'owned copies must be deleted before the learned entries, so no budget path resolves a still-held source');
+  assert.match(restore, /deleteRecipeItemDefinition\(systemId, definitionId\)/);
+  // `deleteRecipeItemDefinition` nulls `recipeItemId` / `linkedRecipeItemUuid` on every
+  // recipe the definition claimed, so membership is dropped FIRST and the two link
+  // fields are repaired from a setup snapshot if they ever drift.
+  assert.match(
+    restore,
+    /updateRecipeItemDefinition\(systemId, definitionId, \{ recipeIds: \[\] \}\)[\s\S]*?deleteRecipeItemDefinition\(systemId, definitionId\)/,
+  );
+  assert.match(restore, /recipe\.linkedRecipeItemUuid = links\.linkedRecipeItemUuid/);
+  assert.match(setup, /recipeLinks: \{[\s\S]*?linkedRecipeItemUuid: recipe\.linkedRecipeItemUuid/);
+
+  // The merge proof must land a USAGE-ONLY write on an already-inert document; a spent
+  // copy cannot be expended and a still-capped one carries no `inert`, so either would
+  // resolve to `undefined === undefined` and pass unconditionally.
+  assert.match(merge, /fixture\.ownedByKey\.inert/);
+  assert.match(merge, /Number\(usage\?\.timesUsed\) === 2/);
+  assert.match(merge, /usage\?\.inert !== true[\s\S]*?dropped the sibling inert flag/);
+
+  // The section wires the shared lifecycle helper and restores in its `finally` slot.
+  assert.match(
+    HARNESS,
+    /shouldRunScreenshotSection\('knowledge'\)[\s\S]*?runFixturedScreenshotSection\(\{[\s\S]*?step: 'knowledge-surface-evidence',[\s\S]*?restore: \(fixture\) => restoreKnowledgeFixture\(/,
+    'the Knowledge section must hand its restore to the shared fixtured-section helper',
+  );
+  // The narrow frame is captured ABOVE the 831px collapse, which is the band where
+  // three columns still hold and the detail pane is at its narrowest.
+  assert.match(HARNESS, /setManagerWindowSize\(page, \{ width: 880, height: 900 \}\)[\s\S]*?assertManagerLayoutStable\(page, 'knowledge narrow'\)/);
+  assert.ok(HARNESS.includes("assertManagerLayoutStable(page, 'knowledge normal')"));
+  assert.ok(HARNESS.includes("'.manager-knowledge-copy-row'"));
 });
 
 test('Tool tab geometry contract rejects clipping, actual overflow, and a missing fourth tab', () => {
@@ -670,7 +1386,10 @@ test('Tool evidence contracts reject leaked horizontal state and duplicate store
 });
 
 test('the Tool Studio run writes one summary/manifest identity with head, target labels, and measured clips', () => {
-  assert.match(HARNESS, /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha:[\s\S]*?targetLabels:/);
+  assert.match(
+    HARNESS,
+    /const screenshotRunIdentity = \{[\s\S]*?runId: randomUUID\(\),[\s\S]*?headSha: resolveScreenshotHeadSha\(\{[\s\S]*?explicitHeadSha: process\.env\.FOUNDRY_SCREENSHOT_HEAD_SHA,[\s\S]*?ciHeadSha: process\.env\.GITHUB_SHA,[\s\S]*?\}\),[\s\S]*?targetLabels:/,
+  );
   assert.match(HARNESS, /results\.screenshotRun = screenshotRunIdentity/);
   assert.match(
     HARNESS,
@@ -713,14 +1432,20 @@ test('the Tool Studio fixture composes durable Tool identity through the canonic
 test("theme-or-global-ui's multi-section target set keeps exactly the sections its labels touch (spine label rides the always-run spine)", () => {
   const themeView = VIEW_RECIPES.find((v) => v.id === 'theme-or-global-ui');
   const targets = themeView.smokeLabels;
-  // Its labels span the spine (manager-default-selection) + three sections.
+  // Its labels span the spine (manager-default-selection) + three D0 sections, and the
+  // two player frames additionally pull in phase E.
   assert.ok(D0_SPINE_LABELS.includes('manager-default-selection'));
   assert.equal(isD0SectionNeededForTargets('components-checks', targets), true); // manager-components-normal
-  assert.equal(isD0SectionNeededForTargets('tags-essences', targets), true); // manager-essences-normal
-  assert.equal(isD0SectionNeededForTargets('gathering', targets), true); // environments/tasks/events
-  // No theme label lands in these, so they stay skippable.
+  assert.equal(isD0SectionNeededForTargets('gathering', targets), true); // gathering-task-editor
+  assert.equal(isD0SectionNeededForTargets('overview-interactables', targets), true); // interactables-manager-list
+  // No theme label lands in these, so they stay skippable. `tags-essences` became
+  // skippable when the set stopped over-sampling manager browsers: the essences and
+  // environments frames added a fourth and fifth manager library without adding an
+  // app-area, so they were dropped in favour of player-app coverage.
   assert.equal(isD0SectionNeededForTargets('recipes', targets), false);
-  assert.equal(isD0SectionNeededForTargets('overview-interactables', targets), false);
+  assert.equal(isD0SectionNeededForTargets('tags-essences', targets), false);
+  assert.equal(isD0SectionNeededForTargets('tools', targets), false);
+  assert.equal(isD0SectionNeededForTargets('knowledge', targets), false);
   assert.equal(isD0SectionNeededForTargets('import-alchemy-experimental', targets), false);
 });
 

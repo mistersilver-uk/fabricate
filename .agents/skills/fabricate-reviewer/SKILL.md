@@ -40,7 +40,11 @@ A clean, well-tested implementation of the wrong thing still fails review.
 6. Check whether the structure keeps dependencies explicit, constructors boring, and responsibilities cohesive when JavaScript boundaries changed.
 7. Check test quality and whether coverage matches the risk.
 8. Verify Foundry compatibility assumptions for touched APIs.
-9. For UI changes, verify generated screenshots are present for the changed views as embedded screenshot images in the PR `Screenshots (if applicable)` section (S3-hosted, produced by `npm run screenshots:ui:publish`), and evaluated against acceptance criteria rather than merely attached.
+9. For UI changes, verify generated screenshots are present for the changed views as embedded screenshot images in the PR `Screenshots (if applicable)` section (S3-hosted; the View Lab `capture` job publishes these on every push, and the smoke's `npm run screenshots:ui:publish` for views outside the case registry), and evaluated against acceptance criteria rather than merely attached.
+If a frame you need is missing, check whether a case covers that state (`scripts/lib/viewLabCases.js`) before asking for a smoke run: rendering one is `node scripts/view-lab-screenshots.mjs apps <case-id>` and takes seconds, whereas the smoke costs ~26 minutes and cannot run in CI.
+A state no case covers is a finding in itself — the change published a frame of something other than what it altered.
+For non-trivial UI changes, verify the plan's reference/reuse inventory covers every supplied artifact and assigns authority per control/state, then compare the evidence against that matrix and the named shipped primitives.
+When an issue-specific maintainer instruction replaced automated production, keep visual approval pending until qualifying maintainer evidence is embedded; the instruction alone does not waive `check-screenshots`.
 10. Reconcile the canonical-spec changes against the plan: compare the `openspec/specs/` portion of the diff against the issue delta's `### Spec Deltas`.
 Run this as a mechanical tick-list: (1) list every entry under the delta's `##### Added/Modified/Removed Requirements` headings; (2) read the `openspec/specs/` portion of the driver-supplied diff; (3) tick each delta entry against a matching diff hunk one by one, and note any spec diff hunk with no delta entry.
 Every entry ticked and no unplanned hunks passes this check; any mismatch without a `### Deviations` note is `NEEDS_CHANGES`; when the driver supplied no delta or no diff, return `BLOCKED` rather than guessing.
@@ -84,9 +88,11 @@ Flag a test that pins a pure predicate while the path consuming it (an event han
 - Validation results from the implementer or CI pass without warnings that matter.
 - UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 - UI screenshot claims identify what the artifact proves: first view, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant responsive sizes.
+- Automated screenshot claims bind every affected view to one successful, non-degraded run with matching run/manifest identity, exact requested head, target label, capture record, and declared/decoded PNG dimensions; stricter view-specific parity rules remain additive.
 - Normal UI PR screenshot evidence is an embedded screenshot image in the PR description with `pr-<number>` in its alt text, produced by `npm run screenshots:ui:publish` (uploaded to S3 under `pr-screenshots/<number>/`).
 Uploaded artifacts, `test-results/` paths, and `user-attachments` embeds are accepted fallbacks, not the normal handoff.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label, which an agent must never apply.
+An explicit maintainer manual-visual instruction may replace the producer but is neither evidence nor an exemption.
 PR-scoped screenshots should not be committed as repository assets.
 - Compact rails, headers, cards, buttons, and fact components are tested with long names or localized strings where overflow could move controls or break layout.
 - Card, overlay, menu, disabled-state, and icon-button workflows have live pointer hit-test coverage when rendered hit targets could differ from DOM structure.
@@ -95,8 +101,9 @@ PR-scoped screenshots should not be committed as repository assets.
 - Image UI tests or smoke screenshots prove linked-image priority, or the remaining screenshot gap is explicitly called out.
 - Smoke screenshot data uses Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be treated as a finding.
 
-## Foundry V13 checks
+## Foundry API checks
 
+These were verified against V13.351 and still hold on the pinned V14.365.
 When reviewing Foundry-facing code, verify:
 
 - `game.documentTypes.Item` is converted before array methods.

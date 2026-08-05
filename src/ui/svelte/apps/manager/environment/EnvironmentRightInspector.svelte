@@ -10,7 +10,7 @@
     composition = { tasks: [], events: [], counts: {} },
     selectedKind = '',
     selectedId = '',
-    onUpdateEnvironment = () => {}
+    onUpdateEnvironment = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -22,33 +22,51 @@
   // (never a selected record); Tasks/Events show the selected record of their
   // own kind, so a stale cross-tab selection never leaks between tabs.
   const recordKind = $derived(activeTab === 'events' ? 'event' : 'task');
-  const recordEntry = $derived((() => {
-    if (activeTab !== 'tasks' && activeTab !== 'events') return null;
-    if (selectedKind !== recordKind || !selectedId) return null;
-    const list = recordKind === 'event' ? composition?.events : composition?.tasks;
-    return (Array.isArray(list) ? list : []).find(entry => entry.id === selectedId) || null;
-  })());
-
+  const recordEntry = $derived(
+    (() => {
+      if (activeTab !== 'tasks' && activeTab !== 'events') return null;
+      if (selectedKind !== recordKind || !selectedId) return null;
+      const list = recordKind === 'event' ? composition?.events : composition?.tasks;
+      return (Array.isArray(list) ? list : []).find((entry) => entry.id === selectedId) || null;
+    })()
+  );
 </script>
 
-<aside class="manager-inspector manager-environment-inspector" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Label', 'Environment inspector')}>
+<aside
+  class="manager-inspector manager-environment-inspector"
+  aria-label={text(
+    'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Label',
+    'Environment inspector'
+  )}
+>
   {#if activeTab === 'overview'}
     <EnvironmentSummaryInspector {environment} {composition} onUpdate={onUpdateEnvironment} />
   {:else if recordEntry}
-    <RecordInspector
-      kind={recordKind}
-      {environment}
-      entry={recordEntry}
-      onUpdateEnvironment={onUpdateEnvironment}
-    />
+    <RecordInspector kind={recordKind} {environment} entry={recordEntry} {onUpdateEnvironment} />
   {:else}
     <section class="manager-inspector-card" data-record-inspector-empty={recordKind}>
-      <p class="manager-kicker">{recordKind === 'event'
-        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEvents', 'No active events')
-        : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasks', 'No active tasks')}</p>
-      <p class="manager-muted">{recordKind === 'event'
-        ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEventsHint', 'Add or include events in this environment so they appear here.')
-        : text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint', 'Add or include tasks in this environment so they appear here.')}</p>
+      <p class="manager-kicker">
+        {recordKind === 'event'
+          ? text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEvents',
+              'No active events'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasks',
+              'No active tasks'
+            )}
+      </p>
+      <p class="manager-muted">
+        {recordKind === 'event'
+          ? text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveEventsHint',
+              'Add or include events in this environment so they appear here.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.NoActiveTasksHint',
+              'Add or include tasks in this environment so they appear here.'
+            )}
+      </p>
     </section>
   {/if}
 </aside>

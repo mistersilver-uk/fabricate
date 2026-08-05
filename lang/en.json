@@ -377,6 +377,10 @@
         "Label": "Active station tool",
         "Named": "Station tool: {label}"
       },
+      "RollPrompt": {
+        "CheckModifier": "Check modifier",
+        "UnnamedModifier": "Unnamed modifier"
+      },
       "Nav": {
         "Crafting": "Crafting",
         "Alchemy": "Alchemy",
@@ -635,24 +639,58 @@
           "FormulaUnresolved": "This check can't be resolved to a number for the selected character."
         },
         "Io": {
-          "Ingredients": "Ingredients",
           "Essences": "Essences",
           "Tools": "Tools",
           "Output": "Produces",
           "Have": "Have",
           "Need": "Need",
           "Missing": "Missing",
-          "HaveOfNeed": "{have} of {need} in inventory",
           "Available": "Available",
           "Unavailable": "Unavailable",
           "AlternativesTitle": "Alternatives",
           "AlternativesHint": "Choose which component this craft will consume.",
-          "AlternativesBadge": "{count} alternatives",
           "ChooseStackTitle": "Which {name} to use",
           "ChooseOption": "Choose {name}",
           "OptionSelected": "Selected",
           "CurrencyCost": "{amount} {unit}",
           "CurrencyUnaffordable": "Not enough {unit}"
+        },
+        "Slots": {
+          "Title": "Requirements",
+          "Hint": "Choose what this craft will use for each requirement.",
+          "ReadOnly": "This isn't the step being crafted, so its requirements can't be changed yet.",
+          "PickForMe": "Pick for me",
+          "PickForMeHint": "Choose components for every requirement you haven't set yourself.",
+          "PickedForYou": "Picked components for the requirements you hadn't chosen.",
+          "NowShowing": "Now showing the choices for {name}.",
+          "TileMet": "{name} is ready with {have} of {need}.",
+          "TilePartial": "{name} has {have} of {need} so far.",
+          "TileShort": "{name} needs {need} and you have {have}.",
+          "OptionsOne": "{count} alternative",
+          "OptionsMany": "{count} alternatives",
+          "Change": "Change",
+          "EditPool": "Edit selection",
+          "AddItems": "Add items"
+        },
+        "Pool": {
+          "Title": "Essence pool",
+          "SharedTitle": "Essence pool shared by {count} requirements",
+          "AddComponents": "Add components to the pool",
+          "NoCarriers": "You have no components that carry these essences.",
+          "YourSelection": "Your selection",
+          "Owned": "You own {count}.",
+          "Contribution": "{amount} {name}",
+          "Meter": "{name} has {delivered} of {need} delivered.",
+          "Allocate": "Units of {name} to spend",
+          "AllocateLess": "Spend one less {name}",
+          "AllocateMore": "Spend one more {name}"
+        },
+        "ConsumptionPlan": {
+          "Title": "This craft will use",
+          "Empty": "This craft doesn't use any components.",
+          "Owned": "You own {count}.",
+          "StillToChoose": "Still to choose: {items}.",
+          "EssenceRequirement": "{name} essence"
         },
         "Shopping": {
           "Title": "Shopping list",
@@ -743,6 +781,10 @@
         "Redacted": {
           "Title": "Hidden recipe"
         },
+        "BlindSecret": {
+          "Badge": "GM only",
+          "Title": "Secret preview: this blind run will yield this task. The player cannot see it."
+        },
         "Fizzle": {
           "Title": "Failed alchemy attempt",
           "Failure": "The submitted ingredients matched no known recipe."
@@ -832,6 +874,7 @@
           "AutoResolve": "Resolves automatically when the world time advances.",
           "WaitingHint": "Waiting for enough world time to pass before the next step can be triggered.",
           "NeedsOwner": "You must own the source character (or ask your GM) to advance this run.",
+          "NoRun": "This run is no longer active — it may have been cancelled or removed.",
           "CancelCraft": "Cancel craft",
           "CancelConfirm": "Cancel this craft?",
           "CancelConfirmRefund": "The consumed ingredients and currency will be returned.",
@@ -995,6 +1038,7 @@
         "Loading": "Loading alchemy…",
         "Error": "Something went wrong loading the workbench",
         "NoActor": "Select a character to use the workbench",
+        "NoIngredients": "No ingredients selected.",
         "YourComponents": "Your components",
         "TapToPlace": "Tap or drag onto the bench",
         "SearchComponents": "Search components…",
@@ -1034,6 +1078,8 @@
           "TieredTier": "Brewed successfully — the check outcome selected the result.",
           "ProducedOnFailure": "The brew failed its check and yielded the failure result.",
           "DiscoveredOnFailure": "Learned {name} — the brew failed and yielded the failure result.",
+          "Brewing": "The mixture is set to work. Finish it from your Journal once enough time has passed.",
+          "DiscoveredBrewing": "Discovered {name}! The mixture is set to work — finish it from your Journal once enough time has passed.",
           "Fizzled": "The mixture fizzles — no reaction."
         },
         "Workbench": "Workbench",
@@ -1057,15 +1103,7 @@
     "Settings": {
       "Theme": {
         "Name": "Fabricate Theme",
-        "Hint": "Choose the colour theme for Fabricate's module UI.",
-        "Choices": {
-          "Fabricate": "Fabricate",
-          "Mythwright": "Mythwright",
-          "IronbloodForge": "Ironblood Forge",
-          "HearthHerb": "Hearth & Herb",
-          "StarglassArcana": "Starglass Arcana",
-          "FoundryNative": "Foundry Native"
-        }
+        "Hint": "Choose the colour theme for Fabricate's module UI."
       },
       "ExperimentalFeatures": {
         "Name": "Experimental Features",
@@ -1130,7 +1168,10 @@
       "SalvageSource": "Source",
       "SalvageRecovered": "Recovered",
       "SalvageConsumed": "Broken Down",
-      "SalvageTools": "Tools Broken"
+      "SalvageTools": "Tools Broken",
+      "TierStepUp": "Stepped up {steps} tier(s)",
+      "TierStepDown": "Stepped down {steps} tier(s)",
+      "TierStepTarget": "Stepped to a target tier"
     },
     "Knowledge": {
       "SystemNotFound": "Crafting system not found",
@@ -1139,6 +1180,7 @@
       "AlreadyLearned": "Recipe is already learned",
       "NoMatchingItem": "No matching recipe item available to learn",
       "LearnBudgetSpent": "This recipe item has no learning uses left.",
+      "LearnRequiresGm": "This book draws on a shared party budget, which only a GM can update. Ask your GM to record this learn.",
       "LearnedRecipe": "Learned recipe: {name}",
       "LearnedRecipes": "{actor} learned {count} recipes: {recipes}",
       "LearnedRecipesPartial": "{actor} learned {count} new recipes: {recipes}",
@@ -1150,6 +1192,22 @@
         "Success": "Reset crafting knowledge for {actor} ({count} recipe(s)).",
         "GMOnly": "Only a GM can reset crafting knowledge.",
         "NoActor": "No such actor to reset crafting knowledge for."
+      },
+      "Manage": {
+        "GMOnly": "Only a GM can manage recipe-item knowledge.",
+        "Unavailable": "Knowledge management is not available right now.",
+        "NoActor": "No such actor to manage knowledge for.",
+        "NoItem": "No such recipe item on this character.",
+        "NoDefinition": "No matching recipe item definition found.",
+        "NoLimitedUses": "This recipe item has unlimited uses, so there is nothing to expend.",
+        "AlreadySpent": "This copy is already spent, so there is no charge left to expend.",
+        "UseExpended": "Expended one use of {name}.",
+        "ExpendFailed": "Failed to expend a use of this recipe item.",
+        "Deleted": "Deleted {name}.",
+        "DeleteFailed": "Failed to delete the recipe item.",
+        "Erased": "Erased {count} learned recipe(s).",
+        "EraseFailed": "Failed to erase the learned recipe.",
+        "Failed": "The knowledge action could not be completed."
       }
     },
     "Admin": {
@@ -1161,6 +1219,7 @@
         "HeadlineNeedsAttention": "Import succeeded — {count} reference(s) need attention.",
         "HeadlineAllResolved": "Import succeeded — all references resolved.",
         "EmptyState": "Nothing needs your attention.",
+        "EmptyStateTitle": "Everything resolved",
         "HandledLine": "{count} reference(s) resolved automatically.",
         "Close": "Close",
         "Kind": {
@@ -1183,24 +1242,13 @@
           "tool": "Tool",
           "essence": "Essence",
           "recipe": "Recipe",
+          "recipeItem": "Book or scroll",
           "task": "Task",
           "event": "Event",
           "unknown": "Record"
         }
       },
-      "Actors": {
-        "Name": "Actor",
-        "None": "No actors available."
-      },
       "Actions": "Actions",
-      "Tabs": {
-        "Systems": "Systems",
-        "Items": "Components",
-        "Recipes": "Recipes",
-        "Environments": "Environments",
-        "Rules": "Rules",
-        "Graph": "Graph"
-      },
       "Manager": {
         "WindowTitle": "Crafting Systems",
         "GMOnly": "Only GMs can manage crafting systems.",
@@ -1564,6 +1612,7 @@
           "Rules": "Rules",
           "Graph": "Graph",
           "Access": "Access",
+          "Knowledge": "Knowledge",
           "SectionLabel": "GM management"
         },
         "Titlebar": {
@@ -1594,7 +1643,7 @@
           "Visibility": {
             "Global": "Global",
             "GlobalDesc": "Every player and character sees all recipes. Nothing is gated.",
-            "GlobalAlchemyDesc": "Every recipe a character brews is revealed to them. Brewing is never gated.",
+            "GlobalAlchemyDesc": "Discovery by brewing is the only way a recipe is revealed, so this needs \"Learn a recipe when its ingredients are matched\" (Checks → Crafting) left on. Brewing is never gated.",
             "Item": "Item",
             "ItemDesc": "A character must have the item in their pack. Only mode where limited use appears in the Books & Scrolls editor.",
             "ItemAlchemyDesc": "A recipe is revealed while a character holds its linked book or scroll. Brewing is never gated.",
@@ -1682,7 +1731,9 @@
           "StatusAll": "All statuses",
           "StatusFilterLabel": "Filter recipe items by status",
           "TypeAll": "All types",
-          "TypeBook": "Book",
+          "TypeIncomplete": "Incomplete",
+          "TypeRecipeBook": "{count} Recipe Book",
+          "TypeScroll": "Scroll",
           "TypeFilter": "Type",
           "TypeFilterLabel": "Filter recipe items by type",
           "Unlimited": "Unlimited",
@@ -1699,6 +1750,23 @@
           "LearnTotal": "{n} total",
           "LearnPerCopy": "{n} / copy",
           "LearnSubTotal": "Shared cap across all copies"
+        },
+        "BulkEdit": {
+          "SelectAll": "Select all",
+          "SelectRow": "Select {name} for bulk edit",
+          "SelectedCount": "{count} selected",
+          "SelectAllResults": "Select all {count} results",
+          "Clear": "Clear",
+          "PanelTitle": "Bulk edit",
+          "ClearSelection": "Clear selection",
+          "SelectedHint": "Stage changes below, then apply to all at once.",
+          "Unchanged": "Unchanged",
+          "CategoryUnchanged": "Leave unchanged",
+          "TagsHint": "click to add · again to remove · again to leave unchanged",
+          "StatusEnable": "Enable",
+          "StatusDisable": "Disable",
+          "Lock": "Lock",
+          "Unlock": "Unlock"
         },
         "Recipe": {
           "Kicker": "Recipes View",
@@ -2069,8 +2137,67 @@
           "CheckTier": "Check tier",
           "CheckTierDefault": "Default DC",
           "CheckTierUnnamed": "Unnamed tier",
+          "BulkEdit": {
+            "SelectedHeading": "{count} recipes selected",
+            "SelectedHeadingOne": "1 recipe selected",
+            "StatusHint": "Enabling is gated by the activation check, so a refused recipe is left switched off.",
+            "BlockedWarning": "At least {count} of {total} selected recipes can't be enabled yet and will stay off — applying reports the exact number.",
+            "BlockedWarningAll": "None of the {count} selected recipes can be enabled yet — they will all stay off.",
+            "BlockedWarningOne": "The selected recipe can't be enabled yet and will stay off.",
+            "CheckTierHint": "The DC these recipes roll against — not the check's outcome tiers.",
+            "CheckTierProgressive": "This system resolves progressively — difficulty lives on each result component, not on the recipe, so there is no recipe-level check tier to bulk edit.",
+            "CheckTierDynamic": "This system's crafting check resolves its DC dynamically at craft time, so recipes carry no tier to select.",
+            "CheckTierFixed": "This system's routed check uses fixed outcome tiers, so a recipe's difficulty comes from its minimum success tier rather than a check tier.",
+            "CheckTierUnrecognisedMode": "Fabricate doesn't recognise this system's resolution mode, so it can't tell which check tiers apply. Check the system's Crafting settings.",
+            "CheckTierNoTiers": "This system's crafting check authors no tiers, so every recipe uses its default DC. Add tiers under Checks to assign them here.",
+            "Books": "Books & scrolls",
+            "NoBooks": "This system defines no books or scrolls.",
+            "BooksHint": "Pick one, then add it where missing or remove it where present",
+            "BooksStagedHint": "{count} changes staged",
+            "BooksStagedHintOne": "1 change staged",
+            "BookPick": "Pick a book or scroll",
+            "BookSearch": "Search {count} books & scrolls…",
+            "BookSearchOne": "Search 1 book or scroll…",
+            "BookNoMatch": "No book or scroll by that name.",
+            "BookKindBook": "Recipe book",
+            "BookKindScroll": "Scroll",
+            "BookKindItem": "Recipe item",
+            "BookMeta": "{kind} · {holds}",
+            "BookHoldsNone": "holds none of the {total} selected",
+            "BookHoldsAll": "holds all {total} selected",
+            "BookHoldsSome": "holds {count} of {total} selected",
+            "BookClearPick": "Clear the picked book or scroll",
+            "BookOpAdd": "Add",
+            "BookOpRemove": "Remove",
+            "BookAdd": "Add {count}",
+            "BookAddAction": "Add {count} — add {book} to every selected recipe that is missing it.",
+            "BookAddNone": "Add — every selected recipe already has {book}.",
+            "BookRemove": "Remove {count}",
+            "BookRemoveAction": "Remove {count} — remove {book} from every selected recipe that has it.",
+            "BookRemoveNone": "Remove — no selected recipe has {book}.",
+            "BookStagedRecipes": "{count} recipes",
+            "BookStagedRecipesOne": "1 recipe",
+            "BookStagedNoChange": "no change",
+            "BookUnstage": "{book} — leave this book unchanged.",
+            "Apply": "Apply to {count} recipes",
+            "ApplyOne": "Apply to 1 recipe",
+            "Applied": "Applied bulk changes to {count} recipes.",
+            "AppliedOne": "Applied bulk changes to 1 recipe.",
+            "AppliedNone": "No recipes needed changing.",
+            "AppliedBlocked": "{count} recipes couldn't be enabled yet.",
+            "AppliedBlockedOne": "1 recipe couldn't be enabled yet.",
+            "AppliedRejected": "{count} recipes couldn't be saved — see the console.",
+            "AppliedRejectedOne": "1 recipe couldn't be saved — see the console.",
+            "AppliedBooksBoth": "Books & scrolls updated — {added} and {removed}.",
+            "AppliedBooksAdded": "Books & scrolls updated — {added}.",
+            "AppliedBooksRemoved": "Books & scrolls updated — {removed}.",
+            "AppliedBookAdditions": "{count} additions",
+            "AppliedBookAdditionsOne": "1 addition",
+            "AppliedBookRemovals": "{count} removals",
+            "AppliedBookRemovalsOne": "1 removal"
+          },
           "MinSuccessTier": "Minimum success tier",
-          "MinSuccessTierNone": "No override (use rolled tier)",
+          "MinSuccessTierNone": "No override (use final tier)",
           "MinSuccessTierHint": "Fail the craft outright when the roll lands below this tier.",
           "CraftingModifier": "Check modifiers",
           "CraftingModifierInherit": "Inherit system default",
@@ -2129,14 +2256,6 @@
           "DiscardDirtyConfirm": "Discard changes",
           "DiscardDirtyCancel": "Keep editing",
           "SaveFailed": "Save failed. Check for duplicate or blank names and try again.",
-          "Visibility": {
-            "Title": "Visibility",
-            "RestrictToggle": "Restrict visibility to specific users",
-            "RestrictHint": "Restrict this recipe to specific players. When off, every player can see it.",
-            "AllowedUsers": "Allowed users",
-            "NoWorldUsers": "No non-GM players exist in this world yet.",
-            "NoUsersSelected": "Restricted with no users selected — no player can see this recipe."
-          },
           "EmptySetup": {
             "Kicker": "Recipe setup",
             "Title": "Set up recipes",
@@ -2211,9 +2330,6 @@
           "EmptyHint": "Drop Foundry items into this page to add components to the selected system.",
           "EmptySearchTitle": "No components match your filters.",
           "EmptySearchHint": "Clear search and filters to show all components in this system.",
-          "Column": {
-            "Component": "Component"
-          },
           "Source": "Source",
           "NoTags": "No tags",
           "NoEssences": "No essences",
@@ -2363,6 +2479,33 @@
             "Hint": "Set how much of each essence this component contributes.",
             "NoEssences": "No essences are defined for this system yet."
           },
+          "BulkEdit": {
+            "SelectedHeading": "{count} components selected",
+            "SelectedHeadingOne": "1 component selected",
+            "Category": "Category",
+            "Tags": "Tags",
+            "TagStateAdd": "{tag} — add to every selected component.",
+            "TagStateRemove": "{tag} — remove from every selected component.",
+            "TagStateNone": "{tag} — leave unchanged.",
+            "NoTags": "This system defines no item tags.",
+            "Essences": "Essences",
+            "EssencesOverwriteHint": "Applying essences overwrites the essence values on every selected component.",
+            "EssencesOverwriteWarning": "This will change or remove authored essence values on {count} of the selected components.",
+            "EssencesStagedChip": "Will overwrite",
+            "EssencesStagedChipAction": "Will overwrite — essences will be overwritten on every selected component. Activate to leave them unchanged.",
+            "EssencesUnstagedChipAction": "Unchanged — essences are left unchanged. Activate to overwrite them on every selected component.",
+            "ProgressiveDc": "Progressive DC",
+            "ProgressiveDcHint": "DC when used as a progressive result",
+            "ProgressiveDcSentence": "Set every selected component to",
+            "ProgressiveDcStagedChip": "Will set",
+            "ProgressiveDcStagedChipAction": "Will set — the progressive DC will be set on every selected component. Activate to leave it unchanged.",
+            "ProgressiveDcUnstagedChipAction": "Unchanged — the progressive DC is left unchanged. Activate to set it on every selected component.",
+            "Apply": "Apply to {count} components",
+            "ApplyOne": "Apply to 1 component",
+            "Applied": "Applied bulk changes to {count} components.",
+            "AppliedOne": "Applied bulk changes to 1 component.",
+            "AppliedNone": "No components needed changing."
+          },
           "Back": "Back",
           "SourceActions": "Source actions",
           "Category": {
@@ -2395,7 +2538,6 @@
           "Filters": "Tags and categories filters",
           "SearchPlaceholder": "Search tags and categories...",
           "SearchLabel": "Search tags and categories",
-          "Workspace": "Tags and categories workspace",
           "Categories": "Recipe categories",
           "CategoriesHint": "General is always available. Add custom categories for recipes that need clearer grouping — categories are flat, and each recipe picks exactly one.",
           "CategoryName": "Category name",
@@ -2407,7 +2549,7 @@
           "ComponentCategoryPlaceholder": "e.g. Reagent",
           "AddComponentCategory": "Add component category",
           "CustomComponentCategoryCount": "{count} component categories",
-          "OnlyGeneralComponent": "No component categories yet",
+          "OnlyGeneralComponent": "Only General so far",
           "OnlyGeneralComponentHint": "Every component falls under General until you add one. Group your component directory by adding a category above.",
           "NoComponentCategoryMatches": "No matches for \"{query}\".",
           "RemoveComponentCategory": "Remove component category",
@@ -2432,7 +2574,8 @@
           "UsageCount": "{count} references",
           "UsageCountSingular": "1 reference",
           "EntriesCount": "{count} entries",
-          "OnlyGeneral": "No recipe categories yet",
+          "EntriesCountSingular": "1 entry",
+          "OnlyGeneral": "Only General so far",
           "OnlyGeneralHint": "Every recipe falls under General until you add one. Group recipes that need clearer organisation by adding a category above.",
           "NoCategoryMatches": "No matches for \"{query}\".",
           "NoTags": "No component tags yet",
@@ -2543,6 +2686,15 @@
           "DefaultIconLabel": "Default essence icon",
           "IconLabel": "Selected icon",
           "IconClassHint": "Current icon: {icon}",
+          "Colour": {
+            "Label": "Colour",
+            "Change": "Change essence colour",
+            "Presets": "Essence colour presets",
+            "Clear": "Clear colour",
+            "None": "No colour",
+            "Authored": "This essence renders in its own colour.",
+            "Unset": "This essence renders in the theme accent."
+          },
           "Description": "Description",
           "DescriptionPlaceholder": "Description",
           "Source": "Source",
@@ -2916,6 +3068,7 @@
             "BackToLibrary": "Back to event library",
             "Save": "Save event",
             "Dirty": "Unsaved",
+            "SaveFailed": "Save failed. Try again.",
             "DiscardChangesPrompt": "The current event has unsaved changes. Save them and continue, or discard them?",
             "CompositionLossWarning": {
               "Title": "This event will leave some environments",
@@ -4116,7 +4269,6 @@
             "Label": "Checks context menu"
           },
           "Quickstart": "Quickstart",
-          "Resources": "Check resources",
           "Configuration": "Configuration",
           "PageKicker": "One per system",
           "Dirty": "Unsaved",
@@ -4158,16 +4310,17 @@
             "ModifierPolicyHeading": "Default combination",
             "ModifierPolicyAddAll": "Add all",
             "ModifierPolicyAddAllDesc": "Sum every eligible modifier into the crafting-check roll.",
-            "ModifierPolicyHighest": "Pick highest",
+            "ModifierPolicyHighest": "Highest",
             "ModifierPolicyHighestDesc": "Use only the single largest eligible modifier (a deterministic maximum).",
             "ModifierPolicyByRecipe": "By recipe",
             "ModifierPolicyByRecipeDesc": "Each recipe chooses its own modifier set; the chosen set is summed.",
+            "ModifierPolicyPlayerPicks": "Player picks",
+            "ModifierPolicyPlayerPicksDesc": "On an interactive craft whose formula uses @craftingmod, the player picks one eligible modifier at roll time (highest pre-selected); other crafts use the highest.",
             "ModifierDefaultsHeading": "Default modifiers",
             "ModifierDefaultsIntro": "Which modifiers apply by default. A recipe can override this set on its Overview tab.",
             "ModifierDefaultsAdd": "Add default modifier",
             "ModifierDefaultsAllSelected": "All modifiers are on by default.",
             "ModifierDefaultsNone": "No modifiers on by default.",
-            "HelpKicker": "Crafting checks",
             "HelpTitle": "About crafting checks",
             "HelpDesc": "The crafting check is shaped by the system resolution mode: simple authors a pass/fail check, routed authors outcome tiers, and progressive requires a check. Alchemy is driven by its check mode — none has no check, simple authors a mandatory pass/fail check, and tiered authors a mandatory routed check.",
             "Docs": "Docs",
@@ -4176,9 +4329,6 @@
             "TypeRelativeDesc": "Tier thresholds are relative to the recipe DC, e.g. DC -5 or DC +10.",
             "TypeFixed": "Fixed",
             "TypeFixedDesc": "Each tier owns a non-overlapping segment of the roll value range. Recipes do not have a DC in this mode.",
-            "NatSteppingTitle": "Natural tier stepping",
-            "NatSteppingHint": "A natural 20 steps the matched tier up once; a natural 1 steps it down once.",
-            "NatSteppingToggle": "Enable natural tier stepping",
             "ExpressionTitle": "Roll expression",
             "ExpressionLabel": "Expression",
             "DiceGroups": "Dice groups",
@@ -4251,7 +4401,6 @@
             "PageLead": "A system has a single salvage check. Its shape is determined by the system's salvage resolution mode and preserved when you switch modes.",
             "ConfigHint": "Roll, difficulty, and outcome settings for the salvage check will appear here.",
             "ProgressiveLead": "Progressive salvage spends the check value against each salvage result's difficulty, in order. The award mode decides how that spend stops.",
-            "HelpKicker": "Salvage checks",
             "HelpTitle": "About salvage checks",
             "HelpDesc": "The salvage check is shaped by the salvage resolution mode. Simple mode makes it optional; routed and progressive modes require it.",
             "Docs": "Salvage docs"
@@ -4263,7 +4412,6 @@
             "D100Title": "Fixed d100 roll",
             "D100Lead": "In d100 mode the gathering check is a fixed d100 roll against each drop's chance. There is nothing to configure here.",
             "D100Hint": "Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.",
-            "HelpKicker": "Gathering checks",
             "HelpTitle": "About gathering checks",
             "HelpDesc": "The gathering check is shaped by the gathering resolution mode. In d100 mode it is the fixed d100 roll; progressive and routed modes let you define it.",
             "Docs": "Gathering docs"
@@ -4287,11 +4435,14 @@
             "CheckHasSuccessOutcome": "At least one outcome is a Success",
             "CheckRangesValid": "Every tier range is valid",
             "CheckRangesNoOverlap": "No tier ranges overlap",
+            "CheckTierStepTargetsResolve": "Tier-step targets name exactly one existing tier",
             "IssueNoRollFormula": "This check has no roll formula; it will not resolve until one is set.",
             "IssueUnnamedOutcome": "Name every outcome tier — an unnamed tier cannot be routed to a result group.",
             "IssueNoSuccessOutcome": "No outcome tier is marked as a Success — successful crafts can't route to a result set. Mark at least one tier as Success.",
             "IssueRangeInvalid": "Some tiers have a start greater than their end.",
-            "IssueRangeOverlap": "Some tier ranges overlap. Each value range must be unique."
+            "IssueRangeOverlap": "Some tier ranges overlap. Each value range must be unique.",
+            "IssueDanglingTierStepTarget": "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
+            "IssueMultipleTierStepTargets": "Two or more triggers set a target tier; if more than one matches, the lowest-ranked wins."
           },
           "Breakage": {
             "Title": "Check triggers",
@@ -4321,7 +4472,19 @@
             "OutcomeForceFailure": "Automatic failure",
             "Tiers": "Outcome tiers",
             "NoTiers": "Add named outcome tiers to target them.",
-            "UnnamedTier": "Unnamed tier"
+            "UnnamedTier": "Unnamed tier",
+            "TierStep": "Tier step",
+            "TierStepMode": "Tier step mode",
+            "TierStepModeNone": "No step",
+            "TierStepModeUp": "Step up",
+            "TierStepModeDown": "Step down",
+            "TierStepModeTarget": "Target tier",
+            "TierStepStepsUp": "Steps up",
+            "TierStepStepsDown": "Steps down",
+            "TierStepTier": "Tier",
+            "TierStepChoose": "Choose a tier…",
+            "TierStepMissingTier": "Missing tier",
+            "TierStepNoTiers": "Add named outcome tiers to step to one."
           }
         },
         "Access": {
@@ -4353,6 +4516,82 @@
           "ToggleNamed": "Toggle access for {name}",
           "RolePlayer": "Player"
         },
+        "Knowledge": {
+          "Actions": "Knowledge actions",
+          "Delete": "Delete",
+          "DeleteArmedLabel": "Confirm deleting {name}. This removes the whole document and cannot be undone.",
+          "DeleteConfirm": "Confirm?",
+          "DeleteLabel": "Delete {name} from this character",
+          "DeleteStackContent": "This copy is a stack of {quantity}. Deleting removes every unit, because uses and learns are tracked per document.",
+          "DeleteStackTitle": "Delete the whole stack?",
+          "DetailLabel": "Character knowledge",
+          "Erase": "Erase memory",
+          "EraseArmedLabel": "Confirm erasing {name}. The recipe is forgotten and cannot be undone.",
+          "EraseConfirm": "Confirm?",
+          "EraseLabel": "Erase {name} from this character's memory",
+          "Expend": "Expend use",
+          "ExpendLabel": "Spend one use of {name}",
+          "ExpendSpent": "This copy is already spent.",
+          "ExpendUncapped": "This copy has unlimited uses, so there is nothing to spend.",
+          "FactItems": "Recipe items",
+          "FactLearned": "Learned recipes",
+          "FactOrphans": "Orphaned entries",
+          "FactOtherSystems": "Other systems",
+          "NoRefundNoSource": "no source copy to refund",
+          "NoRefundNotOwned": "no owned copy to refund",
+          "NoRefundUncapped": "no learn limit to refund",
+          "Inert": "Inert",
+          "ItemsEmptyHint": "This character carries none of this system's recipe items.",
+          "ItemsEmptyTitle": "No owned copies",
+          "LearnedBanner": "Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.",
+          "LearnedByCrafting": "Learned by crafting",
+          "LearnedEmptyHint": "This character has not learned any recipe in this crafting system.",
+          "LearnedEmptyTitle": "Nothing learned yet",
+          "LearnedFrom": "Learned from {source}",
+          "LearnedRowActions": "Learned recipe actions",
+          "MatchCompendium": "Compendium match",
+          "MatchDuplicate": "Copy-source match",
+          "MatchDuplicateHint": "This copy is linked to its recipe item only by duplicate-source provenance, the weakest tier. Bulk auto-learn refuses that link.",
+          "MatchIdentity": "Durable match",
+          "MatchTierTitle": "Definition link: {tier}",
+          "MatchUuid": "Source match",
+          "NoSelectionHint": "Pick a player character to review the recipe items they carry and the recipes they have learned.",
+          "NoSelectionTitle": "Select a character",
+          "NothingTracked": "Nothing tracked",
+          "PartyPoolWarning": "This character holds a party-pool copy. Erase the memory before deleting the copy — deleting the copy first strands its party-pool slot permanently.",
+          "Quantity": "×{quantity}",
+          "RecipeItemsBanner": "Expending a use spends one charge as if the character read the item. Deleting removes the copy from their pack entirely.",
+          "ResetActions": "Knowledge reset actions",
+          "ResetAll": "Reset all systems",
+          "ResetAllContent": "Clear every recipe this character has learned across all crafting systems, including entries whose recipe no longer exists.",
+          "ResetAllTitle": "Reset every system?",
+          "ResetDiscoveryNote": "Erasing a single memory leaves discovery progress intact; a reset also clears it.",
+          "ResetSystem": "Reset this system",
+          "ResetSystemContent": "Clear every recipe this character has learned in the selected crafting system.",
+          "ResetSystemTitle": "Reset this system?",
+          "RosterEmptyHint": "Assign a player character in this world to audit its recipe knowledge.",
+          "RosterEmptyTitle": "No player characters",
+          "RosterLabel": "Characters",
+          "RosterMeta": "{items} item(s) · {learned} learned",
+          "RosterNoMatchHint": "Clear the search to show every player character.",
+          "RosterNoMatchTitle": "No characters match this search",
+          "RowActions": "Copy actions",
+          "SearchLabel": "Search characters",
+          "SearchPlaceholder": "Search characters...",
+          "Subtitle": "Audit and correct what each character carries and has learned in the selected crafting system.",
+          "Tabs": {
+            "Label": "Knowledge sections",
+            "LearnedRecipes": "Learned recipes",
+            "RecipeItems": "Recipe items"
+          },
+          "Title": "Knowledge",
+          "TypeIncomplete": "Incomplete",
+          "TypeRecipeBook": "{count} Recipe Book",
+          "TypeScroll": "Scroll",
+          "UsesRemaining": "{used} of {max} uses spent",
+          "UsesSpent": "Spent",
+          "UsesUnlimited": "Unlimited"
+        },
         "CraftingEffect": {
           "AccessSubTab": "Player & character access",
           "BooksScrollsSubTab": "Books & Scrolls",
@@ -4375,7 +4614,10 @@
             "Uncategorized": "General"
           },
           "Delete": "Delete recipe item",
+          "DeleteContent": "Delete this recipe item? Recipes linked to it will be unlinked.",
+          "DeleteTitle": "Delete recipe item?",
           "Dirty": "Unsaved",
+          "DiscardDirtyContent": "The current recipe item has unsaved changes. Save them and continue, or discard them?",
           "EditBreadcrumb": "Edit recipe item",
           "EditMissingHint": "Pick a recipe item from Books & Scrolls to open its editor.",
           "EditSubtitle": "Link a world item and recipes, then set its use and learn caps.",
@@ -4494,6 +4736,7 @@
             "UnlimitedUses": "Unlimited uses"
           },
           "Save": "Save recipe item",
+          "SaveFailed": "Save failed. Try again.",
           "SelectItem": "Select a recipe item",
           "Tabs": {
             "Label": "Recipe item editor sections",
@@ -4520,14 +4763,6 @@
             "LearnsValid": "Learning limit is valid"
           }
         }
-      },
-      "Sidebar": {
-        "Title": "Crafting Systems",
-        "CreateSystem": "Create System",
-        "DeleteSystem": "Delete",
-        "ExportSystem": "Export System",
-        "ImportSystem": "Import System",
-        "Empty": "No systems created."
       },
       "SystemSettings": {
         "Title": "Crafting System",
@@ -4577,7 +4812,7 @@
           "BehaviourHeading": "Alchemy behaviour",
           "BehaviourIntro": "How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.",
           "LearnOnCraft": "Learn a recipe when its ingredients are matched",
-          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. Off by default.",
+          "LearnOnCraftDesc": "A matched brew records the recipe as discovered for that player, whether the check passes or fails. On by default, and the only source of discovery under Global visibility.",
           "ConsumeOnFail": "Consume ingredients on a failed brew",
           "ConsumeOnFailDesc": "A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.",
           "ShowAttemptHistory": "Show attempt history to players",
@@ -4586,20 +4821,6 @@
       },
       "Features": {
         "Enable": "Enable",
-        "Categories": {
-          "Title": "Recipe Categories",
-          "Hint": "Organize and filter recipes by category in admin and crafting views.",
-          "Placeholder": "e.g. Cooking",
-          "Add": "Add",
-          "Empty": "No custom categories defined yet."
-        },
-        "ItemTags": {
-          "Title": "Item Tags",
-          "Hint": "Use tags for categorization, sorting, and search in components.",
-          "Placeholder": "e.g. armour:leather",
-          "Add": "Add",
-          "Empty": "No item tags defined yet."
-        },
         "Essences": {
           "Title": "Essences",
           "Hint": "Define essence types with descriptions and optional source items.",
@@ -4627,82 +4848,6 @@
           "Save": "Save Essence",
           "Cancel": "Cancel Editing",
           "Remove": "Remove Essence"
-        },
-        "MultiStepRecipes": {
-          "Title": "Multi-Step Recipes",
-          "Hint": "Allow recipes to define explicit ordered steps with per-step ingredient/result and time requirements."
-        },
-        "Gathering": {
-          "Title": "Gathering",
-          "Hint": "Enable gathering environments and task configuration for this crafting system."
-        },
-        "TimeRequirements": {
-          "Title": "Time Requirements",
-          "Hint": "Allow step-level crafting durations using minutes, hours, days, months, and years."
-        },
-        "CurrencyRequirements": {
-          "Title": "Currency Requirements",
-          "Hint": "Configure this system's currencies and how they are spent, via system adapter or macros.",
-          "MacroProvider": "Macro provider",
-          "SystemAdapter": "System adapter",
-          "SelectAdapter": "Select adapter",
-          "CheckMacro": "Check currency macro",
-          "DecrementMacro": "Decrement currency macro",
-          "FormatMacro": "Format currency macro",
-          "SaveConfig": "Save Currency Config"
-        },
-        "PropertyMacros": {
-          "Title": "Property Calculation Macros",
-          "Hint": "Use macros to compute result property updates from crafting context."
-        },
-        "CraftingChecks": {
-          "Title": "Crafting Checks",
-          "Hint": "Choose a system-level check macro that returns pass/fail or named outcomes. Leave the macro blank to disable crafting checks.",
-          "PassFail": "Pass / Fail",
-          "NamedOutcomes": "Named Outcomes",
-          "NoCheckMacro": "No check macro",
-          "OutcomesPlaceholder": "Outcomes (comma separated)",
-          "SaveConfig": "Save Check Config"
-        },
-        "OutcomeRouting": {
-          "Title": "Outcome Routing",
-          "Hint": "Map crafting-check outcomes to specific result groups when complex recipes are enabled."
-        },
-        "EffectTransfer": {
-          "Title": "Effect Transfer",
-          "Hint": "Transfer active effects from consumed ingredients to crafted result items."
-        },
-        "RecipeVisibility": {
-          "Title": "Recipe Visibility",
-          "Hint": "Control which players can see recipes.",
-          "Global": "Global (all recipes visible to all)",
-          "PlayerSpecific": "Player-specific (per-recipe restrictions)",
-          "KnowledgeBased": "Knowledge-based (item or learning)",
-          "SaveConfig": "Save Visibility Config",
-          "PlayerNote": "Per-recipe visibility restrictions can be configured in each recipe's editor. Restricted recipes are hidden from all players by default unless specific users are allowed.",
-          "KnowledgeByItem": "By item (must have recipe item)",
-          "KnowledgeByLearning": "By learning (must have learnt recipe)",
-          "KnowledgeByEither": "Item or learning (either method)",
-          "ItemLimitUses": "Limited uses of recipe items",
-          "ItemMaxUses": "Maximum uses",
-          "ItemDestroyWhenExhausted": "Delete when exhausted",
-          "ConsumeOnLearn": "Consume item on learn",
-          "DragDropEnabled": "Learn recipes from actor item drops",
-          "MaxUsesDecrease": "Decrease maximum uses",
-          "MaxUsesIncrease": "Increase maximum uses",
-          "LearnLimitRecipes": "Limited recipes learned per item",
-          "LearnLimitRecipesToggle": "Enabled",
-          "LearnLimitRecipesHint": "Cap how many recipes a player can learn from one recipe item.",
-          "MaxRecipes": "Maximum recipes",
-          "MaxRecipesDecrease": "Decrease maximum recipes",
-          "MaxRecipesIncrease": "Increase maximum recipes",
-          "DestroyWhenSpent": "Delete when spent",
-          "ListModeLabel": "List mode",
-          "ListModeHint": "How recipes are exposed to players.",
-          "KnowledgeModeHint": "How players gain access to a recipe.",
-          "ItemLimitUsesHint": "Cap how many times a recipe item grants access.",
-          "ConsumeOnLearnHint": "Delete the recipe item when a player learns it.",
-          "DragDropEnabledHint": "Dropping the item on an actor learns the recipe."
         }
       },
       "Items": {
@@ -4789,35 +4934,6 @@
           "ComponentNotFound": "Component not found.",
           "SaveFailed": "Failed to save component."
         }
-      },
-      "Recipes": {
-        "SearchPlaceholder": "Search recipes...",
-        "NewRecipe": "New Recipe",
-        "Import": "Import",
-        "Export": "Export",
-        "NoRecipes": "No Recipes Yet",
-        "NoRecipesHint": "Create recipes for the selected crafting system.",
-        "CreateRecipe": "Create Recipe",
-        "ColRecipe": "Recipe",
-        "ColLocked": "Locked",
-        "ColVisibility": "Visibility",
-        "ColCategory": "Category",
-        "ColType": "Type",
-        "ColComponents": "Components",
-        "ColEnabled": "Enabled",
-        "ColActions": "Actions",
-        "Disabled": "Disabled",
-        "LockedYes": "Yes",
-        "LockedNo": "No",
-        "Simple": "Simple",
-        "Advanced": "Advanced",
-        "Ingredient": "ingredient",
-        "Ingredients": "ingredients",
-        "Tool": "tool",
-        "Tools": "tools",
-        "Edit": "Edit",
-        "Duplicate": "Duplicate",
-        "Delete": "Delete"
       },
       "Environments": {
         "Title": "Gathering Environments",
@@ -4980,36 +5096,10 @@
         "DeleteResultNamed": "Delete result {name}",
         "Yes": "Yes",
         "No": "No"
-      },
-      "Rules": {
-        "Title": "Global Rules"
       }
     },
     "DropZone": {
       "DefaultLabel": "Drop items here"
-    },
-    "Import": {
-      "Title": "Import Crafting System",
-      "SummaryTitle": "Import Summary",
-      "SystemCreated": "Crafting system “{name}” created.",
-      "SystemUpdated": "Crafting system “{name}” updated.",
-      "SystemSkipped": "Crafting system “{name}” skipped (already exists).",
-      "ComponentsRemapped": "{count} component(s) remapped to world items.",
-      "ComponentsUnresolved": "{count} component(s) have unresolved source items.",
-      "RecipesImported": "{imported} of {total} recipe(s) imported.",
-      "RecipesSkipped": "{count} recipe(s) skipped (already exist).",
-      "CollisionsDetected": "{count} collision(s) detected.",
-      "DropPackJson": "Drop a pack JSON file or paste pack data",
-      "Overwrite": "Overwrite existing data",
-      "RetainFallbacks": "Retain existing fallback IDs"
-    },
-    "Error": {
-      "NoRecipe": "Recipe not found",
-      "NoActor": "No actor selected",
-      "MissingIngredients": "Missing required ingredients",
-      "MissingTools": "Missing required tools",
-      "InvalidRecipe": "Invalid recipe configuration",
-      "CraftingFailed": "Crafting failed"
     },
     "Alchemy": {
       "Title": "Alchemy",
@@ -5033,12 +5123,7 @@
       "AutoFillComplete": "Workbench populated from recipe",
       "ComponentsNotFound": "Could not find any of the workbench components in your inventory",
       "ComponentsMissing": "Some components could not be found: {names}",
-      "Palette": {
-        "NoComponents": "No components available",
-        "Available": "available",
-        "SearchPlaceholder": "Search components…",
-        "OwnedOnly": "Owned only"
-      }
+      "FailureResult": "The brew failed."
     },
     "Gathering": {
       "Title": "Gathering",
@@ -5093,77 +5178,6 @@
       "BlindTaskLabel": "Gather",
       "FailureDefault": "Gathering produced no results.",
       "ErrorTitle": "Could Not Load Gathering",
-      "ActiveRuns": {
-        "Title": "Active Gathering",
-        "AvailableAt": "Available at world time {time}"
-      },
-      "Feedback": {
-        "Title": "Last Attempt",
-        "Succeeded": "Gathering succeeded.",
-        "Failed": "Gathering attempt failed.",
-        "WaitingTime": "Gathering started.",
-        "Cancelled": "Gathering was cancelled.",
-        "Blocked": "Gathering is currently blocked."
-      },
-      "History": {
-        "Title": "Recent History",
-        "SucceededSummary": "{results} results, {tools} tools used",
-        "CharacterModifiers": {
-          "Title": "Character Modifiers",
-          "RowsHeading": "Drop rows",
-          "EventsHeading": "Events",
-          "RowEmpty": "No character modifier contributions.",
-          "UnknownModifier": "Unknown modifier",
-          "RedactedSummary": "modifiers contributed {positive} / {negative}"
-        }
-      },
-      "Status": {
-        "waitingTime": "Waiting",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "cancelled": "Cancelled",
-        "unknown": "Unknown"
-      },
-      "Tabs": {
-        "Environments": "Environments",
-        "Log": "Gathering Log"
-      },
-      "Pagination": {
-        "Environments": "Environment pages",
-        "ShowingEnvironments": "Showing {start}-{end} of {total} environments",
-        "PreviousPage": "Previous environment page",
-        "NextPage": "Next environment page"
-      },
-      "Availability": {
-        "All": "All availability",
-        "Available": "Available",
-        "Blocked": "Blocked",
-        "Empty": "No tasks"
-      },
-      "Condition": {
-        "Time": "Time",
-        "Weather": "Weather",
-        "Visibility": "Visibility"
-      },
-      "Empty": {
-        "NoSelectableActorsTitle": "No Selectable Actors",
-        "NoSelectableActorsHint": "Ask the GM to grant ownership of an actor before gathering.",
-        "NoEnvironments": "No gathering environments are available.",
-        "NoFilteredEnvironments": "No environments match these filters.",
-        "SelectEnvironmentForTasks": "Select an environment to view its gathering tasks.",
-        "SelectEnvironmentForDetails": "Select an environment to view its details.",
-        "NoTasks": "No gathering tasks are available.",
-        "NoActiveRuns": "No active gathering runs.",
-        "NoHistory": "No gathering history yet."
-      },
-      "Notifications": {
-        "Started": "Gathering started.",
-        "Succeeded": "Gathering succeeded.",
-        "Failed": "Gathering attempt failed.",
-        "Blocked": "Gathering is currently blocked.",
-        "RefreshFailed": "Could not refresh gathering options.",
-        "StartFailed": "Could not start gathering."
-      },
       "Blocked": {
         "NoSelectableActors": "You do not have an actor available for gathering.",
         "InvalidRememberedActor": "The remembered gathering actor is no longer available.",
@@ -5196,46 +5210,12 @@
       },
       "Realm": {
         "UndiscoveredPlaceholder": "Undiscovered realm"
-      },
-      "Travel": {
-        "Guidance": {
-          "NoCurrentRealm": "Not available while no party realm set.",
-          "Excluded": "Not available in the party's current realm.",
-          "Travel": "Travel to a realm where this is available.",
-          "KnownDestinations": "Travel to: {names}.",
-          "UndiscoveredDestinations": "Available in {count} undiscovered realm(s)."
-        }
-      },
-      "Risk": {
-        "safe": "Safe",
-        "hazardous": "Hazardous",
-        "dangerous": "Dangerous",
-        "deadly": "Deadly",
-        "unsafe": "Unsafe",
-        "extreme": "Extreme"
-      },
-      "Diagnostics": {
-        "MissingCharacterModifier": "Character modifier \"{id}\" is not defined in this system's library.",
-        "MacroOverrideMissingUuid": "A row override using the macro provider is missing a macro UUID.",
-        "CharacterModifierBoundsInvalid": "A row character modifier has min > max.",
-        "CharacterModifierNonFinite": "A character modifier expression did not resolve to a finite number."
       }
     },
     "Labels": {
       "UnknownComponent": "Unknown Component",
       "UnknownTool": "Unknown Tool",
       "UnknownItem": "Unknown Item"
-    },
-    "Graph": {
-      "EdgeNormal": "Produces input for",
-      "EdgeCycle": "Cyclic dependency",
-      "NoRecipes": "No recipes in this system",
-      "NoConnections": "No recipe connections found",
-      "NodeCount": "{count} recipes",
-      "EdgeCount": "{count} connections",
-      "SearchPlaceholder": "Search recipes...",
-      "AllCategories": "All Categories",
-      "ResetView": "Reset View"
     },
     "Tool": {
       "BrokenNameSuffix": " (broken)"

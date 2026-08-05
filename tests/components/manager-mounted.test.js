@@ -14,6 +14,10 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from 'svelte';
+import {
+  TOOL_DISPLAY_PRECEDENCE_CASES,
+  TOOL_PRECEDENCE_MANAGED_ITEMS,
+} from '../helpers/toolDisplayPrecedenceCases.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
@@ -34,6 +38,10 @@ const sharedComponentNames = [
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
   'Stepper',
+  // The manager's ONE selection control (issue 772). `ChecklistCardRow` renders it after
+  // the conversion, which puts it in this root's static graph through the Tool Studio; the
+  // component browser's multi-select puts it there a second way.
+  'SelectionCheckbox',
   // The check-modifier catalogue's default set + a recipe's eligible-modifier override
   // both render the shared pill multi-select (issue 770). A `.svelte` the tree renders
   // but the allowlist omits HANGS the suite (# cancelled) rather than failing it.
@@ -81,6 +89,28 @@ function compileManagerRoot() {
   // map globs for the EDITOR.
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBrowserInspector.svelte');
+  // The shared essence quantity card (issue 772), extracted out of the editor and rendered
+  // by the browser's bulk-edit panel too. `ComponentEditView` above imports it statically,
+  // so omitting it here HANGS every mounted manager test as `# cancelled` — this suite
+  // hand-rolls its compile loop and has no closure validator to fail loudly instead.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte');
+  // The bulk edit panel that REPLACES the single-component inspector in the rail
+  // (issue 772). The root imports it statically, so omitting it HANGS every mounted manager
+  // test as `# cancelled` for the same reason as the card above.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte');
+  // The four shared bulk-edit primitives (issue 1010). They sit directly under
+  // `apps/manager/` — beside Chip and Callout, NOT under `components/` — because their
+  // scoped CSS reads `--fab-mv2-*`, which is only in scope inside `.fabricate-manager`.
+  // `ComponentsBrowserView` imports the toolbar and `ComponentBulkEditPanel` imports the
+  // other three, so omitting any one of them HANGS every mounted manager test.
+  for (const bulkPrimitive of [
+    'BulkSelectionToolbar',
+    'BulkEditPanelShell',
+    'BulkEditSection',
+    'BulkEditSelect',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/${bulkPrimitive}.svelte`);
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte');
@@ -136,7 +166,40 @@ function compileManagerRoot() {
   // The library inspector, extracted out of the root (issue 643). It lives under
   // `recipes/` — NOT `recipe/`, which the screenshot map's RECIPE_EDIT_MATCHES globs.
   writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte');
+  // The rail's other half (issue 1010): the root swaps this in for the inspector while a
+  // bulk selection exists, so it is a STATIC import of the mounted root. Omitting it kills
+  // this suite in its `before` hook, which `node --test` reports as `# cancelled 220`.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
+  // The GM Knowledge surface (issue 785). Adding a `knowledge` branch to the root
+  // puts this WHOLE subtree into the compiled root's STATIC module graph regardless
+  // of `{#if}`, so every child is enumerated by name: omitting one HANGS every
+  // mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
+  // The shared no-state primitive. The Knowledge roster and both tab bodies render it,
+  // so it is in the root's static graph too. `Callout` is the shared standing-statement
+  // strip both Knowledge tabs render (issue 785); same rule, same consequence.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/Callout.svelte');
+  // The shared side-panel explainer card and icon fact row (issue 881). The root renders
+  // the explainer directly in the Tags & Categories inspector and reaches the fact row
+  // through the Tool Studio's browser inspector, so both are in the root's static graph.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ExplainerCard.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/IconFactRow.svelte');
+  // The shared chip (issue 883). The root reaches it through the Tool Studio and Knowledge
+  // trees today, and through every other manager screen as the conversion proceeds.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/Chip.svelte');
+  for (const knowledgeComponent of [
+    'KnowledgeTabs',
+    'KnowledgeRoster',
+    'KnowledgeRecipeItemsTab',
+    'KnowledgeLearnedRecipesTab',
+    'KnowledgeOwnedCopyRow',
+    'KnowledgeLearnedRow',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/knowledge/${knowledgeComponent}.svelte`);
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSettingsView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingEffectPanel.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/SegmentedControl.svelte');
@@ -145,6 +208,10 @@ function compileManagerRoot() {
   // are always rendered in the root tree, so omitting either HANGS the mounted suite.
   writeCompiledSvelte('src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte');
+  // The post-import reference report and the shared modal chrome both modals render
+  // through (issue 877). Same rule as above: an omission cancels the suite, never fails it.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ImportReportModal.svelte');
+  writeCompiledSvelte('src/ui/svelte/apps/manager/ManagerModal.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/AccessTabView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GrantAccessInspector.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemPageInspector.svelte');
@@ -350,6 +417,10 @@ function compileManagerRoot() {
     'src/models/Recipe.js',
     'src/models/Ingredient.js',
     'src/models/IngredientSet.js',
+    // IngredientSet imports the shared essence allocator (issue 917). This list is
+    // hand-rolled with no validator, so omitting a transitive raw module HANGS this
+    // suite as `# cancelled` rather than failing it.
+    'src/utils/essenceAllocation.js',
     'src/models/IngredientGroup.js',
     'src/models/Result.js',
     'src/models/Tool.js',
@@ -367,6 +438,20 @@ function compileManagerRoot() {
     // the sibling of recipeBrowserModel below. Imported by ComponentsBrowserView AND by
     // the root (which lifts the browser state).
     'src/utils/componentBrowserModel.js',
+    // The pure bulk selection + staging model (issue 772). Imported by
+    // ComponentsBrowserView, by the bulk edit panel AND by the root (which owns the staged
+    // draft); omitting it HANGS every mounted manager test as `# cancelled`.
+    'src/utils/componentBulkEditModel.js',
+    // Its shared leaf (issue 1010). The four selection helpers moved here and are
+    // re-exported above under their original names, so this is a STATIC import of that
+    // module. This suite hand-rolls its temp tree and has NO dependency validator, so
+    // omitting it hangs silently rather than naming the missing file.
+    'src/utils/bulkSelectionModel.js',
+    // The recipe browser's bulk selection + staging model (issue 1010). RecipesBrowserView
+    // imports it for the selection helpers, so it is a STATIC import of the mounted tree.
+    // Omitting it kills this suite in its `before` hook, which `node --test` reports as
+    // `# cancelled 220` rather than a failure — read the count, not just `# fail`.
+    'src/utils/recipeBulkEditModel.js',
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
@@ -384,6 +469,10 @@ function compileManagerRoot() {
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The Knowledge surface's pure projection (issue 785). `adminStore` imports it
+    // too, but it lands here because the compiled Knowledge components import it
+    // directly; it is a dependency-free leaf, so this single entry suffices.
+    'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',
     // SystemEditView imports the pure modifier↔prerequisite copy-mapping helpers
     // (issue 768); omitting it HANGS every mounted manager test as `# cancelled`.
     'src/systems/characterModifierPrerequisiteCopy.js',
@@ -454,20 +543,27 @@ function craftingSubitem(labelText) {
   );
 }
 
-// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
-// Assigns the module-level `mounted`/`target` (so afterEach can clean up) and
-// returns the mounted target for the caller to query.
-async function openRecipeEditor(calls, storeOptions = {}) {
+// Mount the manager against a fresh store on a fresh host element. Assigns the
+// module-level `mounted`/`target` (so afterEach can clean up) and returns the target,
+// so the routing helpers below differ only in where they navigate afterwards.
+function mountManager(calls = [], storeOptions = {}) {
   target = document.createElement('div');
   document.body.appendChild(target);
   mounted = mount(Component, {
     target,
     props: {
-      store: createStore(calls, { experimentalFeaturesEnabled: true, ...storeOptions }),
+      store: createStore(calls, storeOptions),
       services: { openCurrentAdmin: () => {} },
     },
   });
   flushSync();
+  return target;
+}
+
+// Mount the manager, route to Recipes, and open the recipe-edit route for r1.
+// Returns the mounted target for the caller to query.
+async function openRecipeEditor(calls, storeOptions = {}) {
+  mountManager(calls, { experimentalFeaturesEnabled: true, ...storeOptions });
   craftingParent().click();
   await tick();
   flushSync();
@@ -480,6 +576,31 @@ async function openRecipeEditor(calls, storeOptions = {}) {
   await tick();
   flushSync();
   return target;
+}
+
+// Mount the manager and route to the Tags & Categories screen. Returns the mounted target.
+async function openTagsScreen(calls = [], storeOptions = {}) {
+  mountManager(calls, storeOptions);
+  navButton('Tags & Categories').click();
+  await tick();
+  flushSync();
+  return target;
+}
+
+// The three numbers that disagreed on one screen before issue 878: the tab badge, the
+// inspector's at-a-glance tile, and the active panel's own entry chip. Reading all three
+// through one helper is what lets a test assert they AGREE as well as what they agree on.
+// The entry chip belongs to whichever panel is mounted, so `tab` must be the active tab.
+function vocabularyCounters(tab, fact) {
+  return {
+    tabBadge: target
+      .querySelector(`[data-vocabulary-tab="${tab}"] .manager-editor-tab-badge`)
+      .textContent.trim(),
+    glanceTile: target
+      .querySelector(`[data-tags-category-fact="${fact}"] strong`)
+      .textContent.trim(),
+    entryChip: target.querySelector('[data-vocabulary-shown-count] span').textContent.trim(),
+  };
 }
 
 function headerSaveButton(target) {
@@ -599,7 +720,10 @@ function createStore(calls = [], options = {}) {
       salvageCraftingCheck: options.salvageCraftingCheck,
       gatheringCraftingCheck: options.gatheringCraftingCheck,
       features: selectedFeatures,
-      managedItemOptions: alchemyManagedItemOptions,
+      // Overridable so a test can supply its own component set (the Tool display
+      // precedence cases resolve `componentId` against their own fixtures); defaults to
+      // the alchemy list every other test relies on.
+      managedItemOptions: options.managedItemOptions ?? alchemyManagedItemOptions,
       // System-level recipe visibility config (issue 511). The Books & Scrolls
       // surface reads the shared use/learn caps from here; left undefined unless a
       // test supplies one (the visibility card then falls back to its defaults).
@@ -1042,6 +1166,11 @@ function createStore(calls = [], options = {}) {
               enabled: false,
               locked: true,
               incomplete: true,
+              // This suite hand-builds projected rows rather than running the real
+              // `_buildRecipeList`, so the projection's `enableBlocked` (issue 1010) has to
+              // be stated here. The row pills now read it rather than `incomplete`, and r2
+              // is exactly the off-and-un-enableable case the assertion below is about.
+              enableBlocked: true,
               isSimple: false,
               structureLabel: 'Single step',
               stepCount: 1,
@@ -1239,7 +1368,10 @@ function createStore(calls = [], options = {}) {
                   dropRows: [],
                 },
               ],
-          events: [],
+          // Opt-in only: the event library is empty by default so the many existing
+          // assertions about the encounters browser's empty state stay true. Tests that
+          // need to reach the gathering-EVENT editor pass `gatheringLibraryEvents`.
+          events: options.gatheringLibraryEvents || [],
           tools: options.gatheringLibraryTools || [],
         },
       },
@@ -1272,7 +1404,13 @@ function createStore(calls = [], options = {}) {
 
   function componentCardsFor(id) {
     if (options.emptyComponents) return [];
-    const cards = (componentItems[id] || []).map((item) =>
+    // Pad the managed list so the browser paginates. A selection is held on the lifted
+    // browser state, not on the page, so proving that Apply carries an id the current page
+    // does not even render needs more rows than one page holds.
+    const padded = options.extraComponentItems
+      ? [...(componentItems[id] || []), ...options.extraComponentItems]
+      : componentItems[id] || [];
+    const cards = padded.map((item) =>
       options.missingComponentSource && item.id === 'c1'
         ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
         : item
@@ -1323,7 +1461,29 @@ function createStore(calls = [], options = {}) {
       applySelectedSystem(id);
       return true;
     },
-    createSystem: () => calls.push(['createSystem']),
+    // The real action returns the created system on success and `false` when the GM
+    // backed out of the dirty-environment confirm, because the root routes it through
+    // `afterTruthyResult` to decide whether to navigate.
+    createSystem: () => {
+      calls.push(['createSystem']);
+      if (Object.hasOwn(options, 'createSystemResult')) return options.createSystemResult;
+      // Model the real action: it registers the system, SELECTS it, and refreshes before
+      // resolving. A stub that only returns an object would let the root navigate to
+      // whichever system was already selected and still pass.
+      const created = {
+        id: 'created-system',
+        name: 'New Crafting System',
+        description: 'Configure categories, item tags, essences, and crafting behaviour.',
+        features: {},
+      };
+      systemDetails[created.id] = created;
+      viewState.update((state) => ({
+        ...state,
+        systems: [...state.systems, { id: created.id, name: created.name, selected: false }],
+      }));
+      applySelectedSystem(created.id);
+      return created;
+    },
     importSystem: () => calls.push(['importSystem']),
     exportSystem: (id) => calls.push(['exportSystem', id]),
     deleteSystem: (id) => calls.push(['deleteSystem', id]),
@@ -1362,6 +1522,7 @@ function createStore(calls = [], options = {}) {
     },
     saveRecipeItem: (recipeItemId, patch) => {
       calls.push(['saveRecipeItem', recipeItemId, patch]);
+      if (options.saveRecipeItemReject) return Promise.reject(new Error('save recipe item failed'));
       return options.saveRecipeItemResult ?? true;
     },
     deleteRecipeItemDefinition: (recipeItemId) => {
@@ -1451,8 +1612,38 @@ function createStore(calls = [], options = {}) {
       if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
       return options.updateComponentResult ?? true;
     },
-    addEssence: (name, description, icon, sourceComponentId) => {
-      calls.push(['addEssence', name, description, icon, sourceComponentId]);
+    // The set-apply bulk write (issue 772). It takes the selection `Set` directly and
+    // already refreshes internally, so the root neither converts nor re-refreshes; the
+    // recorded call is normalized to an array purely so a test can compare it.
+    applyComponentBulkEdit: (componentIds, edit) => {
+      const ids = [...(componentIds || [])];
+      calls.push(['applyComponentBulkEdit', ids, edit]);
+      // The real action returns the write RESULT, never a boolean: `null` for "nothing was
+      // written" and `{updated}` counting the components that actually CHANGED, which is
+      // what the toast names. Defaulting to `ids.length` keeps the common case honest while
+      // a test can hand back a smaller count, or `null`, to drive the other branches.
+      if (Object.hasOwn(options, 'applyComponentBulkEditResult')) {
+        return options.applyComponentBulkEditResult;
+      }
+      return { updated: ids.length, componentIds: ids };
+    },
+    // The recipe twin (issue 1010). Its result carries SIX counts, and the two book ones
+    // count membership EDGES rather than the definitions `booksUpdated` counts — the
+    // post-apply toast composes a sentence out of them.
+    applyRecipeBulkEdit: (recipeIds, edit) => {
+      const ids = [...(recipeIds || [])];
+      calls.push(['applyRecipeBulkEdit', ids, edit]);
+      if (Object.hasOwn(options, 'applyRecipeBulkEditResult')) {
+        return options.applyRecipeBulkEditResult;
+      }
+      return { updated: ids.length, recipeIds: ids };
+    },
+    // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a
+    // four-parameter stub records a call that looks identical whether the argument is
+    // threaded or silently dropped — which is exactly how the value went missing once
+    // already. Recording it is what makes the assertion below able to fail.
+    addEssence: (name, description, icon, sourceComponentId, colorToken) => {
+      calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken]);
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
       return options.addEssenceResult ?? true;
     },
@@ -1648,6 +1839,12 @@ function createStore(calls = [], options = {}) {
     },
     updateGatheringLibraryTask: (systemId, taskId, updates = {}) => {
       calls.push(['updateGatheringLibraryTask', systemId, taskId, updates]);
+      // The two failure branches the root's save path can take. Without these the fixture
+      // could only ever return `true`, so the failed-save alert was undrivable (issue 919).
+      if (options.updateGatheringLibraryTaskReject) {
+        return Promise.reject(new Error('update gathering task failed'));
+      }
+      if (options.updateGatheringLibraryTaskResult === false) return false;
       viewState.update((state) => {
         const systemConfig = state.gatheringConfig?.systems?.[systemId];
         if (!systemConfig) return state;
@@ -1669,11 +1866,55 @@ function createStore(calls = [], options = {}) {
       });
       return true;
     },
+    // Also absent until issue 919. The root optional-chains to `undefined` and reads that as
+    // "proceed", so the cancel branch of the save was undrivable and nothing pinned what a
+    // cancellation must leave on screen. Proceeding stays the default, which is exactly what
+    // the missing method already meant.
+    confirmGatheringLibraryTaskCompositionLoss: (systemId, taskId, draft) => {
+      calls.push(['confirmGatheringLibraryTaskCompositionLoss', systemId, taskId, draft]);
+      return options.confirmGatheringLibraryTaskCompositionLossResult !== false;
+    },
     duplicateGatheringLibraryTask: (...args) => {
       calls.push(['duplicateGatheringLibraryTask', ...args]);
       return { id: 'task-copy', name: 'Gather Moon Herbs (Copy)', dropRows: [] };
     },
     deleteGatheringLibraryTask: (...args) => calls.push(['deleteGatheringLibraryTask', ...args]),
+    // The gathering-EVENT library had no handler here at all before issue 919, so the
+    // root's `store.updateGatheringLibraryEvent?.(…)` optional-chained to `undefined` — and
+    // because the root treats anything other than a literal `false` as success, every
+    // mounted event save passed unconditionally. Mirrors the task handler above.
+    updateGatheringLibraryEvent: (systemId, eventId, updates = {}) => {
+      calls.push(['updateGatheringLibraryEvent', systemId, eventId, updates]);
+      if (options.updateGatheringLibraryEventReject) {
+        return Promise.reject(new Error('update gathering event failed'));
+      }
+      if (options.updateGatheringLibraryEventResult === false) return false;
+      viewState.update((state) => {
+        const systemConfig = state.gatheringConfig?.systems?.[systemId];
+        if (!systemConfig) return state;
+        return {
+          ...state,
+          gatheringConfig: {
+            ...state.gatheringConfig,
+            systems: {
+              ...state.gatheringConfig.systems,
+              [systemId]: {
+                ...systemConfig,
+                events: (systemConfig.events || []).map((event) =>
+                  event.id === eventId ? { ...event, ...updates } : event
+                ),
+              },
+            },
+          },
+        };
+      });
+      return true;
+    },
+    // Mirrors confirmGatheringLibraryTaskCompositionLoss above.
+    confirmGatheringLibraryEventCompositionLoss: (systemId, eventId, draft) => {
+      calls.push(['confirmGatheringLibraryEventCompositionLoss', systemId, eventId, draft]);
+      return options.confirmGatheringLibraryEventCompositionLossResult !== false;
+    },
     createToolDraft: (initialPatch = {}, systemId = 'alchemy') => {
       const created = {
         id: 'tool-new',
@@ -2193,8 +2434,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     const craftingHelp = target.querySelector('[data-checks-help="crafting"]');
     assert.ok(craftingHelp, 'Crafting tab shows its docs help card');
     assert.ok(
-      craftingHelp.classList.contains('manager-setup-card'),
-      'help card reuses the recipe setup-card format'
+      craftingHelp.classList.contains('manager-explainer-card') &&
+        craftingHelp.classList.contains('manager-inspector-card'),
+      'help card renders through the shared explainer primitive on the shared card shell'
     );
     const craftingDocs = craftingHelp.querySelector(
       'a[href="https://mistersilver-uk.github.io/fabricate/crafting-checks"]'
@@ -2554,16 +2796,54 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const { activeTab, href } of cases) {
       target = document.createElement('div');
       document.body.appendChild(target);
-      mounted = mount(ChecksRightMenuComponent, { target, props: { activeTab } });
+      mounted = mount(ChecksRightMenuComponent, {
+        target,
+        // An activation is supplied so the Active card renders too — it is the rail's other
+        // card and shares the same inspector-card contract (issue 883).
+        props: { activeTab, activation: { enabled: true, optional: true } },
+      });
       flushSync();
 
       const card = target.querySelector(`[data-checks-help="${activeTab}"]`);
       assert.ok(card, `${activeTab} menu renders a help card`);
       assert.ok(
-        card.classList.contains('manager-setup-card'),
-        'help card uses the setup-card format'
+        card.classList.contains('manager-explainer-card'),
+        'help card renders through the shared explainer primitive'
       );
       assert.ok(card.querySelector(`a[href="${href}"]`), `${activeTab} help card links to ${href}`);
+
+      // Two links is the reason `ExplainerCard` grew a link LIST (issue 883). They share
+      // one `.manager-setup-links` row and both wear the primitive's one ghost treatment,
+      // so a regression to a single-link primitive drops the Quickstart silently.
+      const linkRow = card.querySelector('.manager-setup-links');
+      assert.ok(linkRow, `${activeTab} help card renders its links as one card-link row`);
+      const linkHrefs = Array.from(linkRow.querySelectorAll('a.manager-explainer-card-docs')).map(
+        (anchor) => anchor.getAttribute('href')
+      );
+      assert.deepEqual(
+        linkHrefs,
+        [href, 'https://mistersilver-uk.github.io/fabricate/quickstart'],
+        `${activeTab} help card keeps both its docs page and the Quickstart`
+      );
+      for (const anchor of linkRow.querySelectorAll('a')) {
+        assert.ok(
+          anchor.classList.contains('is-ghost'),
+          'explainer links keep the primitive ghost treatment'
+        );
+      }
+
+      // The Active card is a plain inspector card under the manager's one card-title
+      // contract — not the `.manager-kicker` micro-label this rail used to use alone.
+      const activeCard = target.querySelector(`[data-checks-active="${activeTab}"]`);
+      assert.ok(activeCard, `${activeTab} menu renders its Active card`);
+      assert.ok(
+        activeCard.querySelector('h3.manager-card-title'),
+        'the Active card titles itself with the shared card-title contract'
+      );
+      assert.ok(
+        !activeCard.querySelector('.manager-kicker'),
+        'the Active card no longer carries a second heading treatment'
+      );
 
       unmount(mounted);
       mounted = null;
@@ -3316,7 +3596,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Under toolSpecific authority the outcome toggle is available but the break pill is not.
     const c2 = triggers.querySelector('[data-trigger="c2"]');
     assert.ok(
-      c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-selected'),
+      c2.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger shows the Automatic success segment selected'
     );
     assert.equal(
@@ -3325,8 +3605,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no break pill under toolSpecific'
     );
 
-    // Clicking a segment emits the new outcome.
-    c2.querySelector('[data-trigger-outcome="none"]').click();
+    // Choosing a segment emits the new outcome.
+    chooseSegment(c2, 'data-trigger-outcome', 'none');
     assert.equal(emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c2').outcome, 'none');
 
     // Add appends a new trigger; remove drops one.
@@ -3439,9 +3719,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(triggers, 'the unified trigger editor renders');
     const c1Triggers = triggers.querySelector('[data-trigger="c1"]');
     assert.ok(
-      c1Triggers
-        .querySelector('[data-trigger-outcome="success"]')
-        .classList.contains('is-selected'),
+      c1Triggers.querySelector('[data-trigger-outcome="success"]').classList.contains('is-active'),
       'the success trigger selects the award-all segment'
     );
     const optionLabels = [...c1Triggers.querySelectorAll('[data-trigger-outcome]')].map(
@@ -3473,12 +3751,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(emitted.at(-1).awardMode, 'partial', 'selecting an award mode emits it');
 
     // Editing a trigger outcome preserves the carried award settings.
-    c1Triggers.querySelector('[data-trigger-outcome="none"]').click();
-    flushSync();
+    chooseSegment(c1Triggers, 'data-trigger-outcome', 'none');
     assert.equal(
       emitted.at(-1).checkBreakage.triggers.find((t) => t.id === 'c1').outcome,
       'none',
-      'clicking a segment emits the new outcome'
+      'choosing a segment emits the new outcome'
     );
     assert.equal(
       emitted.at(-1).awardMode,
@@ -3509,6 +3786,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     return emitted;
   }
 
+  // The outcome toggle and the tier-step mode control are SegmentedControls (issue
+  // 975): the real control is the visually hidden radio, the `<label>` segment is only
+  // the styled surface. Set `.checked`, then dispatch a bubbling `change`.
+  function chooseSegment(root, optionDataAttr, value) {
+    const radio = root.querySelector(`[${optionDataAttr}="${value}"] input[type="radio"]`);
+    assert.ok(radio, `a radio exists for ${optionDataAttr}="${value}"`);
+    radio.checked = true;
+    radio.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
+    flushSync();
+    return radio;
+  }
+
   const breakageTriggers = {
     triggers: [
       {
@@ -3516,6 +3805,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         condition: { type: 'diceGroup', groupId: 0, aggregate: 'anyDie', operator: '==', value: 1 },
         outcome: 'failure',
         breakTools: false,
+        tierStep: { mode: 'none', steps: 1, tierId: null },
       },
     ],
   };
@@ -3689,6 +3979,7 @@ describe('CraftingSystemManager mounted behavior', () => {
               condition: { type: 'outcomeTier', tierIds: ['o1'], outcomeKeys: [] },
               outcome: 'none',
               breakTools: true,
+              tierStep: { mode: 'none', steps: 1, tierId: null },
             },
           ],
         },
@@ -3699,8 +3990,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     const successSeg = tierTrigger.querySelector('[data-trigger-outcome="success"]');
     const noneSeg = tierTrigger.querySelector('[data-trigger-outcome="none"]');
     assert.ok(successSeg, 'the outcome toggle renders for an outcomeTier trigger');
-    assert.ok(successSeg.disabled, 'an outcomeTier condition disables the forcing segments');
-    assert.ok(noneSeg.classList.contains('is-selected'), 'the outcome is pinned to No effect');
+    // Disabled on the RADIO, which is what actually prevents the choice — the class
+    // alone would only dim it, and `select()` guards nothing but `next !== value`.
+    assert.ok(
+      successSeg.querySelector('input[type="radio"]').disabled,
+      'an outcomeTier condition disables the forcing segments'
+    );
+    assert.ok(noneSeg.classList.contains('is-active'), 'the outcome is pinned to No effect');
+    // Stepping is deliberately NOT pinned: it reads the rolled tier and produces the
+    // final one, so there is no circularity to prevent.
+    assert.equal(
+      tierTrigger.querySelector('[data-trigger-tier-step-mode="up"] input[type="radio"]').disabled,
+      false,
+      'an outcomeTier condition can still drive a tier step'
+    );
   });
 
   function mountChecksView(props) {
@@ -3786,6 +4089,17 @@ describe('CraftingSystemManager mounted behavior', () => {
       patches.some((p) => p.defaultModifierPolicy === 'addAll'),
       'selecting a policy radio emits defaultModifierPolicy'
     );
+    // The Phase-2 "Player picks" policy renders as a fourth radio and emits (issue 770 P2).
+    const playerPicksOption = card.querySelector(
+      '[data-crafting-modifier-policy-option="playerPicks"] input'
+    );
+    assert.ok(playerPicksOption, 'the playerPicks policy radio renders');
+    playerPicksOption.click();
+    flushSync();
+    assert.ok(
+      patches.some((p) => p.defaultModifierPolicy === 'playerPicks'),
+      'selecting playerPicks emits defaultModifierPolicy'
+    );
     // The expression field drops the leading `@` for display and restores it on write,
     // so the stored expression keeps the sigil the resolver's replaceFormulaData needs.
     const expression = card.querySelector('input[data-crafting-modifier-field="expression"]');
@@ -3839,6 +4153,94 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // Every choice group in the Checks editors now renders through the shared
+  // RadioCardGroup primitive (issue 855), which only draws the icon tile when the
+  // option supplies an `icon`. An option list that loses its icons still renders,
+  // still emits, and still passes every behavioural test above — the card just goes
+  // blank. Walk the four remaining groups and assert the tile per option.
+  it('checks view: every check choice group renders an icon tile per option (issue 855)', () => {
+    const groups = [
+      {
+        props: { resolutionMode: 'routedByCheck', craftingCheck: routedBreakageValue },
+        attr: 'data-check-type-option',
+        values: ['relative', 'fixed'],
+      },
+      {
+        props: { resolutionMode: 'simple', craftingCheckSimple: simpleBreakageValue },
+        attr: 'data-dc-mode-option',
+        values: ['static', 'dynamic'],
+      },
+      {
+        props: {
+          resolutionMode: 'progressive',
+          craftingCheckProgressive: { rollFormula: '1d20', awardMode: 'equal' },
+        },
+        attr: 'data-award-mode-option',
+        values: ['equal', 'partial', 'exceed'],
+      },
+      {
+        props: { resolutionMode: 'alchemy', alchemyCheckMode: 'none' },
+        attr: 'data-crafting-alchemy-checkmode-option',
+        values: ['none', 'simple', 'tiered'],
+      },
+    ];
+    for (const group of groups) {
+      mountChecksView(group.props);
+      const options = [...target.querySelectorAll(`[${group.attr}]`)];
+      assert.deepEqual(
+        options.map((option) => option.getAttribute(group.attr)),
+        group.values,
+        `${group.attr} still lists its options in authoring order`
+      );
+      for (const option of options) {
+        assert.ok(
+          Boolean(option.querySelector('[data-tool-choice-icon] i')),
+          `${group.attr}="${option.getAttribute(group.attr)}" renders an icon tile`
+        );
+      }
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+  });
+
+  // The check-modifier policy group is rendered through the shared RadioCardGroup
+  // primitive (issue 855), and its two hook attributes are a hand-maintained mirror:
+  // `scripts/foundry-test-run.mjs` scrolls to `[data-crafting-modifier-policy]` for the
+  // smoke frame and `scripts/lib/viewLabCases.js` clicks
+  // `[data-crafting-modifier-policy-option="playerPicks"] input`. Neither producer runs
+  // in `npm test`, so re-plumbing the group through a different primitive could drop
+  // either attribute with no unit failure at all. Pin both here.
+  it('checks view: the modifier policy group keeps its capture-harness hooks and shows an icon per policy (issue 855)', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'highest',
+    });
+    const group = target.querySelector(
+      '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
+    );
+    assert.ok(group, 'the policy group still resolves by [data-crafting-modifier-policy]');
+    const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
+    assert.deepEqual(
+      options.map((option) => option.getAttribute('data-crafting-modifier-policy-option')),
+      ['addAll', 'highest', 'byRecipe', 'playerPicks'],
+      'all four policies still carry the per-option hook, in authoring order'
+    );
+    for (const option of options) {
+      const value = option.getAttribute('data-crafting-modifier-policy-option');
+      assert.ok(
+        Boolean(option.querySelector('[data-tool-choice-icon] i')),
+        `the ${value} card renders an icon tile`
+      );
+      assert.ok(
+        Boolean(option.querySelector('input[type="radio"]')),
+        `the ${value} card is still driven by a real radio input`
+      );
+    }
+  });
+
   it('checks view: the modifier catalogue card is hidden when the crafting check has no formula (issue 770)', () => {
     mountChecksView({ resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } });
     assert.equal(
@@ -3848,18 +4250,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('natural tier stepping is default-off, persists from routed edits, and hides for fixed checks', () => {
-    const emitted = mountCheckEditor(
-      CraftingCheckEditorComponent,
-      routedBreakageValue,
-      'toolSpecific',
-      { allowNatStepping: true }
+  it('the routed editor renders the tier-step row in BOTH tier types', () => {
+    // The check-wide natural-stepping boolean and its card are gone (issue 975):
+    // stepping is a per-trigger effect now, and it is no longer relative-only.
+    mountCheckEditor(CraftingCheckEditorComponent, routedBreakageValue, 'toolSpecific');
+    assert.ok(
+      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      'a relative routed check offers the per-trigger tier step'
     );
-    const toggle = target.querySelector('[data-check-nat-stepping] input[role="switch"]');
-    assert.ok(toggle, 'relative routed checks expose the natural stepping toggle');
-    assert.equal(toggle.checked, false, 'natural stepping defaults off');
-    toggle.click();
-    assert.equal(emitted.at(-1).natStepping, true, 'the routed draft retains the authored value');
 
     unmount(mounted);
     target.remove();
@@ -3867,42 +4265,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     target = null;
     mountCheckEditor(
       CraftingCheckEditorComponent,
-      { ...routedBreakageValue, type: 'fixed', natStepping: true },
-      'toolSpecific',
-      { allowNatStepping: true }
+      { ...routedBreakageValue, type: 'fixed' },
+      'toolSpecific'
     );
-    assert.equal(
-      target.querySelector('[data-check-nat-stepping]'),
-      null,
-      'fixed routed checks ignore the setting'
+    assert.ok(
+      target.querySelector('[data-trigger="c1"] [data-trigger-tier-step]'),
+      'a FIXED routed check offers it too — stepping is no longer type-scoped'
     );
   });
 
-  it('shows natural tier stepping for routed crafting and salvage, never gathering', () => {
+  it('offers tier stepping on routed crafting, salvage AND gathering', () => {
+    // The old toggle was absent for gathering entirely; the per-trigger effect is not.
     mountChecksView({
       resolutionMode: 'routedByCheck',
-      craftingCheck: { ...routedBreakageValue, natStepping: true },
+      craftingCheck: routedBreakageValue,
       salvageResolutionMode: 'routed',
       salvageCheckRouted: routedBreakageValue,
       gatheringResolutionMode: 'routed',
       gatheringCheckRouted: routedBreakageValue,
       features: { salvage: true, gathering: true },
     });
-    assert.ok(target.querySelector('[data-checks-panel="crafting"] [data-check-nat-stepping]'));
+    assert.ok(target.querySelector('[data-checks-panel="crafting"] [data-trigger-tier-step]'));
 
     target.querySelector('[data-checks-tab-button="salvage"]').click();
     flushSync();
-    assert.ok(target.querySelector('[data-checks-panel="salvage"] [data-check-nat-stepping]'));
+    assert.ok(target.querySelector('[data-checks-panel="salvage"] [data-trigger-tier-step]'));
 
     target.querySelector('[data-checks-tab-button="gathering"]').click();
     flushSync();
-    assert.equal(
-      target.querySelector('[data-checks-panel="gathering"] [data-check-nat-stepping]'),
-      null
-    );
+    assert.ok(target.querySelector('[data-checks-panel="gathering"] [data-trigger-tier-step]'));
   });
 
-  it('preserves routed natural stepping through the root draft and Save flow', async () => {
+  it('carries an authored tierStep through the root draft and into the Save payload', async () => {
+    // The allowlist trap: `cloneCheckBreakage` rebuilds each trigger key by key, and
+    // `checkRoutedDirty` compares the JSON of two values that BOTH pass through it — so
+    // a dropped key makes the editor look CLEAN and persist nothing, with no error.
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -3911,7 +4308,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       props: {
         store: createStore(calls, {
           alchemyResolutionMode: 'routedByCheck',
-          craftingCheck: { routed: { ...routedBreakageValue, natStepping: true } },
+          craftingCheck: {
+            routed: {
+              ...routedBreakageValue,
+              checkBreakage: {
+                triggers: [
+                  {
+                    ...breakageTriggers.triggers[0],
+                    tierStep: { mode: 'target', steps: 2, tierId: 'o1' },
+                  },
+                ],
+              },
+            },
+          },
         }),
         services: { openCurrentAdmin: () => {} },
       },
@@ -3921,9 +4330,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    const toggle = target.querySelector('[data-check-nat-stepping] input[role="switch"]');
-    assert.equal(toggle.checked, true, 'cloneRoutedCheck reads back the persisted value');
-    toggle.click();
+    const card = target.querySelector('[data-trigger="c1"]');
+    assert.ok(
+      card.querySelector('[data-trigger-tier-step-mode="target"]').classList.contains('is-active'),
+      'cloneCheckBreakage reads the persisted tierStep back into the draft'
+    );
+    assert.equal(
+      card.querySelector('[data-trigger-tier-step-target]').value,
+      'o1',
+      'and the authored target tier survives the clone'
+    );
+
+    chooseSegment(card, 'data-trigger-tier-step-mode', 'down');
     await tick();
     flushSync();
     target.querySelector('[data-checks-save]').click();
@@ -3932,7 +4350,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     const saved = calls.find((call) => call[0] === 'saveCraftingCheckRouted');
-    assert.equal(saved?.[1]?.natStepping, false, 'Save persists the edited routed value');
+    assert.deepEqual(
+      saved?.[1]?.checkBreakage?.triggers?.[0]?.tierStep,
+      { mode: 'down', steps: 2, tierId: 'o1' },
+      'Save persists the edited tierStep, retaining the target operand'
+    );
+    assert.equal(
+      Object.hasOwn(saved?.[1] ?? {}, 'natStepping'),
+      false,
+      'and the retired natStepping key is not written back'
+    );
   });
 
   for (const mode of ['simple', 'alchemy']) {
@@ -5813,6 +6240,484 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // ── Issue 772: the rail swap ────────────────────────────────────────────────────
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only
+  // place the swap between `ComponentBrowserInspector` and `ComponentBulkEditPanel` — and
+  // the root-owned draft's lifecycle around it — can be proved at all.
+  async function openComponentsBrowser(calls = [], options = {}) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, options),
+        services: { openCurrentAdmin: () => {}, onDropItem: () => {}, onCopySourceUuid: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Components').click();
+    await tick();
+    flushSync();
+    return target;
+  }
+
+  function tickComponentRow(id) {
+    target.querySelector(`[data-component-select="${id}"]`).click();
+    flushSync();
+  }
+
+  it('swaps the single-component inspector for the bulk panel at the FIRST selected row', async () => {
+    await openComponentsBrowser();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail opens on the single-component inspector'
+    );
+    assert.ok(!target.querySelector('[data-component-bulk-panel]'));
+
+    tickComponentRow('c1');
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-panel]')),
+      'ONE ticked row is already a bulk edit — the threshold is > 0, not > 1'
+    );
+    assert.ok(
+      !target.querySelector('[data-component-inspector]'),
+      'the panel REPLACES the inspector rather than stacking beside it'
+    );
+    assert.match(
+      target.querySelector('[data-component-bulk-count]').textContent,
+      /1 component selected/
+    );
+  });
+
+  it('restores the inspector and DISCARDS the staged draft when the selection clears', async () => {
+    await openComponentsBrowser();
+    tickComponentRow('c1');
+
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'add'
+    );
+    assert.equal(target.querySelector('[data-component-bulk-apply]').disabled, false);
+
+    // The panel's own escape — the documented way back to unlink / delete / copy-source.
+    target.querySelector('[data-component-bulk-clear]').click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'the rail returns to the single-component inspector'
+    );
+
+    tickComponentRow('c1');
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'none',
+      'the staged draft was discarded on the count-to-zero transition, not carried forward'
+    );
+    assert.equal(
+      target.querySelector('[data-component-bulk-apply]').disabled,
+      true,
+      'so a re-opened panel cannot apply a stale edit'
+    );
+  });
+
+  it('applies every staged axis in ONE set-apply write, then resets the selection and the draft', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+
+    tickComponentRow('c1');
+    tickComponentRow('c2');
+    assert.match(
+      target.querySelector('[data-component-bulk-count]').textContent,
+      /2 components selected/
+    );
+
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    // Straight past `add` to `remove`, so the write carries BOTH tag axes.
+    target.querySelector('[data-bulk-tag="herb"]').click();
+    flushSync();
+    target.querySelector('[data-bulk-tag="herb"]').click();
+    flushSync();
+    const categorySelect = target.querySelector('[data-component-bulk-category]');
+    categorySelect.value = 'Reagent';
+    categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    flushSync();
+
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
+    assert.equal(applyCalls.length, 1, 'ONE set-apply write for the whole selection');
+    assert.deepEqual(applyCalls[0][1].sort(), ['c1', 'c2']);
+    assert.deepEqual(applyCalls[0][2], {
+      category: 'Reagent',
+      addTags: ['ore'],
+      removeTags: ['herb'],
+    });
+    assert.ok(
+      !('essences' in applyCalls[0][2]) && !('difficulty' in applyCalls[0][2]),
+      'an unstaged axis is NEVER sent — a present key is an instruction to write'
+    );
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-inspector]')),
+      'applying clears the selection, so the rail returns to the inspector'
+    );
+    tickComponentRow('c1');
+    assert.equal(
+      target.querySelector('[data-bulk-tag="ore"]').getAttribute('data-bulk-tag-state'),
+      'none',
+      'and the staged draft is gone with it'
+    );
+  });
+
+  it('sends a staged all-zero essence map, because that is an instruction to CLEAR', async () => {
+    const calls = [];
+    await openComponentsBrowser(calls);
+    tickComponentRow('c1');
+
+    // The steppers cannot reach this state on a fresh draft — `Stepper` emits nothing at
+    // the zero boundary — so the staged-axis chip is the only path to it.
+    target.querySelector('[data-component-bulk-essences-staged]').click();
+    flushSync();
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCall = calls.find((call) => call[0] === 'applyComponentBulkEdit');
+    assert.ok(Boolean(applyCall), 'an all-zero staged map is a REAL edit, not a no-op');
+    assert.ok('essences' in applyCall[2], 'the key must be PRESENT for the write to clear');
+  });
+
+  // Capture `ui.notifications.info`. Nothing else in this suite needs the Foundry `ui`
+  // global, so it is installed per-test and removed again rather than left standing where
+  // an unrelated test could come to depend on it.
+  async function applyBulkEditOverRows(ids, options = {}) {
+    const messages = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      await openComponentsBrowser([], options);
+      for (const id of ids) tickComponentRow(id);
+      target.querySelector('[data-bulk-tag="ore"]').click();
+      flushSync();
+      target.querySelector('[data-component-bulk-apply]').click();
+      await tick();
+      flushSync();
+      return messages;
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  // The apply toast is the ONLY feedback that survives the panel unmounting on success —
+  // applying clears the selection, so the rail is back on the single-component inspector
+  // by the time the GM reads anything. Nothing asserted it before, which is how "Applied
+  // bulk changes to 1 components." shipped green past a panel that gets the same
+  // singular right twice.
+  it('says "1 component" in the applied toast at the panel\'s own > 0 threshold', async () => {
+    const messages = await applyBulkEditOverRows(['c1']);
+    assert.deepEqual(messages, ['Applied bulk changes to 1 component.']);
+  });
+
+  it('and keeps the plural for a real multi-row apply', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2']);
+    assert.deepEqual(messages, ['Applied bulk changes to 2 components.']);
+  });
+
+  // The count the GM is told is the count that actually CHANGED, not the count they ticked.
+  // The write primitive compares each component before and after, so ticking two and adding
+  // a tag one already carries updates ONE. Naming the selection size instead would report
+  // work that did not happen — and the toast is the only record of it.
+  it('names the components that actually changed, not the ones selected', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2'], {
+      applyComponentBulkEditResult: { updated: 1, componentIds: ['c1'] },
+    });
+    assert.deepEqual(messages, ['Applied bulk changes to 1 component.']);
+  });
+
+  // A write that legitimately changed nothing is not a failure and must not read as
+  // "Applied bulk changes to 0 components."
+  it('says nothing needed changing when the write updated none', async () => {
+    const messages = await applyBulkEditOverRows(['c1', 'c2'], {
+      applyComponentBulkEditResult: { updated: 0, componentIds: [] },
+    });
+    assert.deepEqual(messages, ['No components needed changing.']);
+  });
+
+  // `store.applyComponentBulkEdit?.(…)` resolves to `undefined` when the action is absent.
+  // The root used to test `applied === false`, so `undefined` fell through to the success
+  // path: selection cleared, toast fired, nothing written. Any falsy result must abort.
+  it('does not claim success when the store action is missing', async () => {
+    const messages = await applyBulkEditOverRows(['c1'], {
+      applyComponentBulkEditResult: null,
+    });
+    assert.deepEqual(messages, [], 'no toast for a write that never happened');
+  });
+
+  // A selection lives on the lifted browser state, not on the page, and the root builds the
+  // Apply payload from `itemCards` rather than from the rendered rows. Both halves were
+  // proved separately — the view suite pages away and asserts the COUNT survives, the model
+  // suite asserts the reducer is page-independent — but nothing drove the real Apply with a
+  // selection the current page cannot render. That is the composition a GM actually performs
+  // on the library size this feature exists for.
+  it('applies a selection that spans two pages, including the row page 2 cannot see', async () => {
+    const calls = [];
+    // Twelve rows over a ten-row page: `c1` sits on page 1, `pad-11` on page 2.
+    const extraComponentItems = Array.from({ length: 30 }, (_, index) => ({
+      id: `pad-${index + 2}`,
+      name: `Padding ${index + 2}`,
+      img: 'icons/commodities/metal/ore-chunk-grey.webp',
+      description: 'Bulk-selection padding.',
+      tags: [],
+      category: 'general',
+      essences: [],
+    }));
+    await openComponentsBrowser(calls, { extraComponentItems });
+
+    tickComponentRow('c1');
+    target.querySelector('[data-pagination-next]').click();
+    flushSync();
+
+    assert.ok(
+      !target.querySelector('[data-component-select="c1"]'),
+      'pre-condition: page 2 does not render the first selection'
+    );
+    // Whichever row page 2 happens to open on — the point is that it is NOT `c1`, not
+    // which padding row the sort produces.
+    const offPageId = target
+      .querySelector('[data-component-select]')
+      .getAttribute('data-component-select');
+    tickComponentRow(offPageId);
+    target.querySelector('[data-bulk-tag="ore"]').click();
+    flushSync();
+    target.querySelector('[data-component-bulk-apply]').click();
+    await tick();
+    flushSync();
+
+    const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
+    assert.equal(applyCalls.length, 1, 'ONE write for the whole cross-page selection');
+    assert.deepEqual(
+      [...applyCalls[0][1]].sort(),
+      ['c1', offPageId].sort(),
+      'the off-page id reaches the write, not just the count'
+    );
+  });
+
+  // ── Issue 1010: the recipe bulk edit's post-apply report ─────────────────────────
+  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only place
+  // the composed toast can be proved at all. It matters because it COMPOSES: the prototype
+  // this panel follows swaps its books message in for its blocked message with a ternary,
+  // which would let a batch that moved book membership silently swallow the report that
+  // some recipes stayed off — the one outcome the GM cannot see by looking at the rows they
+  // just deselected, because applying clears the selection and unmounts the panel.
+  async function applyRecipeBulkEditOverRows(ids, options = {}) {
+    const messages = [];
+    const previousUi = globalThis.ui;
+    globalThis.ui = { notifications: { info: (message) => messages.push(message) } };
+    try {
+      mountManager([], options);
+      craftingParent().click();
+      await tick();
+      flushSync();
+      for (const id of ids) {
+        target.querySelector(`[data-recipe-select="${id}"]`).click();
+        flushSync();
+      }
+      // Stage one book through the picker: open it, choose the definition, press Add.
+      target.querySelector('.fab-bulk-book-trigger').click();
+      flushSync();
+      target.querySelector('[data-popover-option="ri1"]').click();
+      flushSync();
+      target.querySelector('[data-recipe-bulk-book-add]').click();
+      flushSync();
+      target.querySelector('[data-recipe-bulk-apply]').click();
+      await tick();
+      flushSync();
+      return messages;
+    } finally {
+      if (previousUi === undefined) delete globalThis.ui;
+      else globalThis.ui = previousUi;
+    }
+  }
+
+  it('reports book membership as EDGES, not as the number of books touched', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 2,
+        recipeIds: ['r1', 'r2'],
+        booksUpdated: 1,
+        bookAdditions: 4,
+        bookRemovals: 2,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 4 additions and 2 removals.',
+    ]);
+  });
+
+  it('composes the books sentence WITH the blocked one rather than replacing it', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 2,
+        recipeIds: ['r1', 'r2'],
+        blockedEnables: 1,
+        blockedRecipeIds: ['r2'],
+        bookAdditions: 1,
+      },
+    });
+
+    assert.deepEqual(messages, [
+      'Applied bulk changes to 2 recipes. Books & scrolls updated — 1 addition. '
+        + "1 recipe couldn't be enabled yet.",
+    ]);
+  });
+
+  // `updated` counts recipes whose own FIELDS changed, so a book-only edit legitimately
+  // changes none. Leading with "No recipes needed changing" ahead of "3 additions" reads as
+  // a contradiction rather than as the two distinct facts it is.
+  it('drops "No recipes needed changing" when the batch moved book membership', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: {
+        updated: 0,
+        recipeIds: [],
+        booksUpdated: 1,
+        bookAdditions: 3,
+      },
+    });
+
+    assert.deepEqual(messages, ['Books & scrolls updated — 3 additions.']);
+  });
+
+  it('keeps "No recipes needed changing" when nothing at all moved', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
+      applyRecipeBulkEditResult: { updated: 0, recipeIds: [] },
+    });
+
+    assert.deepEqual(messages, ['No recipes needed changing.']);
+  });
+
+  it('says nothing about books when the axis moved no membership', async () => {
+    const messages = await applyRecipeBulkEditOverRows(['r1'], {
+      applyRecipeBulkEditResult: { updated: 1, recipeIds: ['r1'] },
+    });
+
+    assert.deepEqual(messages, ['Applied bulk changes to 1 recipe.']);
+  });
+
+  // Creating a crafting system already SELECTED it in the store, but the GM was left on
+  // the systems library — one more click from the thing they had just asked for, and with
+  // no signal about which row was the new one.
+  it('creating a crafting system opens the System Overview of the NEW system', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls, {}), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'systems',
+      'pre-condition: the manager opens on the systems library'
+    );
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
+    // The whole point: the NEW system, not whichever one happened to be selected before.
+    assert.equal(
+      target.querySelector('#manager-system-name')?.value,
+      'New Crafting System',
+      'the overview shows the system that was just created'
+    );
+  });
+
+  // …but only when a system was actually created. Backing out of the dirty-environment
+  // confirm returns `false`, and navigating anyway would abandon the very edit the GM just
+  // chose to keep.
+  it('a cancelled crafting-system create stays on the systems library', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, { createSystemResult: false }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await Promise.resolve();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'systems');
+  });
+
+  // ── The root's own prop forwarding ──────────────────────────────────────────────
+  // Three props are computed HERE and handed down, and the view/panel suites all supply
+  // them directly — so every one of them could be mis-wired with those suites still
+  // green. This test mounts the root and reads the DOM the forwarding produces:
+  //  - `difficultyAxisProgressive` into the browser (the row badge), and
+  //  - `showProgressiveDifficulty` into the panel (the DC section), both of which regress
+  //    to the pre-issue-772 CRAFTING-only bug if re-derived from `resolutionMode`;
+  //  - `selectedCards` into the panel, which must be the SELECTION and not the library:
+  //    the overwrite warning counts authored essences over it, so the library would
+  //    overstate the hazard on rows the GM never ticked.
+  // The fixture is deliberately progressive for SALVAGE while `resolutionMode` is
+  // `routedByCheck`, because that is the only shape where the two predicates disagree.
+  it('forwards the three-axis DC predicate and the SELECTED cards, not the crafting mode and the library', async () => {
+    await openComponentsBrowser([], {
+      alchemyResolutionMode: 'routedByCheck',
+      salvageResolutionMode: 'progressive',
+    });
+
+    assert.ok(
+      Boolean(target.querySelector('[data-component-id="c1"] [data-component-difficulty]')),
+      'the row DC badge follows the salvage axis, not the crafting resolution mode'
+    );
+
+    // c2 has NO authored essences; c1 has earth 2.
+    tickComponentRow('c2');
+    assert.ok(
+      Boolean(target.querySelector('[data-component-bulk-difficulty]')),
+      'and so does the panel\'s progressive DC section'
+    );
+
+    target.querySelector('[data-component-bulk-essences-staged]').click();
+    flushSync();
+    assert.ok(
+      !target.querySelector('[data-component-bulk-essence-warning]'),
+      'no selected row has an authored essence value, so there is no hazard to warn about'
+    );
+
+    tickComponentRow('c1');
+    const warning = target.querySelector('[data-component-bulk-essence-warning]');
+    assert.ok(Boolean(warning), 'ticking the row that DOES have one raises the warning');
+    assert.equal(
+      warning.getAttribute('data-component-bulk-essence-warning'),
+      '1',
+      'and it counts the selection'
+    );
+  });
+
   it('opens the in-manager component-edit view, persists tag changes, and exposes source actions', async () => {
     const calls = [];
     const replaced = [];
@@ -6501,15 +7406,91 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-vocabulary-tab="tag"]'));
     assert.ok(target.textContent.includes('potions'), 'recipe tab shows its custom category');
     assert.ok(target.querySelector('[data-category-id="general"]').textContent.includes('Locked'));
-    // A referenced category carries a per-category icon on its row.
-    assert.ok(target.querySelector('[data-category-id="potions"] .manager-vocabulary-icon i'));
+    // A referenced category carries a per-category icon on its row, and that icon IS the
+    // shared searchable IconPicker trigger (issue 878) — not a raw class input.
+    assert.ok(
+      target.querySelector(
+        '[data-vocabulary-icon-picker="potions"] .essence-icon-picker-trigger.manager-vocabulary-icon-trigger i'
+      ),
+      'the row icon renders the shared IconPicker trigger'
+    );
+
+    // Item 5 of issue 878: the view renders NO page header of its own — the shell's
+    // `.manager-header` already carries the title and subtitle for this route.
+    assert.equal(
+      target.querySelector('.manager-tags-categories .manager-section-header'),
+      null,
+      'the tags route must not render a second page header'
+    );
+    // Item 3: the strip uses the shared editor-tab treatment, not a bespoke one.
+    const vocabularyTabs = target.querySelector('.manager-vocabulary-tabs');
+    assert.ok(
+      vocabularyTabs.classList.contains('manager-editor-tabs'),
+      'the vocabulary tab strip reuses the shared editor tab bar'
+    );
+    assert.ok(
+      target
+        .querySelector('[data-vocabulary-tab="recipe"]')
+        .classList.contains('manager-editor-tab-button'),
+      'each vocabulary tab reuses the shared editor tab button'
+    );
+    assert.ok(
+      target.querySelector('[data-vocabulary-tab="recipe"] .manager-editor-tab-badge'),
+      'each vocabulary tab carries the shared editor tab badge'
+    );
 
     // Inspector rail: at-a-glance tiles + reference-safe reassurance (issue 689).
-    assert.ok(target.querySelector('[data-tags-evidence="how-it-works"]'));
+    const howItWorks = target.querySelector('[data-tags-evidence="how-it-works"]');
+    assert.ok(howItWorks);
     assert.ok(target.querySelector('[data-tags-evidence="at-a-glance"]'));
     assert.ok(target.querySelector('[data-tags-category-fact="component-categories"]'));
     assert.ok(target.querySelector('[data-tags-category-fact="references"]'));
-    assert.ok(target.querySelector('[data-tags-evidence="reference-safe"]'));
+    const referenceSafe = target.querySelector('[data-tags-evidence="reference-safe"]');
+    assert.ok(referenceSafe);
+
+    // Issue 881: both contextual-help cards render through the SAME explainer primitive
+    // the Tool Studio's "How Tools work in Fabricate" card uses, so the rail stops
+    // re-deriving one meaning as a disc-bulleted list and a bare paragraph. Rendering the
+    // card shell, the shared card title and the glyph-led rows is the observable contract.
+    for (const card of [howItWorks, referenceSafe]) {
+      assert.ok(
+        card.classList.contains('manager-inspector-card') &&
+          card.classList.contains('manager-explainer-card'),
+        'the tags help cards wear the shared side-panel card shell'
+      );
+      assert.ok(
+        card.querySelector('h3.manager-card-title.manager-explainer-card-title > i'),
+        'the tags help cards carry the shared glyph-led card title'
+      );
+    }
+    assert.equal(
+      howItWorks.querySelectorAll('.manager-explainer-card-list > li').length,
+      3,
+      'the recipe-categories help renders its three rows through the explainer list'
+    );
+    assert.equal(
+      referenceSafe.querySelectorAll('.manager-explainer-card-list > li').length,
+      1,
+      'the reference-safety reassurance is one explainer row, not a bare paragraph'
+    );
+    assert.equal(
+      target.querySelector('.manager-evidence-list'),
+      null,
+      'the retired bullet list must be gone from the rail, not merely unstyled'
+    );
+    // A bold lead-in and its prose are one sentence, so they need a separator. A literal
+    // space there is the last token inside the `{#if}` and Svelte trims block-trailing
+    // whitespace, which ran them together ("…Item.Drag any Item…") — invisible to every
+    // structural assertion above and only caught in a screenshot (issue 881).
+    for (const row of howItWorks.querySelectorAll('.manager-explainer-card-list > li')) {
+      const lead = row.querySelector('strong');
+      if (!lead) continue;
+      assert.match(
+        row.textContent,
+        new RegExp(`${lead.textContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s`),
+        `explainer lead-in "${lead.textContent}" must be separated from its prose`
+      );
+    }
 
     // Live validation: the reserved bucket flags danger as you type, before submit.
     const categoryInput = target.querySelector('#manager-category-add');
@@ -6528,10 +7509,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       'a blocked add never reaches the store'
     );
 
-    // A valid add shows a success hint and delegates with the authored icon.
+    // A valid add shows a success hint and delegates. The icon field is the shared
+    // IconPicker now (issue 878), and an UNTOUCHED one stays empty so the row still
+    // falls back to the default folder glyph — the picked-icon path is its own test.
     setInputValue(categoryInput, 'Elixirs');
-    const iconInput = target.querySelector('#manager-category-add-icon');
-    setInputValue(iconInput, 'fas fa-flask');
     await tick();
     flushSync();
     assert.ok(target.querySelector('.manager-vocabulary-hint.is-success'));
@@ -6542,7 +7523,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     const addCall = calls.find((call) => call[0] === 'addCategory');
-    assert.deepEqual(addCall, ['addCategory', 'Elixirs', 'fas fa-flask']);
+    assert.deepEqual(addCall, ['addCategory', 'Elixirs', '']);
     assert.equal(categoryInput.value, '');
 
     // Per-tab search filters only the active vocabulary and shows an empty state.
@@ -6588,8 +7569,8 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the decorative tag tile uses the fa-tag glyph'
     );
     assert.ok(
-      !target.querySelector('[data-tag-id="ore"] .manager-vocabulary-icon.is-editable'),
-      'the tag tile is decorative, not click-to-edit'
+      !target.querySelector('[data-tag-id="ore"] [data-vocabulary-icon-picker]'),
+      'the tag tile is decorative, not an icon picker'
     );
     const tagInput = target.querySelector('#manager-tag-add');
     setInputValue(tagInput, 'SPICE');
@@ -6714,7 +7695,115 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(!calls.some((call) => call[0] === 'removeComponentCategory'));
   });
 
-  it('edits a per-category icon inline and delegates it to the store (issue 689)', async () => {
+  it('counts the reserved General bucket in the tab badge, the glance tile and the entry chip alike (issue 878)', async () => {
+    // Three counters used to disagree on one screen: the tab badge and the at-a-glance
+    // tile subtracted General while the panel's entry chip included it, so the same
+    // vocabulary read 0, 0 and 1. All three now report the whole vocabulary — the GM's
+    // own entries PLUS the reserved bucket recipes and components genuinely fall under.
+    await openTagsScreen();
+
+    // The fixture seeds exactly one custom recipe category (`potions`) and one custom
+    // component category (`Reagent`), so a correct category counter reads 2. A counter
+    // still subtracting General reads 1 and one double-counting it reads 3.
+    assert.deepEqual(
+      vocabularyCounters('recipe', 'recipe-categories'),
+      { tabBadge: '2', glanceTile: '2', entryChip: '2 entries' },
+      'one custom recipe category plus General is two, on all three surfaces'
+    );
+    // With a custom entry present General has something to be distinguished FROM, so it
+    // takes its row — and the row is what the second of the two numbers accounts for.
+    assert.ok(
+      target.querySelector('[data-category-id="general"]'),
+      'the reserved row is listed once a custom category exists'
+    );
+
+    target.querySelector('[data-vocabulary-tab="component"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      vocabularyCounters('component', 'component-categories'),
+      { tabBadge: '2', glanceTile: '2', entryChip: '2 entries' },
+      'the sibling component vocabulary counts its own General the same way'
+    );
+    assert.ok(target.querySelector('[data-component-category-id="general"]'));
+
+    // Tags are the control: they pass `lockedRow={null}` and have no reserved bucket at
+    // all, so their three counters must equal the raw tag count with nothing added.
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      vocabularyCounters('tag', 'item-tags'),
+      { tabBadge: '3', glanceTile: '3', entryChip: '3 entries' },
+      'the tag vocabulary has no reserved bucket, so nothing is added to its count'
+    );
+  });
+
+  it('leaves General out of the list until the first custom category exists, and explains it in the empty state (issue 878)', async () => {
+    // With no GM-defined categories the reserved row was the only thing in the list: a
+    // row that cannot be renamed, deleted or re-iconed, standing where the onboarding
+    // guidance belongs. It is now withheld until there is a custom entry beside it, and
+    // the empty-state card carries the explanation instead. General is still COUNTED —
+    // the card is what accounts for the 1 the counters report.
+    await openTagsScreen([], {
+      selectedSystemOverrides: { categories: [], componentCategories: [] },
+    });
+
+    assert.equal(
+      target.querySelector('[data-category-id]'),
+      null,
+      'no rows at all render for an empty recipe-category vocabulary, General included'
+    );
+    assert.deepEqual(
+      vocabularyCounters('recipe', 'recipe-categories'),
+      { tabBadge: '1', glanceTile: '1', entryChip: '1 entry' },
+      'General is counted even while it is not listed, and the chip reads as a singular'
+    );
+
+    const emptyPanel = target.querySelector('.manager-vocabulary-empty-panel');
+    assert.ok(emptyPanel, 'the empty-state card renders in place of the reserved row');
+    assert.ok(
+      emptyPanel.textContent.includes('Only General so far'),
+      'the card names General, so the counters reading 1 have a visible referent'
+    );
+    assert.ok(
+      emptyPanel.textContent.includes('Every recipe falls under General until you add one.'),
+      'the card explains what General does rather than merely naming it'
+    );
+    assert.ok(
+      !emptyPanel.classList.contains('is-compact'),
+      'the card is the full panel now that it is the only thing in the list'
+    );
+
+    target.querySelector('[data-vocabulary-tab="component"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-component-category-id]'), null);
+    assert.deepEqual(
+      vocabularyCounters('component', 'component-categories'),
+      { tabBadge: '1', glanceTile: '1', entryChip: '1 entry' },
+      'the component vocabulary resolves the same way from its own reserved bucket'
+    );
+    assert.ok(
+      target
+        .querySelector('.manager-vocabulary-empty-panel')
+        .textContent.includes('Every component falls under General until you add one.'),
+      'the component card explains its own General, not the recipe one'
+    );
+
+    // Tags again as the control: an empty tag vocabulary has genuinely nothing, so it
+    // must count 0 rather than inheriting a reserved bucket it does not have.
+    target.querySelector('[data-vocabulary-tab="tag"]').click();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      vocabularyCounters('tag', 'item-tags'),
+      { tabBadge: '3', glanceTile: '3', entryChip: '3 entries' },
+      'suppressing a reserved row never touches the vocabulary that has none'
+    );
+  });
+
+  it('picks a per-category icon from the searchable popover and delegates it to the store (issue 878)', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -6730,23 +7819,101 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
-    // The editable icon button on a custom category row opens an inline icon editor.
-    target
-      .querySelector('[data-category-id="potions"] .manager-vocabulary-icon.is-editable')
-      .click();
+    // The row's icon tile IS the shared IconPicker trigger: clicking it opens the same
+    // searchable popover the gathering time-of-day / weather / biome icon fields use,
+    // rather than the free-text "type a Font Awesome class, then Save icon" strip it
+    // replaced (issue 878). The popover portals to `.fabricate-manager`, so it is found
+    // from the manager root rather than from inside the row.
+    const picker = target.querySelector('[data-vocabulary-icon-picker="potions"]');
+    assert.ok(picker, 'the custom category row renders an icon picker');
+    assert.equal(
+      target.querySelector('[data-vocabulary-icon-edit="potions"]'),
+      null,
+      'the free-text icon-edit strip is gone'
+    );
+    picker.querySelector('.essence-icon-picker-trigger').click();
     await tick();
     flushSync();
-    const edit = target.querySelector('[data-vocabulary-icon-edit="potions"]');
-    assert.ok(edit, 'the icon editor strip opens for the row');
-    setInputValue(edit.querySelector('input'), 'fas fa-vial');
+
+    const popover = target.querySelector('.essence-icon-picker-popover');
+    assert.ok(popover, 'the searchable icon popover opens');
+    const search = popover.querySelector('.essence-icon-picker-search input');
+    assert.ok(search, 'the popover leads with a search box');
+    setInputValue(search, 'vial');
     await tick();
     flushSync();
-    edit.querySelector('.manager-button.is-primary').click();
+
+    const option = popover.querySelector('.essence-icon-picker-option');
+    assert.ok(option, 'the search narrows the option list');
+    option.click();
     await tick();
     flushSync();
     assert.deepEqual(
       calls.find((call) => call[0] === 'setCategoryIcon'),
-      ['setCategoryIcon', 'potions', 'fas fa-vial']
+      ['setCategoryIcon', 'potions', 'fas fa-flask-vial'],
+      'choosing an option commits immediately — no separate save step'
+    );
+    assert.equal(
+      target.querySelector('.essence-icon-picker-popover'),
+      null,
+      'the popover closes once an icon is chosen'
+    );
+  });
+
+  it('adds a category with an icon chosen from the same searchable popover (issue 878)', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    navButton('Tags & Categories').click();
+    await tick();
+    flushSync();
+
+    // The add form's icon field is the SAME control as the row tile, not a second
+    // free-text one (issue 878, item 4).
+    const iconField = target.querySelector('[data-vocabulary-add-icon]');
+    assert.ok(iconField, 'the add form renders an icon field');
+    assert.equal(
+      iconField.querySelector('input'),
+      null,
+      'the add form icon field is a picker, not a Font Awesome class box'
+    );
+    const trigger = iconField.querySelector(
+      '.essence-icon-picker-trigger.manager-vocabulary-icon-trigger'
+    );
+    assert.ok(trigger, 'the add form icon field renders the shared IconPicker trigger');
+
+    trigger.click();
+    await tick();
+    flushSync();
+    const popover = target.querySelector('.essence-icon-picker-popover');
+    setInputValue(popover.querySelector('.essence-icon-picker-search input'), 'vial');
+    await tick();
+    flushSync();
+    popover.querySelector('.essence-icon-picker-option').click();
+    await tick();
+    flushSync();
+
+    setInputValue(target.querySelector('#manager-category-add'), 'Elixirs');
+    await tick();
+    flushSync();
+    target
+      .querySelector('[aria-label="Recipe categories"] form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await tick();
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      calls.find((call) => call[0] === 'addCategory'),
+      ['addCategory', 'Elixirs', 'fas fa-flask-vial'],
+      'the picked icon rides along with the new category'
     );
   });
 
@@ -7105,10 +8272,49 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Air');
+
+    // A new draft has NO authored colour, and the control must say so. `colorToken`
+    // normalizes an absent value onto `sage`, so an unguarded picker painted a Sage
+    // swatch and marked Sage selected directly above copy reading "No colour — this
+    // essence renders in the theme accent".
+    const colourTrigger = target.querySelector(
+      '[data-manager-essence-colour] .manager-color-picker-trigger'
+    );
+    assert.ok(colourTrigger.classList.contains('is-unset'), 'an unauthored colour reads unset');
+    assert.ok(
+      !/--fab-tag-/.test(colourTrigger.getAttribute('style')),
+      'and the trigger paints a neutral swatch, not a palette colour'
+    );
+
+    // The palette is the WHOLE vocabulary for an essence colour (there is no custom
+    // hex), so picking a preset is the only authoring path there is.
+    colourTrigger.click();
+    await tick();
+    flushSync();
+    assert.equal(
+      document.querySelectorAll('[data-manager-color-token].is-selected').length,
+      0,
+      'no preset claims to be the current choice while none is authored'
+    );
+    document.querySelector('[data-manager-color-token="rose"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      !target
+        .querySelector('[data-manager-essence-colour] .manager-color-picker-trigger')
+        .classList.contains('is-unset'),
+      'authoring a colour ends the unset state'
+    );
+
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
     await tick();
     flushSync();
-    assert.ok(calls.some((call) => call[0] === 'addEssence' && call[1] === 'Air'));
+    const addCall = calls.find((call) => call[0] === 'addEssence' && call[1] === 'Air');
+    assert.ok(addCall, 'the create call reached the store');
+    // FIVE positional arguments, and the fifth is the authored colour. A four-argument
+    // assertion passes identically whether the colour is threaded or dropped.
+    assert.equal(addCall.length, 6, 'addEssence is called with all five arguments');
+    assert.equal(addCall[5], 'rose', 'the GM-authored colour survives the create call');
   });
 
   it('hides manager essence source UI when effect transfer is disabled', async () => {
@@ -7482,19 +8688,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'Collapse crafting menu'
     );
     // The Crafting sub-tabs are a conditional set keyed on the system's
-    // visibilityMode (issue 511, PR-B). The default fixture has no visibilityMode
-    // (→ 'knowledge'), so Access is hidden and Books & Scrolls is shown; order is
-    // Recipes · Books & Scrolls · Settings.
+    // visibilityMode (issue 511, PR-B) plus, for Knowledge, its resolutionMode
+    // (issue 785). The default fixture has no visibilityMode (→ 'knowledge') and a
+    // resolutionMode of 'alchemy', so BOTH Knowledge disjuncts are true: Access is
+    // hidden, Books & Scrolls is shown, and Knowledge appears in every mounted
+    // manager test. Order is Recipes · Books & Scrolls · Knowledge · Settings.
     const craftingItems = Array.from(submenu.querySelectorAll('.manager-nav-subitem'));
     assert.deepEqual(
       craftingItems.map((item) => item.querySelector('.manager-nav-label')?.textContent.trim()),
-      ['Recipes', 'Books & Scrolls', 'Settings']
+      ['Recipes', 'Books & Scrolls', 'Knowledge', 'Settings']
     );
     assert.deepEqual(
       craftingItems.map((item) => item.id),
       [
         'manager-crafting-nav-recipes',
         'manager-crafting-nav-books-scrolls',
+        'manager-crafting-nav-knowledge',
         'manager-crafting-nav-settings',
       ]
     );
@@ -7559,6 +8768,49 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(craftingSubitem('Recipes').classList.contains('is-active'), false);
     assert.equal(craftingSubitem('Settings').getAttribute('aria-current'), null);
     assert.equal(craftingSubitem('Books & Scrolls').getAttribute('aria-current'), null);
+  });
+
+  // The Knowledge surface's ROOT wiring (issue 785). The surface's own behaviour is
+  // covered by tests/components/knowledge-view-mounted.test.js; what only the root
+  // can prove is that the sub-item routes, that the shared inspector aside is
+  // suppressed (leaving it rendered would hold a dead 300px strip open beside the
+  // surface's own roster · detail columns), and that the global roll-up chip lands
+  // in the page header rather than the per-character fact cluster.
+  it('routes the Knowledge sub-item to a full-width three-pane surface with no shared inspector', async () => {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore([], { experimentalFeaturesEnabled: true }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+    craftingParent().click();
+    await tick();
+    flushSync();
+    craftingSubitem('Knowledge').click();
+    await tick();
+    flushSync();
+
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'knowledge');
+    assert.equal(craftingSubitem('Knowledge').getAttribute('aria-current'), 'page');
+    assert.equal(craftingSubitem('Knowledge').classList.contains('is-active'), true);
+    assert.ok(target.querySelector('[data-knowledge-view]'), 'the knowledge surface renders');
+    assert.ok(target.querySelector('[data-knowledge-search]'), 'the roster search renders');
+    assert.equal(
+      target.querySelector('.manager-inspector'),
+      null,
+      'the shared inspector aside is suppressed for the knowledge route'
+    );
+    // The page header carries no roster roll-up pill: the count belongs in the nav-rail
+    // badge like every other browser surface, so its absence is the contract.
+    assert.equal(
+      target.querySelector('[data-knowledge-header-pills]'),
+      null,
+      'the knowledge page header renders no roster roll-up pill'
+    );
   });
 
   // Navigate the mounted manager to the Books & Scrolls surface via the Crafting
@@ -8453,10 +9705,15 @@ describe('CraftingSystemManager mounted behavior', () => {
     const inspectorRateInput = inspectorRateEditor.querySelector(
       '.manager-drop-rate-percent input'
     );
-    assert.equal(inspectorRateInput.getAttribute('type'), 'text');
-    assert.equal(inspectorRateInput.getAttribute('inputmode'), 'numeric');
+    // Issue 883: the inspector renders the shared `ChanceSlider`, exactly as the drop ROWS
+    // do, so its field is a real number input with the control's own min/max rather than a
+    // text input policed by a local digit regex.
+    assert.equal(inspectorRateInput.getAttribute('type'), 'number');
+    assert.equal(inspectorRateInput.getAttribute('min'), '0');
+    assert.equal(inspectorRateInput.getAttribute('max'), '100');
     assert.equal(inspectorRateInput.value, '0');
     const inspectorRateControl = inspectorRateEditor.querySelector('.manager-drop-rate-control');
+    assert.ok(inspectorRateControl.classList.contains('manager-chance-slider-control'));
     assert.ok(inspectorRateControl.classList.contains('is-none'));
     assert.ok(inspectorRateControl.getAttribute('style').includes('--fab-drop-rate-value: 0%;'));
     assert.ok(
@@ -8464,11 +9721,33 @@ describe('CraftingSystemManager mounted behavior', () => {
         .getAttribute('style')
         .includes('--fab-drop-rate-color: var(--fab-drop-rate-none);')
     );
-    inspectorRateInput.value = '09x';
+    inspectorRateInput.value = '9';
     inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(inspectorRateInput.value, '9');
+    // Out of range clamps rather than being held un-committed until blur — the behaviour
+    // the drop rows have shipped with all along.
+    inspectorRateInput.value = '150';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '100');
+    // Commit-on-blur is preserved: an emptied field reverts to the model value on blur
+    // instead of committing an empty rate.
+    inspectorRateInput.value = '9';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    inspectorRateInput.value = '';
+    inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '', 'an emptied field is left alone while editing');
+    inspectorRateInput.dispatchEvent(new Event('blur', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(inspectorRateInput.value, '9', 'blur restores the model value, it does not commit empty');
     let refreshedInspectorRateInput = selectedDropInspector.querySelector(
       '[data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
     );
@@ -8762,7 +10041,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(
       target.querySelector(
-        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]'
+        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
       ).value,
       '35'
     );
@@ -9498,7 +10777,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(
       target.querySelector(
-        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] input[type="text"]'
+        '[data-gathering-task-drop-inspector] [data-gathering-drop-inspector-rate] .manager-drop-rate-percent input'
       ).value,
       '25'
     );
@@ -10478,6 +11757,13 @@ describe('CraftingSystemManager mounted behavior', () => {
       /Check bonus.*Adds @prof/
     );
     assert.equal(inspector.querySelector('[data-tool-inspector-validation]'), null);
+    // Issue 881: the library inspector renders the SAME icon fact row the editor's
+    // behavior preview does, from the same behavior-fact projection — one implementation,
+    // so the two side panels cannot hold two geometries for one meaning.
+    assert.equal(
+      inspector.querySelectorAll('[data-tool-inspector-rule] > .manager-icon-fact-row').length,
+      4
+    );
   });
 
   it('shows canonical validation context in the selected Tool inspector', async () => {
@@ -13623,6 +14909,72 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // Issue 976. The gathering task editor carried the same defect as the recipe editor:
+  // it resolved a tool's name, image and description ONLY through `managedItem(componentId)`,
+  // so a first-class item-sourced tool (`componentId: null`) rendered "Unnamed tool", the
+  // item-bag sentinel and "No description has been added." Pinned against the SAME shared
+  // precedence table as `toolStudio.js` and `RecipeToolsSection`, so the three cannot drift.
+  it('resolves every tool-display precedence case in the gathering task tool picker', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: {
+        store: createStore(calls, {
+          managedItemOptions: TOOL_PRECEDENCE_MANAGED_ITEMS,
+          gatheringLibraryTools: TOOL_DISPLAY_PRECEDENCE_CASES.map((testCase) => ({
+            ...testCase.tool,
+            enabled: true,
+            requirement: null,
+            breakage: { mode: 'limitedUses', maxUses: null },
+            onBreak: { mode: 'destroy' },
+          })),
+          taskInitialToolIds: [],
+        }),
+        services: { openCurrentAdmin: () => {} },
+      },
+    });
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target
+      .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+      .click();
+    await tick();
+    flushSync();
+
+    const section = target.querySelector('[data-gathering-task-required-tools]');
+    assert.ok(section, 'the required tools section renders');
+
+    for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
+      const card = section.querySelector(
+        `[data-gathering-task-required-tools-card="${testCase.tool.id}"]`
+      );
+      assert.ok(card, `${testCase.id}: a picker card renders`);
+      assert.equal(
+        card.querySelector('strong').textContent.trim(),
+        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName,
+        `${testCase.id}: ${testCase.summary}`
+      );
+      assert.equal(
+        card.querySelector('img').getAttribute('src'),
+        testCase.expectedImg,
+        `${testCase.id}: the card renders the expected image`
+      );
+      assert.equal(
+        card.querySelector('.manager-task-component-card-copy span').textContent.trim(),
+        testCase.expectedDescription || 'No description has been added.',
+        `${testCase.id}: the card renders the expected description`
+      );
+    }
+  });
+
   it('renders a stale chip for task toolIds whose library entry is missing and lets the user clear it', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -13762,5 +15114,356 @@ describe('CraftingSystemManager mounted behavior', () => {
       filteredCards[0].getAttribute('data-gathering-task-required-tools-card'),
       'tool-lantern'
     );
+  });
+
+  // --- Failed-save alerts in the editor toolbars (issue 919) -----------------------
+  //
+  // All three of these editors used to compute a failure and render NOTHING: a GM whose
+  // save failed saw no change at all. Each test drives one editor to a dirty draft, fails
+  // its save, and asserts the RENDERED text — element presence alone would pass against an
+  // implementation that renders an empty `<p>`. Each then flips the same live options object
+  // to success and re-saves, and asserts the alert is gone afterwards. For the two gathering
+  // editors that is a real clearing assertion; the recipe-item pair leaves the route on
+  // success, so their absence follows from the whole toolbar branch unmounting instead.
+  //
+  // The `options` object is read at CALL time by the store fixture, so mutating it between
+  // two clicks on one mounted tree switches the outcome without a second mount.
+
+  const SAVE_FAILED_MESSAGE = 'Save failed. Try again.';
+
+  const gatheringEventLibraryFixtures = [
+    {
+      id: 'event-thorns',
+      name: 'Thorn Snare',
+      description: 'Tangled thorns snap shut around a careless gatherer.',
+      img: 'icons/svg/hazard.svg',
+      enabled: true,
+      dropRate: 10,
+      biomes: [],
+      weather: [],
+      timeOfDay: [],
+      dangerTags: [],
+    },
+  ];
+
+  // Two ticks: the save handlers await a store promise, so the state write that renders the
+  // alert lands a microtask after the click. Named apart from the `settle` the system-details
+  // dirty tests use — function declarations are var-scoped, so a second `settle` in this one
+  // describe would silently take over all of their call sites too.
+  async function settleSaveAttempt() {
+    await tick();
+    await tick();
+    flushSync();
+  }
+
+  async function clickHeaderSave() {
+    headerSaveButton(target).click();
+    await settleSaveAttempt();
+  }
+
+  async function clickRecipeItemSave() {
+    target.querySelector('[data-recipe-item-save]').click();
+    await settleSaveAttempt();
+  }
+
+  // Every one of these alerts is asserted THROUGH the toolbar, so the node an identity check
+  // compares is the same node the rendering check found. Querying one scoped and the other bare
+  // would still agree today, but would silently drift apart the moment anything carrying one of
+  // these data attributes rendered outside `.manager-header-actions`.
+  function saveErrorNode(selector) {
+    return target.querySelector(`.manager-header-actions ${selector}`);
+  }
+
+  function assertSaveErrorRendered(selector) {
+    const alert = saveErrorNode(selector);
+    assert.ok(alert, `expected the failed-save alert ${selector} in the header toolbar`);
+    assert.equal(alert.getAttribute('role'), 'alert', 'the failed-save alert is a live region');
+    assert.equal(
+      alert.textContent.trim(),
+      SAVE_FAILED_MESSAGE,
+      'the failed-save alert renders its localized message, not an empty element'
+    );
+  }
+
+  function assertSaveErrorAbsent(selector, why) {
+    assert.equal(target.querySelector(selector), null, why);
+    assert.equal(
+      target.textContent.includes(SAVE_FAILED_MESSAGE),
+      false,
+      `${why} (the message text is gone from the surface too)`
+    );
+  }
+
+  async function openDirtyGatheringTaskEditor(calls, storeOptions) {
+    mountManager(calls, storeOptions);
+    navButton('Gathering').click();
+    await settleSaveAttempt();
+    gatheringSubitem('Tasks').click();
+    await settleSaveAttempt();
+    target
+      .querySelector('[data-gathering-task-id="task-herbs"] [aria-label="Edit Gather Moon Herbs"]')
+      .click();
+    await settleSaveAttempt();
+    setInputValue(target.querySelector('[data-gathering-task-field="name"]'), 'Gather Sun Herbs');
+    await settleSaveAttempt();
+  }
+
+  async function openDirtyGatheringEventEditor(calls, storeOptions) {
+    Object.assign(storeOptions, { gatheringLibraryEvents: gatheringEventLibraryFixtures });
+    mountManager(calls, storeOptions);
+    navButton('Gathering').click();
+    await settleSaveAttempt();
+    gatheringSubitem('Events').click();
+    await settleSaveAttempt();
+    target
+      .querySelector('[data-gathering-event-id="event-thorns"] [aria-label="Edit Thorn Snare"]')
+      .click();
+    await settleSaveAttempt();
+    setInputValue(target.querySelector('[data-gathering-event-field="name"]'), 'Bramble Snare');
+    await settleSaveAttempt();
+  }
+
+  async function openDirtyRecipeItemEditor(calls, storeOptions) {
+    Object.assign(storeOptions, {
+      experimentalFeaturesEnabled: true,
+      recipeItemDefinitions: booksScrollsFixtures,
+    });
+    mountManager(calls, storeOptions);
+    craftingParent().click();
+    await settleSaveAttempt();
+    craftingSubitem('Books & Scrolls').click();
+    await settleSaveAttempt();
+    target.querySelector('[data-books-scrolls-edit="ri1"]').click();
+    await settleSaveAttempt();
+    target.querySelector('[data-recipe-item-enabled]').click();
+    await settleSaveAttempt();
+  }
+
+  // The retry case: a GM whose save fails, changes nothing, and presses Save again gets the
+  // SAME message. `role="alert"` announces on a DOM mutation, and writing a byte-identical
+  // string is not one — $state sees no change, so nothing re-renders and a screen reader is
+  // silent from the second failure onwards. Presence therefore proves nothing here; node
+  // IDENTITY does. This passes only because the save clears its error before the awaited store
+  // call, so the alert leaves the DOM mid-flight and is re-inserted when the failure recurs.
+  async function assertRepeatFailureReAnnounces(selector, save = clickHeaderSave) {
+    await save();
+    assertSaveErrorRendered(selector);
+    const firstAlert = saveErrorNode(selector);
+
+    await save();
+    assertSaveErrorRendered(selector);
+    assert.notStrictEqual(
+      saveErrorNode(selector),
+      firstAlert,
+      'a second identical failure re-inserts the alert rather than leaving the first node in place'
+    );
+    assert.equal(
+      firstAlert.isConnected,
+      false,
+      'the first alert node left the DOM, so the re-insertion is a real announcement'
+    );
+  }
+
+  // The counterpart constraint, and the reason the pre-attempt clear sits AFTER the
+  // composition-loss confirmation rather than at the top of the save: cancelling that
+  // confirmation makes no new attempt at all, so a failure the GM has not yet dealt with has to
+  // stay exactly where it is. Clearing first would delete the alert node with nothing put in its
+  // place — and a removal, unlike an insertion, is typically not announced at all, so the GM
+  // would be left with strictly less than they started with.
+  async function assertCancelledConfirmKeepsSaveError(selector, storeOptions, cancelKey) {
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    const standingAlert = saveErrorNode(selector);
+
+    storeOptions[cancelKey] = false;
+    await clickHeaderSave();
+    assertSaveErrorRendered(selector);
+    assert.strictEqual(
+      saveErrorNode(selector),
+      standingAlert,
+      'a cancelled confirmation leaves the standing failure alert in place, untouched'
+    );
+  }
+
+  // The two gathering rejection paths log through console.error before they surface the
+  // alert, so silence just that call rather than dumping an expected stack into the run.
+  async function withSilencedConsoleError(run) {
+    const original = console.error;
+    console.error = () => {};
+    try {
+      await run();
+    } finally {
+      console.error = original;
+    }
+  }
+
+  it('surfaces a gathering-task save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryTaskResult: false };
+    await openDirtyGatheringTaskEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickHeaderSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+
+    storeOptions.updateGatheringLibraryTaskResult = true;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a gathering-task save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryTaskReject: true };
+    await openDirtyGatheringTaskEditor(calls, storeOptions);
+
+    await withSilencedConsoleError(clickHeaderSave);
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'gathering-task-edit');
+    assertSaveErrorRendered('[data-gathering-task-save-error]');
+
+    storeOptions.updateGatheringLibraryTaskReject = false;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-task-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('re-announces a gathering-task save that fails the same way twice', async () => {
+    await openDirtyGatheringTaskEditor([], { updateGatheringLibraryTaskResult: false });
+    await assertRepeatFailureReAnnounces('[data-gathering-task-save-error]');
+  });
+
+  it('keeps a standing gathering-task save error when the composition-loss warning is cancelled', async () => {
+    const storeOptions = { updateGatheringLibraryTaskResult: false };
+    await openDirtyGatheringTaskEditor([], storeOptions);
+    await assertCancelledConfirmKeepsSaveError(
+      '[data-gathering-task-save-error]',
+      storeOptions,
+      'confirmGatheringLibraryTaskCompositionLossResult'
+    );
+  });
+
+  it('surfaces a gathering-event save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryEventResult: false };
+    await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickHeaderSave();
+    assert.ok(
+      calls.some((call) => call[0] === 'updateGatheringLibraryEvent' && call[2] === 'event-thorns'),
+      'Save routes through updateGatheringLibraryEvent'
+    );
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-event-edit'
+    );
+    assertSaveErrorRendered('[data-gathering-event-save-error]');
+
+    storeOptions.updateGatheringLibraryEventResult = true;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a gathering-event save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { updateGatheringLibraryEventReject: true };
+    await openDirtyGatheringEventEditor(calls, storeOptions);
+
+    // Before issue 919 `saveGatheringEventDraft` had no `catch` at all, so this rejection
+    // escaped as an unhandled rejection and set nothing.
+    await withSilencedConsoleError(clickHeaderSave);
+    assert.equal(
+      target.querySelector('.fabricate-manager').dataset.managerView,
+      'gathering-event-edit'
+    );
+    assertSaveErrorRendered('[data-gathering-event-save-error]');
+
+    storeOptions.updateGatheringLibraryEventReject = false;
+    await clickHeaderSave();
+    assertSaveErrorAbsent(
+      '[data-gathering-event-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('re-announces a gathering-event save that fails the same way twice', async () => {
+    await openDirtyGatheringEventEditor([], { updateGatheringLibraryEventResult: false });
+    await assertRepeatFailureReAnnounces('[data-gathering-event-save-error]');
+  });
+
+  it('keeps a standing gathering-event save error when the composition-loss warning is cancelled', async () => {
+    const storeOptions = { updateGatheringLibraryEventResult: false };
+    await openDirtyGatheringEventEditor([], storeOptions);
+    await assertCancelledConfirmKeepsSaveError(
+      '[data-gathering-event-save-error]',
+      storeOptions,
+      'confirmGatheringLibraryEventCompositionLossResult'
+    );
+  });
+
+  it('surfaces a recipe-item save that returns false, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { saveRecipeItemResult: false };
+    await openDirtyRecipeItemEditor(calls, storeOptions);
+
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'no alert before a save has been attempted'
+    );
+
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assertSaveErrorRendered('[data-recipe-item-save-error]');
+
+    storeOptions.saveRecipeItemResult = true;
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  it('surfaces a recipe-item save that rejects, and clears it on the next success', async () => {
+    const calls = [];
+    const storeOptions = { saveRecipeItemReject: true };
+    await openDirtyRecipeItemEditor(calls, storeOptions);
+
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'recipe-item-edit');
+    assertSaveErrorRendered('[data-recipe-item-save-error]');
+
+    storeOptions.saveRecipeItemReject = false;
+    await clickRecipeItemSave();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
+    assertSaveErrorAbsent(
+      '[data-recipe-item-save-error]',
+      'a successful save clears the failed-save alert'
+    );
+  });
+
+  // `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its awaited store call, and
+  // that line carries exactly the invariant the two gathering saves were changed to hold — but
+  // deleting it left the whole suite green, so nothing was actually holding it. This pins it on
+  // the third editor too, driven through its own Save control rather than the header one.
+  it('re-announces a recipe-item save that fails the same way twice', async () => {
+    await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
+    await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);
   });
 });

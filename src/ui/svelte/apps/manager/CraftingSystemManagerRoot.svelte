@@ -1,11 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
+  import ExplainerCard from './ExplainerCard.svelte';
   import {
     DEFAULT_GATHERING_ENVIRONMENT_IMG,
     DEFAULT_GATHERING_EVENT_IMG,
-    DEFAULT_GATHERING_TASK_IMG
+    DEFAULT_GATHERING_TASK_IMG,
   } from '../../../../gatheringImageDefaults.js';
-  import { localize, notifyWarn } from '../../util/foundryBridge.js';
+  import { localize, notifyInfo, notifyWarn } from '../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import {
     routedSuccessTierOptions,
@@ -14,20 +18,35 @@
     routedOutcomeTierCount,
     routedOutcomeTierNames,
     resolveRecipeCheckTierOptions,
-    resolveRecipeFixedOutcomeTierOptions
+    resolveRecipeFixedOutcomeTierOptions,
   } from '../../../../utils/routedOutcomeKeywords.js';
   import {
+    getEffectiveRecipeCategories,
     getRecipeCategoryLabel,
-    normalizeRecipeCategory
+    normalizeRecipeCategory,
   } from '../../../../utils/recipeCategories.js';
   import {
     getComponentCategoryLabel,
-    normalizeComponentCategory
+    normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
   import { categoryIconFor } from '../../../../utils/categoryIcons.js';
   import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
   import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
-  import { createComponentBrowserState } from '../../../../utils/componentBrowserModel.js';
+  import {
+    componentCategoryOptions,
+    createComponentBrowserState,
+  } from '../../../../utils/componentBrowserModel.js';
+  import {
+    createComponentBulkDraft,
+    toBulkComponentEdit,
+  } from '../../../../utils/componentBulkEditModel.js';
+  import {
+    countBlockedRecipeEnables,
+    countRecipeBookMembership,
+    createRecipeBulkDraft,
+    describeRecipeCheckTierAxis,
+    toBulkRecipeEdit,
+  } from '../../../../utils/recipeBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -49,17 +68,24 @@
   import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeBrowserInspector from './recipes/RecipeBrowserInspector.svelte';
+  // The recipe library's bulk edit panel (issue 1010) — the sibling of the above, and
+  // under `recipes/` for the same reason: `recipe/` is the EDITOR's directory, which the
+  // screenshot map globs for the five recipe-editor frames.
+  import RecipeBulkEditPanel from './recipes/RecipeBulkEditPanel.svelte';
   // The component library's inspector (issue 676) — the sibling of the above. It lives
   // under `components/` (the BROWSER's dir), NOT `component/`, which the screenshot map
   // globs for the component EDITOR's frames.
   import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
+  import ComponentBulkEditPanel from './components/ComponentBulkEditPanel.svelte';
   import BooksScrollsView from './BooksScrollsView.svelte';
+  import KnowledgeView from './KnowledgeView.svelte';
   import CraftingSettingsView from './CraftingSettingsView.svelte';
   import AccessTabView from './AccessTabView.svelte';
   import GrantAccessInspector from './GrantAccessInspector.svelte';
   import ItemPageInspector from './ItemPageInspector.svelte';
   import RecipeItemEditor from './RecipeItemEditor.svelte';
   import ImportFolderMappingModal from './ImportFolderMappingModal.svelte';
+  import ImportReportModal from './ImportReportModal.svelte';
   import {
     buildCraftingNavItems,
     activeCraftingTab as resolveActiveCraftingTab,
@@ -126,12 +152,28 @@
   // group/page state used to live inside ComponentsBrowserView, so every editor
   // round-trip reset it.
   let componentBrowserState = $state(createComponentBrowserState());
+  // The staged-but-unwritten bulk edit (issue 772). The ROOT owns it, not the panel: the
+  // panel is unmounted the moment the selection empties, so a panel-owned draft would be
+  // destroyed by the very transition that is supposed to DISCARD it — indistinguishable
+  // from working, until the panel is kept alive for any other reason. The selection itself
+  // lives on the lifted `componentBrowserState`, beside the browser's other view-state.
+  let componentBulkDraft = $state(createComponentBulkDraft());
+  let componentBulkApplying = $state(false);
+  // The recipe library's twin (issue 1010), owned here for the identical reason: the
+  // recipe bulk panel is unmounted the moment the selection empties, so a panel-owned
+  // draft would be destroyed by the very transition that is supposed to DISCARD it. The
+  // selection itself lives on the lifted `recipeBrowserState`.
+  let recipeBulkDraft = $state(createRecipeBulkDraft());
+  let recipeBulkApplying = $state(false);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
   // Crafting nav group (issue 511): mirrors the gathering group's expand state.
   // The group is always available as of issue 745 (v1.3 headline); only its
   // expand/collapse state lives here.
+  // Not a writable $derived: toggleCraftingMenu writes this from a non-crafting route and the
+  // value must STICK until the route category next changes, which a $derived would clobber.
+  // eslint-disable-next-line svelte/prefer-writable-derived
   let craftingMenuExpanded = $state(false);
   // The selected recipe item on the Books & Scrolls surface (issue 511).
   let selectedRecipeItemId = $state('');
@@ -145,6 +187,9 @@
   let recipeItemDraftBaseline = $state(null);
   let recipeItemLinkedSourceSnapshot = $state(null);
   let recipeItemEditSaving = $state(false);
+  // Set on every failed recipe-item save. Read by the header toolbar, which renders the
+  // localized failure alert beside Save (issue 919 — before that this had no reader at all
+  // and a GM whose save failed was shown nothing).
   let recipeItemSaveFailed = $state(false);
   let recipeItemActiveTab = $state('overview');
   // World-item options fed to the recipe-item editor's Overview link picker. (The
@@ -155,6 +200,10 @@
   // component drop commits, seeded with the per-folder groups the drop resolved to.
   let importMappingOpen = $state(false);
   let importMappingFolders = $state([]);
+  // Post-import reference report (issue 877): the store resolves the assembled
+  // `buildImportReportContent` output once a system import completes, and this renders
+  // it in the same ManagerModal chrome the mapping step above uses.
+  let importReportContent = $state(null);
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
 
@@ -172,10 +221,14 @@
   let gatheringTaskDraft = $state(null);
   let gatheringTaskDraftBaseline = $state(null);
   let gatheringTaskSaving = $state(false);
+  // User-facing failure text for the gathering-task editor, rendered by the header toolbar
+  // beside Save (issue 919).
   let gatheringTaskSaveError = $state('');
   let gatheringEventDraft = $state(null);
   let gatheringEventDraftBaseline = $state(null);
   let gatheringEventSaving = $state(false);
+  // User-facing failure text for the gathering-event editor, rendered by the header toolbar
+  // beside Save (issue 919).
   let gatheringEventSaveError = $state('');
   let toolsComponentSearchTerm = $state('');
   let toolsComponentPageIndex = $state(0);
@@ -183,10 +236,14 @@
   let toolEditorActiveTab = $state('overview');
   let toolValidationFocusNonce = $state(0);
 
-  // Per-check tool-breakage trigger block (issue 419), carried on every check
-  // draft so authoring it under checkDriven authority persists. Deep-clone the
-  // persisted block (matching the engine's `{ enabled, triggers[] }` shape) or
-  // seed the empty default; triggers carry `{ id, label, condition }`.
+  // Per-check unified trigger block (issue 419), carried on every check draft so
+  // authoring it persists. Deep-clone the persisted block or seed the empty default.
+  //
+  // This is an ALLOWLIST, and that makes it the highest-consequence line in the
+  // editor's draft plumbing: a trigger key missing here is dropped on every editor
+  // load, so a GM authors the effect, sees it, saves — and it vanishes with no error.
+  // `checkRoutedDirty` compares the JSON of two values that BOTH pass through here,
+  // so the editor also looks clean. Every trigger key must be listed.
   function cloneCheckBreakage(checkBreakage) {
     const source = checkBreakage && typeof checkBreakage === 'object' ? checkBreakage : {};
     return {
@@ -200,9 +257,15 @@
             outcome: ['success', 'failure', 'none'].includes(trigger?.outcome)
               ? trigger.outcome
               : 'none',
-            breakTools: trigger?.breakTools === true
+            breakTools: trigger?.breakTools === true,
+            // The third effect (issue 975). Copied, not normalized: the draft holds
+            // what the GM authored and `_normalizeTierStep` clamps it on save.
+            tierStep:
+              trigger?.tierStep && typeof trigger.tierStep === 'object'
+                ? { ...trigger.tierStep }
+                : { mode: 'none', steps: 1, tierId: null },
           }))
-        : []
+        : [],
     };
   }
 
@@ -221,7 +284,6 @@
           : '';
     return {
       type: source.type === 'fixed' ? 'fixed' : 'relative',
-      natStepping: source.natStepping === true,
       rollFormula,
       dc: Number.isFinite(dc) ? Math.trunc(dc) : 15,
       thresholdMode: source.thresholdMode === 'exceed' ? 'exceed' : 'meet',
@@ -232,16 +294,14 @@
       fixedOutcomes: Array.isArray(source.fixedOutcomes)
         ? source.fixedOutcomes.map((outcome) => ({ ...outcome }))
         : [],
-      checkBreakage: cloneCheckBreakage(source.checkBreakage)
+      checkBreakage: cloneCheckBreakage(source.checkBreakage),
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkRoutedDraft = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
-  // svelte-ignore state_referenced_locally
-  let checkRoutedBaseline = $state(cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed));
-  // svelte-ignore state_referenced_locally
+  let checkRoutedBaseline = $state(
+    cloneRoutedCheck($viewState.selectedSystem?.craftingCheck?.routed)
+  );
   let lastChecksSystemId = $viewState.selectedSystem?.id || '';
-  // svelte-ignore state_referenced_locally
   let lastChecksResolutionMode = $viewState.selectedSystem?.resolutionMode || 'simple';
   let checkRoutedSaving = $state(false);
   const checkRoutedDirty = $derived(
@@ -260,13 +320,13 @@
       dcMode: source.dcMode === 'dynamic' ? 'dynamic' : 'static',
       tiers: Array.isArray(source.tiers) ? source.tiers.map((tier) => ({ ...tier })) : [],
       macroUuid: source.macroUuid || null,
-      checkBreakage: cloneCheckBreakage(source.checkBreakage)
+      checkBreakage: cloneCheckBreakage(source.checkBreakage),
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkSimpleDraft = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
-  // svelte-ignore state_referenced_locally
-  let checkSimpleBaseline = $state(cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple));
+  let checkSimpleBaseline = $state(
+    cloneSimpleCheck($viewState.selectedSystem?.craftingCheck?.simple)
+  );
   let checkSimpleSaving = $state(false);
   const checkSimpleDirty = $derived(
     JSON.stringify(checkSimpleDraft) !== JSON.stringify(checkSimpleBaseline)
@@ -282,14 +342,12 @@
         ? source.awardMode
         : 'equal',
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
-      checkBreakage: cloneCheckBreakage(source.checkBreakage)
+      checkBreakage: cloneCheckBreakage(source.checkBreakage),
     };
   }
-  // svelte-ignore state_referenced_locally
   let checkProgressiveDraft = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
   );
-  // svelte-ignore state_referenced_locally
   let checkProgressiveBaseline = $state(
     cloneProgressiveCheck($viewState.selectedSystem?.craftingCheck?.progressive)
   );
@@ -302,17 +360,11 @@
   // (simple/routed/progressive), so the crafting clone helpers are reused. Same
   // staged pattern: one draft per mode, committed via the tab-aware header Save.
   const sysSalvage = $viewState.selectedSystem?.salvageCraftingCheck;
-  // svelte-ignore state_referenced_locally
   let salvageSimpleDraft = $state(cloneSimpleCheck(sysSalvage?.simple));
-  // svelte-ignore state_referenced_locally
   let salvageSimpleBaseline = $state(cloneSimpleCheck(sysSalvage?.simple));
-  // svelte-ignore state_referenced_locally
   let salvageRoutedDraft = $state(cloneRoutedCheck(sysSalvage?.routed));
-  // svelte-ignore state_referenced_locally
   let salvageRoutedBaseline = $state(cloneRoutedCheck(sysSalvage?.routed));
-  // svelte-ignore state_referenced_locally
   let salvageProgressiveDraft = $state(cloneProgressiveCheck(sysSalvage?.progressive));
-  // svelte-ignore state_referenced_locally
   let salvageProgressiveBaseline = $state(cloneProgressiveCheck(sysSalvage?.progressive));
   let salvageSimpleSaving = $state(false);
   let salvageRoutedSaving = $state(false);
@@ -331,13 +383,9 @@
   // crafting/salvage progressive + routed shapes (d100 has no editable config),
   // so the crafting clone helpers are reused. Same staged pattern as salvage.
   const sysGathering = $viewState.selectedSystem?.gatheringCraftingCheck;
-  // svelte-ignore state_referenced_locally
   let gatheringProgressiveDraft = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  // svelte-ignore state_referenced_locally
   let gatheringProgressiveBaseline = $state(cloneProgressiveCheck(sysGathering?.progressive));
-  // svelte-ignore state_referenced_locally
   let gatheringRoutedDraft = $state(cloneRoutedCheck(sysGathering?.routed));
-  // svelte-ignore state_referenced_locally
   let gatheringRoutedBaseline = $state(cloneRoutedCheck(sysGathering?.routed));
   let gatheringProgressiveSaving = $state(false);
   let gatheringRoutedSaving = $state(false);
@@ -353,7 +401,12 @@
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
   const placeholderViews = [
-    { id: 'graph', icon: 'fas fa-project-diagram', labelKey: 'FABRICATE.Admin.Manager.Nav.Graph', fallback: 'Graph' }
+    {
+      id: 'graph',
+      icon: 'fas fa-project-diagram',
+      labelKey: 'FABRICATE.Admin.Manager.Nav.Graph',
+      fallback: 'Graph',
+    },
   ];
 
   const selectedSystem = $derived($viewState.selectedSystem);
@@ -363,19 +416,17 @@
   const recipeMultiStepEnabled = $derived(selectedSystem?.features?.multiStepRecipes === true);
   // Complex recipes need a resolution mode that allows multiple ingredient/result
   // sets; simple/progressive systems craft exactly one set into one result.
-  const recipeMultiSetAllowed = $derived(!['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple'));
-  // Both routed modes route a result group across multiple result groups (by the
-  // ingredient set in routedByIngredients, by the check outcome in routedByCheck);
-  // the routing basis is a property of the system mode, not a per-recipe choice.
-  const recipeRouted = $derived(
-    ['routedByIngredients', 'routedByCheck'].includes(selectedSystem?.resolutionMode || 'simple')
+  const recipeMultiSetAllowed = $derived(
+    !['simple', 'progressive'].includes(selectedSystem?.resolutionMode || 'simple')
   );
   const canShowEssences = $derived(selectedSystem?.features?.essences === true);
   // Experimental toggle (issue 745): the Crafting group is now unconditional; this
   // gate only decides whether the unimplemented Graph placeholder is advertised.
   const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
-  const currentView = $derived(normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences));
+  const currentView = $derived(
+    normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences)
+  );
   const isToolStudioRoute = $derived(currentView === 'tools' || currentView === 'tool-edit');
 
   $effect(() => {
@@ -402,7 +453,11 @@
   // the selected system's recipes/environments/components. Drives the GM system
   // overview view, its rail count badge, and the system-blocker banner.
   const systemValidationReport = $derived(
-    $viewState.systemValidation || { issues: [], counts: { critical: 0, warning: 0, info: 0, blockers: 0 }, blocksSystem: false }
+    $viewState.systemValidation || {
+      issues: [],
+      counts: { critical: 0, warning: 0, info: 0, blockers: 0 },
+      blocksSystem: false,
+    }
   );
   const systemBlocksSystem = $derived(systemValidationReport.blocksSystem === true);
   const systemOverviewCount = $derived(
@@ -429,12 +484,12 @@
       none:
         selectedSystem?.resolutionMode === 'alchemy' &&
         (selectedSystem?.alchemy?.checkMode || 'none') === 'none',
-      enabled: selectedSystem?.craftingCheck?.enabled === true
+      enabled: selectedSystem?.craftingCheck?.enabled === true,
     },
     salvage: {
       mode: selectedSystem?.salvageResolutionMode || 'simple',
       optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
-      enabled: selectedSystem?.salvageCraftingCheck?.enabled === true
+      enabled: selectedSystem?.salvageCraftingCheck?.enabled === true,
     },
     // The system-level gathering check's shape is the gathering economy's
     // resolution mode. d100 is the fixed roll (optional/no enable toggle);
@@ -442,8 +497,8 @@
     gathering: {
       mode: gatheringResolutionMode,
       optional: gatheringResolutionMode === 'd100',
-      enabled: selectedSystem?.gatheringCraftingCheck?.enabled === true
-    }
+      enabled: selectedSystem?.gatheringCraftingCheck?.enabled === true,
+    },
   });
 
   // Which crafting check editor is active for the selected system, and whether it
@@ -451,9 +506,12 @@
   // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients`
   // shares the simple pass/fail slot with `simple`/`alchemy`, so it routes dirty
   // tracking + Save through the simple draft (`store.saveCraftingCheckSimple`) and its
-  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. The separate
-  // `recipeRouted` derivation (multi-set / route enablement) still covers both routed
-  // modes.
+  // recipe "Check tier" dropdown falls out of the collapsed 'simple' mode. Collapsing it
+  // here costs nothing elsewhere, because the multi-set and routing behaviours are derived
+  // separately from the RAW `resolutionMode` rather than from this value:
+  // `recipeMultiSetAllowed` gates more than one ingredient/result set, and
+  // `recipeRoutingProvider` picks the routing basis ('check' for routedByCheck,
+  // 'ingredientSet' for routedByIngredients). Both routed modes stay covered there.
   const craftingCheckMode = $derived(
     (function _craftingCheckMode(resolution) {
       if (resolution === 'routedByCheck') return 'routed';
@@ -488,9 +546,7 @@
     (gatheringResolutionMode === 'routed' && gatheringRoutedDirty) ||
       (gatheringResolutionMode === 'progressive' && gatheringProgressiveDirty)
   );
-  const gatheringCheckSaving = $derived(
-    gatheringProgressiveSaving || gatheringRoutedSaving
-  );
+  const gatheringCheckSaving = $derived(gatheringProgressiveSaving || gatheringRoutedSaving);
 
   // Tab-aware Checks dirty/saving/save: the single header Save button persists
   // whichever check sub-tab is active.
@@ -524,7 +580,10 @@
   // on the shared `simple` pass/fail slot and has no outcome tiers) does not surface
   // a dead control.
   const recipeMinSuccessTierOptions = $derived(
-    resolveRecipeFixedOutcomeTierOptions(selectedSystem?.craftingCheck, selectedSystem?.resolutionMode)
+    resolveRecipeFixedOutcomeTierOptions(
+      selectedSystem?.craftingCheck,
+      selectedSystem?.resolutionMode
+    )
   );
 
   // Routed-check outcome tiers (active type) offered to the recipe editor's
@@ -558,7 +617,9 @@
   // DC presets come from `salvageCraftingCheck.simple.tiers` in EVERY resolution mode,
   // routed included (decision 7, case 5) — there is no `.routed.tiers` sibling.
   const salvageCheckTiers = $derived(selectedSystem?.salvageCraftingCheck?.simple?.tiers || []);
-  const salvageCheckDcMode = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static');
+  const salvageCheckDcMode = $derived(
+    selectedSystem?.salvageCraftingCheck?.simple?.dcMode || 'static'
+  );
   const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
   // System components offered to the salvage yield picker.
   //
@@ -592,8 +653,7 @@
   $effect(() => {
     const resolutionMode = selectedSystem?.resolutionMode || 'simple';
     const systemChanged = selectedSystemId !== lastChecksSystemId;
-    const resolutionModeChanged =
-      !systemChanged && resolutionMode !== lastChecksResolutionMode;
+    const resolutionModeChanged = !systemChanged && resolutionMode !== lastChecksResolutionMode;
     if (!systemChanged && !resolutionModeChanged) return;
     lastChecksSystemId = selectedSystemId;
     lastChecksResolutionMode = resolutionMode;
@@ -763,83 +823,177 @@
   const selectedCounts = $derived({
     components: selectedSystem?.managedItemOptions?.length || 0,
     recipes: $viewState.recipes?.length || 0,
-    environments: selectedSystem?.features?.gathering === true ? ($viewState.environments?.length || 0) : null,
+    environments:
+      selectedSystem?.features?.gathering === true ? $viewState.environments?.length || 0 : null,
     essences: selectedSystem?.essenceDefinitions?.length || 0,
     itemTags: selectedSystem?.itemTags?.length || 0,
-    recipeCategories: selectedSystem?.categories?.length || 0
+    recipeCategories: selectedSystem?.categories?.length || 0,
   });
   const itemCards = $derived($viewState.itemCards || []);
   const toolsComponentCards = $derived(Array.isArray(itemCards) ? itemCards : []);
-  const toolsNormalizedComponentSearchTerm = $derived(toolsComponentSearchTerm.trim().toLowerCase());
-  const toolsFilteredComponentCards = $derived(toolsComponentCards.filter(item => {
-    const name = String(item?.name || '').toLowerCase();
-    return !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm);
-  }));
-  const toolsPaginatedComponentCards = $derived(toolsFilteredComponentCards.slice(
-    toolsComponentPageIndex * toolsComponentPageSize,
-    (toolsComponentPageIndex + 1) * toolsComponentPageSize
-  ));
-  const tagCategoryUsage = $derived(buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards));
-  const categoryRows = $derived(buildCategoryRows(
-    selectedSystem?.categories || [],
-    tagCategoryUsage.categoryUsage,
-    selectedSystem?.categoryIcons || {}
-  ));
-  const componentCategoryRows = $derived(buildComponentCategoryRows(
-    selectedSystem?.componentCategories || [],
-    tagCategoryUsage.componentCategoryUsage,
-    selectedSystem?.componentCategoryIcons || {}
-  ));
+  const toolsNormalizedComponentSearchTerm = $derived(
+    toolsComponentSearchTerm.trim().toLowerCase()
+  );
+  const toolsFilteredComponentCards = $derived(
+    toolsComponentCards.filter((item) => {
+      const name = String(item?.name || '').toLowerCase();
+      return (
+        !toolsNormalizedComponentSearchTerm || name.includes(toolsNormalizedComponentSearchTerm)
+      );
+    })
+  );
+  const tagCategoryUsage = $derived(
+    buildTagCategoryUsage(selectedSystem, $viewState.recipes || [], itemCards)
+  );
+  const categoryRows = $derived(
+    buildCategoryRows(
+      selectedSystem?.categories || [],
+      tagCategoryUsage.categoryUsage,
+      selectedSystem?.categoryIcons || {}
+    )
+  );
+  const componentCategoryRows = $derived(
+    buildComponentCategoryRows(
+      selectedSystem?.componentCategories || [],
+      tagCategoryUsage.componentCategoryUsage,
+      selectedSystem?.componentCategoryIcons || {}
+    )
+  );
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
+  // Every category counter on the Tags & Categories screen reports the WHOLE vocabulary
+  // — the GM's own entries plus the reserved General bucket — because General is a real,
+  // referenceable category that recipes and components genuinely fall under (issue 878).
+  // `buildCategoryRows` / `buildComponentCategoryRows` both emit General first, so a row
+  // array's length already IS that total. The previous `custom*` fields subtracted
+  // General here and fed the tab badge and the at-a-glance tile, while `VocabularyPanel`
+  // counted it independently for its own entry chip — one screen, three numbers, two
+  // meanings. The `baseCategories: 1` companion field was read by nothing and is gone
+  // rather than left to invite a double count against these now-inclusive totals.
   const tagCategoryCounts = $derived({
-    baseCategories: 1,
-    customCategories: categoryRows.filter(row => row.id !== 'general').length,
-    customComponentCategories: componentCategoryRows.filter(row => row.id !== 'general').length,
+    recipeCategories: categoryRows.length,
+    componentCategories: componentCategoryRows.length,
     itemTags: tagRows.length,
     categoryReferences: tagCategoryUsage.categoryReferenceCount,
     componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
-    tagReferences: tagCategoryUsage.tagReferenceCount
+    tagReferences: tagCategoryUsage.tagReferenceCount,
   });
   // The Tags & Categories screen shows one vocabulary tab at a time; the active tab
   // is owned here so the inspector's contextual help can follow it (the view is a
-  // controlled component over this state). Each help block is title + three bullets.
+  // controlled component over this state). Each help block is a title plus three
+  // glyph-led rows, rendered by the shared `ExplainerCard` (issue 881) — the same
+  // primitive the Tool Studio's "How Tools work in Fabricate" card renders, so the two
+  // right-hand panels no longer state one meaning at two heading and body scales.
   let tagsActiveTab = $state('recipe');
   const tagsHelp = $derived.by(() => {
     if (tagsActiveTab === 'component') {
       return {
-        title: text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle', 'How component categories work'),
+        title: text(
+          'FABRICATE.Admin.Manager.TagsCategories.ComponentHelpTitle',
+          'How component categories work'
+        ),
         items: [
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1', 'Every component belongs to General until you add categories to group them.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2', 'Component categories are independent of recipe categories.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3', 'Deleting a category reassigns its components back to General.')
-        ]
+          {
+            icon: 'fas fa-cubes',
+            text: text(
+              'FABRICATE.Admin.Manager.TagsCategories.ComponentHelp1',
+              'Every component belongs to General until you add categories to group them.'
+            ),
+          },
+          {
+            icon: 'fas fa-scroll',
+            text: text(
+              'FABRICATE.Admin.Manager.TagsCategories.ComponentHelp2',
+              'Component categories are independent of recipe categories.'
+            ),
+          },
+          {
+            icon: 'fas fa-arrow-rotate-left',
+            text: text(
+              'FABRICATE.Admin.Manager.TagsCategories.ComponentHelp3',
+              'Deleting a category reassigns its components back to General.'
+            ),
+          },
+        ],
       };
     }
     if (tagsActiveTab === 'tag') {
       return {
-        title: text('FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle', 'How component tags work'),
+        title: text(
+          'FABRICATE.Admin.Manager.TagsCategories.TagHelpTitle',
+          'How component tags work'
+        ),
         items: [
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp1', 'Tags appear on components and on tag-placeholder ingredients in recipes.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp2', 'Tag names are normalised to lowercase so they stay consistent.'),
-          text('FABRICATE.Admin.Manager.TagsCategories.TagHelp3', 'A recipe can require any component carrying a tag instead of a specific item.')
-        ]
+          {
+            icon: 'fas fa-tag',
+            text: text(
+              'FABRICATE.Admin.Manager.TagsCategories.TagHelp1',
+              'Tags appear on components and on tag-placeholder ingredients in recipes.'
+            ),
+          },
+          {
+            icon: 'fas fa-font',
+            text: text(
+              'FABRICATE.Admin.Manager.TagsCategories.TagHelp2',
+              'Tag names are normalised to lowercase so they stay consistent.'
+            ),
+          },
+          {
+            icon: 'fas fa-list-check',
+            text: text(
+              'FABRICATE.Admin.Manager.TagsCategories.TagHelp3',
+              'A recipe can require any component carrying a tag instead of a specific item.'
+            ),
+          },
+        ],
       };
     }
     return {
-      title: text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle', 'How recipe categories work'),
+      title: text(
+        'FABRICATE.Admin.Manager.TagsCategories.RecipeHelpTitle',
+        'How recipe categories work'
+      ),
       items: [
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1', 'Categories are flat — each recipe picks one, with no parent or child folders.'),
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2', 'General is the reserved fallback for recipes without a custom category.'),
-        text('FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3', 'Adding a category makes it selectable in the recipe editor immediately.')
-      ]
+        {
+          icon: 'fas fa-folder-tree',
+          text: text(
+            'FABRICATE.Admin.Manager.TagsCategories.RecipeHelp1',
+            'Categories are flat — each recipe picks one, with no parent or child folders.'
+          ),
+        },
+        {
+          icon: 'fas fa-lock',
+          text: text(
+            'FABRICATE.Admin.Manager.TagsCategories.RecipeHelp2',
+            'General is the reserved fallback for recipes without a custom category.'
+          ),
+        },
+        {
+          icon: 'fas fa-scroll',
+          text: text(
+            'FABRICATE.Admin.Manager.TagsCategories.RecipeHelp3',
+            'Adding a category makes it selectable in the recipe editor immediately.'
+          ),
+        },
+      ],
     };
   });
+  // The reference-safety reassurance was a bare `.manager-muted` paragraph under its own
+  // card title — the third re-derivation of the explainer (issue 881). One glyph-led row
+  // in the shared card says the same thing at the shared scale.
+  const tagsReferenceSafeItems = $derived([
+    {
+      icon: 'fas fa-shield-halved',
+      text: text(
+        'FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint',
+        'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.'
+      ),
+    },
+  ]);
   const selectedCountFacts = $derived(buildSelectedCountFacts(selectedCounts));
   const enabledFeatureLabels = $derived(featureLabels(selectedSystem));
-  const selectedGatheringConditionShortcuts = $derived(buildSelectedGatheringConditionShortcuts(
-    selectedSystem,
-    $viewState.gatheringConfig
-  ));
+  const selectedGatheringConditionShortcuts = $derived(
+    buildSelectedGatheringConditionShortcuts(selectedSystem, $viewState.gatheringConfig)
+  );
   const selectedGatheringCharacterModifiers = $derived(
     Array.isArray($viewState.gatheringConfig?.systems?.[selectedSystemId]?.characterModifiers)
       ? $viewState.gatheringConfig.systems[selectedSystemId].characterModifiers
@@ -866,11 +1020,22 @@
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
-  const currencySpendStrategy = $derived(selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty');
+  const currencySpendStrategy = $derived(
+    selectedSystem?.requirements?.currency?.spendStrategy || 'actorProperty'
+  );
   const currencyProviderId = $derived(selectedSystem?.requirements?.currency?.providerId || '');
-  const currencyMacros = $derived(selectedSystem?.requirements?.currency?.macros || { canAfford: '', increment: '', decrement: '' });
+  const currencyMacros = $derived(
+    selectedSystem?.requirements?.currency?.macros || {
+      canAfford: '',
+      increment: '',
+      decrement: '',
+    }
+  );
   const currencyProviderOptions = $derived(
-    getCurrencyProvidersForFoundrySystem(foundrySystemId).map(provider => ({ id: provider.id, label: provider.label }))
+    getCurrencyProvidersForFoundrySystem(foundrySystemId).map((provider) => ({
+      id: provider.id,
+      label: provider.label,
+    }))
   );
   async function onAddCharacterModifier(partial) {
     if (!selectedSystemId) return null;
@@ -974,13 +1139,16 @@
 
   function characterModifierLibraryEntry(modifierId) {
     if (!modifierId) return null;
-    return selectedGatheringCharacterModifiers.find(entry => entry.id === modifierId) || null;
+    return selectedGatheringCharacterModifiers.find((entry) => entry.id === modifierId) || null;
   }
 
   function characterModifierLabelForRef(ref) {
     const entry = characterModifierLibraryEntry(ref?.modifierId);
     if (entry) return entry.label || entry.id;
-    return text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref?.modifierId || '');
+    return text(
+      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
+      'Unknown modifier ({id})'
+    ).replace('{id}', ref?.modifierId || '');
   }
 
   function characterModifierIconForRef(ref) {
@@ -1001,7 +1169,7 @@
     const id = modifierId ?? selectedGatheringCharacterModifiers[0]?.id ?? '';
     if (!id) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
-    const row = rows.find(entry => entry.id === rowId);
+    const row = rows.find((entry) => entry.id === rowId);
     if (!row) return;
     const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
     const newRef = {
@@ -1010,7 +1178,7 @@
       operator: '+',
       min: null,
       max: null,
-      expressionOverride: ''
+      expressionOverride: '',
     };
     updateGatheringTaskDrop(rowId, { characterModifiers: [...refs, newRef] });
   }
@@ -1019,8 +1187,10 @@
   const characterModifierSearchSuggestions = $derived.by(() => {
     const term = characterModifierSearchTerm.trim().toLowerCase();
     if (!term) return [];
-    const attached = new Set((selectedGatheringDrop?.characterModifiers || []).map(ref => ref.modifierId).filter(Boolean));
-    return selectedGatheringCharacterModifiers.filter(entry => {
+    const attached = new Set(
+      (selectedGatheringDrop?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
+    );
+    return selectedGatheringCharacterModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1036,8 +1206,10 @@
   const eventCharacterModifierSearchSuggestions = $derived.by(() => {
     const term = characterModifierSearchTerm.trim().toLowerCase();
     if (!term) return [];
-    const attached = new Set((editingGatheringEvent?.characterModifiers || []).map(ref => ref.modifierId).filter(Boolean));
-    return selectedGatheringCharacterModifiers.filter(entry => {
+    const attached = new Set(
+      (editingGatheringEvent?.characterModifiers || []).map((ref) => ref.modifierId).filter(Boolean)
+    );
+    return selectedGatheringCharacterModifiers.filter((entry) => {
       if (attached.has(entry.id)) return false;
       const label = String(entry.label || '').toLowerCase();
       const id = String(entry.id || '').toLowerCase();
@@ -1057,7 +1229,10 @@
     const documentRef = globalThis.document;
     const windowRef = globalThis.window || globalThis;
     const viewportTop = 0;
-    const viewportBottom = Number(globalThis.innerHeight || windowRef.innerHeight) || documentRef?.documentElement?.clientHeight || 0;
+    const viewportBottom =
+      Number(globalThis.innerHeight || windowRef.innerHeight) ||
+      documentRef?.documentElement?.clientHeight ||
+      0;
     let parent = node?.parentElement;
     while (parent && parent !== documentRef?.documentElement) {
       const style = globalThis.getComputedStyle?.(parent);
@@ -1067,7 +1242,7 @@
         if (rect) {
           return {
             top: Math.max(viewportTop, rect.top),
-            bottom: Math.min(viewportBottom || rect.bottom, rect.bottom)
+            bottom: Math.min(viewportBottom || rect.bottom, rect.bottom),
           };
         }
       }
@@ -1112,15 +1287,15 @@
   let gatheringBiomePickerSelection = $state('');
   $effect(() => {
     const biomeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'biome');
-    if (!biomeAvailable.some(option => option.id === gatheringBiomePickerSelection)) {
+    if (!biomeAvailable.some((option) => option.id === gatheringBiomePickerSelection)) {
       gatheringBiomePickerSelection = biomeAvailable[0]?.id || '';
     }
     const timeAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'timeOfDay');
-    if (!timeAvailable.some(option => option.id === gatheringTimeOfDayPickerSelection)) {
+    if (!timeAvailable.some((option) => option.id === gatheringTimeOfDayPickerSelection)) {
       gatheringTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
     }
     const weatherAvailable = gatheringConditionAvailableOptions(selectedGatheringDrop, 'weather');
-    if (!weatherAvailable.some(option => option.id === gatheringWeatherPickerSelection)) {
+    if (!weatherAvailable.some((option) => option.id === gatheringWeatherPickerSelection)) {
       gatheringWeatherPickerSelection = weatherAvailable[0]?.id || '';
     }
   });
@@ -1130,22 +1305,24 @@
   let gatheringEventBiomePickerSelection = $state('');
   $effect(() => {
     const biomeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'biome');
-    if (!biomeAvailable.some(option => option.id === gatheringEventBiomePickerSelection)) {
+    if (!biomeAvailable.some((option) => option.id === gatheringEventBiomePickerSelection)) {
       gatheringEventBiomePickerSelection = biomeAvailable[0]?.id || '';
     }
     const timeAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'timeOfDay');
-    if (!timeAvailable.some(option => option.id === gatheringEventTimeOfDayPickerSelection)) {
+    if (!timeAvailable.some((option) => option.id === gatheringEventTimeOfDayPickerSelection)) {
       gatheringEventTimeOfDayPickerSelection = timeAvailable[0]?.id || '';
     }
     const weatherAvailable = gatheringConditionAvailableOptions(editingGatheringEvent, 'weather');
-    if (!weatherAvailable.some(option => option.id === gatheringEventWeatherPickerSelection)) {
+    if (!weatherAvailable.some((option) => option.id === gatheringEventWeatherPickerSelection)) {
       gatheringEventWeatherPickerSelection = weatherAvailable[0]?.id || '';
     }
   });
 
   function gatheringEventModifierPickerSelection(kind) {
     if (kind === 'biome') return gatheringEventBiomePickerSelection;
-    return kind === 'weather' ? gatheringEventWeatherPickerSelection : gatheringEventTimeOfDayPickerSelection;
+    return kind === 'weather'
+      ? gatheringEventWeatherPickerSelection
+      : gatheringEventTimeOfDayPickerSelection;
   }
 
   function setGatheringEventModifierPickerSelection(kind, value) {
@@ -1166,7 +1343,9 @@
   }
 
   function gatheringModifierSignedValue(modifier) {
-    return (modifier?.operator === '-' ? -1 : 1) * Math.abs(Math.trunc(Number(modifier?.value || 0)));
+    return (
+      (modifier?.operator === '-' ? -1 : 1) * Math.abs(Math.trunc(Number(modifier?.value || 0)))
+    );
   }
 
   function gatheringModifierValueClass(modifier) {
@@ -1194,7 +1373,9 @@
     event.stopPropagation();
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
-    const next = signedToOperatorValue(String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1)));
+    const next = signedToOperatorValue(
+      String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1))
+    );
     event.currentTarget.value = gatheringModifierDisplayValue(next);
     updateGatheringDropModifier(rowId, kind, modifier.id, next);
   }
@@ -1203,46 +1384,49 @@
     event.stopPropagation();
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
-    const next = signedToOperatorValue(String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1)));
+    const next = signedToOperatorValue(
+      String(gatheringModifierSignedValue(modifier) + (event.key === 'ArrowUp' ? 1 : -1))
+    );
     event.currentTarget.value = gatheringModifierDisplayValue(next);
     updateGatheringEventConditionModifier(kind, modifier.id, next);
   }
 
   async function setCharacterModifierOverrideEnabled(rowId, ref, enabled, libraryEntry) {
-    const expressionOverride = enabled ? (libraryEntry?.expression || '') : '';
+    const expressionOverride = enabled ? libraryEntry?.expression || '' : '';
     await onUpdateDropCharacterModifier(rowId, ref.id, { expressionOverride });
   }
 
   async function onUpdateDropCharacterModifier(rowId, refId, patch) {
     if (!editingGatheringTask?.id || !rowId || !refId) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
-    const row = rows.find(entry => entry.id === rowId);
+    const row = rows.find((entry) => entry.id === rowId);
     if (!row) return;
     const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const nextRefs = refs.map(ref => ref.id === refId ? { ...ref, ...patch } : ref);
+    const nextRefs = refs.map((ref) => (ref.id === refId ? { ...ref, ...patch } : ref));
     updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
   }
 
   async function onDeleteDropCharacterModifier(rowId, refId) {
     if (!editingGatheringTask?.id || !rowId || !refId) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
-    const row = rows.find(entry => entry.id === rowId);
+    const row = rows.find((entry) => entry.id === rowId);
     if (!row) return;
     const refs = Array.isArray(row.characterModifiers) ? row.characterModifiers : [];
-    const nextRefs = refs.filter(ref => ref.id !== refId);
+    const nextRefs = refs.filter((ref) => ref.id !== refId);
     if (nextRefs.length === refs.length) return;
     updateGatheringTaskDrop(rowId, { characterModifiers: nextRefs });
   }
 
-  const visiblePlaceholderViews = $derived(selectedSystem
-    ? placeholderViews.filter(view => isViewAvailableForSystem(view, selectedSystem))
-    : []
+  const visiblePlaceholderViews = $derived(
+    selectedSystem
+      ? placeholderViews.filter((view) => isViewAvailableForSystem(view, selectedSystem))
+      : []
   );
   const showRecipeCategories = $derived(!!selectedSystem);
   const selectedRecipe = $derived(
-    ($viewState.recipes || []).find(recipe => recipe.id === selectedRecipeId)
-      || ($viewState.recipes || [])[0]
-      || null
+    ($viewState.recipes || []).find((recipe) => recipe.id === selectedRecipeId) ||
+      ($viewState.recipes || [])[0] ||
+      null
   );
   // Recipe-edit deriveds read the live draft (not the persisted record) so the
   // editor, inspector, and header chip all track unsaved staged edits.
@@ -1309,7 +1493,9 @@
   // The recipe editor's Access / Books & Scrolls tabs are MODE-CONDITIONAL off the same
   // craftingEffect matrix the nav and Crafting Settings read, so there is exactly one
   // source of truth for which conditional surface a visibility mode implies.
-  const recipeVisibilityEffect = $derived(craftingEffect(selectedSystem?.visibilityMode || 'knowledge'));
+  const recipeVisibilityEffect = $derived(
+    craftingEffect(selectedSystem?.visibilityMode || 'knowledge')
+  );
   // Resolution happens in the STORE (the tab never touches ids): granted characters
   // resolve over EVERY world actor, not the player-character roster, because the
   // runtime predicate applies no type filter. The rosters are passed explicitly so the
@@ -1320,36 +1506,46 @@
       characters: $viewState.accessCharacters || [],
     }) || { players: [], characters: [] }
   );
-  const recipeEditDirty = $derived(Boolean(recipeDraft)
-    && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline));
-  const showComponentTags = $derived(itemCards.some(item => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0)));
-  const showComponentEssences = $derived(itemCards.some(item => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)));
+  const recipeEditDirty = $derived(
+    Boolean(recipeDraft) && JSON.stringify(recipeDraft) !== JSON.stringify(recipeDraftBaseline)
+  );
+  const showComponentTags = $derived(
+    itemCards.some((item) => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0))
+  );
+  const showComponentEssences = $derived(
+    itemCards.some(
+      (item) => item.showEssences || (Array.isArray(item.essences) && item.essences.length > 0)
+    )
+  );
   const selectedComponent = $derived(
-    itemCards.find(item => item.id === selectedComponentId)
-      || itemCards[0]
-      || null
+    itemCards.find((item) => item.id === selectedComponentId) || itemCards[0] || null
   );
-  const essenceCards = $derived($viewState.essenceCards || selectedSystem?.essenceDefinitions || []);
-  const selectedEssenceStrict = $derived(essenceCards.find(essence => essence.id === selectedEssenceId) || null);
+  const essenceCards = $derived(
+    $viewState.essenceCards || selectedSystem?.essenceDefinitions || []
+  );
+  const selectedEssenceStrict = $derived(
+    essenceCards.find((essence) => essence.id === selectedEssenceId) || null
+  );
   const isCreatingEssenceDraft = $derived(currentView === 'essence-edit' && !selectedEssenceId);
-  const selectedEssence = $derived(
-    selectedEssenceStrict
-      || essenceCards[0]
-      || null
+  const selectedEssence = $derived(selectedEssenceStrict || essenceCards[0] || null);
+  const selectedEssenceForInspector = $derived(
+    currentView === 'essence-edit' ? essenceEditDraft : selectedEssence
   );
-  const selectedEssenceForInspector = $derived(currentView === 'essence-edit' ? essenceEditDraft : selectedEssence);
-  const canSaveEssenceEdit = $derived(essenceEditDirty === true
-    && essenceEditDraft?.validName === true
-    && essenceEditSaving !== true);
-  const canSaveComponentEdit = $derived(componentEditCombinedDirty === true
-    && componentEditSaving !== true);
-  const canSaveRecipeEdit = $derived(recipeEditDirty === true
-    && Boolean(recipeDraft?.name?.trim())
-    && recipeEditSaving !== true);
+  const canSaveEssenceEdit = $derived(
+    essenceEditDirty === true && essenceEditDraft?.validName === true && essenceEditSaving !== true
+  );
+  const canSaveComponentEdit = $derived(
+    componentEditCombinedDirty === true && componentEditSaving !== true
+  );
+  const canSaveRecipeEdit = $derived(
+    recipeEditDirty === true && Boolean(recipeDraft?.name?.trim()) && recipeEditSaving !== true
+  );
   const recipeItemDefinitions = $derived(selectedSystem?.recipeItemDefinitions || []);
-  const componentForEdit = $derived(currentView === 'component-edit'
-    ? itemCards.find(item => item.id === selectedComponentId) || null
-    : null);
+  const componentForEdit = $derived(
+    currentView === 'component-edit'
+      ? itemCards.find((item) => item.id === selectedComponentId) || null
+      : null
+  );
   const componentEditTagOptions = $derived(componentTagOptionsFor(componentForEdit));
   const componentEditEssenceOptions = $derived(componentEssenceOptionsFor(componentForEdit));
   const componentEditShowTags = $derived(componentShowTagsFor(componentForEdit));
@@ -1373,43 +1569,132 @@
   // per system (`gatheringConfig.systems[systemId].economy`), so this is a direct
   // read of the edited system's mode, not a scan.
   const gatheringProgressive = $derived(
-    $viewState.gatheringConfig?.systems?.[selectedSystemId]?.economy?.resolutionMode === 'progressive'
+    $viewState.gatheringConfig?.systems?.[selectedSystemId]?.economy?.resolutionMode ===
+      'progressive'
   );
+  // The SYSTEM-scoped half of that question, extracted so three surfaces can share it
+  // (issue 772): the single-component editor control, the browser row's read-only DC
+  // badge, and the browser's bulk-edit progressive-DC section. It carries NO view and NO
+  // selection term — `componentDifficultyShown` below adds those back for the editor —
+  // because the two browser surfaces are, by definition, not in the editor: reusing the
+  // view-scoped predicate there would render both of them NEVER, and pass vacuously.
+  const componentDifficultyAxisProgressive = $derived(
+    selectedSystem?.resolutionMode === 'progressive' ||
+      salvageResolutionMode === 'progressive' ||
+      gatheringProgressive
+  );
+  // Behaviour-preserving by construction: the same three axes ANDed with the same two view
+  // terms this derivation always had. It gates the editor control's VISIBILITY and the
+  // difficulty fold-in on the SAVE path (`saveComponentEdit`), so the rewrite has to hold
+  // for both — nothing under `tests/` names it.
   const componentDifficultyShown = $derived(
-    currentView === 'component-edit'
-    && (
-      selectedSystem?.resolutionMode === 'progressive'
-      || salvageResolutionMode === 'progressive'
-      || gatheringProgressive
-    )
-    && !!componentForEdit
+    currentView === 'component-edit' && componentDifficultyAxisProgressive && !!componentForEdit
   );
   const componentDifficultyDirty = $derived(
-    componentDifficultyShown
-    && normalizeComponentDifficulty(componentDifficultyDraft)
-      !== normalizeComponentDifficulty(componentForEdit?.difficulty)
+    componentDifficultyShown &&
+      normalizeComponentDifficulty(componentDifficultyDraft) !==
+        normalizeComponentDifficulty(componentForEdit?.difficulty)
   );
   const componentEditCombinedDirty = $derived(
     componentEditDirty === true || componentDifficultyDirty === true
   );
+  // ── The bulk selection (issue 772) ───────────────────────────────────────────────
+  // Read straight off the LIFTED browser state, which `ComponentsBrowserView` binds: the
+  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
+  // prop or a second copy of the truth.
+  const componentBulkSelectedIds = $derived(
+    componentBrowserState.bulkSelectedComponentIds ?? new Set()
+  );
+  const componentBulkSelectionCount = $derived(componentBulkSelectedIds.size);
+  const componentBulkSelectedCards = $derived(
+    itemCards.filter((item) => componentBulkSelectedIds.has(item.id))
+  );
+  const componentBulkCategoryOptions = $derived(
+    componentCategoryOptions(itemCards, selectedSystem?.componentCategories || [])
+  );
+  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
+  // prune that removed the last id, or a successful apply. The panel is unmounted at that
+  // point, so this is the only place the discard can honestly happen.
+  $effect(() => {
+    if (componentBulkSelectionCount === 0) componentBulkDraft = createComponentBulkDraft();
+  });
+  // ── The recipe bulk selection (issue 1010) ───────────────────────────────────────
+  // Read straight off the LIFTED browser state, which `RecipesBrowserView` binds: the
+  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
+  // prop or a second copy of the truth. The Component Studio's block above is the twin.
+  const recipeBulkSelectedIds = $derived(recipeBrowserState.bulkSelectedRecipeIds ?? new Set());
+  const recipeBulkSelectionCount = $derived(recipeBulkSelectedIds.size);
+  // The PROJECTED rows, not the ids: the blocked-enable forecast reads `enableBlocked` and
+  // `enabled`, both of which live on the projection the browser renders.
+  const recipeBulkSelectedRows = $derived(
+    ($viewState.recipes || []).filter((recipe) => recipeBulkSelectedIds.has(recipe.id))
+  );
+  // The SAME predicate the row's `Can't enable` pill reads, so the panel's count and the
+  // pilled rows are one set by construction rather than by convention. It is 0 unless
+  // `Enable` is actually staged — nothing can be refused by a disable or a leave-alone.
+  const recipeBulkBlockedCount = $derived(
+    countBlockedRecipeEnables(recipeBulkSelectedRows, recipeBulkDraft?.status)
+  );
+  // How many of the SELECTED recipes each recipe book holds — the `holds n of {total}`
+  // figure the bulk panel's book picker states, and what its Add / Remove counts and
+  // disabled states are derived from.
+  //
+  // Derived from the same PROJECTED ROWS, and that is the load-bearing part. Each row's
+  // `recipeItemIds` comes from `_recipeItemDefinitionsContaining`, which takes the system's
+  // `membershipResolvesByRecipeIds` marker as a parameter and is therefore basis-aware.
+  // Counting from `recipeItemDefinitions[].recipeIds` instead would report "holds none
+  // selected" on every legacy-basis system — where membership still resolves through the
+  // `recipe.recipeItemId` scalar and a book's own array is empty — and would disable Remove
+  // on exactly the worlds this axis exists to fix.
+  const recipeBulkBookMembership = $derived(countRecipeBookMembership(recipeBulkSelectedRows));
+  // The axis gate reuses the EXISTING `recipeCheckTierOptions` derived rather than
+  // re-resolving the tier list: `resolveRecipeCheckTierOptions` is the single source of
+  // truth for which tiers a system offers, and this helper only explains an empty list.
+  const recipeBulkCheckTierAxis = $derived(
+    describeRecipeCheckTierAxis({
+      craftingCheck: selectedSystem?.craftingCheck,
+      craftingCheckMode,
+      tierOptions: recipeCheckTierOptions,
+    })
+  );
+  // The system's AUTHORED vocabulary, which is what the single-recipe editor's own select
+  // offers — not the browser filter's in-use tally, which would make an authored but
+  // currently unused category unreachable as an assignment target.
+  const recipeBulkCategoryOptions = $derived(
+    getEffectiveRecipeCategories(selectedSystem?.categories || [])
+  );
+  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
+  // prune that removed the last id, or a successful apply. The panel is unmounted at that
+  // point, so this is the only place the discard can honestly happen.
+  $effect(() => {
+    if (recipeBulkSelectionCount === 0) recipeBulkDraft = createRecipeBulkDraft();
+  });
   const environmentList = $derived($viewState.environments || []);
-  const environmentValidationCount = $derived(Array.isArray($viewState.environmentValidationState?.errors)
-    ? $viewState.environmentValidationState.errors.length
-    : 0);
-  const selectedEnvironmentId = $derived($viewState.selectedEnvironmentId || $viewState.environmentDraft?.id || '');
+  const environmentValidationCount = $derived(
+    Array.isArray($viewState.environmentValidationState?.errors)
+      ? $viewState.environmentValidationState.errors.length
+      : 0
+  );
+  const selectedEnvironmentId = $derived(
+    $viewState.selectedEnvironmentId || $viewState.environmentDraft?.id || ''
+  );
   const environmentDraftForDisplay = $derived($viewState.environmentDraft || null);
-  const shouldUseEnvironmentDraftForDisplay = $derived(Boolean(environmentDraftForDisplay)
-    && (currentView === 'environment-edit'
-      || $viewState.environmentDraftDirty === true
-      || $viewState.environmentDraftIsNew === true
-      || environmentDraftForDisplay.id === selectedEnvironmentId));
+  const shouldUseEnvironmentDraftForDisplay = $derived(
+    Boolean(environmentDraftForDisplay) &&
+      (currentView === 'environment-edit' ||
+        $viewState.environmentDraftDirty === true ||
+        $viewState.environmentDraftIsNew === true ||
+        environmentDraftForDisplay.id === selectedEnvironmentId)
+  );
   const selectedEnvironment = $derived(
     shouldUseEnvironmentDraftForDisplay
       ? environmentDraftForDisplay
-      : (environmentList.find(environment => environment.id === selectedEnvironmentId)
-        || environmentList.find(environment => environment.id === environmentDraftForDisplay?.id)
-        || environmentList[0]
-        || null)
+      : environmentList.find((environment) => environment.id === selectedEnvironmentId) ||
+          environmentList.find(
+            (environment) => environment.id === environmentDraftForDisplay?.id
+          ) ||
+          environmentList[0] ||
+          null
   );
   const selectedEnvironmentFacts = $derived(environmentFacts(selectedEnvironment));
   const selectedEnvironmentSceneState = $derived(environmentSceneState(selectedEnvironment));
@@ -1418,7 +1703,7 @@
       id: 'environments',
       icon: 'fas fa-seedling',
       labelKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.Environments',
-      labelFallback: 'Environments'
+      labelFallback: 'Environments',
     },
     {
       id: 'tasks',
@@ -1428,7 +1713,7 @@
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
       titleFallback: 'Gathering Tasks',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
-      hintFallback: 'Browse gathering tasks before attaching them to environments.'
+      hintFallback: 'Browse gathering tasks before attaching them to environments.',
     },
     {
       id: 'encounters',
@@ -1438,7 +1723,7 @@
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersTitle',
       titleFallback: 'Gathering events',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint',
-      hintFallback: 'Browse reusable events before attaching them to environments.'
+      hintFallback: 'Browse reusable events before attaching them to environments.',
     },
     {
       id: 'travel',
@@ -1448,7 +1733,7 @@
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
       titleFallback: 'Travel and parties',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelHint',
-      hintFallback: 'Manage Fabricate parties and set the current realm for this crafting system.'
+      hintFallback: 'Manage Fabricate parties and set the current realm for this crafting system.',
     },
     {
       id: 'settings',
@@ -1458,8 +1743,8 @@
       titleKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderTitle',
       titleFallback: 'Gathering settings',
       hintKey: 'FABRICATE.Admin.Manager.Environment.GatheringTabs.SettingsPlaceholderHint',
-      hintFallback: 'Set system-level rules for gathering.'
-    }
+      hintFallback: 'Set system-level rules for gathering.',
+    },
   ];
   // The Travel/Realms subsystem is opt-in per system. When disabled, the Travel
   // nav item is hidden AND removed from the tab-resolution lists so a stale
@@ -1467,20 +1752,29 @@
   // render alone is insufficient — the guards below validate against this list).
   const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
   const visibleGatheringNavItems = $derived(
-    gatheringRealmsEnabled ? gatheringNavItems : gatheringNavItems.filter(tab => tab.id !== 'travel')
+    gatheringRealmsEnabled
+      ? gatheringNavItems
+      : gatheringNavItems.filter((tab) => tab.id !== 'travel')
   );
-  const gatheringInspectorTabs = $derived(visibleGatheringNavItems.filter(tab => tab.id !== 'environments'));
-  const isGatheringRoute = $derived(currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit');
+  const gatheringInspectorTabs = $derived(
+    visibleGatheringNavItems.filter((tab) => tab.id !== 'environments')
+  );
+  const isGatheringRoute = $derived(
+    currentView === 'environments' ||
+      currentView === 'environment-edit' ||
+      currentView === 'gathering-task-edit' ||
+      currentView === 'gathering-event-edit'
+  );
   const isActiveGatheringChildRoute = $derived(
-    isGatheringRoute && visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)
+    isGatheringRoute && visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)
   );
   const activeGatheringInspectorTab = $derived(
-    gatheringInspectorTabs.find(tab => tab.id === activeGatheringTab) || null
+    gatheringInspectorTabs.find((tab) => tab.id === activeGatheringTab) || null
   );
   // Stale-tab guard: if the active tab is no longer visible (e.g. Travel after the
   // GM disables Travel & Realms), fall back to Environments.
   $effect(() => {
-    if (!visibleGatheringNavItems.some(tab => tab.id === activeGatheringTab)) {
+    if (!visibleGatheringNavItems.some((tab) => tab.id === activeGatheringTab)) {
       activeGatheringTab = 'environments';
     }
   });
@@ -1493,11 +1787,17 @@
   // active route via `resolveActiveCraftingTab`. The group is unconditional as of
   // issue 745 (v1.3 headline).
   const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
+  // The Knowledge surface's gate is wider than Books & Scrolls': it is also shown
+  // for an alchemy system under ANY visibility mode, because `learnRecipeOnCraft`
+  // writes learned recipes regardless and under `global` alchemy they are the sole
+  // reveal source (issue 785).
+  const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '');
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
   const craftingNavItems = $derived(
     buildCraftingNavItems({
       visibilityMode: craftingVisibilityMode,
+      resolutionMode: craftingResolutionMode,
       recipeCount,
       recipeItemCount,
     })
@@ -1510,6 +1810,18 @@
   );
   const isCraftingRoute = $derived(isCraftingView(currentView));
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
+  // The Knowledge surface's projection is published TOP-LEVEL, never hung off
+  // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
+  // reference rebuild on every knowledge publish and let a late phase-2 publish
+  // clobber freshly projected rows.
+  const knowledgeState = $derived($viewState.knowledge || null);
+  // Entering the surface arms the store's whole-world scan; leaving it makes
+  // `refreshKnowledge` a total no-op again and drops the cached snapshot. Without
+  // this gate the scan would have to join `refresh()`, which ~40 mutation paths
+  // call and which has no cheap invalidation signature for actors × items.
+  $effect(() => {
+    store.setKnowledgeActive?.(currentView === 'knowledge');
+  });
   // The recipe whose access grant is open on the Access surface.
   const selectedRecipeForAccess = $derived(
     ($viewState.recipes || []).find((recipe) => recipe.id === selectedRecipeIdForAccess) || null
@@ -1520,10 +1832,12 @@
   );
   // ---- Recipe-item editor draft derivations (recipe-item-edit route) ---------
   const recipeItemEditDirty = $derived(
-    Boolean(recipeItemDraft)
-      && JSON.stringify(recipeItemDraft) !== JSON.stringify(recipeItemDraftBaseline)
+    Boolean(recipeItemDraft) &&
+      JSON.stringify(recipeItemDraft) !== JSON.stringify(recipeItemDraftBaseline)
   );
-  const canSaveRecipeItemEdit = $derived(recipeItemEditDirty === true && recipeItemEditSaving !== true);
+  const canSaveRecipeItemEdit = $derived(
+    recipeItemEditDirty === true && recipeItemEditSaving !== true
+  );
   // The linked linked world item for the editor's Overview preview: resolve from the
   // DRAFT's originItemUuid (so a staged link change updates the preview) against the
   // projected recipe item's resolved fields, then the world-item options.
@@ -1573,17 +1887,21 @@
   $effect(() => {
     craftingMenuExpanded = isCraftingRoute;
   });
-  const selectedGatheringRules = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
-    rewardSelectionMode: 'highestRankedDrop',
-    rewardLimit: 1,
-    eventSelectionMode: 'allDrops',
-    eventLimit: 1,
-    eventPolicy: 'successWithEvent',
-    toolBreakagePolicy: 'failureOnBreak',
-    biomeModifierAggregation: 'strongestOfEach',
-    eventVisibility: 'encounterChance'
-  });
-  const selectedGatheringSystemConfig = $derived($viewState.gatheringConfig?.systems?.[selectedSystemId] || {});
+  const selectedGatheringRules = $derived(
+    $viewState.gatheringConfig?.systems?.[selectedSystemId]?.rules || {
+      rewardSelectionMode: 'highestRankedDrop',
+      rewardLimit: 1,
+      eventSelectionMode: 'allDrops',
+      eventLimit: 1,
+      eventPolicy: 'successWithEvent',
+      toolBreakagePolicy: 'failureOnBreak',
+      biomeModifierAggregation: 'strongestOfEach',
+      eventVisibility: 'encounterChance',
+    }
+  );
+  const selectedGatheringSystemConfig = $derived(
+    $viewState.gatheringConfig?.systems?.[selectedSystemId] || {}
+  );
   // Two independent limitation flags. Honor key-presence precedence: a present
   // `enabled` flag wins over a stale legacy `mode` (mirrors the service / GM
   // economy-view read-compat mapping) so a disabled limit can't be resurrected.
@@ -1592,21 +1910,29 @@
   // resolution mode (d100 → fixed, not editable; progressive/routed → editable).
   const gatheringResolutionMode = $derived(selectedGatheringEconomy.resolutionMode || 'd100');
   const selectedGatheringTaskStaminaEnabled = $derived(
-    selectedGatheringEconomy.stamina != null && Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.stamina, 'enabled')
+    selectedGatheringEconomy.stamina != null &&
+      Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.stamina, 'enabled')
       ? selectedGatheringEconomy.stamina.enabled === true
       : selectedGatheringEconomy.mode === 'stamina'
   );
   const selectedGatheringTaskNodesEnabled = $derived(
-    selectedGatheringEconomy.nodes != null && Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.nodes, 'enabled')
+    selectedGatheringEconomy.nodes != null &&
+      Object.prototype.hasOwnProperty.call(selectedGatheringEconomy.nodes, 'enabled')
       ? selectedGatheringEconomy.nodes.enabled === true
       : selectedGatheringEconomy.mode === 'nodes'
   );
-  const gatheringTaskDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []);
-  const gatheringEventDefinitions = $derived(Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : []);
+  const gatheringTaskDefinitions = $derived(
+    Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []
+  );
+  const gatheringEventDefinitions = $derived(
+    Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : []
+  );
   // Tools are system-owned: read the canonical library from the selected
   // crafting system (surfaced on $viewState.selectedSystem.tools by the store)
   // rather than the gathering-config copy.
-  const selectedGatheringSystemTools = $derived(Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []);
+  const selectedGatheringSystemTools = $derived(
+    Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []
+  );
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
   // Recipe-editor tools library: enrich each tool with its backing component's
   // name (so an unlabelled tool can fall back to the component name rather than
@@ -1626,27 +1952,33 @@
   // tier).
   const selectedSystemEnvironmentOptions = $derived(
     environmentList
-      .filter(environment => String(environment?.craftingSystemId || '') === String(selectedSystemId || ''))
-      .map(environment => ({ id: String(environment.id), name: String(environment.name || environment.id) }))
+      .filter(
+        (environment) =>
+          String(environment?.craftingSystemId || '') === String(selectedSystemId || '')
+      )
+      .map((environment) => ({
+        id: String(environment.id),
+        name: String(environment.name || environment.id),
+      }))
   );
   const travelParties = $derived($viewState.travelParties || []);
   const selectedTravelPartyId = $derived($viewState.selectedPartyId || '');
   const selectedTravelParty = $derived(
-    travelParties.find(party => party.id === selectedTravelPartyId) || null
+    travelParties.find((party) => party.id === selectedTravelPartyId) || null
   );
   // Realm selection is UI-local (no store resolution needed); the inspector
   // reads the selected realm from the system-realm projection.
   let selectedTravelRealmId = $state('');
   const travelSystemRealms = $derived($viewState.selectedSystemRealms || []);
   const selectedTravelRealm = $derived(
-    travelSystemRealms.find(realm => realm.id === selectedTravelRealmId) || null
+    travelSystemRealms.find((realm) => realm.id === selectedTravelRealmId) || null
   );
   // Mirror the Parties tab: keep a realm selected whenever one exists, falling
   // back to the first realm when nothing is selected or the selection is gone.
   $effect(() => {
     if (travelSystemRealms.length === 0) {
       if (selectedTravelRealmId) selectedTravelRealmId = '';
-    } else if (!travelSystemRealms.some(realm => realm.id === selectedTravelRealmId)) {
+    } else if (!travelSystemRealms.some((realm) => realm.id === selectedTravelRealmId)) {
       selectedTravelRealmId = travelSystemRealms[0].id;
     }
   });
@@ -1654,14 +1986,17 @@
   let selectedMapRegionUuid = $state('');
   const mapCurrentSceneRegions = $derived($viewState.currentSceneRegions || []);
   const selectedMapRegion = $derived(
-    mapCurrentSceneRegions.find(region => region.sceneRegionUuid === selectedMapRegionUuid) || null
+    mapCurrentSceneRegions.find((region) => region.sceneRegionUuid === selectedMapRegionUuid) ||
+      null
   );
   // Auto-select the first scene region (and re-seat when the scene changes and the
   // region set is replaced), clearing the selection when the scene has none.
   $effect(() => {
     if (mapCurrentSceneRegions.length === 0) {
       if (selectedMapRegionUuid) selectedMapRegionUuid = '';
-    } else if (!mapCurrentSceneRegions.some(region => region.sceneRegionUuid === selectedMapRegionUuid)) {
+    } else if (
+      !mapCurrentSceneRegions.some((region) => region.sceneRegionUuid === selectedMapRegionUuid)
+    ) {
       selectedMapRegionUuid = mapCurrentSceneRegions[0].sceneRegionUuid;
     }
   });
@@ -1670,38 +2005,45 @@
     tasks: gatheringTaskDefinitions.length,
     encounters: gatheringEventDefinitions.length,
     travel: travelParties.length,
-    total: environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length
+    total:
+      environmentList.length + gatheringTaskDefinitions.length + gatheringEventDefinitions.length,
   });
   const selectedGatheringTask = $derived(
-    gatheringTaskDefinitions.find(task => task.id === selectedGatheringTaskId)
-      || gatheringTaskDefinitions[0]
-      || null
+    gatheringTaskDefinitions.find((task) => task.id === selectedGatheringTaskId) ||
+      gatheringTaskDefinitions[0] ||
+      null
   );
   const selectedGatheringEvent = $derived(
-    gatheringEventDefinitions.find(event => event.id === selectedGatheringEventId)
-      || gatheringEventDefinitions[0]
-      || null
+    gatheringEventDefinitions.find((event) => event.id === selectedGatheringEventId) ||
+      gatheringEventDefinitions[0] ||
+      null
   );
   const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
   const selectedGatheringDrop = $derived(
-    gatheringTaskDropRows(editingGatheringTask).find(row => row.id === selectedGatheringDropId)
-      || gatheringTaskDropRows(editingGatheringTask)[0]
-      || null
+    gatheringTaskDropRows(editingGatheringTask).find((row) => row.id === selectedGatheringDropId) ||
+      gatheringTaskDropRows(editingGatheringTask)[0] ||
+      null
   );
   const gatheringTaskDraftDirty = $derived(
-    !!(gatheringTaskDraft && gatheringTaskDraftBaseline
-      && JSON.stringify(gatheringTaskDraft) !== JSON.stringify(gatheringTaskDraftBaseline))
+    !!(
+      gatheringTaskDraft &&
+      gatheringTaskDraftBaseline &&
+      JSON.stringify(gatheringTaskDraft) !== JSON.stringify(gatheringTaskDraftBaseline)
+    )
   );
   const gatheringTaskValidation = $derived(
     gatheringTaskDraft
-      ? (store.validateGatheringLibraryTask?.(gatheringTaskDraft) || { valid: true, errors: [] })
+      ? store.validateGatheringLibraryTask?.(gatheringTaskDraft) || { valid: true, errors: [] }
       : { valid: true, errors: [] }
   );
 
   const editingGatheringEvent = $derived(gatheringEventDraft || selectedGatheringEvent);
   const gatheringEventDraftDirty = $derived(
-    !!(gatheringEventDraft && gatheringEventDraftBaseline
-      && JSON.stringify(gatheringEventDraft) !== JSON.stringify(gatheringEventDraftBaseline))
+    !!(
+      gatheringEventDraft &&
+      gatheringEventDraftBaseline &&
+      JSON.stringify(gatheringEventDraft) !== JSON.stringify(gatheringEventDraftBaseline)
+    )
   );
   const gatheringEventValidation = $derived(validateGatheringEventDraft(gatheringEventDraft));
 
@@ -1709,33 +2051,31 @@
     if (!draft) return { valid: true, errors: [] };
     const errors = [];
     if (!String(draft?.name || '').trim()) {
-      errors.push(text('FABRICATE.Admin.Manager.Environment.Events.NameRequired', 'Name is required.'));
+      errors.push(
+        text('FABRICATE.Admin.Manager.Environment.Events.NameRequired', 'Name is required.')
+      );
     }
     const rate = Number(draft?.dropRate);
     if (!Number.isFinite(rate) || rate < 1 || rate > 100) {
-      errors.push(text('FABRICATE.Admin.Manager.Environment.Events.DropRateInvalid', 'Drop rate must be between 1 and 100.'));
+      errors.push(
+        text(
+          'FABRICATE.Admin.Manager.Environment.Events.DropRateInvalid',
+          'Drop rate must be between 1 and 100.'
+        )
+      );
     }
     return { valid: errors.length === 0, errors };
   }
 
-  const libraryToolsList = $derived(Array.isArray(selectedSystem?.tools) ? selectedSystem.tools : []);
+  const libraryToolsList = $derived(
+    Array.isArray(selectedSystem?.tools) ? selectedSystem.tools : []
+  );
   const focusedToolDraft = $derived($viewState.toolDraft || null);
   const focusedToolValidation = $derived(
     $viewState.toolDraftValidation || { valid: false, errors: ['missing'] }
   );
-  const dirtyToolIds = $derived(
-    $viewState.toolDraftDirty && focusedToolDraft?.id ? [focusedToolDraft.id] : []
-  );
   const selectedLibraryTool = $derived(
-    libraryToolsList.find(tool => tool.id === focusedToolDraft?.id) || null
-  );
-  const selectedLibraryToolDirty = $derived(
-    selectedLibraryTool ? dirtyToolIds.includes(selectedLibraryTool.id) : false
-  );
-  const selectedToolDraftValidation = $derived(
-    currentView === 'tool-edit' && focusedToolDraft
-      ? focusedToolValidation
-      : { valid: true, errors: [] }
+    libraryToolsList.find((tool) => tool.id === focusedToolDraft?.id) || null
   );
 
   $effect(() => {
@@ -1792,7 +2132,11 @@
       selectedGatheringDropId = '';
       return;
     }
-    if (selectedGatheringTaskId && gatheringTaskDefinitions.some(task => task.id === selectedGatheringTaskId)) return;
+    if (
+      selectedGatheringTaskId &&
+      gatheringTaskDefinitions.some((task) => task.id === selectedGatheringTaskId)
+    )
+      return;
     selectedGatheringTaskId = gatheringTaskDefinitions[0]?.id || '';
   });
 
@@ -1801,7 +2145,11 @@
       selectedGatheringEventId = '';
       return;
     }
-    if (selectedGatheringEventId && gatheringEventDefinitions.some(event => event.id === selectedGatheringEventId)) return;
+    if (
+      selectedGatheringEventId &&
+      gatheringEventDefinitions.some((event) => event.id === selectedGatheringEventId)
+    )
+      return;
     selectedGatheringEventId = gatheringEventDefinitions[0]?.id || '';
   });
 
@@ -1811,7 +2159,7 @@
       return;
     }
     const rows = gatheringTaskDropRows(editingGatheringTask);
-    if (selectedGatheringDropId && rows.some(row => row.id === selectedGatheringDropId)) return;
+    if (selectedGatheringDropId && rows.some((row) => row.id === selectedGatheringDropId)) return;
     selectedGatheringDropId = rows[0]?.id || '';
   });
 
@@ -1826,47 +2174,16 @@
   });
 
   $effect(() => {
-    if (toolsComponentPageIndex > 0 && toolsComponentPageIndex * toolsComponentPageSize >= toolsFilteredComponentCards.length) toolsComponentPageIndex = 0;
+    if (
+      toolsComponentPageIndex > 0 &&
+      toolsComponentPageIndex * toolsComponentPageSize >= toolsFilteredComponentCards.length
+    )
+      toolsComponentPageIndex = 0;
   });
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
-  }
-
-  function toolsComponentCardImage(item) {
-    return item?.img || 'icons/svg/item-bag.svg';
-  }
-
-  function toolsComponentDescription(item) {
-    return String(item?.description || '').trim();
-  }
-
-  function onToolsComponentSearchInput(event) {
-    toolsComponentSearchTerm = event.currentTarget.value;
-    toolsComponentPageIndex = 0;
-  }
-
-  function onToolsComponentDragStart(item, event) {
-    const componentId = String(item?.id || '').trim();
-    if (!componentId) return;
-    event.dataTransfer?.setData?.('text/plain', JSON.stringify({ type: 'FabricateManagedComponent', componentId }));
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
-  }
-
-  function gatheringDropModeLabel(mode) {
-    const labels = {
-      highestRankedDrop: text('FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop'),
-      allDrops: text('FABRICATE.Admin.Manager.Environment.Rules.AllDrops', 'All successful drops'),
-      limitedDrops: text('FABRICATE.Admin.Manager.Environment.Rules.LimitedDrops', 'Limit successful drops')
-    };
-    return labels[mode] || labels.highestRankedDrop;
-  }
-
-  function gatheringEventPolicyLabel(policy) {
-    return policy === 'failureWithEvent'
-      ? text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')
-      : text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds');
   }
 
   function updateSelectedGatheringRules(updates) {
@@ -1894,7 +2211,10 @@
   // the SYSTEM's, restated here because it dictates the editor's whole shape; the
   // banner on each tab is where the GM goes to change it.
   function recipeEditSubtitle() {
-    const category = getRecipeCategoryLabel(normalizeRecipeCategory(recipeDraft?.category), localize);
+    const category = getRecipeCategoryLabel(
+      normalizeRecipeCategory(recipeDraft?.category),
+      localize
+    );
     const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
     // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check DC from the same
     // projected `checkSummary` the browser row's check pill reads. A DC-kind check
@@ -1930,8 +2250,9 @@
       return text('FABRICATE.Admin.Manager.Component.SourceOriginMissing', 'Missing');
     }
     const origin = componentForEdit?.sourceOrigin || '';
-    const sourceLabel = componentForEdit?.sourceOriginLabel
-      || (origin === 'compendium'
+    const sourceLabel =
+      componentForEdit?.sourceOriginLabel ||
+      (origin === 'compendium'
         ? text('FABRICATE.Admin.Manager.Component.SourceOriginCompendium', 'Compendium')
         : origin === 'world'
           ? text('FABRICATE.Admin.Manager.Component.SourceOriginWorld', 'Items Directory')
@@ -1942,12 +2263,17 @@
   function resolutionModeLabel(mode) {
     const labels = {
       simple: text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'),
-      routedByIngredients: text('FABRICATE.Admin.Manager.ResolutionRoutedByIngredients', 'Routed by ingredients'),
+      routedByIngredients: text(
+        'FABRICATE.Admin.Manager.ResolutionRoutedByIngredients',
+        'Routed by ingredients'
+      ),
       routedByCheck: text('FABRICATE.Admin.Manager.ResolutionRoutedByCheck', 'Routed by check'),
       progressive: text('FABRICATE.Admin.SystemSettings.ResolutionProgressive', 'Progressive'),
-      alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy')
+      alchemy: text('FABRICATE.Admin.SystemSettings.ResolutionAlchemy', 'Alchemy'),
     };
-    return labels[mode] || mode || text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple');
+    return (
+      labels[mode] || mode || text('FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple')
+    );
   }
 
   // The titlebar's right-hand status line. Resolution mode is a SYSTEM property, so
@@ -1979,11 +2305,15 @@
     const featureMap = [
       ['gathering', 'FABRICATE.Admin.Manager.Feature.Gathering', 'Gathering'],
       ['essences', 'FABRICATE.Admin.Manager.Feature.Essences', 'Essences'],
-      ['multiStepRecipes', 'FABRICATE.Admin.Manager.Feature.MultiStepRecipes', 'Multi-step recipes'],
+      [
+        'multiStepRecipes',
+        'FABRICATE.Admin.Manager.Feature.MultiStepRecipes',
+        'Multi-step recipes',
+      ],
       ['craftingChecks', 'FABRICATE.Admin.Manager.Feature.CraftingChecks', 'Crafting checks'],
       ['outcomeRouting', 'FABRICATE.Admin.Manager.Feature.OutcomeRouting', 'Outcome routing'],
       ['effectTransfer', 'FABRICATE.Admin.Manager.Feature.EffectTransfer', 'Effect transfer'],
-      ['propertyMacros', 'FABRICATE.Admin.Manager.Feature.PropertyMacros', 'Property macros']
+      ['propertyMacros', 'FABRICATE.Admin.Manager.Feature.PropertyMacros', 'Property macros'],
     ];
     return featureMap
       .filter(([key]) => system.features[key] === true)
@@ -1991,8 +2321,9 @@
   }
 
   function uniqueSorted(values) {
-    return Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b));
+    return Array.from(
+      new Set(values.map((value) => String(value || '').trim()).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b));
   }
 
   function buildSelectedCountFacts(counts) {
@@ -2001,40 +2332,40 @@
       {
         id: 'components',
         label: text('FABRICATE.Admin.Manager.Column.Components', 'Components'),
-        value: counts.components
+        value: counts.components,
       },
       {
         id: 'recipes',
         label: text('FABRICATE.Admin.Manager.Column.Recipes', 'Recipes'),
-        value: counts.recipes
+        value: counts.recipes,
       },
       counts.environments == null
         ? {
-          id: 'environments',
-          label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
-          value: offLabel,
-          isOff: true
-        }
+            id: 'environments',
+            label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
+            value: offLabel,
+            isOff: true,
+          }
         : {
-          id: 'environments',
-          label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
-          value: counts.environments
-        },
+            id: 'environments',
+            label: text('FABRICATE.Admin.Manager.GatheringEnvironments', 'Gathering environments'),
+            value: counts.environments,
+          },
       {
         id: 'essences',
         label: text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences'),
-        value: counts.essences
+        value: counts.essences,
       },
       {
         id: 'item-tags',
         label: text('FABRICATE.Admin.Manager.Feature.ItemTags', 'Item tags'),
-        value: counts.itemTags
+        value: counts.itemTags,
       },
       {
         id: 'recipe-categories',
         label: text('FABRICATE.Admin.Manager.Feature.RecipeCategories', 'Recipe categories'),
-        value: counts.recipeCategories
-      }
+        value: counts.recipeCategories,
+      },
     ];
   }
 
@@ -2049,8 +2380,8 @@
         setting: systemConditions.timeOfDay || {
           enabled: true,
           current: gatheringConfig?.conditions?.timeOfDay || 'day',
-          values: gatheringConfig?.vocabularies?.timeOfDay || []
-        }
+          values: gatheringConfig?.vocabularies?.timeOfDay || [],
+        },
       },
       {
         kind: 'weather',
@@ -2059,10 +2390,13 @@
         setting: systemConditions.weather || {
           enabled: true,
           current: gatheringConfig?.conditions?.weather || 'clear',
-          values: gatheringConfig?.vocabularies?.weather || []
-        }
-      }
-    ].filter(condition => condition.setting?.enabled !== false && conditionValues(condition.setting).length > 0);
+          values: gatheringConfig?.vocabularies?.weather || [],
+        },
+      },
+    ].filter(
+      (condition) =>
+        condition.setting?.enabled !== false && conditionValues(condition.setting).length > 0
+    );
   }
 
   function conditionId(option) {
@@ -2086,7 +2420,14 @@
     if (!system) return 'systems';
     if (view === 'system-overview') return 'system-edit';
     if (view === 'tool-edit' && !$viewState.toolDraft) return 'tools';
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !environmentsAvailable) return 'systems';
+    if (
+      (view === 'environments' ||
+        view === 'environment-edit' ||
+        view === 'gathering-task-edit' ||
+        view === 'gathering-event-edit') &&
+      !environmentsAvailable
+    )
+      return 'systems';
     if ((view === 'essences' || view === 'essence-edit') && !essencesAvailable) return 'systems';
     return view;
   }
@@ -2113,58 +2454,187 @@
 
   function viewTitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Title', 'Recipes');
-    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe');
-    if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings');
-    if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access');
-    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls');
-    if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item');
-    if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Title', 'Components');
-    if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
-    if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories');
-    if (currentView === 'essences') return text('FABRICATE.Admin.Manager.Essence.Title', 'Essences');
-    if (currentView === 'essence-edit') return isCreatingEssenceDraft
-      ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
-      : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle', 'Gathering Tasks');
-    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle', 'Travel and parties');
+    if (currentView === 'recipe-edit')
+      return text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe');
+    if (currentView === 'crafting-settings')
+      return text(
+        'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle',
+        'Crafting settings'
+      );
+    if (currentView === 'access')
+      return text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access');
+    if (currentView === 'books-scrolls')
+      return text('FABRICATE.Admin.Manager.BooksScrolls.Title', 'Books & Scrolls');
+    if (currentView === 'knowledge')
+      return text('FABRICATE.Admin.Manager.Knowledge.Title', 'Knowledge');
+    if (currentView === 'recipe-item-edit')
+      return text('FABRICATE.Admin.Manager.RecipeItem.EditTitle', 'Edit recipe item');
+    if (currentView === 'components')
+      return text('FABRICATE.Admin.Manager.Component.Title', 'Components');
+    if (currentView === 'component-edit')
+      return text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component');
+    if (currentView === 'tags')
+      return text('FABRICATE.Admin.Manager.TagsCategories.Title', 'Tags & Categories');
+    if (currentView === 'essences')
+      return text('FABRICATE.Admin.Manager.Essence.Title', 'Essences');
+    if (currentView === 'essence-edit')
+      return isCreatingEssenceDraft
+        ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
+        : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
+        'Gathering Tasks'
+      );
+    if (currentView === 'environments' && activeGatheringTab === 'travel')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelTitle',
+        'Travel and parties'
+      );
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
-    if (currentView === 'tool-edit') return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
+    if (currentView === 'tool-edit')
+      return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
     if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Title', 'Checks');
-    if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
-    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
-    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
-    if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview');
+    if (currentView === 'environments')
+      return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
+    if (currentView === 'environment-edit')
+      return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
+    if (currentView === 'gathering-task-edit')
+      return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
+    if (currentView === 'gathering-event-edit')
+      return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
+    if (currentView === 'system-edit')
+      return text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview');
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
   function viewSubtitle() {
-    if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Subtitle', 'Manage recipes for the selected crafting system.');
+    if (currentView === 'recipes')
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.Subtitle',
+        'Manage recipes for the selected crafting system.'
+      );
     if (currentView === 'recipe-edit') return recipeEditSubtitle();
-    if (currentView === 'crafting-settings') return text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsHint', 'System-level crafting rules: resolution mode and recipe visibility.');
-    if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Subtitle', 'Grant individual recipes to specific characters or players.');
-    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Subtitle', 'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.');
-    if (currentView === 'recipe-item-edit') return text('FABRICATE.Admin.Manager.RecipeItem.EditSubtitle', 'Link a world item and recipes, then set its use and learn caps.');
-    if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Subtitle', 'Manage item-backed components for the selected crafting system.');
+    if (currentView === 'crafting-settings')
+      return text(
+        'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsHint',
+        'System-level crafting rules: resolution mode and recipe visibility.'
+      );
+    if (currentView === 'access')
+      return text(
+        'FABRICATE.Admin.Manager.Access.Subtitle',
+        'Grant individual recipes to specific characters or players.'
+      );
+    if (currentView === 'books-scrolls')
+      return text(
+        'FABRICATE.Admin.Manager.BooksScrolls.Subtitle',
+        'Review every recipe item in this system with its linked recipes and open one to set its use and learn caps.'
+      );
+    if (currentView === 'knowledge')
+      return text(
+        'FABRICATE.Admin.Manager.Knowledge.Subtitle',
+        'Audit and correct what each character carries and has learned in the selected crafting system.'
+      );
+    if (currentView === 'recipe-item-edit')
+      return text(
+        'FABRICATE.Admin.Manager.RecipeItem.EditSubtitle',
+        'Link a world item and recipes, then set its use and learn caps.'
+      );
+    if (currentView === 'components')
+      return text(
+        'FABRICATE.Admin.Manager.Component.Subtitle',
+        'Manage item-backed components for the selected crafting system.'
+      );
     if (currentView === 'component-edit' && componentForEdit) return componentEditSubtitle();
-    if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.EditSubtitle', 'Update tags, essences, and source linkage for this component.');
-    if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Subtitle', 'Manage recipe category and item tag vocabulary for the selected crafting system.');
-    if (currentView === 'essences') return text('FABRICATE.Admin.Manager.Essence.Subtitle', 'Manage essence definitions for the selected crafting system.');
-    if (currentView === 'essence-edit' && isCreatingEssenceDraft && showEssenceSourceUi) return text('FABRICATE.Admin.Manager.Essence.CreateSubtitle', 'Define identity, icon, and source linkage for a new essence.');
-    if (currentView === 'essence-edit' && isCreatingEssenceDraft) return text('FABRICATE.Admin.Manager.Essence.CreateNoSourceSubtitle', 'Define identity and icon for a new essence.');
-    if (currentView === 'essence-edit' && showEssenceSourceUi) return text('FABRICATE.Admin.Manager.Essence.EditSubtitle', 'Update identity, icon, and source linkage for this essence.');
-    if (currentView === 'essence-edit') return text('FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle', 'Update identity and icon for this essence.');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint', 'Browse gathering tasks before attaching them to environments.');
-    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Travel.Subtitle', 'Manage Fabricate parties and set the current realm for the selected crafting system.');
-    if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Subtitle', 'Manage reusable gathering tools and configure how they behave when required by tasks.');
-    if (currentView === 'tool-edit') return text('FABRICATE.Admin.Manager.Tools.EditSubtitle', 'Configure Tool identity, breakage, requirements, and validation.');
-    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Subtitle', 'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.');
-    if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Subtitle', 'Manage gathering environments for the selected crafting system.');
-    if (currentView === 'environment-edit') return text('FABRICATE.Admin.Manager.Environment.EditSubtitle', 'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.');
-    if (currentView === 'gathering-task-edit') return text('FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle', 'Edit availability, identity, and drop rules for the selected gathering task.');
-    if (currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Events.EditSubtitle', 'Edit identity, availability, danger, and modifiers for the selected event.');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.PageSubtitle', 'Edit base settings and review validation issues for the selected crafting system.');
-    return text('FABRICATE.Admin.Manager.Subtitle', 'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.');
+    if (currentView === 'component-edit')
+      return text(
+        'FABRICATE.Admin.Manager.Component.EditSubtitle',
+        'Update tags, essences, and source linkage for this component.'
+      );
+    if (currentView === 'tags')
+      return text(
+        'FABRICATE.Admin.Manager.TagsCategories.Subtitle',
+        'Manage recipe category and item tag vocabulary for the selected crafting system.'
+      );
+    if (currentView === 'essences')
+      return text(
+        'FABRICATE.Admin.Manager.Essence.Subtitle',
+        'Manage essence definitions for the selected crafting system.'
+      );
+    if (currentView === 'essence-edit' && isCreatingEssenceDraft && showEssenceSourceUi)
+      return text(
+        'FABRICATE.Admin.Manager.Essence.CreateSubtitle',
+        'Define identity, icon, and source linkage for a new essence.'
+      );
+    if (currentView === 'essence-edit' && isCreatingEssenceDraft)
+      return text(
+        'FABRICATE.Admin.Manager.Essence.CreateNoSourceSubtitle',
+        'Define identity and icon for a new essence.'
+      );
+    if (currentView === 'essence-edit' && showEssenceSourceUi)
+      return text(
+        'FABRICATE.Admin.Manager.Essence.EditSubtitle',
+        'Update identity, icon, and source linkage for this essence.'
+      );
+    if (currentView === 'essence-edit')
+      return text(
+        'FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle',
+        'Update identity and icon for this essence.'
+      );
+    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
+        'Browse gathering tasks before attaching them to environments.'
+      );
+    if (currentView === 'environments' && activeGatheringTab === 'travel')
+      return text(
+        'FABRICATE.Admin.Manager.Travel.Subtitle',
+        'Manage Fabricate parties and set the current realm for the selected crafting system.'
+      );
+    if (currentView === 'tools')
+      return text(
+        'FABRICATE.Admin.Manager.Tools.Subtitle',
+        'Manage reusable gathering tools and configure how they behave when required by tasks.'
+      );
+    if (currentView === 'tool-edit')
+      return text(
+        'FABRICATE.Admin.Manager.Tools.EditSubtitle',
+        'Configure Tool identity, breakage, requirements, and validation.'
+      );
+    if (currentView === 'checks')
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Subtitle',
+        'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.'
+      );
+    if (currentView === 'environments')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Subtitle',
+        'Manage gathering environments for the selected crafting system.'
+      );
+    if (currentView === 'environment-edit')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.EditSubtitle',
+        'Edit scene linkage, identity, tasks, events, tools, and validation for the selected environment.'
+      );
+    if (currentView === 'gathering-task-edit')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle',
+        'Edit availability, identity, and drop rules for the selected gathering task.'
+      );
+    if (currentView === 'gathering-event-edit')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Events.EditSubtitle',
+        'Edit identity, availability, danger, and modifiers for the selected event.'
+      );
+    if (currentView === 'system-edit')
+      return text(
+        'FABRICATE.Admin.Manager.SystemEdit.PageSubtitle',
+        'Edit base settings and review validation issues for the selected crafting system.'
+      );
+    return text(
+      'FABRICATE.Admin.Manager.Subtitle',
+      'Manage the system definitions that organize Fabricate components, recipes, gathering, and feature rules.'
+    );
   }
 
   function isViewAvailableForSystem(view, system) {
@@ -2174,17 +2644,13 @@
     return system?.features?.[view.feature] === true;
   }
 
-  function isSelectedRecipe(recipe) {
-    return selectedRecipe?.id === recipe.id;
-  }
-
   function isPromise(value) {
     return value && typeof value.then === 'function';
   }
 
   function afterTruthyResult(result, callback) {
     if (isPromise(result)) {
-      return result.then(value => {
+      return result.then((value) => {
         if (value !== false) callback();
         return value;
       });
@@ -2194,32 +2660,79 @@
   }
 
   function headerActionsLabel() {
-    if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Actions', 'Recipe actions');
-    if (currentView === 'components' || currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.Actions', 'Component actions');
-    if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Actions', 'Tags and categories actions');
-    if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.Manager.Essence.Actions', 'Essence actions');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
-    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions', 'Travel and party actions');
-    if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
-    if (currentView === 'checks') return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
-    if (currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit') return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
-    if (currentView === 'system-edit') return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
+    if (currentView === 'recipes')
+      return text('FABRICATE.Admin.Manager.Recipe.Actions', 'Recipe actions');
+    if (currentView === 'components' || currentView === 'component-edit')
+      return text('FABRICATE.Admin.Manager.Component.Actions', 'Component actions');
+    if (currentView === 'tags')
+      return text('FABRICATE.Admin.Manager.TagsCategories.Actions', 'Tags and categories actions');
+    if (currentView === 'essences' || currentView === 'essence-edit')
+      return text('FABRICATE.Admin.Manager.Essence.Actions', 'Essence actions');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+      return text('FABRICATE.Admin.Manager.Environment.Tasks.Actions', 'Gathering task actions');
+    if (currentView === 'environments' && activeGatheringTab === 'travel')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelActions',
+        'Travel and party actions'
+      );
+    if (currentView === 'tools')
+      return text('FABRICATE.Admin.Manager.Tools.Actions', 'Tools actions');
+    if (currentView === 'knowledge')
+      return text('FABRICATE.Admin.Manager.Knowledge.Actions', 'Knowledge actions');
+    if (currentView === 'checks')
+      return text('FABRICATE.Admin.Manager.Checks.Actions', 'Checks actions');
+    if (
+      currentView === 'environments' ||
+      currentView === 'environment-edit' ||
+      currentView === 'gathering-task-edit' ||
+      currentView === 'gathering-event-edit'
+    )
+      return text('FABRICATE.Admin.Manager.Environment.Actions', 'Environment actions');
+    if (currentView === 'system-edit')
+      return text('FABRICATE.Admin.Manager.SystemEdit.Actions', 'System edit actions');
     return text('FABRICATE.Admin.Manager.SystemActions', 'System actions');
   }
 
   function inspectorLabel() {
-    if (currentView === 'recipe-edit') return text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item');
-    if (currentView === 'component-edit') return text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item');
-    if (currentView === 'access') return text('FABRICATE.Admin.Manager.Access.Inspector', 'Grant access inspector');
-    if (currentView === 'books-scrolls') return text('FABRICATE.Admin.Manager.BooksScrolls.Inspector', 'Selected recipe item inspector');
-    if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Inspector', 'Selected recipe inspector');
-    if (currentView === 'components') return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
-    if (currentView === 'tags') return text('FABRICATE.Admin.Manager.TagsCategories.Inspector', 'Tags and categories inspector');
-    if (currentView === 'essences' || currentView === 'essence-edit') return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
-    if (currentView === 'environments' && activeGatheringTab === 'tasks') return text('FABRICATE.Admin.Manager.Environment.Tasks.Inspector', 'Selected gathering task inspector');
-    if (currentView === 'environments' && activeGatheringTab === 'travel') return text('FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector', 'Selected party inspector');
-    if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
-    if (currentView === 'environments') return text('FABRICATE.Admin.Manager.Environment.Inspector', 'Selected environment inspector');
+    if (currentView === 'recipe-edit')
+      return text('FABRICATE.Admin.Manager.Recipe.RecipeItem', 'Recipe item');
+    if (currentView === 'component-edit')
+      return text('FABRICATE.Admin.Manager.Component.SourceCard.Title', 'Linked Source Item');
+    if (currentView === 'access')
+      return text('FABRICATE.Admin.Manager.Access.Inspector', 'Grant access inspector');
+    if (currentView === 'books-scrolls')
+      return text(
+        'FABRICATE.Admin.Manager.BooksScrolls.Inspector',
+        'Selected recipe item inspector'
+      );
+    if (currentView === 'recipes')
+      return text('FABRICATE.Admin.Manager.Recipe.Inspector', 'Selected recipe inspector');
+    if (currentView === 'components')
+      return text('FABRICATE.Admin.Manager.Component.Inspector', 'Selected component inspector');
+    if (currentView === 'tags')
+      return text(
+        'FABRICATE.Admin.Manager.TagsCategories.Inspector',
+        'Tags and categories inspector'
+      );
+    if (currentView === 'essences' || currentView === 'essence-edit')
+      return text('FABRICATE.Admin.Manager.Essence.Inspector', 'Selected essence inspector');
+    if (currentView === 'environments' && activeGatheringTab === 'tasks')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.Inspector',
+        'Selected gathering task inspector'
+      );
+    if (currentView === 'environments' && activeGatheringTab === 'travel')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TravelInspector',
+        'Selected party inspector'
+      );
+    if (currentView === 'tools')
+      return text('FABRICATE.Admin.Manager.Tools.Inspector', 'Selected tool inspector');
+    if (currentView === 'environments')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Inspector',
+        'Selected environment inspector'
+      );
     return text('FABRICATE.Admin.Manager.SelectedSystemInspector', 'Selected system inspector');
   }
 
@@ -2331,7 +2844,7 @@
     return true;
   }
 
-  function confirmGatheringEventRouteExit(nextView) {
+  function confirmGatheringEventRouteExit(_nextView) {
     if (activeView !== 'gathering-event-edit') return true;
     if (!gatheringEventDraftDirty) return finishGatheringEventRouteExit(true);
     const confirmed = store.confirmDiscardDirtyGatheringEventDraft?.() ?? false;
@@ -2339,7 +2852,7 @@
     return finishGatheringEventRouteExit(confirmed);
   }
 
-  function confirmComponentRouteExit(nextView) {
+  function confirmComponentRouteExit(_nextView) {
     if (activeView !== 'component-edit') return true;
     if (componentEditCombinedDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyComponentDraft?.() ?? false;
@@ -2355,7 +2868,7 @@
     return finishEnvironmentRouteExit(confirmed);
   }
 
-  function confirmEssenceRouteExit(nextView) {
+  function confirmEssenceRouteExit(_nextView) {
     if (activeView !== 'essence-edit') return true;
     if (essenceEditDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
@@ -2408,7 +2921,7 @@
     return finishRecipeItemRouteExit(confirmed);
   }
 
-  function confirmGatheringTaskRouteExit(nextView) {
+  function confirmGatheringTaskRouteExit(_nextView) {
     if (activeView !== 'gathering-task-edit') return true;
     if (!gatheringTaskDraftDirty) return finishGatheringTaskRouteExit(true);
     const confirmed = store.confirmDiscardDirtyGatheringTaskDraft?.() ?? false;
@@ -2419,13 +2932,13 @@
   function confirmRouteExit(nextView) {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
-      return environmentConfirmed.then(value => {
+      return environmentConfirmed.then((value) => {
         if (value === false) return false;
         const essenceResult = confirmEssenceRouteExit(nextView);
         if (isPromise(essenceResult)) {
-          return essenceResult.then(essenceValue => essenceValue === false
-            ? false
-            : continueRouteExitAfterEssence(nextView));
+          return essenceResult.then((essenceValue) =>
+            essenceValue === false ? false : continueRouteExitAfterEssence(nextView)
+          );
         }
         return essenceResult === false ? false : continueRouteExitAfterEssence(nextView);
       });
@@ -2433,7 +2946,9 @@
     if (environmentConfirmed === false) return false;
     const essenceResult = confirmEssenceRouteExit(nextView);
     if (isPromise(essenceResult)) {
-      return essenceResult.then(value => value === false ? false : continueRouteExitAfterEssence(nextView));
+      return essenceResult.then((value) =>
+        value === false ? false : continueRouteExitAfterEssence(nextView)
+      );
     }
     if (essenceResult === false) return false;
     return continueRouteExitAfterEssence(nextView);
@@ -2442,7 +2957,9 @@
   function continueRouteExitAfterEssence(nextView) {
     const recipeResult = confirmRecipeRouteExit(nextView);
     if (isPromise(recipeResult)) {
-      return recipeResult.then(value => value === false ? false : continueRouteExitAfterRecipe(nextView));
+      return recipeResult.then((value) =>
+        value === false ? false : continueRouteExitAfterRecipe(nextView)
+      );
     }
     if (recipeResult === false) return false;
     return continueRouteExitAfterRecipe(nextView);
@@ -2451,7 +2968,9 @@
   function continueRouteExitAfterRecipe(nextView) {
     const recipeItemResult = confirmRecipeItemRouteExit(nextView);
     if (isPromise(recipeItemResult)) {
-      return recipeItemResult.then(value => value === false ? false : continueRouteExitAfterRecipeItem(nextView));
+      return recipeItemResult.then((value) =>
+        value === false ? false : continueRouteExitAfterRecipeItem(nextView)
+      );
     }
     if (recipeItemResult === false) return false;
     return continueRouteExitAfterRecipeItem(nextView);
@@ -2460,7 +2979,9 @@
   function continueRouteExitAfterRecipeItem(nextView) {
     const componentResult = confirmComponentRouteExit(nextView);
     if (isPromise(componentResult)) {
-      return componentResult.then(value => value === false ? false : continueRouteExitAfterComponent(nextView));
+      return componentResult.then((value) =>
+        value === false ? false : continueRouteExitAfterComponent(nextView)
+      );
     }
     if (componentResult === false) return false;
     return continueRouteExitAfterComponent(nextView);
@@ -2469,7 +2990,9 @@
   function continueRouteExitAfterComponent(nextView) {
     const taskResult = confirmGatheringTaskRouteExit(nextView);
     if (isPromise(taskResult)) {
-      return taskResult.then(value => value === false ? false : continueRouteExitAfterTask(nextView));
+      return taskResult.then((value) =>
+        value === false ? false : continueRouteExitAfterTask(nextView)
+      );
     }
     if (taskResult === false) return false;
     return continueRouteExitAfterTask(nextView);
@@ -2478,7 +3001,9 @@
   function continueRouteExitAfterTask(nextView) {
     const eventResult = confirmGatheringEventRouteExit(nextView);
     if (isPromise(eventResult)) {
-      return eventResult.then(value => value === false ? false : continueRouteExitAfterTools(nextView));
+      return eventResult.then((value) =>
+        value === false ? false : continueRouteExitAfterTools(nextView)
+      );
     }
     if (eventResult === false) return false;
     return continueRouteExitAfterTools(nextView);
@@ -2491,7 +3016,9 @@
   function continueRouteExitAfterTools(nextView) {
     const toolsResult = confirmToolsRouteExit(nextView);
     if (isPromise(toolsResult)) {
-      return toolsResult.then(value => value === false ? false : confirmSystemDetailsRouteExit(nextView));
+      return toolsResult.then((value) =>
+        value === false ? false : confirmSystemDetailsRouteExit(nextView)
+      );
     }
     if (toolsResult === false) return false;
     return confirmSystemDetailsRouteExit(nextView);
@@ -2537,8 +3064,27 @@
   }
 
   function setView(view) {
-    if ((view === 'recipes' || view === 'components' || view === 'component-edit' || view === 'tags' || view === 'system-edit' || view === 'tools' || view === 'tool-edit' || view === 'checks') && !selectedSystem) return;
-    if ((view === 'environments' || view === 'environment-edit' || view === 'gathering-task-edit' || view === 'gathering-event-edit') && !canShowEnvironments) return;
+    if (
+      (view === 'recipes' ||
+        view === 'components' ||
+        view === 'component-edit' ||
+        view === 'tags' ||
+        view === 'system-edit' ||
+        view === 'tools' ||
+        view === 'tool-edit' ||
+        view === 'checks' ||
+        view === 'knowledge') &&
+      !selectedSystem
+    )
+      return;
+    if (
+      (view === 'environments' ||
+        view === 'environment-edit' ||
+        view === 'gathering-task-edit' ||
+        view === 'gathering-event-edit') &&
+      !canShowEnvironments
+    )
+      return;
     if ((view === 'essences' || view === 'essence-edit') && !canShowEssences) return;
     afterTruthyResult(confirmRouteExit(view), () => {
       activeView = view;
@@ -2549,12 +3095,13 @@
   function selectSystem(systemId, nextView = 'systems') {
     const runSelection = () => {
       const selected = store.selectSystem?.(systemId);
-      if (isPromise(selected)) return selected.then(value => value !== false);
+      if (isPromise(selected)) return selected.then((value) => value !== false);
       return selected !== false;
     };
     if (systemId === selectedSystemId) {
       const confirmed = confirmRouteExit(nextView);
-      if (isPromise(confirmed)) return confirmed.then(value => value === false ? false : runSelection());
+      if (isPromise(confirmed))
+        return confirmed.then((value) => (value === false ? false : runSelection()));
       if (confirmed === false) return false;
     }
     return runSelection();
@@ -2589,15 +3136,21 @@
     afterTruthyResult(confirmSystemDetailsScopeChange(systemId), () => {
       afterTruthyResult(confirmRouteExit(target), () => {
         const selected = store.selectSystem?.(systemId);
-        const landed = isPromise(selected) ? selected.then((value) => value !== false) : selected !== false;
-        afterTruthyResult(landed, () => { activeView = target; });
+        const landed = isPromise(selected)
+          ? selected.then((value) => value !== false)
+          : selected !== false;
+        afterTruthyResult(landed, () => {
+          activeView = target;
+        });
       });
     });
   }
 
   function selectSystemAndShowBrowser(systemId = selectedSystemId) {
     const selected = systemId ? selectSystem(systemId, 'systems') : confirmRouteExit('systems');
-    afterTruthyResult(selected, () => { activeView = 'systems'; });
+    afterTruthyResult(selected, () => {
+      activeView = 'systems';
+    });
   }
 
   // Open the System Overview page (`system-edit`) on a specific tab. Bumping the
@@ -2640,11 +3193,31 @@
   // `environmentId` (the task/event record id never resolves through
   // `selectEnvironment`).
   const OVERVIEW_DEEP_LINKS = {
-    recipe: { view: 'recipe-edit', targetId: (issue) => issue.entityId, open: (id) => editRecipe(id) },
-    environment: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
-    task: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
-    event: { view: 'environment-edit', targetId: (issue) => issue.environmentId, open: (id) => editEnvironment(id) },
-    salvage: { view: 'component-edit', targetId: (issue) => issue.entityId, open: (id) => editComponent(id) }
+    recipe: {
+      view: 'recipe-edit',
+      targetId: (issue) => issue.entityId,
+      open: (id) => editRecipe(id),
+    },
+    environment: {
+      view: 'environment-edit',
+      targetId: (issue) => issue.environmentId,
+      open: (id) => editEnvironment(id),
+    },
+    task: {
+      view: 'environment-edit',
+      targetId: (issue) => issue.environmentId,
+      open: (id) => editEnvironment(id),
+    },
+    event: {
+      view: 'environment-edit',
+      targetId: (issue) => issue.environmentId,
+      open: (id) => editEnvironment(id),
+    },
+    salvage: {
+      view: 'component-edit',
+      targetId: (issue) => issue.entityId,
+      open: (id) => editComponent(id),
+    },
   };
 
   function selectOverviewIssue(issue) {
@@ -2657,7 +3230,9 @@
   }
 
   function backToSystemsBrowser() {
-    afterTruthyResult(confirmRouteExit('systems'), () => { activeView = 'systems'; });
+    afterTruthyResult(confirmRouteExit('systems'), () => {
+      activeView = 'systems';
+    });
   }
 
   function backToEnvironmentsBrowse() {
@@ -2684,7 +3259,6 @@
       : text('FABRICATE.Admin.Manager.Essence.Save', 'Save essence');
   }
 
-
   function selectRecipe(recipeId) {
     selectedRecipeId = recipeId;
   }
@@ -2709,7 +3283,7 @@
       recipeEditSaving = false;
       recipeSaveFailed = false;
       // Seed both draft and baseline from the persisted record (deep plain clones).
-      const source = ($viewState.recipes || []).find(recipe => recipe.id === recipeId) || null;
+      const source = ($viewState.recipes || []).find((recipe) => recipe.id === recipeId) || null;
       recipeDraft = cloneRecipeDraft(source);
       recipeDraftBaseline = cloneRecipeDraft(source);
       activeView = 'recipe-edit';
@@ -2740,7 +3314,10 @@
     try {
       // notify:false — an editor save is the GM's own explicit action (the view
       // returns to the browser on success), so a "Recipe updated" toast is noise.
-      const result = await store.updateRecipe?.(recipeDraft.id, recipeDraft, { allowIncomplete: true, notify: false });
+      const result = await store.updateRecipe?.(recipeDraft.id, recipeDraft, {
+        allowIncomplete: true,
+        notify: false,
+      });
       if (result === false) {
         recipeSaveFailed = true;
         return false;
@@ -2748,7 +3325,7 @@
       recipeDraftBaseline = cloneRecipeDraft(recipeDraft);
       activeView = 'recipes';
       return result;
-    } catch (err) {
+    } catch {
       recipeSaveFailed = true;
       return false;
     } finally {
@@ -2780,7 +3357,9 @@
     const ok = await store.toggleRecipeEnabled?.(recipeDraft.id, next);
     if (ok === false) return;
     recipeDraft = { ...recipeDraft, enabled: next };
-    recipeDraftBaseline = recipeDraftBaseline ? { ...recipeDraftBaseline, enabled: next } : recipeDraftBaseline;
+    recipeDraftBaseline = recipeDraftBaseline
+      ? { ...recipeDraftBaseline, enabled: next }
+      : recipeDraftBaseline;
   }
 
   // Deep-link from the recipe editor's context rail to the Access screen, with THIS
@@ -2798,6 +3377,9 @@
     const rid = recipeDraft?.id;
     if (!rid || !recipeItemId) return false;
     const liveRecipe = ($viewState.recipes || []).find((r) => String(r?.id) === String(rid));
+    // Function-local scratch, spread into a store call on the next line but never held in
+    // state; the persisted value is the array, not the Set.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const membership = new Set((liveRecipe?.recipeItemIds || []).map((id) => String(id)));
     membership.delete(String(recipeItemId));
     await store.setRecipeBookMembership?.(rid, [...membership]);
@@ -2826,7 +3408,9 @@
   // sets, results, tools, duration) route by step id, and the store only assigns
   // ids on save. Without one, an id-less step's edits misroute to the recipe scope.
   function newStepId() {
-    return globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`;
+    return (
+      globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`
+    );
   }
 
   function handleEnterMultiStep() {
@@ -2837,7 +3421,7 @@
       description: '',
       ingredientSets: recipeDraft.ingredientSets || [],
       resultGroups: recipeDraft.resultGroups || [],
-      toolIds: recipeDraft.toolIds || []
+      toolIds: recipeDraft.toolIds || [],
     };
     patchRecipeDraft({ steps: [seeded] });
     return true;
@@ -2847,16 +3431,17 @@
   // before staging the empty steps array (engine falls back to top-level fields).
   async function handleRevertToSingleStep() {
     if (!recipeDraft) return false;
-    const name = String(recipeDraft.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
+    const name =
+      String(recipeDraft.name || '').trim() ||
+      text('FABRICATE.Admin.Manager.Recipe.UnnamedRecipe', 'this recipe');
     const confirmed = await store.confirmRecipeAction?.({
       title: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepTitle'),
-      content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name })
+      content: localize('FABRICATE.Admin.Manager.Recipe.RevertToSingleStepContent', { name }),
     });
     if (!confirmed) return false;
     patchRecipeDraft({ steps: [] });
     return true;
   }
-
 
   function currentSteps() {
     return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
@@ -2879,7 +3464,11 @@
   function handleAddStep() {
     if (!recipeDraft) return false;
     const steps = currentSteps();
-    steps.push({ id: newStepId(), name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`, description: '' });
+    steps.push({
+      id: newStepId(),
+      name: `${text('FABRICATE.Admin.Manager.Recipe.StepLabel', 'Step')} ${steps.length + 1}`,
+      description: '',
+    });
     patchRecipeDraft({ steps });
     return true;
   }
@@ -2887,7 +3476,8 @@
   function handleReorderSteps(from, to) {
     if (!recipeDraft) return false;
     const steps = currentSteps();
-    if (from < 0 || to < 0 || from >= steps.length || to >= steps.length || from === to) return false;
+    if (from < 0 || to < 0 || from >= steps.length || to >= steps.length || from === to)
+      return false;
     const [moved] = steps.splice(from, 1);
     steps.splice(to, 0, moved);
     patchRecipeDraft({ steps });
@@ -2896,7 +3486,7 @@
 
   function handleUpdateStep(stepId, patch) {
     if (!recipeDraft || !patch) return false;
-    const steps = currentSteps().map(step => (step.id === stepId ? { ...step, ...patch } : step));
+    const steps = currentSteps().map((step) => (step.id === stepId ? { ...step, ...patch } : step));
     patchRecipeDraft({ steps });
     return true;
   }
@@ -2908,20 +3498,24 @@
   async function handleDeleteStep(stepId, context = 'overview') {
     if (!recipeDraft) return false;
     const steps = currentSteps();
-    const step = steps.find(entry => entry?.id === stepId);
+    const step = steps.find((entry) => entry?.id === stepId);
     if (!step) return false;
-    const name = String(step.name || '').trim() || text('FABRICATE.Admin.Manager.Recipe.UnnamedStep', 'this step');
-    const alsoDeleted = localize({
-      ingredients: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoIngredients',
-      results: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoResults',
-      tools: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoTools'
-    }[context] || 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoAll');
+    const name =
+      String(step.name || '').trim() ||
+      text('FABRICATE.Admin.Manager.Recipe.UnnamedStep', 'this step');
+    const alsoDeleted = localize(
+      {
+        ingredients: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoIngredients',
+        results: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoResults',
+        tools: 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoTools',
+      }[context] || 'FABRICATE.Admin.Manager.Recipe.DeleteStepAlsoAll'
+    );
     const confirmed = await store.confirmRecipeAction?.({
       title: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepTitle'),
-      content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted })
+      content: localize('FABRICATE.Admin.Manager.Recipe.DeleteStepContent', { name, alsoDeleted }),
     });
     if (!confirmed) return false;
-    patchRecipeDraft({ steps: steps.filter(entry => entry?.id !== stepId) });
+    patchRecipeDraft({ steps: steps.filter((entry) => entry?.id !== stepId) });
     return true;
   }
 
@@ -2964,12 +3558,29 @@
     selectSystem(systemId);
   }
 
+  // A newly created system is already SELECTED by the store, but the GM was left on the
+  // systems library looking at a list — one more click from the thing they just asked for,
+  // and with no signal about which row is the new one. Open its System Overview instead,
+  // on the Settings tab, exactly as `editSystem` does: a new system's first job is to be
+  // configured, and that is the page that configures it.
+  //
+  // This depends on the store's refresh staleness guard. The manager fires
+  // `fabricate.craftingSystemsChanged` from inside its own write, which schedules a refresh
+  // holding the PREVIOUS selection; before that guard existed the older run could publish
+  // last, so the new system appeared and then flicked back and this navigation landed on
+  // the system the GM started from.
   function createSystem() {
-    store.createSystem?.();
+    afterTruthyResult(store.createSystem?.(), () => {
+      requestSystemTab('settings');
+      activeView = 'system-edit';
+    });
   }
 
-  function importSystem() {
-    store.importSystem?.();
+  // The store resolves the post-import report content (or null when the import was
+  // cancelled, failed, or skipped an existing system). Opening the report is driven by
+  // that content being present, so there is no separate open flag to fall out of sync.
+  async function importSystem() {
+    importReportContent = (await store.importSystem?.()) ?? null;
   }
 
   function exportSystem(systemId = selectedSystemId) {
@@ -3039,7 +3650,9 @@
   }
 
   function backToComponentsBrowse() {
-    afterTruthyResult(confirmRouteExit('components'), () => { activeView = 'components'; });
+    afterTruthyResult(confirmRouteExit('components'), () => {
+      activeView = 'components';
+    });
   }
 
   // The salvage DC control's "Manage presets" deep link (issue 676, decision 7).
@@ -3047,10 +3660,6 @@
   // — never by assigning `activeView`, which would silently discard a dirty draft.
   function openSalvageCheckPresets() {
     setView('checks');
-  }
-
-  function cancelComponentEdit() {
-    backToComponentsBrowse();
   }
 
   function handleComponentDraftChange(draft) {
@@ -3074,7 +3683,7 @@
       componentEditDraft = null;
       activeView = 'components';
       return true;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       componentEditSaving = false;
@@ -3121,6 +3730,237 @@
   function deleteComponent(itemId = selectedComponent?.id) {
     if (!itemId) return;
     store.deleteComponent?.(itemId);
+  }
+
+  // ── Bulk edit (issue 772) ────────────────────────────────────────────────────────
+  // The panel stages into a draft this root owns; NOTHING is written until Apply. The
+  // model's helpers are immutable, so the panel hands back a NEW draft rather than
+  // mutating this one — an in-place assumption would compile and silently do nothing.
+  function stageComponentBulkDraft(next) {
+    componentBulkDraft = next || createComponentBulkDraft();
+  }
+
+  // Clearing the selection is the documented escape from a mode that hides unlink, delete
+  // and copy-source-UUID; the count reaching zero also discards the draft (see the effect
+  // above) and returns the rail to the single-component inspector.
+  function clearComponentBulkSelection() {
+    componentBrowserState.bulkSelectedComponentIds = new Set();
+  }
+
+  async function applyComponentBulkEdit() {
+    if (componentBulkApplying) return false;
+    const ids = componentBulkSelectedIds;
+    if (ids.size === 0) return false;
+    // An unstaged axis is never sent. `essences` is present IFF the essence axis is
+    // staged and `difficulty` IFF the DC axis is — a staged all-zero map and a staged 0
+    // are REAL edits meaning "clear", so the write primitive tests key presence rather
+    // than truthiness and this projection must give it something to test.
+    const edit = toBulkComponentEdit(componentBulkDraft);
+    if (Object.keys(edit).length === 0) return false;
+    componentBulkApplying = true;
+    try {
+      // The store returns the write RESULT, never a bare boolean, so a `null` covers every
+      // no-write case in one test — including the optional call resolving to `undefined`
+      // because the action is absent, which a `=== false` check would have read as success.
+      const result = await store.applyComponentBulkEdit?.(ids, edit);
+      if (!result) return false;
+      // The count the GM is told is the count that actually CHANGED, not the count they
+      // ticked: the write primitive compares each component before and after, so adding a
+      // tag three of five already carry updates two. Naming the selection size instead
+      // would report work that did not happen.
+      const count = result.updated;
+      // One `save()` and one `refresh()` happened inside the store action, so the rows are
+      // already re-rendering; clearing the selection returns the rail to the inspector and
+      // the count-to-zero effect discards the draft.
+      clearComponentBulkSelection();
+      // Singular, on the same terms as the panel's own heading and Apply label: the
+      // threshold is `> 0`, so ONE ticked row is the advertised case, and this toast is
+      // the ONLY feedback that survives the panel unmounting on a successful apply.
+      // Zero is its own message rather than "applied to 0 components", which reads as a
+      // failure for what is a legitimate outcome — every selected component already
+      // matched the staged values.
+      notifyInfo(
+        count === 0
+          ? text(
+              'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedNone',
+              'No components needed changing.'
+            )
+          : count === 1
+            ? text(
+                'FABRICATE.Admin.Manager.Component.BulkEdit.AppliedOne',
+                'Applied bulk changes to 1 component.'
+              )
+            : text(
+                'FABRICATE.Admin.Manager.Component.BulkEdit.Applied',
+                'Applied bulk changes to {count} components.'
+              ).replace('{count}', count)
+      );
+      return true;
+    } finally {
+      componentBulkApplying = false;
+    }
+  }
+
+  // ── Recipe bulk edit (issue 1010) ────────────────────────────────────────────────
+  // The twin of the block above. The panel stages into a draft this root owns; NOTHING is
+  // written until Apply, and the model's helpers are immutable, so the panel hands back a
+  // NEW draft rather than mutating this one.
+  function stageRecipeBulkDraft(next) {
+    recipeBulkDraft = next || createRecipeBulkDraft();
+  }
+
+  // Clearing the selection is the documented escape from a mode that hides Edit, Duplicate
+  // and Delete; the count reaching zero also discards the draft (see the effect above) and
+  // returns the rail to the single-recipe inspector.
+  function clearRecipeBulkSelection() {
+    recipeBrowserState.bulkSelectedRecipeIds = new Set();
+  }
+
+  // Singular / plural over one count, so the three post-apply sentences below do not each
+  // grow their own ternary pair.
+  function bulkRecipeCountText(count, oneKey, oneFallback, manyKey, manyFallback) {
+    if (count === 1) return text(oneKey, oneFallback);
+    return text(manyKey, manyFallback).replace('{count}', count);
+  }
+
+  // The book half of the post-apply report, reporting membership EDGES rather than the
+  // DEFINITIONS `booksUpdated` counts: the GM asked to put these recipes in that book, so
+  // "4 additions and 2 removals" answers them where "1 book updated" does not.
+  //
+  // Returns `''` when the batch created no edges, including for an unstaged book axis, so
+  // the caller composes it in exactly as it does the blocked and rejected sentences.
+  function recipeBulkBooksMessage(result) {
+    const added = Number(result?.bookAdditions) || 0;
+    const removed = Number(result?.bookRemovals) || 0;
+    if (added === 0 && removed === 0) return '';
+
+    const addedText = bulkRecipeCountText(
+      added,
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookAdditionsOne',
+      '1 addition',
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookAdditions',
+      '{count} additions'
+    );
+    const removedText = bulkRecipeCountText(
+      removed,
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookRemovalsOne',
+      '1 removal',
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookRemovals',
+      '{count} removals'
+    );
+    // Three WHOLE sentences rather than one assembled around a localized " and ": a join
+    // word is the part of this string a translator is least able to place, and two of the
+    // three shapes never need one.
+    if (added > 0 && removed > 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBooksBoth',
+        'Books & scrolls updated — {added} and {removed}.'
+      )
+        .replace('{added}', addedText)
+        .replace('{removed}', removedText);
+    }
+    if (added > 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBooksAdded',
+        'Books & scrolls updated — {added}.'
+      ).replace('{added}', addedText);
+    }
+    return text(
+      'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBooksRemoved',
+      'Books & scrolls updated — {removed}.'
+    ).replace('{removed}', removedText);
+  }
+
+  // The post-apply report, and the AUTHORITY on the blocked count — the panel's pre-flight
+  // figure is only a lower bound, because it cannot see collisions the batch itself
+  // creates. `rejected` is named separately and is not an expected outcome: it counts
+  // recipes a persistence failure excluded from the batch entirely, each of which the write
+  // primitive logs, which is what makes "see the console" point at something real.
+  //
+  // Every sentence COMPOSES; none replaces another. The prototype swaps its books message
+  // in for its blocked message with a ternary, which would let a batch that touched books
+  // silently swallow the report that some recipes stayed off — the one outcome the GM
+  // cannot see by looking at the rows they just deselected.
+  function recipeBulkAppliedMessage(result) {
+    const updated = Number(result?.updated) || 0;
+    const blocked = Number(result?.blockedEnables) || 0;
+    const rejected = Number(result?.rejected) || 0;
+    const books = recipeBulkBooksMessage(result);
+    // Zero is its own message rather than "applied to 0 recipes", which reads as a failure
+    // for what is a legitimate outcome — every selected recipe already matched. It is
+    // SUPPRESSED when the batch moved book membership: `updated` counts recipes whose own
+    // fields changed, so a book-only edit legitimately changes none, and leading with "No
+    // recipes needed changing" ahead of "4 additions" reads as a contradiction rather than
+    // as the two distinct facts it is.
+    const sentences = [];
+    if (updated === 0 && !books) {
+      sentences.push(
+        text('FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedNone', 'No recipes needed changing.')
+      );
+    } else if (updated > 0) {
+      sentences.push(
+        bulkRecipeCountText(
+          updated,
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedOne',
+          'Applied bulk changes to 1 recipe.',
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.Applied',
+          'Applied bulk changes to {count} recipes.'
+        )
+      );
+    }
+    if (books) sentences.push(books);
+    if (blocked > 0) {
+      sentences.push(
+        bulkRecipeCountText(
+          blocked,
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBlockedOne',
+          "1 recipe couldn't be enabled yet.",
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBlocked',
+          "{count} recipes couldn't be enabled yet."
+        )
+      );
+    }
+    if (rejected > 0) {
+      sentences.push(
+        bulkRecipeCountText(
+          rejected,
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedRejectedOne',
+          "1 recipe couldn't be saved — see the console.",
+          'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedRejected',
+          "{count} recipes couldn't be saved — see the console."
+        )
+      );
+    }
+    return sentences.join(' ');
+  }
+
+  async function applyRecipeBulkEdit() {
+    if (recipeBulkApplying) return false;
+    const ids = recipeBulkSelectedIds;
+    if (ids.size === 0) return false;
+    // An unstaged axis is never sent. Three of the projected keys are FALSY BUT REAL —
+    // `enabled: false`, `locked: false` and `checkTierId: null` — so the write primitive
+    // tests key PRESENCE rather than truthiness, and this projection is what gives it
+    // something to test.
+    const edit = toBulkRecipeEdit(recipeBulkDraft);
+    if (Object.keys(edit).length === 0) return false;
+    recipeBulkApplying = true;
+    try {
+      // The store returns the write RESULT, never a bare boolean, so a `null` covers every
+      // no-write case in one test — including the optional call resolving to `undefined`
+      // because the action is absent, which a `=== false` check would have read as success.
+      const result = await store.applyRecipeBulkEdit?.(ids, edit);
+      if (!result) return false;
+      // One save and one refresh happened inside the store action, so the rows are already
+      // re-rendering; clearing the selection returns the rail to the single-recipe
+      // inspector and the count-to-zero effect discards the draft. The toast below is the
+      // only feedback that survives the panel unmounting on a successful apply.
+      clearRecipeBulkSelection();
+      notifyInfo(recipeBulkAppliedMessage(result));
+      return true;
+    } finally {
+      recipeBulkApplying = false;
+    }
   }
 
   function addCategory(value, icon) {
@@ -3170,17 +4010,20 @@
       const result = essenceId
         ? await store.updateEssence?.(essenceId, updates)
         : await store.addEssence?.(
-          updates.name,
-          updates.description,
-          updates.icon,
-          showEssenceSourceUi ? updates.sourceComponentId || null : null
-        );
+            updates.name,
+            updates.description,
+            updates.icon,
+            showEssenceSourceUi ? updates.sourceComponentId || null : null,
+            // The authored colour (issue 917) has to travel with the create call too, or a
+            // new essence loses the colour the GM picked before its first save.
+            updates.colorToken || null
+          );
       if (result === false) return false;
       essenceEditDirty = false;
       essenceEditDraft = null;
       activeView = canShowEssences ? 'essences' : 'systems';
       return result;
-    } catch (err) {
+    } catch {
       return false;
     } finally {
       essenceEditSaving = false;
@@ -3200,7 +4043,7 @@
 
   function removeEssence(essenceId = selectedEssence?.id) {
     if (!essenceId) return;
-    const essence = essenceCards.find(card => card.id === essenceId);
+    const essence = essenceCards.find((card) => card.id === essenceId);
     if (essence?.deleteBlocked) return;
     store.removeEssence?.(essenceId);
   }
@@ -3235,14 +4078,16 @@
 
   function editEnvironment(environmentId = selectedEnvironment?.id) {
     if (!environmentId || !canShowEnvironments) return;
-    afterTruthyResult(store.selectEnvironment?.(environmentId), () => { activeView = 'environment-edit'; });
+    afterTruthyResult(store.selectEnvironment?.(environmentId), () => {
+      activeView = 'environment-edit';
+    });
   }
 
   function createEnvironment() {
     if (!canShowEnvironments) return;
     const created = store.createEnvironmentDraft?.();
     if (isPromise(created)) {
-      created.then(value => {
+      created.then((value) => {
         if (value !== false && value !== null) activeView = 'environment-edit';
       });
       return;
@@ -3273,7 +4118,7 @@
     if (!systemId) return;
     const created = store.addGatheringLibraryTask?.(systemId);
     if (isPromise(created)) {
-      created.then(task => {
+      created.then((task) => {
         if (task?.id) selectedGatheringTaskId = task.id;
       });
       return;
@@ -3284,7 +4129,7 @@
   function editGatheringTask(taskId = selectedGatheringTask?.id) {
     if (!taskId || !canShowEnvironments) return;
     selectedGatheringTaskId = taskId;
-    const source = gatheringTaskDefinitions.find(task => task.id === taskId) || null;
+    const source = gatheringTaskDefinitions.find((task) => task.id === taskId) || null;
     const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
     gatheringTaskDraft = snapshot;
     gatheringTaskDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
@@ -3315,21 +4160,44 @@
       gatheringTaskSaveError = errors[0] || '';
       return false;
     }
-    const proceed = await store.confirmGatheringLibraryTaskCompositionLoss?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft) ?? true;
+    const proceed =
+      (await store.confirmGatheringLibraryTaskCompositionLoss?.(
+        selectedSystemId,
+        selectedGatheringTaskId,
+        gatheringTaskDraft
+      )) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
+    // Cleared here — once an attempt is actually committed to, and before the awaited store call
+    // (mirrors saveRecipeItemDraft). A retry that fails the same way writes a byte-identical
+    // string, which $state treats as clean, so the role="alert" region is never re-inserted and a
+    // screen reader announces nothing. Dropping it before the await lets the alert leave the DOM
+    // while the save is in flight and be re-inserted when the same failure recurs. It is
+    // deliberately NOT at the top of the function: the early returns above make no new attempt,
+    // and quietly removing a standing failure notice announces nothing at all in its place.
+    gatheringTaskSaveError = '';
     gatheringTaskSaving = true;
     try {
-      const ok = await store.updateGatheringLibraryTask?.(selectedSystemId, selectedGatheringTaskId, gatheringTaskDraft);
+      const ok = await store.updateGatheringLibraryTask?.(
+        selectedSystemId,
+        selectedGatheringTaskId,
+        gatheringTaskDraft
+      );
       if (ok) {
         gatheringTaskDraftBaseline = JSON.parse(JSON.stringify(gatheringTaskDraft));
         gatheringTaskSaveError = '';
         return true;
       }
-      gatheringTaskSaveError = text('FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+      gatheringTaskSaveError = text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
+        'Save failed. Try again.'
+      );
       return false;
     } catch (error) {
       console.error('Failed to save gathering task draft', error);
-      gatheringTaskSaveError = text('FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed', 'Save failed. Try again.');
+      gatheringTaskSaveError = text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.SaveFailed',
+        'Save failed. Try again.'
+      );
       return false;
     } finally {
       gatheringTaskSaving = false;
@@ -3354,7 +4222,7 @@
     if (!systemId || !taskId) return;
     const duplicated = store.duplicateGatheringLibraryTask?.(systemId, taskId);
     if (isPromise(duplicated)) {
-      duplicated.then(task => {
+      duplicated.then((task) => {
         if (task?.id) selectedGatheringTaskId = task.id;
       });
       return;
@@ -3366,7 +4234,7 @@
     if (!systemId || !taskId) return;
     const deleted = store.deleteGatheringLibraryTask?.(systemId, taskId);
     if (isPromise(deleted)) {
-      deleted.then(value => {
+      deleted.then((value) => {
         if (value !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
       });
       return;
@@ -3374,7 +4242,11 @@
     if (deleted !== false && selectedGatheringTaskId === taskId) selectedGatheringTaskId = '';
   }
 
-  function toggleGatheringTaskEnabled(systemId = selectedSystemId, taskId = selectedGatheringTask?.id, enabled = true) {
+  function toggleGatheringTaskEnabled(
+    systemId = selectedSystemId,
+    taskId = selectedGatheringTask?.id,
+    enabled = true
+  ) {
     if (!systemId || !taskId) return;
     store.updateGatheringLibraryTask?.(systemId, taskId, { enabled });
   }
@@ -3387,7 +4259,7 @@
     if (!systemId) return;
     const created = store.addGatheringLibraryEvent?.(systemId);
     if (isPromise(created)) {
-      created.then(event => {
+      created.then((event) => {
         if (event?.id) selectedGatheringEventId = event.id;
       });
       return;
@@ -3398,7 +4270,7 @@
   function editGatheringEvent(eventId = selectedGatheringEvent?.id) {
     if (!eventId || !canShowEnvironments) return;
     selectedGatheringEventId = eventId;
-    const source = gatheringEventDefinitions.find(event => event.id === eventId) || null;
+    const source = gatheringEventDefinitions.find((event) => event.id === eventId) || null;
     const snapshot = source ? JSON.parse(JSON.stringify(source)) : null;
     gatheringEventDraft = snapshot;
     gatheringEventDraftBaseline = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
@@ -3430,16 +4302,43 @@
       gatheringEventSaveError = errors[0] || '';
       return false;
     }
-    const proceed = await store.confirmGatheringLibraryEventCompositionLoss?.(selectedSystemId, selectedGatheringEventId, gatheringEventDraft) ?? true;
+    const proceed =
+      (await store.confirmGatheringLibraryEventCompositionLoss?.(
+        selectedSystemId,
+        selectedGatheringEventId,
+        gatheringEventDraft
+      )) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
+    // Cleared at the same point, and for the same reason, as in saveGatheringTaskDraft: an
+    // unchanged error string is not a DOM mutation, so a repeated identical failure would never
+    // re-announce — and the early returns above are left alone so a cancelled confirmation does
+    // not wipe a failure notice the GM has not yet acted on.
+    gatheringEventSaveError = '';
     gatheringEventSaving = true;
     try {
-      const ok = await store.updateGatheringLibraryEvent?.(selectedSystemId, selectedGatheringEventId, gatheringEventDraft);
+      const ok = await store.updateGatheringLibraryEvent?.(
+        selectedSystemId,
+        selectedGatheringEventId,
+        gatheringEventDraft
+      );
       if (ok !== false) {
         gatheringEventDraftBaseline = JSON.parse(JSON.stringify(gatheringEventDraft));
         gatheringEventSaveError = '';
         return true;
       }
+      gatheringEventSaveError = text(
+        'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
+        'Save failed. Try again.'
+      );
+      return false;
+    } catch (error) {
+      // Until issue 919 this `try` had no `catch` at all, so a rejected store call escaped
+      // as an unhandled rejection and the GM saw nothing. Mirrors saveGatheringTaskDraft.
+      console.error('Failed to save gathering event draft', error);
+      gatheringEventSaveError = text(
+        'FABRICATE.Admin.Manager.Environment.Events.SaveFailed',
+        'Save failed. Try again.'
+      );
       return false;
     } finally {
       gatheringEventSaving = false;
@@ -3463,11 +4362,14 @@
     activeView = 'environments';
   }
 
-  function duplicateGatheringEvent(systemId = selectedSystemId, eventId = selectedGatheringEvent?.id) {
+  function duplicateGatheringEvent(
+    systemId = selectedSystemId,
+    eventId = selectedGatheringEvent?.id
+  ) {
     if (!systemId || !eventId) return;
     const duplicated = store.duplicateGatheringLibraryEvent?.(systemId, eventId);
     if (isPromise(duplicated)) {
-      duplicated.then(event => {
+      duplicated.then((event) => {
         if (event?.id) selectedGatheringEventId = event.id;
       });
       return;
@@ -3479,7 +4381,7 @@
     if (!systemId || !eventId) return;
     const deleted = store.deleteGatheringLibraryEvent?.(systemId, eventId);
     if (isPromise(deleted)) {
-      deleted.then(value => {
+      deleted.then((value) => {
         if (value !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
       });
       return;
@@ -3487,7 +4389,11 @@
     if (deleted !== false && selectedGatheringEventId === eventId) selectedGatheringEventId = '';
   }
 
-  function toggleGatheringEventEnabled(systemId = selectedSystemId, eventId = selectedGatheringEvent?.id, enabled = true) {
+  function toggleGatheringEventEnabled(
+    systemId = selectedSystemId,
+    eventId = selectedGatheringEvent?.id,
+    enabled = true
+  ) {
     if (!systemId || !eventId) return;
     store.updateGatheringLibraryEvent?.(systemId, eventId, { enabled });
   }
@@ -3498,7 +4404,11 @@
       return true;
     }
     if (!selectedSystemId || !selectedGatheringEvent?.id) return false;
-    return store.updateGatheringLibraryEvent?.(selectedSystemId, selectedGatheringEvent.id, updates);
+    return store.updateGatheringLibraryEvent?.(
+      selectedSystemId,
+      selectedGatheringEvent.id,
+      updates
+    );
   }
 
   function updateSelectedGatheringTask(updates = {}) {
@@ -3512,15 +4422,19 @@
 
   function addToolReferenceToSelectedTask(toolId) {
     if (!editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(editingGatheringTask.toolIds) ? editingGatheringTask.toolIds : [];
+    const existing = Array.isArray(editingGatheringTask.toolIds)
+      ? editingGatheringTask.toolIds
+      : [];
     if (existing.includes(toolId)) return;
     updateSelectedGatheringTask({ toolIds: [...existing, toolId] });
   }
 
   function removeToolReferenceFromSelectedTask(toolId) {
     if (!editingGatheringTask || !toolId) return;
-    const existing = Array.isArray(editingGatheringTask.toolIds) ? editingGatheringTask.toolIds : [];
-    updateSelectedGatheringTask({ toolIds: existing.filter(id => id !== toolId) });
+    const existing = Array.isArray(editingGatheringTask.toolIds)
+      ? editingGatheringTask.toolIds
+      : [];
+    updateSelectedGatheringTask({ toolIds: existing.filter((id) => id !== toolId) });
   }
 
   function gatheringDropRowId() {
@@ -3537,34 +4451,45 @@
       quantity: 1,
       dropRate: 25,
       conditionModifiers: { biome: [], timeOfDay: [], weather: [] },
-      enabled: false
+      enabled: false,
     };
     selectedGatheringDropId = row.id;
-    updateSelectedGatheringTask({ dropRows: [...gatheringTaskDropRows(editingGatheringTask), row] });
+    updateSelectedGatheringTask({
+      dropRows: [...gatheringTaskDropRows(editingGatheringTask), row],
+    });
   }
 
   function updateGatheringTaskDrop(rowId, updates = {}) {
     if (!editingGatheringTask || !rowId) return;
-    const rows = gatheringTaskDropRows(editingGatheringTask).map(row => row.id === rowId ? { ...row, ...updates } : row);
-    const patch = store.gatheringTaskAutopopulateFromComponent?.(selectedSystemId, editingGatheringTask, rows) || {};
+    const rows = gatheringTaskDropRows(editingGatheringTask).map((row) =>
+      row.id === rowId ? { ...row, ...updates } : row
+    );
+    const patch =
+      store.gatheringTaskAutopopulateFromComponent?.(
+        selectedSystemId,
+        editingGatheringTask,
+        rows
+      ) || {};
     updateSelectedGatheringTask({ dropRows: rows, ...patch });
   }
 
   function duplicateGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
     if (!editingGatheringTask || !rowId) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
-    const index = rows.findIndex(row => row.id === rowId);
+    const index = rows.findIndex((row) => row.id === rowId);
     if (index < 0) return;
     const duplicate = { ...JSON.parse(JSON.stringify(rows[index])), id: gatheringDropRowId() };
     selectedGatheringDropId = duplicate.id;
-    updateSelectedGatheringTask({ dropRows: [...rows.slice(0, index + 1), duplicate, ...rows.slice(index + 1)] });
+    updateSelectedGatheringTask({
+      dropRows: [...rows.slice(0, index + 1), duplicate, ...rows.slice(index + 1)],
+    });
   }
 
   function deleteGatheringTaskDrop(rowId = selectedGatheringDrop?.id) {
     if (!editingGatheringTask || !rowId) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
-    const index = rows.findIndex(row => row.id === rowId);
-    const nextRows = rows.filter(row => row.id !== rowId);
+    const index = rows.findIndex((row) => row.id === rowId);
+    const nextRows = rows.filter((row) => row.id !== rowId);
     selectedGatheringDropId = nextRows[Math.min(index, nextRows.length - 1)]?.id || '';
     updateSelectedGatheringTask({ dropRows: nextRows });
   }
@@ -3572,7 +4497,7 @@
   function moveGatheringTaskDrop(rowId, direction) {
     if (!editingGatheringTask || !rowId) return;
     const rows = gatheringTaskDropRows(editingGatheringTask);
-    const index = rows.findIndex(row => row.id === rowId);
+    const index = rows.findIndex((row) => row.id === rowId);
     if (index < 0) return;
     const target = direction === 'up' ? index - 1 : index + 1;
     if (target < 0 || target >= rows.length) return;
@@ -3634,58 +4559,65 @@
   }
 
   function gatheringConditionAvailableOptions(row, kind) {
-    const options = kind === 'biome' ? gatheringVocabularyOptions('biomes') : gatheringConditionOptions(kind);
+    const options =
+      kind === 'biome' ? gatheringVocabularyOptions('biomes') : gatheringConditionOptions(kind);
     if (!row) return options;
-    const attached = new Set(gatheringConditionModifierRows(row, kind).map(modifier => modifier.conditionId));
-    return options.filter(option => !attached.has(option.id));
+    const attached = new Set(
+      gatheringConditionModifierRows(row, kind).map((modifier) => modifier.conditionId)
+    );
+    return options.filter((option) => !attached.has(option.id));
   }
 
   function gatheringConditionModifierGroups(row) {
     return {
       timeOfDay: gatheringConditionModifierRows(row, 'timeOfDay'),
       weather: gatheringConditionModifierRows(row, 'weather'),
-      biome: gatheringConditionModifierRows(row, 'biome')
+      biome: gatheringConditionModifierRows(row, 'biome'),
     };
   }
 
   function updateGatheringDropModifier(rowId, kind, modifierId, updates = {}) {
     if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
+    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = gatheringConditionModifierGroups(row);
-    conditionModifiers[kind] = conditionModifiers[kind].map(modifier => modifier.id === modifierId ? { ...modifier, ...updates } : modifier);
+    conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
+      modifier.id === modifierId ? { ...modifier, ...updates } : modifier
+    );
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
   function addGatheringDropModifier(rowId, kind, conditionId) {
     if (!editingGatheringTask || !rowId || !kind || !conditionId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
+    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = gatheringConditionModifierGroups(row);
-    if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
+    if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 },
     ];
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
   function deleteGatheringDropModifier(rowId, kind, modifierId) {
     if (!editingGatheringTask || !rowId || !kind || !modifierId) return;
-    const row = gatheringTaskDropRows(editingGatheringTask).find(entry => entry.id === rowId);
+    const row = gatheringTaskDropRows(editingGatheringTask).find((entry) => entry.id === rowId);
     if (!row) return;
     const conditionModifiers = gatheringConditionModifierGroups(row);
-    conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
+    conditionModifiers[kind] = conditionModifiers[kind].filter(
+      (modifier) => modifier.id !== modifierId
+    );
     updateGatheringTaskDrop(rowId, { conditionModifiers });
   }
 
   function addGatheringEventConditionModifier(kind, conditionId) {
     if (!editingGatheringEvent?.id || !kind || !conditionId) return;
     const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
-    if (conditionModifiers[kind].some(modifier => modifier.conditionId === conditionId)) return;
+    if (conditionModifiers[kind].some((modifier) => modifier.conditionId === conditionId)) return;
     conditionModifiers[kind] = [
       ...conditionModifiers[kind],
-      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 }
+      { id: `${kind}-${gatheringDropRowId()}`, conditionId, operator: '+', value: 0 },
     ];
     updateSelectedGatheringEvent({ conditionModifiers });
   }
@@ -3693,21 +4625,27 @@
   function updateGatheringEventConditionModifier(kind, modifierId, updates = {}) {
     if (!editingGatheringEvent?.id || !kind || !modifierId) return;
     const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
-    conditionModifiers[kind] = conditionModifiers[kind].map(modifier => modifier.id === modifierId ? { ...modifier, ...updates } : modifier);
+    conditionModifiers[kind] = conditionModifiers[kind].map((modifier) =>
+      modifier.id === modifierId ? { ...modifier, ...updates } : modifier
+    );
     updateSelectedGatheringEvent({ conditionModifiers });
   }
 
   function deleteGatheringEventConditionModifier(kind, modifierId) {
     if (!editingGatheringEvent?.id || !kind || !modifierId) return;
     const conditionModifiers = gatheringConditionModifierGroups(editingGatheringEvent);
-    conditionModifiers[kind] = conditionModifiers[kind].filter(modifier => modifier.id !== modifierId);
+    conditionModifiers[kind] = conditionModifiers[kind].filter(
+      (modifier) => modifier.id !== modifierId
+    );
     updateSelectedGatheringEvent({ conditionModifiers });
   }
 
   function pickCharacterModifierForEvent(modifierId) {
     if (!editingGatheringEvent?.id || !modifierId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers) ? editingGatheringEvent.characterModifiers : [];
-    if (refs.some(ref => ref.modifierId === modifierId)) return;
+    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
+      ? editingGatheringEvent.characterModifiers
+      : [];
+    if (refs.some((ref) => ref.modifierId === modifierId)) return;
     characterModifierSearchTerm = '';
     const newRef = {
       id: `char-mod-${modifierId}-${refs.length + 1}-${Math.random().toString(36).slice(2, 6)}`,
@@ -3715,42 +4653,45 @@
       operator: '+',
       min: null,
       max: null,
-      expressionOverride: ''
+      expressionOverride: '',
     };
     updateSelectedGatheringEvent({ characterModifiers: [...refs, newRef] });
   }
 
   function onUpdateEventCharacterModifier(refId, patch) {
     if (!editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers) ? editingGatheringEvent.characterModifiers : [];
-    const next = refs.map(ref => ref.id === refId ? { ...ref, ...patch } : ref);
+    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
+      ? editingGatheringEvent.characterModifiers
+      : [];
+    const next = refs.map((ref) => (ref.id === refId ? { ...ref, ...patch } : ref));
     updateSelectedGatheringEvent({ characterModifiers: next });
   }
 
   function onDeleteEventCharacterModifier(refId) {
     if (!editingGatheringEvent?.id || !refId) return;
-    const refs = Array.isArray(editingGatheringEvent.characterModifiers) ? editingGatheringEvent.characterModifiers : [];
-    updateSelectedGatheringEvent({ characterModifiers: refs.filter(ref => ref.id !== refId) });
+    const refs = Array.isArray(editingGatheringEvent.characterModifiers)
+      ? editingGatheringEvent.characterModifiers
+      : [];
+    updateSelectedGatheringEvent({ characterModifiers: refs.filter((ref) => ref.id !== refId) });
   }
 
   function setEventCharacterModifierOverrideEnabled(ref, enabled, libraryEntry) {
-    const expressionOverride = enabled ? (libraryEntry?.expression || '') : '';
+    const expressionOverride = enabled ? libraryEntry?.expression || '' : '';
     onUpdateEventCharacterModifier(ref.id, { expressionOverride });
   }
 
-  function moveEnvironment(environmentId = selectedEnvironment?.id, direction) {
-    if (!environmentId || !direction) return;
-    store.moveEnvironmentDraft?.(environmentId, direction);
-  }
-
   function selectGatheringTab(tabId) {
-    activeGatheringTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    activeGatheringTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
+      ? tabId
+      : 'environments';
     gatheringMenuExpanded = true;
   }
 
   function openGatheringSection(tabId = 'environments') {
     if (!canShowEnvironments) return;
-    const nextTab = visibleGatheringNavItems.some(tab => tab.id === tabId) ? tabId : 'environments';
+    const nextTab = visibleGatheringNavItems.some((tab) => tab.id === tabId)
+      ? tabId
+      : 'environments';
     afterTruthyResult(confirmRouteExit('environments'), () => {
       activeGatheringTab = nextTab;
       gatheringMenuExpanded = true;
@@ -3780,7 +4721,9 @@
   }
 
   function backToToolsBrowser() {
-    afterTruthyResult(confirmRouteExit('tools'), () => { activeView = 'tools'; });
+    afterTruthyResult(confirmRouteExit('tools'), () => {
+      activeView = 'tools';
+    });
   }
 
   async function saveSelectedToolDraft() {
@@ -3821,7 +4764,7 @@
   // exit runs through `confirmRouteExit` (the Manager confirm-discard guard) via
   // `setView`/`afterTruthyResult`.
   function openCraftingSection(tabId = 'recipes') {
-    const item = craftingNavItems.find(tab => tab.id === tabId) || craftingNavItems[0];
+    const item = craftingNavItems.find((tab) => tab.id === tabId) || craftingNavItems[0];
     const nextView = item?.view || 'recipes';
     afterTruthyResult(confirmRouteExit(nextView), () => {
       activeView = nextView;
@@ -3847,9 +4790,12 @@
   // right caps patch for the active visibility mode (live-apply, no draft). Item
   // mode caps uses; every other mode caps learning.
   function toggleRecipeItemQuickLimit(recipeItemId, limited) {
-    const patch = craftingVisibilityMode === 'item'
-      ? { item: { limitUses: limited === true, maxUses: 1 } }
-      : { learn: { limitLearning: limited === true, learnScope: 'perInstance', learnsAllowed: 1 } };
+    const patch =
+      craftingVisibilityMode === 'item'
+        ? { item: { limitUses: limited === true, maxUses: 1 } }
+        : {
+            learn: { limitLearning: limited === true, learnScope: 'perInstance', learnsAllowed: 1 },
+          };
     store.updateRecipeItemCaps?.(recipeItemId, patch);
   }
 
@@ -3942,7 +4888,7 @@
       recipeItemDraftBaseline = cloneRecipeItemDraft(recipeItemDraft);
       activeView = 'books-scrolls';
       return result;
-    } catch (err) {
+    } catch {
       recipeItemSaveFailed = true;
       return false;
     } finally {
@@ -3984,6 +4930,9 @@
   // Discard) rather than editing the recipe directly — no "Recipe updated" toast.
   function linkRecipeToItem(recipeId) {
     if (!recipeItemDraft?.id || !recipeId) return;
+    // Function-local scratch: the draft is patched with the spread array below, so the Set
+    // never reaches state.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set((recipeItemDraft.recipeIds || []).map((id) => String(id)));
     next.add(String(recipeId));
     patchRecipeItemDraft({ recipeIds: [...next] });
@@ -4018,19 +4967,6 @@
     craftingMenuExpanded = !craftingMenuExpanded;
   }
 
-  function environmentListIndex(environmentId) {
-    return environmentList.findIndex(environment => environment.id === environmentId);
-  }
-
-  function canMoveEnvironmentUp(environmentId) {
-    return environmentListIndex(environmentId) > 0;
-  }
-
-  function canMoveEnvironmentDown(environmentId) {
-    const index = environmentListIndex(environmentId);
-    return index >= 0 && index < environmentList.length - 1;
-  }
-
   function copyComponentSource(uuid = selectedComponent?.registeredItemUuidDisplay) {
     if (!uuid) return;
     return services?.onCopySourceUuid?.(uuid);
@@ -4038,7 +4974,11 @@
 
   function selectedEssenceSourceUuid() {
     if (!selectedEssenceForInspector?.associatedItem) return '';
-    return selectedEssenceForInspector.sourceItemUuid || selectedEssenceForInspector.associatedItem.originItemUuid || '';
+    return (
+      selectedEssenceForInspector.sourceItemUuid ||
+      selectedEssenceForInspector.associatedItem.originItemUuid ||
+      ''
+    );
   }
 
   function copySelectedEssenceSource() {
@@ -4086,7 +5026,7 @@
   function linkedSceneForEnvironment(environment) {
     const sceneUuid = environment?.sceneUuid || '';
     if (!sceneUuid) return null;
-    return (selectedSystem?.sceneOptions || []).find(scene => scene.uuid === sceneUuid) || null;
+    return (selectedSystem?.sceneOptions || []).find((scene) => scene.uuid === sceneUuid) || null;
   }
 
   function environmentSelectionModeLabel(environment) {
@@ -4106,7 +5046,7 @@
       return {
         id: 'none',
         label: text('FABRICATE.Admin.Manager.Environment.SceneNone', 'No scene'),
-        className: 'is-disabled'
+        tone: 'disabled',
       };
     }
     const scene = linkedSceneForEnvironment(environment);
@@ -4114,14 +5054,14 @@
       return {
         id: 'missing',
         label: text('FABRICATE.Admin.Manager.Environment.SceneMissing', 'Scene unresolved'),
-        className: 'is-warning'
+        tone: 'warning',
       };
     }
     return {
       id: 'linked',
       label: text('FABRICATE.Admin.Manager.Environment.SceneLinked', 'Linked scene'),
       name: scene.name || environment.sceneUuid,
-      className: 'is-active'
+      tone: 'active',
     };
   }
 
@@ -4131,23 +5071,29 @@
     const disabledKey = kind === 'event' ? 'disabledEventIds' : 'disabledTaskIds';
     const enabled = Array.isArray(environment?.[enabledKey]) ? environment[enabledKey] : [];
     const forced = Array.isArray(environment?.[forcedKey]) ? environment[forcedKey] : [];
-    const disabled = new Set(Array.isArray(environment?.[disabledKey]) ? environment[disabledKey] : []);
-    return Array.from(new Set([...enabled, ...forced])).filter(id => !disabled.has(id));
+    const disabled = new Set(
+      Array.isArray(environment?.[disabledKey]) ? environment[disabledKey] : []
+    );
+    return Array.from(new Set([...enabled, ...forced])).filter((id) => !disabled.has(id));
   }
 
   function environmentComposedTaskCount(environment) {
-    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableTaskCount;
+    const stored =
+      $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableTaskCount;
     return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'task').length;
   }
 
   function environmentComposedEventCount(environment) {
-    const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableEventCount;
+    const stored =
+      $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.availableEventCount;
     return Number.isFinite(stored) ? stored : environmentComposedIds(environment, 'event').length;
   }
 
   function environmentRequiredToolCount(environment) {
     const taskIds = new Set(environmentComposedIds(environment, 'task'));
     if (taskIds.size === 0) return 0;
+    // Function-local counting scratch, discarded when the function returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const toolIds = new Set();
     for (const task of gatheringTaskDefinitions) {
       if (!taskIds.has(task?.id)) continue;
@@ -4161,7 +5107,10 @@
   }
 
   function gatheringTaskName(task) {
-    return String(task?.name || text('FABRICATE.Admin.Manager.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')).trim();
+    return String(
+      task?.name ||
+        text('FABRICATE.Admin.Manager.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')
+    ).trim();
   }
 
   function gatheringTaskImage(task) {
@@ -4173,46 +5122,55 @@
   }
 
   function gatheringManagedItemLabel(componentId) {
-    const item = (selectedSystem?.managedItemOptions || []).find(option => String(option.id || '') === String(componentId || ''));
+    const item = (selectedSystem?.managedItemOptions || []).find(
+      (option) => String(option.id || '') === String(componentId || '')
+    );
     return item?.name || componentId || '';
   }
 
   function gatheringManagedItemImage(componentId) {
-    const item = (selectedSystem?.managedItemOptions || []).find(option => String(option.id || '') === String(componentId || ''));
+    const item = (selectedSystem?.managedItemOptions || []).find(
+      (option) => String(option.id || '') === String(componentId || '')
+    );
     return item?.img || 'icons/svg/item-bag.svg';
   }
 
   function gatheringDropName(row) {
-    return row?.name || gatheringManagedItemLabel(row?.componentId) || row?.itemUuid || text('FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop', 'Unresolved drop');
+    return (
+      row?.name ||
+      gatheringManagedItemLabel(row?.componentId) ||
+      row?.itemUuid ||
+      text('FABRICATE.Admin.Manager.Environment.Tasks.UnresolvedDrop', 'Unresolved drop')
+    );
   }
 
   function gatheringDropImage(row) {
     return row?.img || gatheringManagedItemImage(row?.componentId) || 'icons/svg/item-bag.svg';
   }
 
-  function gatheringTaskDropLabel(row) {
-    const name = gatheringDropName(row);
-    return `${name} x${row?.quantity || 1} (${row?.dropRate ?? 1}%)`;
-  }
-
   function gatheringOptionLabel(kind, id) {
     const options = selectedGatheringSystemConfig.vocabularies?.biomes?.values;
-    const option = (Array.isArray(options) ? options : []).find(value => String(value?.id || value) === String(id || ''));
+    const option = (Array.isArray(options) ? options : []).find(
+      (value) => String(value?.id || value) === String(id || '')
+    );
     return String(option?.label || option?.id || id || '').trim();
   }
 
   function gatheringConditionLabel(kind, id) {
     if (kind === 'biome') return gatheringOptionLabel('biome', id) || String(id || '');
     const setting = selectedGatheringSystemConfig.conditions?.[kind] || {};
-    const option = (Array.isArray(setting.values) ? setting.values : [])
-      .find(value => String(value?.id || value) === String(id || ''));
+    const option = (Array.isArray(setting.values) ? setting.values : []).find(
+      (value) => String(value?.id || value) === String(id || '')
+    );
     return String(option?.label || option?.id || id || '').trim();
   }
 
   function gatheringModifierKindIcon(kind, conditionId = '') {
     if (kind === 'weather') return 'fas fa-cloud-sun';
     if (kind === 'timeOfDay') return 'fas fa-clock';
-    const option = gatheringVocabularyOptions('biomes').find(value => String(value?.id || value) === String(conditionId || ''));
+    const option = gatheringVocabularyOptions('biomes').find(
+      (value) => String(value?.id || value) === String(conditionId || '')
+    );
     return String(option?.icon || '').trim() || 'fas fa-mountain-sun';
   }
 
@@ -4222,19 +5180,45 @@
         ? text('FABRICATE.Admin.Manager.Environment.Events.BiomeModifiers', 'Biome modifiers')
         : text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiers', 'Biome modifiers');
     }
-    if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers', 'Weather modifiers');
+    if (kind === 'weather')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiers',
+        'Weather modifiers'
+      );
     return text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiers', 'Time modifiers');
   }
 
   function gatheringModifierCardHint(kind, scope = 'task') {
     if (scope === 'event') {
-      if (kind === 'biome') return text('FABRICATE.Admin.Manager.Environment.Events.BiomeModifiersHint', "Adjust this event's chance based on the gathering environment's biomes.");
-      if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Events.WeatherModifiersHint', "Adjust this event's chance based on the active weather condition.");
-      return text('FABRICATE.Admin.Manager.Environment.Events.TimeModifiersHint', "Adjust this event's chance based on the active time of day.");
+      if (kind === 'biome')
+        return text(
+          'FABRICATE.Admin.Manager.Environment.Events.BiomeModifiersHint',
+          "Adjust this event's chance based on the gathering environment's biomes."
+        );
+      if (kind === 'weather')
+        return text(
+          'FABRICATE.Admin.Manager.Environment.Events.WeatherModifiersHint',
+          "Adjust this event's chance based on the active weather condition."
+        );
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Events.TimeModifiersHint',
+        "Adjust this event's chance based on the active time of day."
+      );
     }
-    if (kind === 'biome') return text('FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiersHint', "Adjust this drop's chance based on the gathering environment's biomes.");
-    if (kind === 'weather') return text('FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiersHint', "Adjust this drop's chance based on the active weather condition.");
-    return text('FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiersHint', "Adjust this drop's chance based on the active time of day.");
+    if (kind === 'biome')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.BiomeModifiersHint',
+        "Adjust this drop's chance based on the gathering environment's biomes."
+      );
+    if (kind === 'weather')
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.WeatherModifiersHint',
+        "Adjust this drop's chance based on the active weather condition."
+      );
+    return text(
+      'FABRICATE.Admin.Manager.Environment.Tasks.TimeModifiersHint',
+      "Adjust this drop's chance based on the active time of day."
+    );
   }
 
   function gatheringDropRateValue(row) {
@@ -4271,49 +5255,27 @@
     return 'var(--fab-drop-rate-legendary)';
   }
 
-  function onGatheringDropRateInput(rowId, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    input.value = normalized;
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      updateGatheringTaskDrop(rowId, { dropRate });
-    }
-  }
-
-  function onGatheringDropRateBlur(row, event) {
-    const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
-    const dropRate = Number(normalized);
-    if (normalized !== '' && Number.isInteger(dropRate) && dropRate >= 0 && dropRate <= 100) {
-      input.value = String(dropRate);
-      updateGatheringTaskDrop(row.id, { dropRate });
-      return;
-    }
-    input.value = String(gatheringDropRateValue(row));
-  }
-
-  function onGatheringDropRateKeydown(row, event) {
-    event.stopPropagation();
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    event.preventDefault();
-    const currentValue = event.currentTarget.value === '' ? gatheringDropRateValue(row) : Number(event.currentTarget.value);
-    const dropRate = gatheringDropRateValue({ dropRate: (Number.isFinite(currentValue) ? currentValue : gatheringDropRateValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
-    event.currentTarget.value = String(dropRate);
-    updateGatheringTaskDrop(row.id, { dropRate });
-  }
-
+  // The drop-rate input/blur/keydown trio that used to live here is gone with the
+  // hand-rolled slider it drove (issue 883). `ChanceSlider` owns those three handlers now,
+  // including the commit-on-blur behaviour: an empty field reverts to the model value on
+  // blur rather than being committed. The COUNT field below still hand-rolls them, because
+  // it is a bare numeric field with no slider and no shared control to render through.
   function onGatheringDropCountInput(rowId, event) {
     const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
+    const normalized = String(input.value || '')
+      .replace(/\D+/g, '')
+      .replace(/^0+/, '');
     input.value = normalized;
     const quantity = Number(normalized);
-    if (Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) updateGatheringTaskDrop(rowId, { quantity });
+    if (Number.isInteger(quantity) && quantity >= 1 && quantity <= 999)
+      updateGatheringTaskDrop(rowId, { quantity });
   }
 
   function onGatheringDropCountBlur(row, event) {
     const input = event.currentTarget;
-    const normalized = String(input.value || '').replace(/\D+/g, '').replace(/^0+/, '');
+    const normalized = String(input.value || '')
+      .replace(/\D+/g, '')
+      .replace(/^0+/, '');
     const quantity = Number(normalized);
     if (normalized !== '' && Number.isInteger(quantity) && quantity >= 1 && quantity <= 999) {
       input.value = String(quantity);
@@ -4327,8 +5289,15 @@
     event.stopPropagation();
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
-    const currentValue = event.currentTarget.value === '' ? gatheringDropCountValue(row) : Number(event.currentTarget.value);
-    const quantity = gatheringDropCountValue({ quantity: (Number.isFinite(currentValue) ? currentValue : gatheringDropCountValue(row)) + (event.key === 'ArrowUp' ? 1 : -1) });
+    const currentValue =
+      event.currentTarget.value === ''
+        ? gatheringDropCountValue(row)
+        : Number(event.currentTarget.value);
+    const quantity = gatheringDropCountValue({
+      quantity:
+        (Number.isFinite(currentValue) ? currentValue : gatheringDropCountValue(row)) +
+        (event.key === 'ArrowUp' ? 1 : -1),
+    });
     event.currentTarget.value = String(quantity);
     updateGatheringTaskDrop(row.id, { quantity });
   }
@@ -4336,18 +5305,30 @@
   function gatheringTaskAvailability(task) {
     const timeValues = Array.isArray(task?.timeOfDay) ? task.timeOfDay : [];
     const weatherValues = Array.isArray(task?.weather) ? task.weather : [];
-    const times = timeValues.length > 0
-      ? timeValues.map(id => gatheringConditionLabel('timeOfDay', id)).filter(Boolean).join(', ')
-      : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time');
-    const weather = weatherValues.length > 0
-      ? weatherValues.map(id => gatheringConditionLabel('weather', id)).filter(Boolean).join(', ')
-      : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather');
+    const times =
+      timeValues.length > 0
+        ? timeValues
+            .map((id) => gatheringConditionLabel('timeOfDay', id))
+            .filter(Boolean)
+            .join(', ')
+        : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTime', 'Any time');
+    const weather =
+      weatherValues.length > 0
+        ? weatherValues
+            .map((id) => gatheringConditionLabel('weather', id))
+            .filter(Boolean)
+            .join(', ')
+        : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyWeather', 'Any weather');
     return `${times}, ${weather}`;
   }
 
   function gatheringTaskAllowedInEnvironment(task, environment) {
-    const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
-    const disabledIds = Array.isArray(environment?.disabledTaskIds) ? environment.disabledTaskIds.map(String) : [];
+    const enabledIds = Array.isArray(environment?.enabledTaskIds)
+      ? environment.enabledTaskIds.map(String)
+      : [];
+    const disabledIds = Array.isArray(environment?.disabledTaskIds)
+      ? environment.disabledTaskIds.map(String)
+      : [];
     if (disabledIds.includes(String(task?.id))) return false;
     if (enabledIds.length > 0 && !enabledIds.includes(String(task?.id))) return false;
     return true;
@@ -4370,9 +5351,12 @@
   function gatheringTaskReferencingEnvironments(task) {
     if (!task?.id) return [];
     const taskId = String(task.id);
-    return environmentList.filter(environment => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
-      const enabledIds = Array.isArray(environment?.enabledTaskIds) ? environment.enabledTaskIds.map(String) : [];
+    return environmentList.filter((environment) => {
+      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || ''))
+        return false;
+      const enabledIds = Array.isArray(environment?.enabledTaskIds)
+        ? environment.enabledTaskIds.map(String)
+        : [];
       return enabledIds.includes(taskId);
     });
   }
@@ -4380,9 +5364,12 @@
   function gatheringEventReferencingEnvironments(event) {
     if (!event?.id) return [];
     const eventId = String(event.id);
-    return environmentList.filter(environment => {
-      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
-      const enabledIds = Array.isArray(environment?.enabledEventIds) ? environment.enabledEventIds.map(String) : [];
+    return environmentList.filter((environment) => {
+      if (String(environment?.craftingSystemId || '') !== String(selectedSystemId || ''))
+        return false;
+      const enabledIds = Array.isArray(environment?.enabledEventIds)
+        ? environment.enabledEventIds.map(String)
+        : [];
       return enabledIds.includes(eventId);
     });
   }
@@ -4394,16 +5381,32 @@
     const taskBiomes = Array.isArray(task.biomes) ? task.biomes : [];
     const taskWeather = Array.isArray(task.weather) ? task.weather : [];
     const taskTime = Array.isArray(task.timeOfDay) ? task.timeOfDay : [];
-    return environmentList.filter(environment => {
+    return environmentList.filter((environment) => {
       if (environment?.enabled === false) return false;
-      if (String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')) return false;
+      if (
+        String(environment?.craftingSystemId || selectedSystemId) !== String(selectedSystemId || '')
+      )
+        return false;
       if (!gatheringTaskAllowedInEnvironment(task, environment)) return false;
       const environmentBiomes = Array.isArray(environment?.biomes)
         ? environment.biomes
-        : (environment?.biome ? [environment.biome] : []);
-      if (taskBiomes.length > 0 && !taskBiomes.some(biome => environmentBiomes.includes(biome))) return false;
-      if (weatherSetting.enabled !== false && taskWeather.length > 0 && !taskWeather.includes(weatherSetting.current)) return false;
-      if (timeSetting.enabled !== false && taskTime.length > 0 && !taskTime.includes(timeSetting.current)) return false;
+        : environment?.biome
+          ? [environment.biome]
+          : [];
+      if (taskBiomes.length > 0 && !taskBiomes.some((biome) => environmentBiomes.includes(biome)))
+        return false;
+      if (
+        weatherSetting.enabled !== false &&
+        taskWeather.length > 0 &&
+        !taskWeather.includes(weatherSetting.current)
+      )
+        return false;
+      if (
+        timeSetting.enabled !== false &&
+        taskTime.length > 0 &&
+        !taskTime.includes(timeSetting.current)
+      )
+        return false;
       return true;
     }).length;
   }
@@ -4414,40 +5417,40 @@
       {
         id: 'tasks',
         label: text('FABRICATE.Admin.Environments.Tasks', 'Tasks'),
-        value: environmentComposedTaskCount(environment)
+        value: environmentComposedTaskCount(environment),
       },
       {
         id: 'events',
         label: text('FABRICATE.Admin.Environments.Events', 'Events'),
-        value: environmentComposedEventCount(environment)
+        value: environmentComposedEventCount(environment),
       },
       {
         id: 'required-tools',
         label: text('FABRICATE.Admin.Environments.RequiredTools', 'Required tools'),
-        value: environmentRequiredToolCount(environment)
+        value: environmentRequiredToolCount(environment),
       },
       {
         id: 'mode',
         label: text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode'),
-        value: environmentSelectionModeLabel(environment)
-      }
+        value: environmentSelectionModeLabel(environment),
+      },
     ];
   }
 
   function environmentDirtyFor(environment) {
-    return environment?.id && $viewState.environmentDraft?.id === environment.id && $viewState.environmentDraftDirty === true;
+    return (
+      environment?.id &&
+      $viewState.environmentDraft?.id === environment.id &&
+      $viewState.environmentDraftDirty === true
+    );
   }
 
   function environmentInvalidFor(environment) {
-    return environment?.id && $viewState.environmentDraft?.id === environment.id && environmentValidationCount > 0;
-  }
-
-  function environmentDisplay(environment) {
-    if (!environment) return null;
-    if (shouldUseEnvironmentDraftForDisplay && environmentDraftForDisplay?.id === environment.id) {
-      return environmentDraftForDisplay;
-    }
-    return environment;
+    return (
+      environment?.id &&
+      $viewState.environmentDraft?.id === environment.id &&
+      environmentValidationCount > 0
+    );
   }
 
   // `componentSourceState` lived here to tone the inline components inspector's source
@@ -4455,21 +5458,32 @@
   // its own linked badge, and the browser row derives its origin pill in
   // `ComponentsBrowserView` — so the helper had no callers left.
 
+  // No caller left. Deleting this and its two helpers (usageEvidenceItems,
+  // salvageSummaryLabel) would strip the only readers of the twelve component Salvage* and
+  // Usage* lang keys, orphaning them and failing the lang-keys-no-orphans ratchet, which may
+  // not be grown. lang/en.json is outside this change's owned paths, so the trio is
+  // suppressed rather than deleted; issue 926 removes the code and the keys together.
+  // (Do not spell those keys with their leading namespace here: the orphan scanner treats a
+  // dotted key literal in a COMMENT as a reference, and a partial one covers a whole subtree.)
+  // eslint-disable-next-line no-unused-vars
   function componentEvidenceItems(item) {
     const evidence = [];
     if (!item) return evidence;
     if (Object.prototype.hasOwnProperty.call(item, 'difficulty')) {
       evidence.push({
         id: 'difficulty',
-        label: text('FABRICATE.Admin.Manager.Component.ProgressiveDifficulty', 'Progressive difficulty'),
-        value: item.difficulty
+        label: text(
+          'FABRICATE.Admin.Manager.Component.ProgressiveDifficulty',
+          'Progressive difficulty'
+        ),
+        value: item.difficulty,
       });
     }
     if (item.salvageSummary) {
       evidence.push({
         id: 'salvage',
         label: text('FABRICATE.Admin.Manager.Component.Salvage', 'Salvage'),
-        value: salvageSummaryLabel(item.salvageSummary)
+        value: salvageSummaryLabel(item.salvageSummary),
       });
     }
     for (const fact of usageEvidenceItems(item)) {
@@ -4485,36 +5499,56 @@
       result: text('FABRICATE.Admin.Manager.Component.UsageResult', 'Result usage'),
       tool: text('FABRICATE.Admin.Manager.Component.UsageTool', 'Tool usage'),
       gathering: text('FABRICATE.Admin.Manager.Component.UsageGathering', 'Gathering usage'),
-      salvage: text('FABRICATE.Admin.Manager.Component.UsageSalvage', 'Salvage usage')
+      salvage: text('FABRICATE.Admin.Manager.Component.UsageSalvage', 'Salvage usage'),
     };
     return Object.entries(item.usageCounts)
       .filter(([, count]) => Number.isFinite(Number(count)))
       .map(([key, count]) => ({
         id: `usage-${key}`,
         label: labels[key] || key,
-        value: Number(count)
+        value: Number(count),
       }));
   }
 
   function salvageSummaryLabel(summary) {
     const parts = [
-      text('FABRICATE.Admin.Manager.Component.SalvageQuantity', '{count} required')
-        .replace('{count}', summary.quantityRequired ?? 1)
+      text('FABRICATE.Admin.Manager.Component.SalvageQuantity', '{count} required').replace(
+        '{count}',
+        summary.quantityRequired ?? 1
+      ),
     ];
-    if (summary.toolCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTools', '{count} tools').replace('{count}', summary.toolCount));
-    if (summary.resultGroupCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result groups').replace('{count}', summary.resultGroupCount));
-    if (summary.outcomeCount > 0) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageOutcomes', '{count} outcomes').replace('{count}', summary.outcomeCount));
-    if (summary.hasTimeRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTime', 'time'));
-    if (summary.hasCurrencyRequirement) parts.push(text('FABRICATE.Admin.Manager.Component.SalvageCost', 'cost'));
+    if (summary.toolCount > 0)
+      parts.push(
+        text('FABRICATE.Admin.Manager.Component.SalvageTools', '{count} tools').replace(
+          '{count}',
+          summary.toolCount
+        )
+      );
+    if (summary.resultGroupCount > 0)
+      parts.push(
+        text('FABRICATE.Admin.Manager.Component.SalvageResults', '{count} result groups').replace(
+          '{count}',
+          summary.resultGroupCount
+        )
+      );
+    if (summary.outcomeCount > 0)
+      parts.push(
+        text('FABRICATE.Admin.Manager.Component.SalvageOutcomes', '{count} outcomes').replace(
+          '{count}',
+          summary.outcomeCount
+        )
+      );
+    if (summary.hasTimeRequirement)
+      parts.push(text('FABRICATE.Admin.Manager.Component.SalvageTime', 'time'));
+    if (summary.hasCurrencyRequirement)
+      parts.push(text('FABRICATE.Admin.Manager.Component.SalvageCost', 'cost'));
     return parts.join(', ');
   }
 
-  function stackedLabel(key, fallback) {
-    return `${text(key, fallback)}:`;
-  }
-
   function normalizeVocabularyKey(value) {
-    const normalized = String(value || '').trim().toLowerCase();
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
     return normalized || 'general';
   }
 
@@ -4528,7 +5562,7 @@
 
   function buildCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Admin.Manager.Recipe.General', 'General');
-    const customRows = uniqueSorted(categories || []).map(category => {
+    const customRows = uniqueSorted(categories || []).map((category) => {
       const key = normalizeVocabularyKey(category);
       const recipeUsageCount = usage.get(key) || 0;
       return {
@@ -4538,7 +5572,7 @@
         icon: categoryIconFor(icons, category),
         recipeUsageCount,
         totalUsage: recipeUsageCount,
-        locked: false
+        locked: false,
       };
     });
     return [
@@ -4549,9 +5583,9 @@
         icon: categoryIconFor(icons, 'general'),
         recipeUsageCount: usage.get('general') || 0,
         totalUsage: usage.get('general') || 0,
-        locked: true
+        locked: true,
       },
-      ...customRows
+      ...customRows,
     ];
   }
 
@@ -4561,7 +5595,7 @@
   // the removal-confirmation copy.
   function buildComponentCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Common.General', 'General');
-    const customRows = uniqueSorted(categories || []).map(category => {
+    const customRows = uniqueSorted(categories || []).map((category) => {
       const key = normalizeVocabularyKey(category);
       const componentUsageCount = usage.get(key) || 0;
       return {
@@ -4571,7 +5605,7 @@
         icon: categoryIconFor(icons, category),
         componentUsageCount,
         totalUsage: componentUsageCount,
-        locked: false
+        locked: false,
       };
     });
     return [
@@ -4582,14 +5616,14 @@
         icon: categoryIconFor(icons, 'general'),
         componentUsageCount: usage.get('general') || 0,
         totalUsage: usage.get('general') || 0,
-        locked: true
+        locked: true,
       },
-      ...customRows
+      ...customRows,
     ];
   }
 
   function buildTagRows(tags, usage) {
-    return uniqueSorted(tags || []).map(tag => {
+    return uniqueSorted(tags || []).map((tag) => {
       const key = normalizeVocabularyKey(tag);
       const componentUsageCount = usage.get(key) || 0;
       return {
@@ -4597,21 +5631,22 @@
         kind: 'tag',
         name: tag,
         componentUsageCount,
-        totalUsage: componentUsageCount
+        totalUsage: componentUsageCount,
       };
     });
   }
 
   function countLabelParts(label) {
-    const normalized = String(label ?? '').trim().replace(/\s+/g, ' ');
+    const normalized = String(label ?? '')
+      .trim()
+      .replace(/\s+/g, ' ');
     const firstSpace = normalized.indexOf(' ');
     if (firstSpace === -1) return { lead: normalized, rest: '' };
     return {
       lead: normalized.slice(0, firstSpace),
-      rest: normalized.slice(firstSpace + 1)
+      rest: normalized.slice(firstSpace + 1),
     };
   }
-
 </script>
 
 <div class="fabricate-manager" data-manager-view={currentView}>
@@ -4622,422 +5657,766 @@
     text — hence max-width + ellipsis + title) and never a theme or product name.
   -->
   {#if !isToolStudioRoute}
-  <div class="manager-titlebar" data-manager-titlebar aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}>
-    <!--
+    <div
+      class="manager-titlebar"
+      data-manager-titlebar
+      aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
+    >
+      <!--
       The layer-group icon and "Crafting Systems" product label used to lead this
       strip, but the Foundry window's own title bar already names the app — a second
       copy inside the window was duplicated chrome (issue 643). The gold SYSTEM badge
       is now the left-most element, and the resolution status stays right-aligned.
     -->
-    {#if selectedSystem}
-      <span
-        class="manager-titlebar-badge"
-        data-manager-titlebar-system
-        title={selectedSystem.name}
-        aria-label={text('FABRICATE.Admin.Manager.Titlebar.SystemBadge', 'Selected crafting system')}
-      >{selectedSystem.name}</span>
-      <span
-        class="manager-titlebar-status"
-        data-manager-titlebar-status
-        title={titlebarStatusLabel()}
-        aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
-      >
-        <i class="fas fa-dice-d20 manager-titlebar-status-icon" aria-hidden="true"></i>
-        <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
-      </span>
-    {/if}
-  </div>
+      {#if selectedSystem}
+        <span
+          class="manager-titlebar-badge"
+          data-manager-titlebar-system
+          title={selectedSystem.name}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Titlebar.SystemBadge',
+            'Selected crafting system'
+          )}>{selectedSystem.name}</span
+        >
+        <span
+          class="manager-titlebar-status"
+          data-manager-titlebar-status
+          title={titlebarStatusLabel()}
+          aria-label={text('FABRICATE.Admin.Manager.Titlebar.Status', 'Selected system resolution')}
+        >
+          <i class="fas fa-dice-d20 manager-titlebar-status-icon" aria-hidden="true"></i>
+          <span class="manager-titlebar-status-text">{titlebarStatusLabel()}</span>
+        </span>
+      {/if}
+    </div>
   {/if}
 
   {#if !isToolStudioRoute}
-  <header class="manager-header">
-    <div class="manager-heading">
-      <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
-        <button type="button" onclick={() => selectSystemAndShowBrowser()}>{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button>
-        {#if selectedSystem && currentView !== 'systems'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => editSystem(selectedSystem.id)}>{selectedSystem.name}</button>
-        {/if}
-        {#if currentView === 'recipes'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
-        {/if}
-        {#if currentView === 'crafting-settings'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Settings', 'Settings')}</span>
-        {/if}
-        {#if currentView === 'access'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Access', 'Access')}</span>
-        {/if}
-        {#if currentView === 'books-scrolls'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</span>
-        {/if}
-        {#if currentView === 'recipe-item-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToBooksScrolls}>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.RecipeItem.EditBreadcrumb', 'Edit recipe item')}</span>
-        {/if}
-        {#if currentView === 'components'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
-        {/if}
-        {#if currentView === 'tags'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
-        {/if}
-        {#if currentView === 'essences'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span>
-        {/if}
-        {#if currentView === 'essence-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToEssencesBrowse}>{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{isCreatingEssenceDraft
-            ? text('FABRICATE.Admin.Manager.Essence.CreateBreadcrumb', 'Create essence')
-            : text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span>
-        {/if}
-        {#if currentView === 'recipe-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToRecipesBrowse}>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <!-- Name the recipe (§F5), not the generic "Edit recipe". -->
-          <span>{recipeDraft?.name || text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span>
-        {/if}
-        {#if currentView === 'component-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToComponentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <!-- Name the component, not the generic "Edit component" — the same rule the
+    <header class="manager-header">
+      <div class="manager-heading">
+        <nav
+          class="manager-breadcrumbs"
+          aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
+        >
+          <button type="button" onclick={() => selectSystemAndShowBrowser()}
+            >{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</button
+          >
+          {#if selectedSystem && currentView !== 'systems'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => editSystem(selectedSystem.id)}
+              >{selectedSystem.name}</button
+            >
+          {/if}
+          {#if currentView === 'recipes'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => openCraftingSection('recipes')}
+              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</span>
+          {/if}
+          {#if currentView === 'crafting-settings'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => openCraftingSection('recipes')}
+              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Settings', 'Settings')}</span
+            >
+          {/if}
+          {#if currentView === 'access'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => openCraftingSection('recipes')}
+              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Access', 'Access')}</span>
+          {/if}
+          {#if currentView === 'books-scrolls'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => openCraftingSection('recipes')}
+              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</span>
+          {/if}
+          {#if currentView === 'knowledge'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => openCraftingSection('recipes')}
+              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Knowledge', 'Knowledge')}</span>
+          {/if}
+          {#if currentView === 'recipe-item-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => openCraftingSection('recipes')}
+              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToBooksScrolls}
+              >{text('FABRICATE.Admin.Manager.Nav.BooksScrolls', 'Books & Scrolls')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text('FABRICATE.Admin.Manager.RecipeItem.EditBreadcrumb', 'Edit recipe item')}</span
+            >
+          {/if}
+          {#if currentView === 'components'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
+          {/if}
+          {#if currentView === 'tags'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
+          {/if}
+          {#if currentView === 'essences'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span>
+          {/if}
+          {#if currentView === 'essence-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToEssencesBrowse}
+              >{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{isCreatingEssenceDraft
+                ? text('FABRICATE.Admin.Manager.Essence.CreateBreadcrumb', 'Create essence')
+                : text('FABRICATE.Admin.Manager.Essence.EditBreadcrumb', 'Edit essence')}</span
+            >
+          {/if}
+          {#if currentView === 'recipe-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={() => openCraftingSection('recipes')}
+              >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToRecipesBrowse}
+              >{text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <!-- Name the recipe (§F5), not the generic "Edit recipe". -->
+            <span
+              >{recipeDraft?.name ||
+                text('FABRICATE.Admin.Manager.Recipe.EditBreadcrumb', 'Edit recipe')}</span
+            >
+          {/if}
+          {#if currentView === 'component-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToComponentsBrowse}
+              >{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <!-- Name the component, not the generic "Edit component" — the same rule the
                recipe breadcrumb follows. -->
-          <span>{componentForEdit?.name || text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span>
-        {/if}
-        {#if currentView === 'environments'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
-        {/if}
-        {#if currentView === 'environment-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToEnvironmentsBrowse}>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.EditBreadcrumb', 'Edit environment')}</span>
-        {/if}
-        {#if currentView === 'gathering-task-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToGatheringTaskLibrary}>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks', 'Tasks')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.EditBreadcrumb', 'Edit gathering task')}</span>
-        {/if}
-        {#if currentView === 'gathering-event-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToGatheringEventLibrary}>{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters', 'Events')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Events.EditBreadcrumb', 'Edit gathering event')}</span>
-        {/if}
-        {#if currentView === 'tools'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
-        {/if}
-        {#if currentView === 'tool-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={backToToolsBrowser}>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button>
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{focusedToolDraft?.label || focusedToolDraft?.name || text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled tool')}</span>
-        {/if}
-        {#if currentView === 'checks'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
-        {/if}
-        {#if currentView === 'system-edit'}
-          <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')}</span>
-        {/if}
-      </nav>
-      {#if currentView === 'recipe-edit' && recipeDraft}
-        <!-- The recipe editor's identity header: the recipe's real image (never a
+            <span
+              >{componentForEdit?.name ||
+                text('FABRICATE.Admin.Manager.Component.EditBreadcrumb', 'Edit component')}</span
+            >
+          {/if}
+          {#if currentView === 'environments'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
+          {/if}
+          {#if currentView === 'environment-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToEnvironmentsBrowse}
+              >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.EditBreadcrumb',
+                'Edit environment'
+              )}</span
+            >
+          {/if}
+          {#if currentView === 'gathering-task-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToGatheringTaskLibrary}
+              >{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Tasks', 'Tasks')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.EditBreadcrumb',
+                'Edit gathering task'
+              )}</span
+            >
+          {/if}
+          {#if currentView === 'gathering-event-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToGatheringEventLibrary}
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.GatheringTabs.Encounters',
+                'Events'
+              )}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.Events.EditBreadcrumb',
+                'Edit gathering event'
+              )}</span
+            >
+          {/if}
+          {#if currentView === 'tools'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
+          {/if}
+          {#if currentView === 'tool-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <button type="button" onclick={backToToolsBrowser}
+              >{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</button
+            >
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{focusedToolDraft?.label ||
+                focusedToolDraft?.name ||
+                text('FABRICATE.Admin.Manager.Tools.Untitled', 'Untitled tool')}</span
+            >
+          {/if}
+          {#if currentView === 'checks'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span>{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+          {/if}
+          {#if currentView === 'system-edit'}
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span
+              >{text('FABRICATE.Admin.Manager.SystemEdit.PageBreadcrumb', 'System Overview')}</span
+            >
+          {/if}
+        </nav>
+        {#if currentView === 'recipe-edit' && recipeDraft}
+          <!-- The recipe editor's identity header: the recipe's real image (never a
              glyph-only avatar — a recipe HAS an img), its name, and the
              "<category> · <resolution mode>" subline. -->
-        <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
-          <Medallion src={resolveRecipeImage(recipeDraft)} icon="fas fa-scroll" size={44} />
-          <div class="manager-recipe-edit-heading-copy">
-            <h1 class="manager-title" title={recipeDraft.name || ''}>{recipeDraft.name || viewTitle()}</h1>
-            <p class="manager-subtitle" data-recipe-edit-subline>{viewSubtitle()}</p>
+          <div class="manager-recipe-edit-heading" data-recipe-edit-heading>
+            <Medallion src={resolveRecipeImage(recipeDraft)} icon="fas fa-scroll" size={44} />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={recipeDraft.name || ''}>
+                {recipeDraft.name || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-recipe-edit-subline>{viewSubtitle()}</p>
+            </div>
           </div>
-        </div>
-      {:else if currentView === 'component-edit' && componentForEdit}
-        <!-- The component editor's identity header (issue 676, decision 4 — it must match
+        {:else if currentView === 'component-edit' && componentForEdit}
+          <!-- The component editor's identity header (issue 676, decision 4 — it must match
              the recipe editor's exactly, and was never implemented: this route fell
              through to the generic static "Edit component" heading below). The linked
              item's real image, its NAME, and the "<category> · Linked <source>" subline.
              It reuses the recipe heading's classes wholesale — same shape, same CSS. -->
-        <div class="manager-recipe-edit-heading" data-component-edit-heading>
-          <Medallion src={componentForEdit.img} icon="fas fa-cube" size={44} />
-          <div class="manager-recipe-edit-heading-copy">
-            <h1 class="manager-title" title={componentForEdit.name || ''}>{componentForEdit.name || viewTitle()}</h1>
-            <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
+          <div class="manager-recipe-edit-heading" data-component-edit-heading>
+            <Medallion src={componentForEdit.img} icon="fas fa-cube" size={44} />
+            <div class="manager-recipe-edit-heading-copy">
+              <h1 class="manager-title" title={componentForEdit.name || ''}>
+                {componentForEdit.name || viewTitle()}
+              </h1>
+              <p class="manager-subtitle" data-component-edit-subline>{viewSubtitle()}</p>
+            </div>
           </div>
+        {:else if currentView !== 'tool-edit'}
+          <h1 class="manager-title">{viewTitle()}</h1>
+          <p class="manager-subtitle">{viewSubtitle()}</p>
+        {/if}
+        {#if currentView === 'environment-edit' && environmentDraftForDisplay}
+          <div class="manager-environment-header-pills" data-environment-status-pills>
+            <Chip
+              tone={environmentDraftForDisplay.enabled === false ? 'neutral' : 'active'}
+              data-status-pill="active"
+            >
+              {environmentDraftForDisplay.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+            </Chip>
+            <Chip tone="info" data-status-pill="selection">
+              {environmentDraftForDisplay.selectionMode === 'blind'
+                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind')
+                : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
+            </Chip>
+            <Chip tone="info" data-status-pill="composition">
+              {environmentDraftForDisplay.compositionMode === 'manual'
+                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual')
+                : text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic',
+                    'Automatic'
+                  )}
+            </Chip>
+          </div>
+        {/if}
+      </div>
+      {#if currentView !== 'tools' && currentView !== 'tool-edit'}
+        <div class="manager-header-actions" aria-label={headerActionsLabel()}>
+          {#if currentView === 'recipes'}
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={createRecipe}
+              disabled={!selectedSystemId}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
+            </button>
+          {:else if currentView === 'recipe-edit'}
+            {#if recipeEditDirty}
+              <Chip
+                tone="warning"
+                truncate
+                title={text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}
+                >{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</Chip
+              >
+            {/if}
+            <button
+              type="button"
+              class="manager-button is-ghost"
+              onclick={backToRecipesBrowse}
+              disabled={recipeEditSaving}
+            >
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
+            </button>
+            <button
+              type="button"
+              class="manager-button is-danger"
+              onclick={deleteRecipeFromEdit}
+              disabled={!selectedRecipeId || recipeEditSaving}
+              title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}
+            >
+              <i class="fas fa-trash" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
+            </button>
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={saveRecipeDraft}
+              disabled={!canSaveRecipeEdit}
+            >
+              <i
+                class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
+                aria-hidden="true"
+              ></i>
+              <span>{recipeEditSaveLabel()}</span>
+            </button>
+          {:else if currentView === 'recipe-item-edit'}
+            {#if recipeItemEditDirty}
+              <Chip
+                tone="warning"
+                truncate
+                data-recipe-item-dirty
+                title={text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}
+                >{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</Chip
+              >
+            {/if}
+            <button
+              type="button"
+              class="manager-button"
+              data-recipe-item-back
+              onclick={backToBooksScrolls}
+              disabled={recipeItemEditSaving}
+            >
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.RecipeItem.BackToBrowse',
+                  'Back to Books & Scrolls'
+                )}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-button is-danger"
+              data-recipe-item-delete
+              onclick={deleteRecipeItemFromEdit}
+              disabled={!recipeItemDraft?.id || recipeItemEditSaving}
+              title={text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}
+            >
+              <i class="fas fa-trash" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}</span>
+            </button>
+            <button
+              type="button"
+              class="manager-button is-primary"
+              data-recipe-item-save
+              onclick={saveRecipeItemDraft}
+              disabled={!canSaveRecipeItemEdit}
+            >
+              <i
+                class={recipeItemEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
+                aria-hidden="true"
+              ></i>
+              <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
+            </button>
+            <!--
+          An attempted-and-failed save is announced beside the control the GM just clicked
+          (issue 919). It trails the Save button so the wrapping toolbar drops it onto its
+          own line instead of shoving the "Unsaved" chip out of the row.
+        -->
+            {#if recipeItemSaveFailed}
+              <p class="manager-header-save-error" role="alert" data-recipe-item-save-error>
+                {text('FABRICATE.Admin.Manager.RecipeItem.SaveFailed', 'Save failed. Try again.')}
+              </p>
+            {/if}
+          {:else if currentView === 'components'}
+            <!-- no header actions for the components list -->
+          {:else if currentView === 'knowledge'}
+            <!-- The Knowledge surface's only actions are per-character: they live in the
+             detail-pane header, next to the character they act on. -->
+          {:else if currentView === 'component-edit'}
+            <ComponentEditorHeader
+              dirty={componentEditCombinedDirty}
+              saving={componentEditSaving}
+              canSave={canSaveComponentEdit}
+              formId="manager-component-edit-form"
+              dirtyLabel={text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}
+              backLabel={text('FABRICATE.Admin.Manager.Component.Back', 'Back')}
+              saveLabel={componentEditSaveLabel()}
+              onBack={backToComponentsBrowse}
+            />
+          {:else if currentView === 'tags'}
+            <!-- no header actions for the tags view -->
+          {:else if currentView === 'checks'}
+            {#if checksDirty}
+              <Chip tone="warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</Chip>
+            {/if}
+            <button
+              type="button"
+              class="manager-button is-primary"
+              data-checks-save
+              onclick={saveChecks}
+              disabled={!checksDirty || checksSaving}
+            >
+              <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"
+              ></i>
+              <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
+            </button>
+          {:else if currentView === 'essences'}
+            <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence')}</span>
+            </button>
+          {:else if currentView === 'essence-edit'}
+            {#if essenceEditDirty}
+              <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip>
+            {/if}
+            <button
+              type="button"
+              class="manager-button"
+              onclick={cancelEssenceEdit}
+              disabled={essenceEditSaving}
+            >
+              <i class="fas fa-times" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Essence.Cancel', 'Cancel')}</span>
+            </button>
+            <button
+              type="submit"
+              form="manager-essence-edit-form"
+              class="manager-button is-primary"
+              disabled={!canSaveEssenceEdit}
+            >
+              <i
+                class={essenceEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
+                aria-hidden="true"
+              ></i>
+              <span>{essenceEditSaveLabel()}</span>
+            </button>
+          {:else if currentView === 'environments' && activeGatheringTab === 'tasks'}
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={() => createGatheringTask(selectedSystemId)}
+              disabled={!canShowEnvironments}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.Create',
+                  'Create gathering task'
+                )}</span
+              >
+            </button>
+          {:else if currentView === 'environments' && activeGatheringTab === 'encounters'}
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={() => createGatheringEvent(selectedSystemId)}
+              disabled={!canShowEnvironments}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Environment.Events.Create',
+                  'Create gathering event'
+                )}</span
+              >
+            </button>
+          {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'parties'}
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={() => store.createParty?.()}
+              disabled={!canShowEnvironments || $viewState.travelSaving}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
+            </button>
+          {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'realms'}
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={async () => {
+                const created = await store.createRealmQuick?.(
+                  selectedSystemId,
+                  text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')
+                );
+                if (typeof created === 'string' && created) selectedTravelRealmId = created;
+              }}
+              disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
+            </button>
+          {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+            <!-- Map Region Links tab has no create action. -->
+          {:else if currentView === 'environments'}
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={createEnvironment}
+              disabled={!canShowEnvironments}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span
+              >
+            </button>
+          {:else if currentView === 'environment-edit'}
+            {#if $viewState.environmentDraftDirty}
+              <Chip tone="warning"
+                >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
+              >
+            {/if}
+            <button
+              type="button"
+              class="manager-button"
+              onclick={backToEnvironmentsBrowse}
+              disabled={$viewState.environmentSaving}
+            >
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Environment.BackToBrowse',
+                  'Back to environments'
+                )}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-button is-danger"
+              data-action="delete-environment"
+              onclick={() => store.deleteEnvironmentDraft?.()}
+              disabled={$viewState.environmentDraftIsNew || $viewState.environmentSaving}
+            >
+              <i class="fas fa-trash" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={saveEnvironmentEdit}
+              disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}
+            >
+              <i
+                class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
+                aria-hidden="true"
+              ></i>
+              <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
+            </button>
+          {:else if currentView === 'gathering-task-edit'}
+            {#if gatheringTaskDraftDirty}
+              <Chip tone="warning"
+                >{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</Chip
+              >
+            {/if}
+            <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary',
+                  'Back to task library'
+                )}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-button is-danger"
+              onclick={deleteGatheringTaskDraft}
+              disabled={!selectedGatheringTaskId || gatheringTaskSaving}
+              title={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
+                'Delete gathering task'
+              )}
+            >
+              <i class="fas fa-trash" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
+                  'Delete gathering task'
+                )}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={saveGatheringTaskDraft}
+              disabled={!gatheringTaskDraftDirty ||
+                !gatheringTaskValidation.valid ||
+                gatheringTaskSaving}
+              title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
+            >
+              <i
+                class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
+                aria-hidden="true"
+              ></i>
+              <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
+            </button>
+            <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
+            {#if gatheringTaskSaveError}
+              <p class="manager-header-save-error" role="alert" data-gathering-task-save-error>
+                {gatheringTaskSaveError}
+              </p>
+            {/if}
+          {:else if currentView === 'gathering-event-edit'}
+            {#if gatheringEventDraftDirty}
+              <Chip tone="warning"
+                >{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</Chip
+              >
+            {/if}
+            <button type="button" class="manager-button" onclick={backToGatheringEventLibrary}>
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Environment.Events.BackToLibrary',
+                  'Back to event library'
+                )}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-button is-danger"
+              onclick={deleteGatheringEventDraft}
+              disabled={!selectedGatheringEventId || gatheringEventSaving}
+              title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
+            >
+              <i class="fas fa-trash" aria-hidden="true"></i>
+              <span
+                >{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span
+              >
+            </button>
+            <button
+              type="button"
+              class="manager-button is-primary"
+              onclick={saveGatheringEventDraft}
+              disabled={!gatheringEventDraftDirty ||
+                !gatheringEventValidation.valid ||
+                gatheringEventSaving}
+              title={gatheringEventValidation.valid
+                ? ''
+                : gatheringEventValidation.errors.join('\n')}
+            >
+              <i
+                class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
+                aria-hidden="true"
+              ></i>
+              <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
+            </button>
+            <!-- See the recipe-item branch above: same failed-save alert, same placement (issue 919). -->
+            {#if gatheringEventSaveError}
+              <p class="manager-header-save-error" role="alert" data-gathering-event-save-error>
+                {gatheringEventSaveError}
+              </p>
+            {/if}
+          {:else if currentView === 'system-edit'}
+            <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
+              <i class="fas fa-arrow-left" aria-hidden="true"></i>
+              <span
+                >{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span
+              >
+            </button>
+          {:else}
+            <!-- data-manager-import-system: a zero-behaviour hook. The only other handle on
+                 this button is `manager-button`, which a dozen header controls share, so a
+                 screenshot case could not name it without matching whichever came first. -->
+            <button
+              type="button"
+              class="manager-button"
+              data-manager-import-system
+              onclick={importSystem}
+            >
+              <i class="fas fa-file-import" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
+            </button>
+            <button
+              type="button"
+              class="manager-button"
+              onclick={() => exportSystem()}
+              disabled={!selectedSystemId}
+            >
+              <i class="fas fa-file-export" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
+            </button>
+            <button type="button" class="manager-button is-primary" onclick={createSystem}>
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
+            </button>
+          {/if}
         </div>
-      {:else if currentView !== 'tool-edit'}
-        <h1 class="manager-title">{viewTitle()}</h1>
-        <p class="manager-subtitle">{viewSubtitle()}</p>
       {/if}
-      {#if currentView === 'environment-edit' && environmentDraftForDisplay}
-        <div class="manager-environment-header-pills" data-environment-status-pills>
-          <span class={`manager-chip ${environmentDraftForDisplay.enabled === false ? 'is-neutral' : 'is-active'}`} data-status-pill="active">
-            {environmentDraftForDisplay.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-          </span>
-          <span class="manager-chip is-info" data-status-pill="selection">
-            {environmentDraftForDisplay.selectionMode === 'blind' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Blind', 'Blind') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Targeted', 'Targeted')}
-          </span>
-          <span class="manager-chip is-info" data-status-pill="composition">
-            {environmentDraftForDisplay.compositionMode === 'manual' ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Manual', 'Manual') : text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Automatic', 'Automatic')}
-          </span>
-        </div>
-      {/if}
-    </div>
-    {#if currentView !== 'tools' && currentView !== 'tool-edit'}
-    <div class="manager-header-actions" aria-label={headerActionsLabel()}>
-      {#if currentView === 'recipes'}
-        <button type="button" class="manager-button is-primary" onclick={createRecipe} disabled={!selectedSystemId}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Create', 'Create recipe')}</span>
-        </button>
-      {:else if currentView === 'recipe-edit'}
-        {#if recipeEditDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Recipe.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button is-ghost" onclick={backToRecipesBrowse} disabled={recipeEditSaving}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.BackToBrowse', 'Back to recipes')}</span>
-        </button>
-        <button type="button" class="manager-button is-danger" onclick={deleteRecipeFromEdit} disabled={!selectedRecipeId || recipeEditSaving} title={text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}>
-          <i class="fas fa-trash" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-        </button>
-        <button type="button" class="manager-button is-primary" onclick={saveRecipeDraft} disabled={!canSaveRecipeEdit}>
-          <i class={recipeEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{recipeEditSaveLabel()}</span>
-        </button>
-      {:else if currentView === 'recipe-item-edit'}
-        {#if recipeItemEditDirty}
-          <span class="manager-chip is-warning" data-recipe-item-dirty>{text('FABRICATE.Admin.Manager.RecipeItem.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button" data-recipe-item-back onclick={backToBooksScrolls} disabled={recipeItemEditSaving}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.RecipeItem.BackToBrowse', 'Back to Books & Scrolls')}</span>
-        </button>
-        <button type="button" class="manager-button is-danger" data-recipe-item-delete onclick={deleteRecipeItemFromEdit} disabled={!recipeItemDraft?.id || recipeItemEditSaving} title={text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}>
-          <i class="fas fa-trash" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.RecipeItem.Delete', 'Delete recipe item')}</span>
-        </button>
-        <button type="button" class="manager-button is-primary" data-recipe-item-save onclick={saveRecipeItemDraft} disabled={!canSaveRecipeItemEdit}>
-          <i class={recipeItemEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
-        </button>
-      {:else if currentView === 'components'}
-        <!-- no header actions for the components list -->
-      {:else if currentView === 'component-edit'}
-        <ComponentEditorHeader
-          dirty={componentEditCombinedDirty}
-          saving={componentEditSaving}
-          canSave={canSaveComponentEdit}
-          formId="manager-component-edit-form"
-          dirtyLabel={text('FABRICATE.Admin.Manager.Component.Dirty', 'Unsaved')}
-          backLabel={text('FABRICATE.Admin.Manager.Component.Back', 'Back')}
-          saveLabel={componentEditSaveLabel()}
-          onBack={backToComponentsBrowse}
-        />
-      {:else if currentView === 'tags'}
-        <!-- no header actions for the tags view -->
-      {:else if currentView === 'checks'}
-        {#if checksDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Checks.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button is-primary" data-checks-save onclick={saveChecks} disabled={!checksDirty || checksSaving}>
-          <i class={checksSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Checks.Save', 'Save check')}</span>
-        </button>
-      {:else if currentView === 'essences'}
-        <button type="button" class="manager-button is-primary" onclick={createEssenceDraft}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence')}</span>
-        </button>
-      {:else if currentView === 'essence-edit'}
-        {#if essenceEditDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button" onclick={cancelEssenceEdit} disabled={essenceEditSaving}>
-          <i class="fas fa-times" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Essence.Cancel', 'Cancel')}</span>
-        </button>
-        <button type="submit" form="manager-essence-edit-form" class="manager-button is-primary" disabled={!canSaveEssenceEdit}>
-          <i class={essenceEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{essenceEditSaveLabel()}</span>
-        </button>
-      {:else if currentView === 'environments' && activeGatheringTab === 'tasks'}
-        <button type="button" class="manager-button is-primary" onclick={() => createGatheringTask(selectedSystemId)} disabled={!canShowEnvironments}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Create', 'Create gathering task')}</span>
-        </button>
-      {:else if currentView === 'environments' && activeGatheringTab === 'encounters'}
-        <button type="button" class="manager-button is-primary" onclick={() => createGatheringEvent(selectedSystemId)} disabled={!canShowEnvironments}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Create', 'Create gathering event')}</span>
-        </button>
-      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'parties'}
-        <button type="button" class="manager-button is-primary" onclick={() => store.createParty?.()} disabled={!canShowEnvironments || $viewState.travelSaving}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Travel.CreateParty', 'Create party')}</span>
-        </button>
-      {:else if currentView === 'environments' && activeGatheringTab === 'travel' && activeTravelTab === 'realms'}
-        <button type="button" class="manager-button is-primary" onclick={async () => { const created = await store.createRealmQuick?.(selectedSystemId, text('FABRICATE.Admin.Manager.Travel.DefaultRealmName', 'New realm')); if (typeof created === 'string' && created) selectedTravelRealmId = created; }} disabled={!canShowEnvironments || !selectedSystemId || $viewState.travelSaving}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Travel.CreateRealm', 'Create realm')}</span>
-        </button>
-      {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
-        <!-- Map Region Links tab has no create action. -->
-      {:else if currentView === 'environments'}
-        <button type="button" class="manager-button is-primary" onclick={createEnvironment} disabled={!canShowEnvironments}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span>
-        </button>
-      {:else if currentView === 'environment-edit'}
-        {#if $viewState.environmentDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button" onclick={backToEnvironmentsBrowse} disabled={$viewState.environmentSaving}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.BackToBrowse', 'Back to environments')}</span>
-        </button>
-        <button type="button" class="manager-button is-danger" data-action="delete-environment" onclick={() => store.deleteEnvironmentDraft?.()} disabled={$viewState.environmentDraftIsNew || $viewState.environmentSaving}>
-          <i class="fas fa-trash" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment')}</span>
-        </button>
-        <button type="button" class="manager-button is-primary" onclick={saveEnvironmentEdit} disabled={!$viewState.environmentDraftDirty || $viewState.environmentSaving}>
-          <i class={$viewState.environmentSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Environments.Save', 'Save')}</span>
-        </button>
-      {:else if currentView === 'gathering-task-edit'}
-        {#if gatheringTaskDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Tasks.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button" onclick={backToGatheringTaskLibrary}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.BackToLibrary', 'Back to task library')}</span>
-        </button>
-        <button
-          type="button"
-          class="manager-button is-danger"
-          onclick={deleteGatheringTaskDraft}
-          disabled={!selectedGatheringTaskId || gatheringTaskSaving}
-          title={text('FABRICATE.Admin.Manager.Environment.Tasks.Delete', 'Delete gathering task')}
-        >
-          <i class="fas fa-trash" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Delete', 'Delete gathering task')}</span>
-        </button>
-        <button
-          type="button"
-          class="manager-button is-primary"
-          onclick={saveGatheringTaskDraft}
-          disabled={!gatheringTaskDraftDirty || !gatheringTaskValidation.valid || gatheringTaskSaving}
-          title={gatheringTaskValidation.valid ? '' : gatheringTaskValidation.errors.join('\n')}
-        >
-          <i class={gatheringTaskSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Save', 'Save task')}</span>
-        </button>
-      {:else if currentView === 'gathering-event-edit'}
-        {#if gatheringEventDraftDirty}
-          <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Events.Dirty', 'Unsaved')}</span>
-        {/if}
-        <button type="button" class="manager-button" onclick={backToGatheringEventLibrary}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Events.BackToLibrary', 'Back to event library')}</span>
-        </button>
-        <button
-          type="button"
-          class="manager-button is-danger"
-          onclick={deleteGatheringEventDraft}
-          disabled={!selectedGatheringEventId || gatheringEventSaving}
-          title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
-        >
-          <i class="fas fa-trash" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}</span>
-        </button>
-        <button
-          type="button"
-          class="manager-button is-primary"
-          onclick={saveGatheringEventDraft}
-          disabled={!gatheringEventDraftDirty || !gatheringEventValidation.valid || gatheringEventSaving}
-          title={gatheringEventValidation.valid ? '' : gatheringEventValidation.errors.join('\n')}
-        >
-          <i class={gatheringEventSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Save', 'Save event')}</span>
-        </button>
-      {:else if currentView === 'system-edit'}
-        <button type="button" class="manager-button" onclick={backToSystemsBrowser}>
-          <i class="fas fa-arrow-left" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.SystemEdit.BackToSystems', 'Back to systems')}</span>
-        </button>
-      {:else}
-        <button type="button" class="manager-button" onclick={importSystem}>
-          <i class="fas fa-file-import" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Import', 'Import')}</span>
-        </button>
-        <button type="button" class="manager-button" onclick={() => exportSystem()} disabled={!selectedSystemId}>
-          <i class="fas fa-file-export" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Export', 'Export')}</span>
-        </button>
-        <button type="button" class="manager-button is-primary" onclick={createSystem}>
-          <i class="fas fa-plus" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Create', 'Create')}</span>
-        </button>
-      {/if}
-    </div>
-    {/if}
-  </header>
+    </header>
   {/if}
 
   {#if currentView === 'tools' && selectedSystem}
     <header class="manager-header manager-tools-context-header" data-tool-library-context>
       <div class="manager-heading">
-        <nav class="manager-breadcrumbs" aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}>
-          <button type="button" onclick={() => editSystem(selectedSystem.id)}>{selectedSystem.name}</button>
+        <nav
+          class="manager-breadcrumbs"
+          aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
+        >
+          <button type="button" onclick={() => editSystem(selectedSystem.id)}
+            >{selectedSystem.name}</button
+          >
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
-          <button type="button" onclick={() => openCraftingSection('recipes')}>{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button>
+          <button type="button" onclick={() => openCraftingSection('recipes')}
+            >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</button
+          >
           <i class="fas fa-chevron-right" aria-hidden="true"></i>
           <span>{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
         </nav>
-        <h1 class="manager-title">{text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}</h1>
-        <p class="manager-subtitle">{text(
-          'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
-          'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
-        )}</p>
+        <h1 class="manager-title">
+          {text('FABRICATE.Admin.Manager.Tools.LibraryTitle', 'Tool Studio')}
+        </h1>
+        <p class="manager-subtitle">
+          {text(
+            'FABRICATE.Admin.Manager.Tools.LibrarySubtitle',
+            'Tools that recipes can require — from hand-held gear to fixed stations and places of power. Set how they break and who may wield them.'
+          )}
+        </p>
       </div>
     </header>
   {/if}
 
   <div class={`manager-body ${railCollapsed ? 'is-rail-collapsed' : ''}`}>
-    <aside class="manager-rail" aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}>
+    <aside
+      class="manager-rail"
+      aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}
+    >
       <!--
         Name the workspace before its scope controls. Every manager route, including
         the Tool library/editor, shares this one rail branch.
       -->
-      <p class="manager-rail-title" data-manager-rail-section>{text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}</p>
+      <p class="manager-rail-title" data-manager-rail-section>
+        {text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}
+      </p>
 
       <!--
         The rail's crafting-system card. The kicker names what the card CONTAINS
@@ -5047,11 +6426,16 @@
         The "GM management workspace" caption that used to hang below it is gone: the
         rail's section label already names the workspace above this card.
       -->
-      <section class="manager-rail-block" aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}>
+      <section
+        class="manager-rail-block"
+        aria-label={text('FABRICATE.Admin.Manager.ManagerScope', 'Manager scope')}
+      >
         {#if selectedSystem}
           <div class="manager-scope-card">
             <div class="manager-scope-card-head">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.CraftingSystem', 'Crafting system')}</p>
+              <p class="manager-kicker">
+                {text('FABRICATE.Admin.Manager.CraftingSystem', 'Crafting system')}
+              </p>
               <button
                 type="button"
                 class="manager-rail-toggle manager-scope-collapse"
@@ -5065,7 +6449,10 @@
                   : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
                 onclick={toggleManagerRail}
               >
-                <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
+                <i
+                  class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'}
+                  aria-hidden="true"
+                ></i>
               </button>
             </div>
             <select
@@ -5090,12 +6477,20 @@
               class={`manager-scope-return ${currentView === 'systems' ? 'is-disabled' : ''}`}
               disabled={currentView === 'systems'}
               aria-disabled={currentView === 'systems'}
-              aria-label={text('FABRICATE.Admin.Manager.ReturnToSystemLibrary', 'Return to System Library')}
-              title={text('FABRICATE.Admin.Manager.ReturnToSystemLibrary', 'Return to System Library')}
+              aria-label={text(
+                'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
+                'Return to System Library'
+              )}
+              title={text(
+                'FABRICATE.Admin.Manager.ReturnToSystemLibrary',
+                'Return to System Library'
+              )}
               onclick={backToSystemsBrowser}
             >
               <i class="fas fa-arrow-left-long" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.AllCraftingSystems', 'All crafting systems')}</span>
+              <span
+                >{text('FABRICATE.Admin.Manager.AllCraftingSystems', 'All crafting systems')}</span
+              >
             </button>
           </div>
         {:else}
@@ -5115,25 +6510,49 @@
                   : text('FABRICATE.Admin.Manager.Nav.CollapseRail', 'Collapse navigation rail')}
                 onclick={toggleManagerRail}
               >
-                <i class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'} aria-hidden="true"></i>
+                <i
+                  class={railCollapsed ? 'fas fa-angles-right' : 'fas fa-angles-left'}
+                  aria-hidden="true"
+                ></i>
               </button>
             </div>
-            <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}</h2>
+            <h2 class="manager-title">
+              {text('FABRICATE.Admin.Manager.Nav.Systems', 'Crafting Systems')}
+            </h2>
           </div>
         {/if}
       </section>
 
-      <nav class="manager-nav" aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}>
+      <nav
+        class="manager-nav"
+        aria-label={text('FABRICATE.Admin.Manager.ManagerSections', 'Manager sections')}
+      >
         {#if selectedSystem}
-          <button type="button" class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`} aria-current={currentView === 'system-edit' ? 'page' : undefined} data-nav-system-edit onclick={() => editSystem(selectedSystem.id)}>
+          <button
+            type="button"
+            class={`manager-nav-button ${currentView === 'system-edit' ? 'is-active' : ''}`}
+            aria-current={currentView === 'system-edit' ? 'page' : undefined}
+            data-nav-system-edit
+            onclick={() => editSystem(selectedSystem.id)}
+          >
             <i class="fas fa-clipboard-check" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')}</span>
+            <span class="manager-nav-label"
+              >{text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')}</span
+            >
             {#if systemOverviewCount > 0}
-              <span class="manager-nav-count" aria-label={text('FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria', 'Open validation issues')}>{systemOverviewCount}</span>
+              <span
+                class="manager-nav-count"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.SystemOverview.CountBadgeAria',
+                  'Open validation issues'
+                )}>{systemOverviewCount}</span
+              >
             {/if}
           </button>
           <!-- Crafting group is unconditional as of issue 745 (v1.3 headline). -->
-          <div class={`manager-nav-group ${craftingMenuExpanded || isToolStudioRoute ? 'is-expanded' : ''}`}>
+          <div
+            class={`manager-nav-group ${craftingMenuExpanded || isToolStudioRoute ? 'is-expanded' : ''}`}
+          >
             <button
               type="button"
               class="manager-nav-button manager-nav-parent"
@@ -5143,7 +6562,9 @@
               onclick={activateCraftingParent}
             >
               <i class="fas fa-hammer" aria-hidden="true"></i>
-              <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span>
+              <span class="manager-nav-label"
+                >{text('FABRICATE.Admin.Manager.Nav.Crafting', 'Crafting')}</span
+              >
               <span class="manager-nav-count">{craftingNavCount}</span>
             </button>
             <button
@@ -5156,20 +6577,36 @@
               aria-expanded={craftingMenuExpanded || isToolStudioRoute}
               onclick={toggleCraftingMenu}
             >
-              <i class={craftingMenuExpanded || isToolStudioRoute ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+              <i
+                class={craftingMenuExpanded || isToolStudioRoute
+                  ? 'fas fa-chevron-up'
+                  : 'fas fa-chevron-down'}
+                aria-hidden="true"
+              ></i>
             </button>
             {#if craftingMenuExpanded || isToolStudioRoute}
-              <div class="manager-nav-submenu" id="manager-crafting-submenu" aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label', 'Crafting sections')}>
+              <div
+                class="manager-nav-submenu"
+                id="manager-crafting-submenu"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Crafting.CraftingTabs.Label',
+                  'Crafting sections'
+                )}
+              >
                 {#each craftingNavItems as craftingItem (craftingItem.id)}
                   <button
                     type="button"
                     class={`manager-nav-subitem ${isCraftingRoute && activeCraftingTab === craftingItem.id ? 'is-active' : ''}`}
                     id={`manager-crafting-nav-${craftingItem.id}`}
-                    aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id ? 'page' : undefined}
+                    aria-current={isCraftingRoute && activeCraftingTab === craftingItem.id
+                      ? 'page'
+                      : undefined}
                     onclick={() => openCraftingSection(craftingItem.id)}
                   >
                     <i class={craftingItem.icon} aria-hidden="true"></i>
-                    <span class="manager-nav-label">{text(craftingItem.labelKey, craftingItem.labelFallback)}</span>
+                    <span class="manager-nav-label"
+                      >{text(craftingItem.labelKey, craftingItem.labelFallback)}</span
+                    >
                     {#if craftingItem.count != null}
                       <span class="manager-nav-count">{craftingItem.count}</span>
                     {/if}
@@ -5178,31 +6615,83 @@
               </div>
             {/if}
           </div>
-          <button type="button" class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`} aria-current={currentView === 'components' || currentView === 'component-edit' ? 'page' : undefined} onclick={() => setView('components')}>
+          <button
+            type="button"
+            class={`manager-nav-button ${currentView === 'components' || currentView === 'component-edit' ? 'is-active' : ''}`}
+            aria-current={currentView === 'components' || currentView === 'component-edit'
+              ? 'page'
+              : undefined}
+            onclick={() => setView('components')}
+          >
             <i class="fas fa-boxes" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span>
+            <span class="manager-nav-label"
+              >{text('FABRICATE.Admin.Manager.Nav.Components', 'Components')}</span
+            >
             <span class="manager-nav-count">{selectedCounts.components}</span>
           </button>
-          <button type="button" class={`manager-nav-button ${currentView === 'tags' ? 'is-active' : ''}`} aria-current={currentView === 'tags' ? 'page' : undefined} onclick={() => setView('tags')}>
+          <button
+            type="button"
+            class={`manager-nav-button ${currentView === 'tags' ? 'is-active' : ''}`}
+            aria-current={currentView === 'tags' ? 'page' : undefined}
+            onclick={() => setView('tags')}
+          >
             <i class="fas fa-tags" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span>
-            <span class="manager-nav-count">{selectedCounts.itemTags + selectedCounts.recipeCategories}</span>
+            <span class="manager-nav-label"
+              >{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span
+            >
+            <!--
+              The rail badge is the whole screen's vocabulary, so it sums the SAME
+              inclusive projection the tab badges and at-a-glance tiles read (issue 878).
+              It previously summed `selectedCounts`, which counts raw persisted arrays:
+              General was absent and component categories were omitted entirely, so the
+              rail read 5 beside tab badges of 3 / 1 / 3.
+            -->
+            <span class="manager-nav-count"
+              >{tagCategoryCounts.recipeCategories +
+                tagCategoryCounts.componentCategories +
+                tagCategoryCounts.itemTags}</span
+            >
           </button>
           {#if canShowEssences}
-            <button type="button" class={`manager-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`} aria-current={currentView === 'essences' || currentView === 'essence-edit' ? 'page' : undefined} onclick={() => setView('essences')}>
+            <button
+              type="button"
+              class={`manager-nav-button ${currentView === 'essences' || currentView === 'essence-edit' ? 'is-active' : ''}`}
+              aria-current={currentView === 'essences' || currentView === 'essence-edit'
+                ? 'page'
+                : undefined}
+              onclick={() => setView('essences')}
+            >
               <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-              <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span>
+              <span class="manager-nav-label"
+                >{text('FABRICATE.Admin.Manager.Nav.Essences', 'Essences')}</span
+              >
               <span class="manager-nav-count">{selectedCounts.essences}</span>
             </button>
           {/if}
-          <button type="button" class={`manager-nav-button ${currentView === 'tools' || currentView === 'tool-edit' ? 'is-active' : ''}`} aria-current={currentView === 'tools' || currentView === 'tool-edit' ? 'page' : undefined} onclick={() => setView('tools')}>
+          <button
+            type="button"
+            class={`manager-nav-button ${currentView === 'tools' || currentView === 'tool-edit' ? 'is-active' : ''}`}
+            aria-current={currentView === 'tools' || currentView === 'tool-edit'
+              ? 'page'
+              : undefined}
+            onclick={() => setView('tools')}
+          >
             <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span>
+            <span class="manager-nav-label"
+              >{text('FABRICATE.Admin.Manager.Nav.Tools', 'Tools')}</span
+            >
             <span class="manager-nav-count">{toolsNavCount}</span>
           </button>
-          <button type="button" class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`} aria-current={currentView === 'checks' ? 'page' : undefined} onclick={() => setView('checks')}>
+          <button
+            type="button"
+            class={`manager-nav-button ${currentView === 'checks' ? 'is-active' : ''}`}
+            aria-current={currentView === 'checks' ? 'page' : undefined}
+            onclick={() => setView('checks')}
+          >
             <i class="fas fa-dice-d20" aria-hidden="true"></i>
-            <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span>
+            <span class="manager-nav-label"
+              >{text('FABRICATE.Admin.Manager.Nav.Checks', 'Checks')}</span
+            >
           </button>
           {#if canShowEnvironments}
             <div class={`manager-nav-group ${gatheringMenuExpanded ? 'is-expanded' : ''}`}>
@@ -5215,7 +6704,9 @@
                 onclick={activateGatheringParent}
               >
                 <i class="fas fa-seedling" aria-hidden="true"></i>
-                <span class="manager-nav-label">{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span>
+                <span class="manager-nav-label"
+                  >{text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}</span
+                >
                 <span class="manager-nav-count">{gatheringNavCounts.total}</span>
               </button>
               <button
@@ -5228,22 +6719,37 @@
                 aria-expanded={gatheringMenuExpanded}
                 onclick={toggleGatheringMenu}
               >
-                <i class={gatheringMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'} aria-hidden="true"></i>
+                <i
+                  class={gatheringMenuExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}
+                  aria-hidden="true"
+                ></i>
               </button>
               {#if gatheringMenuExpanded}
-                <div class="manager-nav-submenu" id="manager-gathering-submenu" aria-label={text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Label', 'Gathering sections')}>
+                <div
+                  class="manager-nav-submenu"
+                  id="manager-gathering-submenu"
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.Environment.GatheringTabs.Label',
+                    'Gathering sections'
+                  )}
+                >
                   {#each visibleGatheringNavItems as gatheringItem (gatheringItem.id)}
                     <button
                       type="button"
                       class={`manager-nav-subitem ${isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'is-active' : ''}`}
                       id={`manager-gathering-nav-${gatheringItem.id}`}
-                      aria-current={isGatheringRoute && activeGatheringTab === gatheringItem.id ? 'page' : undefined}
+                      aria-current={isGatheringRoute && activeGatheringTab === gatheringItem.id
+                        ? 'page'
+                        : undefined}
                       onclick={() => openGatheringSection(gatheringItem.id)}
                     >
                       <i class={gatheringItem.icon} aria-hidden="true"></i>
-                      <span class="manager-nav-label">{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span>
+                      <span class="manager-nav-label"
+                        >{text(gatheringItem.labelKey, gatheringItem.labelFallback)}</span
+                      >
                       {#if gatheringNavCounts[gatheringItem.id] != null}
-                        <span class="manager-nav-count">{gatheringNavCounts[gatheringItem.id]}</span>
+                        <span class="manager-nav-count">{gatheringNavCounts[gatheringItem.id]}</span
+                        >
                       {/if}
                     </button>
                   {/each}
@@ -5253,7 +6759,15 @@
           {/if}
         {/if}
         {#each visiblePlaceholderViews as view (view.labelKey)}
-          <button type="button" class="manager-nav-button" disabled title={text('FABRICATE.Admin.Manager.PlannedView', '{view} is planned for a future release.').replace('{view}', text(view.labelKey, view.fallback))}>
+          <button
+            type="button"
+            class="manager-nav-button"
+            disabled
+            title={text(
+              'FABRICATE.Admin.Manager.PlannedView',
+              '{view} is planned for a future release.'
+            ).replace('{view}', text(view.labelKey, view.fallback))}
+          >
             <i class={view.icon} aria-hidden="true"></i>
             <span class="manager-nav-label">{text(view.labelKey, view.fallback)}</span>
             <span class="manager-nav-count">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
@@ -5312,9 +6826,10 @@
         onUpdateGatheringVocabularyValue={store.updateGatheringVocabularyValue}
         onDeleteGatheringVocabularyValue={store.deleteGatheringVocabularyValue}
         gatheringRealmSettings={$viewState.gatheringRealmSettings || { enabled: false }}
-        onSetGatheringRealmsEnabled={(sys, enabled) => store.setGatheringRealmsEnabled?.(sys, enabled)}
+        onSetGatheringRealmsEnabled={(sys, enabled) =>
+          store.setGatheringRealmsEnabled?.(sys, enabled)}
         onPickImagePath={services?.pickImagePath}
-        travelParties={travelParties}
+        {travelParties}
         travelSelectedPartyId={selectedTravelPartyId}
         travelSaving={$viewState.travelSaving === true}
         travelError={$viewState.travelError}
@@ -5322,9 +6837,11 @@
         travelActorOptions={$viewState.actorOptions || []}
         travelSystemRealms={$viewState.selectedSystemRealms || []}
         travelSelectedRealmId={selectedTravelRealmId}
-        onSelectRealm={(id) => selectedTravelRealmId = id}
-        onAddEnvironmentToRealm={(envId, realmId) => store.setEnvironmentRealmMembership?.(envId, realmId, true)}
-        onRemoveEnvironmentFromRealm={(envId, realmId) => store.setEnvironmentRealmMembership?.(envId, realmId, false)}
+        onSelectRealm={(id) => (selectedTravelRealmId = id)}
+        onAddEnvironmentToRealm={(envId, realmId) =>
+          store.setEnvironmentRealmMembership?.(envId, realmId, true)}
+        onRemoveEnvironmentFromRealm={(envId, realmId) =>
+          store.setEnvironmentRealmMembership?.(envId, realmId, false)}
         onSelectParty={(id) => store.selectParty?.(id)}
         onCreateParty={() => store.createParty?.()}
         onRenameParty={(id, name) => store.renameParty?.(id, name)}
@@ -5339,7 +6856,8 @@
         onClearPartyRealmOverride={(id, sys) => store.clearPartyRealmOverride?.(id, sys)}
         onRemoveStaleMember={(id, uuid) => store.removeStaleMember?.(id, uuid)}
         onClearStaleTravelActor={(id) => store.clearStaleTravelActor?.(id)}
-        onDropStaleOverrideRealm={(id, sys, realmId) => store.dropStaleOverrideRealm?.(id, sys, realmId)}
+        onDropStaleOverrideRealm={(id, sys, realmId) =>
+          store.dropStaleOverrideRealm?.(id, sys, realmId)}
         onCreateRealmQuick={(sys, name) => store.createRealmQuick?.(sys, name)}
         onRenameRealm={(sys, id, name) => store.renameRealm?.(sys, id, name)}
         onToggleRealmEnabled={(sys, id, enabled) => store.toggleRealmEnabled?.(sys, id, enabled)}
@@ -5348,11 +6866,15 @@
         travelCurrentSceneRegions={mapCurrentSceneRegions}
         travelCurrentSceneUuid={$viewState.currentSceneUuid || ''}
         mapSelectedRegionUuid={selectedMapRegionUuid}
-        onSelectMapRegion={(uuid) => selectedMapRegionUuid = uuid}
-        onSetMapRegionLink={(sceneRegionUuid, realmId) => store.setMapRegionLink?.(sceneRegionUuid, realmId)}
+        onSelectMapRegion={(uuid) => (selectedMapRegionUuid = uuid)}
+        onSetMapRegionLink={(sceneRegionUuid, realmId) =>
+          store.setMapRegionLink?.(sceneRegionUuid, realmId)}
       />
     {:else if currentView === 'environment-edit' && selectedSystem}
-      <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment')}>
+      <main
+        class="manager-main manager-environment-edit-main"
+        aria-label={text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment')}
+      >
         <section class="manager-environment-editor-shell">
           <EnvironmentEditView
             environmentDraft={$viewState.environmentDraft}
@@ -5378,7 +6900,10 @@
         </section>
       </main>
     {:else if currentView === 'checks' && selectedSystem}
-      <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}>
+      <main
+        class="manager-main manager-environment-edit-main"
+        aria-label={text('FABRICATE.Admin.Manager.Checks.Title', 'Checks')}
+      >
         <section class="manager-environment-editor-shell">
           <ChecksView
             resolutionMode={selectedSystem?.resolutionMode || 'simple'}
@@ -5388,11 +6913,13 @@
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
             craftingCheckModifiers={selectedSystem?.craftingCheck?.checkModifiers || []}
-            craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
+            craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
+              'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
-            alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !== false}
+            alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==
+              false}
             {salvageResolutionMode}
             salvageCheckSimple={salvageSimpleDraft}
             salvageCheckRouted={salvageRoutedDraft}
@@ -5415,7 +6942,9 @@
             onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
             onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
             {onUpdateAlchemyFlags}
-            onTabChange={(tab) => { checksActiveTab = tab; }}
+            onTabChange={(tab) => {
+              checksActiveTab = tab;
+            }}
             {onToggleCheckActive}
           />
         </section>
@@ -5438,7 +6967,9 @@
         environmentOptions={selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
         onUpdateTask={updateSelectedGatheringTask}
-        onSelectDrop={(rowId) => { selectedGatheringDropId = rowId; }}
+        onSelectDrop={(rowId) => {
+          selectedGatheringDropId = rowId;
+        }}
         onAddDrop={addGatheringTaskDrop}
         onUpdateDrop={updateGatheringTaskDrop}
         onMoveDrop={moveGatheringTaskDrop}
@@ -5467,7 +6998,8 @@
         onSelectTool={selectLibraryTool}
         onEditTool={openToolEditor}
         onCreateToolDrop={addToolFromDrop}
-        onToggleToolEnabled={(id, enabled) => store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
+        onToggleToolEnabled={(id, enabled) =>
+          store.toggleToolEnabled?.(id, enabled, selectedSystemId)}
         onSetBreakageAuthority={(authority) => store.setToolBreakageAuthority?.(authority)}
       />
     {:else if currentView === 'tool-edit' && selectedSystem && focusedToolDraft}
@@ -5484,7 +7016,9 @@
         worldItems={worldItemOptions}
         managedItems={selectedSystem?.managedItemOptions || []}
         itemTags={selectedSystem?.itemTags || []}
-        essenceOptions={selectedSystem?.features?.essences === true ? (selectedSystem?.essenceDefinitions || []) : []}
+        essenceOptions={selectedSystem?.features?.essences === true
+          ? selectedSystem?.essenceDefinitions || []
+          : []}
         currencyUnits={selectedSystem?.requirements?.currency?.units || []}
         currencyEnabled={selectedSystem?.requirements?.currency?.enabled === true}
         prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
@@ -5495,7 +7029,9 @@
         onBack={backToToolsBrowser}
         onDelete={deleteSelectedLibraryTool}
         onSave={saveSelectedToolDraft}
-        onTabChange={(tab) => { toolEditorActiveTab = tab; }}
+        onTabChange={(tab) => {
+          toolEditorActiveTab = tab;
+        }}
         onPatch={(patch) => store.patchToolDraft?.(patch)}
         onSourceDrop={stageToolEditorSourceDrop}
         onToggleEnabled={toggleFocusedToolEnabled}
@@ -5518,7 +7054,9 @@
         showSourceUi={showEssenceSourceUi}
         saving={essenceEditSaving}
         onSave={saveEssenceEdit}
-        onDirtyChange={(dirty) => { essenceEditDirty = dirty; }}
+        onDirtyChange={(dirty) => {
+          essenceEditDirty = dirty;
+        }}
         onDraftChange={handleEssenceDraftChange}
         onImportSourceDrop={importEssenceSourceDrop}
       />
@@ -5541,44 +7079,50 @@
       />
     {:else if currentView === 'component-edit' && selectedSystem}
       {#if componentForEdit}
-      <ComponentEditView
-        component={componentForEdit}
-        tagOptions={componentEditTagOptions}
-        essenceOptions={componentEditEssenceOptions}
-        showTags={componentEditShowTags}
-        showEssences={componentEditShowEssences}
-        showSalvage={componentSalvageEnabled}
-        categoryOptions={selectedSystem?.componentCategories || []}
-        salvageResolutionMode={salvageResolutionMode}
-        salvageOutcomeNames={salvageOutcomeNames}
-        {salvageCheckEnabled}
-        {salvageCheckTiers}
-        {salvageCheckDcMode}
-        {salvageCheckDc}
-        componentOptions={salvageComponentOptions}
-        saving={componentEditSaving}
-        showDifficulty={componentDifficultyShown}
-        difficulty={componentDifficultyDraft}
-        onDifficultyChange={(value) => stageComponentDifficulty(value)}
-        onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
-        onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
-        onOpenSource={(uuid) => openComponentSource(uuid)}
-        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-        onManageCheckPresets={openSalvageCheckPresets}
-        onOpenComponent={(componentId) => editComponent(componentId)}
-        onSave={saveComponentEdit}
-        onDirtyChange={(dirty) => { componentEditDirty = dirty; }}
-        onDraftChange={handleComponentDraftChange}
-      />
+        <ComponentEditView
+          component={componentForEdit}
+          tagOptions={componentEditTagOptions}
+          essenceOptions={componentEditEssenceOptions}
+          showTags={componentEditShowTags}
+          showEssences={componentEditShowEssences}
+          showSalvage={componentSalvageEnabled}
+          categoryOptions={selectedSystem?.componentCategories || []}
+          {salvageResolutionMode}
+          {salvageOutcomeNames}
+          {salvageCheckEnabled}
+          {salvageCheckTiers}
+          {salvageCheckDcMode}
+          {salvageCheckDc}
+          componentOptions={salvageComponentOptions}
+          saving={componentEditSaving}
+          showDifficulty={componentDifficultyShown}
+          difficulty={componentDifficultyDraft}
+          onDifficultyChange={(value) => stageComponentDifficulty(value)}
+          onReplaceSource={(itemId, data) => replaceComponentSource(itemId, data)}
+          onUnlinkSource={(itemId) => unlinkComponentSource(itemId)}
+          onOpenSource={(uuid) => openComponentSource(uuid)}
+          onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+          onManageCheckPresets={openSalvageCheckPresets}
+          onOpenComponent={(componentId) => editComponent(componentId)}
+          onSave={saveComponentEdit}
+          onDirtyChange={(dirty) => {
+            componentEditDirty = dirty;
+          }}
+          onDraftChange={handleComponentDraftChange}
+        />
       {:else}
-        <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}>
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-boxes" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.EditMissingHint', 'Pick a component from the browser to edit its tags, essences, and source linkage.')}</p>
-            </div>
-          </div>
+        <main
+          class="manager-main"
+          aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}
+        >
+          <EmptyState
+            icon="fas fa-boxes"
+            title={text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}
+            hint={text(
+              'FABRICATE.Admin.Manager.Component.EditMissingHint',
+              'Pick a component from the browser to edit its tags, essences, and source linkage.'
+            )}
+          />
         </main>
       {/if}
     {:else if currentView === 'components'}
@@ -5588,6 +7132,7 @@
         selectedComponentId={selectedComponent?.id || ''}
         {selectedSystemId}
         selectedSystemResolutionMode={selectedSystem?.resolutionMode || 'simple'}
+        difficultyAxisProgressive={componentDifficultyAxisProgressive}
         categoryVocabulary={selectedSystem?.componentCategories || []}
         bind:browserState={componentBrowserState}
         dropEnabled={!!selectedSystemId && !!services?.onDropItem}
@@ -5612,12 +7157,15 @@
         toolsLibrary={recipeToolsLibrary}
         componentOptions={selectedSystem?.managedItemOptions || []}
         componentTagOptions={selectedSystem?.componentTagOptions || []}
-        essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
+        essenceOptions={selectedSystem?.features?.essences
+          ? selectedSystem?.essenceDefinitions || []
+          : []}
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
         craftingModifierOptions={selectedSystem?.craftingCheck?.checkModifiers || []}
-        craftingModifierPolicyDefault={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
+        craftingModifierPolicyDefault={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
+          'addAll'}
         categories={selectedSystem?.categories || []}
         onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}
@@ -5662,12 +7210,11 @@
         selectedRecipeId={selectedRecipeIdForAccess}
         selectedSystemName={selectedSystem?.name || ''}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
-        onSelectRecipe={(id) => selectedRecipeIdForAccess = id}
+        onSelectRecipe={(id) => (selectedRecipeIdForAccess = id)}
       />
     {:else if currentView === 'books-scrolls' && selectedSystem}
       <BooksScrollsView
         recipeItems={recipeItemDefinitions}
-        selectedSystemName={selectedSystem?.name || ''}
         visibilityMode={craftingVisibilityMode}
         {selectedRecipeItemId}
         onSelectRecipeItem={(id) => selectRecipeItem(id)}
@@ -5675,6 +7222,17 @@
         onDropRecipeItem={(uuid) => dropRecipeItem(uuid)}
         dropEnabled={!!selectedSystemId}
         onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
+      />
+    {:else if currentView === 'knowledge' && selectedSystem}
+      <KnowledgeView
+        knowledge={knowledgeState}
+        selectedSystemName={selectedSystem?.name || ''}
+        onSelectActor={(actorId) => store.selectKnowledgeActor?.(actorId)}
+        onExpend={(actorId, itemId) => store.expendRecipeItemUse?.(actorId, itemId)}
+        onDelete={(actorId, itemId) => store.deleteOwnedRecipeItem?.(actorId, itemId)}
+        onErase={(actorId, recipeId) => store.eraseLearnedRecipe?.(actorId, recipeId)}
+        onResetSystem={(actorId) => store.resetActorSystemKnowledge?.(actorId)}
+        onResetAll={(actorId) => store.resetActorAllKnowledge?.(actorId)}
       />
     {:else if currentView === 'recipe-item-edit' && selectedSystem}
       <RecipeItemEditor
@@ -5685,7 +7243,7 @@
         characterPrerequisites={selectedCharacterPrerequisites}
         visibilityMode={craftingVisibilityMode}
         activeTab={recipeItemActiveTab}
-        onSelectTab={(tab) => recipeItemActiveTab = tab}
+        onSelectTab={(tab) => (recipeItemActiveTab = tab)}
         onPatch={(patch) => patchRecipeItemDraft(patch)}
         onLinkItem={(uuid) => linkRecipeItemSource(uuid)}
         onUnlinkItem={() => unlinkRecipeItemSource()}
@@ -5710,56 +7268,63 @@
         onToggleLocked={(id, locked) => store.toggleRecipeLocked?.(id, locked)}
       />
     {:else if currentView === 'system-edit' && selectedSystem}
-      <main class="manager-main manager-environment-edit-main" aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}>
+      <main
+        class="manager-main manager-environment-edit-main"
+        aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}
+      >
         <section class="manager-environment-editor-shell">
-      <SystemEditView
-        {selectedSystem}
-        systemBlocked={systemBlocksSystem}
-        validationReport={systemValidationReport}
-        requestedTab={requestedSystemTab}
-        requestedTabNonce={requestedSystemTabNonce}
-        onSelectIssue={(issue) => selectOverviewIssue(issue)}
-        onShowSystemOverview={showSystemOverview}
-        onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
-        onDetailsChange={(name, description) => { systemDetailsDraft = { name, description }; }}
-        onDirtyChange={(dirty) => { systemDetailsDirty = dirty; }}
-        reseedNonce={systemDetailsReseedNonce}
-        onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
-        characterModifierLibrary={selectedGatheringCharacterModifiers}
-        {characterModifierPresetsSupported}
-        onAddCharacterModifier={onAddCharacterModifier}
-        onUpdateCharacterModifier={onUpdateCharacterModifier}
-        onDeleteCharacterModifier={onDeleteCharacterModifier}
-        onReorderCharacterModifier={onReorderCharacterModifier}
-        onSeedCharacterModifierPresets={onSeedCharacterModifierPresets}
-        characterPrerequisiteLibrary={selectedCharacterPrerequisites}
-        {characterPrerequisitePresetsSupported}
-        onAddCharacterPrerequisite={onAddCharacterPrerequisite}
-        onUpdateCharacterPrerequisite={onUpdateCharacterPrerequisite}
-        onDeleteCharacterPrerequisite={onDeleteCharacterPrerequisite}
-        onReorderCharacterPrerequisite={onReorderCharacterPrerequisite}
-        onSeedCharacterPrerequisitePresets={onSeedCharacterPrerequisitePresets}
-        currencyUnits={selectedCurrencyUnits}
-        {currencyPresetsSupported}
-        {currencySpendStrategy}
-        {currencyProviderId}
-        {currencyMacros}
-        {currencyProviderOptions}
-        onAddCurrencyUnit={onAddCurrencyUnit}
-        onUpdateCurrencyUnit={onUpdateCurrencyUnit}
-        onDeleteCurrencyUnit={onDeleteCurrencyUnit}
-        onReorderCurrencyUnit={onReorderCurrencyUnit}
-        onAddCurrencySubUnit={onAddCurrencySubUnit}
-        onUpdateCurrencySubUnit={onUpdateCurrencySubUnit}
-        onDeleteCurrencySubUnit={onDeleteCurrencySubUnit}
-        onSeedCurrencyPresets={onSeedCurrencyPresets}
-        onSetCurrencySpendStrategy={onSetCurrencySpendStrategy}
-        onSetCurrencyProvider={onSetCurrencyProvider}
-        onSetCurrencyMacro={onSetCurrencyMacro}
-        onClearCurrencyMacro={onClearCurrencyMacro}
-        onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
-        onToggleTime={(next) => store.toggleRequirement?.('time', next)}
-      />
+          <SystemEditView
+            {selectedSystem}
+            systemBlocked={systemBlocksSystem}
+            validationReport={systemValidationReport}
+            requestedTab={requestedSystemTab}
+            requestedTabNonce={requestedSystemTabNonce}
+            onSelectIssue={(issue) => selectOverviewIssue(issue)}
+            onShowSystemOverview={showSystemOverview}
+            onSaveDetails={(name, description) => store.saveSystemDetails?.(name, description)}
+            onDetailsChange={(name, description) => {
+              systemDetailsDraft = { name, description };
+            }}
+            onDirtyChange={(dirty) => {
+              systemDetailsDirty = dirty;
+            }}
+            reseedNonce={systemDetailsReseedNonce}
+            onToggleFeature={(storeKey, checked) => store.toggleFeature?.(storeKey, checked)}
+            characterModifierLibrary={selectedGatheringCharacterModifiers}
+            {characterModifierPresetsSupported}
+            {onAddCharacterModifier}
+            {onUpdateCharacterModifier}
+            {onDeleteCharacterModifier}
+            {onReorderCharacterModifier}
+            {onSeedCharacterModifierPresets}
+            characterPrerequisiteLibrary={selectedCharacterPrerequisites}
+            {characterPrerequisitePresetsSupported}
+            {onAddCharacterPrerequisite}
+            {onUpdateCharacterPrerequisite}
+            {onDeleteCharacterPrerequisite}
+            {onReorderCharacterPrerequisite}
+            {onSeedCharacterPrerequisitePresets}
+            currencyUnits={selectedCurrencyUnits}
+            {currencyPresetsSupported}
+            {currencySpendStrategy}
+            {currencyProviderId}
+            {currencyMacros}
+            {currencyProviderOptions}
+            {onAddCurrencyUnit}
+            {onUpdateCurrencyUnit}
+            {onDeleteCurrencyUnit}
+            {onReorderCurrencyUnit}
+            {onAddCurrencySubUnit}
+            {onUpdateCurrencySubUnit}
+            {onDeleteCurrencySubUnit}
+            {onSeedCurrencyPresets}
+            {onSetCurrencySpendStrategy}
+            {onSetCurrencyProvider}
+            {onSetCurrencyMacro}
+            {onClearCurrencyMacro}
+            onToggleCurrency={(next) => store.toggleRequirement?.('currency', next)}
+            onToggleTime={(next) => store.toggleRequirement?.('time', next)}
+          />
         </section>
       </main>
     {:else}
@@ -5784,1473 +7349,3286 @@
          `recipe-edit` joined this list in issue 676, the same route `component-edit`
          took in decision 4: its context rail is deleted and its content became real
          tabs (Access, Books & Scrolls) and an Overview control (Step mode), so the
-         editor has nothing to put in a third column and the tabs take the width back. -->
-    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit'}
-    <aside class="manager-inspector" aria-label={inspectorLabel()}>
-      {#if currentView === 'tags' && selectedSystem}
-        <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}</h3>
-          <div class="manager-fact-grid">
-            <div class="manager-fact" data-tags-category-fact="recipe-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.customCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.RecipeCategories', 'Recipe categories')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="component-categories">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.customComponentCategories}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ComponentCategories', 'Component categories')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="item-tags">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.itemTags}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.ItemTags', 'Component tags')}</span></span>
-            </div>
-            <div class="manager-fact" data-tags-category-fact="references">
-              <span class="manager-fact-line"><strong>{tagCategoryCounts.categoryReferences + tagCategoryCounts.componentCategoryReferences + tagCategoryCounts.tagReferences}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.TagsCategories.TotalReferences', 'Total references')}</span></span>
-            </div>
-          </div>
-        </section>
+         editor has nothing to put in a third column and the tabs take the width back.
 
-        <section class="manager-inspector-card" data-tags-evidence="how-it-works">
-          <h3 class="manager-card-title">{tagsHelp.title}</h3>
-          <ul class="manager-evidence-list">
-            {#each tagsHelp.items as tip (tip)}
-              <li>{tip}</li>
-            {/each}
-          </ul>
-        </section>
-
-        <section class="manager-inspector-card" data-tags-evidence="reference-safe">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle', 'Reference-safe by default')}</h3>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeHint', 'Deleting a referenced category reassigns its recipes and components to General; deleting a referenced tag strips it from the components that carry it. Nothing is left dangling.')}</p>
-        </section>
-      {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
-        {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
-          {#if selectedGatheringTask}
-            {#if currentView !== 'gathering-task-edit'}
-            <section class="manager-inspector-card" data-gathering-task-inspector>
-              <div class="manager-inspector-title-row is-hero-large">
-                <img class="manager-recipe-preview" src={gatheringTaskImage(selectedGatheringTask)} alt="" />
-                <div class="manager-inspector-copy">
-                  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Tasks.Selected', 'Selected gathering task')}</p>
-                  <h2 class="manager-inspector-name" title={gatheringTaskName(selectedGatheringTask)}>{gatheringTaskName(selectedGatheringTask)}</h2>
-                  <div class="manager-chip-row">
-                    <span class={`manager-chip ${selectedGatheringTask.enabled === false ? 'is-disabled' : 'is-active'}`}>
-                      {selectedGatheringTask.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                    </span>
-                    <span class="manager-chip">{gatheringTaskAvailability(selectedGatheringTask)}</span>
-                  </div>
-                </div>
+         `knowledge` joined it in issue 785 for the opposite reason: the surface OWNS
+         its third column (roster · detail), so a fourth would clip the detail pane's
+         action cluster at the 1024px minimum with no scrollbar. -->
+    {#if currentView !== 'environment-edit' && currentView !== 'checks' && currentView !== 'system-edit' && currentView !== 'crafting-settings' && currentView !== 'recipe-item-edit' && currentView !== 'component-edit' && currentView !== 'recipe-edit' && currentView !== 'tool-edit' && currentView !== 'knowledge'}
+      <aside class="manager-inspector" aria-label={inspectorLabel()}>
+        {#if currentView === 'tags' && selectedSystem}
+          <section class="manager-inspector-card" data-tags-evidence="at-a-glance">
+            <h3 class="manager-card-title">
+              {text('FABRICATE.Admin.Manager.TagsCategories.AtAGlance', 'Vocabulary at a glance')}
+            </h3>
+            <div class="manager-fact-grid">
+              <div class="manager-fact" data-tags-category-fact="recipe-categories">
+                <span class="manager-fact-line"
+                  ><strong>{tagCategoryCounts.recipeCategories}</strong>
+                  <span class="manager-fact-label"
+                    >{text(
+                      'FABRICATE.Admin.Manager.TagsCategories.RecipeCategories',
+                      'Recipe categories'
+                    )}</span
+                  ></span
+                >
               </div>
-
-              <p class="manager-muted">
-                {truncateDescription(selectedGatheringTask.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-              </p>
-            </section>
-
-            <section class="manager-inspector-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.Details', 'Gathering task details')}</h3>
-              <div class="manager-fact-grid">
-                <div class="manager-fact" data-gathering-task-fact="biomes">
-                  <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
-                </div>
-                <div class="manager-fact" data-gathering-task-fact="drops">
-                  <span class="manager-fact-line"><strong>{gatheringTaskDropRows(selectedGatheringTask).length}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Tasks.Drops', 'Drops')}</span></span>
-                </div>
-                <div class="manager-fact" data-gathering-task-fact="environments">
-                  <span class="manager-fact-line"><strong>{activeGatheringTaskEnvironmentCount(selectedGatheringTask)}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Tasks.ActiveEnvironments', 'Active environments')}</span></span>
-                </div>
+              <div class="manager-fact" data-tags-category-fact="component-categories">
+                <span class="manager-fact-line"
+                  ><strong>{tagCategoryCounts.componentCategories}</strong>
+                  <span class="manager-fact-label"
+                    >{text(
+                      'FABRICATE.Admin.Manager.TagsCategories.ComponentCategories',
+                      'Component categories'
+                    )}</span
+                  ></span
+                >
               </div>
-            </section>
-
-            <section class="manager-inspector-card manager-task-drops-summary-card" data-task-drops-summary>
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary', 'Drops summary')}</h3>
-              {#if gatheringTaskDropRows(selectedGatheringTask).length === 0}
-                <p class="manager-muted" data-task-drops-summary-empty>{text('FABRICATE.Admin.Manager.Environment.Tasks.NoDropsConfigured', 'No drops configured yet.')}</p>
-              {:else}
-                <div class="manager-task-drops-summary-list" data-task-drops-summary-list>
-                  {#each gatheringTaskDropRows(selectedGatheringTask) as drop (drop.id)}
-                    <span class="manager-task-drop-summary-chip" data-task-drop-summary-chip>
-                      <img class="manager-task-drop-summary-thumb" src={gatheringDropImage(drop)} alt="" />
-                      <span class="manager-task-drop-summary-label" title={gatheringDropName(drop)}>{gatheringDropName(drop)}</span>
-                      <strong class="manager-task-drop-summary-percent">{Math.max(1, Math.min(100, Math.floor(Number(drop?.dropRate ?? 1))))}%</strong>
-                    </span>
-                  {/each}
-                </div>
-              {/if}
-            </section>
-
-            <section class="manager-inspector-card manager-task-environment-usage-card" data-task-environment-usage>
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironmentsCard', 'Used in environments')}</h3>
-              {#if gatheringTaskReferencingEnvironments(selectedGatheringTask).length === 0}
-                <p class="manager-muted" data-task-environment-usage-empty>{text('FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments', 'Not used in any environments yet.')}</p>
-              {:else}
-                <div class="manager-task-environment-usage-grid" data-task-environment-usage-chips>
-                  {#each gatheringTaskReferencingEnvironments(selectedGatheringTask) as environment (environment.id)}
-                    <article class="manager-task-environment-usage-card">
-                      <img class="manager-task-environment-usage-thumb" src={environmentImage(environment)} alt="" />
-                      <span class="manager-task-environment-usage-name" title={environmentName(environment)}>{environmentName(environment)}</span>
-                    </article>
-                  {/each}
-                </div>
-              {/if}
-            </section>
-            {/if}
-
-            {#if currentView === 'gathering-task-edit'}
-            {#if selectedGatheringDrop}
-            <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
-            <section class="manager-inspector-card manager-drop-editor-header-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
-              <div class="manager-inspector-title-row">
-                <img class="manager-recipe-preview" src={gatheringDropImage(selectedGatheringDrop)} alt="" />
-                <div class="manager-inspector-copy">
-                  <h2 class="manager-inspector-name">{gatheringDropName(selectedGatheringDrop)}</h2>
-                  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifiersApplyOnlyThisDrop', 'Modifiers below apply only to this drop.')}</p>
-                </div>
+              <div class="manager-fact" data-tags-category-fact="item-tags">
+                <span class="manager-fact-line"
+                  ><strong>{tagCategoryCounts.itemTags}</strong>
+                  <span class="manager-fact-label"
+                    >{text(
+                      'FABRICATE.Admin.Manager.TagsCategories.ItemTags',
+                      'Component tags'
+                    )}</span
+                  ></span
+                >
               </div>
-              <div class="manager-drop-editor-actions">
-                <button type="button" class="manager-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate')} onclick={() => duplicateGatheringTaskDrop(selectedGatheringDrop.id)}>
-                  <i class="fas fa-copy" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop', 'Duplicate')}</span>
-                </button>
-                <button type="button" class="manager-button is-danger" aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')} onclick={() => deleteGatheringTaskDrop(selectedGatheringDrop.id)}>
-                  <i class="fas fa-trash" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop', 'Delete')}</span>
-                </button>
-              </div>
-            </section>
-
-            <div class="manager-drop-inspector-divider" aria-hidden="true"></div>
-
-            <div class="manager-drop-inspector-scroll">
-            <section class="manager-inspector-card manager-drop-editor-card">
-              <div class="manager-drop-editor-values">
-                <label class="manager-field manager-drop-rate-editor" data-gathering-drop-inspector-rate>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')}</span>
-                  <span class="manager-drop-rate-value">
-                    <span class="manager-drop-rate-percent">
-                      <input type="text" inputmode="numeric" pattern="[0-9]*" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent', 'Drop chance percent')} oninput={(event) => onGatheringDropRateInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropRateBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropRateKeydown(selectedGatheringDrop, event)} />
-                      <span aria-hidden="true">%</span>
-                    </span>
-                    <span class={`manager-drop-rate-control ${gatheringDropRateTierClass(selectedGatheringDrop.dropRate)}`} style={`--fab-drop-rate-value: ${gatheringDropRateValue(selectedGatheringDrop)}%; --fab-drop-rate-color: ${gatheringDropRateTierColor(selectedGatheringDrop.dropRate)};`}>
-                      <span class="manager-drop-rate-track" aria-hidden="true">
-                        <span class="manager-drop-rate-fill"></span>
-                      </span>
-                      <input type="range" min="0" max="100" step="1" value={gatheringDropRateValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')} oninput={(event) => updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate: Number(event.currentTarget.value) })} onkeydown={(event) => event.stopPropagation()} />
-                    </span>
-                  </span>
-                </label>
-
-                <label class="manager-field manager-drop-count-editor" data-gathering-drop-inspector-count>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropQuantityColumn', 'Count')}</span>
-                  <input type="text" inputmode="numeric" pattern={'[1-9][0-9]{0,2}'} value={gatheringDropCountValue(selectedGatheringDrop)} aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DropQuantityColumn', 'Count')} oninput={(event) => onGatheringDropCountInput(selectedGatheringDrop.id, event)} onblur={(event) => onGatheringDropCountBlur(selectedGatheringDrop, event)} onkeydown={(event) => onGatheringDropCountKeydown(selectedGatheringDrop, event)} />
-                </label>
-              </div>
-            </section>
-
-            {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
-              {@const cardTitle = gatheringModifierCardTitle(kind, 'task')}
-              {@const cardHint = gatheringModifierCardHint(kind, 'task')}
-              {@const availableConditions = gatheringConditionAvailableOptions(selectedGatheringDrop, kind)}
-              {@const pickerSelection = gatheringDropModifierPickerSelection(kind)}
-              {@const attachedModifiers = gatheringConditionModifierRows(selectedGatheringDrop, kind)}
-              <section class="manager-inspector-card manager-drop-editor-condition-modifier-card" data-gathering-drop-condition-modifiers={kind}>
-                <header class="manager-character-modifier-row-card-header">
-                  <div class="manager-character-modifier-row-card-heading">
-                    <h3 class="manager-card-title">{cardTitle}</h3>
-                    <p class="manager-muted">{cardHint}</p>
-                  </div>
-                </header>
-                <div class="manager-condition-modifier-add-row" data-gathering-drop-condition-modifier-picker={kind}>
-                  <label class="manager-field manager-condition-modifier-picker">
-                    <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel', 'Condition')}</span>
-                    <select
-                      value={pickerSelection}
-                      disabled={availableConditions.length === 0}
-                      data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
-                      onchange={(event) => setGatheringDropModifierPickerSelection(kind, event.currentTarget.value)}
-                    >
-                      {#each availableConditions as option (option.id)}
-                        <option value={option.id}>{option.label || option.id}</option>
-                      {/each}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier', 'Add modifier')}
-                    title={text('FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier', 'Add modifier')}
-                    disabled={availableConditions.length === 0 || !pickerSelection}
-                    data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
-                    onclick={() => addGatheringDropModifier(selectedGatheringDrop.id, kind, pickerSelection)}
+              <div class="manager-fact" data-tags-category-fact="references">
+                <span class="manager-fact-line"
+                  ><strong
+                    >{tagCategoryCounts.categoryReferences +
+                      tagCategoryCounts.componentCategoryReferences +
+                      tagCategoryCounts.tagReferences}</strong
                   >
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                  </button>
-                </div>
-                <div class="manager-condition-modifier-row-list">
-                  {#each attachedModifiers as modifier (modifier.id)}
-                    <article class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`} data-gathering-drop-modifier-id={modifier.id}>
-                      <header class="manager-character-modifier-row-reference-header">
-                        <span class="manager-character-modifier-icon">
-                          <i class={gatheringModifierKindIcon(kind, modifier.conditionId)} aria-hidden="true"></i>
-                        </span>
-                        <span class="manager-character-modifier-row-reference-label">{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span>
-                        <label class="manager-condition-modifier-value">
-                          <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
-                          <input
-                            type="text"
-                            inputmode="numeric"
-                            value={gatheringModifierDisplayValue(modifier)}
-                            aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
-                            oninput={(event) => updateGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id, signedToOperatorValue(event.currentTarget.value))}
-                            onkeydown={(event) => onGatheringDropModifierKeydown(selectedGatheringDrop.id, kind, modifier, event)}
-                          />
-                          <span aria-hidden="true">%</span>
-                        </label>
-                        <button
-                          type="button"
-                          class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-                          aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier', 'Delete modifier')}
-                          onclick={() => deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifier.id)}
-                        >
-                          <i class="fas fa-trash" aria-hidden="true"></i>
-                        </button>
-                      </header>
-                    </article>
-                  {:else}
-                    <p class="manager-muted manager-condition-modifier-row-empty">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers', 'No modifiers attached.')}</p>
-                  {/each}
-                </div>
-              </section>
-            {/each}
+                  <span class="manager-fact-label"
+                    >{text(
+                      'FABRICATE.Admin.Manager.TagsCategories.TotalReferences',
+                      'Total references'
+                    )}</span
+                  ></span
+                >
+              </div>
+            </div>
+          </section>
 
-            <section class="manager-inspector-card manager-character-modifier-row-card" data-gathering-drop-character-modifiers>
-              <header class="manager-character-modifier-row-card-header">
-                <div class="manager-character-modifier-row-card-heading">
-                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle', 'Character modifiers')}</h3>
-                  <p class="manager-muted">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint', 'Modifiers adjust the final chance based on the attempting character.')}</p>
-                </div>
-              </header>
-              <div class="manager-character-modifier-add-search-row">
-                <label bind:this={characterModifierSearchAnchor} class="manager-search is-compact manager-character-modifier-add-search" data-gathering-drop-character-modifier-search>
-                  <i class="fas fa-search" aria-hidden="true"></i>
-                  <input type="search"
-                         value={characterModifierSearchTerm}
-                         oninput={(event) => { characterModifierSearchTerm = event.currentTarget.value; }}
-                         placeholder={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder', 'Search character modifiers...')}
-                         aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel', 'Search character modifiers to add')}
-                         disabled={selectedGatheringCharacterModifiers.length === 0}
-                         data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null} />
-                  {#if characterModifierSearchSuggestions.length > 0}
-                    <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" class:is-above={characterModifierSearchOpenUp} data-gathering-drop-character-modifier-suggestions>
-                      {#each characterModifierSearchSuggestions as option (option.id)}
-                        <button type="button"
-                                class="manager-tag-suggestion manager-character-modifier-add-suggestion"
-                                data-gathering-drop-character-modifier-suggestion={option.id}
-                                onclick={() => pickCharacterModifierForRow(selectedGatheringDrop.id, option.id)}>
-                          <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
-                          <span>{option.label || option.id}</span>
-                        </button>
+          <ExplainerCard
+            icon="fas fa-circle-question"
+            title={tagsHelp.title}
+            items={tagsHelp.items}
+            dataAttr="data-tags-evidence"
+            dataValue="how-it-works"
+          />
+
+          <ExplainerCard
+            icon="fas fa-shield-halved"
+            title={text(
+              'FABRICATE.Admin.Manager.TagsCategories.ReferenceSafeTitle',
+              'Reference-safe by default'
+            )}
+            items={tagsReferenceSafeItems}
+            dataAttr="data-tags-evidence"
+            dataValue="reference-safe"
+          />
+        {:else if currentView === 'environments' || currentView === 'environment-edit' || currentView === 'gathering-task-edit' || currentView === 'gathering-event-edit'}
+          {#if (currentView === 'environments' && activeGatheringTab === 'tasks') || currentView === 'gathering-task-edit'}
+            {#if selectedGatheringTask}
+              {#if currentView !== 'gathering-task-edit'}
+                <section class="manager-inspector-card" data-gathering-task-inspector>
+                  <div class="manager-inspector-title-row is-hero-large">
+                    <img
+                      class="manager-recipe-preview"
+                      src={gatheringTaskImage(selectedGatheringTask)}
+                      alt=""
+                    />
+                    <div class="manager-inspector-copy">
+                      <p class="manager-kicker">
+                        {text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.Selected',
+                          'Selected gathering task'
+                        )}
+                      </p>
+                      <h2
+                        class="manager-inspector-name"
+                        title={gatheringTaskName(selectedGatheringTask)}
+                      >
+                        {gatheringTaskName(selectedGatheringTask)}
+                      </h2>
+                      <div class="manager-chip-row">
+                        <Chip
+                          tone={selectedGatheringTask.enabled === false ? 'disabled' : 'active'}
+                        >
+                          {selectedGatheringTask.enabled === false
+                            ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')
+                            : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
+                        </Chip>
+                        <Chip>{gatheringTaskAvailability(selectedGatheringTask)}</Chip>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="manager-muted">
+                    {truncateDescription(selectedGatheringTask.description) ||
+                      text(
+                        'FABRICATE.Admin.Manager.NoDescriptionAdded',
+                        'No description has been added.'
+                      )}
+                  </p>
+                </section>
+
+                <section class="manager-inspector-card">
+                  <h3 class="manager-card-title">
+                    {text(
+                      'FABRICATE.Admin.Manager.Environment.Tasks.Details',
+                      'Gathering task details'
+                    )}
+                  </h3>
+                  <div class="manager-fact-grid">
+                    <div class="manager-fact" data-gathering-task-fact="biomes">
+                      <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
+                      <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
+                      <!-- `prettier-ignore` preserves the LINE ANCHOR of the directive below, not -->
+                      <!-- the render (issue 923): Prettier splits a `<span>` holding an `{#if}` -->
+                      <!-- across several lines whatever the width, which moves the mustache off -->
+                      <!-- the line `eslint-disable-next-line` is anchored to, so the suppression -->
+                      <!-- stops applying and the violation resurfaces. The fence must be the LAST -->
+                      <!-- comment before the element to take effect. The durable guard for this -->
+                      <!-- whole class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
+                      <!-- eslint-disable-next-line svelte/no-useless-mustaches --><!-- prettier-ignore -->
+                      <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0 ? selectedGatheringTask.biomes.length : text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringTask.biomes) && selectedGatheringTask.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
+                    </div>
+                    <div class="manager-fact" data-gathering-task-fact="drops">
+                      <span class="manager-fact-line"
+                        ><strong>{gatheringTaskDropRows(selectedGatheringTask).length}</strong>
+                        <span class="manager-fact-label"
+                          >{text('FABRICATE.Admin.Manager.Environment.Tasks.Drops', 'Drops')}</span
+                        ></span
+                      >
+                    </div>
+                    <div class="manager-fact" data-gathering-task-fact="environments">
+                      <span class="manager-fact-line"
+                        ><strong
+                          >{activeGatheringTaskEnvironmentCount(selectedGatheringTask)}</strong
+                        >
+                        <span class="manager-fact-label"
+                          >{text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.ActiveEnvironments',
+                            'Active environments'
+                          )}</span
+                        ></span
+                      >
+                    </div>
+                  </div>
+                </section>
+
+                <section class="manager-inspector-card" data-task-drops-summary>
+                  <h3 class="manager-card-title">
+                    {text(
+                      'FABRICATE.Admin.Manager.Environment.Tasks.DropsSummary',
+                      'Drops summary'
+                    )}
+                  </h3>
+                  {#if gatheringTaskDropRows(selectedGatheringTask).length === 0}
+                    <p class="manager-muted" data-task-drops-summary-empty>
+                      {text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.NoDropsConfigured',
+                        'No drops configured yet.'
+                      )}
+                    </p>
+                  {:else}
+                    <div class="manager-task-drops-summary-list" data-task-drops-summary-list>
+                      {#each gatheringTaskDropRows(selectedGatheringTask) as drop (drop.id)}
+                        <span class="manager-task-drop-summary-chip" data-task-drop-summary-chip>
+                          <img
+                            class="manager-task-drop-summary-thumb"
+                            src={gatheringDropImage(drop)}
+                            alt=""
+                          />
+                          <span
+                            class="manager-task-drop-summary-label"
+                            title={gatheringDropName(drop)}>{gatheringDropName(drop)}</span
+                          >
+                          <strong class="manager-task-drop-summary-percent"
+                            >{Math.max(
+                              1,
+                              Math.min(100, Math.floor(Number(drop?.dropRate ?? 1)))
+                            )}%</strong
+                          >
+                        </span>
                       {/each}
                     </div>
                   {/if}
-                </label>
-              </div>
-              <div class="manager-character-modifier-row-list">
-                {#each rowCharacterModifiers(selectedGatheringDrop) as ref (ref.id)}
-                  {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
-                  {@const hasOverride = characterModifierIsCustomized(ref)}
-                  {@const operatorClass = characterModifierOperatorClass(ref.operator)}
-                  <article class="manager-character-modifier-row-reference" data-gathering-drop-character-modifier-ref={ref.id}>
-                    <header class="manager-character-modifier-row-reference-header">
-                      <span class="manager-character-modifier-icon"><i class={characterModifierIconForRef(ref)} aria-hidden="true"></i></span>
-                      <span class="manager-character-modifier-row-reference-label">{characterModifierLabelForRef(ref)}</span>
-                      {#if !libraryEntry}
-                        <span class="manager-character-modifier-stale-warning" data-tooltip={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref.modifierId)}>
-                          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                        </span>
-                      {/if}
-                      <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
-                        <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator', 'Operator')}</span>
-                        <select value={ref.operator || '+'} onchange={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { operator: event.currentTarget.value })}>
-                          <option value="+">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive', 'Positive')}</option>
-                          <option value="-">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative', 'Negative')}</option>
-                        </select>
-                      </label>
-                      <button type="button" class="manager-icon-button is-danger manager-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteDropCharacterModifier(selectedGatheringDrop.id, ref.id)}>
-                        <i class="fas fa-trash" aria-hidden="true"></i>
-                      </button>
-                    </header>
-                    <div class="manager-character-modifier-row-bounds">
-                      <label class="manager-field">
-                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min', 'Min')}</span>
-                        <input type="number" step="1" value={ref.min ?? ''} oninput={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
-                      </label>
-                      <label class="manager-field">
-                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max', 'Max')}</span>
-                        <input type="number" step="1" value={ref.max ?? ''} oninput={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
-                      </label>
-                    </div>
-                    <div class="manager-character-modifier-override-row">
-                      <button
-                        type="button"
-                        class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
-                        aria-pressed={hasOverride}
-                        aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
-                        onclick={() => setCharacterModifierOverrideEnabled(selectedGatheringDrop.id, ref, !hasOverride, libraryEntry)}
-                      >
-                        <span class="manager-status-toggle-track" aria-hidden="true">
-                          <span class="manager-status-toggle-knob"></span>
-                        </span>
-                        <span class="manager-status-toggle-label">
-                          {hasOverride
-                            ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn', 'Overridden')
-                            : text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
-                        </span>
-                      </button>
-                    </div>
-                    {#if hasOverride}
-                      <p class="manager-muted manager-character-modifier-override-hint">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint', 'Overrides the library expression for this row.')}</p>
-                      <label class="manager-field" for={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}>
-                        <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
-                        <input
-                          type="text"
-                          id={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
-                          value={ref.expressionOverride || ''}
-                          oninput={(event) => onUpdateDropCharacterModifier(selectedGatheringDrop.id, ref.id, { expressionOverride: event.currentTarget.value })}
-                        />
-                      </label>
-                    {/if}
-                  </article>
-                {:else}
-                  <p class="manager-muted manager-character-modifier-row-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
-                {/each}
-              </div>
-            </section>
-            </div>
-            </div>
-            {:else}
-            <section class="manager-inspector-card" data-gathering-task-drop-inspector>
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop', 'Selected drop rule')}</h3>
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.Tasks.NoDrops', 'No drops have been added.')}</p>
-            </section>
-            {/if}
-            {/if}
+                </section>
 
-          {:else}
-            <div class="manager-empty">
-              <div>
-                <i class="fas fa-list-check" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.SelectTask', 'Select a gathering task')}</h3>
-                <p>{text('FABRICATE.Admin.Manager.Environment.Tasks.InspectorHint', 'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.')}</p>
-              </div>
-            </div>
-          {/if}
-        {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
-          {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
-            <div class="manager-drop-inspector-stack" data-gathering-event-inspector-stack>
-              <div class="manager-drop-inspector-scroll">
-              {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
-                {@const cardTitle = gatheringModifierCardTitle(kind, 'event')}
-                {@const cardHint = gatheringModifierCardHint(kind, 'event')}
-                {@const availableConditions = gatheringConditionAvailableOptions(editingGatheringEvent, kind)}
-                {@const pickerSelection = gatheringEventModifierPickerSelection(kind)}
-                {@const attachedModifiers = gatheringConditionModifierRows(editingGatheringEvent, kind)}
-                <section class="manager-inspector-card manager-drop-editor-condition-modifier-card" data-gathering-event-condition-modifiers={kind}>
-                  <header class="manager-character-modifier-row-card-header">
-                    <div class="manager-character-modifier-row-card-heading">
-                      <h3 class="manager-card-title">{cardTitle}</h3>
-                      <p class="manager-muted">{cardHint}</p>
-                    </div>
-                  </header>
-                  <div class="manager-condition-modifier-add-row" data-gathering-event-condition-modifier-picker={kind}>
-                    <label class="manager-field manager-condition-modifier-picker">
-                      <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel', 'Condition')}</span>
-                      <select
-                        value={pickerSelection}
-                        disabled={availableConditions.length === 0}
-                        data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
-                        onchange={(event) => setGatheringEventModifierPickerSelection(kind, event.currentTarget.value)}
-                      >
-                        {#each availableConditions as option (option.id)}
-                          <option value={option.id}>{option.label || option.id}</option>
-                        {/each}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier', 'Add modifier')}
-                      title={text('FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier', 'Add modifier')}
-                      disabled={availableConditions.length === 0 || !pickerSelection}
-                      data-tooltip={availableConditions.length === 0 ? text('FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded', 'All conditions already added.') : null}
-                      onclick={() => addGatheringEventConditionModifier(kind, pickerSelection)}
+                <section
+                  class="manager-inspector-card manager-task-environment-usage-card"
+                  data-task-environment-usage
+                >
+                  <h3 class="manager-card-title">
+                    {text(
+                      'FABRICATE.Admin.Manager.Environment.Tasks.UsedInEnvironmentsCard',
+                      'Used in environments'
+                    )}
+                  </h3>
+                  {#if gatheringTaskReferencingEnvironments(selectedGatheringTask).length === 0}
+                    <p class="manager-muted" data-task-environment-usage-empty>
+                      {text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.NotUsedInEnvironments',
+                        'Not used in any environments yet.'
+                      )}
+                    </p>
+                  {:else}
+                    <div
+                      class="manager-task-environment-usage-grid"
+                      data-task-environment-usage-chips
                     >
-                      <i class="fas fa-plus" aria-hidden="true"></i>
-                    </button>
-                  </div>
-                  <div class="manager-condition-modifier-row-list">
-                    {#each attachedModifiers as modifier (modifier.id)}
-                      <article class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`} data-gathering-event-modifier-id={modifier.id}>
-                        <header class="manager-character-modifier-row-reference-header">
-                          <span class="manager-character-modifier-icon">
-                            <i class={gatheringModifierKindIcon(kind, modifier.conditionId)} aria-hidden="true"></i>
-                          </span>
-                          <span class="manager-character-modifier-row-reference-label">{gatheringConditionLabel(kind, modifier.conditionId) || modifier.conditionId}</span>
-                          <label class="manager-condition-modifier-value">
-                            <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}</span>
+                      {#each gatheringTaskReferencingEnvironments(selectedGatheringTask) as environment (environment.id)}
+                        <article class="manager-task-environment-usage-card">
+                          <img
+                            class="manager-task-environment-usage-thumb"
+                            src={environmentImage(environment)}
+                            alt=""
+                          />
+                          <span
+                            class="manager-task-environment-usage-name"
+                            title={environmentName(environment)}
+                            >{environmentName(environment)}</span
+                          >
+                        </article>
+                      {/each}
+                    </div>
+                  {/if}
+                </section>
+              {/if}
+
+              {#if currentView === 'gathering-task-edit'}
+                {#if selectedGatheringDrop}
+                  <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
+                    <section class="manager-inspector-card manager-drop-editor-header-card">
+                      <h3 class="manager-card-title">
+                        {text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop',
+                          'Selected drop rule'
+                        )}
+                      </h3>
+                      <div class="manager-inspector-title-row">
+                        <img
+                          class="manager-recipe-preview"
+                          src={gatheringDropImage(selectedGatheringDrop)}
+                          alt=""
+                        />
+                        <div class="manager-inspector-copy">
+                          <h2 class="manager-inspector-name">
+                            {gatheringDropName(selectedGatheringDrop)}
+                          </h2>
+                          <p class="manager-muted">
+                            {text(
+                              'FABRICATE.Admin.Manager.Environment.Tasks.ModifiersApplyOnlyThisDrop',
+                              'Modifiers below apply only to this drop.'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div class="manager-drop-editor-actions">
+                        <button
+                          type="button"
+                          class="manager-button"
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop',
+                            'Duplicate'
+                          )}
+                          onclick={() => duplicateGatheringTaskDrop(selectedGatheringDrop.id)}
+                        >
+                          <i class="fas fa-copy" aria-hidden="true"></i>
+                          <span
+                            >{text(
+                              'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateDrop',
+                              'Duplicate'
+                            )}</span
+                          >
+                        </button>
+                        <button
+                          type="button"
+                          class="manager-button is-danger"
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop',
+                            'Delete'
+                          )}
+                          onclick={() => deleteGatheringTaskDrop(selectedGatheringDrop.id)}
+                        >
+                          <i class="fas fa-trash" aria-hidden="true"></i>
+                          <span
+                            >{text(
+                              'FABRICATE.Admin.Manager.Environment.Tasks.DeleteDrop',
+                              'Delete'
+                            )}</span
+                          >
+                        </button>
+                      </div>
+                    </section>
+
+                    <div class="manager-drop-inspector-divider" aria-hidden="true"></div>
+
+                    <div class="manager-drop-inspector-scroll">
+                      <section class="manager-inspector-card manager-drop-editor-card">
+                        <div class="manager-drop-editor-values">
+                          <label
+                            class="manager-field manager-drop-rate-editor"
+                            data-gathering-drop-inspector-rate
+                          >
+                            <span
+                              >{text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.DropChance',
+                                'Drop chance'
+                              )}</span
+                            >
+                            <!--
+                    The shared control (issue 883). This inspector used to hand-roll the same
+                    track/fill/range structure the drop ROWS render through `ChanceSlider`, and
+                    re-derive the same `--fab-drop-rate-value` / `--fab-drop-rate-color` inline.
+                    `min` stays 0 here: a task drop has a real "none" tier at 0, unlike a
+                    gathering event.
+                  -->
+                            <ChanceSlider
+                              value={gatheringDropRateValue(selectedGatheringDrop)}
+                              numberLabel={text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent',
+                                'Drop chance percent'
+                              )}
+                              rangeLabel={text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.DropChance',
+                                'Drop chance'
+                              )}
+                              resolveColor={gatheringDropRateTierColor}
+                              controlClass={gatheringDropRateTierClass(
+                                selectedGatheringDrop.dropRate
+                              )}
+                              stopPropagation={true}
+                              onChange={(dropRate) =>
+                                updateGatheringTaskDrop(selectedGatheringDrop.id, { dropRate })}
+                            />
+                          </label>
+
+                          <label
+                            class="manager-field manager-drop-count-editor"
+                            data-gathering-drop-inspector-count
+                          >
+                            <span
+                              >{text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.DropQuantityColumn',
+                                'Count'
+                              )}</span
+                            >
                             <input
                               type="text"
                               inputmode="numeric"
-                              value={gatheringModifierDisplayValue(modifier)}
-                              aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue', 'Modifier value')}
-                              oninput={(event) => updateGatheringEventConditionModifier(kind, modifier.id, signedToOperatorValue(event.currentTarget.value))}
-                              onkeydown={(event) => onGatheringEventModifierKeydown(kind, modifier, event)}
+                              pattern={'[1-9][0-9]{0,2}'}
+                              value={gatheringDropCountValue(selectedGatheringDrop)}
+                              aria-label={text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.DropQuantityColumn',
+                                'Count'
+                              )}
+                              oninput={(event) =>
+                                onGatheringDropCountInput(selectedGatheringDrop.id, event)}
+                              onblur={(event) =>
+                                onGatheringDropCountBlur(selectedGatheringDrop, event)}
+                              onkeydown={(event) =>
+                                onGatheringDropCountKeydown(selectedGatheringDrop, event)}
                             />
-                            <span aria-hidden="true">%</span>
                           </label>
-                          <button
-                            type="button"
-                            class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-                            aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier', 'Delete modifier')}
-                            onclick={() => deleteGatheringEventConditionModifier(kind, modifier.id)}
+                        </div>
+                      </section>
+
+                      {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
+                        {@const cardTitle = gatheringModifierCardTitle(kind, 'task')}
+                        {@const cardHint = gatheringModifierCardHint(kind, 'task')}
+                        {@const availableConditions = gatheringConditionAvailableOptions(
+                          selectedGatheringDrop,
+                          kind
+                        )}
+                        {@const pickerSelection = gatheringDropModifierPickerSelection(kind)}
+                        {@const attachedModifiers = gatheringConditionModifierRows(
+                          selectedGatheringDrop,
+                          kind
+                        )}
+                        <section
+                          class="manager-inspector-card manager-drop-editor-condition-modifier-card"
+                          data-gathering-drop-condition-modifiers={kind}
+                        >
+                          <header class="manager-character-modifier-row-card-header">
+                            <div class="manager-character-modifier-row-card-heading">
+                              <h3 class="manager-card-title">{cardTitle}</h3>
+                              <p class="manager-muted">{cardHint}</p>
+                            </div>
+                          </header>
+                          <div
+                            class="manager-condition-modifier-add-row"
+                            data-gathering-drop-condition-modifier-picker={kind}
                           >
-                            <i class="fas fa-trash" aria-hidden="true"></i>
-                          </button>
+                            <label class="manager-field manager-condition-modifier-picker">
+                              <span class="visually-hidden"
+                                >{text(
+                                  'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
+                                  'Condition'
+                                )}</span
+                              >
+                              <select
+                                value={pickerSelection}
+                                disabled={availableConditions.length === 0}
+                                data-tooltip={availableConditions.length === 0
+                                  ? text(
+                                      'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
+                                      'All conditions already added.'
+                                    )
+                                  : null}
+                                onchange={(event) =>
+                                  setGatheringDropModifierPickerSelection(
+                                    kind,
+                                    event.currentTarget.value
+                                  )}
+                              >
+                                {#each availableConditions as option (option.id)}
+                                  <option value={option.id}>{option.label || option.id}</option>
+                                {/each}
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              class="manager-icon-button"
+                              aria-label={text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
+                                'Add modifier'
+                              )}
+                              title={text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
+                                'Add modifier'
+                              )}
+                              disabled={availableConditions.length === 0 || !pickerSelection}
+                              data-tooltip={availableConditions.length === 0
+                                ? text(
+                                    'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
+                                    'All conditions already added.'
+                                  )
+                                : null}
+                              onclick={() =>
+                                addGatheringDropModifier(
+                                  selectedGatheringDrop.id,
+                                  kind,
+                                  pickerSelection
+                                )}
+                            >
+                              <i class="fas fa-plus" aria-hidden="true"></i>
+                            </button>
+                          </div>
+                          <div class="manager-condition-modifier-row-list">
+                            {#each attachedModifiers as modifier (modifier.id)}
+                              <article
+                                class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`}
+                                data-gathering-drop-modifier-id={modifier.id}
+                              >
+                                <header class="manager-character-modifier-row-reference-header">
+                                  <span class="manager-character-modifier-icon">
+                                    <i
+                                      class={gatheringModifierKindIcon(kind, modifier.conditionId)}
+                                      aria-hidden="true"
+                                    ></i>
+                                  </span>
+                                  <span class="manager-character-modifier-row-reference-label"
+                                    >{gatheringConditionLabel(kind, modifier.conditionId) ||
+                                      modifier.conditionId}</span
+                                  >
+                                  <label class="manager-condition-modifier-value">
+                                    <span class="visually-hidden"
+                                      >{text(
+                                        'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+                                        'Modifier value'
+                                      )}</span
+                                    >
+                                    <input
+                                      type="text"
+                                      inputmode="numeric"
+                                      value={gatheringModifierDisplayValue(modifier)}
+                                      aria-label={text(
+                                        'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+                                        'Modifier value'
+                                      )}
+                                      oninput={(event) =>
+                                        updateGatheringDropModifier(
+                                          selectedGatheringDrop.id,
+                                          kind,
+                                          modifier.id,
+                                          signedToOperatorValue(event.currentTarget.value)
+                                        )}
+                                      onkeydown={(event) =>
+                                        onGatheringDropModifierKeydown(
+                                          selectedGatheringDrop.id,
+                                          kind,
+                                          modifier,
+                                          event
+                                        )}
+                                    />
+                                    <span aria-hidden="true">%</span>
+                                  </label>
+                                  <button
+                                    type="button"
+                                    class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                                    aria-label={text(
+                                      'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
+                                      'Delete modifier'
+                                    )}
+                                    onclick={() =>
+                                      deleteGatheringDropModifier(
+                                        selectedGatheringDrop.id,
+                                        kind,
+                                        modifier.id
+                                      )}
+                                  >
+                                    <i class="fas fa-trash" aria-hidden="true"></i>
+                                  </button>
+                                </header>
+                              </article>
+                            {:else}
+                              <EmptyState
+                                compact
+                                icon="fas fa-sliders"
+                                title={text(
+                                  'FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers',
+                                  'No modifiers attached.'
+                                )}
+                              />
+                            {/each}
+                          </div>
+                        </section>
+                      {/each}
+
+                      <section
+                        class="manager-inspector-card manager-character-modifier-row-card"
+                        data-gathering-drop-character-modifiers
+                      >
+                        <header class="manager-character-modifier-row-card-header">
+                          <div class="manager-character-modifier-row-card-heading">
+                            <h3 class="manager-card-title">
+                              {text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle',
+                                'Character modifiers'
+                              )}
+                            </h3>
+                            <p class="manager-muted">
+                              {text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint',
+                                'Modifiers adjust the final chance based on the attempting character.'
+                              )}
+                            </p>
+                          </div>
                         </header>
+                        <div class="manager-character-modifier-add-search-row">
+                          <label
+                            bind:this={characterModifierSearchAnchor}
+                            class="manager-search is-compact manager-character-modifier-add-search"
+                            data-gathering-drop-character-modifier-search
+                          >
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input
+                              type="search"
+                              value={characterModifierSearchTerm}
+                              oninput={(event) => {
+                                characterModifierSearchTerm = event.currentTarget.value;
+                              }}
+                              placeholder={text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
+                                'Search character modifiers...'
+                              )}
+                              aria-label={text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
+                                'Search character modifiers to add'
+                              )}
+                              disabled={selectedGatheringCharacterModifiers.length === 0}
+                              data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                                ? text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
+                                    'Add a modifier to the system library first to reference it here.'
+                                  )
+                                : null}
+                            />
+                            {#if characterModifierSearchSuggestions.length > 0}
+                              <div
+                                class="manager-tag-suggestions manager-character-modifier-add-suggestions"
+                                class:is-above={characterModifierSearchOpenUp}
+                                data-gathering-drop-character-modifier-suggestions
+                              >
+                                {#each characterModifierSearchSuggestions as option (option.id)}
+                                  <button
+                                    type="button"
+                                    class="manager-tag-suggestion manager-character-modifier-add-suggestion"
+                                    data-gathering-drop-character-modifier-suggestion={option.id}
+                                    onclick={() =>
+                                      pickCharacterModifierForRow(
+                                        selectedGatheringDrop.id,
+                                        option.id
+                                      )}
+                                  >
+                                    <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"
+                                    ></i>
+                                    <span>{option.label || option.id}</span>
+                                  </button>
+                                {/each}
+                              </div>
+                            {/if}
+                          </label>
+                        </div>
+                        <div class="manager-character-modifier-row-list">
+                          {#each rowCharacterModifiers(selectedGatheringDrop) as ref (ref.id)}
+                            {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
+                            {@const hasOverride = characterModifierIsCustomized(ref)}
+                            {@const operatorClass = characterModifierOperatorClass(ref.operator)}
+                            <article
+                              class="manager-character-modifier-row-reference"
+                              data-gathering-drop-character-modifier-ref={ref.id}
+                            >
+                              <header class="manager-character-modifier-row-reference-header">
+                                <span class="manager-character-modifier-icon"
+                                  ><i class={characterModifierIconForRef(ref)} aria-hidden="true"
+                                  ></i></span
+                                >
+                                <span class="manager-character-modifier-row-reference-label"
+                                  >{characterModifierLabelForRef(ref)}</span
+                                >
+                                {#if !libraryEntry}
+                                  <span
+                                    class="manager-character-modifier-stale-warning"
+                                    data-tooltip={text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
+                                      'Unknown modifier ({id})'
+                                    ).replace('{id}', ref.modifierId)}
+                                  >
+                                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"
+                                    ></i>
+                                  </span>
+                                {/if}
+                                <label
+                                  class={`manager-character-modifier-operator-select ${operatorClass}`}
+                                >
+                                  <span class="visually-hidden"
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
+                                      'Operator'
+                                    )}</span
+                                  >
+                                  <select
+                                    value={ref.operator || '+'}
+                                    onchange={(event) =>
+                                      onUpdateDropCharacterModifier(
+                                        selectedGatheringDrop.id,
+                                        ref.id,
+                                        { operator: event.currentTarget.value }
+                                      )}
+                                  >
+                                    <option value="+"
+                                      >{text(
+                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
+                                        'Positive'
+                                      )}</option
+                                    >
+                                    <option value="-"
+                                      >{text(
+                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
+                                        'Negative'
+                                      )}</option
+                                    >
+                                  </select>
+                                </label>
+                                <button
+                                  type="button"
+                                  class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                                  aria-label={text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
+                                    'Delete character modifier reference'
+                                  )}
+                                  onclick={() =>
+                                    onDeleteDropCharacterModifier(selectedGatheringDrop.id, ref.id)}
+                                >
+                                  <i class="fas fa-trash" aria-hidden="true"></i>
+                                </button>
+                              </header>
+                              <div class="manager-character-modifier-row-bounds">
+                                <label class="manager-field">
+                                  <span
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                      'Min'
+                                    )}</span
+                                  >
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    value={ref.min ?? ''}
+                                    oninput={(event) =>
+                                      onUpdateDropCharacterModifier(
+                                        selectedGatheringDrop.id,
+                                        ref.id,
+                                        {
+                                          min:
+                                            event.currentTarget.value === ''
+                                              ? null
+                                              : Number(event.currentTarget.value),
+                                        }
+                                      )}
+                                  />
+                                </label>
+                                <label class="manager-field">
+                                  <span
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                      'Max'
+                                    )}</span
+                                  >
+                                  <input
+                                    type="number"
+                                    step="1"
+                                    value={ref.max ?? ''}
+                                    oninput={(event) =>
+                                      onUpdateDropCharacterModifier(
+                                        selectedGatheringDrop.id,
+                                        ref.id,
+                                        {
+                                          max:
+                                            event.currentTarget.value === ''
+                                              ? null
+                                              : Number(event.currentTarget.value),
+                                        }
+                                      )}
+                                  />
+                                </label>
+                              </div>
+                              <div class="manager-character-modifier-override-row">
+                                <button
+                                  type="button"
+                                  class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+                                  aria-pressed={hasOverride}
+                                  aria-label={text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
+                                    'Override?'
+                                  )}
+                                  onclick={() =>
+                                    setCharacterModifierOverrideEnabled(
+                                      selectedGatheringDrop.id,
+                                      ref,
+                                      !hasOverride,
+                                      libraryEntry
+                                    )}
+                                >
+                                  <span class="manager-status-toggle-track" aria-hidden="true">
+                                    <span class="manager-status-toggle-knob"></span>
+                                  </span>
+                                  <span class="manager-status-toggle-label">
+                                    {hasOverride
+                                      ? text(
+                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
+                                          'Overridden'
+                                        )
+                                      : text(
+                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
+                                          'Override?'
+                                        )}
+                                  </span>
+                                </button>
+                              </div>
+                              {#if hasOverride}
+                                <p class="manager-muted manager-character-modifier-override-hint">
+                                  {text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint',
+                                    'Overrides the library expression for this row.'
+                                  )}
+                                </p>
+                                <label
+                                  class="manager-field"
+                                  for={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
+                                >
+                                  <span
+                                    >{text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
+                                      'Expression'
+                                    )}</span
+                                  >
+                                  <input
+                                    type="text"
+                                    id={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
+                                    value={ref.expressionOverride || ''}
+                                    oninput={(event) =>
+                                      onUpdateDropCharacterModifier(
+                                        selectedGatheringDrop.id,
+                                        ref.id,
+                                        { expressionOverride: event.currentTarget.value }
+                                      )}
+                                  />
+                                </label>
+                              {/if}
+                            </article>
+                          {:else}
+                            <EmptyState
+                              compact
+                              icon="fas fa-sliders"
+                              title={text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty',
+                                'No character modifiers attached.'
+                              )}
+                            />
+                          {/each}
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                {:else}
+                  <section class="manager-inspector-card" data-gathering-task-drop-inspector>
+                    <h3 class="manager-card-title">
+                      {text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.SelectedDrop',
+                        'Selected drop rule'
+                      )}
+                    </h3>
+                    <p class="manager-muted">
+                      {text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.NoDrops',
+                        'No drops have been added.'
+                      )}
+                    </p>
+                  </section>
+                {/if}
+              {/if}
+            {:else}
+              <EmptyState
+                icon="fas fa-list-check"
+                title={text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.SelectTask',
+                  'Select a gathering task'
+                )}
+                hint={text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.InspectorHint',
+                  'The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.'
+                )}
+              />
+            {/if}
+          {:else if (currentView === 'environments' && activeGatheringTab === 'encounters') || currentView === 'gathering-event-edit'}
+            {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
+              <div class="manager-drop-inspector-stack" data-gathering-event-inspector-stack>
+                <div class="manager-drop-inspector-scroll">
+                  {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
+                    {@const cardTitle = gatheringModifierCardTitle(kind, 'event')}
+                    {@const cardHint = gatheringModifierCardHint(kind, 'event')}
+                    {@const availableConditions = gatheringConditionAvailableOptions(
+                      editingGatheringEvent,
+                      kind
+                    )}
+                    {@const pickerSelection = gatheringEventModifierPickerSelection(kind)}
+                    {@const attachedModifiers = gatheringConditionModifierRows(
+                      editingGatheringEvent,
+                      kind
+                    )}
+                    <section
+                      class="manager-inspector-card manager-drop-editor-condition-modifier-card"
+                      data-gathering-event-condition-modifiers={kind}
+                    >
+                      <header class="manager-character-modifier-row-card-header">
+                        <div class="manager-character-modifier-row-card-heading">
+                          <h3 class="manager-card-title">{cardTitle}</h3>
+                          <p class="manager-muted">{cardHint}</p>
+                        </div>
+                      </header>
+                      <div
+                        class="manager-condition-modifier-add-row"
+                        data-gathering-event-condition-modifier-picker={kind}
+                      >
+                        <label class="manager-field manager-condition-modifier-picker">
+                          <span class="visually-hidden"
+                            >{text(
+                              'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
+                              'Condition'
+                            )}</span
+                          >
+                          <select
+                            value={pickerSelection}
+                            disabled={availableConditions.length === 0}
+                            data-tooltip={availableConditions.length === 0
+                              ? text(
+                                  'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
+                                  'All conditions already added.'
+                                )
+                              : null}
+                            onchange={(event) =>
+                              setGatheringEventModifierPickerSelection(
+                                kind,
+                                event.currentTarget.value
+                              )}
+                          >
+                            {#each availableConditions as option (option.id)}
+                              <option value={option.id}>{option.label || option.id}</option>
+                            {/each}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          class="manager-icon-button"
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
+                            'Add modifier'
+                          )}
+                          title={text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
+                            'Add modifier'
+                          )}
+                          disabled={availableConditions.length === 0 || !pickerSelection}
+                          data-tooltip={availableConditions.length === 0
+                            ? text(
+                                'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
+                                'All conditions already added.'
+                              )
+                            : null}
+                          onclick={() => addGatheringEventConditionModifier(kind, pickerSelection)}
+                        >
+                          <i class="fas fa-plus" aria-hidden="true"></i>
+                        </button>
+                      </div>
+                      <div class="manager-condition-modifier-row-list">
+                        {#each attachedModifiers as modifier (modifier.id)}
+                          <article
+                            class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`}
+                            data-gathering-event-modifier-id={modifier.id}
+                          >
+                            <header class="manager-character-modifier-row-reference-header">
+                              <span class="manager-character-modifier-icon">
+                                <i
+                                  class={gatheringModifierKindIcon(kind, modifier.conditionId)}
+                                  aria-hidden="true"
+                                ></i>
+                              </span>
+                              <span class="manager-character-modifier-row-reference-label"
+                                >{gatheringConditionLabel(kind, modifier.conditionId) ||
+                                  modifier.conditionId}</span
+                              >
+                              <label class="manager-condition-modifier-value">
+                                <span class="visually-hidden"
+                                  >{text(
+                                    'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+                                    'Modifier value'
+                                  )}</span
+                                >
+                                <input
+                                  type="text"
+                                  inputmode="numeric"
+                                  value={gatheringModifierDisplayValue(modifier)}
+                                  aria-label={text(
+                                    'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
+                                    'Modifier value'
+                                  )}
+                                  oninput={(event) =>
+                                    updateGatheringEventConditionModifier(
+                                      kind,
+                                      modifier.id,
+                                      signedToOperatorValue(event.currentTarget.value)
+                                    )}
+                                  onkeydown={(event) =>
+                                    onGatheringEventModifierKeydown(kind, modifier, event)}
+                                />
+                                <span aria-hidden="true">%</span>
+                              </label>
+                              <button
+                                type="button"
+                                class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                                aria-label={text(
+                                  'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
+                                  'Delete modifier'
+                                )}
+                                onclick={() =>
+                                  deleteGatheringEventConditionModifier(kind, modifier.id)}
+                              >
+                                <i class="fas fa-trash" aria-hidden="true"></i>
+                              </button>
+                            </header>
+                          </article>
+                        {/each}
+                      </div>
+                    </section>
+                  {/each}
+
+                  <section
+                    class="manager-inspector-card manager-character-modifier-row-card"
+                    data-gathering-event-character-modifiers
+                  >
+                    <header class="manager-character-modifier-row-card-header">
+                      <div class="manager-character-modifier-row-card-heading">
+                        <h3 class="manager-card-title">
+                          {text(
+                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle',
+                            'Character modifiers'
+                          )}
+                        </h3>
+                        <p class="manager-muted">
+                          {text(
+                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint',
+                            'Modifiers adjust the final chance based on the attempting character.'
+                          )}
+                        </p>
+                      </div>
+                    </header>
+                    <div class="manager-character-modifier-add-search-row">
+                      <label
+                        bind:this={characterModifierSearchAnchor}
+                        class="manager-search is-compact manager-character-modifier-add-search"
+                        data-gathering-event-character-modifier-search
+                      >
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <input
+                          type="search"
+                          value={characterModifierSearchTerm}
+                          oninput={(event) => {
+                            characterModifierSearchTerm = event.currentTarget.value;
+                          }}
+                          placeholder={text(
+                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
+                            'Search character modifiers...'
+                          )}
+                          aria-label={text(
+                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
+                            'Search character modifiers to add'
+                          )}
+                          disabled={selectedGatheringCharacterModifiers.length === 0}
+                          data-tooltip={selectedGatheringCharacterModifiers.length === 0
+                            ? text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
+                                'Add a modifier to the system library first to reference it here.'
+                              )
+                            : null}
+                        />
+                        {#if eventCharacterModifierSearchSuggestions.length > 0}
+                          <div
+                            class="manager-tag-suggestions manager-character-modifier-add-suggestions"
+                            class:is-above={characterModifierSearchOpenUp}
+                            data-gathering-event-character-modifier-suggestions
+                          >
+                            {#each eventCharacterModifierSearchSuggestions as option (option.id)}
+                              <button
+                                type="button"
+                                class="manager-tag-suggestion manager-character-modifier-add-suggestion"
+                                data-gathering-event-character-modifier-suggestion={option.id}
+                                onclick={() => pickCharacterModifierForEvent(option.id)}
+                              >
+                                <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
+                                <span>{option.label || option.id}</span>
+                              </button>
+                            {/each}
+                          </div>
+                        {/if}
+                      </label>
+                    </div>
+                    <div class="manager-character-modifier-row-list">
+                      {#each rowCharacterModifiers(editingGatheringEvent) as ref (ref.id)}
+                        {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
+                        {@const hasOverride = characterModifierIsCustomized(ref)}
+                        {@const operatorClass = characterModifierOperatorClass(ref.operator)}
+                        <article
+                          class="manager-character-modifier-row-reference"
+                          data-gathering-event-character-modifier-ref={ref.id}
+                        >
+                          <header class="manager-character-modifier-row-reference-header">
+                            <span class="manager-character-modifier-icon"
+                              ><i class={characterModifierIconForRef(ref)} aria-hidden="true"
+                              ></i></span
+                            >
+                            <span class="manager-character-modifier-row-reference-label"
+                              >{characterModifierLabelForRef(ref)}</span
+                            >
+                            {#if !libraryEntry}
+                              <span
+                                class="manager-character-modifier-stale-warning"
+                                data-tooltip={text(
+                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
+                                  'Unknown modifier ({id})'
+                                ).replace('{id}', ref.modifierId)}
+                              >
+                                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                              </span>
+                            {/if}
+                            <label
+                              class={`manager-character-modifier-operator-select ${operatorClass}`}
+                            >
+                              <span class="visually-hidden"
+                                >{text(
+                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
+                                  'Operator'
+                                )}</span
+                              >
+                              <select
+                                value={ref.operator || '+'}
+                                onchange={(event) =>
+                                  onUpdateEventCharacterModifier(ref.id, {
+                                    operator: event.currentTarget.value,
+                                  })}
+                              >
+                                <option value="+"
+                                  >{text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
+                                    'Positive'
+                                  )}</option
+                                >
+                                <option value="-"
+                                  >{text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
+                                    'Negative'
+                                  )}</option
+                                >
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              class="manager-icon-button is-danger manager-character-modifier-row-reference-delete"
+                              aria-label={text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
+                                'Delete character modifier reference'
+                              )}
+                              onclick={() => onDeleteEventCharacterModifier(ref.id)}
+                            >
+                              <i class="fas fa-trash" aria-hidden="true"></i>
+                            </button>
+                          </header>
+                          <div class="manager-character-modifier-row-bounds">
+                            <label class="manager-field">
+                              <span
+                                >{text(
+                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                  'Min'
+                                )}</span
+                              >
+                              <input
+                                type="number"
+                                step="1"
+                                value={ref.min ?? ''}
+                                oninput={(event) =>
+                                  onUpdateEventCharacterModifier(ref.id, {
+                                    min:
+                                      event.currentTarget.value === ''
+                                        ? null
+                                        : Number(event.currentTarget.value),
+                                  })}
+                              />
+                            </label>
+                            <label class="manager-field">
+                              <span
+                                >{text(
+                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                  'Max'
+                                )}</span
+                              >
+                              <input
+                                type="number"
+                                step="1"
+                                value={ref.max ?? ''}
+                                oninput={(event) =>
+                                  onUpdateEventCharacterModifier(ref.id, {
+                                    max:
+                                      event.currentTarget.value === ''
+                                        ? null
+                                        : Number(event.currentTarget.value),
+                                  })}
+                              />
+                            </label>
+                          </div>
+                          <div class="manager-character-modifier-override-row">
+                            <button
+                              type="button"
+                              class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
+                              aria-pressed={hasOverride}
+                              aria-label={text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
+                                'Override?'
+                              )}
+                              onclick={() =>
+                                setEventCharacterModifierOverrideEnabled(
+                                  ref,
+                                  !hasOverride,
+                                  libraryEntry
+                                )}
+                            >
+                              <span class="manager-status-toggle-track" aria-hidden="true">
+                                <span class="manager-status-toggle-knob"></span>
+                              </span>
+                              <span class="manager-status-toggle-label">
+                                {hasOverride
+                                  ? text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
+                                      'Overridden'
+                                    )
+                                  : text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
+                                      'Override?'
+                                    )}
+                              </span>
+                            </button>
+                          </div>
+                          {#if hasOverride}
+                            <p class="manager-muted manager-character-modifier-override-hint">
+                              {text(
+                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint',
+                                'Overrides the library expression for this row.'
+                              )}
+                            </p>
+                            <label
+                              class="manager-field"
+                              for={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}
+                            >
+                              <span
+                                >{text(
+                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
+                                  'Expression'
+                                )}</span
+                              >
+                              <input
+                                id={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}
+                                type="text"
+                                value={ref.expressionOverride || ''}
+                                oninput={(event) =>
+                                  onUpdateEventCharacterModifier(ref.id, {
+                                    expressionOverride: event.currentTarget.value,
+                                  })}
+                              />
+                            </label>
+                          {/if}
+                        </article>
+                      {:else}
+                        <EmptyState
+                          compact
+                          icon="fas fa-sliders"
+                          title={text(
+                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty',
+                            'No character modifiers attached.'
+                          )}
+                        />
+                      {/each}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}
+              <section class="manager-inspector-card" data-gathering-event-inspector>
+                <div class="manager-inspector-title-row is-hero-large">
+                  <img
+                    class="manager-recipe-preview"
+                    src={selectedGatheringEvent.img || DEFAULT_GATHERING_EVENT_IMG}
+                    alt=""
+                  />
+                  <div class="manager-inspector-copy">
+                    <p class="manager-kicker">
+                      {text(
+                        'FABRICATE.Admin.Manager.Environment.Events.Selected',
+                        'Selected gathering event'
+                      )}
+                    </p>
+                    <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>
+                      {selectedGatheringEvent.name ||
+                        text(
+                          'FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent',
+                          'Unnamed event'
+                        )}
+                    </h2>
+                    <div class="manager-chip-row">
+                      <Chip tone={selectedGatheringEvent.enabled === false ? 'disabled' : 'active'}>
+                        {selectedGatheringEvent.enabled === false
+                          ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')
+                          : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
+                      </Chip>
+                      {#if Array.isArray(selectedGatheringEvent.dangerTags) && selectedGatheringEvent.dangerTags.length > 0}
+                        <Chip>{sortedDangerTags(selectedGatheringEvent.dangerTags).join(', ')}</Chip
+                        >
+                      {/if}
+                    </div>
+                  </div>
+                </div>
+
+                <p class="manager-muted">
+                  {truncateDescription(selectedGatheringEvent.description) ||
+                    text(
+                      'FABRICATE.Admin.Manager.NoDescriptionAdded',
+                      'No description has been added.'
+                    )}
+                </p>
+              </section>
+
+              <section class="manager-inspector-card">
+                <h3 class="manager-card-title">
+                  {text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}
+                </h3>
+                <div class="manager-fact-grid">
+                  <div class="manager-fact" data-gathering-event-fact="biomes">
+                    <!-- `{' '}` is the separator, not a literal space: a literal one is the last token -->
+                    <!-- inside the `{#if}` and Svelte trims block-trailing whitespace, rendering "3Biome". -->
+                    <!-- `prettier-ignore` preserves the LINE ANCHOR of the directive below, not -->
+                    <!-- the render (issue 923): Prettier splits a `<span>` holding an `{#if}` -->
+                    <!-- across several lines whatever the width, which moves the mustache off -->
+                    <!-- the line `eslint-disable-next-line` is anchored to, so the suppression -->
+                    <!-- stops applying and the violation resurfaces. The fence must be the LAST -->
+                    <!-- comment before the element to take effect. The durable guard for this -->
+                    <!-- whole class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
+                    <!-- eslint-disable-next-line svelte/no-useless-mustaches --><!-- prettier-ignore -->
+                    <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0 ? selectedGatheringEvent.biomes.length : text('FABRICATE.Admin.Manager.Environment.Events.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
+                  </div>
+                  <div class="manager-fact" data-gathering-event-fact="drop-rate">
+                    <span class="manager-fact-line"
+                      ><strong
+                        >{(() => {
+                          const rate = Number(selectedGatheringEvent.dropRate);
+                          if (!Number.isFinite(rate)) return '—';
+                          return `${Math.max(1, Math.min(100, Math.floor(rate)))}%`;
+                        })()}</strong
+                      >
+                      <span class="manager-fact-label"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Events.DropRate',
+                          'Drop rate'
+                        )}</span
+                      ></span
+                    >
+                  </div>
+                  <div class="manager-fact" data-gathering-event-fact="environments">
+                    <span class="manager-fact-line"
+                      ><strong
+                        >{(() => {
+                          if (!selectedGatheringEvent?.id) return 0;
+                          const eventId = String(selectedGatheringEvent.id);
+                          return environmentList.filter((env) => {
+                            if (
+                              String(env?.craftingSystemId || '') !== String(selectedSystemId || '')
+                            )
+                              return false;
+                            const ids = Array.isArray(env?.enabledEventIds)
+                              ? env.enabledEventIds.map(String)
+                              : [];
+                            return ids.includes(eventId);
+                          }).length;
+                        })()}</strong
+                      >
+                      <span class="manager-fact-label"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Events.ActiveEnvironments',
+                          'Active environments'
+                        )}</span
+                      ></span
+                    >
+                  </div>
+                </div>
+              </section>
+
+              <section
+                class="manager-inspector-card manager-event-environment-usage-card"
+                data-event-environment-usage
+              >
+                <h3 class="manager-card-title">
+                  {text(
+                    'FABRICATE.Admin.Manager.Environment.Events.UsedInEnvironmentsCard',
+                    'Used in environments'
+                  )}
+                </h3>
+                {#if gatheringEventReferencingEnvironments(selectedGatheringEvent).length === 0}
+                  <p class="manager-muted" data-event-environment-usage-empty>
+                    {text(
+                      'FABRICATE.Admin.Manager.Environment.Events.NotUsedInEnvironments',
+                      'Not used in any environments yet.'
+                    )}
+                  </p>
+                {:else}
+                  <div
+                    class="manager-event-environment-usage-grid"
+                    data-event-environment-usage-chips
+                  >
+                    {#each gatheringEventReferencingEnvironments(selectedGatheringEvent) as environment (environment.id)}
+                      <article class="manager-event-environment-usage-card">
+                        <img
+                          class="manager-event-environment-usage-thumb"
+                          src={environmentImage(environment)}
+                          alt=""
+                        />
+                        <span
+                          class="manager-event-environment-usage-name"
+                          title={environmentName(environment)}>{environmentName(environment)}</span
+                        >
                       </article>
                     {/each}
                   </div>
-                </section>
-              {/each}
-
-              <section class="manager-inspector-card manager-character-modifier-row-card" data-gathering-event-character-modifiers>
-                <header class="manager-character-modifier-row-card-header">
-                  <div class="manager-character-modifier-row-card-heading">
-                    <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle', 'Character modifiers')}</h3>
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint', 'Modifiers adjust the final chance based on the attempting character.')}</p>
-                  </div>
-                </header>
-                <div class="manager-character-modifier-add-search-row">
-                  <label bind:this={characterModifierSearchAnchor} class="manager-search is-compact manager-character-modifier-add-search" data-gathering-event-character-modifier-search>
-                    <i class="fas fa-search" aria-hidden="true"></i>
-                    <input
-                      type="search"
-                      value={characterModifierSearchTerm}
-                      oninput={(event) => { characterModifierSearchTerm = event.currentTarget.value; }}
-                      placeholder={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder', 'Search character modifiers...')}
-                      aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel', 'Search character modifiers to add')}
-                      disabled={selectedGatheringCharacterModifiers.length === 0}
-                      data-tooltip={selectedGatheringCharacterModifiers.length === 0 ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint', 'Add a modifier to the system library first to reference it here.') : null}
-                    />
-                    {#if eventCharacterModifierSearchSuggestions.length > 0}
-                      <div class="manager-tag-suggestions manager-character-modifier-add-suggestions" class:is-above={characterModifierSearchOpenUp} data-gathering-event-character-modifier-suggestions>
-                        {#each eventCharacterModifierSearchSuggestions as option (option.id)}
-                          <button
-                            type="button"
-                            class="manager-tag-suggestion manager-character-modifier-add-suggestion"
-                            data-gathering-event-character-modifier-suggestion={option.id}
-                            onclick={() => pickCharacterModifierForEvent(option.id)}
-                          >
-                            <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
-                            <span>{option.label || option.id}</span>
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
-                  </label>
-                </div>
-                <div class="manager-character-modifier-row-list">
-                  {#each rowCharacterModifiers(editingGatheringEvent) as ref (ref.id)}
-                    {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
-                    {@const hasOverride = characterModifierIsCustomized(ref)}
-                    {@const operatorClass = characterModifierOperatorClass(ref.operator)}
-                    <article class="manager-character-modifier-row-reference" data-gathering-event-character-modifier-ref={ref.id}>
-                      <header class="manager-character-modifier-row-reference-header">
-                        <span class="manager-character-modifier-icon"><i class={characterModifierIconForRef(ref)} aria-hidden="true"></i></span>
-                        <span class="manager-character-modifier-row-reference-label">{characterModifierLabelForRef(ref)}</span>
-                        {#if !libraryEntry}
-                          <span class="manager-character-modifier-stale-warning" data-tooltip={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier', 'Unknown modifier ({id})').replace('{id}', ref.modifierId)}>
-                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                          </span>
-                        {/if}
-                        <label class={`manager-character-modifier-operator-select ${operatorClass}`}>
-                          <span class="visually-hidden">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator', 'Operator')}</span>
-                          <select value={ref.operator || '+'} onchange={(event) => onUpdateEventCharacterModifier(ref.id, { operator: event.currentTarget.value })}>
-                            <option value="+">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive', 'Positive')}</option>
-                            <option value="-">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative', 'Negative')}</option>
-                          </select>
-                        </label>
-                        <button type="button" class="manager-icon-button is-danger manager-character-modifier-row-reference-delete" aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference', 'Delete character modifier reference')} onclick={() => onDeleteEventCharacterModifier(ref.id)}>
-                          <i class="fas fa-trash" aria-hidden="true"></i>
-                        </button>
-                      </header>
-                      <div class="manager-character-modifier-row-bounds">
-                        <label class="manager-field">
-                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min', 'Min')}</span>
-                          <input type="number" step="1" value={ref.min ?? ''} oninput={(event) => onUpdateEventCharacterModifier(ref.id, { min: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
-                        </label>
-                        <label class="manager-field">
-                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max', 'Max')}</span>
-                          <input type="number" step="1" value={ref.max ?? ''} oninput={(event) => onUpdateEventCharacterModifier(ref.id, { max: event.currentTarget.value === '' ? null : Number(event.currentTarget.value) })} />
-                        </label>
-                      </div>
-                      <div class="manager-character-modifier-override-row">
-                        <button
-                          type="button"
-                          class={`manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
-                          aria-pressed={hasOverride}
-                          aria-label={text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
-                          onclick={() => setEventCharacterModifierOverrideEnabled(ref, !hasOverride, libraryEntry)}
-                        >
-                          <span class="manager-status-toggle-track" aria-hidden="true">
-                            <span class="manager-status-toggle-knob"></span>
-                          </span>
-                          <span class="manager-status-toggle-label">
-                            {hasOverride
-                              ? text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn', 'Overridden')
-                              : text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle', 'Override?')}
-                          </span>
-                        </button>
-                      </div>
-                      {#if hasOverride}
-                        <p class="manager-muted manager-character-modifier-override-hint">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint', 'Overrides the library expression for this row.')}</p>
-                        <label class="manager-field" for={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}>
-                          <span>{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression', 'Expression')}</span>
-                          <input
-                            id={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}
-                            type="text"
-                            value={ref.expressionOverride || ''}
-                            oninput={(event) => onUpdateEventCharacterModifier(ref.id, { expressionOverride: event.currentTarget.value })}
-                          />
-                        </label>
-                      {/if}
-                    </article>
-                  {:else}
-                    <p class="manager-muted manager-character-modifier-row-empty">{text('FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty', 'No character modifiers attached.')}</p>
-                  {/each}
-                </div>
+                {/if}
               </section>
-              </div>
-            </div>
-          {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}
-            <section class="manager-inspector-card" data-gathering-event-inspector>
-              <div class="manager-inspector-title-row is-hero-large">
-                <img class="manager-recipe-preview" src={selectedGatheringEvent.img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
+            {:else if currentView !== 'gathering-event-edit'}
+              <EmptyState
+                icon="fas fa-masks-theater"
+                title={text(
+                  'FABRICATE.Admin.Manager.Environment.Events.SelectEvent',
+                  'Select a gathering event'
+                )}
+                hint={text(
+                  'FABRICATE.Admin.Manager.Environment.Events.InspectorHint',
+                  'The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.'
+                )}
+              />
+            {/if}
+          {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
+            <section
+              class="manager-inspector-card manager-gathering-rules-card"
+              data-gathering-inspector-rules
+            >
+              <div class="manager-inspector-title-row">
+                <span class="manager-inspector-icon" aria-hidden="true">
+                  <i class="fas fa-scale-balanced"></i>
+                </span>
                 <div class="manager-inspector-copy">
-                  <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Events.Selected', 'Selected gathering event')}</p>
-                  <h2 class="manager-inspector-name" title={selectedGatheringEvent.name || ''}>{selectedGatheringEvent.name || text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')}</h2>
-                  <div class="manager-chip-row">
-                    <span class={`manager-chip ${selectedGatheringEvent.enabled === false ? 'is-disabled' : 'is-active'}`}>
-                      {selectedGatheringEvent.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                    </span>
-                    {#if Array.isArray(selectedGatheringEvent.dangerTags) && selectedGatheringEvent.dangerTags.length > 0}
-                      <span class="manager-chip">{sortedDangerTags(selectedGatheringEvent.dangerTags).join(', ')}</span>
-                    {/if}
+                  <p class="manager-kicker">
+                    {text('FABRICATE.Admin.Manager.Environment.Rules.Kicker', 'Gathering rules')}
+                  </p>
+                  <h2 class="manager-inspector-name">
+                    {text('FABRICATE.Admin.Manager.Environment.Rules.Title', 'Rules')}
+                  </h2>
+                </div>
+              </div>
+
+              <div class="manager-rules-stack">
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-gift"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-rewards">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.Rewards',
+                        'Rewards'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.RewardsDescription',
+                        'Choose how rewards are granted.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-rewards"
+                      value={selectedGatheringRules.rewardSelectionMode}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ rewardSelectionMode: event.target.value })}
+                    >
+                      <option value="highestRankedDrop"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop',
+                          'Highest ranked successful drop'
+                        )}</option
+                      >
+                      <option value="allDrops"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.AllDrops',
+                          'All successful drops'
+                        )}</option
+                      >
+                      <option value="limitedDrops"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.LimitedDrops',
+                          'Limit successful drops'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+                {#if selectedGatheringRules.rewardSelectionMode === 'limitedDrops'}
+                  <div class="manager-rule-stepper" data-gathering-rule-stepper="rewardLimit">
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseRewardLimit',
+                        'Decrease reward limit'
+                      )}
+                      onclick={() => adjustGatheringRuleLimit('rewardLimit', -1)}
+                      ><i class="fas fa-minus" aria-hidden="true"></i></button
+                    >
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={selectedGatheringRules.rewardLimit}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.RewardLimit',
+                        'Reward limit'
+                      )}
+                      oninput={(event) =>
+                        updateSelectedGatheringRules({
+                          rewardLimit: Number(event.target.value || 1),
+                        })}
+                    />
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseRewardLimit',
+                        'Increase reward limit'
+                      )}
+                      onclick={() => adjustGatheringRuleLimit('rewardLimit', 1)}
+                      ><i class="fas fa-plus" aria-hidden="true"></i></button
+                    >
                   </div>
+                {/if}
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-percent"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-drop-modifier-mode">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.DropModifierMode',
+                        'Modifier mode'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeDescription',
+                        'Choose how all drop and event modifiers (character, weather, time of day, biome) adjust a chance. This applies system-wide and cannot be overridden per modifier.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-drop-modifier-mode"
+                      value={selectedGatheringRules.dropModifierMode ?? 'additive'}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ dropModifierMode: event.target.value })}
+                    >
+                      <option value="additive"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeAdditive',
+                          'Additive (percentage points)'
+                        )}</option
+                      >
+                      <option value="multiplicative"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeMultiplicative',
+                          'Multiplicative (scale by percentage)'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-masks-theater"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-events">
+                    <strong
+                      >{text('FABRICATE.Admin.Manager.Environment.Rules.Events', 'Events')}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.EventsDescription',
+                        'Choose how matching events are applied after a gathering roll.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-events"
+                      value={selectedGatheringRules.eventSelectionMode}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ eventSelectionMode: event.target.value })}
+                    >
+                      <option value="highestRankedDrop"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop',
+                          'Highest ranked triggered event'
+                        )}</option
+                      >
+                      <option value="allDrops"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.EventAllDrops',
+                          'All triggered events'
+                        )}</option
+                      >
+                      <option value="limitedDrops"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.EventLimitedDrops',
+                          'Limit triggered events'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+                {#if selectedGatheringRules.eventSelectionMode === 'limitedDrops'}
+                  <div class="manager-rule-stepper" data-gathering-rule-stepper="eventLimit">
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit',
+                        'Decrease event limit'
+                      )}
+                      onclick={() => adjustGatheringRuleLimit('eventLimit', -1)}
+                      ><i class="fas fa-minus" aria-hidden="true"></i></button
+                    >
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={selectedGatheringRules.eventLimit}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.EventLimit',
+                        'Event limit'
+                      )}
+                      oninput={(event) =>
+                        updateSelectedGatheringRules({
+                          eventLimit: Number(event.target.value || 1),
+                        })}
+                    />
+                    <button
+                      type="button"
+                      class="manager-icon-button"
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseEventLimit',
+                        'Increase event limit'
+                      )}
+                      onclick={() => adjustGatheringRuleLimit('eventLimit', 1)}
+                      ><i class="fas fa-plus" aria-hidden="true"></i></button
+                    >
+                  </div>
+                {/if}
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-scale-balanced"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-outcome">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.EventOutcome',
+                        'Event outcome'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.EventOutcomeDescription',
+                        'Decide whether rolling an event still allows the gathering attempt to succeed.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-outcome"
+                      value={selectedGatheringRules.eventPolicy}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ eventPolicy: event.target.value })}
+                    >
+                      <option value="successWithEvent"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds',
+                          'Gathering succeeds'
+                        )}</option
+                      >
+                      <option value="failureWithEvent"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.GatheringFails',
+                          'Gathering fails'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-eye"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-event-visibility">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.EventVisibility',
+                        'Event visibility'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityDescription',
+                        'Control how much event information players see.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-event-visibility"
+                      value={selectedGatheringRules.eventVisibility ?? 'encounterChance'}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ eventVisibility: event.target.value })}
+                    >
+                      <option value="dangerLevelOnly"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityDangerOnly',
+                          'Danger level only'
+                        )}</option
+                      >
+                      <option value="encounterChance"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityEncounter',
+                          'Encounter chance'
+                        )}</option
+                      >
+                      <option value="full"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityFull',
+                          'Full details'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-screwdriver-wrench"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-tool-breakage">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.ToolBreakageOutcome',
+                        'Tool breakage outcome'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.ToolBreakageDescription',
+                        'Decide whether a broken tool fails the gathering attempt or only reports the breakage.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-tool-breakage"
+                      value={selectedGatheringRules.toolBreakagePolicy ?? 'failureOnBreak'}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ toolBreakagePolicy: event.target.value })}
+                    >
+                      <option value="failureOnBreak"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.ToolFailureOnBreak',
+                          'Attempt fails on break'
+                        )}</option
+                      >
+                      <option value="successDespiteBreak"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.ToolSuccessDespiteBreak',
+                          'Attempt succeeds despite break'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-mountain-sun"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-biome-aggregation">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.BiomeModifiers',
+                        'Biome modifiers'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.BiomeModifiersDescription',
+                        'Decide how multiple matching biome modifiers combine into one drop-rate adjustment.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-biome-aggregation"
+                      value={selectedGatheringRules.biomeModifierAggregation ?? 'strongestOfEach'}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({
+                          biomeModifierAggregation: event.target.value,
+                        })}
+                    >
+                      <option value="strongestOfEach"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationStrongestOfEach',
+                          'Strongest of each'
+                        )}</option
+                      >
+                      <option value="cumulative"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationCumulative',
+                          'Cumulative'
+                        )}</option
+                      >
+                      <option value="dominant"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationDominant',
+                          'Dominant biome'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-eye-slash"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-blind-gate">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGate',
+                        'Blind candidate gate'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGateDescription',
+                        'In blind mode, choose whether the generic gather only resolves to tasks the character can attempt, or to any matching task.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-blind-gate"
+                      value={selectedGatheringRules.blindCandidateGate ?? 'attemptableOnly'}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ blindCandidateGate: event.target.value })}
+                    >
+                      <option value="attemptableOnly"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.BlindGateAttemptableOnly',
+                          'Only attemptable tasks'
+                        )}</option
+                      >
+                      <option value="allMatching"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.BlindGateAllMatching',
+                          'Any matching task'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-wand-sparkles"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-reveal-policy">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.RevealPolicy',
+                        'Blind reveal'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.RevealPolicyDescription',
+                        'Decide whether a blind task is revealed to the player after they attempt it.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-reveal-policy"
+                      value={selectedGatheringRules.revealPolicy ?? 'never'}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ revealPolicy: event.target.value })}
+                    >
+                      <option value="never"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.RevealNever',
+                          'Never reveal'
+                        )}</option
+                      >
+                      <option value="onSuccess"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.RevealOnSuccess',
+                          'Reveal on success'
+                        )}</option
+                      >
+                      <option value="onAttempt"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.RevealOnAttempt',
+                          'Reveal on any attempt'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+
+                <div class="manager-rule-row">
+                  <span class="manager-rule-icon" aria-hidden="true"
+                    ><i class="fas fa-users-viewfinder"></i></span
+                  >
+                  <label class="manager-rule-copy" for="manager-gathering-rule-reveal-scope">
+                    <strong
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.RevealScope',
+                        'Reveal scope'
+                      )}</strong
+                    >
+                    <span
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.RevealScopeDescription',
+                        'Who learns the revealed task: just the actor, the controlling user, the party, or everyone.'
+                      )}</span
+                    >
+                  </label>
+                  <span class="manager-rule-field">
+                    <select
+                      id="manager-gathering-rule-reveal-scope"
+                      value={selectedGatheringRules.revealScope ?? 'actor'}
+                      onchange={(event) =>
+                        updateSelectedGatheringRules({ revealScope: event.target.value })}
+                    >
+                      <option value="actor"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.RevealScopeActor',
+                          'Actor'
+                        )}</option
+                      >
+                      <option value="user"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.RevealScopeUser',
+                          'User'
+                        )}</option
+                      >
+                      <option value="party"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.RevealScopeParty',
+                          'Party'
+                        )}</option
+                      >
+                      <option value="global"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Environment.Rules.RevealScopeGlobal',
+                          'Everyone'
+                        )}</option
+                      >
+                    </select>
+                  </span>
+                </div>
+              </div>
+            </section>
+          {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
+            <section
+              class="manager-inspector-card manager-travel-inspector"
+              data-gathering-inspector-travel
+              data-travel-inspector={activeTravelTab}
+            >
+              {#if activeTravelTab === 'parties'}
+                {#if selectedTravelParty}
+                  <div class="manager-inspector-title-row">
+                    <span class="manager-inspector-icon" aria-hidden="true">
+                      {#if selectedTravelParty.travelActor?.img}
+                        <img
+                          class="manager-travel-parties-thumb"
+                          src={selectedTravelParty.travelActor.img}
+                          alt=""
+                        />
+                      {:else}
+                        <i class="fas fa-people-group"></i>
+                      {/if}
+                    </span>
+                    <div class="manager-inspector-copy">
+                      <p class="manager-kicker">
+                        {text('FABRICATE.Admin.Manager.Travel.InspectorKicker', 'Selected party')}
+                      </p>
+                      <h2 class="manager-inspector-name">{selectedTravelParty.name}</h2>
+                    </div>
+                  </div>
+
+                  <section class="manager-inspector-card">
+                    <h3 class="manager-card-title">
+                      {text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current realm')}
+                    </h3>
+                    {#if selectedTravelParty.currentRealmEvidence.realms.length > 0}
+                      <ul class="manager-travel-evidence-realms">
+                        {#each selectedTravelParty.currentRealmEvidence.realms as realm (realm.id)}
+                          <li>
+                            {realm.name}
+                            {#if !realm.enabled}
+                              <Chip tone="disabled"
+                                >{text(
+                                  'FABRICATE.Admin.Manager.Travel.DisabledRealmChip',
+                                  'Disabled'
+                                )}</Chip
+                              >
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {:else}
+                      <p class="manager-muted">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.EvidenceNoRealms',
+                          'No current realm set for this system.'
+                        )}
+                      </p>
+                    {/if}
+                  </section>
+
+                  <div class="manager-travel-inspector-actions">
+                    {#if selectedTravelParty.enabled}
+                      <button
+                        type="button"
+                        class="manager-button manager-party-enable-toggle is-on"
+                        disabled={$viewState.travelSaving === true}
+                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, false)}
+                      >
+                        <i class="fas fa-toggle-on" aria-hidden="true"></i>
+                        <span
+                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Disable', 'Disable')}</span
+                        >
+                      </button>
+                    {:else}
+                      <button
+                        type="button"
+                        class="manager-button manager-party-enable-toggle is-off"
+                        disabled={$viewState.travelSaving === true ||
+                          !selectedTravelParty.travelActorUuid}
+                        title={selectedTravelParty.travelActorUuid
+                          ? undefined
+                          : text(
+                              'FABRICATE.Admin.Manager.Travel.Parties.EnableNeedsTravelActor',
+                              'Assign a travel actor to enable this party.'
+                            )}
+                        onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, true)}
+                      >
+                        <i class="fas fa-toggle-off" aria-hidden="true"></i>
+                        <span
+                          >{text('FABRICATE.Admin.Manager.Travel.Parties.Enable', 'Enable')}</span
+                        >
+                      </button>
+                    {/if}
+                    <button
+                      type="button"
+                      class="manager-button is-danger"
+                      disabled={$viewState.travelSaving === true}
+                      onclick={() => store.deleteParty?.(selectedTravelParty.id)}
+                    >
+                      <i class="fas fa-trash" aria-hidden="true"></i>
+                      <span
+                        >{text(
+                          'FABRICATE.Admin.Manager.Travel.Parties.Delete',
+                          'Delete party'
+                        )}</span
+                      >
+                    </button>
+                  </div>
+                {:else}
+                  <p class="manager-muted">
+                    {text(
+                      'FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder',
+                      'Select a party to see its details.'
+                    )}
+                  </p>
+                {/if}
+              {:else if activeTravelTab === 'realms'}
+                {#if selectedTravelRealm}
+                  <div class="manager-inspector-title-row">
+                    <span class="manager-inspector-icon" aria-hidden="true">
+                      <i class="fas fa-map-location-dot"></i>
+                    </span>
+                    <div class="manager-inspector-copy">
+                      <p class="manager-kicker">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.Realms.InspectorKicker',
+                          'Selected realm'
+                        )}
+                      </p>
+                      <h2 class="manager-inspector-name">{selectedTravelRealm.name}</h2>
+                    </div>
+                  </div>
+
+                  <div class="manager-travel-inspector-actions">
+                    <button
+                      type="button"
+                      class="manager-button is-danger"
+                      disabled={$viewState.travelSaving === true}
+                      onclick={() => store.deleteRealm?.(selectedSystemId, selectedTravelRealm.id)}
+                    >
+                      <i class="fas fa-trash" aria-hidden="true"></i>
+                      <span
+                        >{text(
+                          'FABRICATE.Admin.Manager.Travel.Realms.Delete',
+                          'Delete realm'
+                        )}</span
+                      >
+                    </button>
+                  </div>
+
+                  <section class="manager-inspector-card">
+                    <RealmNameField
+                      name={selectedTravelRealm.name}
+                      disabled={$viewState.travelSaving === true}
+                      onRename={(name) =>
+                        store.renameRealm?.(selectedSystemId, selectedTravelRealm.id, name)}
+                    />
+                  </section>
+
+                  <section class="manager-inspector-card">
+                    <h3 class="manager-card-title">
+                      <i class="fas fa-seedling" aria-hidden="true"></i>
+                      {text(
+                        'FABRICATE.Admin.Manager.Travel.Realms.EnvironmentsCardTitle',
+                        'Environments'
+                      )}
+                    </h3>
+                    {#if selectedTravelRealm.environments.length > 0}
+                      <ul class="manager-travel-region-environments">
+                        {#each selectedTravelRealm.environments as environment (environment.id)}
+                          <li>
+                            <span class="manager-travel-region-thumb" aria-hidden="true">
+                              {#if environment.img}<img src={environment.img} alt="" />{:else}<i
+                                  class="fas fa-seedling"
+                                ></i>{/if}
+                            </span>
+                            <span class="manager-travel-region-item-name">{environment.name}</span>
+                          </li>
+                        {/each}
+                      </ul>
+                    {:else}
+                      <p class="manager-muted">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.Realms.NoEnvironments',
+                          'No environments include this realm yet.'
+                        )}
+                      </p>
+                    {/if}
+                  </section>
+
+                  <section class="manager-inspector-card">
+                    <h3 class="manager-card-title">
+                      <i class="fas fa-people-group" aria-hidden="true"></i>
+                      {text(
+                        'FABRICATE.Admin.Manager.Travel.Realms.PartiesCardTitle',
+                        'Parties in this realm'
+                      )}
+                    </h3>
+                    {#if selectedTravelRealm.parties.length > 0}
+                      <ul class="manager-travel-region-parties">
+                        {#each selectedTravelRealm.parties as party (party.id)}
+                          <li>
+                            <span class="manager-travel-region-thumb" aria-hidden="true">
+                              {#if party.img}<img src={party.img} alt="" />{:else}<i
+                                  class="fas fa-people-group"
+                                ></i>{/if}
+                            </span>
+                            <span class="manager-travel-region-item-name">{party.name}</span>
+                          </li>
+                        {/each}
+                      </ul>
+                    {:else}
+                      <p class="manager-muted">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.Realms.NoParties',
+                          'No parties are currently in this realm.'
+                        )}
+                      </p>
+                    {/if}
+                  </section>
+                {:else}
+                  <p class="manager-muted">
+                    {text(
+                      'FABRICATE.Admin.Manager.Travel.Inspector.RealmsPlaceholder',
+                      'Select a realm to see its details.'
+                    )}
+                  </p>
+                {/if}
+              {:else if activeTravelTab === 'map'}
+                {#if selectedMapRegion}
+                  <section class="manager-inspector-card manager-map-link-region-card">
+                    <div class="manager-inspector-title-row">
+                      <span
+                        class="manager-inspector-icon manager-map-link-inspector-swatch"
+                        aria-hidden="true"
+                        style={selectedMapRegion.color
+                          ? `background:${selectedMapRegion.color};`
+                          : ''}
+                      ></span>
+                      <div class="manager-inspector-copy">
+                        <p class="manager-kicker">
+                          {text(
+                            'FABRICATE.Admin.Manager.Travel.MapLinks.InspectorKicker',
+                            'Selected map region'
+                          )}
+                        </p>
+                        <h2 class="manager-inspector-name">
+                          {selectedMapRegion.name ||
+                            text(
+                              'FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion',
+                              'Unnamed region'
+                            )}
+                        </h2>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="manager-inspector-card">
+                    <h3 class="manager-card-title">
+                      <i class="fas fa-link" aria-hidden="true"></i>
+                      {text(
+                        'FABRICATE.Admin.Manager.Travel.MapLinks.LinkSectionTitle',
+                        'Linked Fabricate realm'
+                      )}
+                    </h3>
+                    {#if selectedMapRegion.linkedRegionId}
+                      {@const linkedRealm = travelSystemRealms.find(
+                        (realm) => realm.id === selectedMapRegion.linkedRegionId
+                      )}
+                      <ul class="manager-travel-region-parties">
+                        <li>
+                          <span class="manager-travel-region-thumb" aria-hidden="true"
+                            ><i class="fas fa-map-location-dot"></i></span
+                          >
+                          <span class="manager-travel-region-item-name"
+                            >{linkedRealm?.name ||
+                              text(
+                                'FABRICATE.Admin.Manager.Travel.MapLinks.Stale',
+                                'Unknown realm'
+                              )}</span
+                          >
+                          {#if linkedRealm && !linkedRealm.enabled}
+                            <Chip tone="disabled"
+                              >{text(
+                                'FABRICATE.Admin.Manager.Travel.DisabledChip',
+                                'Disabled'
+                              )}</Chip
+                            >
+                          {/if}
+                        </li>
+                      </ul>
+                    {:else}
+                      <p class="manager-muted">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked',
+                          'This map region isn’t linked to a Fabricate realm.'
+                        )}
+                      </p>
+                    {/if}
+                  </section>
+
+                  <section class="manager-inspector-card">
+                    <h3 class="manager-card-title">
+                      <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+                      {text(
+                        'FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInMapRegionTitle',
+                        'Parties in this map region'
+                      )}
+                    </h3>
+                    {#if selectedMapRegion.partiesInMapRegion?.length > 0}
+                      <ul class="manager-travel-region-parties">
+                        {#each selectedMapRegion.partiesInMapRegion as party (party.id)}
+                          <li>
+                            <span class="manager-travel-region-thumb" aria-hidden="true">
+                              {#if party.img}<img src={party.img} alt="" />{:else}<i
+                                  class="fas fa-people-group"
+                                ></i>{/if}
+                            </span>
+                            <span class="manager-travel-region-item-name">{party.name}</span>
+                          </li>
+                        {/each}
+                      </ul>
+                    {:else}
+                      <p class="manager-muted">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInMapRegion',
+                          'No party travel markers are in this map region.'
+                        )}
+                      </p>
+                    {/if}
+                  </section>
+
+                  <section class="manager-inspector-card">
+                    <h3 class="manager-card-title">
+                      <i class="fas fa-people-group" aria-hidden="true"></i>
+                      {text(
+                        'FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInFabricateRegionTitle',
+                        'Parties in this Fabricate realm'
+                      )}
+                    </h3>
+                    {#if !selectedMapRegion.linkedRegionId}
+                      <p class="manager-muted">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked',
+                          'This map region isn’t linked to a Fabricate realm.'
+                        )}
+                      </p>
+                    {:else if selectedMapRegion.partiesInFabricateRealm?.length > 0}
+                      <ul class="manager-travel-region-parties">
+                        {#each selectedMapRegion.partiesInFabricateRealm as party (party.id)}
+                          <li>
+                            <span class="manager-travel-region-thumb" aria-hidden="true">
+                              {#if party.img}<img src={party.img} alt="" />{:else}<i
+                                  class="fas fa-people-group"
+                                ></i>{/if}
+                            </span>
+                            <span class="manager-travel-region-item-name">{party.name}</span>
+                          </li>
+                        {/each}
+                      </ul>
+                    {:else}
+                      <p class="manager-muted">
+                        {text(
+                          'FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInFabricateRegion',
+                          'No parties are in this Fabricate realm.'
+                        )}
+                      </p>
+                    {/if}
+                  </section>
+                {:else}
+                  <p class="manager-muted">
+                    {text(
+                      'FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder',
+                      'Select a region to map it to Scene Regions.'
+                    )}
+                  </p>
+                {/if}
+              {/if}
+            </section>
+          {:else if currentView === 'environments' && activeGatheringInspectorTab}
+            <section
+              class="manager-inspector-card"
+              data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}
+            >
+              <div class="manager-inspector-title-row is-hero-large">
+                <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
+                  <i class={activeGatheringInspectorTab.icon}></i>
+                </span>
+                <div class="manager-inspector-copy">
+                  <p class="manager-kicker">
+                    {text(
+                      'FABRICATE.Admin.Manager.Environment.GatheringTabs.Label',
+                      'Gathering sections'
+                    )}
+                  </p>
+                  <h2 class="manager-inspector-name">
+                    {text(
+                      activeGatheringInspectorTab.titleKey,
+                      activeGatheringInspectorTab.titleFallback
+                    )}
+                  </h2>
+                </div>
+              </div>
+              <p class="manager-muted">
+                {text(
+                  activeGatheringInspectorTab.hintKey,
+                  activeGatheringInspectorTab.hintFallback
+                )}
+              </p>
+            </section>
+          {:else if selectedEnvironment}
+            <section class="manager-inspector-card">
+              <img
+                class={`manager-environment-preview ${hasEnvironmentImage(selectedEnvironment) ? '' : 'is-fallback'}`}
+                src={environmentImage(selectedEnvironment)}
+                alt=""
+              />
+              <div class="manager-inspector-copy">
+                <p class="manager-kicker">
+                  {text('FABRICATE.Admin.Manager.Environment.Selected', 'Selected environment')}
+                </p>
+                <h2 class="manager-inspector-name" title={environmentName(selectedEnvironment)}>
+                  {environmentName(selectedEnvironment)}
+                </h2>
+                <div class="manager-chip-row">
+                  <Chip tone={selectedEnvironment.enabled === false ? 'disabled' : 'active'}
+                    >{environmentStatusLabel(selectedEnvironment)}</Chip
+                  >
+                  <Chip>{environmentSelectionModeLabel(selectedEnvironment)}</Chip>
+                  <Chip tone={selectedEnvironmentSceneState.tone}
+                    >{selectedEnvironmentSceneState.label}</Chip
+                  >
                 </div>
               </div>
 
               <p class="manager-muted">
-                {truncateDescription(selectedGatheringEvent.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
+                {truncateDescription(selectedEnvironment.description) ||
+                  text(
+                    'FABRICATE.Admin.Manager.NoDescriptionAdded',
+                    'No description has been added.'
+                  )}
               </p>
             </section>
 
             <section class="manager-inspector-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Events.Details', 'Event details')}</h3>
+              <h3 class="manager-card-title">
+                {text('FABRICATE.Admin.Manager.Environment.Details', 'Environment details')}
+              </h3>
               <div class="manager-fact-grid">
-                <div class="manager-fact" data-gathering-event-fact="biomes">
-                  <span class="manager-fact-line"><strong>{Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0 ? selectedGatheringEvent.biomes.length : text('FABRICATE.Admin.Manager.Environment.Events.AnyBiome', 'Any biome')}</strong>{#if Array.isArray(selectedGatheringEvent.biomes) && selectedGatheringEvent.biomes.length > 0}{' '}<span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>{/if}</span>
-                </div>
-                <div class="manager-fact" data-gathering-event-fact="drop-rate">
-                  <span class="manager-fact-line"><strong>{(() => {
-                    const rate = Number(selectedGatheringEvent.dropRate);
-                    if (!Number.isFinite(rate)) return '—';
-                    return `${Math.max(1, Math.min(100, Math.floor(rate)))}%`;
-                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Events.DropRate', 'Drop rate')}</span></span>
-                </div>
-                <div class="manager-fact" data-gathering-event-fact="environments">
-                  <span class="manager-fact-line"><strong>{(() => {
-                    if (!selectedGatheringEvent?.id) return 0;
-                    const eventId = String(selectedGatheringEvent.id);
-                    return environmentList.filter(env => {
-                      if (String(env?.craftingSystemId || '') !== String(selectedSystemId || '')) return false;
-                      const ids = Array.isArray(env?.enabledEventIds) ? env.enabledEventIds.map(String) : [];
-                      return ids.includes(eventId);
-                    }).length;
-                  })()}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Events.ActiveEnvironments', 'Active environments')}</span></span>
-                </div>
+                {#each selectedEnvironmentFacts as fact (fact.id)}
+                  <div class="manager-fact" data-environment-fact={fact.id}>
+                    <span class="manager-fact-line"
+                      ><strong>{fact.value}</strong>
+                      <span class="manager-fact-label">{fact.label}</span></span
+                    >
+                  </div>
+                {/each}
+                {#if selectedEnvironment.sceneUuid}
+                  <div class="manager-fact" data-environment-fact="scene">
+                    <span class="manager-fact-line"
+                      ><strong
+                        >{selectedEnvironmentSceneState.name ||
+                          selectedEnvironment.sceneUuid}</strong
+                      >
+                      <span class="manager-fact-label"
+                        >{text('FABRICATE.Admin.Manager.Environment.Scene', 'Scene')}</span
+                      ></span
+                    >
+                  </div>
+                {/if}
               </div>
             </section>
 
-            <section class="manager-inspector-card manager-event-environment-usage-card" data-event-environment-usage>
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Events.UsedInEnvironmentsCard', 'Used in environments')}</h3>
-              {#if gatheringEventReferencingEnvironments(selectedGatheringEvent).length === 0}
-                <p class="manager-muted" data-event-environment-usage-empty>{text('FABRICATE.Admin.Manager.Environment.Events.NotUsedInEnvironments', 'Not used in any environments yet.')}</p>
-              {:else}
-                <div class="manager-event-environment-usage-grid" data-event-environment-usage-chips>
-                  {#each gatheringEventReferencingEnvironments(selectedGatheringEvent) as environment (environment.id)}
-                    <article class="manager-event-environment-usage-card">
-                      <img class="manager-event-environment-usage-thumb" src={environmentImage(environment)} alt="" />
-                      <span class="manager-event-environment-usage-name" title={environmentName(environment)}>{environmentName(environment)}</span>
-                    </article>
+            {#if environmentDirtyFor(selectedEnvironment) || environmentInvalidFor(selectedEnvironment) || $viewState.environmentSaveError}
+              <section class="manager-inspector-card">
+                <h3 class="manager-card-title">
+                  {text('FABRICATE.Admin.Manager.Environment.DraftState', 'Draft state')}
+                </h3>
+                <div class="manager-feature-list">
+                  {#if environmentDirtyFor(selectedEnvironment)}
+                    <Chip tone="warning"
+                      >{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</Chip
+                    >
+                  {/if}
+                  {#if environmentInvalidFor(selectedEnvironment)}
+                    <Chip tone="danger"
+                      >{text(
+                        'FABRICATE.Admin.Manager.Environment.ValidationCount',
+                        '{count} validation issues'
+                      ).replace('{count}', environmentValidationCount)}</Chip
+                    >
+                  {/if}
+                </div>
+                {#if $viewState.environmentSaveError}
+                  <p class="manager-muted">{$viewState.environmentSaveError}</p>
+                {/if}
+              </section>
+            {/if}
+          {:else if environmentList.length === 0}
+            <section
+              class="manager-setup-card"
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Environment.EmptySetup.Title',
+                'Plan gathering content'
+              )}
+            >
+              <div class="manager-setup-card-header">
+                <i class="fas fa-seedling" aria-hidden="true"></i>
+                <div>
+                  <p class="manager-kicker">
+                    {text(
+                      'FABRICATE.Admin.Manager.Environment.EmptySetup.Kicker',
+                      'Gathering setup'
+                    )}
+                  </p>
+                  <h3>
+                    {text(
+                      'FABRICATE.Admin.Manager.Environment.EmptySetup.Title',
+                      'Plan gathering content'
+                    )}
+                  </h3>
+                </div>
+              </div>
+              <p class="manager-muted">
+                {text(
+                  'FABRICATE.Admin.Manager.Environment.EmptySetup.Hint',
+                  'Gathering tasks and events give environments consistent activities, risks, and rewards across gathering locations.'
+                )}
+              </p>
+              <ol class="manager-setup-list">
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Environment.EmptySetup.StepTasks',
+                    'Define gathering tasks with their checks, timing, result groups, and failure outcomes.'
+                  )}
+                </li>
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Environment.EmptySetup.StepEvents',
+                    'Prepare event options that can be reused across your locations.'
+                  )}
+                </li>
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Environment.EmptySetup.StepCreate',
+                    'Create environments after the gathering task and event libraries are ready to attach.'
+                  )}
+                </li>
+              </ol>
+              <div
+                class="manager-setup-links"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Environment.EmptySetup.Resources',
+                  'Environment resources'
+                )}
+              >
+                <a
+                  class="manager-button"
+                  href="https://mistersilver-uk.github.io/fabricate/gathering-environments"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <i class="fas fa-book-open" aria-hidden="true"></i>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs',
+                      'Gathering docs'
+                    )}</span
+                  >
+                </a>
+                <a
+                  class="manager-button"
+                  href="https://mistersilver-uk.github.io/fabricate/quickstart"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <i class="fas fa-circle-question" aria-hidden="true"></i>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Environment.EmptySetup.Quickstart',
+                      'Quickstart'
+                    )}</span
+                  >
+                </a>
+              </div>
+            </section>
+          {:else}
+            <EmptyState
+              icon="fas fa-seedling"
+              title={text(
+                'FABRICATE.Admin.Manager.Environment.SelectEnvironment',
+                'Select an environment'
+              )}
+              hint={text(
+                'FABRICATE.Admin.Manager.Environment.InspectorHint',
+                'The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.'
+              )}
+            />
+          {/if}
+        {:else if currentView === 'essences' || currentView === 'essence-edit'}
+          {#if selectedEssenceForInspector}
+            <section class="manager-inspector-card">
+              <div class="manager-inspector-title-row is-hero-large">
+                <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
+                  <i class={selectedEssenceForInspector.icon || 'fas fa-mortar-pestle'}></i>
+                </span>
+                <div class="manager-inspector-copy">
+                  <p class="manager-kicker">
+                    {text('FABRICATE.Admin.Manager.Essence.Selected', 'Selected essence')}
+                  </p>
+                  <h2 class="manager-inspector-name" title={selectedEssenceForInspector.name}>
+                    {selectedEssenceForInspector.name}
+                  </h2>
+                  <div class="manager-chip-row">
+                    {#if selectedEssenceForInspector.deleteBlocked}
+                      <Chip tone="warning"
+                        >{text(
+                          'FABRICATE.Admin.Manager.Essence.DeleteBlockedShort',
+                          'In use'
+                        )}</Chip
+                      >
+                    {/if}
+                  </div>
+                </div>
+              </div>
+              <p class="manager-muted">
+                {truncateDescription(selectedEssenceForInspector.description) ||
+                  text(
+                    'FABRICATE.Admin.Manager.NoDescriptionAdded',
+                    'No description has been added.'
+                  )}
+              </p>
+            </section>
+
+            {#if currentView === 'essence-edit' && (essenceEditDirty || essenceEditSaving)}
+              <section class="manager-inspector-card">
+                <h3 class="manager-card-title">
+                  {text('FABRICATE.Admin.Manager.Essence.DraftState', 'Draft state')}
+                </h3>
+                <div class="manager-feature-list">
+                  {#if essenceEditDirty}
+                    <Chip tone="warning"
+                      >{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip
+                    >
+                  {/if}
+                  {#if essenceEditSaving}
+                    <Chip>{text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...')}</Chip>
+                  {/if}
+                </div>
+              </section>
+            {/if}
+
+            {#if showEssenceSourceUi && currentView !== 'essence-edit'}
+              <section class="manager-inspector-card" data-essence-section="source">
+                <div class="manager-edit-card-heading">
+                  <h3 class="manager-card-title">
+                    {text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
+                  </h3>
+                </div>
+                {#if selectedEssenceForInspector.associatedItem}
+                  <div
+                    class="manager-essence-source-summary manager-essence-inspector-source-summary"
+                  >
+                    <img
+                      class="manager-essence-source-thumb"
+                      src={selectedEssenceForInspector.associatedItem.img ||
+                        'icons/svg/item-bag.svg'}
+                      alt=""
+                    />
+                    <div class="manager-essence-source-copy">
+                      <strong
+                        >{selectedEssenceForInspector.associatedItem.name ||
+                          selectedEssenceForInspector.sourceName}</strong
+                      >
+                    </div>
+                  </div>
+                  <div class="manager-essence-inspector-source-actions">
+                    <button
+                      type="button"
+                      class="manager-button"
+                      data-essence-action="copy-source"
+                      title={selectedEssenceSourceUuid() ||
+                        text(
+                          'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
+                          'This component has no source item UUID.'
+                        )}
+                      disabled={!selectedEssenceSourceUuid()}
+                      onclick={copySelectedEssenceSource}
+                    >
+                      <i class="fas fa-copy" aria-hidden="true"></i>
+                      <span
+                        >{text(
+                          'FABRICATE.Admin.Manager.Essence.CopySource',
+                          'Copy source UUID'
+                        )}</span
+                      >
+                    </button>
+                    <button
+                      type="button"
+                      class="manager-button is-warning-action"
+                      data-essence-action="unlink-source"
+                      onclick={unlinkSelectedEssenceSource}
+                    >
+                      <i class="fas fa-unlink" aria-hidden="true"></i>
+                      <span
+                        >{text(
+                          'FABRICATE.Admin.Manager.Essence.UnlinkSource',
+                          'Unlink Source'
+                        )}</span
+                      >
+                    </button>
+                  </div>
+                {:else}
+                  <div
+                    class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone"
+                  >
+                    <EssenceSourceSelector
+                      value={null}
+                      items={selectedSystem?.managedItemOptions || []}
+                      onDrop={handleInspectorEssenceSourceDrop}
+                      onSelect={handleInspectorEssenceSourceSelect}
+                      onClear={() => updateSelectedEssenceSource(null)}
+                    />
+                  </div>
+                {/if}
+              </section>
+            {/if}
+
+            <section class="manager-inspector-card" data-essence-section="usage">
+              <h3 class="manager-card-title">
+                {text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}
+              </h3>
+              <div class="manager-requirements-list">
+                <div class="manager-requirement-row">
+                  <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
+                  <strong
+                    >{text(
+                      'FABRICATE.Admin.Manager.Essence.ComponentUsageCount',
+                      '{count} components'
+                    ).replace(
+                      '{count}',
+                      selectedEssenceForInspector.componentUsageCount || 0
+                    )}</strong
+                  >
+                </div>
+              </div>
+              {#if Array.isArray(selectedEssenceForInspector.componentUsageItems) && selectedEssenceForInspector.componentUsageItems.length > 0}
+                <div
+                  class="manager-essence-usage-grid"
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.Essence.ComponentUsageGrid',
+                    'Components using this essence'
+                  )}
+                >
+                  {#each selectedEssenceForInspector.componentUsageItems as component (component.id)}
+                    <button
+                      type="button"
+                      class="manager-essence-usage-item"
+                      title={component.name}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Component.EditNamed',
+                        'Edit {name}'
+                      ).replace('{name}', component.name)}
+                      onclick={() => editComponent(component.id)}
+                    >
+                      <img src={componentImage(component)} alt="" />
+                    </button>
                   {/each}
                 </div>
               {/if}
             </section>
-          {:else if currentView !== 'gathering-event-edit'}
-            <div class="manager-empty">
-              <div>
-                <i class="fas fa-masks-theater" aria-hidden="true"></i>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.Events.SelectEvent', 'Select a gathering event')}</h3>
-                <p>{text('FABRICATE.Admin.Manager.Environment.Events.InspectorHint', 'The inspector shows event availability, danger tags, drop rate, and active environment usage for the selected row.')}</p>
-              </div>
-            </div>
-          {/if}
-        {:else if currentView === 'environments' && activeGatheringTab === 'settings'}
-          <section class="manager-inspector-card manager-gathering-rules-card" data-gathering-inspector-rules>
-            <div class="manager-inspector-title-row">
-              <span class="manager-inspector-icon" aria-hidden="true">
-                <i class="fas fa-scale-balanced"></i>
-              </span>
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Rules.Kicker', 'Gathering rules')}</p>
-                <h2 class="manager-inspector-name">{text('FABRICATE.Admin.Manager.Environment.Rules.Title', 'Rules')}</h2>
-              </div>
-            </div>
 
-            <div class="manager-rules-stack">
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-gift"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-rewards">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Rewards', 'Rewards')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RewardsDescription', 'Choose how rewards are granted.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-rewards" value={selectedGatheringRules.rewardSelectionMode} onchange={(event) => updateSelectedGatheringRules({ rewardSelectionMode: event.target.value })}>
-                    <option value="highestRankedDrop">{text('FABRICATE.Admin.Manager.Environment.Rules.HighestRankedDrop', 'Highest ranked successful drop')}</option>
-                    <option value="allDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.AllDrops', 'All successful drops')}</option>
-                    <option value="limitedDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.LimitedDrops', 'Limit successful drops')}</option>
-                  </select>
-                </span>
-              </div>
-              {#if selectedGatheringRules.rewardSelectionMode === 'limitedDrops'}
-                <div class="manager-rule-stepper" data-gathering-rule-stepper="rewardLimit">
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.DecreaseRewardLimit', 'Decrease reward limit')} onclick={() => adjustGatheringRuleLimit('rewardLimit', -1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                  <input type="number" min="1" step="1" value={selectedGatheringRules.rewardLimit} aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.RewardLimit', 'Reward limit')} oninput={(event) => updateSelectedGatheringRules({ rewardLimit: Number(event.target.value || 1) })} />
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.IncreaseRewardLimit', 'Increase reward limit')} onclick={() => adjustGatheringRuleLimit('rewardLimit', 1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
+            {#if selectedEssenceForInspector.deleteBlocked}
+              <section class="manager-inspector-card">
+                <h3 class="manager-card-title">
+                  {text('FABRICATE.Admin.Manager.Essence.UsageBlockedTitle', 'Deletion blocked')}
+                </h3>
+                <p class="manager-muted">
+                  {text(
+                    'FABRICATE.Admin.Manager.Essence.UsageBlockedHint',
+                    'Remove this essence from components before deleting the definition.'
+                  )}
+                </p>
+              </section>
+            {/if}
+          {:else if currentView === 'essences' && essenceCards.length === 0}
+            <section
+              class="manager-setup-card"
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Essence.EmptySetup.Title',
+                'Set up essences'
+              )}
+            >
+              <div class="manager-setup-card-header">
+                <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
+                <div>
+                  <p class="manager-kicker">
+                    {text('FABRICATE.Admin.Manager.Essence.EmptySetup.Kicker', 'Essence setup')}
+                  </p>
+                  <h3>
+                    {text('FABRICATE.Admin.Manager.Essence.EmptySetup.Title', 'Set up essences')}
+                  </h3>
                 </div>
-              {/if}
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-percent"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-drop-modifier-mode">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.DropModifierMode', 'Modifier mode')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeDescription', 'Choose how all drop and event modifiers (character, weather, time of day, biome) adjust a chance. This applies system-wide and cannot be overridden per modifier.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-drop-modifier-mode" value={selectedGatheringRules.dropModifierMode ?? 'additive'} onchange={(event) => updateSelectedGatheringRules({ dropModifierMode: event.target.value })}>
-                    <option value="additive">{text('FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeAdditive', 'Additive (percentage points)')}</option>
-                    <option value="multiplicative">{text('FABRICATE.Admin.Manager.Environment.Rules.DropModifierModeMultiplicative', 'Multiplicative (scale by percentage)')}</option>
-                  </select>
-                </span>
               </div>
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-masks-theater"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-events">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.Events', 'Events')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.EventsDescription', 'Choose how matching events are applied after a gathering roll.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-events" value={selectedGatheringRules.eventSelectionMode} onchange={(event) => updateSelectedGatheringRules({ eventSelectionMode: event.target.value })}>
-                    <option value="highestRankedDrop">{text('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop', 'Highest ranked triggered event')}</option>
-                    <option value="allDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.EventAllDrops', 'All triggered events')}</option>
-                    <option value="limitedDrops">{text('FABRICATE.Admin.Manager.Environment.Rules.EventLimitedDrops', 'Limit triggered events')}</option>
-                  </select>
-                </span>
-              </div>
-              {#if selectedGatheringRules.eventSelectionMode === 'limitedDrops'}
-                <div class="manager-rule-stepper" data-gathering-rule-stepper="eventLimit">
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit', 'Decrease event limit')} onclick={() => adjustGatheringRuleLimit('eventLimit', -1)}><i class="fas fa-minus" aria-hidden="true"></i></button>
-                  <input type="number" min="1" step="1" value={selectedGatheringRules.eventLimit} aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.EventLimit', 'Event limit')} oninput={(event) => updateSelectedGatheringRules({ eventLimit: Number(event.target.value || 1) })} />
-                  <button type="button" class="manager-icon-button" aria-label={text('FABRICATE.Admin.Manager.Environment.Rules.IncreaseEventLimit', 'Increase event limit')} onclick={() => adjustGatheringRuleLimit('eventLimit', 1)}><i class="fas fa-plus" aria-hidden="true"></i></button>
-                </div>
-              {/if}
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-outcome">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.EventOutcome', 'Event outcome')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.EventOutcomeDescription', 'Decide whether rolling an event still allows the gathering attempt to succeed.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-outcome" value={selectedGatheringRules.eventPolicy} onchange={(event) => updateSelectedGatheringRules({ eventPolicy: event.target.value })}>
-                    <option value="successWithEvent">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringSucceeds', 'Gathering succeeds')}</option>
-                    <option value="failureWithEvent">{text('FABRICATE.Admin.Manager.Environment.Rules.GatheringFails', 'Gathering fails')}</option>
-                  </select>
-                </span>
-              </div>
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-eye"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-event-visibility">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibility', 'Event visibility')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityDescription', 'Control how much event information players see.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-event-visibility" value={selectedGatheringRules.eventVisibility ?? 'encounterChance'} onchange={(event) => updateSelectedGatheringRules({ eventVisibility: event.target.value })}>
-                    <option value="dangerLevelOnly">{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityDangerOnly', 'Danger level only')}</option>
-                    <option value="encounterChance">{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityEncounter', 'Encounter chance')}</option>
-                    <option value="full">{text('FABRICATE.Admin.Manager.Environment.Rules.EventVisibilityFull', 'Full details')}</option>
-                  </select>
-                </span>
-              </div>
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-screwdriver-wrench"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-tool-breakage">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.ToolBreakageOutcome', 'Tool breakage outcome')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.ToolBreakageDescription', 'Decide whether a broken tool fails the gathering attempt or only reports the breakage.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-tool-breakage" value={selectedGatheringRules.toolBreakagePolicy ?? 'failureOnBreak'} onchange={(event) => updateSelectedGatheringRules({ toolBreakagePolicy: event.target.value })}>
-                    <option value="failureOnBreak">{text('FABRICATE.Admin.Manager.Environment.Rules.ToolFailureOnBreak', 'Attempt fails on break')}</option>
-                    <option value="successDespiteBreak">{text('FABRICATE.Admin.Manager.Environment.Rules.ToolSuccessDespiteBreak', 'Attempt succeeds despite break')}</option>
-                  </select>
-                </span>
-              </div>
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-mountain-sun"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-biome-aggregation">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeModifiers', 'Biome modifiers')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeModifiersDescription', "Decide how multiple matching biome modifiers combine into one drop-rate adjustment.")}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-biome-aggregation" value={selectedGatheringRules.biomeModifierAggregation ?? 'strongestOfEach'} onchange={(event) => updateSelectedGatheringRules({ biomeModifierAggregation: event.target.value })}>
-                    <option value="strongestOfEach">{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationStrongestOfEach', 'Strongest of each')}</option>
-                    <option value="cumulative">{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationCumulative', 'Cumulative')}</option>
-                    <option value="dominant">{text('FABRICATE.Admin.Manager.Environment.Rules.BiomeAggregationDominant', 'Dominant biome')}</option>
-                  </select>
-                </span>
-              </div>
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-eye-slash"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-blind-gate">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGate', 'Blind candidate gate')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.BlindCandidateGateDescription', 'In blind mode, choose whether the generic gather only resolves to tasks the character can attempt, or to any matching task.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-blind-gate" value={selectedGatheringRules.blindCandidateGate ?? 'attemptableOnly'} onchange={(event) => updateSelectedGatheringRules({ blindCandidateGate: event.target.value })}>
-                    <option value="attemptableOnly">{text('FABRICATE.Admin.Manager.Environment.Rules.BlindGateAttemptableOnly', 'Only attemptable tasks')}</option>
-                    <option value="allMatching">{text('FABRICATE.Admin.Manager.Environment.Rules.BlindGateAllMatching', 'Any matching task')}</option>
-                  </select>
-                </span>
-              </div>
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-wand-sparkles"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-reveal-policy">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealPolicy', 'Blind reveal')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealPolicyDescription', 'Decide whether a blind task is revealed to the player after they attempt it.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-reveal-policy" value={selectedGatheringRules.revealPolicy ?? 'never'} onchange={(event) => updateSelectedGatheringRules({ revealPolicy: event.target.value })}>
-                    <option value="never">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealNever', 'Never reveal')}</option>
-                    <option value="onSuccess">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealOnSuccess', 'Reveal on success')}</option>
-                    <option value="onAttempt">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealOnAttempt', 'Reveal on any attempt')}</option>
-                  </select>
-                </span>
-              </div>
-
-              <div class="manager-rule-row">
-                <span class="manager-rule-icon" aria-hidden="true"><i class="fas fa-users-viewfinder"></i></span>
-                <label class="manager-rule-copy" for="manager-gathering-rule-reveal-scope">
-                  <strong>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScope', 'Reveal scope')}</strong>
-                  <span>{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeDescription', 'Who learns the revealed task: just the actor, the controlling user, the party, or everyone.')}</span>
-                </label>
-                <span class="manager-rule-field">
-                  <select id="manager-gathering-rule-reveal-scope" value={selectedGatheringRules.revealScope ?? 'actor'} onchange={(event) => updateSelectedGatheringRules({ revealScope: event.target.value })}>
-                    <option value="actor">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeActor', 'Actor')}</option>
-                    <option value="user">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeUser', 'User')}</option>
-                    <option value="party">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeParty', 'Party')}</option>
-                    <option value="global">{text('FABRICATE.Admin.Manager.Environment.Rules.RevealScopeGlobal', 'Everyone')}</option>
-                  </select>
-                </span>
-              </div>
-            </div>
-          </section>
-        {:else if currentView === 'environments' && activeGatheringTab === 'travel'}
-          <section class="manager-inspector-card manager-travel-inspector" data-gathering-inspector-travel data-travel-inspector={activeTravelTab}>
-            {#if activeTravelTab === 'parties'}
-              {#if selectedTravelParty}
-                <div class="manager-inspector-title-row">
-                  <span class="manager-inspector-icon" aria-hidden="true">
-                    {#if selectedTravelParty.travelActor?.img}
-                      <img class="manager-travel-parties-thumb" src={selectedTravelParty.travelActor.img} alt="" />
-                    {:else}
-                      <i class="fas fa-people-group"></i>
-                    {/if}
-                  </span>
-                  <div class="manager-inspector-copy">
-                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.InspectorKicker', 'Selected party')}</p>
-                    <h2 class="manager-inspector-name">{selectedTravelParty.name}</h2>
-                  </div>
-                </div>
-
-                <section class="manager-inspector-card">
-                  <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Travel.EvidenceLabel', 'Current realm')}</h3>
-                  {#if selectedTravelParty.currentRealmEvidence.realms.length > 0}
-                    <ul class="manager-travel-evidence-realms">
-                      {#each selectedTravelParty.currentRealmEvidence.realms as realm (realm.id)}
-                        <li>
-                          {realm.name}
-                          {#if !realm.enabled}
-                            <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledRealmChip', 'Disabled')}</span>
-                          {/if}
-                        </li>
-                      {/each}
-                    </ul>
-                  {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.EvidenceNoRealms', 'No current realm set for this system.')}</p>
-                  {/if}
-                </section>
-
-                <div class="manager-travel-inspector-actions">
-                  {#if selectedTravelParty.enabled}
-                    <button
-                      type="button"
-                      class="manager-button manager-party-enable-toggle is-on"
-                      disabled={$viewState.travelSaving === true}
-                      onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, false)}
-                    >
-                      <i class="fas fa-toggle-on" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Disable', 'Disable')}</span>
-                    </button>
-                  {:else}
-                    <button
-                      type="button"
-                      class="manager-button manager-party-enable-toggle is-off"
-                      disabled={$viewState.travelSaving === true || !selectedTravelParty.travelActorUuid}
-                      title={selectedTravelParty.travelActorUuid
-                        ? undefined
-                        : text('FABRICATE.Admin.Manager.Travel.Parties.EnableNeedsTravelActor', 'Assign a travel actor to enable this party.')}
-                      onclick={() => store.setPartyEnabled?.(selectedTravelParty.id, true)}
-                    >
-                      <i class="fas fa-toggle-off" aria-hidden="true"></i>
-                      <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Enable', 'Enable')}</span>
-                    </button>
-                  {/if}
-                  <button
-                    type="button"
-                    class="manager-button is-danger"
-                    disabled={$viewState.travelSaving === true}
-                    onclick={() => store.deleteParty?.(selectedTravelParty.id)}
+              <p class="manager-muted">
+                {text(
+                  'FABRICATE.Admin.Manager.Essence.EmptySetup.Hint',
+                  'Create the first essence definition for this system, then assign quantities to components that should contribute that essence.'
+                )}
+              </p>
+              <ol class="manager-setup-list">
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Essence.EmptySetup.StepCreate',
+                    'Create an essence with a clear name, icon, and description.'
+                  )}
+                </li>
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Essence.EmptySetup.StepAssign',
+                    'Edit components to assign essence quantities that recipes can require.'
+                  )}
+                </li>
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Essence.EmptySetup.StepTransfer',
+                    'If effect transfer is enabled, link source components whose effects should carry to crafted results.'
+                  )}
+                </li>
+              </ol>
+              <div
+                class="manager-setup-links"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Essence.EmptySetup.Resources',
+                  'Essence resources'
+                )}
+              >
+                <a
+                  class="manager-button"
+                  href="https://mistersilver-uk.github.io/fabricate/essences"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <i class="fas fa-book-open" aria-hidden="true"></i>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs',
+                      'Essence docs'
+                    )}</span
                   >
-                    <i class="fas fa-trash" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.Travel.Parties.Delete', 'Delete party')}</span>
-                  </button>
-                </div>
-              {:else}
-                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.PartiesPlaceholder', 'Select a party to see its details.')}</p>
-              {/if}
-            {:else if activeTravelTab === 'realms'}
-              {#if selectedTravelRealm}
-                <div class="manager-inspector-title-row">
-                  <span class="manager-inspector-icon" aria-hidden="true">
-                    <i class="fas fa-map-location-dot"></i>
-                  </span>
-                  <div class="manager-inspector-copy">
-                    <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.Realms.InspectorKicker', 'Selected realm')}</p>
-                    <h2 class="manager-inspector-name">{selectedTravelRealm.name}</h2>
-                  </div>
-                </div>
-
-                <div class="manager-travel-inspector-actions">
-                  <button
-                    type="button"
-                    class="manager-button is-danger"
-                    disabled={$viewState.travelSaving === true}
-                    onclick={() => store.deleteRealm?.(selectedSystemId, selectedTravelRealm.id)}
+                </a>
+                <a
+                  class="manager-button"
+                  href="https://mistersilver-uk.github.io/fabricate/effect-transfer"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Essence.EmptySetup.EffectTransferDocs',
+                      'Effect transfer'
+                    )}</span
                   >
-                    <i class="fas fa-trash" aria-hidden="true"></i>
-                    <span>{text('FABRICATE.Admin.Manager.Travel.Realms.Delete', 'Delete realm')}</span>
-                  </button>
-                </div>
-
-                <section class="manager-inspector-card">
-                  <RealmNameField
-                    name={selectedTravelRealm.name}
-                    disabled={$viewState.travelSaving === true}
-                    onRename={(name) => store.renameRealm?.(selectedSystemId, selectedTravelRealm.id, name)}
-                  />
-                </section>
-
-                <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-seedling" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Realms.EnvironmentsCardTitle', 'Environments')}</h3>
-                  {#if selectedTravelRealm.environments.length > 0}
-                    <ul class="manager-travel-region-environments">
-                      {#each selectedTravelRealm.environments as environment (environment.id)}
-                        <li>
-                          <span class="manager-travel-region-thumb" aria-hidden="true">
-                            {#if environment.img}<img src={environment.img} alt="" />{:else}<i class="fas fa-seedling"></i>{/if}
-                          </span>
-                          <span class="manager-travel-region-item-name">{environment.name}</span>
-                        </li>
-                      {/each}
-                    </ul>
-                  {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Realms.NoEnvironments', 'No environments include this realm yet.')}</p>
-                  {/if}
-                </section>
-
-                <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.Realms.PartiesCardTitle', 'Parties in this realm')}</h3>
-                  {#if selectedTravelRealm.parties.length > 0}
-                    <ul class="manager-travel-region-parties">
-                      {#each selectedTravelRealm.parties as party (party.id)}
-                        <li>
-                          <span class="manager-travel-region-thumb" aria-hidden="true">
-                            {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
-                          </span>
-                          <span class="manager-travel-region-item-name">{party.name}</span>
-                        </li>
-                      {/each}
-                    </ul>
-                  {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Realms.NoParties', 'No parties are currently in this realm.')}</p>
-                  {/if}
-                </section>
-              {:else}
-                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.RealmsPlaceholder', 'Select a realm to see its details.')}</p>
-              {/if}
-            {:else if activeTravelTab === 'map'}
-              {#if selectedMapRegion}
-                <section class="manager-inspector-card manager-map-link-region-card">
-                  <div class="manager-inspector-title-row">
-                    <span class="manager-inspector-icon manager-map-link-inspector-swatch" aria-hidden="true" style={selectedMapRegion.color ? `background:${selectedMapRegion.color};` : ''}></span>
-                    <div class="manager-inspector-copy">
-                      <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Travel.MapLinks.InspectorKicker', 'Selected map region')}</p>
-                      <h2 class="manager-inspector-name">{selectedMapRegion.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.UnnamedRegion', 'Unnamed region')}</h2>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-link" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.LinkSectionTitle', 'Linked Fabricate realm')}</h3>
-                  {#if selectedMapRegion.linkedRegionId}
-                    {@const linkedRealm = travelSystemRealms.find(realm => realm.id === selectedMapRegion.linkedRegionId)}
-                    <ul class="manager-travel-region-parties">
-                      <li>
-                        <span class="manager-travel-region-thumb" aria-hidden="true"><i class="fas fa-map-location-dot"></i></span>
-                        <span class="manager-travel-region-item-name">{linkedRealm?.name || text('FABRICATE.Admin.Manager.Travel.MapLinks.Stale', 'Unknown realm')}</span>
-                        {#if linkedRealm && !linkedRealm.enabled}
-                          <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
-                        {/if}
-                      </li>
-                    </ul>
-                  {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate realm.')}</p>
-                  {/if}
-                </section>
-
-                <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-map-location-dot" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInMapRegionTitle', 'Parties in this map region')}</h3>
-                  {#if selectedMapRegion.partiesInMapRegion?.length > 0}
-                    <ul class="manager-travel-region-parties">
-                      {#each selectedMapRegion.partiesInMapRegion as party (party.id)}
-                        <li>
-                          <span class="manager-travel-region-thumb" aria-hidden="true">
-                            {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
-                          </span>
-                          <span class="manager-travel-region-item-name">{party.name}</span>
-                        </li>
-                      {/each}
-                    </ul>
-                  {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInMapRegion', 'No party travel markers are in this map region.')}</p>
-                  {/if}
-                </section>
-
-                <section class="manager-inspector-card">
-                  <h3 class="manager-card-title"><i class="fas fa-people-group" aria-hidden="true"></i> {text('FABRICATE.Admin.Manager.Travel.MapLinks.PartiesInFabricateRegionTitle', 'Parties in this Fabricate realm')}</h3>
-                  {#if !selectedMapRegion.linkedRegionId}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NotLinked', 'This map region isn’t linked to a Fabricate realm.')}</p>
-                  {:else if selectedMapRegion.partiesInFabricateRealm?.length > 0}
-                    <ul class="manager-travel-region-parties">
-                      {#each selectedMapRegion.partiesInFabricateRealm as party (party.id)}
-                        <li>
-                          <span class="manager-travel-region-thumb" aria-hidden="true">
-                            {#if party.img}<img src={party.img} alt="" />{:else}<i class="fas fa-people-group"></i>{/if}
-                          </span>
-                          <span class="manager-travel-region-item-name">{party.name}</span>
-                        </li>
-                      {/each}
-                    </ul>
-                  {:else}
-                    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.MapLinks.NoPartiesInFabricateRegion', 'No parties are in this Fabricate realm.')}</p>
-                  {/if}
-                </section>
-              {:else}
-                <p class="manager-muted">{text('FABRICATE.Admin.Manager.Travel.Inspector.MapLinksPlaceholder', 'Select a region to map it to Scene Regions.')}</p>
-              {/if}
-            {/if}
-          </section>
-        {:else if currentView === 'environments' && activeGatheringInspectorTab}
-          <section class="manager-inspector-card" data-gathering-inspector-placeholder={activeGatheringInspectorTab.id}>
-            <div class="manager-inspector-title-row is-hero-large">
-              <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-                <i class={activeGatheringInspectorTab.icon}></i>
-              </span>
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.GatheringTabs.Label', 'Gathering sections')}</p>
-                <h2 class="manager-inspector-name">
-                  {text(activeGatheringInspectorTab.titleKey, activeGatheringInspectorTab.titleFallback)}
-                </h2>
-              </div>
-            </div>
-            <p class="manager-muted">
-              {text(activeGatheringInspectorTab.hintKey, activeGatheringInspectorTab.hintFallback)}
-            </p>
-          </section>
-        {:else if selectedEnvironment}
-          <section class="manager-inspector-card">
-            <img class={`manager-environment-preview ${hasEnvironmentImage(selectedEnvironment) ? '' : 'is-fallback'}`} src={environmentImage(selectedEnvironment)} alt="" />
-            <div class="manager-inspector-copy">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.Selected', 'Selected environment')}</p>
-              <h2 class="manager-inspector-name" title={environmentName(selectedEnvironment)}>{environmentName(selectedEnvironment)}</h2>
-              <div class="manager-chip-row">
-                <span class={`manager-chip ${selectedEnvironment.enabled === false ? 'is-disabled' : 'is-active'}`}>{environmentStatusLabel(selectedEnvironment)}</span>
-                <span class="manager-chip">{environmentSelectionModeLabel(selectedEnvironment)}</span>
-                <span class={`manager-chip ${selectedEnvironmentSceneState.className}`}>{selectedEnvironmentSceneState.label}</span>
-              </div>
-            </div>
-
-            <p class="manager-muted">
-              {truncateDescription(selectedEnvironment.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-            </p>
-          </section>
-
-          <section class="manager-inspector-card">
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.Details', 'Environment details')}</h3>
-            <div class="manager-fact-grid">
-              {#each selectedEnvironmentFacts as fact (fact.id)}
-                <div class="manager-fact" data-environment-fact={fact.id}>
-                  <span class="manager-fact-line"><strong>{fact.value}</strong> <span class="manager-fact-label">{fact.label}</span></span>
-                </div>
-              {/each}
-              {#if selectedEnvironment.sceneUuid}
-                <div class="manager-fact" data-environment-fact="scene">
-                  <span class="manager-fact-line"><strong>{selectedEnvironmentSceneState.name || selectedEnvironment.sceneUuid}</strong> <span class="manager-fact-label">{text('FABRICATE.Admin.Manager.Environment.Scene', 'Scene')}</span></span>
-                </div>
-              {/if}
-            </div>
-          </section>
-
-          {#if environmentDirtyFor(selectedEnvironment) || environmentInvalidFor(selectedEnvironment) || $viewState.environmentSaveError}
-            <section class="manager-inspector-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Environment.DraftState', 'Draft state')}</h3>
-              <div class="manager-feature-list">
-                {#if environmentDirtyFor(selectedEnvironment)}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Environment.Dirty', 'Unsaved')}</span>
-                {/if}
-                {#if environmentInvalidFor(selectedEnvironment)}
-                  <span class="manager-chip is-danger">{text('FABRICATE.Admin.Manager.Environment.ValidationCount', '{count} validation issues').replace('{count}', environmentValidationCount)}</span>
-                {/if}
-              </div>
-              {#if $viewState.environmentSaveError}
-                <p class="manager-muted">{$viewState.environmentSaveError}</p>
-              {/if}
-            </section>
-          {/if}
-
-        {:else if environmentList.length === 0}
-          <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.Environment.EmptySetup.Title', 'Plan gathering content')}>
-            <div class="manager-setup-card-header">
-              <i class="fas fa-seedling" aria-hidden="true"></i>
-              <div>
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Kicker', 'Gathering setup')}</p>
-                <h3>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Title', 'Plan gathering content')}</h3>
-              </div>
-            </div>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Hint', 'Gathering tasks and events give environments consistent activities, risks, and rewards across gathering locations.')}</p>
-            <ol class="manager-setup-list">
-              <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepTasks', 'Define gathering tasks with their checks, timing, result groups, and failure outcomes.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepEvents', 'Prepare event options that can be reused across your locations.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.StepCreate', 'Create environments after the gathering task and event libraries are ready to attach.')}</li>
-            </ol>
-            <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Environment.EmptySetup.Resources', 'Environment resources')}>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/gathering-environments" target="_blank" rel="noreferrer">
-                <i class="fas fa-book-open" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.GatheringDocs', 'Gathering docs')}</span>
-              </a>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
-                <i class="fas fa-circle-question" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Environment.EmptySetup.Quickstart', 'Quickstart')}</span>
-              </a>
-            </div>
-          </section>
-        {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-seedling" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Environment.SelectEnvironment', 'Select an environment')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Environment.InspectorHint', 'The inspector shows scene imagery, task evidence, draft state, and existing actions for the selected row.')}</p>
-            </div>
-          </div>
-        {/if}
-      {:else if currentView === 'essences' || currentView === 'essence-edit'}
-        {#if selectedEssenceForInspector}
-          <section class="manager-inspector-card">
-            <div class="manager-inspector-title-row is-hero-large">
-              <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-                <i class={selectedEssenceForInspector.icon || 'fas fa-mortar-pestle'}></i>
-              </span>
-              <div class="manager-inspector-copy">
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.Selected', 'Selected essence')}</p>
-                <h2 class="manager-inspector-name" title={selectedEssenceForInspector.name}>{selectedEssenceForInspector.name}</h2>
-                <div class="manager-chip-row">
-                  {#if selectedEssenceForInspector.deleteBlocked}
-                    <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.DeleteBlockedShort', 'In use')}</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-            <p class="manager-muted">
-              {truncateDescription(selectedEssenceForInspector.description) || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-            </p>
-          </section>
-
-          {#if currentView === 'essence-edit' && (essenceEditDirty || essenceEditSaving)}
-            <section class="manager-inspector-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.DraftState', 'Draft state')}</h3>
-              <div class="manager-feature-list">
-                {#if essenceEditDirty}
-                  <span class="manager-chip is-warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</span>
-                {/if}
-                {#if essenceEditSaving}
-                  <span class="manager-chip">{text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...')}</span>
-                {/if}
+                </a>
               </div>
             </section>
-          {/if}
-
-          {#if showEssenceSourceUi && currentView !== 'essence-edit'}
-          <section class="manager-inspector-card" data-essence-section="source">
-            <div class="manager-edit-card-heading">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}</h3>
-            </div>
-            {#if selectedEssenceForInspector.associatedItem}
-              <div class="manager-essence-source-summary manager-essence-inspector-source-summary">
-                <img class="manager-essence-source-thumb" src={selectedEssenceForInspector.associatedItem.img || 'icons/svg/item-bag.svg'} alt="" />
-                <div class="manager-essence-source-copy">
-                  <strong>{selectedEssenceForInspector.associatedItem.name || selectedEssenceForInspector.sourceName}</strong>
-                </div>
-              </div>
-              <div class="manager-essence-inspector-source-actions">
-                <button type="button" class="manager-button" data-essence-action="copy-source" title={selectedEssenceSourceUuid() || text('FABRICATE.Admin.Manager.Essence.SourceNoUuid', 'This component has no source item UUID.')} disabled={!selectedEssenceSourceUuid()} onclick={copySelectedEssenceSource}>
-                  <i class="fas fa-copy" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Essence.CopySource', 'Copy source UUID')}</span>
-                </button>
-                <button type="button" class="manager-button is-warning-action" data-essence-action="unlink-source" onclick={unlinkSelectedEssenceSource}>
-                  <i class="fas fa-unlink" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Manager.Essence.UnlinkSource', 'Unlink Source')}</span>
-                </button>
-              </div>
-            {:else}
-              <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">
-                <EssenceSourceSelector
-                  value={null}
-                  items={selectedSystem?.managedItemOptions || []}
-                  onDrop={handleInspectorEssenceSourceDrop}
-                  onSelect={handleInspectorEssenceSourceSelect}
-                  onClear={() => updateSelectedEssenceSource(null)}
-                />
-              </div>
-            {/if}
-          </section>
-          {/if}
-
-          <section class="manager-inspector-card" data-essence-section="usage">
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</h3>
-            <div class="manager-requirements-list">
-              <div class="manager-requirement-row">
-                <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
-                <strong>{text('FABRICATE.Admin.Manager.Essence.ComponentUsageCount', '{count} components').replace('{count}', selectedEssenceForInspector.componentUsageCount || 0)}</strong>
-              </div>
-            </div>
-            {#if Array.isArray(selectedEssenceForInspector.componentUsageItems) && selectedEssenceForInspector.componentUsageItems.length > 0}
-              <div class="manager-essence-usage-grid" aria-label={text('FABRICATE.Admin.Manager.Essence.ComponentUsageGrid', 'Components using this essence')}>
-                {#each selectedEssenceForInspector.componentUsageItems as component (component.id)}
-                  <button type="button" class="manager-essence-usage-item" title={component.name} aria-label={text('FABRICATE.Admin.Manager.Component.EditNamed', 'Edit {name}').replace('{name}', component.name)} onclick={() => editComponent(component.id)}>
-                    <img src={componentImage(component)} alt="" />
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </section>
-
-          {#if selectedEssenceForInspector.deleteBlocked}
-            <section class="manager-inspector-card">
-              <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Essence.UsageBlockedTitle', 'Deletion blocked')}</h3>
-              <p class="manager-muted">{text('FABRICATE.Admin.Manager.Essence.UsageBlockedHint', 'Remove this essence from components before deleting the definition.')}</p>
-            </section>
-          {/if}
-
-        {:else if currentView === 'essences' && essenceCards.length === 0}
-          <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.Essence.EmptySetup.Title', 'Set up essences')}>
-            <div class="manager-setup-card-header">
-              <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-              <div>
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Essence.EmptySetup.Kicker', 'Essence setup')}</p>
-                <h3>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.Title', 'Set up essences')}</h3>
-              </div>
-            </div>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Essence.EmptySetup.Hint', 'Create the first essence definition for this system, then assign quantities to components that should contribute that essence.')}</p>
-            <ol class="manager-setup-list">
-              <li>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.StepCreate', 'Create an essence with a clear name, icon, and description.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.StepAssign', 'Edit components to assign essence quantities that recipes can require.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.StepTransfer', 'If effect transfer is enabled, link source components whose effects should carry to crafted results.')}</li>
-            </ol>
-            <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Essence.EmptySetup.Resources', 'Essence resources')}>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/essences" target="_blank" rel="noreferrer">
-                <i class="fas fa-book-open" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.EssenceDocs', 'Essence docs')}</span>
-              </a>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/effect-transfer" target="_blank" rel="noreferrer">
-                <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Essence.EmptySetup.EffectTransferDocs', 'Effect transfer')}</span>
-              </a>
-            </div>
-          </section>
-        {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-mortar-pestle" aria-hidden="true"></i>
-              <h3>{currentView === 'essence-edit'
+          {:else}
+            <EmptyState
+              icon="fas fa-mortar-pestle"
+              title={currentView === 'essence-edit'
                 ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorTitle', 'New essence draft')
-                : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}</h3>
-              <p>{currentView === 'essence-edit'
-                ? text('FABRICATE.Admin.Manager.Essence.CreateInspectorHint', 'The inspector will show the essence ID after the draft is saved.')
+                : text('FABRICATE.Admin.Manager.Essence.SelectEssence', 'Select an essence')}
+              hint={currentView === 'essence-edit'
+                ? text(
+                    'FABRICATE.Admin.Manager.Essence.CreateInspectorHint',
+                    'The inspector will show the essence ID after the draft is saved.'
+                  )
                 : showEssenceSourceUi
-                ? text('FABRICATE.Admin.Manager.Essence.InspectorHint', 'The inspector shows source linkage and component usage for the selected essence.')
-                : text('FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint', 'The inspector shows identity and component usage for the selected essence.')}</p>
-            </div>
-          </div>
-        {/if}
-      {:else if currentView === 'components'}
-        {#if selectedComponent}
-          <ComponentBrowserInspector
-            {selectedComponent}
-            showTags={showComponentTags}
-            showEssences={showComponentEssences}
-            onEdit={() => editComponent(selectedComponent?.id)}
-            onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
-            onUnlink={(id) => unlinkComponentSource(id)}
-            onDelete={(id) => deleteComponent(id)}
-          />
-        {:else if itemCards.length === 0}
-          <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.Component.EmptySetup.Title', 'Set up components')}>
-            <div class="manager-setup-card-header">
-              <i class="fas fa-box-open" aria-hidden="true"></i>
-              <div>
-                <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Component.EmptySetup.Kicker', 'Component setup')}</p>
-                <h3>{text('FABRICATE.Admin.Manager.Component.EmptySetup.Title', 'Set up components')}</h3>
+                  ? text(
+                      'FABRICATE.Admin.Manager.Essence.InspectorHint',
+                      'The inspector shows source linkage and component usage for the selected essence.'
+                    )
+                  : text(
+                      'FABRICATE.Admin.Manager.Essence.InspectorNoSourceHint',
+                      'The inspector shows identity and component usage for the selected essence.'
+                    )}
+            />
+          {/if}
+        {:else if currentView === 'components'}
+          <!--
+          The bulk panel REPLACES the single-component inspector while the selection is
+          non-empty (issue 772) — the prototype's `bulkOn` / `bulkOff` swap, at its
+          `> 0` threshold. It sits FIRST so it wins over `selectedComponent`, which is
+          always truthy once the library has rows. The setup card below cannot be masked by
+          it: an empty `itemCards` forces an empty pruned selection.
+        -->
+          {#if componentBulkSelectionCount > 0}
+            <ComponentBulkEditPanel
+              count={componentBulkSelectionCount}
+              categoryOptions={componentBulkCategoryOptions}
+              tags={selectedSystem?.itemTags || []}
+              showEssences={selectedSystem?.features?.essences === true}
+              essenceDefinitions={selectedSystem?.essenceDefinitions || []}
+              showProgressiveDifficulty={componentDifficultyAxisProgressive}
+              selectedCards={componentBulkSelectedCards}
+              draft={componentBulkDraft}
+              applying={componentBulkApplying}
+              onDraftChange={(next) => stageComponentBulkDraft(next)}
+              onClearSelection={() => clearComponentBulkSelection()}
+              onApply={() => applyComponentBulkEdit()}
+            />
+          {:else if selectedComponent}
+            <ComponentBrowserInspector
+              {selectedComponent}
+              showTags={showComponentTags}
+              showEssences={showComponentEssences}
+              onEdit={() => editComponent(selectedComponent?.id)}
+              onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
+              onUnlink={(id) => unlinkComponentSource(id)}
+              onDelete={(id) => deleteComponent(id)}
+            />
+          {:else if itemCards.length === 0}
+            <section
+              class="manager-setup-card"
+              aria-label={text(
+                'FABRICATE.Admin.Manager.Component.EmptySetup.Title',
+                'Set up components'
+              )}
+            >
+              <div class="manager-setup-card-header">
+                <i class="fas fa-box-open" aria-hidden="true"></i>
+                <div>
+                  <p class="manager-kicker">
+                    {text('FABRICATE.Admin.Manager.Component.EmptySetup.Kicker', 'Component setup')}
+                  </p>
+                  <h3>
+                    {text(
+                      'FABRICATE.Admin.Manager.Component.EmptySetup.Title',
+                      'Set up components'
+                    )}
+                  </h3>
+                </div>
               </div>
-            </div>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Component.EmptySetup.Hint', 'Import item-backed components before recipes can reference ingredients, tools, results, or essence sources.')}</p>
-            <ol class="manager-setup-list">
-              <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepImport', 'Drop world, compendium, pack, or folder items into the component browser.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepOrganize', 'Add tags, essences, source links, and difficulty metadata where the selected system uses them.')}</li>
-              <li>{text('FABRICATE.Admin.Manager.Component.EmptySetup.StepRecipes', 'Use the managed components as recipe requirements, tools, and results.')}</li>
-            </ol>
-            <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.Component.EmptySetup.Resources', 'Component resources')}>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/crafting-systems#components" target="_blank" rel="noreferrer">
-                <i class="fas fa-book-open" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Component.EmptySetup.ComponentDocs', 'Component docs')}</span>
-              </a>
-              <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
-                <i class="fas fa-circle-question" aria-hidden="true"></i>
-                <span>{text('FABRICATE.Admin.Manager.Component.EmptySetup.Quickstart', 'Quickstart')}</span>
-              </a>
-            </div>
-          </section>
-        {:else}
-          <div class="manager-empty">
-            <div>
-              <i class="fas fa-boxes" aria-hidden="true"></i>
-              <h3>{text('FABRICATE.Admin.Manager.Component.SelectComponent', 'Select a component')}</h3>
-              <p>{text('FABRICATE.Admin.Manager.Component.InspectorHint', 'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.')}</p>
-            </div>
-          </div>
-        {/if}
-      {:else if currentView === 'recipes'}
-        <RecipeBrowserInspector
-          {selectedRecipe}
-          resolutionMode={selectedSystem?.resolutionMode || 'simple'}
-          outcomeTiers={recipeAllOutcomeTierOptions}
-          recipeCount={($viewState.recipes || []).length}
-          componentCount={selectedCounts.components}
-          componentOptions={selectedSystem?.managedItemOptions || []}
-          essenceOptions={selectedSystem?.features?.essences ? (selectedSystem?.essenceDefinitions || []) : []}
-          {showRecipeCategories}
-          showVisibilitySummary={$viewState.showVisibilitySummary}
-          onEdit={() => editRecipe(selectedRecipe?.id)}
-          onDuplicate={() => duplicateRecipe()}
-          onDelete={() => deleteRecipe()}
-          onAddComponents={() => setView('components')}
-        />
-      {:else if currentView === 'tools'}
-        <ToolBrowserInspector
-          tool={selectedLibraryTool}
-          managedItems={selectedSystem?.managedItemOptions || []}
-          prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
-          authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
-          onEdit={openToolEditor}
-        />
-      {:else if currentView === 'component-edit'}
-        <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single
+              <p class="manager-muted">
+                {text(
+                  'FABRICATE.Admin.Manager.Component.EmptySetup.Hint',
+                  'Import item-backed components before recipes can reference ingredients, tools, results, or essence sources.'
+                )}
+              </p>
+              <ol class="manager-setup-list">
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Component.EmptySetup.StepImport',
+                    'Drop world, compendium, pack, or folder items into the component browser.'
+                  )}
+                </li>
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Component.EmptySetup.StepOrganize',
+                    'Add tags, essences, source links, and difficulty metadata where the selected system uses them.'
+                  )}
+                </li>
+                <li>
+                  {text(
+                    'FABRICATE.Admin.Manager.Component.EmptySetup.StepRecipes',
+                    'Use the managed components as recipe requirements, tools, and results.'
+                  )}
+                </li>
+              </ol>
+              <div
+                class="manager-setup-links"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.Component.EmptySetup.Resources',
+                  'Component resources'
+                )}
+              >
+                <a
+                  class="manager-button"
+                  href="https://mistersilver-uk.github.io/fabricate/crafting-systems#components"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <i class="fas fa-book-open" aria-hidden="true"></i>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Component.EmptySetup.ComponentDocs',
+                      'Component docs'
+                    )}</span
+                  >
+                </a>
+                <a
+                  class="manager-button"
+                  href="https://mistersilver-uk.github.io/fabricate/quickstart"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <i class="fas fa-circle-question" aria-hidden="true"></i>
+                  <span
+                    >{text(
+                      'FABRICATE.Admin.Manager.Component.EmptySetup.Quickstart',
+                      'Quickstart'
+                    )}</span
+                  >
+                </a>
+              </div>
+            </section>
+          {:else}
+            <EmptyState
+              icon="fas fa-boxes"
+              title={text(
+                'FABRICATE.Admin.Manager.Component.SelectComponent',
+                'Select a component'
+              )}
+              hint={text(
+                'FABRICATE.Admin.Manager.Component.InspectorHint',
+                'The inspector shows component identity, origin, tags, essences, and source copy context for the selected row.'
+              )}
+            />
+          {/if}
+        {:else if currentView === 'recipes'}
+          <!--
+          The bulk panel REPLACES the single-recipe inspector while the selection is
+          non-empty (issue 1010), at the same `> 0` threshold the Component Studio uses. It
+          sits FIRST so it wins over `selectedRecipe`, which is always truthy once the
+          library has rows.
+        -->
+          {#if recipeBulkSelectionCount > 0}
+            <RecipeBulkEditPanel
+              count={recipeBulkSelectionCount}
+              categoryOptions={recipeBulkCategoryOptions}
+              checkTierAxis={recipeBulkCheckTierAxis}
+              checkTierOptions={recipeCheckTierOptions}
+              books={recipeItemDefinitions}
+              bookMembership={recipeBulkBookMembership}
+              blockedCount={recipeBulkBlockedCount}
+              draft={recipeBulkDraft}
+              applying={recipeBulkApplying}
+              onDraftChange={(next) => stageRecipeBulkDraft(next)}
+              onClearSelection={() => clearRecipeBulkSelection()}
+              onApply={() => applyRecipeBulkEdit()}
+            />
+          {:else}
+            <RecipeBrowserInspector
+              {selectedRecipe}
+              resolutionMode={selectedSystem?.resolutionMode || 'simple'}
+              outcomeTiers={recipeAllOutcomeTierOptions}
+              recipeCount={($viewState.recipes || []).length}
+              componentCount={selectedCounts.components}
+              componentOptions={selectedSystem?.managedItemOptions || []}
+              essenceOptions={selectedSystem?.features?.essences
+                ? selectedSystem?.essenceDefinitions || []
+                : []}
+              {showRecipeCategories}
+              showVisibilitySummary={$viewState.showVisibilitySummary}
+              onEdit={() => editRecipe(selectedRecipe?.id)}
+              onDuplicate={() => duplicateRecipe()}
+              onDelete={() => deleteRecipe()}
+              onAddComponents={() => setView('components')}
+            />
+          {/if}
+        {:else if currentView === 'tools'}
+          <ToolBrowserInspector
+            tool={selectedLibraryTool}
+            managedItems={selectedSystem?.managedItemOptions || []}
+            prerequisiteOptions={selectedSystem?.characterPrerequisites || []}
+            authority={selectedSystem?.toolBreakage?.authority || 'toolSpecific'}
+            onEdit={openToolEditor}
+          />
+        {:else if currentView === 'component-edit'}
+          <!-- NO RIGHT RAIL (issue 676, decision 4). The component editor is a single
              scrolling column: the source actions rehomed into the identity strip and
              the progressive-difficulty control into the body, both inside
              ComponentEditView. Nothing was lost — see ComponentIdentityStrip. -->
-      {:else if currentView === 'access'}
-        <GrantAccessInspector
-          recipe={selectedRecipeForAccess}
-          characters={store.getPcRoster?.() || []}
-          players={$viewState.worldUsers || []}
-          onSaveAccess={(id, grant) => store.saveRecipeAccess?.(id, grant)}
-        />
-      {:else if currentView === 'books-scrolls'}
-        <ItemPageInspector
-          item={selectedRecipeItem}
-          visibilityMode={craftingVisibilityMode}
-          onOpenRecipeItem={(id) => editRecipeItem(id)}
-          onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
-          onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
-        />
-      {:else if selectedSystem}
-        <section class="manager-inspector-card">
-          <div class="manager-inspector-title-row is-hero-large">
-            <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-              <i class="fas fa-layer-group"></i>
-            </span>
-            <div class="manager-inspector-copy">
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.Column.System', 'System')}</p>
-              <h2 class="manager-inspector-name" title={selectedSystem.name}>{selectedSystem.name}</h2>
-              <div class="manager-chip-row">
-                <span class="manager-chip is-active">{resolutionModeLabel(selectedSystem.resolutionMode)}</span>
-                <span class={`manager-chip ${selectedSystem.enabled === false ? 'is-disabled' : 'is-active'}`}>
-                  {selectedSystem.enabled === false ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled') : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
-                </span>
+        {:else if currentView === 'access'}
+          <GrantAccessInspector
+            recipe={selectedRecipeForAccess}
+            characters={store.getPcRoster?.() || []}
+            players={$viewState.worldUsers || []}
+            onSaveAccess={(id, grant) => store.saveRecipeAccess?.(id, grant)}
+          />
+        {:else if currentView === 'books-scrolls'}
+          <ItemPageInspector
+            item={selectedRecipeItem}
+            visibilityMode={craftingVisibilityMode}
+            onOpenRecipeItem={(id) => editRecipeItem(id)}
+            onToggleEnabled={(id, enabled) => store.setRecipeItemEnabled?.(id, enabled)}
+            onToggleQuickLimit={(id, limited) => toggleRecipeItemQuickLimit(id, limited)}
+          />
+        {:else if selectedSystem}
+          <section class="manager-inspector-card">
+            <div class="manager-inspector-title-row is-hero-large">
+              <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
+                <i class="fas fa-layer-group"></i>
+              </span>
+              <div class="manager-inspector-copy">
+                <p class="manager-kicker">
+                  {text('FABRICATE.Admin.Manager.Column.System', 'System')}
+                </p>
+                <h2 class="manager-inspector-name" title={selectedSystem.name}>
+                  {selectedSystem.name}
+                </h2>
+                <div class="manager-chip-row">
+                  <Chip tone="active">{resolutionModeLabel(selectedSystem.resolutionMode)}</Chip>
+                  <Chip tone={selectedSystem.enabled === false ? 'disabled' : 'active'}>
+                    {selectedSystem.enabled === false
+                      ? text('FABRICATE.Admin.Manager.StatusDisabled', 'Disabled')
+                      : text('FABRICATE.Admin.Manager.StatusActive', 'Active')}
+                  </Chip>
+                </div>
               </div>
             </div>
-          </div>
 
-          <p class="manager-muted">
-            {selectedSystem.description || text('FABRICATE.Admin.Manager.NoDescriptionAdded', 'No description has been added.')}
-          </p>
-        </section>
+            <p class="manager-muted">
+              {selectedSystem.description ||
+                text(
+                  'FABRICATE.Admin.Manager.NoDescriptionAdded',
+                  'No description has been added.'
+                )}
+            </p>
+          </section>
 
-        <section class="manager-inspector-card">
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
-          <div class="manager-fact-grid">
-            {#each selectedCountFacts as fact (fact.id)}
-              {@const labelParts = countLabelParts(fact.label)}
-              <div class="manager-fact" class:is-off={fact.isOff} data-count-id={fact.id}>
-                {#if fact.isOff}
-                  <span class="manager-fact-line">
-                    <span class="manager-fact-label">{fact.label}</span>
-                    <strong class="is-disabled">{fact.value}</strong>
-                  </span>
-                {:else}
-                  <span class="manager-fact-line">
-                    <span class="manager-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-fact-label">{labelParts.rest}</span>{/if}
-                  </span>
-                {/if}
-              </div>
-            {/each}
-          </div>
-        </section>
-
-        <section class="manager-inspector-card" aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}>
-          <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}</h3>
-          {#if enabledFeatureLabels.length > 0}
-            <div class="manager-feature-list">
-              {#each enabledFeatureLabels as feature (feature)}
-                <span class="manager-chip is-active">{feature}</span>
-              {/each}
-            </div>
-          {:else}
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.NoOptionalFeatures', 'No optional features enabled.')}</p>
-          {/if}
-        </section>
-
-        {#if selectedGatheringConditionShortcuts.length > 0}
-          <section class="manager-inspector-card manager-condition-shortcut-card" data-systems-gathering-conditions aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}>
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}</h3>
-            <div class="manager-condition-shortcut-list">
-              {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
-                <label class="manager-field manager-condition-shortcut" data-systems-gathering-condition={condition.kind}>
-                  <span class="manager-condition-shortcut-label">
-                    <i class={condition.icon} aria-hidden="true"></i>
-                    <span>{condition.label}</span>
-                  </span>
-                  <select value={condition.setting.current} onchange={(event) => updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}>
-                    {#each conditionValues(condition.setting) as option (conditionId(option))}
-                      <option value={conditionId(option)}>{conditionLabel(option)}</option>
-                    {/each}
-                  </select>
-                </label>
+          <section class="manager-inspector-card">
+            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Counts', 'Counts')}</h3>
+            <div class="manager-fact-grid">
+              {#each selectedCountFacts as fact (fact.id)}
+                {@const labelParts = countLabelParts(fact.label)}
+                <div class="manager-fact" class:is-off={fact.isOff} data-count-id={fact.id}>
+                  {#if fact.isOff}
+                    <span class="manager-fact-line">
+                      <span class="manager-fact-label">{fact.label}</span>
+                      <strong class="is-disabled">{fact.value}</strong>
+                    </span>
+                  {:else}
+                    <!-- prettier-ignore -->
+                    <span class="manager-fact-line">
+                      <!-- `{' '}` is the separator between the leading span and the trailing label: -->
+                      <!-- a literal space is the first token inside the `{#if}` and Svelte trims -->
+                      <!-- block-leading whitespace, so the two would run together. -->
+                      <!-- The fence above preserves the LINE ANCHOR of the directive below, not -->
+                      <!-- the render (issue 923): Prettier splits the line below across three, -->
+                      <!-- which moves the mustache off the line the directive is anchored to, -->
+                      <!-- and the suppression stops applying. The durable guard for this whole -->
+                      <!-- class is `reportUnusedDisableDirectives: 'error'` in eslint.config.js. -->
+                      <!-- eslint-disable-next-line svelte/no-useless-mustaches -->
+                      <span class="manager-fact-leading"><strong>{fact.value}</strong> {labelParts.lead}</span>{#if labelParts.rest}{' '}<span class="manager-fact-label">{labelParts.rest}</span>{/if}
+                    </span>
+                  {/if}
+                </div>
               {/each}
             </div>
           </section>
-        {/if}
 
-      {:else if systemsLoading}
-        <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}>
-          <div class="manager-setup-card-header">
-            <i class="fas fa-spinner" aria-hidden="true"></i>
-            <div>
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.LoadingSystemsKicker', 'Startup')}</p>
-              <h3>{text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}</h3>
+          <section
+            class="manager-inspector-card"
+            aria-label={text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
+          >
+            <h3 class="manager-card-title">
+              {text('FABRICATE.Admin.Manager.EnabledFeatures', 'Enabled features')}
+            </h3>
+            {#if enabledFeatureLabels.length > 0}
+              <div class="manager-feature-list">
+                {#each enabledFeatureLabels as feature (feature)}
+                  <Chip tone="active">{feature}</Chip>
+                {/each}
+              </div>
+            {:else}
+              <p class="manager-muted">
+                {text(
+                  'FABRICATE.Admin.Manager.NoOptionalFeatures',
+                  'No optional features enabled.'
+                )}
+              </p>
+            {/if}
+          </section>
+
+          {#if selectedGatheringConditionShortcuts.length > 0}
+            <section
+              class="manager-inspector-card manager-condition-shortcut-card"
+              data-systems-gathering-conditions
+              aria-label={text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
+            >
+              <h3 class="manager-card-title">
+                {text('FABRICATE.Admin.Manager.GlobalConditions', 'Global conditions')}
+              </h3>
+              <div class="manager-condition-shortcut-list">
+                {#each selectedGatheringConditionShortcuts as condition (condition.kind)}
+                  <label
+                    class="manager-field manager-condition-shortcut"
+                    data-systems-gathering-condition={condition.kind}
+                  >
+                    <span class="manager-condition-shortcut-label">
+                      <i class={condition.icon} aria-hidden="true"></i>
+                      <span>{condition.label}</span>
+                    </span>
+                    <select
+                      value={condition.setting.current}
+                      onchange={(event) =>
+                        updateSelectedGatheringCondition(condition.kind, event.currentTarget.value)}
+                    >
+                      {#each conditionValues(condition.setting) as option (conditionId(option))}
+                        <option value={conditionId(option)}>{conditionLabel(option)}</option>
+                      {/each}
+                    </select>
+                  </label>
+                {/each}
+              </div>
+            </section>
+          {/if}
+        {:else if systemsLoading}
+          <section
+            class="manager-setup-card"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.LoadingSystems',
+              'Loading crafting systems...'
+            )}
+          >
+            <div class="manager-setup-card-header">
+              <i class="fas fa-spinner" aria-hidden="true"></i>
+              <div>
+                <p class="manager-kicker">
+                  {text('FABRICATE.Admin.Manager.LoadingSystemsKicker', 'Startup')}
+                </p>
+                <h3>
+                  {text('FABRICATE.Admin.Manager.LoadingSystems', 'Loading crafting systems...')}
+                </h3>
+              </div>
             </div>
-          </div>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.LoadingSystemsHint', 'Fabricate is finishing startup before the system library is shown.')}</p>
-        </section>
-      {:else if ($viewState.systems || []).length === 0}
-        <section class="manager-setup-card" aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Title', 'Set up your first system')}>
-          <div class="manager-setup-card-header">
-            <i class="fas fa-compass" aria-hidden="true"></i>
-            <div>
-              <p class="manager-kicker">{text('FABRICATE.Admin.Manager.EmptySetup.Kicker', 'First run')}</p>
-              <h3>{text('FABRICATE.Admin.Manager.EmptySetup.Title', 'Set up your first system')}</h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.LoadingSystemsHint',
+                'Fabricate is finishing startup before the system library is shown.'
+              )}
+            </p>
+          </section>
+        {:else if ($viewState.systems || []).length === 0}
+          <section
+            class="manager-setup-card"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.EmptySetup.Title',
+              'Set up your first system'
+            )}
+          >
+            <div class="manager-setup-card-header">
+              <i class="fas fa-compass" aria-hidden="true"></i>
+              <div>
+                <p class="manager-kicker">
+                  {text('FABRICATE.Admin.Manager.EmptySetup.Kicker', 'First run')}
+                </p>
+                <h3>
+                  {text('FABRICATE.Admin.Manager.EmptySetup.Title', 'Set up your first system')}
+                </h3>
+              </div>
             </div>
-          </div>
-          <p class="manager-muted">{text('FABRICATE.Admin.Manager.EmptySetup.Hint', 'Create a crafting system, add item-backed components, then build recipes from those components.')}</p>
-          <ol class="manager-setup-list">
-            <li>{text('FABRICATE.Admin.Manager.EmptySetup.StepSystem', 'Create a system for one crafting discipline or ruleset.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.EmptySetup.StepComponents', 'Import world or compendium items as reusable components.')}</li>
-            <li>{text('FABRICATE.Admin.Manager.EmptySetup.StepRecipes', 'Add recipes that consume components and award results.')}</li>
-          </ol>
-          <div class="manager-setup-links" aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}>
-            <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate/quickstart" target="_blank" rel="noreferrer">
-              <i class="fas fa-book-open" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.EmptySetup.Quickstart', 'Quickstart')}</span>
-            </a>
-            <a class="manager-button" href="https://mistersilver-uk.github.io/fabricate" target="_blank" rel="noreferrer">
-              <i class="fas fa-circle-question" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.EmptySetup.Docs', 'Docs')}</span>
-            </a>
-          </div>
-        </section>
-      {:else}
-        <div class="manager-empty">
-          <div>
-            <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
-            <h3>{text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}</h3>
-            <p>{text('FABRICATE.Admin.Manager.InspectorHint', 'The inspector shows counts, resolution mode, and enabled features for the selected system.')}</p>
-          </div>
-        </div>
-      {/if}
-    </aside>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.EmptySetup.Hint',
+                'Create a crafting system, add item-backed components, then build recipes from those components.'
+              )}
+            </p>
+            <ol class="manager-setup-list">
+              <li>
+                {text(
+                  'FABRICATE.Admin.Manager.EmptySetup.StepSystem',
+                  'Create a system for one crafting discipline or ruleset.'
+                )}
+              </li>
+              <li>
+                {text(
+                  'FABRICATE.Admin.Manager.EmptySetup.StepComponents',
+                  'Import world or compendium items as reusable components.'
+                )}
+              </li>
+              <li>
+                {text(
+                  'FABRICATE.Admin.Manager.EmptySetup.StepRecipes',
+                  'Add recipes that consume components and award results.'
+                )}
+              </li>
+            </ol>
+            <div
+              class="manager-setup-links"
+              aria-label={text('FABRICATE.Admin.Manager.EmptySetup.Resources', 'Resources')}
+            >
+              <a
+                class="manager-button"
+                href="https://mistersilver-uk.github.io/fabricate/quickstart"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <i class="fas fa-book-open" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.EmptySetup.Quickstart', 'Quickstart')}</span>
+              </a>
+              <a
+                class="manager-button"
+                href="https://mistersilver-uk.github.io/fabricate"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <i class="fas fa-circle-question" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Manager.EmptySetup.Docs', 'Docs')}</span>
+              </a>
+            </div>
+          </section>
+        {:else}
+          <EmptyState
+            icon="fas fa-arrow-pointer"
+            title={text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
+            hint={text(
+              'FABRICATE.Admin.Manager.InspectorHint',
+              'The inspector shows counts, resolution mode, and enabled features for the selected system.'
+            )}
+          />
+        {/if}
+      </aside>
     {/if}
   </div>
 
@@ -7261,6 +10639,12 @@
     itemTags={selectedSystem?.itemTags || []}
     onAddCategory={addComponentCategory}
     onCommit={commitImportFolderMapping}
-    onClose={() => importMappingOpen = false}
+    onClose={() => (importMappingOpen = false)}
+  />
+
+  <ImportReportModal
+    open={importReportContent !== null}
+    content={importReportContent}
+    onClose={() => (importReportContent = null)}
   />
 </div>

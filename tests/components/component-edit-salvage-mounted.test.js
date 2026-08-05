@@ -52,12 +52,22 @@ const harness = createMountedComponentHarness({
   // component under test must be listed here too — the harness imports `componentPath`
   // from the temp tree but only compiles what `compiledModules` names.
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+    // the harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/SearchablePopover.svelte',
     // The salvage result quantity + the progressive DC are the shared Stepper (issue
     // 676). Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and
     // the suite HANGS (# cancelled) rather than failing.
     'src/ui/svelte/components/Stepper.svelte',
+    // The shared essence quantity card (issue 772). `ComponentEditView` renders it after
+    // the extraction, so it is in this tree's static import closure whether or not a given
+    // test turns the essences section on.
+    'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
     'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
     'src/ui/svelte/apps/manager/ComponentEditView.svelte',
   ],
@@ -532,6 +542,131 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     );
     const groups = target.querySelectorAll('[data-salvage-group]');
     assert.equal(groups.length, 2, 'both the success and the reserved failure rows render (data not blanked)');
+    harness.remount();
+  });
+});
+
+/*
+ * Issue 772, acceptance 15 — the editor's essences section after the extraction.
+ *
+ * Until this block existed the editor's essence card had NO seam anywhere: none of
+ * `data-component-edit-essence`, `data-component-essence-active`, the retired quantity
+ * class or the Increment/Decrement/Quantity aria labels appeared in a single file under
+ * `tests/`, and no step in `scripts/foundry-test-run.mjs` drove them. So extracting the
+ * card into `EssenceQuantityCard` and replacing its raw `<input type="number">` +
+ * `manager-icon-button` −/+ with the shared `Stepper` broke nothing AND proved nothing,
+ * while changing the keyboard, clamp and commit behaviour of the control underneath.
+ *
+ * This lands the seam rather than the coverage gap: the card still READS a persisted
+ * quantity, still INCREMENTS, still DECREMENTS and still CLEARS, and each of those still
+ * reaches the draft the parent saves.
+ *
+ * It lives in this suite because this suite already mounts `ComponentEditView` and already
+ * carries the compiled-module entry the extraction forces; a fourth `ComponentEditView`
+ * harness would be a fourth copy of the same 40-line setup.
+ */
+describe('ComponentEditView — the extracted essence quantity card (issue 772)', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+
+  const ESSENCES = [
+    { id: 'fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
+    { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', quantity: 0 },
+  ];
+
+  const ESSENCE_OVERRIDES = { showEssences: true, essenceOptions: ESSENCES };
+  const essenceProps = (overrides = {}) => props({ ...ESSENCE_OVERRIDES, ...overrides });
+
+  const cardFor = (target, id) => target.querySelector(`[data-component-edit-essence="${id}"]`);
+  const stepperInput = (essenceCard) => essenceCard.querySelector('[data-stepper-input]');
+
+  it('reads each persisted quantity and tints the untouched card', async () => {
+    const target = await harness.mount(essenceProps());
+
+    const fire = cardFor(target, 'fire');
+    const earth = cardFor(target, 'earth');
+    assert.ok(fire && earth, 'one card per system essence');
+
+    // The value is READ from the component, not defaulted. A card that renders 0 for a
+    // persisted 2 would save a silent clear on the next unrelated edit.
+    assert.equal(stepperInput(fire).value, '2');
+    assert.equal(stepperInput(earth).value, '0');
+
+    // The contributed/untouched tint and its hook survive the extraction.
+    assert.equal(fire.getAttribute('data-component-essence-active'), 'true');
+    assert.equal(fire.classList.contains('is-active'), true);
+    assert.equal(earth.getAttribute('data-component-essence-active'), 'false');
+    assert.equal(earth.classList.contains('is-inactive'), true);
+
+    // The identity half is still identity-FIRST, with the essence's own icon.
+    assert.equal(fire.querySelector('.manager-component-essence-name').textContent, 'Fire');
+    assert.ok(fire.querySelector('.manager-component-essence-icon i.fa-fire'));
+
+    harness.remount();
+  });
+
+  it('increments, decrements and clears through the shared stepper, and the draft follows', async () => {
+    const { drafts, props: mountProps } = trackDirty(ESSENCE_OVERRIDES);
+    const target = await harness.mount(mountProps);
+
+    const earth = cardFor(target, 'earth');
+    earth.querySelector('[data-stepper-increment]').click();
+    await flushRender();
+    assert.equal(stepperInput(cardFor(target, 'earth')).value, '1');
+    assert.equal(
+      drafts.at(-1).updates.essences.earth,
+      1,
+      'an increment reaches the essences map the parent saves'
+    );
+    assert.equal(cardFor(target, 'earth').classList.contains('is-active'), true);
+
+    const fire = cardFor(target, 'fire');
+    fire.querySelector('[data-stepper-decrement]').click();
+    await flushRender();
+    assert.equal(stepperInput(cardFor(target, 'fire')).value, '1');
+    assert.equal(drafts.at(-1).updates.essences.fire, 1);
+
+    // Clearing to zero DROPS the key rather than persisting a zero, which is what
+    // `buildUpdates` has always done — and the card recedes again.
+    cardFor(target, 'fire').querySelector('[data-stepper-decrement]').click();
+    await flushRender();
+    assert.equal(stepperInput(cardFor(target, 'fire')).value, '0');
+    assert.equal(
+      Object.hasOwn(drafts.at(-1).updates.essences, 'fire'),
+      false,
+      'a cleared essence leaves the map, it is not stored as 0'
+    );
+    assert.equal(cardFor(target, 'fire').classList.contains('is-inactive'), true);
+
+    harness.remount();
+  });
+
+  it('clamps at zero and accepts a typed quantity', async () => {
+    const { drafts, props: mountProps } = trackDirty(ESSENCE_OVERRIDES);
+    const target = await harness.mount(mountProps);
+
+    // `Stepper` disables − at its `min`, so a zero card cannot be driven negative. This is
+    // the behaviour the raw `<input type="number">` did NOT have: `min="0"` is advisory on
+    // a typed entry and the old −/+ buttons clamped in the view's own handler instead.
+    assert.equal(cardFor(target, 'earth').querySelector('[data-stepper-decrement]').disabled, true);
+
+    const input = stepperInput(cardFor(target, 'earth'));
+    input.value = '4';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushRender();
+    assert.equal(drafts.at(-1).updates.essences.earth, 4, 'a typed quantity commits');
+    assert.equal(drafts.at(-1).essenceCount, 2, 'and both essences now count as contributed');
+
+    harness.remount();
+  });
+
+  it('disables every card while the editor is saving', async () => {
+    const target = await harness.mount(essenceProps({ saving: true }));
+    for (const id of ['fire', 'earth']) {
+      const essenceCard = cardFor(target, id);
+      assert.equal(stepperInput(essenceCard).disabled, true);
+      assert.equal(essenceCard.querySelector('[data-stepper-increment]').disabled, true);
+    }
     harness.remount();
   });
 });

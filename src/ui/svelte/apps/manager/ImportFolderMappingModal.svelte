@@ -5,8 +5,11 @@
   lets the GM assign (or inline-create) a category and/or tags per folder — or skip a
   folder — before importing.
 
-  The modal is portaled to `.fabricate-manager` with the Manager's dim overlay and
-  Escape / outside-click dismissal. Each per-folder row mirrors the compact
+  The dialog chrome — portal into `.fabricate-manager`, centring, the compact title +
+  subtitle, the round close control, and the footer rail — comes from the shared
+  `ManagerModal` primitive (issue 877), so this modal and the post-import reference
+  report are ONE implementation of "manager modal dialog" rather than two. This file
+  owns only the mapping body. Each per-folder row mirrors the compact
   RecipeRoutingAssignment + SearchablePopover "assign X per Y" pattern: a folder name, a
   `tabular-nums` item-count badge, a category `<select>` with an inline "＋ New" (the
   shared InlineVocabularyAdd), a tags multi-assign (RecipeRoutingAssignment chips +
@@ -17,12 +20,13 @@
   as folders are skipped (a skipped folder's items are excluded from the import).
 -->
 <script>
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
-  import { portal } from '../../actions/portal.js';
+  import Chip from './Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { matchFolderNameToVocabulary } from '../../../../utils/matchFolderVocabulary.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
+  import ManagerModal from './ManagerModal.svelte';
   import RecipeRoutingAssignment from './recipe/RecipeRoutingAssignment.svelte';
+  import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
 
   let {
     open = false,
@@ -45,7 +49,6 @@
   let assignments = $state([]);
   let matchByName = $state(true);
   let creatingCategoryFor = $state(-1);
-  let dialogRoot = $state(null);
   let matchToggle = $state(null);
 
   function text(key, fallback) {
@@ -107,11 +110,6 @@
     }
   });
 
-  function getHost() {
-    if (typeof document === 'undefined') return null;
-    return document.querySelector('.fabricate-manager') || document.body;
-  }
-
   // The reserved General bucket leads; custom categories follow. General's value is ''
   // (no explicit category assignment) — imported components already default to general.
   const categorySelectOptions = $derived([
@@ -133,8 +131,14 @@
   );
   const importDisabled = $derived(importCount === 0);
 
-  function tagOptionsFor(state) {
-    // Existing tags not yet assigned to this row (RecipeRoutingAssignment shape).
+  // Every existing tag, in the RecipeRoutingAssignment shape. Handing over the UNFILTERED
+  // list IS that component's contract: it takes `options` (the full candidate list) beside
+  // `selectedIds` and derives its own picker from the pair, dropping what is already selected
+  // here or disabled elsewhere. Do not filter here — it would be a second, divergent copy of
+  // that rule, and it would break the selected chips, whose labels resolve each selected id
+  // back through `options`. The `_state` parameter is vestigial: the row contributes nothing
+  // to the mapping.
+  function tagOptionsFor(_state) {
     return (itemTags || []).map((tag) => ({ id: tag, name: `#${tag}` }));
   }
 
@@ -223,233 +227,208 @@
   }
 </script>
 
-{#if open}
-  <div class="manager-import-mapping-overlay" data-import-mapping-overlay>
-    <div
-      class="manager-import-mapping-dialog"
-      bind:this={dialogRoot}
-      role="dialog"
-      aria-modal="true"
-      aria-label={text('FABRICATE.Admin.Items.ImportMapping.Title', 'Categorize imported folders')}
-      data-import-mapping
-      use:portal={() => getHost()}
-      use:dismissOnOutsideClick={{ enabled: open, onDismiss: onClose }}
-    >
-      <div class="manager-import-mapping-header">
-        <div class="manager-import-mapping-heading">
-          <h3 class="manager-import-mapping-title">
-            {text('FABRICATE.Admin.Items.ImportMapping.Title', 'Categorize imported folders')}
-          </h3>
-          <p class="manager-import-mapping-subtitle manager-muted">
-            {text(
-              'FABRICATE.Admin.Items.ImportMapping.Subtitle',
-              'Assign a category and tags to each detected folder, or skip it.'
-            )}
-          </p>
-        </div>
-        <button
-          type="button"
-          class="manager-icon-button"
-          data-import-mapping-close
-          aria-label={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
-          onclick={() => onClose()}
+<ManagerModal
+  {open}
+  title={text('FABRICATE.Admin.Items.ImportMapping.Title', 'Categorize imported folders')}
+  subtitle={text(
+    'FABRICATE.Admin.Items.ImportMapping.Subtitle',
+    'Assign a category and tags to each detected folder, or skip it.'
+  )}
+  closeLabel={text('FABRICATE.Admin.ImportReport.Close', 'Close')}
+  rootAttributes={{ 'data-import-mapping': '' }}
+  {onClose}
+>
+  {#snippet body()}
+    <!-- The manager's ONE selection control (issue 772). This was a raw checkbox wearing
+         Foundry's default control chrome, which is exactly the inconsistency the shared
+         primitive exists to remove — and it sat one dialog away from the component
+         browser's rows, which now render through the same component. -->
+    <label class="manager-import-mapping-match" data-import-mapping-match>
+      <SelectionCheckbox
+        size="sm"
+        wrapper="contents"
+        bind:input={matchToggle}
+        checked={matchByName}
+        ariaLabel={text(
+          'FABRICATE.Admin.Items.ImportMapping.MatchByName',
+          'Match folder names to existing categories and tags'
+        )}
+        onChange={toggleMatchByName}
+      />
+      <span>
+        {text(
+          'FABRICATE.Admin.Items.ImportMapping.MatchByName',
+          'Match folder names to existing categories and tags'
+        )}
+      </span>
+    </label>
+
+    <div class="manager-import-mapping-list">
+      {#each activeRows as row (row.index)}
+        <div
+          class={`manager-import-mapping-row ${row.state.skipped ? 'is-skipped' : ''}`}
+          data-import-mapping-row={row.group.folderId ?? `unfiled-${row.index}`}
         >
-          <i class="fas fa-xmark" aria-hidden="true"></i>
-        </button>
-      </div>
-
-      <label class="manager-import-mapping-match" data-import-mapping-match>
-        <input
-          type="checkbox"
-          bind:this={matchToggle}
-          checked={matchByName}
-          onchange={toggleMatchByName}
-        />
-        <span>
-          {text(
-            'FABRICATE.Admin.Items.ImportMapping.MatchByName',
-            'Match folder names to existing categories and tags'
-          )}
-        </span>
-      </label>
-
-      <div class="manager-import-mapping-list">
-        {#each activeRows as row (row.index)}
-          <div
-            class={`manager-import-mapping-row ${row.state.skipped ? 'is-skipped' : ''}`}
-            data-import-mapping-row={row.group.folderId ?? `unfiled-${row.index}`}
-          >
-            <div class="manager-import-mapping-row-head">
-              <span class="manager-import-mapping-folder">
-                <i class="fas fa-folder" aria-hidden="true"></i>
-                <strong>{row.group.folderName}</strong>
+          <div class="manager-import-mapping-row-head">
+            <span class="manager-import-mapping-folder">
+              <i class="fas fa-folder" aria-hidden="true"></i>
+              <strong>{row.group.folderName}</strong>
+            </span>
+            <!-- "12 items" is a PHRASE, so it stays in the UI face rather than taking the
+                 `mono` prop; only the figures inside it need to stop shifting width. -->
+            <Chip
+              class="manager-import-mapping-count"
+              data-import-mapping-count
+              style="font-variant-numeric: tabular-nums;"
+            >
+              {itemCountLabel(row.group.itemCount)}
+            </Chip>
+            <button
+              type="button"
+              class={`manager-button is-subtle manager-import-mapping-skip ${row.state.skipped ? 'is-active' : ''}`}
+              data-import-mapping-skip
+              aria-pressed={row.state.skipped}
+              onclick={() => toggleSkip(row.index)}
+            >
+              <i class={row.state.skipped ? 'fas fa-rotate-left' : 'fas fa-ban'} aria-hidden="true"
+              ></i>
+              <span>
+                {row.state.skipped
+                  ? text('FABRICATE.Admin.Items.ImportMapping.Unskip', 'Include')
+                  : text('FABRICATE.Admin.Items.ImportMapping.Skip', 'Skip')}
               </span>
-              <span
-                class="manager-chip manager-import-mapping-count"
-                data-import-mapping-count
-                style="font-variant-numeric: tabular-nums;"
-              >
-                {itemCountLabel(row.group.itemCount)}
-              </span>
+            </button>
+          </div>
+
+          {#if !row.state.skipped}
+            <div class="manager-import-mapping-controls">
+              <label class="manager-field manager-import-mapping-category">
+                <span>{text('FABRICATE.Admin.Items.ImportMapping.Category', 'Category')}</span>
+                <select
+                  data-import-mapping-category
+                  value={row.state.category}
+                  onchange={(event) => setCategory(row.index, event.currentTarget.value)}
+                >
+                  {#each categorySelectOptions as option (option.value)}
+                    <option value={option.value}>{option.label}</option>
+                  {/each}
+                </select>
+              </label>
               <button
                 type="button"
-                class={`manager-button is-subtle manager-import-mapping-skip ${row.state.skipped ? 'is-active' : ''}`}
-                data-import-mapping-skip
-                aria-pressed={row.state.skipped}
-                onclick={() => toggleSkip(row.index)}
+                class="manager-button is-subtle manager-import-mapping-new-category"
+                data-import-mapping-new-category
+                onclick={() =>
+                  (creatingCategoryFor = creatingCategoryFor === row.index ? -1 : row.index)}
               >
-                <i class={row.state.skipped ? 'fas fa-rotate-left' : 'fas fa-ban'} aria-hidden="true"
-                ></i>
-                <span>
-                  {row.state.skipped
-                    ? text('FABRICATE.Admin.Items.ImportMapping.Unskip', 'Include')
-                    : text('FABRICATE.Admin.Items.ImportMapping.Skip', 'Skip')}
-                </span>
+                <i class="fas fa-plus" aria-hidden="true"></i>
+                <span>{text('FABRICATE.Admin.Items.ImportMapping.NewCategory', 'New')}</span>
               </button>
+
+              <RecipeRoutingAssignment
+                options={tagOptionsFor(row.state)}
+                selectedIds={row.state.tags}
+                label={text('FABRICATE.Admin.Items.ImportMapping.Tags', 'Tags')}
+                addLabel={text('FABRICATE.Admin.Items.ImportMapping.AddTag', 'Add tag')}
+                placeholder={text(
+                  'FABRICATE.Admin.Items.ImportMapping.SearchTags',
+                  'Search tags...'
+                )}
+                emptyHint={text(
+                  'FABRICATE.Admin.Items.ImportMapping.NoTags',
+                  'No tags yet — create them in Tags & Categories.'
+                )}
+                onAdd={(tag) => addTag(row.index, tag)}
+                onRemove={(tag) => removeTag(row.index, tag)}
+              />
             </div>
 
-            {#if !row.state.skipped}
-              <div class="manager-import-mapping-controls">
-                <label class="manager-field manager-import-mapping-category">
-                  <span>{text('FABRICATE.Admin.Items.ImportMapping.Category', 'Category')}</span>
-                  <select
-                    data-import-mapping-category
-                    value={row.state.category}
-                    onchange={(event) => setCategory(row.index, event.currentTarget.value)}
-                  >
-                    {#each categorySelectOptions as option (option.value)}
-                      <option value={option.value}>{option.label}</option>
-                    {/each}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  class="manager-button is-subtle manager-import-mapping-new-category"
-                  data-import-mapping-new-category
-                  onclick={() =>
-                    (creatingCategoryFor = creatingCategoryFor === row.index ? -1 : row.index)}
-                >
-                  <i class="fas fa-plus" aria-hidden="true"></i>
-                  <span>{text('FABRICATE.Admin.Items.ImportMapping.NewCategory', 'New')}</span>
-                </button>
-
-                <RecipeRoutingAssignment
-                  options={tagOptionsFor(row.state)}
-                  selectedIds={row.state.tags}
-                  label={text('FABRICATE.Admin.Items.ImportMapping.Tags', 'Tags')}
-                  addLabel={text('FABRICATE.Admin.Items.ImportMapping.AddTag', 'Add tag')}
-                  placeholder={text('FABRICATE.Admin.Items.ImportMapping.SearchTags', 'Search tags...')}
-                  emptyHint={text(
-                    'FABRICATE.Admin.Items.ImportMapping.NoTags',
-                    'No tags yet — create them in Tags & Categories.'
+            {#if creatingCategoryFor === row.index}
+              <div class="manager-import-mapping-create" data-import-mapping-create-category>
+                <InlineVocabularyAdd
+                  inputId={`import-mapping-new-category-${row.index}`}
+                  inputLabel={text(
+                    'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryName',
+                    'Component category name'
                   )}
-                  onAdd={(tag) => addTag(row.index, tag)}
-                  onRemove={(tag) => removeTag(row.index, tag)}
+                  inputPlaceholder={text(
+                    'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryPlaceholder',
+                    'e.g. Reagent'
+                  )}
+                  addLabel={text(
+                    'FABRICATE.Admin.Manager.TagsCategories.AddComponentCategory',
+                    'Add component category'
+                  )}
+                  describeInput={categoryHint()}
+                  normalize={(value) => String(value || '').trim()}
+                  successFeedback={() =>
+                    text(
+                      'FABRICATE.Admin.Manager.TagsCategories.CategoryAddedFeedback',
+                      'Category added.'
+                    )}
+                  addFailedFeedback={text(
+                    'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryAddFailedFeedback',
+                    'Component category could not be added.'
+                  )}
+                  onAdd={(value) => createCategory(row.index, value)}
                 />
               </div>
-
-              {#if creatingCategoryFor === row.index}
-                <div class="manager-import-mapping-create" data-import-mapping-create-category>
-                  <InlineVocabularyAdd
-                    inputId={`import-mapping-new-category-${row.index}`}
-                    inputLabel={text(
-                      'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryName',
-                      'Component category name'
-                    )}
-                    inputPlaceholder={text(
-                      'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryPlaceholder',
-                      'e.g. Reagent'
-                    )}
-                    addLabel={text(
-                      'FABRICATE.Admin.Manager.TagsCategories.AddComponentCategory',
-                      'Add component category'
-                    )}
-                    describeInput={categoryHint()}
-                    normalize={(value) => String(value || '').trim()}
-                    successFeedback={() =>
-                      text('FABRICATE.Admin.Manager.TagsCategories.CategoryAddedFeedback', 'Category added.')}
-                    addFailedFeedback={text(
-                      'FABRICATE.Admin.Manager.TagsCategories.ComponentCategoryAddFailedFeedback',
-                      'Component category could not be added.'
-                    )}
-                    onAdd={(value) => createCategory(row.index, value)}
-                  />
-                </div>
-              {/if}
             {/if}
-          </div>
-        {/each}
-      </div>
-
-      <div class="manager-import-mapping-footer">
-        <button type="button" class="manager-button" data-import-mapping-cancel onclick={() => onClose()}>
-          {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
-        </button>
-        <button
-          type="button"
-          class="manager-button is-primary"
-          data-import-mapping-commit
-          disabled={importDisabled}
-          onclick={commit}
-        >
-          <i class="fas fa-file-import" aria-hidden="true"></i>
-          <span>
-            {commitLabel(importCount)}
-          </span>
-        </button>
-      </div>
+          {/if}
+        </div>
+      {/each}
     </div>
-  </div>
-{/if}
+  {/snippet}
+
+  {#snippet footer()}
+    <button
+      type="button"
+      class="manager-button"
+      data-import-mapping-cancel
+      onclick={() => onClose()}
+    >
+      {text('FABRICATE.Admin.Manager.Cancel', 'Cancel')}
+    </button>
+    <button
+      type="button"
+      class="manager-button is-primary"
+      data-import-mapping-commit
+      disabled={importDisabled}
+      onclick={commit}
+    >
+      <i class="fas fa-file-import" aria-hidden="true"></i>
+      <span>
+        {commitLabel(importCount)}
+      </span>
+    </button>
+  {/snippet}
+</ManagerModal>
 
 <style>
-  .manager-import-mapping-overlay {
-    display: contents;
-  }
+  /*
+    One control scale for the whole dialog (issue 772).
 
-  .manager-import-mapping-dialog {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    width: min(560px, calc(100vw - 48px));
-    max-height: min(640px, calc(100vh - 64px));
-    padding: var(--fab-space-4);
-    background: var(--fab-bg-1);
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 12px;
-    box-shadow: var(--fab-shadow-lg);
-  }
-
-  .manager-import-mapping-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-import-mapping-title {
-    margin: 0;
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: var(--fab-text);
-  }
-
-  .manager-import-mapping-subtitle {
-    margin: var(--fab-space-2xs) 0 0;
-    font-size: 0.72rem;
-  }
-
+    Every control in here rendered at the manager's default body size while the surfaces
+    it sits between — the components toolbar it is launched from, and the bulk edit rail
+    beside it — read at `--fab-recipe-control-font`. The dialog is dense (a row per
+    detected folder, each with a select, a chip, and three buttons), so it was both the
+    largest type on screen and the one with the least room for it.
+  */
   .manager-import-mapping-match {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
-    font-size: 0.76rem;
+    font-size: var(--fab-recipe-control-font);
     color: var(--fab-text-secondary);
+  }
+
+  /* The row's inline actions — Skip / New / Add tag — are secondary to the dialog's own
+     Cancel and Import, which keep the default 34px so the commit action stays the
+     heaviest thing in the footer. */
+  .manager-import-mapping-row :global(.manager-button) {
+    min-height: 28px;
+    padding: 0 var(--fab-space-2);
+    font-size: var(--fab-recipe-control-font);
   }
 
   .manager-import-mapping-list {
@@ -488,6 +467,23 @@
     min-width: 0;
     flex: 1;
     color: var(--fab-text);
+    font-size: var(--fab-recipe-control-font);
+  }
+
+  /* The field labels read as the bulk rail's micro-labels rather than as body text: the
+     two surfaces sit side by side and were captioning the same vocabulary — a category
+     and a tag set — at two different scales. This also settles an inconsistency inside
+     the dialog itself, where "Category" was sentence case beside an uppercase "TAGS". */
+  .manager-import-mapping-controls :global(.manager-field > span) {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fab-text-muted);
+  }
+
+  .manager-import-mapping-category select {
+    font-size: var(--fab-recipe-control-font);
   }
 
   .manager-import-mapping-folder strong {
@@ -507,10 +503,15 @@
     min-width: 140px;
   }
 
-  .manager-import-mapping-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--fab-space-2);
+  /* The real control is 1px and transparent, so the ring has to be drawn on the visible
+     box. `SelectionCheckbox` scopes its own ring to the `<label>` IT renders, which this
+     host opts out of with `wrapper="contents"` — so the host draws it. This rule reaches
+     into the component's markup using `:global()`, following the pattern in
+     `BulkSelectionToolbar.svelte` (issue 924). The adjacent-sibling form is what makes
+     `:global()` sufficient: `<input>` and `<span class="fab-selection-check">` are
+     siblings in the component's `wrapper="contents"` mode. */
+  .manager-import-mapping-match :global(.fab-selection-input:focus-visible + .fab-selection-check) {
+    outline: 2px solid var(--fab-mv2-accent);
+    outline-offset: 2px;
   }
 </style>

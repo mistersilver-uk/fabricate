@@ -103,9 +103,9 @@ A recipe can raise its own difficulty on top of that shared check by requiring a
 
 Set it with the **Minimum success tier** dropdown on the recipe editor's Overview tab.
 The dropdown appears only when the system uses a Routed by check crafting check with fixed tiers.
-It lists the check's success tiers from lowest to highest, and it defaults to **No override (use rolled tier)**.
+It lists the check's success tiers from lowest to highest, and it defaults to **No override (use final tier)**.
 
-While the default is selected, the recipe uses whichever tier the roll lands in, the same as any other recipe.
+While the default is selected, the recipe uses whichever tier the attempt ends on, the same as any other recipe.
 When you pick a minimum tier, a roll that lands below it fails the craft outright.
 The craft takes its normal failure path, so ingredients are consumed and no result is produced, exactly as a failed check would.
 A roll that lands on the chosen tier or higher produces its result as usual.

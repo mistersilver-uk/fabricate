@@ -36,7 +36,7 @@
   id={cardId}
   class="manager-field is-wide manager-resolution-mode-card manager-radio-card-group"
   class:is-config-cards={configCards}
-  disabled={disabled}
+  {disabled}
   data-radio-card-group={dataGroup || undefined}
   {...{ [dataAttr]: dataAttr ? true : undefined }}
 >
@@ -65,17 +65,23 @@
           onchange={(event) => choose(option, event)}
         />
         {#if configCards && option.icon}
-          <span class="manager-resolution-option-icon" data-tool-choice-icon aria-hidden="true"><i class={option.icon}></i></span>
+          <span class="manager-resolution-option-icon" data-tool-choice-icon aria-hidden="true"
+            ><i class={option.icon}></i></span
+          >
         {/if}
         <span class="manager-resolution-option-body">
           <span class="manager-resolution-option-name" data-tool-choice-title>
             {text(option.labelKey, option.label || option.fallback)}
             {#if option.disabled && (option.badgeKey || option.badgeFallback)}
-              <span class="manager-resolution-option-badge">{text(option.badgeKey, option.badgeFallback)}</span>
+              <span class="manager-resolution-option-badge"
+                >{text(option.badgeKey, option.badgeFallback)}</span
+              >
             {/if}
           </span>
           {#if option.description || option.descFallback}
-            <span class="manager-resolution-option-desc" data-tool-choice-description>{text(option.descKey, option.description || option.descFallback)}</span>
+            <span class="manager-resolution-option-desc" data-tool-choice-description
+              >{text(option.descKey, option.description || option.descFallback)}</span
+            >
           {/if}
         </span>
       </label>

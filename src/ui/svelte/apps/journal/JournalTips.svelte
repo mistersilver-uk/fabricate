@@ -11,7 +11,7 @@
   const TIP_KEYS = [
     'FABRICATE.App.Journal.Tips.WorldTime',
     'FABRICATE.App.Journal.Tips.Trigger',
-    'FABRICATE.App.Journal.Tips.History'
+    'FABRICATE.App.Journal.Tips.History',
   ];
 </script>
 

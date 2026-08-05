@@ -57,7 +57,9 @@ Possible `reason` values:
 For a system whose `resolutionMode` is `"alchemy"`, `visible` reflects only whether the recipe is revealed in the player's Known list, and `craftable` is always `true` for a non-GM regardless of reveal state.
 Brewing is gated solely by a matched ingredient signature, never by visibility.
 The system's `visibilityMode` selects the reveal source: `global` reveals brew-discovered recipes, `item` reveals a linked book or scroll held on the crafting actor or a component source, `knowledge` reveals a learned recipe, and `restricted` (surfaced as "Manual" in the alchemy manager) reveals a recipe granted on the Access tab.
-Brew-discovery (`alchemy.learnOnCraft`) reveal is unioned across every mode, and `learnOnCraft` governs only whether a matched brew records that discovery, never whether a recipe is craftable.
+Brew-discovery (`alchemy.learnOnCraft`, on by default) reveal is unioned across every mode, and `learnOnCraft` governs only whether a matched brew records that discovery, never whether a recipe is craftable.
+Because `global` reveals from brew-discovery alone, turning `learnOnCraft` off under that mode reveals nothing to any player; the system-validation report flags the pairing as an `alchemyGlobalNoDiscovery` warning.
+A time-gated brew records its discovery when the gate matures and the run is finished, not when it is started.
 For non-alchemy modes `craftable` still follows the mode's gating rules, and `guardCraftStart` re-runs the same evaluation before a run starts.
 
 ### evaluateKnowledgeAccess(params)
@@ -111,6 +113,22 @@ This requirement applies to every caller, including a GM.
 `message` is an i18n key such as `FABRICATE.Knowledge.AlreadyLearned`.
 UI callers are expected to localize it at the presentation boundary, using `messageData` for interpolation when present.
 
+### expendRecipeItemUse(actor, itemId, definition)
+
+Spends one use of a single owned recipe item copy, the same accounting the recipe-driven craft path applies when a limited-use item is consumed.
+
+| Parameter | Type | Description |
+|:----------|:-----|:------------|
+| `actor` | `Actor` | The actor that owns the copy |
+| `itemId` | `string` | The owned copy's document id (not a uuid) |
+| `definition` | `object` | The recipe item definition the copy matches |
+
+Applies no visibility-mode or knowledge-mode gate, and no GM check of its own.
+The Knowledge surface's **Expend use** action is the intended caller, and it applies the GM gate itself before calling this method.
+An already-spent copy, or a copy from a book with no use cap, performs no write at all and returns a failure result.
+
+**Returns:** `Promise<{ success: boolean, message: string, messageData?: object }>`
+
 ### cleanupLearnedRecipes(validRecipeIds)
 
 Removes learned records for recipes that no longer exist.
@@ -129,8 +147,10 @@ This is the shared deletion primitive behind erasing a single recipe, resetting 
 | `options.freeLearnBudget` | `boolean` | Free the consumed learn budget so a capped book permits re-learning (default `true`) |
 | `options.clearDiscovery` | `boolean` | Also clear each recipe's discovery progress (default `false`) |
 
-When `freeLearnBudget` is `true`, each cleared entry frees one consumed learn slot against a source book the actor still holds.
-An entry with no held source book, or whose recipe no longer exists, frees nothing.
+When `freeLearnBudget` is `true`, a cleared entry frees one consumed learn slot only when four things all hold: it names a source book, the actor still holds that book, the recipe still resolves, and that book actually caps learning.
+An entry failing any of the first three is an orphan case and gets no budget math at all: an auto-learned entry (no recorded source book), a source book the actor no longer holds, or a recipe id that no longer resolves.
+The fourth is not an orphan case: the source book is present and the recipe resolves, so the decrement runs, but an uncapped book's learn count was never incremented in the first place, so the decrement has nothing to give back.
+See [Knowledge]({% link visibility.md %}#learned-recipes-tab) for how the Knowledge surface states this to a GM before they erase a row.
 
 **Returns:** `Promise<{ success: boolean, count: number }>`
 
@@ -162,5 +182,6 @@ await game.fabricate.resetActorKnowledge({
 The facade is GM-only and takes an actor id, not an actor uuid.
 It never throws.
 It returns `{ success, message, messageData }` so a macro can branch on the outcome and localize `message` at the presentation boundary.
-This is the interim console and macro path.
-A Books and Scrolls Knowledge tab that surfaces the same reset in the UI is planned and not yet available.
+The Knowledge surface's per-character reset control, in the Crafting Admin panel, routes through this same facade for both of its reset grains.
+It remains available to macros and the console for the same reset outside that UI.
+See [Visibility & Knowledge]({% link visibility.md %}#resetting-a-characters-knowledge) for the GM-facing surface.

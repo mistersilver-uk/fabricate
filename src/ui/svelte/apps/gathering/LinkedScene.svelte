@@ -20,7 +20,6 @@
   let sceneName = $state('');
   let sceneThumb = $state('');
   let canView = $state(false);
-  let resolved = $state(false);
 
   function playerCanView(doc) {
     try {
@@ -40,26 +39,23 @@
     sceneName = '';
     sceneThumb = '';
     canView = false;
-    resolved = false;
-    if (!uuid || typeof globalThis.fromUuid !== 'function') {
-      resolved = true;
-      return;
-    }
+    if (!uuid || typeof globalThis.fromUuid !== 'function') return;
     let cancelled = false;
     Promise.resolve(globalThis.fromUuid(uuid))
-      .then(doc => {
+      .then((doc) => {
         if (cancelled) return;
         if (doc) {
           sceneName = String(doc.name || '');
           sceneThumb = sceneDocumentImage(doc) || '';
           canView = playerCanView(doc);
         }
-        resolved = true;
       })
       .catch(() => {
-        if (!cancelled) resolved = true;
+        // An unresolvable uuid leaves the cleared placeholder state above in place.
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   });
 
   async function handleView() {
@@ -93,7 +89,15 @@
   </span>
 
   {#if canView}
-    <button type="button" class="gathering-linked-scene-visit" data-gathering-scene-visit onclick={(event) => { event.stopPropagation(); handleView(); }}>
+    <button
+      type="button"
+      class="gathering-linked-scene-visit"
+      data-gathering-scene-visit
+      onclick={(event) => {
+        event.stopPropagation();
+        handleView();
+      }}
+    >
       <i class="fas fa-location-arrow" aria-hidden="true"></i>
       {localize('FABRICATE.App.Gathering.Detail.SceneVisit')}
     </button>

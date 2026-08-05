@@ -13,8 +13,8 @@
  *
  * Each non-blank, trimmed entry is compiled as a case-insensitive regular
  * expression source — matching how the in-source `ignoredErrorPatterns`
- * defaults are written (e.g. `/reading 'OBJECTS'/`). Blank entries are dropped
- * so a trailing comma or an empty CSV yields no patterns.
+ * defaults are written (e.g. `/favicon/i`). Blank entries are dropped so a
+ * trailing comma or an empty CSV yields no patterns.
  *
  * The CSV splits on `,`, so a pattern containing a literal comma (e.g.
  * `x{1,3}`) cannot be expressed — an accepted limitation of the flag format.
@@ -47,9 +47,15 @@ export function parseAllowedConsoleErrorPatterns(csv) {
 
 /**
  * APPEND caller-supplied waiver patterns to the in-source defaults — never
- * replace them. The Foundry canvas-artefact default (`/reading 'OBJECTS'/`)
+ * replace them. Each default (the favicon and minimum-resolution advisories)
  * lives in source, where its justification lives, and MUST keep applying even
  * when `--allowed-console-error-patterns` is set.
+ *
+ * Note what the defaults no longer include: a `/reading 'OBJECTS'/` canvas
+ * waiver sat there until issue #1010, where it turned out to be masking a real
+ * harness defect (a scene wait that resolved mid-draw) rather than a browser
+ * artefact. Adding a default here is a decision to stop seeing a class of
+ * error — justify it as such.
  *
  * @param {RegExp[]} defaults - the harness's in-source `ignoredErrorPatterns`
  * @param {string | undefined | null} csv - the `--allowed-console-error-patterns` value

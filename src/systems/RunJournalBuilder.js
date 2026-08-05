@@ -1,8 +1,9 @@
-import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
+import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 
 import {
   actorToOption,
   idOf,
+  isBlindWaitingTaskId,
   normalizeList,
   numberOrNull,
   plainObjectOrNull,
@@ -11,6 +12,9 @@ import {
 } from './gatheringEngineInternals.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
+// Generic player-facing label for a blind gathering run, shared with the
+// gathering listing so both surfaces say the same thing.
+const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const DAY_SECONDS = 24 * 60 * 60;
 
 // Localized player-facing resolution-mode label keys. The crafting
@@ -98,6 +102,13 @@ function durationToSeconds(timeRequirement = null) {
  * every model is built from cloned primitives, and undiscovered crafting/alchemy
  * recipes are redacted to a generic label for non-GM viewers.
  *
+ * Redaction hides a run's IDENTITY (name, image, steps, results, recipe id) and
+ * NOTHING ELSE. It is not an authorization gate: an owner may still advance and
+ * cancel a redacted run (issue 966). Conflating the two deadlocked every timed
+ * craft of a recipe the crafter cannot see — alchemy brews an undiscovered
+ * recipe by design, so a timed brew consumed its ingredients, armed its gate, and
+ * then offered neither a Finish nor a Cancel affordance for the rest of time.
+ *
  * All collaborators are injected; the class touches no Foundry globals.
  */
 export class RunJournalBuilder {
@@ -112,6 +123,10 @@ export class RunJournalBuilder {
    * @param {object} [deps.recipeVisibility] RecipeVisibilityService for viewer redaction.
    * @param {Function} [deps.getSystem] `(systemId) => system|null`.
    * @param {Function} [deps.getTool] `(systemId, toolId) => { name }|null`.
+   * @param {Function} [deps.getGatheringBlindSecret] `(runId) => { taskId, snapshot }|null`
+   *   — reads the GM-owned blind-run store (issue 901). Present only so a GM's
+   *   journal can preview the task an in-flight blind run will yield; the
+   *   projection ignores it for every non-GM viewer.
    * @param {Function} [deps.getGatheringTask] `(environmentId, taskId) => { name, img }|null`
    *   — resolves a gathering run's task to its authored name/image (from the COMPOSED
    *   environment), mirroring how `getRecipe` resolves a crafting run's name/image.
@@ -136,7 +151,7 @@ export class RunJournalBuilder {
     getSystem = null,
     getTool = null,
     getGatheringTask = null,
-    getRecipeItemImg = null,
+    getGatheringBlindSecret = null,
     getResultItem = null,
     getComponent = null,
     getViewer = null,
@@ -152,7 +167,8 @@ export class RunJournalBuilder {
     this._getSystem = typeof getSystem === 'function' ? getSystem : () => null;
     this._getTool = typeof getTool === 'function' ? getTool : () => null;
     this._getGatheringTask = typeof getGatheringTask === 'function' ? getGatheringTask : () => null;
-    this._getRecipeItemImg = typeof getRecipeItemImg === 'function' ? getRecipeItemImg : () => null;
+    this._getGatheringBlindSecret =
+      typeof getGatheringBlindSecret === 'function' ? getGatheringBlindSecret : null;
     this._getResultItem = typeof getResultItem === 'function' ? getResultItem : () => null;
     this._getComponent = typeof getComponent === 'function' ? getComponent : () => null;
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
@@ -220,13 +236,17 @@ export class RunJournalBuilder {
       terminal
         ? this._salvageRunManager?.getRunHistory?.(actor)
         : this._salvageRunManager?.getActiveRuns?.(actor)
-    ).map((run) => this._passthroughRunModel({ run, runType: 'salvage', worldTime, terminal }));
+    ).map((run) =>
+      this._passthroughRunModel({ run, runType: 'salvage', viewer, worldTime, terminal })
+    );
 
     const gathering = normalizeList(
       terminal
         ? this._gatheringRunSource?.getRunHistory?.(actor)
         : this._gatheringRunSource?.getActiveRuns?.(actor)
-    ).map((run) => this._passthroughRunModel({ run, runType: 'gathering', worldTime, terminal }));
+    ).map((run) =>
+      this._passthroughRunModel({ run, runType: 'gathering', viewer, worldTime, terminal })
+    );
 
     return dedupeRunModelsById(
       [...crafting, ...salvage, ...gathering].filter(Boolean),
@@ -239,19 +259,21 @@ export class RunJournalBuilder {
   // ---------------------------------------------------------------------------
 
   /**
-   * Resolve a crafting run's icon with the SAME precedence the GM editor / player
-   * listings / roll prompt use — the recipe-item definition image wins over the
-   * recipe's own `img`, and the final fallback is the recipe default (blueprint),
-   * NEVER the generic item bag. A recipe-item-backed recipe's `recipe.img` is the
-   * model default blueprint, so without the recipe-item lookup the run showed the
-   * bag / blueprint instead of the authored item image.
+   * Resolve a crafting run's icon: the recipe's OWN `img`, per `data-models/spec.md`
+   * `## Recipe` requirement 16.
+   *
+   * This previously preferred the linked recipe-item definition's image, keyed on the
+   * legacy `recipe.recipeItemId` scalar, which outranked an authored `recipe.img` and
+   * tracked definition order rather than anything the GM authored (issue 887). The
+   * injected `getRecipeItemImg` port existed solely for that lookup and is gone with it.
+   *
+   * `resolveRecipeImage` keeps the item-bag sentinel treated as "no image", so a run
+   * still falls back to the blueprint and never to the bag.
+   *
    * @private
    */
   _resolveCraftingRunImg(recipe) {
-    const recipeItemImg = recipe?.recipeItemId
-      ? this._getRecipeItemImg(recipe.craftingSystemId, recipe.recipeItemId) || ''
-      : '';
-    return recipeItemImg || stringOrNull(recipe?.img) || DEFAULT_RECIPE_IMAGE;
+    return stringOrNull(resolveRecipeImage(recipe));
   }
 
   _craftingRunModel({ run, actor, viewer, worldTime, terminal }) {
@@ -358,15 +380,21 @@ export class RunJournalBuilder {
       flavor: '',
       failureReason,
       ...this._craftingResults(runSteps, redacted, stringOrNull(run.craftingSystemId)),
-      // A redacted run hides its recipe identity, so it cannot offer a manual
-      // "Trigger Next Step" advance — only a discovered crafting run can.
-      manualAdvance: !redacted,
+      // `manualAdvance` states what the run TYPE needs, not what the viewer may do:
+      // a crafting run always advances on a click, where gathering and salvage
+      // auto-resolve off the world-time hook. Redaction must NOT suppress it
+      // (issue 966) — nothing ever finishes a crafting run on its own, so a
+      // redacted run with `false` here is a permanent zombie holding consumed
+      // ingredients. The advance itself is authorized downstream by
+      // `resolveAdvanceSources`, which owns the ownership check.
+      manualAdvance: true,
       // A player may cancel their own in-progress craft (issue 848) only on an OWNED
-      // actor (the engine writes items with no GM relay), and only while the run is
-      // live (not terminal) and discovered (not redacted). `refundOnCancel` mirrors
-      // the owning system's `features.refundOnPlayerCancel` (default ON) so the UI can
-      // tell the player whether inputs will be returned before they confirm.
-      canCancel: !terminal && !redacted && actor?.isOwner === true,
+      // actor (the engine writes items with no GM relay) and only while the run is
+      // live. Redaction is deliberately NOT a condition (issue 966): a crafter who
+      // cannot see what they started still gets to abandon it. `refundOnCancel`
+      // mirrors the owning system's `features.refundOnPlayerCancel` (default ON) so
+      // the UI can tell the player whether inputs will be returned before they confirm.
+      canCancel: !terminal && actor?.isOwner === true,
       refundOnCancel: system?.features?.refundOnPlayerCancel !== false,
     };
   }
@@ -672,7 +700,7 @@ export class RunJournalBuilder {
   // `startedAt/updatedAt/finishedAt` names.
   // ---------------------------------------------------------------------------
 
-  _passthroughRunModel({ run, runType, worldTime, terminal }) {
+  _passthroughRunModel({ run, runType, viewer = null, worldTime, terminal }) {
     if (!run?.id) return null;
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
     const status = stringOrNull(run.status) || (terminal ? 'succeeded' : 'inProgress');
@@ -686,32 +714,12 @@ export class RunJournalBuilder {
         ? numberOrNull(run.completedAtWorldTime)
         : numberOrNull(run.finishedAt);
 
-    // Gathering runs persist only a `taskId`; salvage runs persist only the source
-    // `componentId`. Resolve each to the authored name/image (mirroring how crafting
-    // resolves recipe name/img), and fall back to the raw id + default image when it
-    // cannot be resolved. A salvage title is the bare source-component name — the bag
-    // icon and run context already convey "salvage", matching crafting's bare recipe
-    // name and gathering's bare task name.
-    let title = stringOrEmpty(run.label) || stringOrEmpty(run.taskId);
-    let img = DEFAULT_RUN_IMAGE;
-    if (runType === 'gathering') {
-      const taskId = stringOrNull(run.taskId);
-      const task =
-        taskId && taskId !== 'blind'
-          ? this._getGatheringTask(stringOrNull(run.environmentId), taskId)
-          : null;
-      if (task) {
-        title = stringOrEmpty(task.name) || title;
-        img = stringOrNull(task.img) || DEFAULT_RUN_IMAGE;
-      }
-    } else if (runType === 'salvage') {
-      const componentId = stringOrNull(run.componentId);
-      const component = componentId
-        ? this._getComponent(stringOrNull(run.craftingSystemId), componentId)
-        : null;
-      title = stringOrEmpty(component?.name) || stringOrEmpty(componentId) || title;
-      img = stringOrNull(component?.img) || DEFAULT_RUN_IMAGE;
-    }
+    const { title, img, blindSecretPreview } = this._passthroughRunIdentity({
+      run,
+      runType,
+      viewer,
+      fallbackTitle: stringOrEmpty(run.label) || stringOrEmpty(run.taskId),
+    });
 
     return {
       id: stringOrNull(run.id),
@@ -741,10 +749,103 @@ export class RunJournalBuilder {
       resolutionModeLabel: '',
       recipeId: null,
       taskId: stringOrNull(run.taskId),
+      // GM-only marker: this row names a task the acting player cannot see.
+      blindSecretPreview,
       flavor: '',
       failureReason: stringOrNull(run.failureReason),
       ...this._passthroughResults(run.createdResults, stringOrNull(run.craftingSystemId)),
       manualAdvance: false,
+    };
+  }
+
+  /**
+   * Resolve a gathering/salvage run's display identity.
+   *
+   * Gathering runs persist only a `taskId`; salvage runs persist only the source
+   * `componentId`. Each resolves to the authored name/image (mirroring how
+   * crafting resolves recipe name/img), falling back to the raw id + default image
+   * when it cannot be resolved. A salvage title is the bare source-component name —
+   * the bag icon and run context already convey "salvage", matching crafting's bare
+   * recipe name and gathering's bare task name.
+   *
+   * @returns {{title: string, img: string, blindSecretPreview: boolean}}
+   * @private
+   */
+  _passthroughRunIdentity({ run, runType, viewer, fallbackTitle }) {
+    if (runType === 'gathering') return this._gatheringRunIdentity({ run, viewer, fallbackTitle });
+    if (runType === 'salvage') return this._salvageRunIdentity({ run, fallbackTitle });
+    return { title: fallbackTitle, img: DEFAULT_RUN_IMAGE, blindSecretPreview: false };
+  }
+
+  /**
+   * Resolve a gathering run's display identity.
+   *
+   * Three cases (issue 901):
+   *
+   * - A plain run names its task and resolves to that task's authored name/image,
+   *   exactly as before.
+   * - A BLIND run persists only the `blind:<environmentId>` marker, so for a
+   *   player it resolves to the generic blind label. It previously resolved to the
+   *   real task's NAME, because the marker did not exist and the run carried the
+   *   drawn task id in clear text — the leak this issue is about, in rendered text.
+   * - For a GM, a blind run resolves to the real task from the GM-owned blind-run
+   *   store and is flagged as a secret preview, because the GM needs to know what
+   *   the player will get.
+   *
+   * @returns {{title: string, img: string, blindSecretPreview: boolean}}
+   * @private
+   */
+  _gatheringRunIdentity({ run, viewer, fallbackTitle }) {
+    const { blind, secret, task } = this._gatheringRunDisplayTask({ run, viewer });
+    return {
+      title:
+        stringOrEmpty(task?.name) || (blind ? this.localize(BLIND_TASK_LABEL_KEY) : fallbackTitle),
+      img: stringOrNull(task?.img) || DEFAULT_RUN_IMAGE,
+      blindSecretPreview: secret,
+    };
+  }
+
+  /**
+   * Which task a gathering run should be DISPLAYED as, and whether that is a
+   * GM-only secret preview the acting player cannot see.
+   *
+   * @returns {{blind: boolean, secret: boolean, task: object|null}}
+   * @private
+   */
+  _gatheringRunDisplayTask({ run, viewer }) {
+    const environmentId = stringOrNull(run.environmentId);
+    const blind = isBlindWaitingTaskId(run.taskId) || run.taskId === 'blind';
+    if (!blind) {
+      return {
+        blind: false,
+        secret: false,
+        task: this._getGatheringTask(environmentId, stringOrNull(run.taskId)),
+      };
+    }
+    // Only a GM may see behind the marker, and only through the GM-owned store.
+    const record = viewer?.isGM === true ? this._getGatheringBlindSecret?.(run.id) : null;
+    if (!record) return { blind: true, secret: false, task: null };
+    const task =
+      this._getGatheringTask(environmentId, stringOrNull(record.taskId)) ??
+      plainObjectOrNull(record.snapshot?.task);
+    return { blind: true, secret: Boolean(task), task };
+  }
+
+  /**
+   * Resolve a salvage run's display identity from its source component.
+   *
+   * @returns {{title: string, img: string, blindSecretPreview: boolean}}
+   * @private
+   */
+  _salvageRunIdentity({ run, fallbackTitle }) {
+    const componentId = stringOrNull(run.componentId);
+    const component = componentId
+      ? this._getComponent(stringOrNull(run.craftingSystemId), componentId)
+      : null;
+    return {
+      title: stringOrEmpty(component?.name) || stringOrEmpty(componentId) || fallbackTitle,
+      img: stringOrNull(component?.img) || DEFAULT_RUN_IMAGE,
+      blindSecretPreview: false,
     };
   }
 

@@ -64,10 +64,22 @@ export const RECIPE_DEFAULT_PAGE_SIZE = 25;
  * editor round-trip) is not misread as a system switch and does not wipe the page/filters
  * this object otherwise preserves. See the reset effect in each browser view.
  *
+ * `bulkSelectedRecipeIds` (issue 1010) is the bulk edit SELECTION, lifted for the same
+ * reason everything else here is: it must survive the editor round-trip. It is
+ * `bulkSelectedRecipeIds`, NOT `selectedRecipeIds` — `selectedRecipeId` (singular) already
+ * means *the row whose single-recipe inspector is open* and is user-visible copy, and two
+ * meanings one character apart threaded into the same component is a defect waiting to
+ * happen. Deliberately a bare `new Set()` literal and NOT an import from
+ * `recipeBulkEditModel.js`, exactly as `componentBrowserModel.js` records for its own twin:
+ * a new import in this module would force matching mount-harness allowlist edits in the
+ * suites that mount this tree, where an omission HANGS the suite as `# cancelled` rather
+ * than failing.
+ *
  * @returns {{
  *   statusFilter: string, lockFilter: string, categoryFilter: string,
  *   groupByCategory: boolean, sortKey: RecipeSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string
+ *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string,
+ *   bulkSelectedRecipeIds: Set<string>
  * }}
  */
 export function createRecipeBrowserState() {
@@ -82,6 +94,7 @@ export function createRecipeBrowserState() {
     pageSize: RECIPE_DEFAULT_PAGE_SIZE,
     collapsedCategories: new Set(),
     systemId: '',
+    bulkSelectedRecipeIds: new Set(),
   };
 }
 
@@ -132,14 +145,35 @@ export function filterRecipes(recipes, filters = {}) {
 }
 
 /**
- * The attention rank a row sorts on: 2 = enabling is blocked, 1 = incomplete but
- * enabled, 0 = clear. Descending by default, so the rows needing work float up.
+ * The attention rank a row sorts on. It is `deriveRecipeStatuses`'s authoring-state
+ * branch, expressed as a number, and is deliberately written as the SAME two tests in
+ * the same order so the sort and the pill cannot name different sets:
  *
- * @param {object} recipe
+ *  - `2` — the row wears the red `Can't enable` pill: activation would refuse it AND it
+ *    is currently off.
+ *  - `1` — the row wears the amber `Incomplete` pill: the same activation blocker on a
+ *    recipe that is already ON. It stays BELOW 2 rather than joining it, because that is
+ *    what the two pills already say — nothing is being refused, since the activation gate
+ *    fires only on a transition into the enabled state — and a "blocked and already on"
+ *    fourth rank would be a state neither pill nor spec describes.
+ *  - `0` — the row wears neither.
+ *
+ * Descending by default, so the rows needing work float up.
+ *
+ * This reads `enableBlocked`, not `incomplete` (issue 1010). `incomplete` is
+ * `validate() === false && validateStructure() === true`, which does NOT capture
+ * blocked-ness: a structurally broken recipe reads `incomplete: false` and still cannot
+ * be enabled, and neither a dangling essence reference, a tag placeholder, an unmet
+ * resolution-mode requirement nor an alchemy signature conflict moves it. Both pills were
+ * repointed at `enableBlocked` for exactly that reason, so a rank left on `incomplete`
+ * sorted the reddest rows in the browser at 0 — below rows painted amber — under a sort
+ * key named "needs attention".
+ *
+ * @param {object} recipe a projected recipe row.
  * @returns {0 | 1 | 2}
  */
 export function attentionRank(recipe) {
-  if (recipe?.incomplete !== true) return 0;
+  if (recipe?.enableBlocked !== true) return 0;
   return recipe?.enabled === false ? 2 : 1;
 }
 
@@ -326,12 +360,29 @@ export function deriveRecipeIo(recipe, resolutionMode) {
 
 /**
  * The row's status pills, in render order. At most one of the two authoring
- * states applies:
+ * states applies, and BOTH read the SAME predicate — `recipe.enableBlocked`, the
+ * projected answer to "would activation refuse this recipe?" (issue 1010):
  *
- *  - `blocked` — incomplete AND currently off: enabling would be REFUSED by
- *    `toggleRecipeEnabled` (RecipeActivationError), so the row says so up front.
- *  - `incomplete` — incomplete but already on (a legacy row): work still to do,
- *    but nothing is being refused.
+ *  - `blocked` — activation would refuse it AND it is currently off: enabling would
+ *    be REFUSED by `toggleRecipeEnabled` (RecipeActivationError), so the row says so
+ *    up front.
+ *  - `incomplete` — the same blocker on a recipe that is already ON: unfinished or
+ *    conflicting work a GM should still resolve, but nothing is being refused,
+ *    because the activation check runs only on a transition into the enabled state.
+ *
+ * Both branches used to read `recipe.incomplete`, which is
+ * `validate() === false && validateStructure() === true` (`adminStore.js`). A
+ * STRUCTURALLY BROKEN recipe therefore reads `incomplete: false` and wore NO pill at
+ * all while still being un-enableable — and the bulk edit panel's pre-flight count and
+ * the set-apply write both read the wider activation predicate. Two surfaces on one
+ * screen would then disagree about one fact: "3 selected recipes will stay off" above
+ * zero pilled rows. The row pill, the panel's count and the write now read ONE
+ * predicate and cannot disagree by construction.
+ *
+ * The off/on split is tested STRICTLY (`enabled === false`), not as `!enabled`, to
+ * match `countBlockedRecipeEnables` in `recipeBulkEditModel.js` — a row missing the
+ * field would otherwise be counted by one surface and not pilled by the other, which
+ * is precisely the drift this shared predicate exists to close.
  *
  * @param {object} recipe a projected recipe row.
  * @returns {{id: 'disabled' | 'locked' | 'blocked' | 'incomplete', tone: string, icon: string}[]}
@@ -344,7 +395,7 @@ export function deriveRecipeStatuses(recipe) {
   if (recipe?.locked === true) {
     pills.push({ id: 'locked', tone: 'accent', icon: 'fas fa-lock' });
   }
-  if (recipe?.incomplete === true) {
+  if (recipe?.enableBlocked === true) {
     pills.push(
       recipe?.enabled === false
         ? { id: 'blocked', tone: 'danger', icon: 'fas fa-circle-exclamation' }

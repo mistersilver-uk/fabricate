@@ -30,7 +30,7 @@
     selectedSystem = null,
     onSetResolutionMode = () => {},
     onSetSalvageResolutionMode = () => {},
-    onSetVisibilityMode = () => {}
+    onSetVisibilityMode = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -57,7 +57,7 @@
       labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Global',
       fallback: 'Global',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.GlobalDesc',
-      descFallback: 'Every player and character sees all recipes. Nothing is gated.'
+      descFallback: 'Every player and character sees all recipes. Nothing is gated.',
     },
     {
       value: 'restricted',
@@ -65,7 +65,7 @@
       labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Restricted',
       fallback: 'Restricted',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.RestrictedDesc',
-      descFallback: 'Recipes can be made visible to specific characters or players.'
+      descFallback: 'Recipes can be made visible to specific characters or players.',
     },
     {
       value: 'item',
@@ -74,7 +74,7 @@
       fallback: 'Item',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.ItemDesc',
       descFallback:
-        'A character must have the item in their pack. Only mode where limited use appears in the Books & Scrolls editor.'
+        'A character must have the item in their pack. Only mode where limited use appears in the Books & Scrolls editor.',
     },
     {
       value: 'knowledge',
@@ -83,8 +83,8 @@
       fallback: 'Knowledge',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.KnowledgeDesc',
       descFallback:
-        'A character must learn the recipe from a scroll or book using the item. Only mode where learning limits appear in the Books & Scrolls editor.'
-    }
+        'A character must learn the recipe from a scroll or book using the item. Only mode where learning limits appear in the Books & Scrolls editor.',
+    },
   ];
 
   // Alchemy relabel: reveal language, and `restricted` → "Manual (GM-granted
@@ -96,7 +96,8 @@
       labelKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.Global',
       fallback: 'Global',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.GlobalAlchemyDesc',
-      descFallback: 'Every recipe a character brews is revealed to them. Brewing is never gated.'
+      descFallback:
+        'Discovery by brewing is the only way a recipe is revealed, so this needs "Learn a recipe when its ingredients are matched" (Checks → Crafting) left on. Brewing is never gated.',
     },
     {
       value: 'restricted',
@@ -105,7 +106,7 @@
       fallback: 'Manual (GM-granted access)',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.ManualDesc',
       descFallback:
-        'You reveal recipes to specific characters or players in the Access tab. Any character can still brew any recipe by matching its ingredients.'
+        'You reveal recipes to specific characters or players in the Access tab. Any character can still brew any recipe by matching its ingredients.',
     },
     {
       value: 'item',
@@ -114,7 +115,7 @@
       fallback: 'Item',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.ItemAlchemyDesc',
       descFallback:
-        'A recipe is revealed while a character holds its linked book or scroll. Brewing is never gated.'
+        'A recipe is revealed while a character holds its linked book or scroll. Brewing is never gated.',
     },
     {
       value: 'knowledge',
@@ -123,8 +124,8 @@
       fallback: 'Knowledge',
       descKey: 'FABRICATE.Admin.Manager.Crafting.Visibility.KnowledgeAlchemyDesc',
       descFallback:
-        'A recipe is revealed once a character learns it from a book or scroll. Brewing is never gated.'
-    }
+        'A recipe is revealed once a character learns it from a book or scroll. Brewing is never gated.',
+    },
   ];
 
   const isAlchemy = $derived(selectedSystem?.resolutionMode === 'alchemy');
@@ -152,7 +153,7 @@
     restricted: 'Grant recipes to specific characters or players in the Access tab.',
     item: 'Players craft from recipes only while holding the linked item.',
     knowledge:
-      'Players learn recipes by reading books and scrolls. Configure learning limits in the Books & Scrolls editor.'
+      'Players learn recipes by reading books and scrolls. Configure learning limits in the Books & Scrolls editor.',
   };
 
   let systemResolutionModeValue = $state('simple');
@@ -193,15 +194,28 @@
   <main
     class="manager-main manager-crafting-settings-main"
     data-crafting-settings
-    aria-label={text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings')}
+    aria-label={text(
+      'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle',
+      'Crafting settings'
+    )}
   >
     <div class="crafting-settings-layout">
       <div class="crafting-settings-content">
         <section class="manager-section-header">
           <div class="manager-heading">
             <p class="manager-kicker">{selectedSystem.name}</p>
-            <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle', 'Crafting settings')}</h2>
-            <p class="manager-subtitle">{text('FABRICATE.Admin.Manager.Crafting.Settings.Subtitle', 'Control how players get access to the recipes in this system.')}</p>
+            <h2 class="manager-title">
+              {text(
+                'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle',
+                'Crafting settings'
+              )}
+            </h2>
+            <p class="manager-subtitle">
+              {text(
+                'FABRICATE.Admin.Manager.Crafting.Settings.Subtitle',
+                'Control how players get access to the recipes in this system.'
+              )}
+            </p>
           </div>
         </section>
 
@@ -209,9 +223,19 @@
           <section class="crafting-settings-section" data-crafting-resolution-section>
             <div class="crafting-settings-section-head">
               <i class="fas fa-diagram-project" aria-hidden="true"></i>
-              <h3 class="crafting-settings-section-title">{text('FABRICATE.Admin.Manager.Crafting.Settings.ResolutionHeading', 'Recipe resolution')}</h3>
+              <h3 class="crafting-settings-section-title">
+                {text(
+                  'FABRICATE.Admin.Manager.Crafting.Settings.ResolutionHeading',
+                  'Recipe resolution'
+                )}
+              </h3>
             </div>
-            <p class="crafting-settings-section-intro">{text('FABRICATE.Admin.Manager.Crafting.Settings.ResolutionIntro', 'Choose how a crafting attempt is turned into a result. Applies to every recipe in the system.')}</p>
+            <p class="crafting-settings-section-intro">
+              {text(
+                'FABRICATE.Admin.Manager.Crafting.Settings.ResolutionIntro',
+                'Choose how a crafting attempt is turned into a result. Applies to every recipe in the system.'
+              )}
+            </p>
             <ResolutionModeCard
               cardId="manager-crafting-resolution-mode"
               legendKey="FABRICATE.Admin.SystemSettings.ResolutionMode"
@@ -231,7 +255,12 @@
           <section class="crafting-settings-section" data-crafting-visibility-section>
             <div class="crafting-settings-section-head">
               <i class="fas fa-eye" aria-hidden="true"></i>
-              <h3 class="crafting-settings-section-title">{text('FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading', 'Recipe visibility')}</h3>
+              <h3 class="crafting-settings-section-title">
+                {text(
+                  'FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading',
+                  'Recipe visibility'
+                )}
+              </h3>
             </div>
             <p class="crafting-settings-section-intro">{visibilityIntro}</p>
             <ResolutionModeCard
@@ -252,9 +281,19 @@
             <section class="crafting-settings-section is-compact" data-crafting-salvage-section>
               <div class="crafting-settings-section-head">
                 <i class="fas fa-recycle" aria-hidden="true"></i>
-                <h3 class="crafting-settings-section-title">{text('FABRICATE.Admin.SystemSettings.SalvageResolutionMode', 'Salvage resolution mode')}</h3>
+                <h3 class="crafting-settings-section-title">
+                  {text(
+                    'FABRICATE.Admin.SystemSettings.SalvageResolutionMode',
+                    'Salvage resolution mode'
+                  )}
+                </h3>
               </div>
-              <p class="crafting-settings-section-intro">{text('FABRICATE.Admin.Manager.Crafting.Settings.SalvageIntro', 'Choose how a salvage attempt is turned into returned components.')}</p>
+              <p class="crafting-settings-section-intro">
+                {text(
+                  'FABRICATE.Admin.Manager.Crafting.Settings.SalvageIntro',
+                  'Choose how a salvage attempt is turned into returned components.'
+                )}
+              </p>
               <ResolutionModeCard
                 cardId="manager-crafting-salvage-resolution-mode"
                 legendKey="FABRICATE.Admin.SystemSettings.SalvageResolutionMode"

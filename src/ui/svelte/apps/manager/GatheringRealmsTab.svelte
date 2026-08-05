@@ -9,6 +9,8 @@
   intentionally blank.
 -->
 <script>
+  import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
@@ -20,7 +22,7 @@
     saving = false,
     onSelectRealm = () => {},
     onAddEnvironment = () => {},
-    onRemoveEnvironment = () => {}
+    onRemoveEnvironment = () => {},
   } = $props();
 
   const PAGE_SIZE = 6;
@@ -38,7 +40,11 @@
   const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
   const filteredRealms = $derived(
     normalizedSearch
-      ? realms.filter(realm => String(realm.name || '').toLowerCase().includes(normalizedSearch))
+      ? realms.filter((realm) =>
+          String(realm.name || '')
+            .toLowerCase()
+            .includes(normalizedSearch)
+        )
       : realms
   );
 
@@ -54,13 +60,15 @@
   $effect(() => {
     if (!selectedRealmId || selectedRealmId === lastNavigatedSelection) return;
     lastNavigatedSelection = selectedRealmId;
-    const index = filteredRealms.findIndex(realm => realm.id === selectedRealmId);
+    const index = filteredRealms.findIndex((realm) => realm.id === selectedRealmId);
     if (index < 0) return;
     const targetPage = Math.floor(index / PAGE_SIZE);
     if (targetPage !== pageIndex) pageIndex = targetPage;
   });
 
-  const pagedRealms = $derived(filteredRealms.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE));
+  const pagedRealms = $derived(
+    filteredRealms.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE)
+  );
 
   function selectRow(realmId) {
     onSelectRealm(realmId === selectedRealmId ? '' : realmId);
@@ -80,16 +88,20 @@
   function environmentCountLabel(realm) {
     return countLabel(
       realm?.environmentCount ?? 0,
-      'FABRICATE.Admin.Manager.Travel.Realms.EnvironmentCountOne', '1 environment',
-      'FABRICATE.Admin.Manager.Travel.Realms.EnvironmentCount', '{count} environments'
+      'FABRICATE.Admin.Manager.Travel.Realms.EnvironmentCountOne',
+      '1 environment',
+      'FABRICATE.Admin.Manager.Travel.Realms.EnvironmentCount',
+      '{count} environments'
     );
   }
 
   function partyCountLabel(realm) {
     return countLabel(
       realm?.partyCount ?? 0,
-      'FABRICATE.Admin.Manager.Travel.Realms.PartyCountOne', '1 party',
-      'FABRICATE.Admin.Manager.Travel.Realms.PartyCount', '{count} parties'
+      'FABRICATE.Admin.Manager.Travel.Realms.PartyCountOne',
+      '1 party',
+      'FABRICATE.Admin.Manager.Travel.Realms.PartyCount',
+      '{count} parties'
     );
   }
 </script>
@@ -101,24 +113,33 @@
   aria-labelledby="travel-tab-realms"
   data-travel-panel="realms"
 >
-  <section class="manager-toolbar manager-travel-realms-toolbar" aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.Filters', 'Realm filters')}>
+  <section
+    class="manager-toolbar manager-travel-realms-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.Filters', 'Realm filters')}
+  >
     <label class="manager-search">
       <i class="fas fa-search" aria-hidden="true"></i>
       <input
         type="search"
         bind:value={searchTerm}
-        placeholder={text('FABRICATE.Admin.Manager.Travel.Realms.SearchPlaceholder', 'Search realms...')}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.SearchPlaceholder',
+          'Search realms...'
+        )}
         aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.SearchLabel', 'Search realms')}
       />
     </label>
   </section>
 
   {#if filteredRealms.length === 0}
-    <p class="manager-muted manager-travel-realms-empty">
-      {realms.length === 0
+    <EmptyState
+      compact
+      icon={realms.length === 0 ? 'fas fa-earth-americas' : 'fas fa-magnifying-glass'}
+      title={realms.length === 0
         ? text('FABRICATE.Admin.Manager.Travel.Realms.Empty', 'No realms yet.')
         : text('FABRICATE.Admin.Manager.Travel.Realms.NoMatches', 'No realms match your search.')}
-    </p>
+      dataAttr="data-travel-realms-empty"
+    />
   {:else}
     <div class="manager-travel-realms-list" role="list">
       {#each pagedRealms as realm (realm.id)}
@@ -137,19 +158,25 @@
             onkeydown={(event) => onRowKeydown(event, realm.id)}
           >
             <div class="manager-travel-realms-left">
-              <span class="manager-travel-realms-icon" aria-hidden="true"><i class={REALM_ICON}></i></span>
+              <span class="manager-travel-realms-icon" aria-hidden="true"
+                ><i class={REALM_ICON}></i></span
+              >
               <span class="manager-travel-realms-name">{realm.name}</span>
               {#if !realm.enabled}
-                <span class="manager-chip is-disabled">{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</span>
+                <Chip tone="disabled"
+                  >{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip
+                >
               {/if}
-              <span class="manager-chip is-neutral manager-travel-realms-count-chip">
-                <i class="fas fa-seedling" aria-hidden="true"></i>
+              <Chip tone="neutral" icon="fas fa-seedling" class="manager-travel-realms-count-chip">
                 <span>{environmentCountLabel(realm)}</span>
-              </span>
-              <span class="manager-chip is-neutral manager-travel-realms-count-chip">
-                <i class="fas fa-people-group" aria-hidden="true"></i>
+              </Chip>
+              <Chip
+                tone="neutral"
+                icon="fas fa-people-group"
+                class="manager-travel-realms-count-chip"
+              >
                 <span>{partyCountLabel(realm)}</span>
-              </span>
+              </Chip>
             </div>
             <span class="manager-travel-realms-chevron" aria-hidden="true">
               <i class={isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'}></i>
@@ -176,7 +203,7 @@
       pageSize={PAGE_SIZE}
       {pageIndex}
       pageSizeOptions={[PAGE_SIZE]}
-      onPageChange={(next) => pageIndex = next}
+      onPageChange={(next) => (pageIndex = next)}
     />
   {/if}
 </div>

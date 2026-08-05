@@ -7,6 +7,10 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { Recipe } from '../../src/models/Recipe.js';
+import {
+  TOOL_DISPLAY_PRECEDENCE_CASES,
+  flattenToolForRecipeLibrary,
+} from '../helpers/toolDisplayPrecedenceCases.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -29,6 +33,9 @@ const RAW_MODULES = [
   'src/models/Recipe.js',
   'src/models/Ingredient.js',
   'src/models/IngredientSet.js',
+  // IngredientSet imports the shared essence allocator (issue 917); the harness's
+  // dependency validator throws a named "add it to rawModules" error without it.
+  'src/utils/essenceAllocation.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
   'src/systems/toolCheckBonus.js',
@@ -55,6 +62,12 @@ const RAW_MODULES = [
 
 // The new tab + section components the editor shell composes.
 const RECIPE_COMPILED = [
+  // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+  // harness omits HANGS the suite (# cancelled) rather than failing it.
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
+  // the harness omits HANGS the suite (# cancelled) rather than failing it.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/manager/SearchablePopover.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   // The Results tab's progressive reorder-permission card (issue 651). A component the
@@ -105,6 +118,9 @@ const stepsHarness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-steps-',
   rawModules: RAW_MODULES,
   compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
@@ -491,8 +507,15 @@ describe('RecipeEditView (mounted)', () => {
     assert.equal(select.value, 'byRecipe', 'reflects the recipe override policy');
     assert.deepEqual(
       [...select.querySelectorAll('option')].map((o) => o.value),
-      ['', 'addAll', 'highest', 'byRecipe']
+      ['', 'addAll', 'highest', 'byRecipe', 'playerPicks']
     );
+    // The Phase-2 "Player picks" override round-trips through the wrapper (issue 770 P2).
+    select.value = 'playerPicks';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(patches.at(-1), {
+      craftingModifier: { policy: 'playerPicks', modifierIds: ['med'] },
+    });
     // The per-modifier picker shows the catalogue as cancellable pills, with the
     // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
@@ -2243,6 +2266,74 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // Issue 976. `RecipeToolsSection` resolved a tool's identity ONLY through its linked
+  // managed component, so a first-class item-sourced tool (`componentId: null`, identity
+  // in the `name`/`img` snapshot) rendered "Unnamed tool" and the item-bag sentinel in
+  // BOTH the added row and the add-a-tool picker. The library entries are flattened
+  // exactly as `CraftingSystemManagerRoot.recipeToolsLibrary` flattens them, so the
+  // fixture is the real wire shape rather than a hand-tuned one.
+  const precedenceLibrary = TOOL_DISPLAY_PRECEDENCE_CASES.map((testCase) =>
+    flattenToolForRecipeLibrary(testCase.tool)
+  );
+
+  it('resolves every tool-display precedence case in the selected-tool rows', async () => {
+    const target = await editHarness.mount(
+      identityProps({
+        recipe: { ...RECIPE, toolIds: precedenceLibrary.map((tool) => tool.id) },
+        toolsLibrary: precedenceLibrary,
+      })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+
+    for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
+      const row = target.querySelector(`[data-recipe-tool-id="${testCase.tool.id}"]`);
+      assert.ok(row, `${testCase.id}: a row renders`);
+      assert.equal(
+        row.querySelector('.manager-recipe-tool-name').textContent.trim(),
+        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName,
+        `${testCase.id}: ${testCase.summary}`
+      );
+      assert.equal(
+        row.querySelector('img').getAttribute('src'),
+        testCase.expectedImg,
+        `${testCase.id}: the row renders the expected image`
+      );
+    }
+    editHarness.remount();
+  });
+
+  it('resolves every tool-display precedence case in the add-a-tool picker', async () => {
+    // The reporter saw the placeholders "when adding them to recipes", so the picker
+    // is a distinct assertion, not a corollary of the row one.
+    const target = await editHarness.mount(
+      identityProps({ recipe: { ...RECIPE, toolIds: [] }, toolsLibrary: precedenceLibrary })
+    );
+    clickTab(target, 'tools');
+    await flushRender();
+    target.querySelector('[data-recipe-section="tools"] .manager-recipe-tools-trigger').click();
+    await flushRender();
+
+    const options = [...document.querySelectorAll('.manager-travel-option')];
+    assert.equal(
+      options.length,
+      precedenceLibrary.length,
+      'the popover lists every unattached library tool'
+    );
+    for (const testCase of TOOL_DISPLAY_PRECEDENCE_CASES) {
+      const expectedName =
+        testCase.expectedName === null ? 'Unnamed tool' : testCase.expectedName;
+      const option = options.find((node) => node.textContent.includes(expectedName));
+      assert.ok(option, `${testCase.id}: the picker option shows "${expectedName}"`);
+      assert.equal(
+        option.querySelector('img')?.getAttribute('src'),
+        testCase.expectedImg,
+        `${testCase.id}: the picker option renders the expected image`
+      );
+    }
+    editHarness.remount();
+  });
+
   it('renders per-step ingredient groupings in a collapsible step accordion for a multi-step recipe', async () => {
     const target = await editHarness.mount(
       identityProps({
@@ -2386,10 +2477,17 @@ describe('RecipeEditView (mounted)', () => {
     const tagReq = set.querySelector('[data-recipe-group-id="grp-2"]');
     assert.ok(tagReq, 'the tag requirement renders');
     assert.ok(tagReq.querySelector('[data-recipe-tag="liquid"]'), 'the tag chip renders');
-    assert.equal(
-      tagReq.querySelector('[data-recipe-tag-match="any"]').getAttribute('aria-pressed'),
-      'true',
+    // The tag-match control is a SegmentedControl (issue 975): active state is the
+    // `.is-active` segment class and the checked state of its visually hidden radio,
+    // not an `aria-pressed` toggle button.
+    assert.ok(
+      tagReq.querySelector('[data-recipe-tag-match="any"]').classList.contains('is-active'),
       'tag match defaults to Any'
+    );
+    assert.equal(
+      tagReq.querySelector('[data-recipe-tag-match="any"] input[type="radio"]').checked,
+      true,
+      'and its radio is the checked one'
     );
 
     // §B7: the invented "AND" hairline dividers between requirements are gone — the
@@ -3074,8 +3172,11 @@ describe('RecipeEditView (mounted)', () => {
       { type: 'tags', tags: ['herbal'], tagMatch: 'any' },
       'adding a tag records it on the tags match'
     );
-    // The any/all toggle writes tagMatch.
-    tagTarget.querySelector('[data-recipe-option] [data-recipe-tag-match="all"]').click();
+    // The any/all toggle writes tagMatch. The real control is the visually hidden
+    // radio — the label is only the styled surface.
+    tagTarget
+      .querySelector('[data-recipe-option] [data-recipe-tag-match="all"] input[type="radio"]')
+      .click();
     await flushRender();
     assert.equal(
       next.at(-1).ingredientSets[0].ingredientGroups[0].options[0].match.tagMatch,
@@ -3092,9 +3193,14 @@ describe('RecipeEditView (mounted)', () => {
     );
     const option = tagTarget.querySelector('[data-recipe-option]');
     // The controls row leads with the Any/All toggle, then the Add tag control.
-    const controls = option.querySelector('.manager-recipe-option-tags-controls').innerHTML;
-    const toggleAt = controls.indexOf('manager-recipe-tag-match-toggle');
-    const triggerAt = controls.indexOf('manager-recipe-tag-trigger');
+    // Ordering asserted over the rendered NODES rather than an innerHTML substring
+    // scan: the toggle is now the shared SegmentedControl, whose track class is not
+    // recipe-specific, so a substring search would be ambiguous.
+    const controls = option.querySelector('.manager-recipe-option-tags-controls');
+    const kids = [...controls.children];
+    const has = (node, selector) => node.matches(selector) || Boolean(node.querySelector(selector));
+    const toggleAt = kids.findIndex((node) => has(node, '[data-recipe-tag-match]'));
+    const triggerAt = kids.findIndex((node) => has(node, '.manager-recipe-tag-trigger'));
     assert.ok(
       toggleAt !== -1 && triggerAt !== -1 && toggleAt < triggerAt,
       'the Any/All toggle precedes the Add tag control'

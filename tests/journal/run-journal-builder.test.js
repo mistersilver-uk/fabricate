@@ -137,7 +137,6 @@ function makeBuilder({
   recipe = RECIPE,
   getGatheringTask = null,
   getResultItem = null,
-  getRecipeItemImg = null,
   getComponent = null,
 } = {}) {
   return new RunJournalBuilder({
@@ -164,7 +163,6 @@ function makeBuilder({
     },
     getGatheringTask,
     getResultItem,
-    getRecipeItemImg,
     getComponent,
     localize,
     nowWorldTime: () => worldTime,
@@ -399,14 +397,20 @@ test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () =
   // The step label is blanked so a hidden multi-step recipe never leaks its
   // step count / active step name through the run journal.
   assert.equal(redacted.stepLabel, '');
-  // A hidden-identity run offers no "Trigger Next Step" advance.
-  assert.equal(redacted.manualAdvance, false);
-  // ...nor a player cancel (issue 848): a redacted run cannot be self-cancelled even by
-  // an owner, since surfacing the affordance would leak that a run exists to cancel.
+  // Redaction hides IDENTITY ONLY (issue 966). A crafting run always advances on a
+  // click — nothing resolves one automatically — so suppressing the affordance here
+  // stranded every timed craft of a recipe the crafter cannot see. The run card is
+  // already listed, so the affordance leaks nothing its redacted title does not.
+  assert.equal(redacted.manualAdvance, true);
+  // ...and an owner may still abandon it (issue 848 + 966).
   const redactedOwned = makeBuilder({ active: [activeCraftingRun()], recipeVisibility })
     .buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER })
     .activeRuns[0];
-  assert.equal(redactedOwned.canCancel, false, 'a redacted run is never cancellable');
+  assert.equal(redactedOwned.canCancel, true, 'an owner can cancel a redacted run');
+  // The identity redaction itself is unchanged on that owned projection.
+  assert.equal(redactedOwned.recipeId, null);
+  assert.equal(redactedOwned.names.title, 'FABRICATE.App.Journal.Redacted.Title');
+  assert.deepEqual(redactedOwned.steps, []);
 
   const visible = makeBuilder({ active: [activeCraftingRun()], recipeVisibility }).buildListing({
     actor: ACTOR,
@@ -515,7 +519,12 @@ test('gathering run with a blind/null taskId does not consult the task resolver'
   }).activeRuns[0];
 
   assert.equal(consulted, false, 'resolver not called for a blind task');
-  assert.equal(run.names.title, 'blind');
+  // Issue 901: the title is now the generic localization KEY, not the raw marker. The
+  // builder emits keys and the view localizes them, so a player used to be shown the
+  // literal string "blind" as a task title; they now get the same "Gather" label every
+  // other blind surface uses. The resolver assertion above is what this test is for and
+  // is unchanged.
+  assert.equal(run.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
   assert.equal(run.img, 'icons/svg/item-bag.svg');
 });
 
@@ -1010,23 +1019,29 @@ test('a dynamic-DC check surfaces the formula without a DC number', () => {
 const BLUEPRINT_IMG = 'icons/sundries/documents/blueprint-recipe-alchemical.webp';
 const ITEM_BAG = 'icons/svg/item-bag.svg';
 
-test('a recipe-item crafting run resolves the recipe-item definition image (never the item bag)', () => {
-  const recipeItemRecipe = { ...RECIPE, img: BLUEPRINT_IMG, recipeItemId: 'ri-1' };
+// Inverted with issue 887. This case previously asserted the BORROW — that a linked
+// recipe-item definition's image outranked the recipe's own. A recipe's icon is its own
+// `img` and nothing else (`data-models/spec.md` `## Recipe` requirement 16), so the
+// legacy `recipeItemId` scalar is no longer an input and the injected port that resolved
+// it is gone.
+test('a crafting run resolves the recipe OWN image, never a containing book/scroll', () => {
+  const AUTHORED = 'icons/consumables/potions/bottle-round-corked-red.webp';
 
-  // The recipe-item definition image wins over recipe.img.
+  // A recipe carrying the legacy scalar still renders its authored image. The scalar is
+  // retained on the fixture deliberately: deleting it would make this pass vacuously,
+  // whereas keeping it fails the moment anyone re-adds the borrow.
   let run = makeBuilder({
     active: [activeCraftingRun()],
-    recipe: recipeItemRecipe,
-    getRecipeItemImg: (systemId, recipeItemId) =>
-      systemId === 'sys-1' && recipeItemId === 'ri-1' ? 'icons/tools/smithing/anvil.webp' : null,
+    recipe: { ...RECIPE, img: AUTHORED, recipeItemId: 'ri-1' },
   }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
-  assert.equal(run.img, 'icons/tools/smithing/anvil.webp');
+  assert.equal(run.img, AUTHORED, 'an authored image is never outranked by a containing book');
 
-  // No definition image → recipe.img (blueprint), NEVER the item bag.
+  // A bag-valued recipe resolves the blueprint, NEVER the bag — the sentinel handling
+  // that made routing through `resolveRecipeImage` mandatory rather than collapsing to
+  // `recipe.img || DEFAULT`.
   run = makeBuilder({
     active: [activeCraftingRun()],
-    recipe: recipeItemRecipe,
-    getRecipeItemImg: () => null,
+    recipe: { ...RECIPE, img: ITEM_BAG, recipeItemId: 'ri-1' },
   }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
   assert.equal(run.img, BLUEPRINT_IMG);
   assert.notEqual(run.img, ITEM_BAG);

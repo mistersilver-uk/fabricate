@@ -1,0 +1,16 @@
+/*
+ * The View Lab cascade, layered exactly as Foundry's game view layers it.
+ *
+ * This file is served RAW (see the static mounts in `vite.config.js`) so that the browser -
+ * not a bundler - resolves these imports. Vite's PostCSS `@import` inliner would otherwise
+ * flatten them at dev-server time and drop the `layer()` annotations, which are the entire
+ * point: layer membership, not load order, is what decides who wins.
+ *
+ * Order and layers mirror `Express.CORE_VIEW_STYLES` and `View._getStaticContent`:
+ *   - foundry2.css is linked UNLAYERED ahead of this file (it declares no layer).
+ *   - Font Awesome is core's second view style, at layer "variables".
+ *   - fabricate.css is a module stylesheet; `module.json` gives it no explicit `layer`, and an
+ *     unlayered module sheet is imported at layer "modules".
+ */
+@import '/@foundry-chrome/fonts/fontawesome/css/all.min.css' layer(variables);
+@import '/@fabricate-styles/fabricate.css' layer(modules);

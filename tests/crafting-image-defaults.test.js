@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   DEFAULT_CRAFTING_IMAGE,
+  DEFAULT_MATERIAL_GLYPH,
   GENERIC_ITEM_IMAGE,
   resolveRecipeImage,
 } from '../src/ui/svelte/util/craftingImageDefaults.js';
@@ -19,6 +20,13 @@ describe('crafting image defaults', () => {
 
   it('pins the generic item-bag sentinel', () => {
     assert.equal(GENERIC_ITEM_IMAGE, 'icons/svg/item-bag.svg');
+  });
+
+  it('gives a material tile a glyph fallback that is NOT the recipe blueprint', () => {
+    // The blueprint is the recipe's fallback (issue 917). Reusing it for a component
+    // or tag requirement would tell the player their material is a recipe.
+    assert.ok(DEFAULT_MATERIAL_GLYPH.startsWith('fa'), 'the material fallback is a glyph class');
+    assert.notEqual(DEFAULT_MATERIAL_GLYPH, DEFAULT_CRAFTING_IMAGE);
   });
 
   describe('resolveRecipeImage', () => {

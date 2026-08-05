@@ -18,7 +18,7 @@
     onIncrement = null,
     onDecrement = null,
     onRemove = null,
-    onClear = null
+    onClear = null,
   } = $props();
 
   const queued = $derived(Array.isArray(entries) ? entries : []);
@@ -44,7 +44,7 @@
         isEssence: ing.isEssence === true,
         icon: ing.icon ?? null,
         have: ing.have ?? 0,
-        need: ing.totalNeed ?? 0
+        need: ing.totalNeed ?? 0,
       })),
     ...essences
       .filter((ess) => ess?.satisfied !== true)
@@ -54,8 +54,8 @@
         icon: ess.icon ?? null,
         isEssence: true,
         have: ess.have ?? 0,
-        need: ess.totalNeed ?? 0
-      }))
+        need: ess.totalNeed ?? 0,
+      })),
   ]);
 
   const acquireTools = $derived(
@@ -65,7 +65,7 @@
         key: `tool:${tool.componentId ?? tool.name}`,
         name: tool.name ?? '',
         img: tool.img ?? null,
-        needsRepair: tool.needsRepair === true
+        needsRepair: tool.needsRepair === true,
       }))
   );
 
@@ -76,18 +76,14 @@
   function ownedLabel(row) {
     return localize('FABRICATE.App.Crafting.Shopping.Owned', { have: row.have, need: row.need });
   }
-  function onEntryKey(recipeId, event) {
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault();
-      onIncrement?.(recipeId);
-    }
-  }
   function onEntryContext(recipeId, event) {
     event.preventDefault();
     onDecrement?.(recipeId);
   }
-  function onEntryRemove(recipeId, event) {
-    event.stopPropagation();
+  // No `stopPropagation`: the × is a SIBLING of the row's activation button, not a
+  // descendant of it, so a click here was never on its way to the increment handler.
+  // (It was, back when the whole `<li>` carried `onclick`.)
+  function onEntryRemove(recipeId) {
     onRemove?.(recipeId);
   }
 </script>
@@ -153,25 +149,39 @@
         </p>
         <ul class="crafting-shopping-queue">
           {#each queued as entry (entry.recipeId)}
+            <!--
+              The row stays a real `listitem` and nests a real `<button>` for the
+              increment action. It is NOT itself a button: it already contains the
+              remove `<button>`, and `<button>`'s content model forbids interactive
+              descendants. That would not self-correct — Svelte builds the DOM with
+              `createElement`/`appendChild` and never goes through the HTML parser, so
+              the invalid nesting would ship rather than being implicitly closed.
+
+              `oncontextmenu` stays on the `<li>` on purpose: right-clicking anywhere
+              on the row — the × included — decrements, which is the behaviour the row
+              has always had.
+            -->
             <li
               class="crafting-shopping-entry"
-              data-shopping-entry={entry.recipeId}
-              role="button"
-              tabindex="0"
-              title={entry.name}
-              onclick={() => onIncrement?.(entry.recipeId)}
               oncontextmenu={(event) => onEntryContext(entry.recipeId, event)}
-              onkeydown={(event) => onEntryKey(entry.recipeId, event)}
             >
-              <CraftingThumb src={entry.img} alt="" size={28} />
-              <span class="crafting-shopping-entry-name">{entry.name}</span>
-              <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
+              <button
+                type="button"
+                class="crafting-shopping-entry-main"
+                data-shopping-entry={entry.recipeId}
+                title={entry.name}
+                onclick={() => onIncrement?.(entry.recipeId)}
+              >
+                <CraftingThumb src={entry.img} alt="" size={28} />
+                <span class="crafting-shopping-entry-name">{entry.name}</span>
+                <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
+              </button>
               <button
                 type="button"
                 class="crafting-shopping-remove"
                 title={localize('FABRICATE.App.Crafting.Shopping.Remove')}
                 aria-label={localize('FABRICATE.App.Crafting.Shopping.Remove')}
-                onclick={(event) => onEntryRemove(entry.recipeId, event)}
+                onclick={() => onEntryRemove(entry.recipeId)}
               >
                 <i class="fas fa-xmark" aria-hidden="true"></i>
               </button>
@@ -386,24 +396,90 @@
     gap: 6px;
   }
 
+  /* The row's own padding moved INSIDE the activation button, so the whole padded area
+     stays clickable rather than shrinking the target by the 4px/6px band. The `×` is a
+     SIBLING of that button, not a descendant, so the right edge is restored here —
+     without it the `×` would sit flush against the row border. */
   .crafting-shopping-entry {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 4px 6px;
+    padding: 0 6px 0 0;
     border: 1px solid var(--fab-border);
     border-radius: 6px;
     background: var(--fab-surface);
-    cursor: pointer;
   }
 
   .crafting-shopping-entry:hover {
     background: var(--fab-surface-raised);
   }
 
-  .crafting-shopping-entry:focus-visible {
+  /* Both elements are in this template, so the compiler can see this `:has()` and keeps
+     it — unlike a `:has()` reaching across a component boundary, which it prunes. */
+  .crafting-shopping-entry:has(.crafting-shopping-entry-main:focus-visible) {
     outline: 2px solid var(--fab-accent);
     outline-offset: -2px;
+  }
+
+  /*
+    The row's activation target. Foundry's `@layer elements.forms` paints every `<button>`
+    with its own background, border, fixed `--button-size` height and an explicit 14px
+    Signika face, so all of that is reset here. A scoped block is the right home for it:
+    `css: 'injected'` emits these rules UNLAYERED, and an unlayered rule beats a layered
+    one whatever the specificity. (The comment above `.manager-access-row` in
+    `styles/fabricate.css` says a scoped override is unreliable against Foundry's `button`
+    rule — issue 511. `button.manager-chip` in `Chip.svelte` is the shipped counter-example;
+    moving this to the global sheet would also drag the whole theme screenshot scope in.)
+
+    Named reasons for the non-obvious declarations:
+     - `background`/`border` — Foundry paints BOTH, so unreset this draws a boxed button
+       inside the row's own border and surface.
+     - `flex: 1 1 auto; min-width: 0` — as a flex child of the `<li>`. Without it the
+       button shrink-wraps, the `×` unpins from the right edge, and the name's ellipsis
+       truncation stops working.
+     - `text-align: left` — buttons carry the UA's `text-align: center`, which
+       `appearance: none` does not clear; it would inherit into the flex-grown name.
+     - the four font longhands — Foundry's `@layer reset` sets `font: inherit` on buttons,
+       but `elements.forms` overrides it with an explicit 14px Signika and the later layer
+       wins regardless of specificity. `.crafting-shopping-entry-qty` declares no
+       `font-size`, so unreset the quantity would jump to 14px while the 13px name held,
+       shifting the row baseline.
+     - `height: auto` + `min-height` — the row needs ~36px (a 28px thumb plus padding)
+       against Foundry's ~32px `--button-size` floor, which would otherwise clip it.
+  */
+  .crafting-shopping-entry-main {
+    appearance: none;
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    height: auto;
+    min-height: 36px;
+    margin: 0;
+    padding: 4px 6px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+    cursor: pointer;
+  }
+
+  /* The ROW draws the ring (the `:has()` rule above). Without this the button ALSO
+     matches `.fabricate-app button:focus-visible` in `styles/fabricate.css` and the row
+     gets two concentric accent rings, the outer one painting over its border. Scoped,
+     this is (0,3,0) and beats that area rule at (0,2,1) — which is held at single-class
+     specificity for exactly this purpose. `.crafting-shopping-remove:focus-visible`
+     below is the same pattern. The area rule's `:focus` half already covers the mouse
+     case, so `:focus-visible` alone is enough. */
+  .crafting-shopping-entry-main:focus-visible {
+    outline: none;
   }
 
   .crafting-shopping-entry-name {

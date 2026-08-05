@@ -21,6 +21,7 @@
   per-step instances are distinguishable in tests.
 -->
 <script>
+  import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeResultGroupCard from './RecipeResultGroupCard.svelte';
 
@@ -47,7 +48,7 @@
     // Deep-link from a progressive row's read-only difficulty badge to the component
     // editor's Difficulty card.
     onOpenComponent = () => {},
-    idPrefix = ''
+    idPrefix = '',
   } = $props();
 
   function text(key, fallback) {
@@ -77,7 +78,7 @@
     return sets.map((set, index) => ({
       id: set.id,
       name: setDisplayName(set, index),
-      disabled: !!set.resultGroupId && set.resultGroupId !== group.id
+      disabled: !!set.resultGroupId && set.resultGroupId !== group.id,
     }));
   }
 
@@ -96,7 +97,7 @@
     return tierOptions.map((tier) => ({
       id: tier.id,
       name: tier.name,
-      disabled: elsewhere.has(tier.id)
+      disabled: elsewhere.has(tier.id),
     }));
   }
 
@@ -209,14 +210,26 @@
       />
     </div>
   {:else if groups.length === 0}
-    <div class="manager-recipe-section-empty">
-      <p class="manager-recipe-section-empty-title">{text('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}</p>
-      <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint', 'Add a set of items this recipe can produce.')}</p>
-      <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
+    <EmptyState
+      compact
+      icon="fas fa-gift"
+      title={text('FABRICATE.Admin.Manager.Recipe.ResultsEmpty', 'No results yet')}
+      hint={text(
+        'FABRICATE.Admin.Manager.Recipe.ResultsEmptyHint',
+        'Add a set of items this recipe can produce.'
+      )}
+      contextClass="manager-recipe-tab-empty"
+    >
+      <button
+        type="button"
+        class="manager-button is-dashed manager-recipe-add-full"
+        data-recipe-add="result-set"
+        onclick={() => addGroup()}
+      >
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
       </button>
-    </div>
+    </EmptyState>
   {:else}
     <!-- Results has NO OR relationship between groups (§C2): the producing group is
          chosen at craft time by outcome/routing, so no OR divider sits between them. -->
@@ -241,7 +254,12 @@
         </li>
       {/each}
     </ul>
-    <button type="button" class="manager-button is-dashed manager-recipe-add-full" data-recipe-add="result-set" onclick={() => addGroup()}>
+    <button
+      type="button"
+      class="manager-button is-dashed manager-recipe-add-full"
+      data-recipe-add="result-set"
+      onclick={() => addGroup()}
+    >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.Recipe.AddResultSet', 'Add result set')}</span>
     </button>

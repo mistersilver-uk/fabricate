@@ -1,6 +1,6 @@
 import { readInteractableBehaviorSystem } from '../canvas/regions/interactableRegionFlags.js';
 
-import { normalizeNodeConfig } from './gatheringNodeConfig.js';
+import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
 import {
   cloneJson,
   durationToSeconds,
@@ -8,7 +8,7 @@ import {
   normalizeList,
   numberOrNullStrict,
 } from './gatheringRichStateInternals.js';
-import { respawnNodeOnce } from './nodeRespawnMath.js';
+import { resolveAccrualAnchor, respawnNodeOnce } from './nodeRespawnMath.js';
 
 /**
  * Owns the finite resource-node subsystem extracted from
@@ -42,6 +42,15 @@ export class GatheringNodeService {
    *   resolver by ref (issue 302).
    * @param {Function|null} [options.writeInteractableBehavior] Interactable
    *   scoped-node writer (issue 302).
+   * @param {Function|null} [options.depleteEnvironmentNode] GM-routed environment
+   *   node depletion seam. Called as `({ environmentId, taskId })` when a gathering
+   *   attempt consumes a unit from the ENVIRONMENT pool. Present in the live module
+   *   (main.js injects the socket writer) because the pool is persisted in a WORLD
+   *   setting only a GM may update; absent by default, in which case the write is
+   *   applied directly (GM-only worlds and unit tests).
+   * @param {Function|null} [options.nodesEnabled] `(systemId) => boolean` economy
+   *   gate, so the active-GM applier re-checks the toggle instead of trusting the
+   *   requesting client.
    */
   constructor({
     environmentStore = null,
@@ -53,6 +62,8 @@ export class GatheringNodeService {
     nowWorldTime = () => 0,
     resolveRegionBehavior = null,
     writeInteractableBehavior = null,
+    depleteEnvironmentNode = null,
+    nodesEnabled = null,
   } = {}) {
     this.environmentStore = environmentStore;
     this.getConfig = getConfig;
@@ -65,6 +76,9 @@ export class GatheringNodeService {
       typeof resolveRegionBehavior === 'function' ? resolveRegionBehavior : null;
     this.writeInteractableBehavior =
       typeof writeInteractableBehavior === 'function' ? writeInteractableBehavior : null;
+    this.depleteEnvironmentNode =
+      typeof depleteEnvironmentNode === 'function' ? depleteEnvironmentNode : null;
+    this.nodesEnabled = typeof nodesEnabled === 'function' ? nodesEnabled : null;
   }
 
   async restockNode({ environmentId, taskId, current = null, max = null } = {}) {
@@ -117,8 +131,8 @@ export class GatheringNodeService {
   /**
    * Resolve the node source for an attempt: either the ENVIRONMENT pool (default,
    * unchanged) or an interactable's OWN scoped pool (issue 302), selected by the
-   * `interactableRef`. Returns a `{ kind, read(), write(node) }` handle so the
-   * gate / depletion / listing touchpoints stay scope-agnostic.
+   * `interactableRef`. Returns a `{ kind, read(), write(node), deplete(node) }` handle
+   * so the gate / depletion / listing touchpoints stay scope-agnostic.
    *
    * - No `interactableRef` → `kind: 'environment'`. `read()` returns the task's
    *   composed node (`task.nodes`); `write(node)` persists into the per-environment
@@ -131,18 +145,34 @@ export class GatheringNodeService {
    * - Any other ref (behaviour gone, environment scope, malformed node) falls back
    *   to the environment branch — safe and never throws.
    *
+   * `deplete(node)` is the ATTEMPT-COMMIT write and is distinct from `write(node)`
+   * because the environment pool lives in a world setting a player may not update.
+   * When the GM-routing seam is injected it takes over, and the caller's already
+   * decremented `node` is deliberately NOT sent: the active GM recomputes the single
+   * unit from its own stored state (see {@link applyEnvironmentNodeDepletion}). The
+   * interactable branch keeps writing the node through its own GM-routed behaviour
+   * writer, which is where issue 302 solved the same problem.
+   *
    * @param {object} params
    * @param {object} params.environment
    * @param {object} params.task
    * @param {{sceneId:string,regionId:string,behaviorId:string}|null} [params.interactableRef]
-   * @returns {{ kind: 'environment'|'interactable', read: () => (object|null), write: (node: object) => (void|Promise<void>) }}
+   * @returns {{ kind: 'environment'|'interactable', read: () => (object|null), write: (node: object) => (void|Promise<void>), deplete: (node: object) => (void|Promise<void>) }}
    */
   _resolveNodeSource({ environment, task, interactableRef = null } = {}) {
     const environmentSource = {
       kind: 'environment',
+      // Whether `deplete` hands the write to another client. When true this client
+      // never learns the count the GM actually wrote, so callers must not publish
+      // their locally computed `current` as fact (see `commitAcceptedAttempt`).
+      routed: !!this.depleteEnvironmentNode,
       read: () => task?.nodes ?? null,
       write: (node) =>
         this._writeNodeState({ environmentId: environment?.id, taskId: task?.id, node }),
+      deplete: (node) =>
+        this.depleteEnvironmentNode
+          ? this.depleteEnvironmentNode({ environmentId: environment?.id, taskId: task?.id })
+          : this._writeNodeState({ environmentId: environment?.id, taskId: task?.id, node }),
     };
 
     if (!interactableRef || typeof this.resolveRegionBehavior !== 'function') {
@@ -160,12 +190,51 @@ export class GatheringNodeService {
       return environmentSource;
     }
 
+    const write = (node) => this.writeInteractableBehavior?.(interactableRef, { node });
     return {
       kind: 'interactable',
+      // The behaviour writer already relays to the active GM (issue 302), but it sends
+      // the caller's node object rather than recomputing, so this client's `current` IS
+      // what gets written. Left as `false` deliberately: flipping it would change the
+      // pre-existing interactable reporting, which is outside this change.
+      routed: false,
       // Self-authoritative scoped pool — no library merge (it owns its own config).
       read: () => view.node,
-      write: (node) => this.writeInteractableBehavior?.(interactableRef, { node }),
+      write,
+      // Already GM-routed by the behaviour writer (issue 302) — no extra hop.
+      deplete: write,
     };
+  }
+
+  /**
+   * ACTIVE-GM edge for a routed environment node depletion: consume one unit of the
+   * addressed pool and persist it. Recomputes the decrement from the GM's OWN stored
+   * state rather than trusting any node object off the wire, so concurrent gatherers
+   * are additive and a forged request can only ever take one unit off the pool it
+   * addresses.
+   *
+   * No-ops (returning null) when the environment is gone, the task has no node
+   * config, or the crafting system's node economy is disabled.
+   *
+   * @param {{ environmentId: string, taskId: string }} args
+   * @returns {Promise<object|null>} The updated environment, or null on no-op.
+   */
+  async applyEnvironmentNodeDepletion({ environmentId, taskId } = {}) {
+    const environment = this.environmentStore?.get?.(environmentId);
+    if (!environment) return null;
+    if (this.nodesEnabled && this.nodesEnabled(environment.craftingSystemId) !== true) return null;
+    const existing = this._currentNodeState(environment, taskId);
+    if (!existing) return null;
+    // Library config is authoritative (mirrors restockNode): merge it over the
+    // stored runtime so a stale per-environment snapshot cannot resurrect an old
+    // `max` or respawn policy through the decrement.
+    const effective = this._mergeNodeConfigState(
+      this._libraryNodeConfigs(environment.craftingSystemId).get(String(taskId)) || null,
+      existing
+    );
+    const node = depleteNodeOnce(effective, { worldTime: Number(this.nowWorldTime?.() ?? 0) });
+    if (!node) return null;
+    return this._writeNodeState({ environmentId, taskId, node });
   }
 
   /**
@@ -313,8 +382,8 @@ export class GatheringNodeService {
       return { changed: false, node: nodes };
     }
     // The respawn ARITHMETIC (interval resolution, gain per mode, anchor advance,
-    // backwards/stalled-time re-anchor, room===0 short-circuit, max-clamp early
-    // break) is the single pure implementation in `nodeRespawnMath`. This env
+    // absent-anchor seed, backward-time freeze, room===0 short-circuit, max-clamp
+    // early break) is the single pure implementation in `nodeRespawnMath`. This env
     // path injects the SAME calendar/random seams the per-token adapter uses —
     // `secondsPerUnit` (legacy `intervalSeconds` falls through inside the math),
     // the `rollD100() <= chance*100` chance seam, and a SYNCHRONOUS expression
@@ -323,18 +392,22 @@ export class GatheringNodeService {
     // implementation removes the prior `_respawnNode`/`respawnNodeOnce` drift.
 
     // Pre-roll expression amounts asynchronously (the math is sync). The needed
-    // count is bounded by the elapsed whole intervals capped by the restock room,
-    // mirroring the math's stochastic-loop bound; the math may consume fewer (the
-    // max-clamp early break) — surplus pre-rolls are simply unused.
+    // count is bounded by the elapsed whole intervals capped by the restock room.
+    // The anchor MUST be resolved through the math's own shared predicate
+    // (`resolveAccrualAnchor`, issues 403/896) rather than a local finiteness
+    // test: `Number(null) === 0` is finite, so the lax form read the `null` anchor
+    // of an unevaluated pool as world time 0 and pre-rolled a whole restock of
+    // real, awaited, `Roll`-backed evaluations that the math's seed branch then
+    // consumed NONE of. With the predicates shared, the bound again mirrors the
+    // math's stochastic-loop bound; the math may still consume fewer (the
+    // max-clamp early break) — those surplus pre-rolls are simply unused.
     let expressionRolls = null;
     let expressionCursor = 0;
     if ((respawn.gainMode || 'guaranteed') === 'expression') {
       const interval = respawn.intervalUnit
         ? durationToSeconds(this.secondsPerUnit, respawn.intervalAmount, respawn.intervalUnit)
         : Number(respawn.intervalSeconds || 0);
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-        ? Number(respawn.lastEvaluatedWorldTime)
-        : now;
+      const last = resolveAccrualAnchor(respawn.lastEvaluatedWorldTime, now);
       if (interval > 0 && now > last) {
         const elapsedIntervals = Math.floor((now - last) / interval);
         const room = Math.max(0, Number(nodes.max || 0) - Number(nodes.current || 0));
@@ -365,8 +438,8 @@ export class GatheringNodeService {
     if (changed) {
       const nextCurrent = Number(node?.current ?? before);
       const max = Number(node?.max ?? nodes.max ?? 0);
-      // Only emit the respawn hook when the count actually moved (a pure
-      // re-anchor changes the node but gains nothing).
+      // Only emit the respawn hook when the count actually moved (a seed or a
+      // room===0 anchor advance changes the node but gains nothing).
       if (nextCurrent !== before) {
         this.callHook('fabricate.gathering.nodeRespawned', {
           environmentId,
@@ -404,16 +477,17 @@ export class GatheringNodeService {
     if (!Number.isFinite(now)) return { changed: false, node };
 
     // Pre-roll expression amounts asynchronously (the math is sync), mirroring the
-    // env path's bound: elapsed whole intervals capped by the restock room.
+    // env path's bound: elapsed whole intervals capped by the restock room, with
+    // the anchor resolved through the math's shared absent-anchor predicate
+    // (issues 403/896) so a never-evaluated pool pre-rolls nothing on its seeding
+    // tick. See `_respawnNode` for why the lax finiteness test was wrong.
     let expressionRolls = null;
     let expressionCursor = 0;
     if ((respawn.gainMode || 'guaranteed') === 'expression') {
       const interval = respawn.intervalUnit
         ? durationToSeconds(this.secondsPerUnit, respawn.intervalAmount, respawn.intervalUnit)
         : Number(respawn.intervalSeconds || 0);
-      const last = Number.isFinite(Number(respawn.lastEvaluatedWorldTime))
-        ? Number(respawn.lastEvaluatedWorldTime)
-        : now;
+      const last = resolveAccrualAnchor(respawn.lastEvaluatedWorldTime, now);
       if (interval > 0 && now > last) {
         const elapsedIntervals = Math.floor((now - last) / interval);
         const room = Math.max(0, Number(node.max || 0) - Number(node.current || 0));

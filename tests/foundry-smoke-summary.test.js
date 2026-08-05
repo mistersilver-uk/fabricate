@@ -19,8 +19,20 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HARNESS_PATH = join(__dirname, '..', 'scripts', 'foundry-test-run.mjs');
 
-// The in-source Foundry canvas-artefact default the harness always ships with.
-const OBJECTS_DEFAULT = /reading 'OBJECTS'/;
+// A stand-in for "some pattern supplied as an in-source default", built HERE. Every test
+// below hands `appendAllowedConsoleErrorPatterns` its defaults array explicitly and none of
+// them reads the harness's own `ignoredErrorPatternDefaults`, so what this file pins is the
+// append-and-keep-applying CONTRACT, not the contents of that list.
+//
+// HISTORICAL, and named so it cannot read as anything else: this is the shape of the
+// `/reading 'OBJECTS'/` canvas waiver the harness genuinely did ship until issue 1010
+// RETIRED it, on finding it had spent a year masking a harness defect — a scene wait that
+// resolved mid-draw — rather than a headless browser artefact. Nothing replaced it. Do not
+// read its survival here as evidence that it, or a priority-renamed variant of it, should
+// come back; read the note on `appendAllowedConsoleErrorPatterns` in
+// `scripts/lib/foundrySmokeSignal.js` and the retirement note in `scripts/foundry-test-run.mjs`
+// first, because a returning message of either form is a regression to diagnose.
+const RETIRED_OBJECTS_WAIVER = /reading 'OBJECTS'/;
 
 // ── The split smoke signal ────────────────────────────────────────────────
 
@@ -94,36 +106,39 @@ test('parseAllowedConsoleErrorPatterns fails fast on a malformed pattern, naming
 });
 
 test('--allowed-console-error-patterns APPENDS to the in-source defaults, never replaces them', () => {
-  const combined = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'my-benign-pattern');
+  const combined = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'my-benign-pattern');
 
   // The appended pattern is honoured...
   assert.ok(isConsoleErrorWaived('saw my-benign-pattern in the log', combined));
-  // ...AND the Foundry canvas-artefact default STILL applies with the flag set.
+  // ...AND the supplied default STILL applies with the flag set, which is the property
+  // this file pins. Which patterns the harness supplies is the harness's business, and is
+  // pinned there — today it supplies no canvas waiver at all.
   assert.ok(isConsoleErrorWaived("Cannot read properties of undefined (reading 'OBJECTS')", combined));
 
   // Defaults come first, then the CSV patterns; nothing is dropped.
   assert.equal(combined.length, 2);
-  assert.equal(combined[0], OBJECTS_DEFAULT);
+  assert.equal(combined[0], RETIRED_OBJECTS_WAIVER);
 });
 
 test('an unrelated error is still gating even with a waiver pattern set', () => {
-  const combined = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'my-benign-pattern');
+  const combined = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'my-benign-pattern');
   assert.equal(isConsoleErrorWaived('a real Fabricate regression', combined), false);
 });
 
 test('a pageerror is waivable by a matching pattern and NOT by a non-matching one', () => {
   // The pageerror handler tests err.message against the same pattern set, so a
   // matching appended pattern waives it — the deliberate existing capability.
-  const waived = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'benign lifecycle glitch');
+  const waived = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'benign lifecycle glitch');
   assert.ok(isConsoleErrorWaived('benign lifecycle glitch during teardown', waived));
 
   // A non-matching pattern does not waive it.
-  const nonMatching = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'some other thing');
+  const nonMatching = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'some other thing');
   assert.equal(isConsoleErrorWaived('benign lifecycle glitch during teardown', nonMatching), false);
 
-  // And the always-present OBJECTS default waives the Foundry canvas pageerror
-  // even with no CLI patterns supplied.
-  const defaultsOnly = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], '');
+  // And a supplied default keeps waiving with no CLI patterns at all, so an empty CSV
+  // narrows nothing. Stated over the retired fixture rather than over whatever the harness
+  // ships today, because the claim is about the EMPTY-CSV path and not about that list.
+  const defaultsOnly = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], '');
   assert.ok(isConsoleErrorWaived("Cannot read properties of undefined (reading 'OBJECTS')", defaultsOnly));
 });
 
@@ -152,7 +167,7 @@ test('no input waives a step failure — an all-waived console list still throws
   // Model the full pipeline: the waiver removed every console error (consoleErrors
   // is empty because all matched a pattern), yet a step failed. The run MUST still
   // throw, and with reason 'steps' — the waiver cannot rescue a failed step.
-  const patterns = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'everything is benign');
+  const patterns = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'everything is benign');
   const capturedButAllWaived = ['everything is benign here', "reading 'OBJECTS'"];
   const gatingConsoleErrors = capturedButAllWaived.filter((text) => !isConsoleErrorWaived(text, patterns));
   assert.deepEqual(gatingConsoleErrors, []); // all waived → nothing gates on console
@@ -166,7 +181,7 @@ test('no input waives a step failure — an all-waived console list still throws
 });
 
 test('a clean run with all console errors waived does not throw', () => {
-  const patterns = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'benign');
+  const patterns = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'benign');
   const captured = ['a benign thing', "reading 'OBJECTS'"];
   const gating = captured.filter((text) => !isConsoleErrorWaived(text, patterns));
   const outcome = evaluateSmokeOutcome({
@@ -179,7 +194,7 @@ test('a clean run with all console errors waived does not throw', () => {
 // ── The shared capture-routing seam (both handlers go through it) ─────────
 
 test('classifyCapturedError routes a matching error to waived and a non-matching one to gating', () => {
-  const patterns = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'benign lifecycle glitch');
+  const patterns = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'benign lifecycle glitch');
 
   // The Foundry canvas-artefact default and an appended pattern both waive.
   assert.deepEqual(classifyCapturedError("reading 'OBJECTS' blew up", patterns), { waived: true });
@@ -192,11 +207,11 @@ test('classifyCapturedError routes a matching error to waived and a non-matching
 test('classifyCapturedError routes identically regardless of console-vs-pageerror origin', () => {
   // Both handlers feed the SAME classifier, so a pageerror message and a console
   // error text with the same content route the same way — pageerror stays waivable.
-  const patterns = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'shared benign');
+  const patterns = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'shared benign');
   const text = 'shared benign teardown noise';
   assert.equal(classifyCapturedError(text, patterns).waived, true);
 
-  const nonMatching = appendAllowedConsoleErrorPatterns([OBJECTS_DEFAULT], 'something else');
+  const nonMatching = appendAllowedConsoleErrorPatterns([RETIRED_OBJECTS_WAIVER], 'something else');
   assert.equal(classifyCapturedError(text, nonMatching).waived, false);
 });
 
@@ -358,8 +373,11 @@ test('source: responsive evidence viewports narrowly waive Foundry minimum-resol
   const source = await readFile(HARNESS_PATH, 'utf8');
   assert.match(
     source,
-    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|900px by 700px\|680px by 700px/,
+    /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater[\s\S]*?1280px by 720px\|1280px by 520px\|900px by 700px\|680px by 700px/,
   );
+  // The waiver stays dimension-specific: an unexpected low-resolution run must still
+  // fail the smoke, so a catch-all pattern would defeat its purpose (issue 881).
+  assert.doesNotMatch(source, /display has a resolution of \(\?:\.\*\)/);
 });
 
 test('source: smoke-world cleanup removes stale chat cards before stale documents', async () => {

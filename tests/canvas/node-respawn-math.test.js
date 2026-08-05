@@ -91,18 +91,64 @@ test('respawnNodeOnce expression: early-breaks once the pool is full (clamp)', (
   assert.equal(next.respawn.lastRoll.rolls.length, 1);
 });
 
-// --- respawnNodeOnce: re-anchor & room===0 branches ------------------------
+// --- respawnNodeOnce: accrual-anchor & room===0 branches -------------------
 
-test('respawnNodeOnce backwards/stalled time: re-anchors, never gains', () => {
+// issue 403: `lastEvaluatedWorldTime` is an ACCRUAL anchor — a high-water mark of
+// the entitlement already granted — so it is monotonic non-decreasing. A backward
+// world-time tick freezes it (writing nothing at all, so no persisted state is
+// rewritten and no clamp rides along); moving it back would re-grant the intervals
+// between the rewound instant and the anchor on the way forward again.
+test('respawnNodeOnce backwards/stalled time: freezes the anchor and writes nothing', () => {
   const node = { current: 2, max: 5, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 10 * HOUR } };
-  // now (5h) < last (10h): re-anchor to now, no gain.
+  // now (5h) < anchor (10h): freeze — no gain, no re-anchor, nothing to persist.
   const back = respawnNodeOnce(node, { now: 5 * HOUR, secondsPerUnit: secondsPerHour });
-  assert.equal(back.changed, true);
+  assert.equal(back.changed, false, 'a rewind reports no change, so the caller writes nothing');
+  assert.equal(back.node, node, 'the node is returned untouched, not rebuilt');
   assert.equal(back.node.current, 2, 'no gain on backwards time');
-  assert.equal(back.node.respawn.lastEvaluatedWorldTime, 5 * HOUR);
+  assert.equal(back.node.respawn.lastEvaluatedWorldTime, 10 * HOUR, 'the anchor may legitimately sit ahead of now');
   // now === last: nothing changes.
   const still = respawnNodeOnce({ ...node, respawn: { ...node.respawn, lastEvaluatedWorldTime: 5 * HOUR } }, { now: 5 * HOUR, secondsPerUnit: secondsPerHour });
   assert.equal(still.changed, false);
+});
+
+test('respawnNodeOnce: a rewind then fast-forward to the same instant grants nothing', () => {
+  const node = { current: 1, max: 5, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 10 * HOUR } };
+  const back = respawnNodeOnce(node, { now: 2 * HOUR, secondsPerUnit: secondsPerHour });
+  const forward = respawnNodeOnce(back.node, { now: 10 * HOUR, secondsPerUnit: secondsPerHour });
+  assert.equal(forward.changed, false, 'no free nodes for time already accounted for');
+  assert.equal(forward.node.current, 1);
+  // Past the frozen anchor the pool is live again — the freeze is not permanent.
+  const later = respawnNodeOnce(forward.node, { now: 13 * HOUR, secondsPerUnit: secondsPerHour });
+  assert.equal(later.node.current, 4, '+3 intervals measured from the frozen anchor');
+});
+
+// An ABSENT anchor is seeded, never frozen — and the absent case must be decided
+// BEFORE the backward comparison. `normalizeRespawn`/`_mergeNodeConfigState` emit
+// `null` (never `undefined`) for an unevaluated pool, and `Number(null) === 0` is
+// finite, so a `null` anchor reads as "anchored at world time 0" and takes the
+// FORWARD branch for any now > 0 — an absent-check folded inside the backward
+// branch would never fire in production. The predicate is nullish OR non-finite:
+// dropping the finiteness half persists a NaN anchor and a NaN count.
+test('respawnNodeOnce absent/garbage anchor: seeds at now, then regenerates from the seed', () => {
+  const pool = (anchor) => ({
+    current: 1,
+    max: 5,
+    respawn: {
+      policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1,
+      ...(anchor === undefined ? {} : { lastEvaluatedWorldTime: anchor })
+    }
+  });
+  for (const [label, anchor] of [['missing key', undefined], ['null', null], ['garbage', 'nope']]) {
+    const seeded = respawnNodeOnce(pool(anchor), { now: 4 * HOUR, secondsPerUnit: secondsPerHour });
+    assert.equal(seeded.changed, true, `${label}: the seed is reported so the caller persists it`);
+    assert.equal(seeded.node.current, 1, `${label}: seeding grants no backlog`);
+    assert.equal(seeded.node.respawn.lastEvaluatedWorldTime, 4 * HOUR, `${label}: anchored at now`);
+    // Second observation: a single call cannot distinguish "seeded correctly"
+    // from "frozen forever", so prove the seeded pool still accrues.
+    const later = respawnNodeOnce(seeded.node, { now: 6 * HOUR, secondsPerUnit: secondsPerHour });
+    assert.equal(later.changed, true, `${label}: live after seeding, not frozen`);
+    assert.equal(later.node.current, 3, `${label}: +2 intervals after the seed`);
+  }
 });
 
 test('respawnNodeOnce room===0: advances the anchor without gaining (already full)', () => {
@@ -121,6 +167,32 @@ test('nextRespawnEta: legacy intervalSeconds node → next anchor strictly after
   assert.ok(eta);
   assert.equal(eta.nextWorldTime, 2 * HOUR, 'next whole interval boundary after now');
   assert.equal(eta.secondsUntil, 30 * 60);
+});
+
+// issue 896: `Number(null) === 0` is finite, so the ETA used to count down
+// against an epoch-zero grid for a pool that has never been evaluated. A literal
+// `null` is required to exercise this — `Number(undefined)` is `NaN`, so a
+// missing key already took the correct branch before the fix.
+test('nextRespawnEta: a null-anchored pool reports one whole interval (the pending seed), not an epoch-zero remainder', () => {
+  const node = { current: 0, max: 5, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: null } };
+  const eta = nextRespawnEta(node, secondsPerHour, 5.5 * HOUR);
+  assert.ok(eta);
+  assert.equal(eta.secondsUntil, HOUR, 'issue 896: the pool seeds on the next tick and gains one whole interval after that');
+  assert.equal(eta.nextWorldTime, 6.5 * HOUR, 'issue 896: the countdown runs from the pending seed at now, not from world time 0');
+});
+
+// REGRESSION PIN, not fix evidence: #403's accrual policy lets the anchor sit
+// AHEAD of `now` (a world-time rewind FREEZES the pool rather than re-anchoring),
+// and `nextRespawnEta`'s `Math.max(0, nowTime - last)` clamp already reports that
+// correctly. Both the old and the new predicate resolve a present finite anchor
+// identically, so this cannot fail before the fix — it pins behaviour #896 must
+// not disturb.
+test('nextRespawnEta: an anchor ahead of now still reports the anchor-relative countdown', () => {
+  const node = { current: 0, max: 5, respawn: { policy: 'overTime', gainMode: 'guaranteed', intervalUnit: 'hours', intervalAmount: 1, lastEvaluatedWorldTime: 10 * HOUR } };
+  const eta = nextRespawnEta(node, secondsPerHour, 2 * HOUR);
+  assert.ok(eta);
+  assert.equal(eta.nextWorldTime, 11 * HOUR, 'one interval past the frozen anchor');
+  assert.equal(eta.secondsUntil, 9 * HOUR, 'measured from now, matching what the frozen pool actually does');
 });
 
 test('nextRespawnEta: manual policy / at-max → null (never auto-respawns)', () => {

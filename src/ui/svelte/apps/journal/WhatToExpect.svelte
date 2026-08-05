@@ -14,7 +14,7 @@
   const COPY_KEYS = {
     crafting: 'FABRICATE.App.Journal.WhatToExpect.Crafting',
     gathering: 'FABRICATE.App.Journal.WhatToExpect.Gathering',
-    salvage: 'FABRICATE.App.Journal.WhatToExpect.Salvage'
+    salvage: 'FABRICATE.App.Journal.WhatToExpect.Salvage',
   };
   // A single-step crafting run has no "next step" flow to describe, so it gets a
   // one-check variant of the crafting explainer.

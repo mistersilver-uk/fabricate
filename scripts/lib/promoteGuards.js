@@ -178,14 +178,29 @@ export function evaluateRegistryLeadTarget({ channel, sourceChannel, label, head
   }
 
   if (channel === 'beta') {
+    // The remedy is ordered by what is actually reachable. "Push more work to main" is the remedy
+    // ONLY while main's own line is already numbered above v${version}; when the prerelease line is
+    // itself numbered below it (main still computing prereleases of a version the release line has
+    // long since passed), every version main mints is below it too, so that advice cannot work.
+    // The operation that fixes it is the forward-port, and it WAS scheduled inside the very
+    // promotion this refusal blocks — a deadlock. Since issue #1001 it runs at the PRERELEASE
+    // promotion instead (release.yml, once its early-access publish is verified), with the release
+    // promotion's own job 2 as a confirming backstop, and it is dispatchable on its own from
+    // .github/workflows/forward-port.yml. Naming the forward-port first is what makes this refusal
+    // escapable: it is runnable on its own and makes nothing publicly obtainable.
     return {
       decision: 'refuse',
       kind: 'backwards',
       reason:
         `registry-lead: beta target ${label} advertises v${head}, older than the v${version} being ` +
-        'promoted to public. Foundry would defect that cohort. Advance beta first — push the feature ' +
-        `work to main so beta.yml mints a newer beta (whose prerelease head sorts above v${version}) — ` +
-        'then re-run this promotion.',
+        'promoted to public. Foundry would defect that cohort. Advance beta first. If the prerelease ' +
+        `line is itself numbered below v${version} — which is the case whenever v${head} is a ` +
+        'prerelease of a version at or below the released one — no amount of new work on main can ' +
+        'raise it, because every version it mints stays on that line: bring the release line back ' +
+        'into the prerelease line first (the forward-port, which merges release into main and ' +
+        'promotes nothing), and the next prerelease is numbered above the released version. ' +
+        'Otherwise push the feature work to main so beta.yml mints a newer beta (whose prerelease ' +
+        `head sorts above v${version}). Then re-run this promotion.`,
     };
   }
   return {

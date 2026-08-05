@@ -16,6 +16,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import RadioCardGroup from '../RadioCardGroup.svelte';
   import ToggleCard from '../ToggleCard.svelte';
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
@@ -57,9 +58,9 @@
     craftingDefaultModifierIds = [],
     // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
     // already honours. Restored as live-persisting toggles below the alchemy check-mode
-    // selector. Defaults mirror the manager normalizer (learnOnCraft OFF; consumeOnFail and
-    // showAttemptHistoryToPlayers ON).
-    alchemyLearnOnCraft = false,
+    // selector. Defaults mirror the manager normalizer (all three ON; learnOnCraft
+    // joined them in issue 966).
+    alchemyLearnOnCraft = true,
     alchemyConsumeOnFail = true,
     alchemyShowAttemptHistory = true,
     salvageResolutionMode = 'simple',
@@ -90,7 +91,7 @@
     onUpdateCraftingCheckModifiers = () => {},
     onUpdateAlchemyFlags = () => {},
     onTabChange = () => {},
-    onToggleCheckActive = () => {}
+    onToggleCheckActive = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -104,38 +105,44 @@
   // simple (the pass/fail editor), or tiered (the routed outcome-tier editor).
   // Selecting a mode persists live via `onSetAlchemyCheckMode` (spread + refresh
   // in the store), swapping the editor below. Labels/copy reuse the shared
-  // SystemSettings.Alchemy.CheckMode* strings.
+  // SystemSettings.Alchemy.CheckMode* strings. The icons read as "no roll at all",
+  // "one roll" and "a staircase of outcome tiers".
   const ALCHEMY_CHECK_MODE_OPTIONS = [
     {
       value: 'none',
+      icon: 'fas fa-ban',
       labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNone',
       fallback: 'No check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeNoneDesc',
       descFallback:
-        'A matched brew always succeeds and produces its single result set. No crafting check.'
+        'A matched brew always succeeds and produces its single result set. No crafting check.',
     },
     {
       value: 'simple',
+      icon: 'fas fa-dice-d20',
       labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimple',
       fallback: 'Simple check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeSimpleDesc',
       descFallback:
-        'A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.'
+        'A mandatory pass/fail check. On a pass the success result set is produced; on a fail the reserved failure result set is.',
     },
     {
       value: 'tiered',
+      icon: 'fas fa-stairs',
       labelKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTiered',
       fallback: 'Tiered check',
       descKey: 'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeTieredDesc',
       descFallback:
-        'A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.'
-    }
+        'A mandatory routed check. Each success outcome tier routes to its assigned result set, exactly like routed-by-check.',
+    },
   ];
 
   // Failure consumption policy toggle states (issue 712). `consumeIngredientsOnFail`
   // defaults ON (`!== false`), `breakToolsOnFail` defaults OFF (`=== true`), matching
   // the manager normalizer so an authored-OFF system does not read back ON.
-  const consumeIngredientsOnFail = $derived(craftingConsumption?.consumeIngredientsOnFail !== false);
+  const consumeIngredientsOnFail = $derived(
+    craftingConsumption?.consumeIngredientsOnFail !== false
+  );
   const breakToolsOnFail = $derived(craftingConsumption?.breakToolsOnFail === true);
 
   let activeTab = $state('crafting');
@@ -211,7 +218,7 @@
       configHint: text(
         'FABRICATE.Admin.Manager.Checks.Crafting.ConfigHint',
         'Roll, difficulty, and outcome settings for the crafting check will appear here.'
-      )
+      ),
     },
     salvage: {
       title: text('FABRICATE.Admin.Manager.Checks.Salvage.PageTitle', 'Salvage check'),
@@ -222,7 +229,7 @@
       configHint: text(
         'FABRICATE.Admin.Manager.Checks.Salvage.ConfigHint',
         'Roll, difficulty, and outcome settings for the salvage check will appear here.'
-      )
+      ),
     },
     gathering: {
       title: text('FABRICATE.Admin.Manager.Checks.Gathering.PageTitle', 'Gathering check'),
@@ -233,8 +240,8 @@
       configHint: text(
         'FABRICATE.Admin.Manager.Checks.Gathering.ConfigHint',
         'Roll, difficulty, and outcome settings for the gathering check will appear here.'
-      )
-    }
+      ),
+    },
   };
 
   // The Validation tab aggregates per-check validation: one section per in-play
@@ -251,8 +258,8 @@
           ? craftingCheck
           : craftingProgressive
             ? craftingCheckProgressive
-            : craftingCheckSimple
-      }
+            : craftingCheckSimple,
+      },
     ];
     if (salvageEnabled) {
       list.push({
@@ -262,14 +269,14 @@
           ? salvageCheckRouted
           : salvageProgressive
             ? salvageCheckProgressive
-            : salvageCheckSimple
+            : salvageCheckSimple,
       });
     }
     if (gatheringEnabled && !gatheringD100) {
       list.push({
         subsystem: 'gathering',
         mode: gatheringResolutionMode,
-        check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted
+        check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted,
       });
     }
     return list;
@@ -282,7 +289,15 @@
 </script>
 
 <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
-  <ChecksEditorTabs {activeTab} showSalvage={salvageEnabled} showGathering={gatheringEnabled} onSelect={(tab) => { activeTab = tab; onTabChange(tab); }} />
+  <ChecksEditorTabs
+    {activeTab}
+    showSalvage={salvageEnabled}
+    showGathering={gatheringEnabled}
+    onSelect={(tab) => {
+      activeTab = tab;
+      onTabChange(tab);
+    }}
+  />
 
   <div class="manager-environment-workspace" class:is-inspector-hidden={!hasMenu}>
     <div
@@ -296,47 +311,56 @@
       {:else if activeTab === 'crafting' && craftingAlchemy}
         <div class="manager-checks-page" data-checks-panel="crafting">
           <section class="manager-inspector-card">
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeIntro', 'Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.')}</p>
-            <div
-              class="manager-checks-type-options"
-              role="radiogroup"
-              data-crafting-alchemy-checkmode
-              aria-label={text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}
-            >
-              {#each ALCHEMY_CHECK_MODE_OPTIONS as option (option.value)}
-                <label
-                  class={`manager-resolution-option ${alchemyCheckMode === option.value ? 'is-active' : ''}`}
-                  data-crafting-alchemy-checkmode-option={option.value}
-                >
-                  <input
-                    type="radio"
-                    name="crafting-alchemy-checkmode"
-                    value={option.value}
-                    checked={alchemyCheckMode === option.value}
-                    onchange={() => onSetAlchemyCheckMode(option.value)}
-                  />
-                  <span class="manager-resolution-option-body">
-                    <span class="manager-resolution-option-name">{text(option.labelKey, option.fallback)}</span>
-                    <span class="manager-resolution-option-desc">{text(option.descKey, option.descFallback)}</span>
-                  </span>
-                </label>
-              {/each}
-            </div>
+            <h3 class="manager-card-title">
+              {text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}
+            </h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.SystemSettings.Alchemy.CheckModeIntro',
+                'Choose how a matched brew is resolved: with no check, a simple pass/fail check, or a tiered routed check.'
+              )}
+            </p>
+            <RadioCardGroup
+              legendKey="FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading"
+              legend="Alchemy check"
+              options={ALCHEMY_CHECK_MODE_OPTIONS}
+              selectedValue={alchemyCheckMode}
+              groupName="crafting-alchemy-checkmode"
+              columns={2}
+              dataAttr="data-crafting-alchemy-checkmode"
+              optionDataAttr="data-crafting-alchemy-checkmode-option"
+              onChange={(mode) => onSetAlchemyCheckMode(mode)}
+            />
           </section>
 
           <section class="manager-inspector-card" data-alchemy-behaviour>
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.SystemSettings.Alchemy.BehaviourHeading', 'Alchemy behaviour')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.SystemSettings.Alchemy.BehaviourIntro', 'How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.')}</p>
+            <h3 class="manager-card-title">
+              {text('FABRICATE.Admin.SystemSettings.Alchemy.BehaviourHeading', 'Alchemy behaviour')}
+            </h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.SystemSettings.Alchemy.BehaviourIntro',
+                'How brewing rewards discovery, treats failed attempts, and remembers dead ends. These apply regardless of the check mode above.'
+              )}
+            </p>
             <div class="manager-checks-flag-list">
               <ToggleCard
                 variant="is-info"
                 icon="fas fa-book-sparkles"
                 section="alchemy-learn-on-craft"
                 field="learnOnCraft"
-                title={text('FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraft', 'Learn a recipe when its ingredients are matched')}
-                sub={text('FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraftDesc', 'A matched brew records the recipe as discovered for that player, whether the check passes or fails. Off by default.')}
-                toggleLabel={text('FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraft', 'Learn a recipe when its ingredients are matched')}
+                title={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraft',
+                  'Learn a recipe when its ingredients are matched'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraftDesc',
+                  'A matched brew records the recipe as discovered for that player, whether the check passes or fails. Off by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.LearnOnCraft',
+                  'Learn a recipe when its ingredients are matched'
+                )}
                 on={alchemyLearnOnCraft}
                 onToggle={(next) => onUpdateAlchemyFlags({ learnOnCraft: next })}
               />
@@ -345,9 +369,18 @@
                 icon="fas fa-fire-flame-curved"
                 section="alchemy-consume-on-fail"
                 field="consumeOnFail"
-                title={text('FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFail', 'Consume ingredients on a failed brew')}
-                sub={text('FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFailDesc', 'A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.')}
-                toggleLabel={text('FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFail', 'Consume ingredients on a failed brew')}
+                title={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFail',
+                  'Consume ingredients on a failed brew'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFailDesc',
+                  'A matched brew that fails its check consumes the submitted ingredients, the same as an unmatched fizzle. On by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.ConsumeOnFail',
+                  'Consume ingredients on a failed brew'
+                )}
                 on={alchemyConsumeOnFail}
                 onToggle={(next) => onUpdateAlchemyFlags({ consumeOnFail: next })}
               />
@@ -356,9 +389,18 @@
                 icon="fas fa-clock-rotate-left"
                 section="alchemy-show-attempt-history"
                 field="showAttemptHistoryToPlayers"
-                title={text('FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistory', 'Show attempt history to players')}
-                sub={text('FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistoryDesc', 'Record dead-end attempts so a player sees which ingredient combinations produced no reaction. On by default.')}
-                toggleLabel={text('FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistory', 'Show attempt history to players')}
+                title={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistory',
+                  'Show attempt history to players'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistoryDesc',
+                  'Record dead-end attempts so a player sees which ingredient combinations produced no reaction. On by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.SystemSettings.Alchemy.ShowAttemptHistory',
+                  'Show attempt history to players'
+                )}
                 on={alchemyShowAttemptHistory}
                 onToggle={(next) => onUpdateAlchemyFlags({ showAttemptHistoryToPlayers: next })}
               />
@@ -366,14 +408,26 @@
           </section>
 
           {#if alchemyCheckMode === 'tiered'}
-            <CraftingCheckEditor value={craftingCheck} {resolutionMode} allowNatStepping breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+            <CraftingCheckEditor
+              value={craftingCheck}
+              {resolutionMode}
+              breakageAuthority={craftingBreakageAuthority}
+              onChange={onUpdateCraftingCheck}
+            />
           {:else if alchemyCheckMode === 'simple'}
-            <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
+            <SimpleCraftingCheckEditor
+              value={craftingCheckSimple}
+              breakageAuthority={craftingBreakageAuthority}
+              onChange={onUpdateCraftingCheckSimple}
+            />
           {:else}
             <section class="manager-inspector-card" data-alchemy-none-readonly>
               <p class="manager-kicker">{pageKicker}</p>
               <h2 class="manager-card-title">
-                {text('FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneTitle', 'Resolves without a check')}
+                {text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.AlchemyNoneTitle',
+                  'Resolves without a check'
+                )}
               </h2>
               <p class="manager-muted">
                 {text(
@@ -391,25 +445,57 @@
              which the routed test asserts is absent once the editor renders. -->
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if craftingRouted}
-            <CraftingCheckEditor value={craftingCheck} {resolutionMode} allowNatStepping breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheck} />
+            <CraftingCheckEditor
+              value={craftingCheck}
+              {resolutionMode}
+              breakageAuthority={craftingBreakageAuthority}
+              onChange={onUpdateCraftingCheck}
+            />
           {:else if craftingSimple}
-            <SimpleCraftingCheckEditor value={craftingCheckSimple} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckSimple} />
+            <SimpleCraftingCheckEditor
+              value={craftingCheckSimple}
+              breakageAuthority={craftingBreakageAuthority}
+              onChange={onUpdateCraftingCheckSimple}
+            />
           {:else}
-            <ProgressiveCraftingCheckEditor value={craftingCheckProgressive} breakageAuthority={craftingBreakageAuthority} onChange={onUpdateCraftingCheckProgressive} />
+            <ProgressiveCraftingCheckEditor
+              value={craftingCheckProgressive}
+              breakageAuthority={craftingBreakageAuthority}
+              onChange={onUpdateCraftingCheckProgressive}
+            />
           {/if}
 
           <section class="manager-inspector-card" data-failure-consumption>
-            <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionHeading', 'Failure consumption policy')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionIntro', 'What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage failures follow their own separate policy.')}</p>
+            <h3 class="manager-card-title">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionHeading',
+                'Failure consumption policy'
+              )}
+            </h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.FailureConsumptionIntro',
+                'What happens to a recipe’s ingredients and tools when its crafting check fails. Salvage failures follow their own separate policy.'
+              )}
+            </p>
             <div class="manager-checks-flag-list">
               <ToggleCard
                 variant="is-info"
                 icon="fas fa-fire-flame-curved"
                 section="failure-consume-ingredients"
                 field="consumeIngredientsOnFail"
-                title={text('FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail', 'Consume ingredients on a failed check')}
-                sub={text('FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFailDesc', 'The recipe’s ingredients are used up even when the crafting check fails. On by default.')}
-                toggleLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail', 'Consume ingredients on a failed check')}
+                title={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail',
+                  'Consume ingredients on a failed check'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFailDesc',
+                  'The recipe’s ingredients are used up even when the crafting check fails. On by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.ConsumeIngredientsOnFail',
+                  'Consume ingredients on a failed check'
+                )}
                 on={consumeIngredientsOnFail}
                 onToggle={(next) => onUpdateCraftingConsumption({ consumeIngredientsOnFail: next })}
               />
@@ -418,9 +504,18 @@
                 icon="fas fa-hammer-crash"
                 section="failure-break-tools"
                 field="breakToolsOnFail"
-                title={text('FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail', 'Break tools on a failed check')}
-                sub={text('FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFailDesc', 'Required tools break when the crafting check fails. Off by default.')}
-                toggleLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail', 'Break tools on a failed check')}
+                title={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail',
+                  'Break tools on a failed check'
+                )}
+                sub={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFailDesc',
+                  'Required tools break when the crafting check fails. Off by default.'
+                )}
+                toggleLabel={text(
+                  'FABRICATE.Admin.Manager.Checks.Crafting.BreakToolsOnFail',
+                  'Break tools on a failed check'
+                )}
                 on={breakToolsOnFail}
                 onToggle={(next) => onUpdateCraftingConsumption({ breakToolsOnFail: next })}
               />
@@ -438,15 +533,29 @@
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">
-          <CraftingCheckEditor value={salvageCheckRouted} showTiers={false} allowNatStepping breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckRouted} />
+          <CraftingCheckEditor
+            value={salvageCheckRouted}
+            showTiers={false}
+            breakageAuthority={salvageBreakageAuthority}
+            onChange={onUpdateSalvageCheckRouted}
+          />
         </div>
       {:else if activeTab === 'salvage' && salvageProgressive}
         <div data-checks-panel="salvage">
-          <ProgressiveCraftingCheckEditor value={salvageCheckProgressive} breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckProgressive} />
+          <ProgressiveCraftingCheckEditor
+            value={salvageCheckProgressive}
+            breakageAuthority={salvageBreakageAuthority}
+            onChange={onUpdateSalvageCheckProgressive}
+          />
         </div>
       {:else if activeTab === 'salvage' && salvageSimple}
         <div data-checks-panel="salvage">
-          <SimpleCraftingCheckEditor value={salvageCheckSimple} showDcSource={false} breakageAuthority={salvageBreakageAuthority} onChange={onUpdateSalvageCheckSimple} />
+          <SimpleCraftingCheckEditor
+            value={salvageCheckSimple}
+            showDcSource={false}
+            breakageAuthority={salvageBreakageAuthority}
+            onChange={onUpdateSalvageCheckSimple}
+          />
         </div>
       {:else if activeTab === 'gathering' && gatheringD100}
         <div class="manager-checks-page" data-checks-panel="gathering" data-gathering-d100-readonly>
@@ -474,11 +583,20 @@
         </div>
       {:else if activeTab === 'gathering' && gatheringProgressive}
         <div data-checks-panel="gathering">
-          <ProgressiveCraftingCheckEditor value={gatheringCheckProgressive} breakageAuthority={gatheringBreakageAuthority} onChange={onUpdateGatheringCheckProgressive} />
+          <ProgressiveCraftingCheckEditor
+            value={gatheringCheckProgressive}
+            breakageAuthority={gatheringBreakageAuthority}
+            onChange={onUpdateGatheringCheckProgressive}
+          />
         </div>
       {:else if activeTab === 'gathering' && gatheringRouted}
         <div data-checks-panel="gathering">
-          <CraftingCheckEditor value={gatheringCheckRouted} showTiers={false} breakageAuthority={gatheringBreakageAuthority} onChange={onUpdateGatheringCheckRouted} />
+          <CraftingCheckEditor
+            value={gatheringCheckRouted}
+            showTiers={false}
+            breakageAuthority={gatheringBreakageAuthority}
+            onChange={onUpdateGatheringCheckRouted}
+          />
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

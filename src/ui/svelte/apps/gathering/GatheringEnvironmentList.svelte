@@ -7,16 +7,12 @@
   names / chip rows cannot blow out the column.
 -->
 <script>
+  import { untrack } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EnvironmentCard from './EnvironmentCard.svelte';
   import Pagination from '../../components/Pagination.svelte';
 
-  let {
-    environments = [],
-    selectedId = null,
-    onSelect = null,
-    services = null
-  } = $props();
+  let { environments = [], selectedId = null, onSelect = null, services = null } = $props();
 
   let searchTerm = $state('');
   const normalizedSearchTerm = $derived(searchTerm.trim().toLowerCase());
@@ -25,7 +21,16 @@
   // from the services getter and written back through the services setter, so
   // the component never touches Foundry globals. Every access is optional-chained
   // so a mount with a bare/absent `services` bag defaults to off (show all).
-  let hideUnavailable = $state(services?.getHideUnavailableEnvironments?.() === true);
+  //
+  // The seed is a ONE-TIME read of `services`, and `untrack` says so rather than
+  // leaving the compiler to guess (it reported `state_referenced_locally` here). This
+  // must NOT become a `$derived`: after mount the toggle is owned by the user, and
+  // re-reading the persisted value would silently revert an in-session toggle the
+  // moment anything upstream re-passed the services bag. The setter is the sync path
+  // in the other direction, so the stored value never goes stale either.
+  let hideUnavailable = $state(
+    untrack(() => services?.getHideUnavailableEnvironments?.() === true)
+  );
 
   function setHideUnavailable(next) {
     hideUnavailable = next === true;
@@ -38,32 +43,43 @@
 
   // Available environments first, then locked teasers.
   const ordered = $derived([
-    ...environments.filter(environment => environment?.locked !== true),
-    ...environments.filter(environment => environment?.locked === true)
+    ...environments.filter((environment) => environment?.locked !== true),
+    ...environments.filter((environment) => environment?.locked === true),
   ]);
 
   // Count of currently unavailable (locked) teasers, sourced from the ordered
   // (pre-search) set. This is what the toggle label surfaces; with an active
   // search term it can exceed the cards actually removed from the current view.
-  const lockedCount = $derived(ordered.filter(environment => environment?.locked === true).length);
+  const lockedCount = $derived(
+    ordered.filter((environment) => environment?.locked === true).length
+  );
 
-  const hideLabel = $derived(lockedCount > 0
-    ? localize('FABRICATE.App.Gathering.Environments.HideUnavailableCount', { count: lockedCount })
-    : localize('FABRICATE.App.Gathering.Environments.HideUnavailable'));
+  const hideLabel = $derived(
+    lockedCount > 0
+      ? localize('FABRICATE.App.Gathering.Environments.HideUnavailableCount', {
+          count: lockedCount,
+        })
+      : localize('FABRICATE.App.Gathering.Environments.HideUnavailable')
+  );
 
   // Filter the already-ordered list by a case-insensitive substring match on
   // name + description, mirroring EnvironmentsBrowserView.
-  const filtered = $derived(ordered.filter(environment =>
-    !normalizedSearchTerm
-    || `${environment?.name ?? ''} ${environment?.description ?? ''}`.toLowerCase().includes(normalizedSearchTerm)
-  ));
+  const filtered = $derived(
+    ordered.filter(
+      (environment) =>
+        !normalizedSearchTerm ||
+        `${environment?.name ?? ''} ${environment?.description ?? ''}`
+          .toLowerCase()
+          .includes(normalizedSearchTerm)
+    )
+  );
 
   // Single post-toggle derived list. Render, the empty check, Pagination
   // totalCount, and the pageIndex-reset effect all read THIS list, so the view
   // stays consistent whether or not the toggle is on.
-  const visible = $derived(hideUnavailable
-    ? filtered.filter(environment => environment?.locked !== true)
-    : filtered);
+  const visible = $derived(
+    hideUnavailable ? filtered.filter((environment) => environment?.locked !== true) : filtered
+  );
 
   const paginated = $derived(visible.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize));
 
@@ -151,8 +167,11 @@
       {pageSize}
       {pageIndex}
       {pageSizeOptions}
-      onPageChange={(n) => pageIndex = n}
-      onPageSizeChange={(n) => { pageSize = n; pageIndex = 0; }}
+      onPageChange={(n) => (pageIndex = n)}
+      onPageSizeChange={(n) => {
+        pageSize = n;
+        pageIndex = 0;
+      }}
     />
   </div>
 </section>
@@ -287,7 +306,9 @@
     height: 10px;
     border-radius: 50%;
     background: var(--fab-text-muted);
-    transition: transform 120ms ease, background-color 120ms ease;
+    transition:
+      transform 120ms ease,
+      background-color 120ms ease;
   }
 
   .gathering-env-hide-toggle.is-on .gathering-env-hide-toggle-knob {

@@ -22,6 +22,7 @@ It is what the tooling reads; on a private channel nothing installs from it and 
 - **cohort** — the clients installed from one target.
 - **channel head** — the version a channel's `latest` manifest currently advertises.
 - **prerelease line** — the branch that produces prerelease versions, and those versions.
+- **prerelease channel** — the channel serving the prerelease line.
 - **release line** — the branch that produces stable versions, and those versions.
 - **hotfix line** — a line cut from a published public version, producing patch versions of it only.
 - **hotfix channel** — the channel serving a hotfix line.
@@ -185,6 +186,24 @@ Its manifest MUST nevertheless be left in place, so that the tooling and credent
 - **AND** the failure names the remedy: publish that channel's head before re-running the promotion
 - **AND** a target of the source channel is exempt here, because the promotion's source-advertises verification already refuses an absent head on it
 
+#### Scenario: the lagging private head belongs to the prerelease channel
+
+- **WHEN** a promotion refuses because the prerelease channel's head is a version Foundry considers older than the version being promoted
+- **THEN** the failure names bringing the release line back into the prerelease line as the remedy whenever the prerelease line is itself numbered below that version
+
+### Requirement: Prerelease line precedence
+
+The prerelease line MUST always be positioned so that the next version it mints is numbered above every stable version already published to a channel that retains a cohort.
+A prerelease channel head that is a prerelease of such a stable version satisfies this, because Foundry does not consider a stable version newer than its own prereleases; a head belonging to an older version does not.
+Deferring the forward-port that keeps this true is not a delay but a deadlock: while the prerelease line is numbered below a published stable version, every version that line mints is numbered below it too, so the prerelease channel's head can never overtake the published version, and the registry lead prohibition refuses the very promotion that would have performed the forward-port.
+The remedy for a prerelease line that has fallen below a published stable version MUST be available without making any version publicly obtainable, because the refusal that reports the condition is itself what blocks the promotion.
+
+#### Scenario: the prerelease line has fallen below a published stable version
+
+- **WHEN** the prerelease line is numbered below a stable version already published to a channel
+- **THEN** it can be brought back above that version without promoting any version to `public`
+- **AND** every version the prerelease line mints afterwards is numbered above every published stable version
+
 ### Requirement: Self-contained distribution targets
 
 Each target MUST be self-contained: its own versioned archive, whose in-archive manifest bakes that target's own manifest and download URLs, and a `latest` manifest carrying that same manifest URL.
@@ -220,7 +239,10 @@ It is a client-affecting artefact and not a storefront label: a set integer maxi
 The release automation MUST be the sole authority for version numbers; a version MUST NOT be created, renamed, or copied by hand.
 The release automation releases the commit that is checked out, so a prerelease promotion MUST be a real merge or fast-forward of that commit onto the release line — never a squash, and never a tag copy — and the stable version MUST be recomputed from the Conventional Commits on that line, because squashing collapses the Conventional Commit types the computation reads.
 A release promotion MUST NOT create or move a git tag; it changes only release metadata and channel publication.
-A release promotion of a version built on the release line MUST forward-port that line into the prerelease line before any prerelease channel is written.
+A stable version minted on the release line MUST be forward-ported into the prerelease line once that version has been published to its channel, and MUST NOT be forward-ported before that publication is confirmed, because a version no channel carries is not one the prerelease line needs to be numbered above.
+A release promotion of a version built on the release line MUST confirm that the forward-port has happened, and MUST perform it if it has not, before any prerelease channel is written.
+The forward-port obligation binds the release line only, never a hotfix line.
+A forward-port that has already happened MUST be a no-op rather than a repetition, so that it can be invoked more than once without conflicting.
 A release artefact MUST be created only from a pre-existing, pushed tag and MUST be pinned to that tag's commit; a release creation allowed to create a missing tag will create it from the default branch's head rather than the tested commit.
 The notes published with a version's release artefact MUST be the notes generated for that version when its branch built it, together with the notes of any version that was minted and published to a channel but superseded before it was ever made public — without which the public record silently omits every change a superseded version carried.
 
@@ -229,6 +251,12 @@ The notes published with a version's release artefact MUST be the notes generate
 - **WHEN** a tested prerelease commit is promoted into the release line
 - **THEN** that commit is merged, or fast-forwarded, onto the release line without squashing
 - **AND** the stable version is recomputed from the commits since the last stable version
+- **AND** once that stable version is published to its channel, the release line is forward-ported into the prerelease line
+
+#### Scenario: a stable version whose channel publication did not succeed
+
+- **WHEN** the release line mints a stable version but the publish to its channel does not succeed
+- **THEN** the release line is not forward-ported into the prerelease line, and the failed publication is reported
 
 #### Scenario: a version is superseded before it is made public
 

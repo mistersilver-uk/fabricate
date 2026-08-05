@@ -158,9 +158,20 @@ export function makeEngine({ richState, env = environment(), calls = {}, runMana
  *   failure-path test needs a genuine failure tier for a low roll to land on — a
  *   bare success-only check would clamp a miss up to success. The name should not
  *   match any result group (so it routes to the failure path). Defaults to `null`.
+ * @param {Array<object>} [options.triggers] Unified check triggers (issue 419/975)
+ *   for the `checkBreakage` block `_resolveRoutedFormulaOutcome` reads. Authored in
+ *   normalized shape (`{ id, condition, outcome, breakTools, tierStep }`), since the
+ *   engine consumes `routed.checkBreakage.triggers` directly rather than through
+ *   `CraftingSystemManager`. The block is always emitted — an empty list is what the
+ *   normalizer itself produces, and is inert at every seam that reads it.
  * @returns {{ routed: object }} A `gatheringCraftingCheck` fragment.
  */
-export function routedSystemCheck({ tierName = 'Iron', dc = 15, failureTierName = null } = {}) {
+export function routedSystemCheck({
+  tierName = 'Iron',
+  dc = 15,
+  failureTierName = null,
+  triggers = []
+} = {}) {
   const relativeOutcomes = [{ id: `tier-${tierName}`, name: tierName, success: true, dc: 0 }];
   if (failureTierName) {
     relativeOutcomes.push({
@@ -176,7 +187,8 @@ export function routedSystemCheck({ tierName = 'Iron', dc = 15, failureTierName 
       dc,
       type: 'relative',
       thresholdMode: 'meet',
-      relativeOutcomes
+      relativeOutcomes,
+      checkBreakage: { triggers }
     }
   };
 }

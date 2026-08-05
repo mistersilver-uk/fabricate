@@ -321,6 +321,9 @@ Expand it to reveal its sections.
   It lists every recipe item in the system with its linked recipes and each item's own use and learn caps.
   Open a recipe item to set that item's caps and its recipe list on its own page.
   See [Books & Scrolls]({% link visibility.md %}#books--scrolls).
+- **Knowledge** appears whenever **Books & Scrolls** does, and also for a system whose recipe resolution mode is Alchemy, even in a visibility mode that would not otherwise show Books & Scrolls.
+  It audits and corrects what each character actually carries and has learned, separately from the recipe items and access grants themselves.
+  See [Knowledge]({% link visibility.md %}#knowledge).
 
 ---
 

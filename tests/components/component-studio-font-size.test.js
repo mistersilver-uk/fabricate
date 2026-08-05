@@ -64,6 +64,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
+import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
@@ -103,6 +104,34 @@ const FIXTURE = `
             <span class="manager-chip is-info manager-component-filter-chip" data-m="filter-chip"><span>Category: Reagent</span></span>
             <span class="manager-component-count" data-m="count">1–2 of 2</span>
           </div>
+          <!-- The multi-select row (issue 772) — the toolbar's FOURTH row, above the list.
+               Its markup moved to the shared BulkSelectionToolbar.svelte under apps/manager/
+               (issue 1010) and its own classes were renamed with it; the host row class
+               ".manager-component-filter-row is-selection" is a PROP of that primitive,
+               defaulted to this studio's string, so the row context below is unchanged.
+
+               The input/box pair below is a HAND-COPY of what SelectionCheckbox.svelte renders
+               inside BulkSelectionToolbar.svelte, and it silently duplicates a structural
+               contract: that component's focus ring is drawn by the adjacent-sibling selector
+               ".fab-selection-input:focus-visible + .fab-selection-check", written inside
+               :global() because it reaches across a component boundary — so nothing analyses
+               it (issue 924). This fixture is a font-size probe and does not check the ring;
+               the ring's structure and the drift of those class tokens are asserted in
+               tests/components/bulk-selection-toolbar-mounted.test.js. If either class name
+               changes in SelectionCheckbox.svelte, update this fixture too, so the two stop
+               disagreeing about what the studio renders.
+               (No backticks in here — this whole block is a JS template literal.) -->
+          <div class="manager-component-filter-row is-selection" data-component-selection-toolbar>
+            <label class="fab-bulk-selection-all" data-m="bulk-select-all">
+              <input type="checkbox" class="fab-selection-input">
+              <span class="fab-selection-check is-md"><i class="fas fa-minus"></i></span>
+              <span class="fab-bulk-selection-all-label">Select all</span>
+            </label>
+            <span class="fab-bulk-selection-divider"></span>
+            <span class="fab-bulk-selection-count" data-m="bulk-selected-count"><i class="fas fa-layer-group"></i><span>2 selected</span></span>
+            <button type="button" class="fab-bulk-selection-link" data-m="bulk-results-link">Select all 4 results</button>
+            <button type="button" class="fab-bulk-selection-clear" data-m="bulk-clear"><i class="fas fa-xmark"></i><span>Clear</span></button>
+          </div>
         </section>
         <div class="manager-components-list">
           <ul class="manager-component-group-body">
@@ -130,6 +159,65 @@ const FIXTURE = `
             </div>
           </div>
           <span class="manager-availability-pill is-tag" data-m="tag-pill"><span>metal</span></span>
+        </section>
+
+        <!--
+          The BULK EDIT panel (issue 772). It REPLACES the inspector above in the same rail
+          while the selection is non-empty, so both surfaces are pinned here: the swap must
+          not re-type the rail. Its appearance is a scoped block, which is why the panel is
+          in the scoped-component pairing below - without that treatment every role in
+          here would match nothing and land on Foundry's 14px app base.
+
+          Its CHROME moved to BulkEditPanelShell / BulkEditSection / BulkEditSelect under
+          apps/manager/ (issue 1010) and its classes were renamed with it; only the essence
+          grid and the DC row are still the component panel's own. Every EXPECTED px value
+          below is unchanged, which is the point: the extraction is a pure move.
+        -->
+        <section class="fab-bulk-edit-panel" data-component-bulk-panel>
+          <header class="fab-bulk-edit-header">
+            <p class="fab-bulk-edit-eyebrow" data-m="bulk-eyebrow">Bulk edit</p>
+            <button type="button" class="fab-bulk-edit-clear" data-m="bulk-clear-selection"><i class="fas fa-xmark"></i><span>Clear selection</span></button>
+          </header>
+          <div class="fab-bulk-edit-hero">
+            <span class="fab-bulk-edit-hero-icon"><i class="fas fa-layer-group"></i></span>
+            <div class="fab-bulk-edit-hero-copy">
+              <strong class="fab-bulk-edit-hero-title" data-m="bulk-hero-title">2 components selected</strong>
+              <span class="fab-bulk-edit-hero-hint" data-m="bulk-hero-hint">Stage changes below, then apply to all at once.</span>
+            </div>
+          </div>
+          <p class="fab-bulk-edit-label" data-m="bulk-label">Category</p>
+          <select class="fab-bulk-edit-select" data-m="bulk-select"><option>Leave unchanged</option></select>
+          <div class="fab-bulk-edit-label-row">
+            <p class="fab-bulk-edit-label">Tags</p>
+            <span class="fab-bulk-edit-hint" data-m="bulk-hint">click to add · again to remove · again to leave unchanged</span>
+          </div>
+          <div class="manager-chip-row">
+            <button type="button" class="manager-chip is-positive" data-m="bulk-tag-chip"><i class="fas fa-tag"></i>metal<i class="fas fa-plus"></i></button>
+          </div>
+          <!-- The panel's SECOND hint scale: a standing sentence, not the inline aside
+               above. Both are pinned, because the whole point of splitting them is that
+               they are different sizes — one map entry could not state that. -->
+          <p class="fab-bulk-edit-subhint" data-m="bulk-subhint">Applying essences overwrites the essence values on every selected component.</p>
+          <div class="manager-component-bulk-essence-grid">
+            <article class="manager-component-essence-card is-inactive" data-component-edit-essence="fire">
+              <div class="manager-component-essence-identity">
+                <span class="manager-component-essence-icon"><i class="fas fa-fire"></i></span>
+                <strong class="manager-component-essence-name" data-m="bulk-essence-name">Fire</strong>
+              </div>
+              <div class="manager-component-essence-control">
+                <div class="fab-stepper">
+                  <button type="button" class="fab-stepper-adjunct" data-stepper-decrement><i class="fas fa-minus"></i></button>
+                  <input type="number" class="fab-stepper-input" data-m="bulk-stepper-input" value="0">
+                  <button type="button" class="fab-stepper-adjunct" data-stepper-increment><i class="fas fa-plus"></i></button>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div class="manager-component-bulk-dc-row">
+            <i class="fas fa-dice-d20"></i>
+            <span class="manager-component-bulk-dc-copy" data-m="bulk-dc-copy">Set every selected component to</span>
+          </div>
+          <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
         </section>
       </div>
 
@@ -188,8 +276,8 @@ const FIXTURE = `
                 </li>
               </ul>
             </div>
-            <div class="manager-component-tag-toggles">
-              <button type="button" class="manager-component-tag-toggle is-on" data-m="tag-toggle"><span>Brass</span></button>
+            <div class="manager-component-tag-run">
+              <button type="button" class="manager-chip is-tag" data-m="tag-toggle"><i class="fas fa-tag"></i>Brass<i class="fas fa-circle-check"></i></button>
             </div>
           </section>
           <input type="text" data-m="bleed-baseline" value="bare">
@@ -198,11 +286,58 @@ const FIXTURE = `
     </section>
   </div>`;
 
+// See the twin note in `recipe-studio-font-size.test.js`: the chip's appearance moved into
+// `Chip.svelte`'s scoped block (issue 883), so this gate reproduces Svelte's real delivery
+// — the component's compiled CSS appended after the global sheet, and the real scoping hash
+// on the fixture's elements — rather than dropping those roles and losing the coverage.
+//
+// Issue 772 added four more scoped components to this studio (the selection box, the
+// selection toolbar, the extracted essence card and the bulk edit panel), and every one of
+// them needs BOTH halves of the treatment: appending the CSS without the hash class makes
+// the rules match nothing, and adding the hash without the real ordering proves the wrong
+// winner. A role that gets neither silently measures Foundry's 14px app base and trips the
+// anti-bleed loop at the end of this file.
+//
+// Issue 1010 split the toolbar and the panel's chrome into four shared primitives under
+// `apps/manager/`, so the list below grew rather than moved: the panel still owns the
+// essence grid and the DC row, while the header, hero, section scales, select and Apply are
+// emitted by their own components and therefore carry their own scope hashes. Miss one and
+// its roles fall to 14px — which is why no `EXPECTED` value needed touching to make this
+// pass, and why a green run is evidence the extraction preserved the cascade.
+const SCOPED_COMPONENTS = [
+  'src/ui/svelte/apps/manager/Chip.svelte',
+  'src/ui/svelte/components/SelectionCheckbox.svelte',
+  'src/ui/svelte/components/Stepper.svelte',
+  'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+  'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSection.svelte',
+  'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
+  'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
+].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
+
+// The contract classes are DERIVED from each component's own emitted CSS rather than
+// hand-listed beside it. A hand-list is one more mirror in a file whose header already
+// records what mirror rot cost here once: renaming a scoped class would leave its role
+// unstamped, and the failure would read as a size change rather than a stale fixture.
+function stampScopedClasses(fixture, { css, hashClass }) {
+  const classes = new Set(
+    [...css.matchAll(new RegExp(`\\.([\\w-]+)\\.${hashClass}\\b`, 'g'))].map((match) => match[1])
+  );
+  return [...classes].reduce(
+    (markup, className) => withScopeHash(markup, className, hashClass),
+    fixture
+  );
+}
+
+const SCOPED_FIXTURE = SCOPED_COMPONENTS.reduce(stampScopedClasses, FIXTURE);
+const SCOPED_CSS = SCOPED_COMPONENTS.map((component) => component.css).join('\n');
+
 function page() {
   return `<!doctype html><html><head><meta charset="utf-8">
-    <style>${foundryCss}</style><style>${fabricateCss}</style>
+    <style>${foundryCss}</style><style>${fabricateCss}</style><style>${SCOPED_CSS}</style>
     <style>:root{--font-primary:Arial,sans-serif}</style></head>
-    <body class="game">${FIXTURE}</body></html>`;
+    <body class="game">${SCOPED_FIXTURE}</body></html>`;
 }
 
 // px at the 16px root: rem * 16. Each entry names the Phase 0 prototype target it
@@ -224,13 +359,18 @@ const EXPECTED = {
   'sort-select': 11.52,
   'essence-select': 11.52,
   'toolbar-button': 11.52, // 0.72rem — the sort-direction toggle at the compact scale
-  'filter-chip': 12, // 0.75rem — the chip family
+  // Every chip role below MOVED from 12 (0.75rem) to 9.92 (0.62rem) in issue 883. That is
+  // the deliberate change, not drift: the compact Tool Studio scale is now the only chip
+  // scale, so these five roles are re-pinned to it rather than being relaxed or dropped.
+  // They also read much closer to the prototype numbers their old comments quoted (9px,
+  // 9.5px) than the 12px they were pinned at.
+  'filter-chip': 9.92, // 0.62rem — the one chip scale (was 12)
   count: 10.88, // 0.68rem — quiet right-aligned metadata, not a control
   // ── The list.
   'row-name': 12.16, // 0.76rem serif — bleed fix; prototype row name 13.5px serif
   'row-description': 12.48, // 0.78rem — prototype row description 11px sans
-  'row-badge': 12, // 0.75rem — prototype row badge/chip 9px sans
-  'row-difficulty': 12, // same chip family
+  'row-badge': 9.92, // 0.62rem — prototype row badge/chip 9px sans (was 12)
+  'row-difficulty': 9.92, // same chip family
   // ── The browser inspector (issue 676). It shares the recipe inspector's rules.
   'inspector-label': 9.28, // 0.58rem — a section micro-label on the panel background
   'inspector-flavour': 11.52, // 0.72rem — the description, whole
@@ -249,12 +389,12 @@ const EXPECTED = {
   // ── The identity STRIP (issue 676). It is display, not a form: the read-only boxed
   // Name/Description fields it replaced are gone, and with them `readonly-value`.
   'identity-name': 18, // 1.125rem serif — prototype identity name 18px/600. Exact.
-  'identity-lock': 12, // 0.75rem — the chip family; prototype lock badge 9px sans
+  'identity-lock': 9.92, // 0.62rem — prototype lock badge 9px sans (was 12)
   'identity-description': 13, // 0.8125rem/1.65 — prototype description 13px/1.65. Exact.
   'identity-note': 10, // 0.625rem — prototype premise note 10px sans. Exact.
   'drop-target': 10, // 0.625rem — prototype drop-target label 10px/1.4 sans. Exact.
   // ── The salvage panel.
-  'salvage-mode-pill': 12, // 0.75rem — the chip family; prototype mode pill 9.5px sans
+  'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
   'info-banner': 10.56, // 0.66rem — prototype roll-budget banner 10.5px sans
   'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
@@ -271,7 +411,46 @@ const EXPECTED = {
   // that changes it read as one pair rather than a number with a speck beside it.
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc
   'stage-move': 10.88, // 0.68rem — the reorder chevron glyph; reorder IS the authoring act
-  'tag-toggle': 11.2, // 0.7rem — prototype tag toggle pill 11px sans. Near-exact.
+  // The editor's tag pill converged on the shared `Chip` (issue 772), so it MOVED from
+  // 11.2 (its own 0.7rem, near-exact against the prototype's 11px pill) to the one chip
+  // scale it now shares with every other chip on this screen. That is the declared cost of
+  // the conversion, not drift: the alternative was a second pill implementation sitting
+  // beside the bulk-edit panel's, which is what issue 772 exists to remove. The role is
+  // re-authored above as a real `.manager-chip` and re-measured here.
+  'tag-toggle': 9.92, // 0.62rem — the one chip scale (was 11.2)
+  // ── The multi-select row (issue 772). One scale for the whole row: the box's caption,
+  // the count readout and the two text actions are peers, and a row that sized them
+  // differently would read as three registers stacked in one bar.
+  'bulk-select-all': 10.88, // 0.68rem
+  'bulk-selected-count': 10.88, // 0.68rem — accent, but the SAME size
+  'bulk-results-link': 10.88,
+  'bulk-clear': 10.88,
+  // ── The BULK EDIT panel. It replaces the browser inspector in the same rail, so its
+  // micro-label matches `inspector-label` exactly (0.58rem) and its hero sits just under
+  // the inspector's `stat-value`: the swap must not re-type the rail.
+  'bulk-eyebrow': 9.28, // 0.58rem — the rail micro-label scale, in accent
+  'bulk-clear-selection': 9.92, // 0.62rem
+  'bulk-hero-title': 14.72, // 0.92rem serif
+  'bulk-hero-hint': 9.92, // 0.62rem
+  'bulk-label': 9.28, // 0.58rem — identical to `inspector-label`
+  // The INLINE hint only (the tri-state chip cycle, "click to add · again to remove ·
+  // again to leave unchanged"), which sits on a label row's baseline and must not
+  // out-weigh the label beside it.
+  'bulk-hint': 9.28, // 0.58rem — sits WITH its label, not above the body scale
+  // A STANDING SENTENCE addressed to the GM — the essence-overwrite warning, the DC's
+  // meaning, the no-tags empty state. It is read rather than glanced at, and one of them
+  // is the only prose explaining a destructive axis, so it is a step up from the inline
+  // hint and matches the hero's own hint. It used to share `bulk-hint`, which made that
+  // sentence the SMALLEST text in the panel.
+  'bulk-subhint': 9.92, // 0.62rem — identical to `bulk-hero-hint`
+  'bulk-select': 11.52, // 0.72rem — the shared manager control-text scale
+  'bulk-tag-chip': 9.92, // 0.62rem — the one chip scale, as everywhere else
+  'bulk-essence-name': 12.16, // 0.76rem — the extracted card, shared with the editor grid
+  'bulk-stepper-input': 11.84, // 0.74rem mono — the shared Stepper, shared with the editor
+  'bulk-dc-copy': 9.92, // 0.62rem
+  // 0.78rem, matching `.manager-component-browser-inspector-edit` — the button this one
+  // SWAPS PLACES with in the rail's bottom slot. The swap must not re-type the slot.
+  'bulk-apply': 12.48,
   // The cascade context. A bare control inherits Foundry's 14px app base; any role
   // above landing on 14 means its rule stopped applying and Foundry bled through.
   'bleed-baseline': 14,

@@ -14,6 +14,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Chip from '../Chip.svelte';
   // Shared pure resolver: an empty OR generic item-bag image falls back to the
   // alchemical blueprint — matching the player builder + browser exactly (no drift).
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
@@ -22,7 +23,7 @@
     linkedRecipes = [],
     availableRecipes = [],
     onLinkRecipe = () => {},
-    onRemoveRecipe = () => {}
+    onRemoveRecipe = () => {},
   } = $props();
 
   let linkOpen = $state(false);
@@ -32,12 +33,17 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const linkedIds = $derived(new Set((linkedRecipes || []).map(recipe => String(recipe?.id))));
+  const linkedIds = $derived(new Set((linkedRecipes || []).map((recipe) => String(recipe?.id))));
   // Only offer recipes that are not already linked.
-  const linkable = $derived((availableRecipes || []).filter(recipe => !linkedIds.has(String(recipe?.id))));
+  const linkable = $derived(
+    (availableRecipes || []).filter((recipe) => !linkedIds.has(String(recipe?.id)))
+  );
 
   function categoryLabel(recipe) {
-    return String(recipe?.category || text('FABRICATE.Admin.Manager.RecipeItem.Contents.Uncategorized', 'General'));
+    return String(
+      recipe?.category ||
+        text('FABRICATE.Admin.Manager.RecipeItem.Contents.Uncategorized', 'General')
+    );
   }
 
   function linkRecipe(recipeId) {
@@ -47,27 +53,42 @@
   }
 </script>
 
-<section class="manager-recipe-item-tab" data-recipe-item-tab="contents" aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Title', 'Recipes inside')}>
+<section
+  class="manager-recipe-item-tab"
+  data-recipe-item-tab="contents"
+  aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.Title', 'Recipes inside')}
+>
   <div class="manager-recipe-item-contents-head">
     <div class="manager-recipe-item-contents-heading">
       <i class="fas fa-scroll" aria-hidden="true"></i>
-      <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.RecipeItem.Contents.Heading', 'Recipes inside')}</h3>
+      <h3 class="manager-card-title">
+        {text('FABRICATE.Admin.Manager.RecipeItem.Contents.Heading', 'Recipes inside')}
+      </h3>
     </div>
     <div class="manager-recipe-item-link-recipe">
-      <button
+      <Chip
+        tag="button"
+        tone="neutral"
+        icon="fas fa-plus"
+        class="manager-recipe-item-link-recipe-toggle"
         type="button"
-        class="manager-chip is-neutral manager-recipe-item-link-recipe-toggle"
         data-recipe-item-link-recipe-toggle
         aria-haspopup="listbox"
         aria-expanded={linkOpen}
         disabled={linkable.length === 0}
-        onclick={() => { linkOpen = !linkOpen; }}
+        onclick={() => {
+          linkOpen = !linkOpen;
+        }}
       >
-        <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}</span>
-      </button>
+      </Chip>
       {#if linkOpen && linkable.length > 0}
-        <div class="manager-recipe-item-link-recipe-list" role="listbox" data-recipe-item-link-recipe-list aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}>
+        <div
+          class="manager-recipe-item-link-recipe-list"
+          role="listbox"
+          data-recipe-item-link-recipe-list
+          aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
+        >
           {#each linkable as recipe (recipe.id)}
             <button
               type="button"
@@ -77,7 +98,9 @@
               data-recipe-item-link-recipe-option={recipe.id}
               onclick={() => linkRecipe(recipe.id)}
             >
-              <span class="manager-recipe-item-recipe-icon" aria-hidden="true"><img src={resolveRecipeImage(recipe)} alt="" /></span>
+              <span class="manager-recipe-item-recipe-icon" aria-hidden="true"
+                ><img src={resolveRecipeImage(recipe)} alt="" /></span
+              >
               <span class="manager-recipe-item-recipe-name">{recipe.name}</span>
               <span class="manager-recipe-item-recipe-cat">{categoryLabel(recipe)}</span>
             </button>
@@ -87,10 +110,20 @@
     </div>
   </div>
 
-  <p class="manager-muted manager-recipe-item-contents-hint">{text('FABRICATE.Admin.Manager.RecipeItem.Contents.Hint', 'The recipes a reader can learn from this item. Remove any that shouldn’t be taught here.')}</p>
+  <p class="manager-muted manager-recipe-item-contents-hint">
+    {text(
+      'FABRICATE.Admin.Manager.RecipeItem.Contents.Hint',
+      'The recipes a reader can learn from this item. Remove any that shouldn’t be taught here.'
+    )}
+  </p>
 
   {#if linkedRecipes.length === 0}
-    <p class="manager-muted" data-recipe-item-contents-empty>{text('FABRICATE.Admin.Manager.RecipeItem.Contents.Empty', 'No recipes linked yet. Use “Link recipe” to add one.')}</p>
+    <p class="manager-muted" data-recipe-item-contents-empty>
+      {text(
+        'FABRICATE.Admin.Manager.RecipeItem.Contents.Empty',
+        'No recipes linked yet. Use “Link recipe” to add one.'
+      )}
+    </p>
   {:else}
     <ul class="manager-recipe-item-recipe-list" data-recipe-item-contents-list>
       {#each linkedRecipes as recipe (recipe.id)}
@@ -147,11 +180,12 @@
     position: relative;
   }
 
-  .manager-recipe-item-link-recipe-toggle {
-    cursor: pointer;
-  }
-
-  .manager-recipe-item-link-recipe-toggle:disabled {
+  /* The toggle is a `Chip` (issue 883), so it is NOT in this component's scope: Svelte
+     stamps its hash on this component's own elements only, and a child component's root
+     never carries it. Reaching it needs `:global`, nested under a selector that DOES
+     carry the hash so nothing leaks. `cursor: pointer` is gone because the primitive's
+     own button rule already sets it; only the disabled state is this component's own. */
+  .manager-recipe-item-link-recipe :global(.manager-recipe-item-link-recipe-toggle:disabled) {
     opacity: 0.5;
     cursor: not-allowed;
   }

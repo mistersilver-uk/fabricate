@@ -13,6 +13,7 @@
   evaluator that could disagree. The category map below is display metadata only.
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
   import { evaluateRecipeReadiness } from './recipeReadiness.js';
@@ -24,7 +25,7 @@
     routedOutcomeTierOptions = [],
     alchemy = null,
     signatureConflicts = [],
-    onSelectIssue = () => {}
+    onSelectIssue = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -32,13 +33,15 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  const readiness = $derived(evaluateRecipeReadiness(recipe || {}, {
-    systemComponents: componentTagOptions,
-    routingProvider,
-    routedOutcomeTierOptions,
-    alchemy,
-    signatureConflicts
-  }));
+  const readiness = $derived(
+    evaluateRecipeReadiness(recipe || {}, {
+      systemComponents: componentTagOptions,
+      routingProvider,
+      routedOutcomeTierOptions,
+      alchemy,
+      signatureConflicts,
+    })
+  );
 
   const CHECK_LABELS = {
     hasName: ['CheckName', 'Has a name'],
@@ -47,22 +50,52 @@
     stepsNamed: ['CheckStepsNamed', 'Every step is named'],
     noDuplicateMatches: ['CheckNoDuplicateMatches', 'No duplicate component or tag matches'],
     noRequirementOverlap: ['CheckNoRequirementOverlap', 'No overlapping ingredient requirements'],
-    routedResultGroupsRouted: ['CheckRoutedResultGroupsRouted', 'Every check-mode result set is assigned a check outcome'],
-    routedOutcomeTiersProduced: ['CheckRoutedOutcomeTiersProduced', 'Every check success outcome produces a result set'],
+    routedResultGroupsRouted: [
+      'CheckRoutedResultGroupsRouted',
+      'Every check-mode result set is assigned a check outcome',
+    ],
+    routedOutcomeTiersProduced: [
+      'CheckRoutedOutcomeTiersProduced',
+      'Every check success outcome produces a result set',
+    ],
     alchemyResultSelection: ['CheckAlchemyResultSelection', 'Resolves to exactly one result set'],
-    noSignatureCollision: ['CheckNoSignatureCollision', 'No ingredient-signature collision with another recipe']
+    noSignatureCollision: [
+      'CheckNoSignatureCollision',
+      'No ingredient-signature collision with another recipe',
+    ],
   };
   const ISSUE_LABELS = {
     noName: ['IssueNoName', 'The recipe needs a name.'],
     noIngredientSet: ['IssueNoIngredientSet', 'A step has no ingredient set.'],
     noResultGroup: ['IssueNoResultGroup', 'A step has no result set.'],
-    disabledIncomplete: ['IssueDisabledIncomplete', 'The recipe is disabled and cannot be enabled until its requirements are complete.'],
-    duplicateAlternative: ['IssueDuplicateAlternative', 'An OR group repeats the same component or tag match.'],
-    duplicateRequirement: ['IssueDuplicateRequirement', 'A set repeats the same ingredient requirement.'],
-    requirementOverlap: ['IssueRequirementOverlap', 'Two requirements in a set can be satisfied by the same component (ambiguous).'],
-    unroutedResultGroup: ['IssueUnroutedResultGroup', 'A result set is not assigned to any check outcome and will never be produced.'],
-    unproducedOutcomeTier: ['IssueUnproducedOutcomeTier', 'A check outcome is not assigned to any result set, so it produces nothing.'],
-    alchemyResultSelection: ['IssueAlchemyResultSelection', 'An alchemy recipe must resolve to exactly one result set before it can be enabled.']
+    disabledIncomplete: [
+      'IssueDisabledIncomplete',
+      'The recipe is disabled and cannot be enabled until its requirements are complete.',
+    ],
+    duplicateAlternative: [
+      'IssueDuplicateAlternative',
+      'An OR group repeats the same component or tag match.',
+    ],
+    duplicateRequirement: [
+      'IssueDuplicateRequirement',
+      'A set repeats the same ingredient requirement.',
+    ],
+    requirementOverlap: [
+      'IssueRequirementOverlap',
+      'Two requirements in a set can be satisfied by the same component (ambiguous).',
+    ],
+    unroutedResultGroup: [
+      'IssueUnroutedResultGroup',
+      'A result set is not assigned to any check outcome and will never be produced.',
+    ],
+    unproducedOutcomeTier: [
+      'IssueUnproducedOutcomeTier',
+      'A check outcome is not assigned to any result set, so it produces nothing.',
+    ],
+    alchemyResultSelection: [
+      'IssueAlchemyResultSelection',
+      'An alchemy recipe must resolve to exactly one result set before it can be enabled.',
+    ],
   };
 
   // Display grouping (metadata only — the evaluator is untouched). A check id not
@@ -77,7 +110,7 @@
     alchemyResultSelection: 'resolution',
     hasName: 'requirements',
     stepsNamed: 'requirements',
-    noSignatureCollision: 'requirements'
+    noSignatureCollision: 'requirements',
   };
 
   // The negative issue id(s) that own each check, so an unsatisfied check can borrow
@@ -91,14 +124,14 @@
     routedResultGroupsRouted: ['unroutedResultGroup'],
     routedOutcomeTiersProduced: ['unproducedOutcomeTier'],
     alchemyResultSelection: ['alchemyResultSelection'],
-    noSignatureCollision: ['signatureCollision']
+    noSignatureCollision: ['signatureCollision'],
   };
 
   const GROUP_ORDER = [
     ['ingredients', 'GroupIngredients', 'Ingredients', 'fas fa-flask'],
     ['results', 'GroupResults', 'Results', 'fas fa-box-open'],
     ['resolution', 'GroupResolution', 'Resolution', 'fas fa-dice-d20'],
-    ['requirements', 'GroupRequirements', 'Requirements', 'fas fa-clipboard-check']
+    ['requirements', 'GroupRequirements', 'Requirements', 'fas fa-clipboard-check'],
   ];
 
   function checkLabel(id) {
@@ -120,6 +153,8 @@
 
   // Build one row per check, borrowing the owning issue when the check fails.
   const rows = $derived.by(() => {
+    // Function-local bookkeeping scratch, discarded when the $derived.by returns.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const usedIssueIds = new Set();
     const checkRows = readiness.checks.map((check) => {
       const owners = CHECK_TO_ISSUES[check.id] || [];
@@ -140,13 +175,17 @@
         title: checkLabel(check.id),
         detail: issue ? issueTitle(issue) : '',
         issueId: issue ? issue.id : '',
-        target: issue ? issue.target || '' : ''
+        target: issue ? issue.target || '' : '',
       };
     });
     // Any issue not attached to a check row (e.g. `disabledIncomplete`) becomes its
     // own row, grouped by its deep-link target so nothing is lost when the Issues
     // card is retired.
-    const targetGroup = { ingredients: 'ingredients', results: 'results', overview: 'requirements' };
+    const targetGroup = {
+      ingredients: 'ingredients',
+      results: 'results',
+      overview: 'requirements',
+    };
     const orphanRows = readiness.issues
       .filter((issue) => !usedIssueIds.has(issue))
       .map((issue) => ({
@@ -157,7 +196,7 @@
         title: issueTitle(issue),
         detail: '',
         issueId: issue.id,
-        target: issue.target || ''
+        target: issue.target || '',
       }));
     return [...checkRows, ...orphanRows];
   });
@@ -167,7 +206,7 @@
       id,
       icon,
       label: text(`FABRICATE.Admin.Manager.Recipe.Validation.${labelKey}`, labelFallback),
-      rows: rows.filter((row) => row.category === id)
+      rows: rows.filter((row) => row.category === id),
     })).filter((group) => group.rows.length > 0)
   );
 
@@ -186,7 +225,9 @@
   const warningIssues = $derived(
     (readiness?.issues || []).filter((issue) => issue.severity === 'warning')
   );
-  const passingCount = $derived((readiness?.checks || []).filter((check) => check.satisfied).length);
+  const passingCount = $derived(
+    (readiness?.checks || []).filter((check) => check.satisfied).length
+  );
   const warningCount = $derived(warningIssues.length);
   const blockingCount = $derived(criticalIssues.length);
   const summaryStatus = $derived(
@@ -196,26 +237,41 @@
     summaryStatus === 'blocked'
       ? {
           icon: 'fas fa-circle-xmark',
-          title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlocked', 'Cannot be enabled'),
-          sub: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlockedSub', 'Clear every blocking issue before this recipe can be enabled.')
+          title: text(
+            'FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlocked',
+            'Cannot be enabled'
+          ),
+          sub: text(
+            'FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlockedSub',
+            'Clear every blocking issue before this recipe can be enabled.'
+          ),
         }
       : summaryStatus === 'warning'
         ? {
             icon: 'fas fa-triangle-exclamation',
-            title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarnings', 'Enabled with warnings'),
-            sub: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarningsSub', 'Saves and enables — review the warnings when you can.')
+            title: text(
+              'FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarnings',
+              'Enabled with warnings'
+            ),
+            sub: text(
+              'FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarningsSub',
+              'Saves and enables — review the warnings when you can.'
+            ),
           }
         : {
             icon: 'fas fa-circle-check',
             title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClear', 'All clear'),
-            sub: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClearSub', 'Every structural check passes. Ready to enable.')
+            sub: text(
+              'FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClearSub',
+              'Every structural check passes. Ready to enable.'
+            ),
           }
   );
 
   const STATUS_META = {
     pass: ['fas fa-circle-check', 'StatusPass', 'PASS'],
     warn: ['fas fa-triangle-exclamation', 'StatusWarn', 'WARNING'],
-    block: ['fas fa-circle-exclamation', 'StatusBlock', 'BLOCKS ENABLE']
+    block: ['fas fa-circle-exclamation', 'StatusBlock', 'BLOCKS ENABLE'],
   };
 
   function statusPill(status) {
@@ -227,10 +283,21 @@
   }
 </script>
 
-<section class="manager-recipe-tab manager-recipe-validation" data-recipe-tab="validation" aria-label={text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}>
+<section
+  class="manager-recipe-tab manager-recipe-validation"
+  data-recipe-tab="validation"
+  aria-label={text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}
+>
   <div class="manager-recipe-tab-intro">
-    <h2 class="manager-recipe-tab-title">{text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}</h2>
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.Recipe.Validation.Intro', 'A recipe saves even while incomplete, but only enables when every blocking issue is cleared.')}</p>
+    <h2 class="manager-recipe-tab-title">
+      {text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation')}
+    </h2>
+    <p class="manager-muted">
+      {text(
+        'FABRICATE.Admin.Manager.Recipe.Validation.Intro',
+        'A recipe saves even while incomplete, but only enables when every blocking issue is cleared.'
+      )}
+    </p>
   </div>
 
   <!-- The aggregate header (issue 676): a status medallion + the Passing/Warnings/
@@ -239,7 +306,10 @@
        already reads this surface has to learn a new name. Laid out as a ROW here — the
        rail stacked it in a 300px column; a tab is ~1060px wide. -->
   <section class="manager-recipe-validation-summary-row" data-recipe-section="validation-summary">
-    <div class={`manager-recipe-rail-summary is-${summaryStatus}`} data-recipe-validation-summary={summaryStatus}>
+    <div
+      class={`manager-recipe-rail-summary is-${summaryStatus}`}
+      data-recipe-validation-summary={summaryStatus}
+    >
       <span class="manager-recipe-rail-summary-medallion" aria-hidden="true">
         <i class={summaryMeta.icon}></i>
       </span>
@@ -251,18 +321,29 @@
     <ul class="manager-recipe-rail-counts" data-recipe-validation-counts>
       <li class="manager-recipe-rail-count is-passing">
         <i class="fas fa-circle-check" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing')}</span>
-        <span class="manager-recipe-rail-count-value" data-recipe-count-passing>{passingCount}</span>
+        <span class="manager-recipe-rail-count-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing')}</span
+        >
+        <span class="manager-recipe-rail-count-value" data-recipe-count-passing>{passingCount}</span
+        >
       </li>
       <li class="manager-recipe-rail-count is-warning">
         <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings')}</span>
-        <span class="manager-recipe-rail-count-value" data-recipe-count-warnings>{warningCount}</span>
+        <span class="manager-recipe-rail-count-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings')}</span
+        >
+        <span class="manager-recipe-rail-count-value" data-recipe-count-warnings
+          >{warningCount}</span
+        >
       </li>
       <li class="manager-recipe-rail-count is-blocking">
         <i class="fas fa-circle-xmark" aria-hidden="true"></i>
-        <span class="manager-recipe-rail-count-label">{text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking')}</span>
-        <span class="manager-recipe-rail-count-value" data-recipe-count-blocking>{blockingCount}</span>
+        <span class="manager-recipe-rail-count-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking')}</span
+        >
+        <span class="manager-recipe-rail-count-value" data-recipe-count-blocking
+          >{blockingCount}</span
+        >
       </li>
     </ul>
   </section>
@@ -294,9 +375,10 @@
                 class="manager-button is-ghost manager-recipe-val-view"
                 data-recipe-issue-view={row.target}
                 onclick={() => onSelectIssue(row.target)}
-              >{text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}</button>
+                >{text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}</button
+              >
             {/if}
-            <span class={`manager-chip manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</span>
+            <Chip class={`manager-recipe-val-pill is-${row.status}`}>{statusPill(row.status)}</Chip>
           </li>
         {/each}
       </ul>

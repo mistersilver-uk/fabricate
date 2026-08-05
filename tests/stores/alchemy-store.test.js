@@ -429,6 +429,35 @@ describe('alchemyStore', () => {
     assert.equal(store.benchEmpty, true);
   });
 
+  // Issue 966: a time-gated brew START matched a signature, consumed the inputs and
+  // armed a run — but returned `success: false` with no disposition, so it fell into
+  // the trailing else and bannered as a fizzle, telling the player their brew failed.
+  it('a started time-gated brew banners as brewing, not as a fizzle, and toasts nothing', async () => {
+    const harness = makeServices({
+      submitAlchemyAttempt: async () => ({
+        success: false,
+        results: null,
+        disposition: 'timed-start',
+        message: 'Step "Brew" is still in progress (3600s remaining)',
+      }),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    await store.brew();
+    flushSync();
+    assert.equal(store.lastBrew.status, 'brewing');
+    assert.equal(
+      store.lastBrew.message,
+      '',
+      'the untranslated engine string must not reach the banner'
+    );
+    assert.deepEqual(harness.calls.notify ?? [], [], 'a started brew is not an error to toast');
+    assert.equal(store.benchEmpty, true);
+  });
+
   it('removeAll deletes every placed unit of a component (removes the key)', async () => {
     const { store } = await loadedStore();
     store.add('ashsalt');

@@ -28,7 +28,6 @@
   const isSucceeded = $derived(status === 'succeeded');
   const hasSteps = $derived(runType === 'crafting' || runType === 'salvage');
   const steps = $derived(Array.isArray(run?.steps) ? run.steps : []);
-  const stepCount = $derived(steps.length);
   const TERMINAL_STEP = new Set(['succeeded', 'failed']);
   // The step whose detail to show: the active step when present, else the last
   // EXECUTED step for a terminal run. All recipe steps are pre-created, so a run
@@ -67,7 +66,9 @@
     <header class="journal-detail-header">
       <img class="journal-detail-thumb" src={run.img || DEFAULT_RUN_IMAGE} alt="" />
       <div class="journal-detail-identity">
-        <h2 class="journal-detail-title" title={run.names?.title ?? ''}>{run.names?.title ?? ''}</h2>
+        <h2 class="journal-detail-title" title={run.names?.title ?? ''}>
+          {run.names?.title ?? ''}
+        </h2>
         <div class="journal-detail-meta">
           <RunStatusPill {status} />
           {#if run.structureLabel}
@@ -108,9 +109,13 @@
                 {#if result.img}
                   <img class="journal-detail-result-thumb" src={result.img} alt="" />
                 {/if}
-                <span class="journal-detail-result-name">{result.name ?? result.componentId ?? ''}</span>
+                <span class="journal-detail-result-name"
+                  >{result.name ?? result.componentId ?? ''}</span
+                >
                 {#if Number(result.quantity) > 1}
-                  <span class="journal-detail-result-qty">{localize('FABRICATE.App.Journal.Quantity', { n: result.quantity })}</span>
+                  <span class="journal-detail-result-qty"
+                    >{localize('FABRICATE.App.Journal.Quantity', { n: result.quantity })}</span
+                  >
                 {/if}
               </li>
             {/each}

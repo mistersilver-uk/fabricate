@@ -18,6 +18,7 @@
     onChange(next)  — called with the normalized requirement or null
 -->
 <script>
+  import Chip from '../Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { dismissOnOutsideClick } from '../../../actions/dismissOnOutsideClick.js';
   import { portal } from '../../../actions/portal.js';
@@ -25,7 +26,7 @@
   import {
     TIME_UNITS,
     formatTimeRequirement,
-    durationUnitLabelSingular
+    durationUnitLabelSingular,
   } from '../../../util/recipeDuration.js';
   import Stepper from '../../../components/Stepper.svelte';
 
@@ -63,7 +64,7 @@
       days: unitValue('days'),
       months: unitValue('months'),
       years: unitValue('years'),
-      [unit]: value
+      [unit]: value,
     };
     const total = next.minutes + next.hours + next.days + next.months + next.years;
     onChange(total > 0 ? next : null);
@@ -105,7 +106,7 @@
       left: 0,
       top: 0,
       width: window.innerWidth,
-      height: window.innerHeight
+      height: window.innerHeight,
     };
     const triggerRect = triggerButton.getBoundingClientRect();
     const layout = computeIconPickerPopoverLayout(
@@ -115,11 +116,11 @@
         top: triggerRect.top - hostRect.top,
         bottom: triggerRect.bottom - hostRect.top,
         width: triggerRect.width,
-        height: triggerRect.height
+        height: triggerRect.height,
       },
       {
         width: hostRect.width || window.innerWidth,
-        height: hostRect.height || window.innerHeight
+        height: hostRect.height || window.innerHeight,
       },
       // The popover itself sizes to its content (CSS `width: max-content`); this
       // width only reserves horizontal room so the left-aligned popover stays
@@ -140,7 +141,7 @@
       `left: ${layout.left}px;`,
       'right: auto;',
       `max-height: ${layout.maxHeight}px;`,
-      vertical
+      vertical,
     ].join(' ');
   }
 
@@ -164,12 +165,18 @@
 <div
   class="manager-recipe-duration"
   bind:this={pickerRoot}
-  use:dismissOnOutsideClick={{ enabled: open, onDismiss: close, additionalNodes: () => [popoverRoot] }}
+  use:dismissOnOutsideClick={{
+    enabled: open,
+    onDismiss: close,
+    additionalNodes: () => [popoverRoot],
+  }}
 >
-  <button
+  <Chip
+    tag="button"
+    bind:element={triggerButton}
+    icon="fa-solid fa-clock"
+    class={`manager-recipe-duration-trigger ${hasDuration ? '' : 'is-empty'}`}
     type="button"
-    bind:this={triggerButton}
-    class={`manager-chip manager-recipe-duration-trigger ${hasDuration ? '' : 'is-empty'}`}
     data-recipe-duration-trigger
     aria-haspopup="dialog"
     aria-expanded={open}
@@ -181,9 +188,8 @@
     onclick={toggle}
     oncontextmenu={clearDuration}
   >
-    <i class="fa-solid fa-clock" aria-hidden="true"></i>
     <span>{triggerLabel}</span>
-  </button>
+  </Chip>
 
   {#if open}
     <div

@@ -16,7 +16,12 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/apps/manager/checks/checksReadiness.js',
   ],
-  compiledModules: ['src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte'],
+  compiledModules: [
+    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
+    // harness omits HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
+  ],
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
 });
 
@@ -86,6 +91,55 @@ describe('ChecksValidationTab (mounted)', () => {
     assert.ok(
       target.querySelector('[data-issue-severity="critical"]'),
       'a critical issue group renders'
+    );
+    harness.remount();
+  });
+
+  it('renders the tier-step target issues and their shared green tick (issue 975)', async () => {
+    const target = await harness.mount({
+      sections: [
+        {
+          subsystem: 'crafting',
+          mode: 'routed',
+          check: {
+            type: 'relative',
+            rollFormula: '1d20',
+            relativeOutcomes: [{ id: 'a', name: 'Success', success: true, dc: 0 }],
+            checkBreakage: {
+              triggers: [
+                {
+                  id: 't1',
+                  condition: { type: 'rollTotal', operator: '<=', value: 1 },
+                  outcome: 'none',
+                  breakTools: false,
+                  tierStep: { mode: 'target', steps: 1, tierId: 'gone' },
+                },
+                {
+                  id: 't2',
+                  condition: { type: 'rollTotal', operator: '>=', value: 20 },
+                  outcome: 'none',
+                  breakTools: false,
+                  tierStep: { mode: 'target', steps: 1, tierId: 'a' },
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+    const tick = target.querySelector('[data-check="tierStepTargetsResolve"]');
+    assert.ok(tick, 'the paired readiness check renders');
+    assert.equal(tick.dataset.satisfied, 'false');
+    // Both issues carry real localized copy, not a bare id echoed back to the GM.
+    for (const id of ['danglingTierStepTarget', 'multipleTierStepTargets']) {
+      const issue = target.querySelector(`[data-issue="${id}"]`);
+      assert.ok(issue, `${id} is listed`);
+      const title = issue.querySelector('.manager-recipe-issue-title').textContent.trim();
+      assert.notEqual(title, id, `${id} resolves to copy rather than echoing its own id`);
+    }
+    assert.ok(
+      !target.querySelector('[data-issue-severity="critical"]'),
+      'neither is critical — a target count is guidance, not breakage'
     );
     harness.remount();
   });

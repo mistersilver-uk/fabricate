@@ -20,7 +20,6 @@ const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, (
 function baseProps(overrides = {}) {
   return {
     environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: [] },
-    composition: { counts: {}, conditions: {} },
     realmRecords: [],
     realmsEnabled: false,
     biomeOptions: [],

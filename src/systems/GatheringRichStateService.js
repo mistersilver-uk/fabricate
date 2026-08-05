@@ -1,5 +1,5 @@
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
-import { normalizeNodeConfig } from './gatheringNodeConfig.js';
+import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
 import {
   cloneJson,
@@ -187,6 +187,12 @@ export class GatheringRichStateService {
     // absent (the default), every node path falls back to the environment scope.
     resolveRegionBehavior = null,
     writeInteractableBehavior = null,
+    // GM-routed ENVIRONMENT node depletion seam. The environment pool is persisted
+    // in the `gatheringEnvironments` WORLD setting, which Foundry lets only a GM
+    // update, so a player's gather decrement is emitted to the active GM instead of
+    // written directly (see `gatheringNodeSocket.js`). When absent (the default) the
+    // write is applied in place, which is what tests and a GM client do anyway.
+    depleteEnvironmentNode = null,
     // Extracted collaborators (issue 376). Default-constructed below from the
     // parent's already-assigned seams so `makeRichState()` and main.js keep
     // working unchanged. Injectable for focused tests.
@@ -244,6 +250,11 @@ export class GatheringRichStateService {
         nowWorldTime: this.nowWorldTime,
         resolveRegionBehavior: this.resolveRegionBehavior,
         writeInteractableBehavior: this.writeInteractableBehavior,
+        depleteEnvironmentNode:
+          typeof depleteEnvironmentNode === 'function' ? depleteEnvironmentNode : null,
+        // The economy gate lives on the parent, so the active-GM applier re-checks
+        // the toggle here instead of trusting the requesting client's check.
+        nodesEnabled: (systemId) => this.nodesEnabled(systemId),
       });
   }
 
@@ -1099,6 +1110,19 @@ export class GatheringRichStateService {
   }
 
   /**
+   * Apply a routed ENVIRONMENT node depletion as the active GM. main.js wires this
+   * as the socket handler's apply body, so a player's gather decrement lands as a
+   * legitimate GM-authored world-setting write instead of failing with "lacks
+   * permission to update Setting". Delegated to GatheringNodeService.
+   *
+   * @param {{ environmentId: string, taskId: string }} payload
+   * @returns {Promise<object|null>} The updated environment, or null on no-op.
+   */
+  async applyEnvironmentNodeDepletion(payload = {}) {
+    return this.nodeService.applyEnvironmentNodeDepletion(payload);
+  }
+
+  /**
    * Regenerate one actor's stamina as world time passes. Delegated to
    * GatheringStaminaService (issue 376); GatheringEngine calls this on the
    * parent.
@@ -1313,6 +1337,15 @@ export class GatheringRichStateService {
     return { blockedReasons, evidence };
   }
 
+  /**
+   * @param {object} args
+   * @param {'immediate'|'waitingStart'|'timedMaturity'} [args.phase='immediate'] Which
+   *   commit this is. A TIMED run commits twice — once when the wait starts and once
+   *   when it matures — and `shouldDepleteNode` is true at both for `onStart` timing,
+   *   which consumed two units per run. `phase` disambiguates: `onStart` consumes at
+   *   `waitingStart`, `onSuccess` at `timedMaturity`, and an `immediate` attempt (the
+   *   single-commit case) keeps consuming exactly as before.
+   */
   async commitAcceptedAttempt({
     actor,
     system,
@@ -1321,6 +1354,7 @@ export class GatheringRichStateService {
     outcome = null,
     viewer = null,
     interactableRef = null,
+    phase = 'immediate',
   } = {}) {
     const evidence = {
       conditions: cloneJson(environment?.conditions || {}),
@@ -1340,29 +1374,36 @@ export class GatheringRichStateService {
 
     const source = this.nodeService._resolveNodeSource({ environment, task, interactableRef });
     const depletionSource = source.read();
-    if (nodesEnabled && depletionSource && shouldDepleteNode({ nodes: depletionSource }, outcome)) {
+    if (
+      nodesEnabled &&
+      depletionSource &&
+      shouldDepleteNode({ nodes: depletionSource }, outcome) &&
+      depletionPhaseMatches(depletionSource, phase)
+    ) {
       // Persist the full node object (config + respawn timers) with one consumed,
       // so the resolved pool (env `nodeRuntime[taskId]` OR the interactable's own
-      // scoped `node`) is seeded and decremented in a single write.
-      const max = Number(depletionSource.max || 0);
-      const current = Math.min(max, Math.max(0, Number(depletionSource.current || 0) - 1));
-      const node = { ...cloneJson(depletionSource), current };
-      // Seed the respawn anchor at depletion time so the FIRST world-time advance
-      // past the interval produces a gain instead of only re-anchoring. Without
-      // this, a freshly-seeded pool carries lastEvaluatedWorldTime: null and the
-      // first tick is wasted on anchoring (mirrors stamina pool anchor seeding).
-      if (node.respawn?.policy === 'overTime' && node.respawn.lastEvaluatedWorldTime == null) {
-        node.respawn = {
-          ...node.respawn,
-          lastEvaluatedWorldTime: Number(this.nowWorldTime?.() ?? 0),
-        };
-      }
-      await source.write(node);
+      // scoped `node`) is seeded and decremented in a single write. `deplete` — not
+      // `write` — because the ENVIRONMENT pool lives in a world setting only a GM may
+      // update, so a player's decrement is routed to the active GM (which recomputes
+      // it from its own stored state); `remaining` below is this client's optimistic
+      // view of that write, exactly as it was before the routing existed.
+      const node = depleteNodeOnce(depletionSource, {
+        worldTime: Number(this.nowWorldTime?.() ?? 0),
+      });
+      await source.deplete(node);
       evidence.node = {
         taskId: task.id,
         consumed: 1,
-        remaining: current,
+        remaining: node.current,
         scope: source.kind,
+        // False when the write was relayed: `remaining` is then this client's local
+        // computation, not the count the GM wrote, and can be wrong (repeat gathers
+        // before the setting replicates all read the same stale `current`; a matured
+        // timed run reads a start-time snapshot; the GM may no-op the write entirely).
+        // Consumers that publish a durable number must suppress it — see the chat card
+        // in `GatheringEngine#_postGatheringChatMessage`. `redactRichEvidence` still
+        // reads `remaining` so blind-run `available` reporting is unchanged.
+        authoritative: source.routed !== true,
       };
     }
 
@@ -1466,8 +1507,14 @@ export class GatheringRichStateService {
         ? cloneJson(normalized.staminaCostModifiers)
         : [],
       gatheringModifier: normalized.gatheringModifier,
+      // resultGroups is read by the routed path (GatheringEngine.matchResultGroupsByName
+      // and normalizeList(task.resultGroups)[0]); dormant until #683 ships routed
+      // resolution, but must stay carried so that path is not broken on arrival.
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
-      resultSelection: { provider: 'd100Rows' },
+      // Per-task routed-check DC override (issue 904). resolutionMode stays hardcoded
+      // to 'd100' above — routed gathering is disabled ("Coming soon") pending #683 —
+      // so this plumbing is deliberately dormant until routed resolution ships.
+      dcOverride: normalized.dcOverride,
       catalysts: [],
       toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : [],
     };
@@ -1741,6 +1788,26 @@ export class GatheringRichStateService {
   }
 }
 
+/**
+ * Whether THIS commit is the one that consumes the node, for a run that commits more
+ * than once. A timed run calls `commitAcceptedAttempt` twice — at `waitingStart` and
+ * again at `timedMaturity` — and `shouldDepleteNode` answers true at both for
+ * `onStart` timing, so an `onStart` timed task used to consume two units per run.
+ *
+ * `onStart` consumes when the attempt starts; `onSuccess` consumes when the outcome
+ * resolves. An `immediate` attempt has exactly one commit and always consumes there,
+ * which is why it is not gated (that is the single-commit path both timings share).
+ *
+ * @param {object} node The resolved node (carries `depletionTiming`).
+ * @param {'immediate'|'waitingStart'|'timedMaturity'} phase
+ * @returns {boolean}
+ */
+function depletionPhaseMatches(node, phase) {
+  if (phase !== 'waitingStart' && phase !== 'timedMaturity') return true;
+  const consumesOnStart = node?.depletionTiming !== 'onSuccess';
+  return consumesOnStart ? phase === 'waitingStart' : phase === 'timedMaturity';
+}
+
 function shouldDepleteNode(task, outcome) {
   if (!task?.nodes) return false;
   if (task.nodes.depletionTiming === 'onSuccess') return outcome?.status === 'succeeded';
@@ -1925,6 +1992,17 @@ function normalizeLibraryTask(task = {}) {
       ? task.toolIds.map((id) => String(id ?? '').trim()).filter(Boolean)
       : [],
     nodes: normalizeNodeConfig(task.nodes),
+    // Per-task routed-check DC override (issue 904): replaces the routed check's
+    // own dc at gather time when set. Guard null/''/undefined explicitly before
+    // `Number()` so re-normalizing a null stays null (Number(null) is 0, which
+    // would otherwise mint a spurious 0 override the GM never set). Mirrors
+    // `_normalizeGatheringTask` in src/ui/svelte/stores/adminStore.js exactly.
+    dcOverride: (() => {
+      const raw = task.dcOverride;
+      if ([null, undefined, ''].includes(raw)) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    })(),
   };
 }
 

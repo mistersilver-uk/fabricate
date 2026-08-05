@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "foundryVersion": "14.365",
+  "harvestedAt": null,
+  "source": {
+    "kind": "release-archive",
+    "name": "foundryvtt-14.365.zip",
+    "sha256": "6f9bc29bb3e20abf78aaa2182192e7233a008c2f7c45ade70e6082da20bebc8f"
+  },
+  "chromeMarkup": {
+    "applicationMjsSha256": "b5aef80d3e042a4a856be9dd875c72a5224988d62046ba770f25376f4291faa0",
+    "dialogMjsSha256": "4e2d299eaa931d96df1839e64a2defc60b6b95ee89a3e1d32d60b99040899343"
+  },
+  "unresolvedReferences": [
+    "public/fonts/fontawesome/webfonts/fa-v4compatibility.woff2"
+  ],
+  "assets": [
+    {
+      "path": "client/applications/api/application.mjs",
+      "bytes": 85646,
+      "sha256": "b5aef80d3e042a4a856be9dd875c72a5224988d62046ba770f25376f4291faa0"
+    },
+    {
+      "path": "client/applications/api/dialog.mjs",
+      "bytes": 21200,
+      "sha256": "4e2d299eaa931d96df1839e64a2defc60b6b95ee89a3e1d32d60b99040899343"
+    },
+    {
+      "path": "css/foundry2.css",
+      "bytes": 470343,
+      "sha256": "c52a159278becb5ac4169bc40cadeb48054edf2ddf78b3508d19534e7acd97d1"
+    },
+    {
+      "path": "fonts/amiri/amiri-bold.woff2",
+      "bytes": 19884,
+      "sha256": "976862397ada7e28a1fb279f3d831115c95d58cd9df2b7ee46918f8133a0abfb"
+    },
+    {
+      "path": "fonts/amiri/amiri-regular.woff2",
+      "bytes": 20612,
+      "sha256": "e4a30ab007939335bbf745c994f81fa69e554b02a85b310fbd583530ad317ad0"
+    },
+    {
+      "path": "fonts/bruno-ace/bruno-ace-sc.woff2",
+      "bytes": 19928,
+      "sha256": "034b55ea8bdd6f10932b64387499b39adeb3430ab7a67eb6a890d73f5682e10a"
+    },
+    {
+      "path": "fonts/bruno-ace/bruno-ace.woff2",
+      "bytes": 17704,
+      "sha256": "2987474d89a263ebcb10b9597517b6043de9db442445a1edf6038765ef390b96"
+    },
+    {
+      "path": "fonts/fontawesome/css/all.min.css",
+      "bytes": 160254,
+      "sha256": "c4cd5ef4a83e4fe86cb852ddfc987e7f7482350993f66b40a70e6842008ea292"
+    },
+    {
+      "path": "fonts/fontawesome/webfonts/fa-brands-400.woff2",
+      "bytes": 110076,
+      "sha256": "c91080337a8a7735a389aab4ae9ecb1d35df90c654801ec32b19ec980ffafbc3"
+    },
+    {
+      "path": "fonts/fontawesome/webfonts/fa-duotone-900.woff2",
+      "bytes": 326968,
+      "sha256": "255a984141631adc9e7a5f74dbcebf3516486432c2edb9ca5cf0734d351d945b"
+    },
+    {
+      "path": "fonts/fontawesome/webfonts/fa-light-300.woff2",
+      "bytes": 366248,
+      "sha256": "8df8da4da3c9ef276cc4dc2ca10434e4724762b03bb45ace884b18c9605aa25f"
+    },
+    {
+      "path": "fonts/fontawesome/webfonts/fa-regular-400.woff2",
+      "bytes": 342108,
+      "sha256": "ab1c6b8e3dce1525fc301bc29c11c912266f9bdbc249e42facb3db0a7eaab5b9"
+    },
+    {
+      "path": "fonts/fontawesome/webfonts/fa-solid-900.woff2",
+      "bytes": 265848,
+      "sha256": "6c5ae9ea51f33e6a29a52689adec7a0891a75bdba0482ea384f9bdec0be4953a"
+    },
+    {
+      "path": "fonts/fontawesome/webfonts/fa-thin-100.woff2",
+      "bytes": 396172,
+      "sha256": "8a0b1ab59d681d3d626e558e922caedce5c808d95a3801025989898fead5a527"
+    },
+    {
+      "path": "fonts/modesto-condensed/modesto-condensed-bold.woff2",
+      "bytes": 20604,
+      "sha256": "dc51a6dff5450210383c2aed575e77bbbf80da01052d4975e09526e09e0aecc9"
+    },
+    {
+      "path": "fonts/modesto-condensed/modesto-condensed.woff2",
+      "bytes": 21712,
+      "sha256": "886c977b3683cd19c0280123e8472da59128c8a25ba9b1f524693ea6640238ee"
+    },
+    {
+      "path": "fonts/signika/signika-bold.woff2",
+      "bytes": 38220,
+      "sha256": "f57457e65ac911e442a11afaca1f13b672ca42062bbdedd9b4723338f48e3c91"
+    },
+    {
+      "path": "fonts/signika/signika-regular.woff2",
+      "bytes": 38624,
+      "sha256": "210e81745c75214bc84a307cc76c150f5545f91549282c724a6bf4b965c027b6"
+    },
+    {
+      "path": "icons/logo-scifi-blank.png",
+      "bytes": 128941,
+      "sha256": "7828b57abbf236affb2ee7a6d28148d08f71a922ea7b858c3b09ac74608a5b65"
+    },
+    {
+      "path": "icons/svg/d10-grey.svg",
+      "bytes": 676,
+      "sha256": "9f2de586aa72cde760557f8056f8ec7d4720cc6566f8d1edbf44ef183aaae7bc"
+    },
+    {
+      "path": "icons/svg/d12-grey.svg",
+      "bytes": 747,
+      "sha256": "2c61dc684d6e9d260a9a79bf64df361ac0a77643e4ca194efd919660cb1d521a"
+    },
+    {
+      "path": "icons/svg/d20-grey.svg",
+      "bytes": 2040,
+      "sha256": "f8ff8074f6049a78538dd39d97cfab1befb831b2a554b9df767c0c37e1a55879"
+    },
+    {
+      "path": "icons/svg/d4-grey.svg",
+      "bytes": 383,
+      "sha256": "b10e712f21badfeb6b313c771a809a773cb691ac49c04d60f2eb99d8d65246e2"
+    },
+    {
+      "path": "icons/svg/d6-grey.svg",
+      "bytes": 160,
+      "sha256": "e0e3389354f78b5974ebd0ca87748c250054b85b80ed6f1392bf747cfbc44932"
+    },
+    {
+      "path": "icons/svg/d8-grey.svg",
+      "bytes": 501,
+      "sha256": "0671d7af4cd43472cd022aadefae824d7e050697d37906903bcc807261efc582"
+    },
+    {
+      "path": "icons/vtt-512.png",
+      "bytes": 116495,
+      "sha256": "6d0156a49aaf82836245f54aeb9bbf80f8b4ffffce67acce7fb029ccc14558cc"
+    },
+    {
+      "path": "lang/en.json",
+      "bytes": 206844,
+      "sha256": "42a46b1c86a63d73688316971eb9205c433039a6253816847a2bb85b6ebf457a"
+    },
+    {
+      "path": "ui/backgrounds/setup-scifi.webp",
+      "bytes": 432166,
+      "sha256": "e5dc75d456b9b2b3177f3825b5cc8a4c45793fd7e4988caa50e121fec292f5f8"
+    },
+    {
+      "path": "ui/backgrounds/setup.webp",
+      "bytes": 266168,
+      "sha256": "ff3899f60b47debef6cf752efedb854a653eba8b584488bd43ceb54bd67dd464"
+    },
+    {
+      "path": "ui/denim075.png",
+      "bytes": 27879,
+      "sha256": "11c0f2e713a789629cefaad1f9574a0d26662ec41d2dcb106b37a790d9a7f97c"
+    },
+    {
+      "path": "ui/parchment.jpg",
+      "bytes": 112260,
+      "sha256": "398e46c9dbb386a8f9a52675d5826d720f5a2db38fdd913ccb769ede526f8e8a"
+    },
+    {
+      "path": "ui/resize-handle.webp",
+      "bytes": 54,
+      "sha256": "1196768e8b5ccfa3cb501944d3d1517f9dcb455a53788d9b2113461ac124da08"
+    }
+  ],
+  "trees": [
+    {
+      "prefix": "icons/",
+      "files": 7096,
+      "bytes": 49064850,
+      "sha256": "43d39451e819b70554cd0f4bb6e50855b43534c2e29506d5d55b0536894d3e20"
+    }
+  ]
+}

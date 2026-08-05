@@ -17,20 +17,30 @@
   live in the pure `recipeBrowserModel.js`; this component only renders.
 -->
 <script>
+  import Chip from './Chip.svelte';
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import StatusPill from '../../components/StatusPill.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
+  import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
+  import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
+  import {
+    describeRecipeSelection,
+    pruneRecipeSelection,
+    setRecipeSelection,
+    toggleRecipeSelection,
+  } from '../../../../utils/recipeBulkEditModel.js';
   import {
     RECIPE_SORT_KEYS,
     buildRecipeBrowserModel,
     createRecipeBrowserState,
     deriveRecipeIo,
-    deriveRecipeStatuses
+    deriveRecipeStatuses,
   } from '../../../../utils/recipeBrowserModel.js';
 
   let {
@@ -52,10 +62,9 @@
     // with the controls reset to defaults threw away the page, filters, sort and
     // grouping the GM left. When unbound — the isolated mounted tests — the local
     // fallback below keeps every control reactive in-component.
-    browserState = $bindable(null)
+    browserState = $bindable(null),
   } = $props();
 
-  // svelte-ignore state_referenced_locally
   let ownBrowserState = $state(createRecipeBrowserState());
   // The active view-state: the root's lifted object when bound, else the local
   // fallback. Both are `$state` proxies, so nested writes (`ui.statusFilter = …`)
@@ -80,6 +89,10 @@
     ui.categoryFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
+    // The bulk selection is scoped to the selected system — its ids name recipes the new
+    // system does not have — so a switch clears it, and the root discards the staged draft
+    // when the count reaches zero (issue 1010). Mirrors ComponentsBrowserView.
+    ui.bulkSelectedRecipeIds = new Set();
     ui.systemId = selectedSystemId;
   });
 
@@ -95,7 +108,9 @@
   function handleToggleEnabled(recipe) {
     flashMessage = '';
     onToggleEnabled(recipe.id, recipe.enabled === false, {
-      onBlocked: (message) => { flashMessage = message; }
+      onBlocked: (message) => {
+        flashMessage = message;
+      },
     });
   }
 
@@ -113,13 +128,72 @@
       sortDirection: ui.sortDirection,
       pageIndex: ui.pageIndex,
       pageSize: ui.pageSize,
-      groupByCategory: ui.groupByCategory && showRecipeCategories
+      groupByCategory: ui.groupByCategory && showRecipeCategories,
     })
   );
 
   $effect(() => {
     if (model.pageIndex !== ui.pageIndex) ui.pageIndex = model.pageIndex;
   });
+
+  // ── Bulk selection (issue 1010) ──────────────────────────────────────────────────
+  // `pageIds` is the set of RENDERED row ids, NOT `model.page`: with grouping on (the
+  // default) a COLLAPSED group renders no rows at all, so a naive page list would let the
+  // toolbar's tri-state box select rows the GM cannot see and report a count exceeding the
+  // visible ones. `filteredIds` is the whole filtered set, which the results link reaches
+  // and the page box deliberately cannot.
+  const bulkSelectedIds = $derived(ui.bulkSelectedRecipeIds ?? new Set());
+  const filteredIds = $derived(model.filtered.map((recipe) => recipe.id));
+  const pageIds = $derived(
+    model.groups.filter(isGroupRendered).flatMap((group) => group.recipes.map((r) => r.id))
+  );
+  const selectionSummary = $derived(
+    describeRecipeSelection({
+      pageIds,
+      filteredIds,
+      selectedIds: bulkSelectedIds,
+    })
+  );
+
+  // The SAME condition the markup renders a group's rows under, read once so the two can
+  // never drift: an ungrouped run is always rendered, a grouped one only while expanded.
+  function isGroupRendered(group) {
+    const grouped = ui.groupByCategory && showRecipeCategories && !!group.category;
+    return !grouped || isExpanded(group.category);
+  }
+
+  // A delete, an unlink or a store refresh must never leave a phantom id in the count or
+  // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
+  // subset, so equal sizes mean an identical set — so this cannot loop.
+  $effect(() => {
+    const current = ui.bulkSelectedRecipeIds ?? new Set();
+    if (current.size === 0) return;
+    const pruned = pruneRecipeSelection(
+      current,
+      (recipes || []).map((recipe) => recipe.id)
+    );
+    if (pruned.size !== current.size) ui.bulkSelectedRecipeIds = pruned;
+  });
+
+  // Every mutation assigns a NEW Set rather than mutating in place: the reactive unit is
+  // `ui.bulkSelectedRecipeIds`, not the Set, so an in-place mutation compiles, runs, and
+  // silently stops the bound lifted state propagating back to the manager root — the rule
+  // `toggleGroup` below already documents for `collapsedCategories`.
+  function toggleRecipeBulkSelected(id) {
+    ui.bulkSelectedRecipeIds = toggleRecipeSelection(bulkSelectedIds, id);
+  }
+
+  function setPageSelected(on) {
+    ui.bulkSelectedRecipeIds = setRecipeSelection(bulkSelectedIds, pageIds, on);
+  }
+
+  function selectAllResults() {
+    ui.bulkSelectedRecipeIds = setRecipeSelection(bulkSelectedIds, filteredIds, true);
+  }
+
+  function clearBulkSelection() {
+    ui.bulkSelectedRecipeIds = new Set();
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -137,12 +211,16 @@
   const statusOptions = $derived([
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
     { value: 'on', labelKey: 'FABRICATE.Admin.Manager.StatusOn', fallback: 'On' },
-    { value: 'off', labelKey: 'FABRICATE.Admin.Manager.StatusOff', fallback: 'Off' }
+    { value: 'off', labelKey: 'FABRICATE.Admin.Manager.StatusOff', fallback: 'Off' },
   ]);
   const lockOptions = $derived([
     { value: 'all', labelKey: 'FABRICATE.Admin.Manager.Recipe.FilterAll', fallback: 'All' },
-    { value: 'unlocked', labelKey: 'FABRICATE.Admin.Manager.Recipe.Unlocked', fallback: 'Unlocked' },
-    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.LockedLabel', fallback: 'Locked' }
+    {
+      value: 'unlocked',
+      labelKey: 'FABRICATE.Admin.Manager.Recipe.Unlocked',
+      fallback: 'Unlocked',
+    },
+    { value: 'locked', labelKey: 'FABRICATE.Admin.Manager.Recipe.LockedLabel', fallback: 'Locked' },
   ]);
 
   const SORT_LABELS = {
@@ -150,14 +228,14 @@
     attention: ['FABRICATE.Admin.Manager.Recipe.SortAttention', 'Needs attention'],
     dc: ['FABRICATE.Admin.Manager.Recipe.SortDc', 'Check DC'],
     ingredients: ['FABRICATE.Admin.Manager.Recipe.SortIngredients', 'Ingredients'],
-    results: ['FABRICATE.Admin.Manager.Recipe.SortResults', 'Results']
+    results: ['FABRICATE.Admin.Manager.Recipe.SortResults', 'Results'],
   };
 
   const FILTER_CHIP_LABELS = {
     status: ['FABRICATE.Admin.Manager.Recipe.ChipStatus', 'Status: {value}'],
     lock: ['FABRICATE.Admin.Manager.Recipe.ChipLock', 'Lock: {value}'],
     category: ['FABRICATE.Admin.Manager.Recipe.ChipCategory', 'Category: {value}'],
-    search: ['FABRICATE.Admin.Manager.Recipe.ChipSearch', 'Search: {value}']
+    search: ['FABRICATE.Admin.Manager.Recipe.ChipSearch', 'Search: {value}'],
   };
 
   function sortLabel(key) {
@@ -167,7 +245,8 @@
 
   function chipLabel(chip) {
     const [labelKey, fallback] = FILTER_CHIP_LABELS[chip.id];
-    const value = chip.id === 'category' ? getRecipeCategoryLabel(chip.value, localize) : chip.value;
+    const value =
+      chip.id === 'category' ? getRecipeCategoryLabel(chip.value, localize) : chip.value;
     return format(labelKey, fallback, { value });
   }
 
@@ -183,13 +262,6 @@
     ui.lockFilter = 'all';
     ui.categoryFilter = 'all';
     onSearchChange('');
-  }
-
-  function recipeImage(recipe) {
-    // The linked-book image wins; otherwise the shared resolver maps an empty OR
-    // generic item-bag image → the recipe blueprint (never the bag SVG). The
-    // Medallion itself is an import-free leaf, so the CALLER resolves this.
-    return recipe?.recipeItemImg || resolveRecipeImage(recipe);
   }
 
   function categoryLabel(category) {
@@ -216,7 +288,11 @@
     const count = (group?.recipes || []).length;
     const total = group?.total ?? count;
     if (total > count) {
-      return format('FABRICATE.Admin.Manager.Recipe.GroupCountOfTotal', '{count} of {total} recipes', { count, total });
+      return format(
+        'FABRICATE.Admin.Manager.Recipe.GroupCountOfTotal',
+        '{count} of {total} recipes',
+        { count, total }
+      );
     }
     return count === 1
       ? text('FABRICATE.Admin.Manager.Recipe.GroupCountOne', '1 recipe')
@@ -228,20 +304,26 @@
   }
 
   function toggleGroup(category) {
+    // Copy-then-reassign: the reactive unit is `ui.collapsedCategories`, not the Set. In-place
+    // SvelteSet mutation would stop the bound state propagating back to the manager root.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(ui.collapsedCategories);
     if (next.has(category)) next.delete(category);
     else next.add(category);
     ui.collapsedCategories = next;
   }
 
-  // The four row states, localized. `recipe.incomplete` is the derived authoring
-  // flag (no ingredient sets / no result groups); off + incomplete means enabling
-  // would be REFUSED, so the row says so rather than merely "incomplete".
+  // The four row states, localized. Both authoring states read ONE predicate —
+  // `recipe.enableBlocked`, "would activation refuse this recipe?" (issue 1010) — so the
+  // pilled rows, the bulk panel's pre-flight count and the set-apply write are the same
+  // set by construction. Off + blocked means enabling would be REFUSED, so the row says
+  // so rather than merely "incomplete"; on + blocked is unfinished work with nothing
+  // being refused. The labels are unchanged.
   const STATUS_LABELS = {
     disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
     locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
     blocked: ['FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable"],
-    incomplete: ['FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete']
+    incomplete: ['FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete'],
   };
 
   function statusPills(recipe) {
@@ -264,7 +346,9 @@
 
   function ioReadout(recipe) {
     const io = deriveRecipeIo(recipe, resolutionMode);
-    const inText = format('FABRICATE.Admin.Manager.Recipe.CountIn', '{count} in', { count: io.inCount });
+    const inText = format('FABRICATE.Admin.Manager.Recipe.CountIn', '{count} in', {
+      count: io.inCount,
+    });
     const outText =
       io.outKind === 'items'
         ? format('FABRICATE.Admin.Manager.Recipe.CountOut', '{count} out', { count: io.outCount })
@@ -287,20 +371,28 @@
   const CHECK_PILLS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
-    progressive: ['FABRICATE.Admin.Manager.Recipe.CheckProgressive', 'Progressive', 'fas fa-list-ol'],
-    ingredients: ['FABRICATE.Admin.Manager.Recipe.CheckByIngredients', 'By ingredients', 'fas fa-code-branch'],
-    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation']
+    progressive: [
+      'FABRICATE.Admin.Manager.Recipe.CheckProgressive',
+      'Progressive',
+      'fas fa-list-ol',
+    ],
+    ingredients: [
+      'FABRICATE.Admin.Manager.Recipe.CheckByIngredients',
+      'By ingredients',
+      'fas fa-code-branch',
+    ],
+    none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
   };
 
   const CHECK_TOOLTIPS = {
     ingredients: [
       'FABRICATE.Admin.Manager.Recipe.CheckByIngredientsTooltip',
-      'This system routes results by the ingredient set used, with no crafting check.'
+      'This system routes results by the ingredient set used, with no crafting check.',
     ],
     none: [
       'FABRICATE.Admin.Manager.Recipe.CheckNoneTooltip',
-      'This system has no usable crafting check.'
-    ]
+      'This system has no usable crafting check.',
+    ],
   };
 
   // The check pill is projected by the store (`recipe.checkSummary`) — the row cannot
@@ -313,7 +405,7 @@
       kind: summary.kind,
       icon,
       label: format(labelKey, fallback, { dc: summary.dc ?? '' }),
-      title: tooltip ? text(tooltip[0], tooltip[1]) : ''
+      title: tooltip ? text(tooltip[0], tooltip[1]) : '',
     };
   }
 
@@ -329,7 +421,10 @@
   what the breadcrumb and the titlebar's gold system badge already said.
 -->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
-  <section class="manager-toolbar manager-recipe-toolbar" aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}>
+  <section
+    class="manager-toolbar manager-recipe-toolbar"
+    aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
+  >
     <div class="manager-recipe-filter-row">
       <label class="manager-search">
         <i class="fas fa-search" aria-hidden="true"></i>
@@ -337,7 +432,10 @@
           type="search"
           value={recipeSearchTerm || ''}
           oninput={(event) => onSearchChange(event.currentTarget.value)}
-          placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Recipe.SearchPlaceholder',
+            'Search recipes...'
+          )}
           aria-label={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
         />
       </label>
@@ -345,19 +443,31 @@
         options={statusOptions}
         value={ui.statusFilter}
         groupName="manager-recipe-status-filter"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.StatusFilterLabel', 'Filter recipes by status')}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.StatusFilterLabel',
+          'Filter recipes by status'
+        )}
         dataAttr="data-recipe-status-filter"
         optionDataAttr="data-recipe-status-option"
-        onChange={(value) => { ui.statusFilter = value; ui.pageIndex = 0; }}
+        onChange={(value) => {
+          ui.statusFilter = value;
+          ui.pageIndex = 0;
+        }}
       />
       <SegmentedControl
         options={lockOptions}
         value={ui.lockFilter}
         groupName="manager-recipe-lock-filter"
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.LockFilterLabel', 'Filter recipes by lock state')}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Recipe.LockFilterLabel',
+          'Filter recipes by lock state'
+        )}
         dataAttr="data-recipe-lock-filter"
         optionDataAttr="data-recipe-lock-option"
-        onChange={(value) => { ui.lockFilter = value; ui.pageIndex = 0; }}
+        onChange={(value) => {
+          ui.lockFilter = value;
+          ui.pageIndex = 0;
+        }}
       />
     </div>
 
@@ -377,33 +487,52 @@
           class="manager-recipe-category-filter"
           data-recipe-category-filter
           value={ui.categoryFilter}
-          onchange={(event) => { ui.categoryFilter = event.currentTarget.value; ui.pageIndex = 0; }}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel', 'Filter recipes by category')}
+          onchange={(event) => {
+            ui.categoryFilter = event.currentTarget.value;
+            ui.pageIndex = 0;
+          }}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Recipe.CategoryFilterLabel',
+            'Filter recipes by category'
+          )}
         >
-          <option value="all">{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option>
+          <option value="all"
+            >{text('FABRICATE.Admin.Manager.Recipe.CategoryAll', 'All categories')}</option
+          >
           {#each recipeCategories || [] as category (category.name)}
             <option value={category.name}>{categoryLabel(category.name)} ({category.count})</option>
           {/each}
         </select>
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
         <div class="manager-recipe-filter-field">
-          <span class="manager-recipe-filter-label" id="manager-recipe-group-label">{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span>
+          <span class="manager-recipe-filter-label" id="manager-recipe-group-label"
+            >{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span
+          >
           <button
             type="button"
             class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
             data-recipe-group-toggle
             aria-pressed={ui.groupByCategory}
             aria-labelledby="manager-recipe-group-label"
-            onclick={() => ui.groupByCategory = !ui.groupByCategory}
+            onclick={() => (ui.groupByCategory = !ui.groupByCategory)}
           >
-            <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
+            <span class="manager-status-toggle-track" aria-hidden="true"
+              ><span class="manager-status-toggle-knob"></span></span
+            >
           </button>
         </div>
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
       {/if}
       <div class="manager-recipe-filter-field">
-        <span class="manager-recipe-filter-label">{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span>
-        <select value={ui.sortKey} data-recipe-sort onchange={(event) => ui.sortKey = event.currentTarget.value} aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}>
+        <span class="manager-recipe-filter-label"
+          >{text('FABRICATE.Admin.Manager.Recipe.SortBy', 'Sort by')}</span
+        >
+        <select
+          value={ui.sortKey}
+          data-recipe-sort
+          onchange={(event) => (ui.sortKey = event.currentTarget.value)}
+          aria-label={text('FABRICATE.Admin.Manager.Recipe.SortLabel', 'Sort recipes')}
+        >
           {#each RECIPE_SORT_KEYS as key (key)}
             <option value={key}>{sortLabel(key)}</option>
           {/each}
@@ -412,30 +541,44 @@
           type="button"
           class="manager-button manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.ToggleSortDirection', 'Toggle sort direction')}
-          onclick={() => ui.sortDirection = ui.sortDirection === 'asc' ? 'desc' : 'asc'}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Recipe.ToggleSortDirection',
+            'Toggle sort direction'
+          )}
+          onclick={() => (ui.sortDirection = ui.sortDirection === 'asc' ? 'desc' : 'asc')}
         >
-          <i class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-short-wide' : 'fas fa-arrow-down-wide-short'} aria-hidden="true"></i>
-          <span>{ui.sortDirection === 'asc'
-            ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
-            : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span>
+          <i
+            class={ui.sortDirection === 'asc'
+              ? 'fas fa-arrow-down-short-wide'
+              : 'fas fa-arrow-down-wide-short'}
+            aria-hidden="true"
+          ></i>
+          <span
+            >{ui.sortDirection === 'asc'
+              ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
+              : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span
+          >
         </button>
       </div>
     </div>
 
     <div class="manager-recipe-filter-row is-chips">
       {#each model.chips as chip (chip.id)}
-        <span class="manager-chip is-info manager-recipe-filter-chip" data-recipe-filter-chip={chip.id}>
+        <Chip tone="info" class="manager-recipe-filter-chip" data-recipe-filter-chip={chip.id}>
           <span>{chipLabel(chip)}</span>
           <button
             type="button"
             class="manager-recipe-chip-clear"
-            aria-label={format('FABRICATE.Admin.Manager.Recipe.ClearChip', 'Clear {filter} filter', { filter: chip.id })}
+            aria-label={format(
+              'FABRICATE.Admin.Manager.Recipe.ClearChip',
+              'Clear {filter} filter',
+              { filter: chip.id }
+            )}
             onclick={() => clearChip(chip.id)}
           >
             <i class="fas fa-times" aria-hidden="true"></i>
           </button>
-        </span>
+        </Chip>
       {/each}
       <!--
         The count is quiet right-aligned metadata, not a control: a bordered mono chip
@@ -446,10 +589,38 @@
         {format('FABRICATE.Admin.Manager.Recipe.CountRange', '{start}–{end} of {total}', {
           start: model.rangeStart,
           end: model.rangeEnd,
-          total: model.totalCount
+          total: model.totalCount,
         })}
       </span>
     </div>
+
+    <!--
+      The multi-select row is the LAST row of the toolbar, immediately above the list —
+      the same third-row-then-list order the Component Studio shipped (issue 1010). It is
+      a row of THIS toolbar, not a sticky bar of its own over the list, so it inherits the
+      toolbar's own metrics instead of declaring a second register.
+
+      Every prop below is an OVERRIDE: the shared primitive's row class and its five
+      `data-*` hooks default to the Component Studio's strings so that studio's smoke
+      selectors, view-lab cases and mounted assertions kept working through the
+      extraction. This studio must name its own, or both browsers would answer to one set
+      of hooks.
+    -->
+    <BulkSelectionToolbar
+      rowClass="manager-recipe-filter-row"
+      toolbarAttr="data-recipe-selection-toolbar"
+      pageBoxAttr="data-recipe-select-all-page"
+      countAttr="data-recipe-selection-count"
+      resultsAttr="data-recipe-select-all-results"
+      clearAttr="data-recipe-clear-selection"
+      pageSelectionState={selectionSummary.pageSelectionState}
+      count={selectionSummary.count}
+      showSelectAllResults={selectionSummary.showSelectAllResults}
+      selectAllResultsCount={selectionSummary.selectAllResultsCount}
+      onTogglePage={(on) => setPageSelected(on)}
+      onSelectAllResults={selectAllResults}
+      onClear={clearBulkSelection}
+    />
   </section>
 
   {#if flashMessage}
@@ -469,32 +640,45 @@
         class="manager-icon-button manager-recipe-flash-dismiss"
         data-recipe-flash-dismiss
         aria-label={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
-        onclick={() => flashMessage = ''}
+        onclick={() => (flashMessage = '')}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
       </button>
     </div>
   {/if}
 
-  <section class="manager-table-scroll" aria-label={text('FABRICATE.Admin.Manager.Recipe.Table', 'Recipes table')}>
+  <section
+    class="manager-table-scroll"
+    aria-label={text('FABRICATE.Admin.Manager.Recipe.Table', 'Recipes table')}
+  >
     {#if (recipes || []).length === 0}
-      <div class="manager-empty">
-        <div>
-          <i class="fas fa-scroll" aria-hidden="true"></i>
-          <h3>{text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}</h3>
-          <p>{text('FABRICATE.Admin.Manager.Recipe.EmptyHint', 'Create recipes for the selected crafting system.')}</p>
-        </div>
-      </div>
+      <EmptyState
+        icon="fas fa-scroll"
+        title={text('FABRICATE.Admin.Manager.Recipe.EmptyTitle', 'No recipes yet')}
+        hint={text(
+          'FABRICATE.Admin.Manager.Recipe.EmptyHint',
+          'Create recipes for the selected crafting system.'
+        )}
+      />
     {:else if model.filtered.length === 0}
       <!-- A filtered-to-nothing library is not an error state and does not want the
            full empty-panel apparatus: one dashed panel says it, and the Clear-filters
            button is the way out. -->
-      <div class="manager-empty manager-recipe-empty-filtered">
-        <div>
-          <p>{text('FABRICATE.Admin.Manager.Recipe.EmptySearchTitle', 'No recipes match your filters.')}</p>
-          <button type="button" class="manager-button" data-clear-filters="recipes" onclick={clearFilters}>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button>
-        </div>
-      </div>
+      <EmptyState
+        filtered
+        hint={text(
+          'FABRICATE.Admin.Manager.Recipe.EmptySearchTitle',
+          'No recipes match your filters.'
+        )}
+      >
+        <button
+          type="button"
+          class="manager-button"
+          data-clear-filters="recipes"
+          onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        >
+      </EmptyState>
     {:else}
       <div class="manager-recipes-table">
         <!--
@@ -508,13 +692,21 @@
           stack of cards means nothing (see `.manager-recipe-table-head` in fabricate.css).
         -->
         <div class="manager-recipe-table-head" aria-hidden="true">
-          <span class="manager-recipe-head-identity">{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span>
+          <span class="manager-recipe-head-identity"
+            >{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span
+          >
           <div class="manager-recipe-head-cluster">
-            <span class="manager-recipe-head-cell is-io">{text('FABRICATE.Admin.Manager.Recipe.Column.Requirements', 'Requirements')}</span>
-            <span class="manager-recipe-head-cell is-check">{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span>
+            <span class="manager-recipe-head-cell is-io"
+              >{text('FABRICATE.Admin.Manager.Recipe.Column.Requirements', 'Requirements')}</span
+            >
+            <span class="manager-recipe-head-cell is-check"
+              >{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span
+            >
             <!-- STATUS spans both the lock and the enable-toggle columns: lock and
                  enable are both status controls, so the header sits over the pair. -->
-            <span class="manager-recipe-head-cell is-status">{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span>
+            <span class="manager-recipe-head-cell is-status"
+              >{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span
+            >
             <span class="manager-recipe-head-cell is-edit"></span>
           </div>
         </div>
@@ -536,14 +728,24 @@
                 {#each group.recipes as recipe (recipe.id)}
                   {@const io = ioReadout(recipe)}
                   {@const check = checkPill(recipe)}
+                  <!--
+                    `.is-bulk-selected` is a DIFFERENT question from `.is-selected` —
+                    "this row is in the set an Apply will write to" versus "you are
+                    here" — and a row can carry both (issue 1010).
+                  -->
                   <li
                     class={`manager-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''} ${recipe.enabled === false ? 'is-off' : ''}`}
+                    class:is-bulk-selected={bulkSelectedIds.has(recipe.id)}
                     data-recipe-id={recipe.id}
-                    data-recipe-incomplete={recipe.incomplete === true}
+                    data-recipe-bulk-selected={bulkSelectedIds.has(recipe.id)}
                     aria-current={isSelectedRecipe(recipe) ? 'true' : undefined}
                   >
-                    <button type="button" class="manager-recipe-identity" onclick={() => onSelectRecipe(recipe.id)}>
-                      <Medallion src={recipeImage(recipe)} icon="fas fa-scroll" size={40} />
+                    <button
+                      type="button"
+                      class="manager-recipe-identity"
+                      onclick={() => onSelectRecipe(recipe.id)}
+                    >
+                      <Medallion src={resolveRecipeImage(recipe)} icon="fas fa-scroll" size={40} />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
                           <span class="manager-system-name" title={recipe.name}>{recipe.name}</span>
@@ -551,22 +753,35 @@
                             <StatusPill tone={pill.tone} icon={pill.icon} label={pill.label} />
                           {/each}
                         </span>
-                        <span class="manager-system-description manager-recipe-description" title={recipe.description}>
-                          {recipe.description || text('FABRICATE.Admin.Manager.NoDescription', 'No description')}
+                        <span
+                          class="manager-system-description manager-recipe-description"
+                          title={recipe.description}
+                        >
+                          {recipe.description ||
+                            text('FABRICATE.Admin.Manager.NoDescription', 'No description')}
                         </span>
                       </span>
                     </button>
 
                     <div class="manager-recipe-cluster">
-                      <span class={`manager-recipe-io ${io.empty ? 'is-empty' : ''}`} data-recipe-io>
+                      <span
+                        class={`manager-recipe-io ${io.empty ? 'is-empty' : ''}`}
+                        data-recipe-io
+                      >
                         <span class="manager-recipe-io-counts">
                           <span>{io.inText}</span>
                           <span aria-hidden="true">·</span>
-                          {#if io.routed}<i class="fas fa-code-branch manager-recipe-io-routed" aria-hidden="true"></i>{/if}
+                          {#if io.routed}<i
+                              class="fas fa-code-branch manager-recipe-io-routed"
+                              aria-hidden="true"
+                            ></i>{/if}
                           <span>{io.outText}</span>
                         </span>
                         <span class="manager-recipe-io-steps">
-                          <i class={(recipe.stepCount ?? 0) > 1 ? 'fas fa-list-ol' : 'fas fa-minus'} aria-hidden="true"></i>
+                          <i
+                            class={(recipe.stepCount ?? 0) > 1 ? 'fas fa-list-ol' : 'fas fa-minus'}
+                            aria-hidden="true"
+                          ></i>
                           <span>{stepText(recipe)}</span>
                         </span>
                       </span>
@@ -575,10 +790,15 @@
                            takes the mono face (`is-mono`, tabular figures) when it
                            carries a number. The word-only kinds (Dynamic DC,
                            Progressive, the em dash) stay in the UI face. -->
-                      <span class={`manager-chip manager-recipe-check is-${check.kind} ${check.kind === 'dc' ? 'is-mono' : ''}`} data-recipe-check={check.kind} title={check.title || undefined}>
-                        <i class={check.icon} aria-hidden="true"></i>
+                      <Chip
+                        class={`manager-recipe-check is-${check.kind}`}
+                        mono={check.kind === 'dc'}
+                        icon={check.icon}
+                        data-recipe-check={check.kind}
+                        title={check.title || undefined}
+                      >
                         <span>{check.label}</span>
-                      </span>
+                      </Chip>
 
                       <button
                         type="button"
@@ -592,10 +812,16 @@
                           recipe.locked ? 'Unlock {name}' : 'Lock {name}',
                           { name: recipe.name }
                         )}
-                        title={text('FABRICATE.Admin.Manager.Recipe.LockHint', 'Locked recipes stay visible to players, but only a GM can craft them.')}
+                        title={text(
+                          'FABRICATE.Admin.Manager.Recipe.LockHint',
+                          'Locked recipes stay visible to players, but only a GM can craft them.'
+                        )}
                         onclick={() => onToggleLocked(recipe.id, recipe.locked !== true)}
                       >
-                        <i class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'} aria-hidden="true"></i>
+                        <i
+                          class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'}
+                          aria-hidden="true"
+                        ></i>
                       </button>
 
                       <!--
@@ -636,12 +862,48 @@
                         type="button"
                         class="manager-icon-button manager-recipe-edit"
                         data-recipe-edit={recipe.id}
-                        aria-label={format('FABRICATE.Admin.Manager.Recipe.EditNamed', 'Edit {name}', { name: recipe.name })}
+                        aria-label={format(
+                          'FABRICATE.Admin.Manager.Recipe.EditNamed',
+                          'Edit {name}',
+                          { name: recipe.name }
+                        )}
                         title={text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}
                         onclick={() => onEditRecipe(recipe.id)}
                       >
                         <i class="fas fa-pen" aria-hidden="true"></i>
                       </button>
+
+                      <!--
+                        The bulk selection box (issue 1010), AFTER the Edit pencil and
+                        INSIDE this cluster as its last cell — not a row-level sibling, or
+                        the `--fab-recipe-col-select` track appended to
+                        `--fab-recipe-cluster-cols` would have nothing to place. Trailing
+                        placement is also what lets that track be APPENDED: the column
+                        header's four explicit `grid-column` placements survive an append
+                        and would every one of them break on a prepend.
+
+                        `SelectionCheckbox` renders NO `<button>`, which is load-bearing
+                        here: the Foundry smoke walk reaches Edit through
+                        `[data-recipe-edit]` and the row through `.manager-recipe-identity`,
+                        and a selection control that answered to a looser row-button
+                        selector would start intercepting those clicks.
+
+                        This cluster is a `<div>`, so the primitive renders its own
+                        `<label>` (`wrapper="label"`); without it the visible box would have
+                        no label association and no click target.
+                      -->
+                      <SelectionCheckbox
+                        size="lg"
+                        wrapper="label"
+                        checked={bulkSelectedIds.has(recipe.id)}
+                        ariaLabel={format(
+                          'FABRICATE.Admin.Manager.BulkEdit.SelectRow',
+                          'Select {name} for bulk edit',
+                          { name: recipe.name }
+                        )}
+                        data-recipe-select={recipe.id}
+                        onChange={() => toggleRecipeBulkSelected(recipe.id)}
+                      />
                     </div>
                   </li>
                 {/each}
@@ -658,7 +920,10 @@
     pageSize={ui.pageSize}
     pageIndex={model.pageIndex}
     pageSizeOptions={[10, 25, 50]}
-    onPageChange={(next) => ui.pageIndex = next}
-    onPageSizeChange={(next) => { ui.pageSize = next; ui.pageIndex = 0; }}
+    onPageChange={(next) => (ui.pageIndex = next)}
+    onPageSizeChange={(next) => {
+      ui.pageSize = next;
+      ui.pageIndex = 0;
+    }}
   />
 </main>

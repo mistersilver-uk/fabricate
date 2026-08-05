@@ -17,11 +17,13 @@
   let {
     availableAt = null,
     services = null,
-    hintKey = 'FABRICATE.App.Journal.TimeRemaining.WhenPassed'
+    hintKey = 'FABRICATE.App.Journal.TimeRemaining.WhenPassed',
   } = $props();
 
   const components = $derived(
-    Number.isFinite(Number(availableAt)) ? (services?.getWorldTimeComponents?.(Number(availableAt)) ?? null) : null
+    Number.isFinite(Number(availableAt))
+      ? (services?.getWorldTimeComponents?.(Number(availableAt)) ?? null)
+      : null
   );
   const whenLabel = $derived(worldTimeLabel(components, { localize }));
 </script>

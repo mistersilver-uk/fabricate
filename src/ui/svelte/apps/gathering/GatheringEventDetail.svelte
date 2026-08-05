@@ -14,21 +14,22 @@
 <script>
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
-  import { riskClass, riskLabel, biomeChipStyle, descriptionOrDefault } from '../../util/gatheringFormat.js';
+  import {
+    riskClass,
+    riskLabel,
+    biomeChipStyle,
+    descriptionOrDefault,
+  } from '../../util/gatheringFormat.js';
   import ChanceBar from './ChanceBar.svelte';
   import LinkedScene from './LinkedScene.svelte';
   import {
     getWeatherIcon,
     getWeatherLabelKey,
     getTimeOfDayIcon,
-    getTimeOfDayLabelKey
+    getTimeOfDayLabelKey,
   } from '../../util/gatheringConditionIcons.js';
 
-  let {
-    event = null,
-    hasEvents = false,
-    services = null
-  } = $props();
+  let { event = null, hasEvents = false, services = null } = $props();
 
   const name = $derived(String(event?.name ?? ''));
   const description = $derived(String(event?.description ?? ''));
@@ -49,37 +50,45 @@
   // player app; biome chips use the resolved biomeTags (icon + colour + label)
   // like the environment's biome pips; regions are free-form text chips.
   const weatherChips = $derived(
-    (Array.isArray(event?.weather) ? event.weather : []).map(id => ({
+    (Array.isArray(event?.weather) ? event.weather : []).map((id) => ({
       id,
       icon: getWeatherIcon(id),
-      label: localize(getWeatherLabelKey(id))
+      label: localize(getWeatherLabelKey(id)),
     }))
   );
   const timeOfDayChips = $derived(
-    (Array.isArray(event?.timeOfDay) ? event.timeOfDay : []).map(id => ({
+    (Array.isArray(event?.timeOfDay) ? event.timeOfDay : []).map((id) => ({
       id,
       icon: getTimeOfDayIcon(id),
-      label: localize(getTimeOfDayLabelKey(id))
+      label: localize(getTimeOfDayLabelKey(id)),
     }))
   );
   const biomeChips = $derived(Array.isArray(event?.biomeTags) ? event.biomeTags : []);
   const regions = $derived(Array.isArray(event?.regions) ? event.regions : []);
 
   const hasDetails = $derived(
-    weatherChips.length > 0 || timeOfDayChips.length > 0 || biomeChips.length > 0
-    || regions.length > 0 || sceneUuid !== ''
+    weatherChips.length > 0 ||
+      timeOfDayChips.length > 0 ||
+      biomeChips.length > 0 ||
+      regions.length > 0 ||
+      sceneUuid !== ''
   );
 
   const titleId = 'gathering-event-detail-title';
 </script>
 
 {#if event == null}
-  <div class="gathering-event-detail-state" data-gathering-event-detail-state={hasEvents ? 'empty' : 'none'}>
+  <div
+    class="gathering-event-detail-state"
+    data-gathering-event-detail-state={hasEvents ? 'empty' : 'none'}
+  >
     <i class={`fas ${hasEvents ? 'fa-hand-pointer' : 'fa-masks-theater'}`} aria-hidden="true"></i>
     <p>
-      {localize(hasEvents
-        ? 'FABRICATE.App.Gathering.Detail.SelectEventHint'
-        : 'FABRICATE.App.Gathering.Detail.NoEvents')}
+      {localize(
+        hasEvents
+          ? 'FABRICATE.App.Gathering.Detail.SelectEventHint'
+          : 'FABRICATE.App.Gathering.Detail.NoEvents'
+      )}
     </p>
   </div>
 {:else}
@@ -92,7 +101,12 @@
   >
     <header class="gathering-event-detail-header">
       <span class="gathering-event-detail-thumb-wrap">
-        <img class="gathering-event-detail-thumb" class:is-fallback={!img} src={img || DEFAULT_GATHERING_EVENT_IMG} alt="" />
+        <img
+          class="gathering-event-detail-thumb"
+          class:is-fallback={!img}
+          src={img || DEFAULT_GATHERING_EVENT_IMG}
+          alt=""
+        />
       </span>
       <span class="gathering-event-detail-heading">
         <h2 id={titleId} class="gathering-event-detail-title" title={name}>{name}</h2>
@@ -109,7 +123,9 @@
       </span>
     </header>
 
-    <p class="gathering-event-detail-description" class:is-fallback={!hasDescription}>{descriptionText}</p>
+    <p class="gathering-event-detail-description" class:is-fallback={!hasDescription}>
+      {descriptionText}
+    </p>
 
     {#if chance != null}
       <ChanceBar value={chance} scale="event" />
@@ -117,7 +133,9 @@
 
     {#if hasDetails}
       <div class="gathering-event-detail-card" data-gathering-event-details>
-        <p class="gathering-event-detail-card-heading">{localize('FABRICATE.App.Gathering.Detail.EventConditionsHeading')}</p>
+        <p class="gathering-event-detail-card-heading">
+          {localize('FABRICATE.App.Gathering.Detail.EventConditionsHeading')}
+        </p>
 
         {#if weatherChips.length > 0}
           <div class="gathering-event-detail-group" data-gathering-event-match="weather">
@@ -296,13 +314,25 @@
   }
 
   /* Danger-tier icon colour, mirroring the center column's danger pip. */
-  .gathering-event-detail-tag.is-danger i { color: var(--fab-danger, var(--fab-text-muted)); }
-  .gathering-event-detail-tag.is-danger.risk-safe i { color: var(--fab-success); }
-  .gathering-event-detail-tag.is-danger.risk-unsafe i { color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%); }
-  .gathering-event-detail-tag.is-danger.risk-hazardous i { color: var(--fab-warning); }
-  .gathering-event-detail-tag.is-danger.risk-dangerous i { color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%); }
+  .gathering-event-detail-tag.is-danger i {
+    color: var(--fab-danger, var(--fab-text-muted));
+  }
+  .gathering-event-detail-tag.is-danger.risk-safe i {
+    color: var(--fab-success);
+  }
+  .gathering-event-detail-tag.is-danger.risk-unsafe i {
+    color: color-mix(in srgb, var(--fab-success) 55%, var(--fab-warning) 45%);
+  }
+  .gathering-event-detail-tag.is-danger.risk-hazardous i {
+    color: var(--fab-warning);
+  }
+  .gathering-event-detail-tag.is-danger.risk-dangerous i {
+    color: color-mix(in srgb, var(--fab-warning) 50%, var(--fab-danger) 50%);
+  }
   .gathering-event-detail-tag.is-danger.risk-deadly i,
-  .gathering-event-detail-tag.is-danger.risk-extreme i { color: var(--fab-danger); }
+  .gathering-event-detail-tag.is-danger.risk-extreme i {
+    color: var(--fab-danger);
+  }
 
   .gathering-event-detail-description {
     margin: 0;

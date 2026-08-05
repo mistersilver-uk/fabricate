@@ -7,6 +7,10 @@
     "docs/_site",
     "docs/.jekyll-cache",
     "dist",
+    // The View Lab / screenshot publisher writes a `.pr-body.md` staging file here. Gitignored
+    // like `dist` and `tmp`, but the glob is `**/*.md`, so without this line `lint:md` goes red on
+    // any machine that has run a capture or a publish.
+    "ui-screenshot-artifact",
     ".worktrees",
     ".claude/worktrees",
     "tmp",

@@ -2,10 +2,9 @@ name: CI
 
 on:
   pull_request:
-    # `edited` lets title/screenshot checks re-run when the PR title or body is
-    # fixed after opening. The expensive unit-tests job opts out of `edited`
-    # (see its `if:`), so description tweaks only re-run the cheap metadata jobs.
-    types: [opened, synchronize, reopened, edited]
+    # `edited` re-runs only title/screenshot metadata checks. `ready_for_review`
+    # starts a fresh full gate run after the draft-head preflight.
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches:
       - main
@@ -13,7 +12,8 @@ on:
       - '[0-9]+.[0-9]+.x'
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
+  # Metadata edits must not cancel an in-flight code-gate run for the same PR.
+  group: ci-${{ github.event.pull_request.number || github.sha }}-${{ github.event.action == 'edited' && 'metadata' || 'code' }}
   cancel-in-progress: true
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
   unit-tests:
     # Skip on `edited` PR events: editing the title/body doesn't change the head
     # commit, so the existing result for that SHA still stands. Runs on push and
-    # all other PR events (opened/synchronize/reopened).
+    # all other PR events, including `ready_for_review`.
     if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -38,10 +38,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: ./node_modules/.bin/playwright install chromium --with-deps
 
       - name: Run unit tests
         run: npm test
@@ -65,10 +65,20 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint (ESLint)
         run: npm run lint
+
+      - name: Lint Svelte components (ESLint)
+        run: npm run lint:svelte
+
+      # The graph-independent Svelte compiler-warning sweep (issue 924). `npm run build`
+      # also fails on a warning via `onwarn` in `svelte.config.js`, but a Vite build
+      # compiles only the entry graph and is blind to a component nothing imports, so the
+      # authoritative gate is this sweep over every `src/**/*.svelte`.
+      - name: Check Svelte compiler warnings
+        run: npm run lint:svelte:warnings
 
       - name: Lint styles (Stylelint)
         run: npm run lint:css
@@ -82,6 +92,7 @@ jobs:
   validate-bindings:
     # Pure-Node consistency check for the agent role bindings (skills <-> Codex
     # <-> Claude <-> AGENTS.md table). No install needed — the script has no deps.
+    if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -111,7 +122,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint commit messages
         run: |
@@ -147,22 +158,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REPO: ${{ github.repository }}
         run: |
           # Read the live body (not the event payload) so a re-run or `edited`
           # event sees screenshots added after the PR was opened.
-          PR_BODY=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json body --jq .body)
+          PR_BODY=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json body --jq .body)
           printf '%s\n' "$PR_BODY" > pr-body.md
 
-          # Get changed files
-          CHANGED_FILES=$(gh pr diff "$PR_NUMBER" \
-            --repo "${{ github.repository }}" \
-            --name-only)
-          printf '%s\n' "$CHANGED_FILES" > changed-files.txt
+          # Get changed files. Use the files endpoint, NOT `gh pr diff
+          # --name-only`: that fetches the unified diff, which the API caps at
+          # 20,000 lines and rejects with `HTTP 406 ... diff too_large` beyond
+          # it. This step runs under `bash -e`, so on a large PR the job died
+          # here — before the evidence script ran — and the maintainer-applied
+          # `screenshots-exempt` label was never even read, making the gate
+          # unskippable. The files endpoint returns metadata rather than a diff
+          # body, so no line cap applies; `--paginate` walks its 100-per-page
+          # pages. It does cap out at 3000 files (a limit no PR should reach).
+          gh api "repos/$PR_REPO/pulls/$PR_NUMBER/files" \
+            --paginate \
+            --jq '.[].filename' > changed-files.txt
 
           # Read the live label list. Only a maintainer-applied
           # `screenshots-exempt` label can skip this check; agents cannot
           # self-apply labels, so this cannot be no-op'd from the PR body.
-          PR_LABELS=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json labels --jq '.labels[].name')
+          PR_LABELS=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json labels --jq '.labels[].name')
           printf '%s\n' "$PR_LABELS" > labels.txt
 
           node scripts/ui-pr-screenshot-evidence.mjs check \

@@ -1,14 +1,91 @@
 // Shared harness for mounted Svelte component tests. Compiling each `.svelte`
 // into a temp dir and rewriting its client imports is identical across every
 // component test, so it lives here rather than being copy-pasted per file.
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { compile, compileModule } from 'svelte/compiler';
 import { createClassComponent } from 'svelte/legacy';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from './svelte-dom.js';
+
+const STATIC_IMPORT_PATTERN = /(?:^|[;\n])\s*(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
+
+function toRepoPath(repoRoot, absolutePath) {
+  return relative(repoRoot, absolutePath).replaceAll('\\', '/');
+}
+
+function resolveLocalModule(repoRoot, importerPath, specifier) {
+  const absolutePath = resolve(repoRoot, dirname(importerPath), specifier);
+  const candidates = [
+    absolutePath,
+    `${absolutePath}.js`,
+    `${absolutePath}.svelte`,
+    `${absolutePath}.svelte.js`,
+    join(absolutePath, 'index.js'),
+    join(absolutePath, 'index.svelte')
+  ];
+  const match = candidates.find((candidate) => existsSync(candidate));
+  return match ? toRepoPath(repoRoot, match) : null;
+}
+
+function declarationListFor(modulePath) {
+  if (modulePath.endsWith('.svelte.js')) return 'runeModules';
+  if (modulePath.endsWith('.svelte')) return 'compiledModules';
+  return 'rawModules';
+}
+
+function formatImporterChain(importerChain) {
+  return importerChain.join(' -> ');
+}
+
+function validateMountedComponentDependencies({ repoRoot, rawModules, runeModules, compiledModules, componentPath }) {
+  const declaredModules = new Set([...rawModules, ...runeModules, ...compiledModules, componentPath]);
+  const pending = [
+    ...[...declaredModules]
+      .filter((modulePath) => modulePath !== componentPath)
+      .map((modulePath) => ({ modulePath, importerChain: [modulePath] })),
+    { modulePath: componentPath, importerChain: [componentPath] }
+  ];
+  const visited = new Set();
+  const missing = [];
+
+  while (pending.length > 0) {
+    const { modulePath: importerPath, importerChain } = pending.pop();
+    if (visited.has(importerPath)) continue;
+    visited.add(importerPath);
+
+    const sourcePath = resolve(repoRoot, importerPath);
+    if (!existsSync(sourcePath)) {
+      missing.push(`declared module ${importerPath} does not exist`);
+      continue;
+    }
+
+    const source = readFileSync(sourcePath, 'utf8');
+    for (const match of source.matchAll(STATIC_IMPORT_PATTERN)) {
+      const specifier = match[1];
+      if (!specifier.startsWith('.')) continue;
+
+      const importedPath = resolveLocalModule(repoRoot, importerPath, specifier);
+      if (!importedPath) {
+        missing.push(`${importerPath} imports ${specifier}, but no local module resolves from it`);
+        continue;
+      }
+      if (!declaredModules.has(importedPath)) {
+        missing.push(
+          `${formatImporterChain([...importerChain, importedPath])}; ${importerPath} imports ${specifier} (${importedPath}); add it to ${declarationListFor(importedPath)}`
+        );
+        continue;
+      }
+      pending.push({ modulePath: importedPath, importerChain: [...importerChain, importedPath] });
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(`Mounted Svelte harness dependency closure is incomplete:\n- ${missing.join('\n- ')}`);
+  }
+}
 
 /**
  * Rewrite a compiled component's imports so they resolve against the temp dir:
@@ -22,10 +99,56 @@ export function rewriteClientImports(code) {
 }
 
 /**
+ * Guard the whole CLIENT/SERVER split every mounted suite depends on.
+ *
+ * Svelte's exports are condition-mapped: the `browser` condition selects the real client
+ * build and every other condition (including Node's default) selects a server build.
+ * `npm test` passes `--conditions=browser`; a bare `node --test <file>` does not. The
+ * split is not confined to one subpath — `svelte` itself (`.`) and `svelte/legacy` are
+ * mapped the same way, so under the wrong condition set the `createClassComponent` this
+ * harness mounts with comes from `legacy-server.js` and the components under test are
+ * driven by a server runtime that never updates the DOM. Checking `svelte/reactivity` is
+ * therefore a canary for the whole set, not a check about one export: the subpath is the
+ * cheapest one to state a target for, and it happens to carry the sharpest vacuous pass
+ * (its server `SvelteSet` is literally `globalThis.Set`, so an assertion that a component
+ * uses `SvelteSet` rather than `Set` cannot fail — and no suite asserts that today, which
+ * is exactly why the guard must not be read as existing only for `SvelteSet`).
+ *
+ * The check compares what the specifier actually resolves to against the `browser` target
+ * the installed Svelte declares for that subpath, so it states the condition rather than
+ * hard-coding a filename, and keeps working across Svelte releases that rename the build.
+ * `import.meta.resolve` is synchronous and does not evaluate the module, so this adds no
+ * second copy of the client runtime to a mounted suite.
+ *
+ * @throws {Error} when the process did not resolve `svelte/reactivity` under `browser`.
+ */
+export function assertClientSvelteReactivity() {
+  const packagePath = fileURLToPath(import.meta.resolve('svelte/package.json'));
+  const browserTarget = JSON.parse(readFileSync(packagePath, 'utf8')).exports?.['./reactivity']?.browser;
+  if (!browserTarget) {
+    throw new Error(
+      "The installed Svelte no longer declares a 'browser' condition for 'svelte/reactivity'; "
+        + 'the vacuous-pass guard in tests/helpers/svelte-component-harness.js needs updating.'
+    );
+  }
+  const expected = resolve(dirname(packagePath), browserTarget);
+  const actual = fileURLToPath(import.meta.resolve('svelte/reactivity'));
+  if (actual !== expected) {
+    throw new Error(
+      `'svelte/reactivity' resolved to ${actual}, not the client build ${expected}. `
+        + 'Without the browser export condition, SvelteSet IS globalThis.Set and every '
+        + 'reactivity assertion passes vacuously. Run the suite via `npm test` (which passes '
+        + '--conditions=browser), or add --conditions=browser to a bare `node --test` run.'
+    );
+  }
+}
+
+/**
  * Install the minimal Foundry/DOM globals that mounted component tests rely on.
  * Call after `setupDOM()` so `document` exists.
  */
 export function installComponentTestGlobals() {
+  assertClientSvelteReactivity();
   globalThis.Text = document.createTextNode('').constructor;
   globalThis.Comment = document.createComment('').constructor;
   const labels = {
@@ -98,12 +221,21 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
+  // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
+  // is already in the compiled graph and imports it, so omitting this HANGS every
+  // mounted crafting suite (# cancelled). Deliberately import-free, so one entry
+  // suffices — see the module header.
+  'src/ui/svelte/util/requirementSlots.js',
   // RecipeDetailHeader surfaces the recipe's authored craft duration pre-craft (issue
   // 846) via this formatter. RecipeDetailHeader is already in the compiled graph, so
   // omitting this raw dep HANGS every mounted crafting test (# cancelled). It imports
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
+  // Same rule, issue 917: the builder now shares its step->recipe view projection and
+  // its active-run step read with CraftingEngine through this import-free leaf, so it
+  // must be copied alongside the builder.
+  'src/systems/stepRecipeView.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
   // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
@@ -124,6 +256,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // can be mounted from one shared list.
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
+  // The shared numeric stepper the essence pool's per-carrier rows are built on
+  // (issue 917). IoTable renders EssencePoolPanel, which renders this, so omitting it
+  // HANGS every mounted crafting suite rather than failing it.
+  'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
   'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
   'src/ui/svelte/apps/crafting/QuantityTag.svelte',
@@ -136,6 +272,16 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   'src/ui/svelte/apps/crafting/detail/CraftingCheckCard.svelte',
   'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+  // IoTable is the requirement surface's composition root (issue 917) and renders all
+  // four of these. IoTable is already listed, so omitting any of them HANGS every
+  // mounted crafting suite (# cancelled), not just the rail's own one.
+  'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
+  'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
+  'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte',
+  'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
+  // The one "N Radiant" contribution chip both of the two panels above render. They
+  // are already listed, so omitting this HANGS every mounted crafting suite.
+  'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
   'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
   'src/ui/svelte/apps/crafting/detail/RollResultBox.svelte',
   'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
@@ -183,6 +329,7 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
 
   return {
     async setup() {
+      validateMountedComponentDependencies({ repoRoot, rawModules, runeModules, compiledModules, componentPath });
       setupDOM();
       installComponentTestGlobals();
       tempRoot = mkdtempSync(join(tmpdir(), tmpPrefix));

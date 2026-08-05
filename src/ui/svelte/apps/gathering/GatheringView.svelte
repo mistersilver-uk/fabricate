@@ -10,7 +10,15 @@
   highlight-only — no center-column wiring yet.
 -->
 <script>
-  import { localize, notifyWarn, subscribeSceneChange, subscribeTravelMarkerMove, subscribeInventoryChange, subscribeCraftingDataChange } from '../../util/foundryBridge.js';
+  import {
+    localize,
+    notifyWarn,
+    subscribeSceneChange,
+    subscribeTravelMarkerMove,
+    subscribeInventoryChange,
+    subscribeCraftingDataChange,
+    subscribeGatheringDataChange,
+  } from '../../util/foundryBridge.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
@@ -21,7 +29,7 @@
     resolveDefaultTaskSelection,
     visibleTasksFor,
     resolveDefaultEventSelection,
-    visibleEventsFor
+    visibleEventsFor,
   } from './selectionDefault.js';
   import { resolveScopedGatheringSelection } from './scopedSelection.js';
 
@@ -32,7 +40,7 @@
     // the view navigates straight to that environment and opens that task's detail
     // (rather than the generic first-attemptable default). Null on a manual open.
     scopedEnvironmentId = null,
-    scopedTaskId = null
+    scopedTaskId = null,
   } = $props();
 
   // The shared actor-selection store (services.actorBar). Existing tests mount
@@ -77,20 +85,20 @@
   // The environment whose detail the center column renders; null until the
   // player picks a selectable card (or when the prior selection drops out).
   const selectedEnvironment = $derived(
-    environments.find(environment => environment?.id === selectedId) ?? null
+    environments.find((environment) => environment?.id === selectedId) ?? null
   );
   // The tasks the player can pick for the selected environment (blind →
   // discovered, targeted → full list), and the currently selected task object.
   const visibleTasks = $derived(visibleTasksFor(selectedEnvironment));
   const selectedTask = $derived(
-    visibleTasks.find(task => String(task?.id) === String(selectedTaskId)) ?? null
+    visibleTasks.find((task) => String(task?.id) === String(selectedTaskId)) ?? null
   );
   // The events the player can inspect for the selected environment, and the
   // currently selected event object (drives the right-column event inspector
   // when the Events tab is active).
   const visibleEvents = $derived(visibleEventsFor(selectedEnvironment));
   const selectedEvent = $derived(
-    visibleEvents.find(event => String(event?.id) === String(selectedEventId)) ?? null
+    visibleEvents.find((event) => String(event?.id) === String(selectedEventId)) ?? null
   );
 
   // `quiet` refreshes (e.g. on scene change) keep the populated grid on screen
@@ -104,7 +112,7 @@
       // listing; `null` lets `listGatheringForActor` fall back to the persisted
       // default for fresh loads.
       const result = await services?.listGatheringForActor?.({
-        rememberedActorId: store?.selectedActorId ?? null
+        rememberedActorId: store?.selectedActorId ?? null,
       });
       listing = result ?? null;
       const listingEnvironments = Array.isArray(listing?.environments) ? listing.environments : [];
@@ -124,7 +132,7 @@
         appliedScopeKey,
         currentSelectedId: selectedId,
         currentTaskId: selectedTaskId,
-        defaultResolver: resolveDefaultSelection
+        defaultResolver: resolveDefaultSelection,
       });
       appliedScopeKey = scopeDecision.appliedScopeKey;
       selectedId = scopeDecision.selectedEnvironmentId;
@@ -136,12 +144,18 @@
       // resolution and avoids an $effect write-loop. When the scope was just
       // applied, the decision's task preference is the scoped task (when present
       // in the env's visible tasks).
-      const resolvedEnvironment = listingEnvironments
-        .find(environment => environment?.id === selectedId) ?? null;
-      selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(resolvedEnvironment), scopeDecision.taskPreferenceId);
+      const resolvedEnvironment =
+        listingEnvironments.find((environment) => environment?.id === selectedId) ?? null;
+      selectedTaskId = resolveDefaultTaskSelection(
+        visibleTasksFor(resolvedEnvironment),
+        scopeDecision.taskPreferenceId
+      );
       // Resolve the event selection the same way (preserve a still-present pick,
       // else default to the first event) so the Events tab inspector is seeded.
-      selectedEventId = resolveDefaultEventSelection(visibleEventsFor(resolvedEnvironment), selectedEventId);
+      selectedEventId = resolveDefaultEventSelection(
+        visibleEventsFor(resolvedEnvironment),
+        selectedEventId
+      );
 
       // First-load backstop: when the shared selection is still empty, adopt the
       // listing's resolved actor AT MOST ONCE and ONLY when it is a player
@@ -149,8 +163,8 @@
       // store's own fallback in place (no ping-pong).
       if (store && !backstopApplied && !store.selectedActorId) {
         const resolvedId = listing?.selectedActorId ?? null;
-        const isPlayerCharacter = Boolean(resolvedId)
-          && store.selectableActors.some((actor) => actor?.id === resolvedId);
+        const isPlayerCharacter =
+          Boolean(resolvedId) && store.selectableActors.some((actor) => actor?.id === resolvedId);
         if (isPlayerCharacter) {
           backstopApplied = true;
           store.selectActor(resolvedId);
@@ -173,7 +187,7 @@
     selectedId = id;
     // A new environment starts with its own default task selection (first
     // attemptable), rather than carrying over the previous env's task.
-    const nextEnvironment = environments.find(environment => environment?.id === id) ?? null;
+    const nextEnvironment = environments.find((environment) => environment?.id === id) ?? null;
     selectedTaskId = resolveDefaultTaskSelection(visibleTasksFor(nextEnvironment), null);
     // A new environment also resets to the default (Tasks) tab and its own
     // default event selection.
@@ -210,7 +224,7 @@
         rememberedActorId: store?.selectedActorId ?? null,
         // UI-triggered attempt: prompt an interactive roll dialog + post the roll
         // to chat (Dice So Nice) for the routed/progressive check paths.
-        interactive: true
+        interactive: true,
       });
       // Never swallow a rejected attempt: surface WHY so a blocked attempt can't be
       // a silent no-op. A started/accepted attempt reports its outcome via the chat
@@ -243,9 +257,8 @@
   // without flashing the spinner. Tracks only the scope key so a manual navigation
   // within the same session does not re-trigger it.
   $effect(() => {
-    const scopeKey = scopedEnvironmentId && scopedTaskId
-      ? `${scopedEnvironmentId}|${scopedTaskId}`
-      : null;
+    const scopeKey =
+      scopedEnvironmentId && scopedTaskId ? `${scopedEnvironmentId}|${scopedTaskId}` : null;
     if (scopeKey && scopeKey !== appliedScopeKey) {
       load(true);
     }
@@ -260,22 +273,33 @@
   // token position. When a travel marker moves, re-fetch (quietly) so the current
   // realm and any realm-gated availability update without reopening the app.
   // Filtered to actual travel markers so ordinary token moves don't re-fetch.
-  $effect(() => subscribeTravelMarkerMove((actorUuid) => {
-    if (services?.isTravelMarkerActor?.(actorUuid)) load(true);
-  }));
+  $effect(() =>
+    subscribeTravelMarkerMove((actorUuid) => {
+      if (services?.isTravelMarkerActor?.(actorUuid)) load(true);
+    })
+  );
 
   // Present-tool availability is read live from the selected actor's items, so an
   // item added/removed/edited on that actor can change which tasks are attemptable.
   // Quietly re-fetch when the selected gathering actor's inventory changes.
-  $effect(() => subscribeInventoryChange(() => load(true), {
-    isRelevantActor: (actorId) =>
-      Boolean(store?.selectedActorId) && String(actorId) === String(store.selectedActorId)
-  }));
+  $effect(() =>
+    subscribeInventoryChange(() => load(true), {
+      isRelevantActor: (actorId) =>
+        Boolean(store?.selectedActorId) && String(actorId) === String(store.selectedActorId),
+    })
+  );
 
   // A GM editing/saving a crafting system can change the gathering tasks, tools, or
   // drop tables surfaced here; quietly re-fetch. Cross-client via the updateSetting
   // bridge (see subscribeCraftingDataChange).
   $effect(() => subscribeCraftingDataChange(() => load(true)));
+
+  // Resource-node counts live on the environment and are written by the active GM —
+  // including the depletion caused by THIS player's own attempt, which lands after
+  // the post-attempt `load()` above has already run. Quietly re-fetch when the
+  // replicated environment setting reloads, so counts and the depleted-pool gate
+  // reflect the world instead of a stale local snapshot.
+  $effect(() => subscribeGatheringDataChange(() => load(true)));
 
   // Report the selected environment's stamina pool up to the shared store so the
   // header bar can render it; cleared when no environment is selected.
@@ -290,7 +314,8 @@
   // (shown if any enables it), else shown (no system context).
   function resolveConditionVisibility(flag) {
     if (selectedEnvironment) return selectedEnvironment[flag] !== false;
-    if (environments.length > 0) return environments.some((environment) => environment?.[flag] !== false);
+    if (environments.length > 0)
+      return environments.some((environment) => environment?.[flag] !== false);
     return true;
   }
 
@@ -305,7 +330,7 @@
   // at all there is no system context, so it defaults to shown.
   const headerConditionVisibility = $derived({
     weather: resolveConditionVisibility('weatherEnabled'),
-    timeOfDay: resolveConditionVisibility('timeOfDayEnabled')
+    timeOfDay: resolveConditionVisibility('timeOfDayEnabled'),
   });
   $effect(() => {
     store?.setConditionVisibility(headerConditionVisibility);
@@ -325,7 +350,7 @@
     selectedEnvironment
       ? {
           enabled: selectedEnvironment.realmsEnabled === true,
-          realms: selectedEnvironment.currentRealms ?? []
+          realms: selectedEnvironment.currentRealms ?? [],
         }
       : (listing?.realmContext ?? { enabled: false, realms: [] })
   );
@@ -351,44 +376,47 @@
   </div>
 {:else}
   <div class="gathering-view-container">
-  <div class="gathering-view-grid" data-gathering-state="populated">
-    <div class="gathering-view-column gathering-view-column-left">
-      <GatheringEnvironmentList {environments} {selectedId} {onSelect} {services} />
-    </div>
-    <section class="gathering-view-column gathering-view-column-center" data-gathering-detail>
-      <GatheringDetail
-        environment={selectedEnvironment}
-        {services}
-        onAttempt={attempt}
-        {busy}
-        {selectedTaskId}
-        {onSelectTask}
-        {activeTab}
-        {onTabChange}
-        {selectedEventId}
-        {onSelectEvent}
-      />
-    </section>
-    <section class="gathering-view-column gathering-view-column-right" data-gathering-task-detail-column>
-      {#if activeTab === 'events'}
-        <GatheringEventDetail
-          event={selectedEvent}
-          hasEvents={visibleEvents.length > 0}
+    <div class="gathering-view-grid" data-gathering-state="populated">
+      <div class="gathering-view-column gathering-view-column-left">
+        <GatheringEnvironmentList {environments} {selectedId} {onSelect} {services} />
+      </div>
+      <section class="gathering-view-column gathering-view-column-center" data-gathering-detail>
+        <GatheringDetail
+          environment={selectedEnvironment}
           {services}
-        />
-      {:else}
-        <GatheringTaskDetail
-          task={selectedTask}
-          hasTasks={visibleTasks.length > 0}
-          environmentId={selectedId}
           onAttempt={attempt}
           {busy}
-          {services}
-          rememberedActorId={store?.selectedActorId ?? null}
+          {selectedTaskId}
+          {onSelectTask}
+          {activeTab}
+          {onTabChange}
+          {selectedEventId}
+          {onSelectEvent}
         />
-      {/if}
-    </section>
-  </div>
+      </section>
+      <section
+        class="gathering-view-column gathering-view-column-right"
+        data-gathering-task-detail-column
+      >
+        {#if activeTab === 'events'}
+          <GatheringEventDetail
+            event={selectedEvent}
+            hasEvents={visibleEvents.length > 0}
+            {services}
+          />
+        {:else}
+          <GatheringTaskDetail
+            task={selectedTask}
+            hasTasks={visibleTasks.length > 0}
+            environmentId={selectedId}
+            onAttempt={attempt}
+            {busy}
+            {services}
+            rememberedActorId={store?.selectedActorId ?? null}
+          />
+        {/if}
+      </section>
+    </div>
   </div>
 {/if}
 

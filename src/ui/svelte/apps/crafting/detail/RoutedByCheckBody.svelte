@@ -17,14 +17,18 @@
     craftability = null,
     rollResult = null,
     onChoose = null,
-    onChooseOption = null
+    onChooseOption = null,
+    // The requirement rail's interaction state (issue 917), spread straight onto
+    // IoTable. One cohesive value rather than eight props threaded through four
+    // bodies; `{}` renders a read-only rail with no chooser.
+    rail = {},
   } = $props();
 </script>
 
 <div data-recipe-mode="routedByCheck">
   <RecipeBodyShell {recipe} {selectedSetId} {rollResult} {onChoose}>
     {#snippet results()}
-      <IoTable {craftability} result={null} {onChooseOption} />
+      <IoTable {craftability} result={null} {onChooseOption} {...rail} />
       <OutcomeTierTable tiers={recipe?.outcomeTiers ?? []} />
     {/snippet}
   </RecipeBodyShell>

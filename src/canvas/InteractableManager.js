@@ -50,6 +50,7 @@ import {
 import {
   regionEnvironmentIdsAtPoint,
   interactableBehaviorsContainingToken,
+  regionContainsTokenDocument,
   selectRepromptTokenDoc,
 } from './regionHitTest.js';
 import { buildInteractableRegionFlags } from './regions/interactableDeletion.js';
@@ -1002,12 +1003,22 @@ class InteractableManager {
   }
 
   /**
-   * Whether the actor's token is still inside the behaviour's region, via the V13
-   * document-level `RegionDocument#testPoint({ x, y, elevation })`. The behaviour's
-   * `parent` is the RegionDocument; we call its document-level `testPoint` (the
-   * placeable `region.object.testPoint(point, elevation)` is deprecated in V13).
-   * Defensive: returns true (do not block) when the token/region cannot be
-   * resolved (the enter event itself already vouched for presence).
+   * Whether the actor's token is still inside the behaviour's region. This runs on
+   * the ACTIVE GM'S client for every player request, so it may execute against a
+   * scene that client is not viewing (and, on V14, against a scene level it is not
+   * viewing) — nothing canvas-rendered may be consulted. The whole containment
+   * decision therefore delegates to {@link regionContainsTokenDocument}, which
+   * asks Foundry's authoritative membership and containment APIs before falling
+   * back to geometry; see that function for the signal rule.
+   *
+   * Two defensive "cannot locate ⇒ do not block" answers are preserved. The first
+   * is here: no token document matches the requested actor. The second — a region
+   * exposing no `testPoint` — now lives inside the seam and is NOT a blanket
+   * grant: it makes only the geometric signal unanswerable, so Foundry's own
+   * containment predicate can still deny.
+   *
+   * Admitting when ANY of the actor's tokens is inside is pre-existing and
+   * deliberate.
    *
    * @param {object} behavior
    * @param {string} actorId
@@ -1016,28 +1027,12 @@ class InteractableManager {
    */
   _tokenInsideRegion(behavior, actorId, _userId) {
     const region = behavior?.parent ?? null;
-    if (typeof region?.testPoint !== 'function') return true; // can't locate — don't block.
     const scene = region?.parent ?? null;
-    const tokens = scene?.tokens;
-    const list = Array.isArray(tokens?.contents)
-      ? tokens.contents
-      : typeof tokens?.values === 'function'
-        ? [...tokens.values()]
-        : [];
-    const tokenDocs = list.filter(
+    const tokenDocs = this._sceneTokenDocs(scene).filter(
       (t) => String(t?.actorId ?? t?.actor?.id ?? '') === String(actorId ?? '')
     );
     if (tokenDocs.length === 0) return true; // can't locate — don't block.
-    for (const tokenDoc of tokenDocs) {
-      const center = tokenDoc?.object?.center ?? null;
-      const point = center ?? { x: Number(tokenDoc?.x ?? 0), y: Number(tokenDoc?.y ?? 0) };
-      try {
-        if (region.testPoint({ x: point.x, y: point.y, elevation: 0 }) === true) return true;
-      } catch {
-        /* tolerate */
-      }
-    }
-    return false;
+    return tokenDocs.some((tokenDoc) => regionContainsTokenDocument(region, tokenDoc) === true);
   }
 
   // --- Foundry-edge helpers (placement) --------------------------------------

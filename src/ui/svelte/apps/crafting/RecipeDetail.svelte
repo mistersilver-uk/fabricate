@@ -38,7 +38,15 @@
     // this single prop set is passed to all four bodies; only SimpleRecipeBody reads
     // it. It MUST be declared and forwarded here — a prop that skips this dispatcher
     // silently drops to its default and the step blocks never render.
-    steps = []
+    steps = [],
+    // Requirement rail interaction state (issue 917). Like the props above, this
+    // dispatcher hands ONE identical set to all four bodies; every body forwards it
+    // to IoTable. A prop that skips this dispatcher silently drops to its default,
+    // which renders an inert rail with no chooser.
+    rail = {},
+    // The step the engine would execute for this actor's active run, so a multi-step
+    // body can make only that step's rail interactive.
+    activeStepId = null,
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -61,7 +69,7 @@
     simple: SimpleRecipeBody,
     routedByIngredients: IngredientRoutedBody,
     routedByCheck: RoutedByCheckBody,
-    progressive: ProgressiveBody
+    progressive: ProgressiveBody,
   };
   const Body = $derived(BODIES[mode] ?? SimpleRecipeBody);
 </script>
@@ -89,16 +97,12 @@
           {onReorderStage}
           {onReorderStageSettled}
           {steps}
+          {rail}
+          {activeStepId}
         />
       </div>
       <div class="crafting-detail-footer">
-        <CraftButton
-          label={craftLabel}
-          disabled={!canCraft}
-          {disabledReason}
-          {busy}
-          {onCraft}
-        />
+        <CraftButton label={craftLabel} disabled={!canCraft} {disabledReason} {busy} {onCraft} />
       </div>
     {/if}
   </div>

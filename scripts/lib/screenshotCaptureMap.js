@@ -51,9 +51,25 @@ export const CLASS_A_LABELS = Object.freeze(
 
 export const CLASS_B_LABELS = Object.freeze(
   new Set([
+    // The interactive crafting-check roll prompt. Captured by
+    // `handleRollPromptIfPresent` between the Craft click and the run summary, so its
+    // label reaches `screenshot()` through a parameter rather than a literal
+    // `screenshot(page, '<label>')` call — which is why it went unregistered here
+    // until issue 855.
+    'player-crafting-roll-prompt',
     'player-crafting-run-summary',
     'player-crafting-roll-result',
     'player-crafting-alternatives-switched',
+    // The requirement-rail states that live in the STORE rather than the world DB
+    // (issue 917): which chooser is open, and how many units of each carrier the
+    // player has allocated. `player-crafting-tag-unmatched` is deliberately absent —
+    // it is the all-fixed rail with every chooser closed, so it renders purely from
+    // seeded world state and needs no interaction to reach.
+    'player-crafting-slot-rail',
+    'player-crafting-essence-pool',
+    'player-crafting-pick-for-me',
+    'player-crafting-essence-pool-shared',
+    'player-crafting-consumption-plan',
     'player-crafting-progressive-reordered',
     'manager-import-report',
     'manager-import-folder-mapping',
@@ -93,6 +109,13 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'currency-macro',
   'currency-actor-inventory',
   'manager-recipes-normal',
+  // Issue 1010 — the Recipe Studio's bulk-edit states, captured immediately after the plain
+  // browser frame so `manager-recipes` keeps winning its own `candidates[0]` with
+  // `manager-recipes-normal` (the lowest capture counter among that view's three labels).
+  // Inside the `recipes` section span, so a recipe-only PR scopes to that section alone.
+  'manager-recipes-bulk-edit',
+  'manager-recipes-bulk-edit-unstaged',
+  'manager-recipes-bulk-edit-blocked',
   'manager-recipes-narrow',
   'manager-recipes-no-check',
   'manager-recipes-grouped-continuation',
@@ -116,6 +139,8 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-recipe-edit-results-alchemy',
   'manager-recipe-edit-access-rail',
   'manager-components-normal',
+  'manager-components-bulk-edit',
+  'manager-components-bulk-edit-unstaged',
   'manager-components-description-before',
   'manager-components-description-repaired',
   'manager-components-description-ingested',
@@ -157,7 +182,14 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'manager-tool-stress-invalid-validation',
   'manager-tool-parity-06-breakage-900x700',
   'manager-tool-stress-wrapping-680',
+  'manager-knowledge-owned-copies',
+  'manager-knowledge-empty-tab',
+  'manager-knowledge-learned-lost-copy',
+  'manager-knowledge-party-pool-warning',
+  'manager-knowledge-delete-armed',
+  'manager-knowledge-narrow',
   'manager-components-progressive',
+  'manager-components-bulk-edit-progressive',
   'manager-component-edit-difficulty',
   'interactable-config-linked',
   'interactable-config-unlinked',
@@ -191,6 +223,7 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'player-crafting-simple',
   'player-crafting-ingredient-routed',
   'player-crafting-routed-by-check',
+  'player-crafting-roll-prompt',
   'player-crafting-run-summary',
   'player-crafting-roll-result',
   'player-crafting-essence-alternative',
@@ -198,6 +231,16 @@ export const SCREENSHOT_CAPTURE_ORDER = Object.freeze([
   'player-crafting-essence-legacy',
   'player-crafting-essence-ingredient',
   'player-crafting-essence-shopping',
+  // The requirement-rail redesign (issue 917), in walk order. Each is its OWN
+  // `VIEW_RECIPES` entry rather than an extra label on `player-crafting`, because
+  // `collect` publishes only `candidates[0]` per view id — appending them there would
+  // publish one arbitrary frame forever and none of these states would reach a PR.
+  'player-crafting-slot-rail',
+  'player-crafting-tag-unmatched',
+  'player-crafting-essence-pool',
+  'player-crafting-pick-for-me',
+  'player-crafting-essence-pool-shared',
+  'player-crafting-consumption-plan',
   'player-crafting-multistep',
   'player-crafting-progressive',
   'player-crafting-progressive-reordered',
@@ -376,6 +419,15 @@ const D0_SECTION_SPANS = [
     name: 'tools',
     from: 'manager-tool-parity-01-library-1280x720',
     to: 'manager-tool-stress-wrapping-680',
+  },
+  {
+    // The GM Knowledge surface (issue 785). Its fixture writes real actor flags,
+    // creates world Items + recipe-item definitions and grants owned copies, and its
+    // `finally` restore undoes all of it — so skipping the section skips the mutation
+    // AND its restore together, exactly like the Tool Studio section above.
+    name: 'knowledge',
+    from: 'manager-knowledge-owned-copies',
+    to: 'manager-knowledge-narrow',
   },
   {
     name: 'overview-interactables',

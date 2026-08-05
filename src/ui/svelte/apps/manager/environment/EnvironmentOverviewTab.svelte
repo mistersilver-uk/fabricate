@@ -7,7 +7,6 @@
 
   let {
     environment = null,
-    composition = { counts: {}, conditions: {} },
     realmRecords = [],
     realmsEnabled = false,
     biomeOptions = [],
@@ -15,7 +14,7 @@
     linkedSceneImage = '',
     onPickImagePath = null,
     onUpdate = () => {},
-    onSetCompositionMode = () => {}
+    onSetCompositionMode = () => {},
   } = $props();
 
   const isSceneLinked = $derived(Boolean(String(environment?.sceneUuid || '').trim()));
@@ -28,33 +27,51 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function optId(option) { return String(option?.id ?? option ?? '').trim(); }
-  function optLabel(option) { return String(option?.label ?? option?.id ?? option ?? '').trim(); }
+  function optId(option) {
+    return String(option?.id ?? option ?? '').trim();
+  }
+  function optLabel(option) {
+    return String(option?.label ?? option?.id ?? option ?? '').trim();
+  }
   function defaultDangerLabel(id) {
-    return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Events.DangerTag.${id}`, id.charAt(0).toUpperCase() + id.slice(1));
+    return text(
+      `FABRICATE.Admin.Manager.EnvironmentEditor.Events.DangerTag.${id}`,
+      id.charAt(0).toUpperCase() + id.slice(1)
+    );
   }
   function dangerOption(option) {
     const id = optId(option);
-    const label = option && typeof option === 'object' && optLabel(option)
-      ? optLabel(option)
-      : defaultDangerLabel(id);
+    const label =
+      option && typeof option === 'object' && optLabel(option)
+        ? optLabel(option)
+        : defaultDangerLabel(id);
     return { id, label };
   }
 
   const biomes = $derived(Array.isArray(environment?.biomes) ? environment.biomes : []);
-  const availableBiomes = $derived(biomeOptions.filter(option => !biomes.includes(optId(option))));
+  const availableBiomes = $derived(
+    biomeOptions.filter((option) => !biomes.includes(optId(option)))
+  );
 
   // Realm membership (geography). Mirrors the biome chip control but sourced
   // from the system's GatheringRealm records and gated on the Travel toggle.
-  const includedRealmIds = $derived(Array.isArray(environment?.includedRealmIds) ? environment.includedRealmIds : []);
-  const realmOptions = $derived((Array.isArray(realmRecords) ? realmRecords : []).map(realm => ({
-    id: String(realm?.id ?? '').trim(),
-    label: String(realm?.name ?? realm?.id ?? '').trim()
-  })).filter(option => option.id));
-  const availableRealms = $derived(realmOptions.filter(option => !includedRealmIds.includes(option.id)));
+  const includedRealmIds = $derived(
+    Array.isArray(environment?.includedRealmIds) ? environment.includedRealmIds : []
+  );
+  const realmOptions = $derived(
+    (Array.isArray(realmRecords) ? realmRecords : [])
+      .map((realm) => ({
+        id: String(realm?.id ?? '').trim(),
+        label: String(realm?.name ?? realm?.id ?? '').trim(),
+      }))
+      .filter((option) => option.id)
+  );
+  const availableRealms = $derived(
+    realmOptions.filter((option) => !includedRealmIds.includes(option.id))
+  );
 
   function realmLabel(id) {
-    return optLabel(realmOptions.find(option => optId(option) === id)) || id;
+    return optLabel(realmOptions.find((option) => optId(option) === id)) || id;
   }
   function addRealm(event) {
     const id = String(event.currentTarget.value || '').trim();
@@ -63,16 +80,19 @@
     if (!includedRealmIds.includes(id)) onUpdate({ includedRealmIds: [...includedRealmIds, id] });
   }
   function removeRealm(id) {
-    onUpdate({ includedRealmIds: includedRealmIds.filter(value => value !== id) });
+    onUpdate({ includedRealmIds: includedRealmIds.filter((value) => value !== id) });
   }
-  const dangerLevelOptions = $derived((Array.isArray(dangerOptions) && dangerOptions.length > 0
-    ? dangerOptions
-    : DANGER_LEVELS
-  ).map(dangerOption).filter(option => option.id));
+  const dangerLevelOptions = $derived(
+    (Array.isArray(dangerOptions) && dangerOptions.length > 0 ? dangerOptions : DANGER_LEVELS)
+      .map(dangerOption)
+      .filter((option) => option.id)
+  );
   const dangerLevel = $derived(String(environment?.dangerLevel || '').trim() || 'safe');
-  const renderedDangerOptions = $derived(dangerLevelOptions.some(option => option.id === dangerLevel)
-    ? dangerLevelOptions
-    : [{ id: dangerLevel, label: defaultDangerLabel(dangerLevel) }, ...dangerLevelOptions]);
+  const renderedDangerOptions = $derived(
+    dangerLevelOptions.some((option) => option.id === dangerLevel)
+      ? dangerLevelOptions
+      : [{ id: dangerLevel, label: defaultDangerLabel(dangerLevel) }, ...dangerLevelOptions]
+  );
   const selectionMode = $derived(environment?.selectionMode === 'blind' ? 'blind' : 'targeted');
 
   function addBiome(event) {
@@ -81,7 +101,9 @@
     if (!biomes.includes(id)) onUpdate({ biomes: [...biomes, id] });
     event.currentTarget.value = '';
   }
-  function removeBiome(id) { onUpdate({ biomes: biomes.filter(value => value !== id) }); }
+  function removeBiome(id) {
+    onUpdate({ biomes: biomes.filter((value) => value !== id) });
+  }
 
   async function chooseImage() {
     if (typeof onPickImagePath !== 'function' || isSceneLinked) return;
@@ -90,28 +112,44 @@
   }
 
   function biomeLabel(id) {
-    return optLabel(biomeOptions.find(option => optId(option) === id)) || id;
+    return optLabel(biomeOptions.find((option) => optId(option) === id)) || id;
   }
   function biomeColorStyle(id) {
-    const option = biomeOptions.find(entry => optId(entry) === id);
+    const option = biomeOptions.find((entry) => optId(entry) === id);
     return biomeChipStyle(option);
   }
   function dangerLabel(id) {
-    const option = renderedDangerOptions.find(option => option.id === id);
+    const option = renderedDangerOptions.find((option) => option.id === id);
     return option?.label || defaultDangerLabel(id);
   }
 </script>
 
-<section class="manager-environment-tab manager-environment-overview" data-environment-tab="overview" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Title', 'Overview')}>
+<section
+  class="manager-environment-tab manager-environment-overview"
+  data-environment-tab="overview"
+  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Title', 'Overview')}
+>
   {#if !environment}
-    <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Empty', 'No environment loaded.')}</p>
+    <p class="manager-muted">
+      {text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Empty', 'No environment loaded.')}
+    </p>
   {:else}
     <div class="manager-environment-overview-stack">
       <section class="manager-task-core-card" data-overview-section="identity">
         <div class="manager-task-card-heading">
           <div>
-            <h3>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Identity', 'Environment identity')}</h3>
-            <p class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.IdentityHint', 'Name the environment, describe it, choose an image, and toggle whether it is active.')}</p>
+            <h3>
+              {text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Identity',
+                'Environment identity'
+              )}
+            </h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.IdentityHint',
+                'Name the environment, describe it, choose an image, and toggle whether it is active.'
+              )}
+            </p>
           </div>
         </div>
         <div class="manager-task-core-grid">
@@ -120,14 +158,32 @@
               <span
                 class="manager-task-image-picker is-scene-linked"
                 data-scene-locked-image
-                title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip', "This image comes from the linked scene and can't be edited. Unlink the scene to choose a custom image.")}
-                aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage', 'Image provided by the linked scene')}
+                title={text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImageTooltip',
+                  "This image comes from the linked scene and can't be edited. Unlink the scene to choose a custom image."
+                )}
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SceneLockedImage',
+                  'Image provided by the linked scene'
+                )}
               >
-                <img src={linkedSceneImage || environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG} alt="" />
+                <img
+                  src={linkedSceneImage || environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG}
+                  alt=""
+                />
                 <i class="fas fa-lock" aria-hidden="true"></i>
               </span>
             {:else}
-              <button type="button" class="manager-task-image-picker" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage', 'Choose environment image')} onclick={chooseImage} disabled={typeof onPickImagePath !== 'function'}>
+              <button
+                type="button"
+                class="manager-task-image-picker"
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ChooseImage',
+                  'Choose environment image'
+                )}
+                onclick={chooseImage}
+                disabled={typeof onPickImagePath !== 'function'}
+              >
                 <img src={environment.img || DEFAULT_GATHERING_ENVIRONMENT_IMG} alt="" />
                 <i class="fas fa-pen" aria-hidden="true"></i>
               </button>
@@ -140,41 +196,105 @@
                 aria-pressed={environment.enabled !== false}
                 onclick={() => onUpdate({ enabled: environment.enabled === false })}
               >
-                <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
-                <span class="manager-status-toggle-label">{environment.enabled === false ? text('FABRICATE.Admin.Manager.StatusOff', 'Off') : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span>
+                <span class="manager-status-toggle-track" aria-hidden="true"
+                  ><span class="manager-status-toggle-knob"></span></span
+                >
+                <span class="manager-status-toggle-label"
+                  >{environment.enabled === false
+                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span
+                >
               </button>
-              <p class="manager-muted">{environment.enabled === false
-                ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DraftHint', 'Hidden from players while off.')
-                : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ActiveHint', 'Available to players while on.')}</p>
+              <p class="manager-muted">
+                {environment.enabled === false
+                  ? text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DraftHint',
+                      'Hidden from players while off.'
+                    )
+                  : text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.ActiveHint',
+                      'Available to players while on.'
+                    )}
+              </p>
             </div>
           </div>
           <div class="manager-task-identity-fields">
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Name', 'Name')}</span>
-              <input data-environment-field="name" value={environment.name || ''} oninput={(event) => onUpdate({ name: event.currentTarget.value })} />
+              <input
+                data-environment-field="name"
+                value={environment.name || ''}
+                oninput={(event) => onUpdate({ name: event.currentTarget.value })}
+              />
             </label>
             <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Description', 'Description')}</span>
-              <textarea data-environment-field="description" value={environment.description || ''} oninput={(event) => onUpdate({ description: event.currentTarget.value })}></textarea>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Description',
+                  'Description'
+                )}</span
+              >
+              <textarea
+                data-environment-field="description"
+                value={environment.description || ''}
+                oninput={(event) => onUpdate({ description: event.currentTarget.value })}
+              ></textarea>
             </label>
           </div>
         </div>
       </section>
 
       <section class="manager-environment-card" data-overview-section="context">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Context', 'Environment context')}</h3>
+        <h3 class="manager-card-title">
+          {text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Context',
+            'Environment context'
+          )}
+        </h3>
         <div class="manager-environment-context-split">
           <div class="manager-environment-context-col">
             {#if realmsEnabled}
-              <div class="manager-field manager-environment-context-field" data-environment-field="includedRealmIds">
-                <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Realms', 'Realms')}</span>
-                <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsHint', 'Which realms this environment belongs to. Players can gather here when their party is in one of these realms.')}</p>
+              <div
+                class="manager-field manager-environment-context-field"
+                data-environment-field="includedRealmIds"
+              >
+                <span
+                  >{text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Realms',
+                    'Realms'
+                  )}</span
+                >
+                <p class="manager-muted manager-environment-context-hint">
+                  {text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsHint',
+                    'Which realms this environment belongs to. Players can gather here when their party is in one of these realms.'
+                  )}
+                </p>
                 {#if realmOptions.length === 0}
-                  <p class="manager-muted manager-environment-realm-empty" data-environment-realm-empty>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty', 'No realms yet. Create realms in the Travel tab first.')}</p>
+                  <p
+                    class="manager-muted manager-environment-realm-empty"
+                    data-environment-realm-empty
+                  >
+                    {text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RealmsEmpty',
+                      'No realms yet. Create realms in the Travel tab first.'
+                    )}
+                  </p>
                 {:else}
                   {#if availableRealms.length > 0}
-                    <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm', 'Add realm')} onchange={addRealm}>
-                      <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm', 'Add realm')}</option>
+                    <select
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm',
+                        'Add realm'
+                      )}
+                      onchange={addRealm}
+                    >
+                      <option value=""
+                        >{text(
+                          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm',
+                          'Add realm'
+                        )}</option
+                      >
                       {#each availableRealms as option (optId(option))}
                         <option value={optId(option)}>{optLabel(option)}</option>
                       {/each}
@@ -185,11 +305,25 @@
                       {#each includedRealmIds as id (id)}
                         <span class="manager-availability-pill is-realm">
                           <span>{realmLabel(id)}</span>
-                          <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveRealm', 'Remove {name}').replace('{name}', realmLabel(id))} onclick={() => removeRealm(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                          <button
+                            type="button"
+                            class="manager-availability-remove"
+                            aria-label={text(
+                              'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveRealm',
+                              'Remove {name}'
+                            ).replace('{name}', realmLabel(id))}
+                            onclick={() => removeRealm(id)}
+                            ><i class="fas fa-xmark" aria-hidden="true"></i></button
+                          >
                         </span>
                       {/each}
                     {:else}
-                      <span class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRealms', 'No realms selected')}</span>
+                      <span class="manager-muted"
+                        >{text(
+                          'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRealms',
+                          'No realms selected'
+                        )}</span
+                      >
                     {/if}
                   </div>
                 {/if}
@@ -197,9 +331,23 @@
             {/if}
 
             <label class="manager-field manager-environment-context-field">
-              <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger', 'Danger level')}</span>
-              <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint', 'A ceiling — events up to and including this level can appear.')}</p>
-              <select data-environment-field="dangerLevel" value={dangerLevel} onchange={(event) => onUpdate({ dangerLevel: event.currentTarget.value })}>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Danger',
+                  'Danger level'
+                )}</span
+              >
+              <p class="manager-muted manager-environment-context-hint">
+                {text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.DangerHint',
+                  'A ceiling — events up to and including this level can appear.'
+                )}
+              </p>
+              <select
+                data-environment-field="dangerLevel"
+                value={dangerLevel}
+                onchange={(event) => onUpdate({ dangerLevel: event.currentTarget.value })}
+              >
                 {#each renderedDangerOptions as option (option.id)}
                   <option value={option.id}>{dangerLabel(option.id)}</option>
                 {/each}
@@ -207,12 +355,32 @@
             </label>
           </div>
 
-          <div class="manager-field manager-environment-context-field manager-environment-context-biomes">
-            <span>{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Biomes', 'Biomes')}</span>
-            <p class="manager-muted manager-environment-context-hint">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BiomesHint', 'The terrain here. Tasks and events match if they share one or more biomes.')}</p>
+          <div
+            class="manager-field manager-environment-context-field manager-environment-context-biomes"
+          >
+            <span
+              >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Biomes', 'Biomes')}</span
+            >
+            <p class="manager-muted manager-environment-context-hint">
+              {text(
+                'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BiomesHint',
+                'The terrain here. Tasks and events match if they share one or more biomes.'
+              )}
+            </p>
             {#if availableBiomes.length > 0}
-              <select aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome', 'Add biome')} onchange={addBiome}>
-                <option value="">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome', 'Add biome')}</option>
+              <select
+                aria-label={text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome',
+                  'Add biome'
+                )}
+                onchange={addBiome}
+              >
+                <option value=""
+                  >{text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome',
+                    'Add biome'
+                  )}</option
+                >
                 {#each availableBiomes as option (optId(option))}
                   <option value={optId(option)}>{optLabel(option)}</option>
                 {/each}
@@ -223,11 +391,25 @@
                 {#each biomes as id (id)}
                   <span class="manager-availability-pill is-biome" style={biomeColorStyle(id)}>
                     <span>{biomeLabel(id)}</span>
-                    <button type="button" class="manager-availability-remove" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveBiome', 'Remove {name}').replace('{name}', biomeLabel(id))} onclick={() => removeBiome(id)}><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                    <button
+                      type="button"
+                      class="manager-availability-remove"
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveBiome',
+                        'Remove {name}'
+                      ).replace('{name}', biomeLabel(id))}
+                      onclick={() => removeBiome(id)}
+                      ><i class="fas fa-xmark" aria-hidden="true"></i></button
+                    >
                   </span>
                 {/each}
               {:else}
-                <span class="manager-muted">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoBiomes', 'No biomes selected')}</span>
+                <span class="manager-muted"
+                  >{text(
+                    'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoBiomes',
+                    'No biomes selected'
+                  )}</span
+                >
               {/if}
             </div>
           </div>
@@ -235,35 +417,67 @@
       </section>
 
       <div class="manager-environment-overview-duo">
-      <section class="manager-environment-card" data-overview-section="player">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.PlayerFacing', 'Player-facing behaviour')}</h3>
-        <div class="manager-environment-mode-control" role="radiogroup" aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SelectionMode', 'Task selection mode')}>
-          {#each [['targeted', 'Targeted', 'fas fa-eye'], ['blind', 'Blind', 'fas fa-eye-slash']] as option (option[0])}
-            <button
-              type="button"
-              role="radio"
-              class={`manager-environment-mode-option ${selectionMode === option[0] ? 'is-selected' : ''}`}
-              aria-checked={selectionMode === option[0]}
-              data-selection-mode-option={option[0]}
-              onclick={() => onUpdate({ selectionMode: option[0] })}
-            >
-              <span class="manager-environment-mode-head"><i class={option[2]} aria-hidden="true"></i><span>{text(`FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${option[1]}`, option[1])}</span></span>
-            </button>
-          {/each}
-        </div>
-        <p class="manager-muted manager-environment-mode-hint">
-          {selectionMode === 'blind'
-            ? text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindHint', 'Players get a generic gather action unless tasks are revealed.')
-            : text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.TargetedHint', 'Players choose a visible task.')}
-        </p>
-      </section>
+        <section class="manager-environment-card" data-overview-section="player">
+          <h3 class="manager-card-title">
+            {text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.PlayerFacing',
+              'Player-facing behaviour'
+            )}
+          </h3>
+          <div
+            class="manager-environment-mode-control"
+            role="radiogroup"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.SelectionMode',
+              'Task selection mode'
+            )}
+          >
+            {#each [['targeted', 'Targeted', 'fas fa-eye'], ['blind', 'Blind', 'fas fa-eye-slash']] as option (option[0])}
+              <button
+                type="button"
+                role="radio"
+                class={`manager-environment-mode-option ${selectionMode === option[0] ? 'is-selected' : ''}`}
+                aria-checked={selectionMode === option[0]}
+                data-selection-mode-option={option[0]}
+                onclick={() => onUpdate({ selectionMode: option[0] })}
+              >
+                <span class="manager-environment-mode-head"
+                  ><i class={option[2]} aria-hidden="true"></i><span
+                    >{text(
+                      `FABRICATE.Admin.Manager.EnvironmentEditor.Overview.${option[1]}`,
+                      option[1]
+                    )}</span
+                  ></span
+                >
+              </button>
+            {/each}
+          </div>
+          <p class="manager-muted manager-environment-mode-hint">
+            {selectionMode === 'blind'
+              ? text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.BlindHint',
+                  'Players get a generic gather action unless tasks are revealed.'
+                )
+              : text(
+                  'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.TargetedHint',
+                  'Players choose a visible task.'
+                )}
+          </p>
+        </section>
 
-      <section class="manager-environment-card" data-overview-section="composition">
-        <h3 class="manager-card-title">{text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.CompositionMode', 'Composition mode')}</h3>
-        <CompositionModeControl mode={environment.compositionMode || 'automatic'} onChange={onSetCompositionMode} />
-      </section>
+        <section class="manager-environment-card" data-overview-section="composition">
+          <h3 class="manager-card-title">
+            {text(
+              'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.CompositionMode',
+              'Composition mode'
+            )}
+          </h3>
+          <CompositionModeControl
+            mode={environment.compositionMode || 'automatic'}
+            onChange={onSetCompositionMode}
+          />
+        </section>
       </div>
-
     </div>
   {/if}
 </section>

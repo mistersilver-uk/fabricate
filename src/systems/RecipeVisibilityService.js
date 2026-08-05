@@ -9,6 +9,7 @@ import { itemMatchesRecipeItemSource, matchRecipeItemDefinition } from '../utils
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { createDefaultPartyLearnPool } from './recipeItemPartyLearnPool.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { selectWritableActors } from './writableActors.js';
 
 const LEARN_RECIPE_MESSAGES = {
   systemNotFound: 'FABRICATE.Knowledge.SystemNotFound',
@@ -17,6 +18,7 @@ const LEARN_RECIPE_MESSAGES = {
   alreadyLearned: 'FABRICATE.Knowledge.AlreadyLearned',
   noMatchingItem: 'FABRICATE.Knowledge.NoMatchingItem',
   learnBudgetSpent: 'FABRICATE.Knowledge.LearnBudgetSpent',
+  learnRequiresGm: 'FABRICATE.Knowledge.LearnRequiresGm',
   prerequisiteNotMet: 'FABRICATE.Knowledge.PrerequisiteNotMet',
   characterPrerequisiteNotMet: 'FABRICATE.Knowledge.CharacterPrerequisiteNotMet',
   learnedRecipe: 'FABRICATE.Knowledge.LearnedRecipe',
@@ -24,6 +26,24 @@ const LEARN_RECIPE_MESSAGES = {
   learnedRecipesPartial: 'FABRICATE.Knowledge.LearnedRecipesPartial',
   noNewRecipesLearned: 'FABRICATE.Knowledge.NoNewRecipesLearned',
 };
+
+// Result messages for the GM-driven knowledge-management operations (issue 785).
+// Every key is a STATIC literal at its call site so the localization guards can see it.
+const MANAGE_KNOWLEDGE_MESSAGES = {
+  noItem: 'FABRICATE.Knowledge.Manage.NoItem',
+  noLimitedUses: 'FABRICATE.Knowledge.Manage.NoLimitedUses',
+  alreadySpent: 'FABRICATE.Knowledge.Manage.AlreadySpent',
+  useExpended: 'FABRICATE.Knowledge.Manage.UseExpended',
+};
+
+// The three outcomes of `_applyRecipeItemUse`. A bare boolean cannot distinguish
+// "this book is uncapped, so there was nothing to spend" from "this copy is already
+// spent", and the GM path has to report those differently.
+const APPLY_USE_OUTCOME = Object.freeze({
+  applied: 'applied',
+  uncapped: 'uncapped',
+  spent: 'spent',
+});
 
 const VISIBILITY_MODES = ['global', 'restricted', 'item', 'knowledge'];
 
@@ -114,9 +134,10 @@ export class RecipeVisibilityService {
   }
 
   // The book/scroll definitions a recipe belongs to (issue 511 many-to-many). Canonical
-  // read is each definition's `recipeIds[]`; a system with no membership authored yet
-  // (fully un-migrated) falls back to the recipe's legacy single reverse ref. Returns a
-  // SET — a recipe may live in several books, each with its own caps.
+  // read is each definition's `recipeIds[]`; while the system's
+  // `membershipResolvesByRecipeIds` marker is unset it falls back to the recipe's legacy
+  // single reverse ref. Returns a SET — a recipe may live in several books, each with
+  // its own caps.
   _getRecipeItemDefinitions(recipe) {
     const system = this._getCraftingSystem(recipe);
     if (!system) return [];
@@ -128,11 +149,12 @@ export class RecipeVisibilityService {
     );
     if (byMembership.length > 0) return byMembership;
 
-    // Only fall back when NO book in the system carries membership yet.
-    const anyMigrated = definitions.some(
-      (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
-    );
-    if (anyMigrated) return [];
+    // Only fall back while the system has not resolved by `recipeIds` (issue 1011). This
+    // is player-facing — per-book learn caps and character prerequisites are enforced
+    // off it — so the basis is READ from the system, never re-derived from the arrays:
+    // the retired inference flipped in both directions, so emptying the last array
+    // resurrected phantom memberships for every player at once.
+    if (system.membershipResolvesByRecipeIds === true) return [];
 
     const recipeItemId = String(recipe?.recipeItemId || '').trim();
     if (recipeItemId) {
@@ -266,9 +288,15 @@ export class RecipeVisibilityService {
     return all.find((recipe) => String(recipe?.id) === String(id)) || null;
   }
 
+  // The persisted use count of one recipe item copy, coerced exactly as the craft
+  // path always coerced it. The trailing `|| 0` is load-bearing: a corrupt truthy
+  // non-numeric `timesUsed` (`"abc"`) makes `Number(...)` NaN, and the craft path's
+  // historical outer `Number(selected.timesUsed || 0) + 1` over this already-coerced
+  // value produced `1`, not NaN. Dropping it would write `null` and force `exhausted`
+  // false, so no `whenSpent` disposal branch could ever run for such a copy.
   _getRecipeItemUsage(item) {
     const usage = getFabricateFlag(item, 'recipeItemUsage', {});
-    return Number(usage?.timesUsed || 0);
+    return Number(usage?.timesUsed || 0) || 0;
   }
 
   async _setRecipeItemUsage(item, timesUsed) {
@@ -495,6 +523,17 @@ export class RecipeVisibilityService {
         prerequisiteIds,
       },
     };
+  }
+
+  // Resolve caps from a recipe item DEFINITION alone (issue 785). The GM Knowledge
+  // surface names an owned copy and the definition it matched, never a recipe, and
+  // `_getRecipeItemCaps` reads `recipe` only to default its `definition` parameter —
+  // so supplying the definition makes the recipe argument inert. Routing through
+  // `_getRecipeItemCaps` (never a raw `definition.caps` read) is what keeps the legacy
+  // `destroyWhenExhausted` / `limitRecipes` / `learningMode` derivations applied. A
+  // missing definition resolves to uncapped, matching the fail-open convention.
+  _capsForDefinition(definition) {
+    return this._getRecipeItemCaps(null, definition || null);
   }
 
   _collectCandidateItems(recipe, craftingActor, componentSourceActors = []) {
@@ -1527,6 +1566,19 @@ export class RecipeVisibilityService {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learnBudgetSpent };
     }
 
+    // A `total`-scope budget lives in a WORLD setting, so only a GM can reserve a
+    // slot. Report that as its own reason: the increment failing because this client
+    // is a player is NOT the budget being spent, and reporting "no learning uses
+    // left" told players their shared budget was gone while it sat untouched — a
+    // silent, permanent block on every `total`-scope book. `writable` is optional so
+    // injected test doubles (and any store that cannot refuse) behave as before.
+    if (
+      typeof this._partyLearnPool.writable === 'function' &&
+      this._partyLearnPool.writable() !== true
+    ) {
+      return { success: false, message: LEARN_RECIPE_MESSAGES.learnRequiresGm };
+    }
+
     const reserved = await this._partyLearnPool.increment(key);
     if (!reserved) {
       return { success: false, message: LEARN_RECIPE_MESSAGES.learnBudgetSpent };
@@ -1677,29 +1729,120 @@ export class RecipeVisibilityService {
 
     // Anchor caps to the SPECIFIC book the selected item is (per-book use caps): a
     // recipe in two item-mode books with differing maxUses/whenSpent must exhaust and
-    // spend the actually-consumed item by ITS book's rules, not the first book's. When
-    // that book does not limit uses there is nothing to track.
+    // spend the actually-consumed item by ITS book's rules, not the first book's.
     const selectedCaps = this._getRecipeItemCaps(
       recipe,
       this._matchDefinitionForItem(recipe, selected.item)
     );
-    if (!selectedCaps.item.limitUses) return;
-    const nextUses = Number(selected.timesUsed || 0) + 1;
-    const maxUses = Number(selectedCaps.item.maxUses);
-    const exhausted = Number.isFinite(maxUses) && maxUses > 0 && nextUses >= maxUses;
+    await this._applyRecipeItemUse(selected.item, selectedCaps.item);
+  }
 
-    // On exhaustion: 'destroyed' deletes the item; 'inert' keeps it but flags it so
-    // it no longer grants craftability (it is already excluded by `_filterNonExhausted`
-    // once `timesUsed >= maxUses`, so no further gating is needed).
-    if (exhausted && selectedCaps.item.whenSpent === 'inert') {
-      await this._markRecipeItemInert(selected.item, nextUses);
-      return;
+  /**
+   * Spend one use of one recipe item copy (issue 785). This is the SINGLE decision
+   * point for the increment, the exhaustion test and the `whenSpent` disposal, shared
+   * by the recipe-driven craft path (`applyRecipeItemUseOnCraft`) and the GM-driven
+   * Knowledge surface (`expendRecipeItemUse`) so the two can never diverge.
+   *
+   * An uncapped book performs NO write at all — not a zero-delta write.
+   *
+   * An ALREADY-SPENT copy performs no write either. The guard is the exact
+   * complement of `_filterNonExhausted`, which is what makes it behaviour-preserving
+   * on the craft path: that path only ever reaches here with a candidate that
+   * predicate already kept. The GM path has no such pre-filter, so without the guard
+   * a stale row (an asynchronous re-projection, a second GM window, a macro spending
+   * the last charge) would let a disabled-looking button drive one more increment —
+   * and, under `whenSpent: 'destroyed'`, silently delete the copy while reporting
+   * success.
+   *
+   * The current count is re-read from the document here rather than taken from a
+   * caller-supplied candidate snapshot. On the craft path the two are equal (nothing
+   * awaits between candidate collection and this write), so the re-read is strictly
+   * safer: it closes a staleness window that would open the moment an `await` is
+   * inserted between the two, and it keeps the GM path free of any snapshot at all.
+   *
+   * @param {object} item the owned recipe item copy to spend a use of
+   * @param {object} itemCaps the resolved `caps.item` block from `_getRecipeItemCaps`
+   * @returns {Promise<'applied'|'uncapped'|'spent'>} which of the three outcomes ran
+   */
+  async _applyRecipeItemUse(item, itemCaps) {
+    if (!item || itemCaps?.limitUses !== true) return APPLY_USE_OUTCOME.uncapped;
+
+    const timesUsed = this._getRecipeItemUsage(item);
+    const maxUses = Number(itemCaps.maxUses);
+    // A non-finite or non-positive `maxUses` is UNLIMITED (fail-open) — the same
+    // reading `_filterNonExhausted` applies, so the two can never disagree about
+    // whether a copy still has charges.
+    const capped = Number.isFinite(maxUses) && maxUses > 0;
+    if (capped && timesUsed >= maxUses) return APPLY_USE_OUTCOME.spent;
+
+    const nextUses = timesUsed + 1;
+    const exhausted = capped && nextUses >= maxUses;
+
+    // On exhaustion: 'destroyed' deletes the item; 'inert' keeps it but records the
+    // exhaustion (it is already excluded by `_filterNonExhausted` once
+    // `timesUsed >= maxUses`, so no further gating is needed).
+    if (exhausted && itemCaps.whenSpent === 'inert') {
+      await this._markRecipeItemInert(item, nextUses);
+      return APPLY_USE_OUTCOME.applied;
     }
 
-    await this._setRecipeItemUsage(selected.item, nextUses);
-    if (exhausted && selectedCaps.item.whenSpent === 'destroyed') {
-      await selected.item.delete();
+    await this._setRecipeItemUsage(item, nextUses);
+    if (exhausted && itemCaps.whenSpent === 'destroyed') {
+      await item.delete();
     }
+    return APPLY_USE_OUTCOME.applied;
+  }
+
+  // Resolve one owned copy by DOCUMENT ID — never a uuid. Prefers the real
+  // `EmbeddedCollection#get` and falls back to scanning a plain array so a lightweight
+  // `{ items: [...] }` actor still resolves. Returns null rather than throwing when
+  // the actor, the collection, or the copy is gone.
+  _getActorOwnedItemById(actor, itemId) {
+    if (!actor || !itemId) return null;
+    const fromCollection = actor.items?.get?.(String(itemId));
+    if (fromCollection) return fromCollection;
+    return [...(actor.items || [])].find((item) => String(item?.id) === String(itemId)) || null;
+  }
+
+  /**
+   * Spend one use of a GM-nominated owned recipe item copy (issue 785 — the Knowledge
+   * surface's Expend action).
+   *
+   * No visibility-mode and no knowledge-mode gate applies: the GM named the copy, and
+   * gating here would contradict `_applyRecipeItemUse` being the single decision point.
+   * GM authorization itself belongs at the manager service seam — engines never gate.
+   *
+   * The copy is addressed by document id because the surface hands back the id it
+   * rendered; a copy that has vanished between render and click yields a result shape,
+   * never a throw past a caller that expects one.
+   *
+   * An already-spent copy, or a copy from an uncapped book, performs NO write at
+   * all — `_applyRecipeItemUse` short-circuits on both outcomes — and this returns a
+   * failure result rather than a silent success.
+   *
+   * @param {object} actor the owning actor
+   * @param {string} itemId the owned copy's document id
+   * @param {object} definition the recipe item definition the copy matched
+   * @returns {Promise<{ success: boolean, message: string, messageData?: object }>}
+   */
+  async expendRecipeItemUse(actor, itemId, definition) {
+    const item = this._getActorOwnedItemById(actor, itemId);
+    if (!item) {
+      return { success: false, message: MANAGE_KNOWLEDGE_MESSAGES.noItem };
+    }
+
+    const outcome = await this._applyRecipeItemUse(item, this._capsForDefinition(definition).item);
+    if (outcome === APPLY_USE_OUTCOME.spent) {
+      return { success: false, message: MANAGE_KNOWLEDGE_MESSAGES.alreadySpent };
+    }
+    if (outcome !== APPLY_USE_OUTCOME.applied) {
+      return { success: false, message: MANAGE_KNOWLEDGE_MESSAGES.noLimitedUses };
+    }
+    return {
+      success: true,
+      message: MANAGE_KNOWLEDGE_MESSAGES.useExpended,
+      messageData: { name: item.name },
+    };
   }
 
   async learnRecipeOnCraft(recipe, craftingActor) {
@@ -1722,8 +1865,16 @@ export class RecipeVisibilityService {
     await this._setLearnedMap(craftingActor, next);
   }
 
+  /**
+   * Startup maintenance: drop learned-recipe entries naming a deleted recipe.
+   *
+   * Scoped to the actors THIS client may write (issue 970). It runs on every client
+   * at `initialize()` and mutates actor flags directly (there is no GM relay), so an
+   * un-filtered walk had a player attempting `Actor#update` on every other
+   * character in the world.
+   */
   async cleanupLearnedRecipes(validRecipeIds = new Set()) {
-    for (const actor of game.actors || []) {
+    for (const actor of selectWritableActors(game.actors)) {
       const learned = this._getLearnedMap(actor);
       const staleIds = Object.keys(learned || {}).filter((id) => !validRecipeIds.has(id));
       if (staleIds.length === 0) continue;

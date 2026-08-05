@@ -27,7 +27,9 @@
       case 'allDrops':
         return localize('FABRICATE.App.Gathering.Detail.AwardModeAll');
       case 'limitedDrops':
-        return localize('FABRICATE.App.Gathering.Detail.AwardModeLimited', { x: Number(breakdown?.awardLimit ?? 1) });
+        return localize('FABRICATE.App.Gathering.Detail.AwardModeLimited', {
+          x: Number(breakdown?.awardLimit ?? 1),
+        });
       case 'highestRankedDrop':
         return localize('FABRICATE.App.Gathering.Detail.AwardModeHighest');
       default:
@@ -37,13 +39,19 @@
   const eventHint = $derived(
     breakdown?.eventPolicy === 'failureWithEvent'
       ? localize('FABRICATE.App.Gathering.Detail.EventImpactFailure')
-      : (breakdown?.eventPolicy ? localize('FABRICATE.App.Gathering.Detail.EventImpactSuccess') : '')
+      : breakdown?.eventPolicy
+        ? localize('FABRICATE.App.Gathering.Detail.EventImpactSuccess')
+        : ''
   );
 
   let expandedIds = $state(new Set());
   function toggle(id) {
+    // Copy-then-reassign: the reactive unit is `expandedIds`, not the Set. A plain Set
+    // that is never mutated after assignment is correct here; SvelteSet is not needed.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const next = new Set(expandedIds);
-    if (next.has(id)) next.delete(id); else next.add(id);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     expandedIds = next;
   }
   function onRowKey(event, id) {
@@ -56,7 +64,9 @@
 
 {#if loading}
   <div class="gathering-task-drops" data-gathering-drops data-gathering-drops-state="loading">
-    <p class="gathering-task-drops-heading">{localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}</p>
+    <p class="gathering-task-drops-heading">
+      {localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}
+    </p>
     <p class="gathering-task-drops-loading">
       <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
       {localize('FABRICATE.App.Gathering.Detail.DropsLoading')}
@@ -64,7 +74,9 @@
   </div>
 {:else if hasDrops}
   <div class="gathering-task-drops" data-gathering-drops data-gathering-drops-state="ready">
-    <p class="gathering-task-drops-heading">{localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}</p>
+    <p class="gathering-task-drops-heading">
+      {localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}
+    </p>
 
     {#if awardHint !== '' || eventHint !== ''}
       <ul class="gathering-task-drops-hints" data-gathering-drops-hints>
@@ -81,7 +93,6 @@
       {#each drops as drop, index (drop.id ?? index)}
         {@const isOpen = expandedIds.has(drop.id ?? index)}
         <li class="gathering-task-drop" data-gathering-drop data-drop-id={drop.id ?? ''}>
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="gathering-task-drop-summary"
             role="button"
@@ -90,12 +101,20 @@
             onclick={() => toggle(drop.id ?? index)}
             onkeydown={(event) => onRowKey(event, drop.id ?? index)}
           >
-            <img class="gathering-task-drop-thumb" src={drop.img || 'icons/svg/item-bag.svg'} alt="" />
+            <img
+              class="gathering-task-drop-thumb"
+              src={drop.img || 'icons/svg/item-bag.svg'}
+              alt=""
+            />
             <span class="gathering-task-drop-copy">
               <span class="gathering-task-drop-name" title={drop.name}>
                 {drop.name}
                 {#if Number(drop.quantity) > 1}
-                  <span class="gathering-task-drop-qty">{localize('FABRICATE.App.Gathering.Detail.DropQuantity', { x: Number(drop.quantity) })}</span>
+                  <span class="gathering-task-drop-qty"
+                    >{localize('FABRICATE.App.Gathering.Detail.DropQuantity', {
+                      x: Number(drop.quantity),
+                    })}</span
+                  >
                 {/if}
               </span>
               <span
@@ -104,11 +123,14 @@
                 aria-valuemin="0"
                 aria-valuemax="100"
                 aria-valuenow={pct(drop.finalChance)}
-                aria-label={localize('FABRICATE.App.Gathering.Detail.FindChance', { x: pct(drop.finalChance) })}
+                aria-label={localize('FABRICATE.App.Gathering.Detail.FindChance', {
+                  x: pct(drop.finalChance),
+                })}
                 data-gathering-drop-value={pct(drop.finalChance)}
               >
                 <span class="gathering-task-drop-track">
-                  <span class="gathering-task-drop-fill" style={`width: ${pct(drop.finalChance)}%`}></span>
+                  <span class="gathering-task-drop-fill" style={`width: ${pct(drop.finalChance)}%`}
+                  ></span>
                 </span>
                 <span class="gathering-task-drop-percent">{pct(drop.finalChance)}%</span>
               </span>
