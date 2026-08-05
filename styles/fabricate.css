@@ -4587,7 +4587,8 @@
 }
 
 .fabricate-manager .manager-recipe-stat-grid,
-.fabricate-manager .manager-component-stat-grid {
+.fabricate-manager .manager-component-stat-grid,
+.fabricate-manager .manager-essence-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fab-space-2);
@@ -4595,7 +4596,8 @@
 }
 
 .fabricate-manager .manager-recipe-stat,
-.fabricate-manager .manager-component-stat {
+.fabricate-manager .manager-component-stat,
+.fabricate-manager .manager-essence-stat {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
@@ -4609,7 +4611,8 @@
 /* The stat VALUE is a name-scale number: serif, per the typographic contract, with
    tabular figures so a 9 -> 10 change cannot reflow the tile. */
 .fabricate-manager .manager-recipe-stat-value,
-.fabricate-manager .manager-component-stat-value {
+.fabricate-manager .manager-component-stat-value,
+.fabricate-manager .manager-essence-stat-value {
   overflow: hidden;
   color: var(--fab-mv2-text);
   font-family: var(--fab-font-serif);
@@ -4636,7 +4639,8 @@
 }
 
 .fabricate-manager .manager-recipe-stat-label,
-.fabricate-manager .manager-component-stat-label {
+.fabricate-manager .manager-component-stat-label,
+.fabricate-manager .manager-essence-stat-label {
   color: var(--fab-text-subtle);
   font-size: 0.62rem;
   font-weight: 600;
@@ -5532,6 +5536,16 @@
   cursor: default;
 }
 
+/* The five row identity buttons share ONE reset, so each row surface can be a real
+   `<button>` without restating Foundry's overrides — see CONTRIBUTING.md "Instance 1 —
+   button layout".
+   `height: auto` is part of that rule and belongs HERE rather than on the one variant that
+   currently needs it: Foundry pins a fixed `height` on every `button`, used height resolves
+   to `max(height, min-height)`, and the four row-shaped identities escape it only because
+   their content never grows past the 46px `min-height` masking it. The essence grid CARD is
+   a stacked ~150px variant of the same button, so without this it would clip and the
+   cluster below would overlap the description. A no-op for the four short siblings and the
+   hazard removed for every future tall one. */
 .fabricate-manager .manager-recipe-identity,
 .fabricate-manager .manager-component-identity,
 .fabricate-manager .manager-environment-identity,
@@ -5545,6 +5559,7 @@
   align-items: center;
   width: 100%;
   min-width: 0;
+  height: auto;
   min-height: 46px;
   padding: 0;
   border: 0;
@@ -6190,8 +6205,10 @@
 /* `.manager-essence-icon` and the two `.manager-essence-source-cell*` rules are RETIRED
    with the table (issue 1036): the row's tile is the shared `Medallion`, which carries the
    essence's own colour, and the source COLUMN is gone — a broken link is now reported by
-   the capability pill plus the retained needs-attention filter rather than by an image in
-   a column of its own. `.manager-essence-identity`'s own grid template is retired too: it
+   the capability pill itself (a non-`linked` source tones it, swaps its glyph for a broken
+   link and titles it: see `essenceCapabilityPills`) plus the retained needs-attention
+   filter, rather than by an image in a column of its own.
+   `.manager-essence-identity`'s own grid template is retired too: it
    joins the shared identity-button reset above, at that reset's 46px tile track. */
 
 .fabricate-manager .manager-essence-edit-main {
@@ -6219,48 +6236,19 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-essence-icon-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-essence-icon-preview {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  color: var(--fab-mv2-accent);
-  background: var(--fab-overlay-light-06);
-  font-size: 3rem;
-}
+/* `.manager-essence-icon-panel` is RETIRED here and authored once, scoped, in
+   `EssenceIdentityTab.svelte` — its only consumer, which already declared the same block
+   plus an `align-items` the global lacked. Two rules at equal specificity for one element
+   is a cascade coin-toss, so the surviving copy carries the global's `min-width: 0` too.
+   `.manager-essence-icon-preview` and the three `.manager-essence-icon-copy` rules are
+   retired outright: the Identity tab renders the shared `Medallion` and `IconPicker`, so
+   nothing emits those classes at all. */
 
 .fabricate-manager .manager-essence-field-label {
   color: var(--fab-mv2-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.2;
-}
-
-.fabricate-manager .manager-essence-icon-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-essence-icon-copy strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fab-mv2-text);
-  font-size: 0.84rem;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .fabricate-manager .manager-essence-icon-actions {
@@ -6285,7 +6273,6 @@
   min-height: 122px;
 }
 
-.fabricate-manager .manager-essence-icon-copy small,
 .fabricate-manager .manager-form-warning {
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;

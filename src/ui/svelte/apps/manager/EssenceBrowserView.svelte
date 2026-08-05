@@ -189,11 +189,16 @@
     ui.bulkSelectedEssenceIds = new Set();
   }
 
+  // The counts the model computes ARE rendered, on the control they describe. Each is how
+  // many rows choosing that segment would show — the model widens the status axis and keeps
+  // every other active filter, so `Disabled 0` means "nothing to see here" rather than
+  // "nothing within the filter you already have".
   const statusOptions = $derived(
     ESSENCE_STATUS_SEGMENTS.map((segment) => ({
       value: segment.value,
       labelKey: segment.labelKey,
       fallback: segment.fallback,
+      count: model.statusCounts?.[segment.value] ?? 0,
     }))
   );
   const viewModeOptions = $derived(

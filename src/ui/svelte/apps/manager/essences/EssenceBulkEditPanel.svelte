@@ -150,6 +150,19 @@
     return managerColorTokenLabel(value, localize);
   }
 
+  // `blockedNames` is CAPPED by the model. `Select all matching` can select every essence
+  // in the system, so the tail is SUMMARISED rather than comma-joined into one callout —
+  // and it is summarised rather than dropped, so the count and the names never disagree.
+  const blockedNamesLabel = $derived(
+    impact.blockedOverflow > 0
+      ? format(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlockedMore',
+          '{names} and {count} more',
+          { names: impact.blockedNames.join(', '), count: impact.blockedOverflow }
+        )
+      : impact.blockedNames.join(', ')
+  );
+
   const deleteLabel = $derived(
     impact.deletable === 1
       ? text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteOne', 'Delete 1 essence')
@@ -280,10 +293,17 @@
         { count: impact.deletable }
       )}
     </li>
+    <!--
+      Counted over the WHOLE SELECTION, not over the deletable members, and worded to say
+      so. A component carrying an essence is exactly what BLOCKS that essence's delete, so
+      counted over the deletable rows this number is zero by construction — which is what
+      it read before, directly above a callout naming the essences those components keep.
+      See `describeEssenceDeleteImpact`.
+    -->
     <li data-essence-bulk-impact-row="components">
       {format(
         'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactComponents',
-        '{count} components carry them.',
+        '{count} components carry one or more of the selected essences.',
         { count: impact.componentsAffected }
       )}
     </li>
@@ -302,7 +322,7 @@
       text={format(
         'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlocked',
         '{count} selected essences are still carried by components and will be skipped: {names}',
-        { count: impact.blocked, names: impact.blockedNames.join(', ') }
+        { count: impact.blocked, names: blockedNamesLabel }
       )}
       dataAttr="data-essence-bulk-blocked"
       dataValue={String(impact.blocked)}
@@ -345,13 +365,19 @@
     gap: var(--fab-space-2);
   }
 
+  /* WEIGHT, not size. This is the sentence the GM is asked to act on and it sits under a
+     louder warning `Callout`; at the muted tone it was the quietest thing on a destructive
+     card. It keeps the small type — the card is a rail, not a dialog — and gains the
+     secondary text colour and a heavier face so it reads as a statement rather than a
+     footnote. */
   .manager-essence-bulk-impact {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2xs);
     margin: 0;
     padding-left: var(--fab-space-4);
-    color: var(--fab-text-muted);
-    font-size: 0.7rem;
+    color: var(--fab-text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
   }
 </style>

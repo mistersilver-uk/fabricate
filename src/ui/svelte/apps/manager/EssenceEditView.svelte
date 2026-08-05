@@ -235,6 +235,13 @@
       colorToken: normalizeEssenceColorToken(colorToken),
       enabled: enabled !== false,
       propertyMacroUuid: propertyMacroUuid || null,
+      // The RESOLVED macro name, not the uuid. `draftSignature` already re-fires on
+      // `macroName`, so the summary was recomputed every time the name resolved and then
+      // emitted without it — and the manager root's live preview, having nothing else to
+      // pass, printed "Runs Macro.lab-aether-binding" where the design shows "Runs Ember
+      // Infusion". It is empty while resolution is in flight, and
+      // `projectEssenceBehaviourFacts` falls back to "the linked property macro" then.
+      macroName,
       // The two derived capability facts the preview, the tab badge and the row all read.
       // Named exactly as `adminStore._buildEssenceCards` emits them, so the live draft and
       // a persisted card are interchangeable everywhere they are consumed.

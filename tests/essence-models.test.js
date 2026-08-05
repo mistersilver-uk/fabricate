@@ -43,6 +43,7 @@ import {
   selectableEssenceOptions,
 } from '../src/utils/essenceValidation.js';
 import { recipeReferencesEssence } from '../src/utils/recipeEssenceReferences.js';
+import { makeEssenceRow } from './helpers/makeEssenceRow.js';
 import {
   RECIPE_BULK_STATUS_VALUES,
   setBulkRecipeStatus,
@@ -471,10 +472,24 @@ describe('1036 — essenceBrowserModel', () => {
     assert.deepEqual([model.rangeStart, model.rangeEnd, model.totalCount], [0, 0, 0]);
   });
 
-  it('reports the status counts over the UNFILTERED rows, so the control keeps saying what it would find', () => {
+  it('counts each status over every filter EXCEPT the status axis, so a segment says what it would find', () => {
     const model = buildEssenceBrowserModel(ROWS, { status: 'enabled' });
-    assert.deepEqual(model.statusCounts, { all: 4, enabled: 2, disabled: 2 });
+    assert.deepEqual(
+      model.statusCounts,
+      { all: 4, enabled: 2, disabled: 2 },
+      'the status axis itself is widened, or `Disabled (0)` would be a tautology'
+    );
     assert.deepEqual(model.filteredIds, ['air', 'fire'], 'while the rows themselves ARE filtered');
+
+    // The OTHER axes are not widened. `needs-attention` is `water` (disabled) and `earth`
+    // (disabled), so every segment reports what selecting it alongside that source filter
+    // would actually show — 2, 0 and 2 rather than the roster's 4, 2 and 2. This is the
+    // rule `browserGroupCounts.js` states for the library group headers, on a second axis.
+    assert.deepEqual(
+      buildEssenceBrowserModel(ROWS, { status: 'enabled', source: 'needs-attention' })
+        .statusCounts,
+      { all: 2, enabled: 0, disabled: 2 }
+    );
   });
 });
 
@@ -485,37 +500,38 @@ describe('1036 — essenceBrowserModel', () => {
 describe('1036 — describeEssenceDeleteImpact', () => {
   // The SHARED-CARRIER fixture, deliberately shaped so a sum and a union differ. This
   // mirrors what `tests/essence-manager-set-apply.test.js` proves the manager does:
-  // 3 essences across 2 SHARED recipes is `recipesUpdated: 2`, because each referencing
-  // recipe is rewritten ONCE for the whole selection. Summing per-essence counts would
-  // report 4 — a sidebar telling the GM twice the truth. The identities are what make the
-  // two answers distinguishable at all; a counts-only fixture cannot fail this.
+  // essences across SHARED recipes rewrite each referencing recipe ONCE for the whole
+  // selection. Summing per-essence counts would report one more — a sidebar telling the GM
+  // more than the truth. The identities are what make the two answers distinguishable at
+  // all; a counts-only fixture cannot fail this.
+  //
+  // It is built through `makeEssenceRow` so it OBEYS the store's invariant: `deleteBlocked`
+  // is `componentUsageCount > 0` at the only producer of these rows, so a carried essence is
+  // blocked and a deletable essence carries nothing. The two carrier numbers are therefore
+  // counted over different sets, and this fixture separates them: `fire`/`water` are the
+  // carried, blocked pair and `earth`/`air` are the deletable pair.
   const SELECTION = [
-    {
+    makeEssenceRow({
       id: 'fire',
       name: 'Fire',
-      deleteBlocked: false,
-      componentUsageItems: [{ id: 'comp-a' }],
+      componentUsageItems: [{ id: 'comp-a' }, { id: 'comp-b' }],
+      componentUsageCount: 2,
       recipeUsageIds: ['r1', 'r2'],
-    },
-    {
+    }),
+    makeEssenceRow({
       id: 'water',
       name: 'Water',
-      deleteBlocked: false,
-      componentUsageItems: [{ id: 'comp-a' }],
+      componentUsageItems: [{ id: 'comp-b' }],
+      componentUsageCount: 1,
       recipeUsageIds: ['r2'],
-    },
-    {
-      id: 'earth',
-      name: 'Earth',
-      deleteBlocked: true,
-      componentUsageItems: [{ id: 'comp-z' }],
-      recipeUsageIds: ['r9'],
-    },
+    }),
+    makeEssenceRow({ id: 'earth', name: 'Earth', recipeUsageIds: ['r1', 'r2'] }),
+    makeEssenceRow({ id: 'air', name: 'Air', recipeUsageIds: ['r2'] }),
   ];
 
   it('reports the UNION of affected recipes, not the sum of per-essence counts', () => {
     const impact = describeEssenceDeleteImpact(SELECTION);
-    assert.equal(impact.deletable, 2, 'selection size 3, deletable 2');
+    assert.equal(impact.deletable, 2, 'selection size 4, deletable 2');
     assert.equal(
       impact.recipeRewrites,
       2,
@@ -527,9 +543,30 @@ describe('1036 — describeEssenceDeleteImpact', () => {
     const impact = describeEssenceDeleteImpact(SELECTION);
     assert.equal(
       impact.componentsAffected,
-      1,
-      'one component carries both deletable essences; the sum would be 2'
+      2,
+      'comp-a and comp-b, with comp-b carrying both; the sum would be 3'
     );
+  });
+
+  it('counts the carrying components over the SELECTION, never over the deletable members', () => {
+    // THE structural defect this axis shipped with. `deleteBlocked` is
+    // `componentUsageCount > 0`, so a row that could contribute a carrier is excluded from
+    // `deletable` by construction: counted there the number is `0` for EVERY selection a
+    // real store can produce, rendered directly above the callout naming the essences those
+    // same components are keeping. Counted over the selection it explains that callout.
+    const allBlocked = describeEssenceDeleteImpact([SELECTION[0], SELECTION[1]]);
+    assert.equal(allBlocked.deletable, 0, 'a carried essence is never deletable');
+    assert.equal(
+      allBlocked.componentsAffected,
+      2,
+      'and the carriers are still reported — over `deletable` this could only be 0'
+    );
+
+    // Negative control: a selection carried by nothing reports nothing, so the assertion
+    // above cannot pass on a number that is merely always non-zero.
+    const noneCarried = describeEssenceDeleteImpact([SELECTION[2], SELECTION[3]]);
+    assert.equal(noneCarried.deletable, 2);
+    assert.equal(noneCarried.componentsAffected, 0);
   });
 
   it('accepts a bare id array as well as the store `{id, …}` row shape', () => {
@@ -541,33 +578,51 @@ describe('1036 — describeEssenceDeleteImpact', () => {
     assert.equal(impact.recipeRewrites, 1);
   });
 
-  it('excludes and NAMES the blocked members, and excludes their usage from the impact', () => {
+  it('excludes and NAMES the blocked members, and excludes their RECIPES from the rewrite', () => {
     const impact = describeEssenceDeleteImpact(SELECTION);
-    assert.equal(impact.blocked, 1);
-    assert.deepEqual(impact.blockedNames, ['Earth']);
-    assert.deepEqual(impact.deletableIds, ['fire', 'water']);
-    assert.deepEqual(
-      [impact.recipeRewrites, impact.componentsAffected],
-      [
-        describeEssenceDeleteImpact(SELECTION.slice(0, 2)).recipeRewrites,
-        describeEssenceDeleteImpact(SELECTION.slice(0, 2)).componentsAffected,
-      ],
-      "dropping the blocked row changes nothing — its own recipe and component are not touched"
+    assert.equal(impact.blocked, 2);
+    assert.deepEqual(impact.blockedNames, ['Fire', 'Water']);
+    assert.deepEqual(impact.deletableIds, ['earth', 'air']);
+    assert.equal(
+      impact.recipeRewrites,
+      describeEssenceDeleteImpact(SELECTION.slice(2)).recipeRewrites,
+      'dropping the blocked rows changes the REWRITE count not at all — nothing they alone require is rewritten'
+    );
+    assert.notEqual(
+      impact.componentsAffected,
+      describeEssenceDeleteImpact(SELECTION.slice(2)).componentsAffected,
+      'while the CARRIER count is theirs alone, which is why the two axes read different sets'
     );
   });
 
   it('is INERT when every selection member is blocked', () => {
-    const impact = describeEssenceDeleteImpact([SELECTION[2]]);
+    const impact = describeEssenceDeleteImpact([SELECTION[0]]);
     assert.equal(impact.canDelete, false);
     assert.equal(impact.deletable, 0);
-    assert.deepEqual(impact.blockedNames, ['Earth']);
-    assert.equal(impact.componentsAffected, 0);
-    assert.equal(impact.recipeRewrites, 0);
+    assert.deepEqual(impact.blockedNames, ['Fire']);
+    assert.equal(impact.componentsAffected, 2, 'the carriers are the REASON, so they are stated');
+    assert.equal(impact.recipeRewrites, 0, 'while nothing is deleted, so nothing is rewritten');
+  });
+
+  it('CAPS the named blocked members and reports the remainder as a count', () => {
+    // `Select all matching` can select every essence in the system, and an uncapped list
+    // comma-joins all of them into one callout.
+    const rows = ['A', 'B', 'C', 'D', 'E'].map((name, index) =>
+      makeEssenceRow({ id: `e${index}`, name, componentUsageCount: 1 })
+    );
+    const impact = describeEssenceDeleteImpact(rows);
+    assert.equal(impact.blocked, 5, 'the count is all of them, so nothing is understated');
+    assert.deepEqual(impact.blockedNames, ['A', 'B', 'C']);
+    assert.equal(impact.blockedOverflow, 2);
+
+    const under = describeEssenceDeleteImpact(rows.slice(0, 2));
+    assert.deepEqual(under.blockedNames, ['A', 'B']);
+    assert.equal(under.blockedOverflow, 0, 'and a short list is never truncated or summarised');
   });
 
   it('recomputes from the selection it is given rather than caching', () => {
-    assert.equal(describeEssenceDeleteImpact(SELECTION.slice(0, 1)).recipeRewrites, 2);
-    assert.equal(describeEssenceDeleteImpact(SELECTION.slice(1, 2)).recipeRewrites, 1);
+    assert.equal(describeEssenceDeleteImpact(SELECTION.slice(2, 3)).recipeRewrites, 2);
+    assert.equal(describeEssenceDeleteImpact(SELECTION.slice(3, 4)).recipeRewrites, 1);
   });
 
   it('contributes NOTHING for a row supplying no identities, rather than an over-count', () => {

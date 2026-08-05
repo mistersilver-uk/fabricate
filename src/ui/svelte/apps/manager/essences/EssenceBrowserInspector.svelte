@@ -144,14 +144,23 @@
      a delete; recipes REQUIRE it, which is what a delete rewrites. Neither number is
      derivable from the other. -->
 <section class="manager-inspector-card" data-essence-section="stats">
+  <!-- The SHIPPED two-stat grid, joined rather than re-authored: `.manager-essence-stat-*`
+       is added to the `.manager-recipe-stat-*` / `.manager-component-stat-*` selector lists
+       in `styles/fabricate.css`. This inspector is one click from those two, and a
+       hand-rolled copy had already drifted on radius, background, value size and both
+       halves of the typographic contract (serif + `tabular-nums`). -->
   <div class="manager-essence-stat-grid">
     <div class="manager-essence-stat" data-essence-stat="components">
-      <strong>{essence.componentUsageCount || 0}</strong>
-      <span>{text('FABRICATE.Admin.Manager.Essence.StatComponents', 'Components')}</span>
+      <strong class="manager-essence-stat-value">{essence.componentUsageCount || 0}</strong>
+      <span class="manager-essence-stat-label"
+        >{text('FABRICATE.Admin.Manager.Essence.StatComponents', 'Components')}</span
+      >
     </div>
     <div class="manager-essence-stat" data-essence-stat="recipes">
-      <strong>{essence.recipeUsageCount || 0}</strong>
-      <span>{text('FABRICATE.Admin.Manager.Essence.StatRecipes', 'Recipes require it')}</span>
+      <strong class="manager-essence-stat-value">{essence.recipeUsageCount || 0}</strong>
+      <span class="manager-essence-stat-label"
+        >{text('FABRICATE.Admin.Manager.Essence.StatRecipes', 'Recipes require it')}</span
+      >
     </div>
   </div>
 </section>
@@ -330,31 +339,11 @@
 </section>
 
 <style>
-  .manager-essence-stat-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--fab-space-2);
-  }
-
-  .manager-essence-stat {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2xs);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: 8px;
-    background: var(--fab-overlay-light-03);
-  }
-
-  .manager-essence-stat strong {
-    font-size: 1.25rem;
-    line-height: 1;
-  }
-
-  .manager-essence-stat span {
-    color: var(--fab-text-muted);
-    font-size: 0.66rem;
-  }
+  /* No stat-grid block here. The four rules this file used to declare are the shipped
+     `.manager-recipe-stat-*` / `.manager-component-stat-*` rules with four visible
+     divergences, so the classes joined those selector lists in `styles/fabricate.css`
+     instead — one shape, one definition, and the essence inspector's numbers now match the
+     recipe and component inspectors a click away. */
 
   .manager-essence-inspector-actions {
     display: flex;

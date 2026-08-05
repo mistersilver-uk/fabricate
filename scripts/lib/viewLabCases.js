@@ -1814,10 +1814,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     // The grid carries the SAME state vocabulary as the list — the Disabled pill, the capability
     // pills and the recipe count — because a presentation toggle must not silently remove state.
-    // This frame is what proves it, beside `manager-essences-normal`'s list.
+    // This frame is what proves it, beside `manager-essences-normal`'s list. It is ALSO the only
+    // proof that the card's identity `<button>` grows past Foundry's fixed button height instead
+    // of cropping: happy-dom computes no cascade, so no unit test can see it.
+    //
+    // The step clicks the segment LABEL, not its radio. `SegmentedControl` hides the radio with
+    // `clip: rect(0 0 0 0)` at 1x1, and `view-lab-screenshots.mjs` uses `target.click()`, whose
+    // hit-target check requires the element under the click point to BE the target or a
+    // descendant of it — here it is the enclosing `<label>`, an ANCESTOR. That step timed out for
+    // 30s and, because one failing case fails the whole capture job, published nothing at all.
+    // `:706` and `:707` in this file already click the label for exactly this control and pass.
     query: {},
-    steps: ['Essences', { selector: '[data-essence-view-option="grid"] input' }],
+    steps: ['Essences', { selector: '[data-essence-view-option="grid"]' }],
     expectView: 'essences',
+    // A click that lands but does not switch presentation would photograph the LIST under the
+    // grid case's name — the "publishes an unrelated frame" failure this registry exists to
+    // prevent, and one that would silently un-prove the crop fix above.
+    expectSelector: '.fabricate-manager .manager-essences-table[data-essence-view="grid"]',
     kinds: ['manager', 'essences'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
@@ -1831,16 +1844,63 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essences bulk edit',
     reaches: 'beyond',
     smokeLabels: [],
-    // An ACTIVE bulk selection, so the rail shows the bulk panel rather than the inspector. Two
-    // rows are ticked and one of them (`aether`) is delete-BLOCKED, which is what puts the impact
-    // statement's three numbers, the named blocked member and the armed delete all in one frame.
+    // An ACTIVE bulk selection, so the rail shows the bulk panel rather than the inspector.
+    //
+    // The ticked pair is `mote` + `aether`, and the pairing is the whole point. `aether` is
+    // delete-BLOCKED (components carry it), which puts the named blocked member and a non-zero
+    // carrier count on screen; `mote` is the corpus's only DELETABLE essence, which is what makes
+    // "1 essence definition will be deleted", "1 recipe will be rewritten" and a LIVE Delete
+    // button possible at all.
+    //
+    // It previously ticked `earth`, which is carried like every other lab essence, so the frame
+    // could only show the inert all-blocked state — 0/0/0 above a DISABLED button — and the
+    // maintainer's binding decision (state the impact, then Arm/Confirm) was photographed nowhere.
+    // No selection reachable in this world could have fixed that without a deletable essence.
     query: {},
     steps: [
       'Essences',
-      { selector: '[data-essence-select="earth"]' },
+      { selector: '[data-essence-select="mote"]' },
       { selector: '[data-essence-select="aether"]' },
     ],
     expectView: 'essences',
+    // The frame must show the LIVE action, not the inert one. `ArmedDangerButton` renders the
+    // idle danger button without `disabled` only when something is actually deletable, so this
+    // fails loudly if the selection ever stops containing a deletable member.
+    expectSelector:
+      '.fabricate-manager [data-essence-bulk-delete-card] .manager-button.is-danger:not([disabled])',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essences-bulk-delete-armed',
+    label: 'Manager — Essences bulk delete armed',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The ARMED half of the maintainer's binding decision, which no case photographed. The same
+    // selection as above, plus one click on the danger button: the first click only ARMS, so this
+    // frame shows `Confirm delete` beside the impact statement it is a confirmation OF, with
+    // nothing written.
+    //
+    // Two frames rather than one because the two states are the decision: an impact statement
+    // stated BEFORE arming, and an arm that is a second, separate act.
+    query: {},
+    steps: [
+      'Essences',
+      { selector: '[data-essence-select="mote"]' },
+      { selector: '[data-essence-select="aether"]' },
+      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it
+      // arms, so this cannot drift onto a wrapper the way a class selector could.
+      { selector: '[data-arm-token="delete-essences"]' },
+    ],
+    expectView: 'essences',
+    // Armed is a STATE, and a frame that merely re-photographed the idle button would be
+    // indistinguishable from the case above. `ArmedDangerButton` marks the armed control.
+    expectSelector: '.fabricate-manager [data-arm-token="delete-essences"][data-armed="true"]',
     kinds: ['manager', 'essences'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,

@@ -1583,8 +1583,14 @@
   // selection changes at all. An arm is a statement about a SPECIFIC set: once the set
   // moves, the impact sentence the GM read before arming is no longer the impact of
   // confirming, so the second click must not still be a confirmation.
+  //
+  // It reads the SET, not its size. The browser assigns a NEW `Set` on every mutation, so
+  // the set identity is what "changes at all" actually means; a size dependency cannot see
+  // a same-size swap, and every control happening to change the size today is a property of
+  // the current controls rather than of this rule.
   $effect(() => {
-    if (essenceBulkSelectionCount === 0) essenceBulkDraft = createEssenceBulkDraft();
+    const selectedIds = essenceBulkSelectedIds;
+    if (selectedIds.size === 0) essenceBulkDraft = createEssenceBulkDraft();
     essenceBulkDeleteArmed = false;
   });
   const canSaveComponentEdit = $derived(
@@ -2928,14 +2934,26 @@
     return finishEnvironmentRouteExit(confirmed);
   }
 
-  // The SAME-VIEW SKIP (issue 1036, criterion 23). This guard ignored its argument, unlike
-  // the recipe, component, recipe-item and system guards, so re-entering the essence editor
-  // from the essence editor — the shipped `editEssence` path when the GM picks a different
-  // row while already editing — raised a discard prompt for a navigation that never leaves
-  // the route. `SCOPE_BROWSER_BY_VIEW` already maps `essence-edit` to `essences`, so the
-  // skip is safe: this is not the `environment-edit` hazard, whose scope key differs.
-  function confirmEssenceRouteExit(nextView) {
-    if (activeView !== 'essence-edit' || nextView === 'essence-edit') return true;
+  // The SAME-VIEW SKIP (issue 1036, criterion 23), comparing the ESSENCE and not only the
+  // view token. This guard ignored its argument, unlike the recipe, component, recipe-item
+  // and system guards, so re-entering the essence editor from the essence editor raised a
+  // discard prompt for a navigation that never leaves the route. `SCOPE_BROWSER_BY_VIEW`
+  // already maps `essence-edit` to `essences`, so skipping is safe: this is not the
+  // `environment-edit` hazard, whose scope key differs.
+  //
+  // But `essence-edit` is a "same token, different subject" route, exactly like `tool-edit`
+  // and `system-edit`, and both of those learned it the hard way. `editEssence` already
+  // early-returns on an unchanged id, so EVERY call that reaches this guard from inside the
+  // editor is a switch to a different essence — or `createEssenceDraft`, which switches to
+  // no essence at all — and a bare `nextView === 'essence-edit'` skip returned `true` for
+  // all of them, after which `editEssence` clears `essenceEditDraft` with the draft
+  // unsaved, no prompt, and `store.cancelEssenceDraft()` never called.
+  // `confirmToolsRouteExit` compares ids for this reason; so does
+  // `confirmSystemDetailsScopeChange`.
+  function confirmEssenceRouteExit(nextView, nextEssenceId = '') {
+    if (activeView !== 'essence-edit') return true;
+    if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)
+      return true;
     if (essenceEditDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishEssenceRouteExit);
@@ -2995,12 +3013,15 @@
     return finishGatheringTaskRouteExit(confirmed);
   }
 
-  function confirmRouteExit(nextView) {
+  // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
+  // routes whose view token does not change when the subject does. Only the essence guard
+  // reads it today; every other caller keeps its one-argument shape.
+  function confirmRouteExit(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
       return environmentConfirmed.then((value) => {
         if (value === false) return false;
-        const essenceResult = confirmEssenceRouteExit(nextView);
+        const essenceResult = confirmEssenceRouteExit(nextView, nextRouteId);
         if (isPromise(essenceResult)) {
           return essenceResult.then((essenceValue) =>
             essenceValue === false ? false : continueRouteExitAfterEssence(nextView)
@@ -3010,7 +3031,7 @@
       });
     }
     if (environmentConfirmed === false) return false;
-    const essenceResult = confirmEssenceRouteExit(nextView);
+    const essenceResult = confirmEssenceRouteExit(nextView, nextRouteId);
     if (isPromise(essenceResult)) {
       return essenceResult.then((value) =>
         value === false ? false : continueRouteExitAfterEssence(nextView)
@@ -3611,7 +3632,10 @@
   function editEssence(essenceId = selectedEssence?.id) {
     if (!essenceId || !canShowEssences) return;
     if (currentView === 'essence-edit' && essenceId === selectedEssenceId) return;
-    afterTruthyResult(confirmRouteExit('essence-edit'), () => {
+    // The target id is what lets the essence guard tell "re-entering this editor" from
+    // "switching to a different essence"; without it the guard would skip the discard
+    // prompt for the switch.
+    afterTruthyResult(confirmRouteExit('essence-edit', essenceId), () => {
       selectedEssenceId = essenceId;
       essenceEditDirty = false;
       essenceEditDraft = null;
@@ -10118,7 +10142,7 @@
               effectTransferEnabled={showEssenceSourceUi}
               propertyMacrosEnabled={showEssencePropertyMacroUi}
               sourceName={essenceEditDraft.sourceName || ''}
-              macroName={essenceEditDraft.propertyMacroUuid || ''}
+              macroName={essenceEditDraft.macroName || ''}
               sampleComponentName={essenceEditDraft.componentUsageItems?.[0]?.name || ''}
             />
           {:else if currentView === 'essences' && essenceBulkSelectionCount > 0}

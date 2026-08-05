@@ -13,9 +13,11 @@
  * shared `browserPagination.js` leaf and the status tallies from `browserGroupCounts.js`,
  * so neither is a third copy.
  *
- * Search is deliberately NOT a filter here: the admin store's search term is applied
- * before projection, so re-applying it would double-filter. The term still contributes an
- * active-filter chip.
+ * Search is deliberately NOT a filter here, and NOT because the store applies it first —
+ * there is no essence search in `adminStore` at all, which is why the term had to move onto
+ * the lifted browser state. It is applied by the VIEW because whether a source name is
+ * searchable depends on `showSourceUi`, a presentation fact this module cannot know. The
+ * term still contributes an active-filter chip through `describeActiveEssenceFilters`.
  */
 
 import { countByCategory } from './browserGroupCounts.js';
@@ -145,8 +147,12 @@ export function filterEssences(essences, filters = {}) {
 }
 
 /**
- * How many FILTERED rows each status holds — the counts the segmented control's option
- * labels read, so the GM can see that `Disabled` matches nothing without opening it.
+ * How many rows each status holds — the counts the segmented control's option labels read,
+ * so the GM can see that `Disabled` matches nothing without opening it.
+ *
+ * Total over whatever rows it is GIVEN. `buildEssenceBrowserModel` gives it the rows every
+ * active filter EXCEPT the status axis leaves, which is what makes each segment's number
+ * equal to what clicking it shows; see that function.
  *
  * Computed with the shared `countByCategory` tally rather than a hand-rolled loop; it is
  * key-agnostic and this is a second key.
@@ -219,8 +225,8 @@ export function paginateEssences(essences, options = {}) {
  * The active-filter chips, as data. Each chip names the filter it clears; the view
  * localizes and renders the dismissible run.
  *
- * Search is included even though it is not applied here (the admin store filters before
- * projection): a search term is an active filter the GM must be able to see and clear.
+ * Search is included even though it is applied by the VIEW rather than here: a search term
+ * is an active filter the GM must be able to see and clear, wherever it is applied.
  *
  * @param {{status?: string, source?: string, search?: string}} [filters]
  * @returns {{id: 'status' | 'source' | 'search', value: string}[]}
@@ -241,12 +247,24 @@ export function describeActiveEssenceFilters(filters = {}) {
 /**
  * Run the whole pipeline in one call: filter → sort → paginate.
  *
- * One entry point so the view composes nothing itself and the ORDER cannot drift. The
- * status counts are computed over the UNFILTERED rows, because the segmented control's own
- * option labels must keep reporting what selecting them would find — a `Disabled (0)` that
- * only says "0 within the current status filter" is a tautology.
+ * One entry point so the view composes nothing itself and the ORDER cannot drift.
  *
- * @param {object[]} essences the projected rows.
+ * ## What the status counts are counted over
+ *
+ * Every active filter EXCEPT the status axis itself — so the count on each segment is
+ * exactly how many rows clicking it would show. Counting over the status-filtered rows
+ * would be the tautology `Disabled (0)` while the Enabled segment is selected; counting
+ * over the raw roster would print a number the GM cannot reach, because the search and the
+ * source filter are still narrowing the list. `browserGroupCounts.js` states the same rule
+ * for the library group headers — "a category total that ignored the active search /
+ * category / essence filters would be a third wrong number" — and this is the same
+ * question asked on a different axis.
+ *
+ * The SEARCH is applied by the view before the rows arrive here, so it is already
+ * accounted for; the SOURCE filter is applied here and is therefore re-applied explicitly
+ * with the status axis widened to `all`.
+ *
+ * @param {object[]} essences the projected rows, already narrowed by the view's search.
  * @param {{status?: string, source?: string, key?: EssenceSortKey,
  *   direction?: SortDirection, pageIndex?: number, pageSize?: number}} [options]
  * @returns {{essences: object[], filteredIds: string[], pageIds: string[],
@@ -262,6 +280,6 @@ export function buildEssenceBrowserModel(essences, options = {}) {
     ...paged,
     filteredIds: sorted.map((essence) => String(essence?.id ?? '')).filter(Boolean),
     pageIds: paged.essences.map((essence) => String(essence?.id ?? '')).filter(Boolean),
-    statusCounts: essenceStatusCounts(essences),
+    statusCounts: essenceStatusCounts(filterEssences(essences, { ...options, status: 'all' })),
   };
 }

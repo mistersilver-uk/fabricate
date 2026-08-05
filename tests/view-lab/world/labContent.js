@@ -723,6 +723,10 @@ const RUNEWORK_COMPONENTS = [
  * The shared essence vocabulary. Every one of the six lab systems declares THIS array, so
  * an edit here moves every essence surface in the corpus at once.
  *
+ * SIX entries, and the sixth (`mote`) exists for one reason: it is the only essence NO
+ * component carries, and `deleteBlocked` is `componentUsageCount > 0`, so it is the only
+ * essence in the corpus that can be deleted at all. See its own note.
+ *
  * COLOURS (issue 1036). Four of the five carry a distinct `--fab-tag-*` token and `air` is
  * deliberately left UNSET: an essence with no authored colour renders in the theme accent
  * by design, and it is a first-class state the redesign has to photograph — the frame
@@ -785,6 +789,31 @@ const ESSENCES = [
     enabled: false,
     sourceComponentId: 'sm-ruby',
     propertyMacroUuid: 'Macro.lab-aether-binding',
+  },
+  {
+    // The DELETABLE essence, and the only one in the corpus (issue 1036). NO component
+    // anywhere carries it, so `componentUsageCount` is 0, `deleteBlocked` is false, and it
+    // is the sole route to a bulk-delete impact statement with non-zero numbers and a LIVE
+    // Delete button.
+    //
+    // Without it the commissioned `manager-essences-bulk-edit` frame could only ever show
+    // the inert all-blocked state — every other lab essence is carried, and an essence is
+    // deletable exactly when no component carries it — so the maintainer's binding decision
+    // (state the impact, then Arm/Confirm) had no qualifying visual evidence at all.
+    //
+    // It is required by `sm-r-runeplate-draft`, so `recipeRewrites` is 1 rather than 0 and
+    // the third impact number is not trivially satisfied. That recipe SPECIFICALLY, for the
+    // reason recorded there: it is already `enabled: false` and already un-enableable, so a
+    // new requirement on it moves no status pill on any recipe-library frame.
+    //
+    // NO `sourceComponentId` on purpose: it is the corpus's only essence with no source at
+    // all, so the browser's `Source: none` filter and the row's absent Effects pill both
+    // have a subject.
+    id: 'mote',
+    name: 'Mote',
+    description: 'Loose motive dust. Useful, and nobody has found a use.',
+    icon: 'fas fa-circle-dot',
+    colorToken: 'butter',
   },
 ];
 
@@ -1319,6 +1348,22 @@ const SMITHING_RECIPES = [
               // which is what `recipeReferencesEssence` walks. A bare `{ essenceId }` is
               // not a reference at all and would leave the count at zero.
               options: [{ match: { type: 'essence', essenceId: 'aether', amount: 2 } }],
+            },
+            {
+              // `mote` rides along on this SAME recipe, for the reason `aether` is here: it
+              // is the corpus's only DELETABLE essence, and without a recipe requiring it
+              // the bulk-delete impact statement's "recipes will be rewritten" number would
+              // be 0 for every selection that can reach a live Delete button.
+              //
+              // A SECOND GROUP rather than a second option in the group above. Options
+              // inside one group are ALTERNATIVES, so adding `mote` there would have made
+              // the disabled `aether` merely one way to satisfy the group — which could
+              // lift the activation blocker and move this recipe's status pill, the exact
+              // outcome the note above chose this recipe to avoid. Groups are required
+              // independently, so the blocker still sees a required disabled essence.
+              id: 'sm-runeplate-s1-g2',
+              name: 'Mote dusting',
+              options: [{ match: { type: 'essence', essenceId: 'mote', amount: 1 } }],
             },
           ],
         },

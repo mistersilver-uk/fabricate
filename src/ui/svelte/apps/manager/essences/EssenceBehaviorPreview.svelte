@@ -6,8 +6,10 @@
   ONE component for both, because they are one list. The delta is explicit that
   `EssenceBrowserInspector` renders this rather than re-authoring the same three facts a
   second time; the difference between the two sites is the surrounding CHROME (the "How it
-  appears" header, the two sample previews and the live-update note), which the inspector
-  suppresses through `showIdentity` / `showLiveNote`.
+  appears" header, the two sample previews — on a component, and as a recipe input — and the
+  live-update note), which the inspector suppresses through `showIdentity` / `showLiveNote`.
+  There is no third `is-embedded` treatment: it declared the base rule's own `gap` and its
+  comment described removing padding this block never had, so it changed nothing.
 
   ── SUPPRESSION IS RENDERED, NOT REMOVED ──────────────────────────────────────────
   For a DISABLED essence each behaviour row still renders and states that it will not run.
@@ -74,7 +76,6 @@
 
 <aside
   class="manager-essence-preview"
-  class:is-embedded={!showIdentity}
   data-essence-behavior-preview
   aria-label={text('FABRICATE.Admin.Manager.Essence.Preview.Label', 'Essence behaviour preview')}
 >
@@ -121,6 +122,27 @@
           )}</span
       >
     </div>
+
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.Essence.Preview.AsARecipeInput', 'As a recipe input')}
+    </p>
+    <!-- The SECOND sample the prototype shows, and the other half of "where a GM meets
+         this essence": carried by a component, and required by a recipe. Those are the two
+         usage axes the inspector and the delete-impact statement both count separately, so
+         a preview showing only the component half under-describes the essence. -->
+    <div class="manager-essence-preview-sample" data-essence-preview-recipe>
+      <Chip tone="neutral" swatch={essence?.colorToken || ''} icon={essence?.icon || undefined}>
+        {format('FABRICATE.Admin.Manager.Essence.Preview.SampleQuantity', '{name} ×2', {
+          name,
+        })}
+      </Chip>
+      <span class="manager-muted"
+        >{text(
+          'FABRICATE.Admin.Manager.Essence.Preview.SampleRecipe',
+          'a recipe that requires it'
+        )}</span
+      >
+    </div>
   {/if}
 
   <p class="manager-kicker">
@@ -153,12 +175,6 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  /* Embedded in the inspector: no panel padding of its own, because the inspector card it
-     sits inside already supplies it. */
-  .manager-essence-preview.is-embedded {
-    gap: var(--fab-space-2);
   }
 
   .manager-essence-preview-identity {

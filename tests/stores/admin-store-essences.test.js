@@ -18,6 +18,7 @@ import test from 'node:test';
 import { get } from 'svelte/store';
 
 import { makeEssence, makeEssenceStoreHarness } from '../helpers/essenceFixtures.js';
+import { describeEssenceDeleteImpact } from '../../src/utils/essenceBulkEditModel.js';
 
 const { createAdminStore } = await import('../../src/ui/svelte/stores/adminStore.js');
 
@@ -223,6 +224,46 @@ test('1036/17: the card carries the recipe IDENTITIES the delete-impact union ne
     [],
     'negative control: an unreferenced essence names no recipe, so the walk is not matching everything'
   );
+});
+
+test('1036/17: the delete-impact statement reports a NON-ZERO carrier count on STORE-BUILT rows', async () => {
+  // Why this pin is in the STORE suite and not only in the model suite: `deleteBlocked` is
+  // `componentUsageCount > 0` at this producer and nowhere else, so a carried essence is
+  // always blocked. A component count taken over the DELETABLE rows is therefore `0` for
+  // every selection the running app can produce — and a model-level fixture combining
+  // `deleteBlocked: false` with a non-empty `componentUsageItems` proved it non-zero anyway,
+  // because that fixture is a shape this function cannot emit. Only rows built HERE can
+  // fail when the union is taken over the wrong set.
+  const harness = makeEssenceStoreHarness({
+    essences: [
+      makeEssence({ id: 'fire' }),
+      makeEssence({ id: 'water', name: 'Water' }),
+      makeEssence({ id: 'air', name: 'Air' }),
+    ],
+    components: [
+      { id: 'c1', name: 'Ember', essences: { fire: 1, water: 2 } },
+      { id: 'c2', name: 'Cinder', essences: { fire: 3 } },
+    ],
+    recipes: [recipeWithSetEssence('r1', 'air')],
+  });
+  const store = await openStore(harness);
+
+  const selection = cardsOf(store);
+  assert.deepEqual(
+    selection.map((card) => card.deleteBlocked),
+    [true, true, false],
+    'the invariant this pin rests on: a carried essence is blocked, an uncarried one is not'
+  );
+
+  const impact = describeEssenceDeleteImpact(selection);
+  assert.equal(impact.deletable, 1, 'only `air` is deletable');
+  assert.equal(
+    impact.componentsAffected,
+    2,
+    'Ember and Cinder — a union over the DELETABLE rows could only ever be 0 here'
+  );
+  assert.equal(impact.recipeRewrites, 1, 'and the recipe number stays scoped to what is deleted');
+  assert.equal(impact.blocked, 2);
 });
 
 test('1036: recipe usage does NOT become a delete block', async () => {

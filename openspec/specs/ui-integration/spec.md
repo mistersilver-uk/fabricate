@@ -667,8 +667,11 @@ Capabilities:
 - Manager prevents essence deletion while one or more managed components reference that essence with a positive quantity.
   The same refusal applies to a SET delete: blocked members are excluded from the write and named in the panel, the action is inert when every selected member is blocked, and the refusal is enforced by the store rather than by a disabled control.
 - A set delete states its impact before it is armed, and recomputes it when the selection changes.
-  The statement reports how many essence definitions will be deleted, how many components carry them and how many recipes will be rewritten.
+  The statement reports how many essence definitions will be deleted, how many components carry one or more of the SELECTED essences, and how many recipes will be rewritten.
+  The component number is counted over the whole selection rather than over the deletable members, because a component carrying an essence is what blocks that essence's delete: counted over the deletable members it would be zero for every possible selection, stated directly above the callout naming the essences those same components keep.
+  It therefore explains the skip rather than contradicting it, and the copy says which set it counts.
   The two carrier numbers are counts of DISTINCT carriers, so neither exceeds what the cascade will touch.
+  The named blocked members are capped, with the remainder reported as a count, so selecting every essence in the system cannot put every name in one callout.
 - The set delete uses the two-step armed confirmation rather than a modal dialog.
   This is a deliberate exception to the reserved-for-bulk-actions dialog rule, taken on an explicit maintainer decision, and it is paired with the impact statement above.
 - Manager source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.

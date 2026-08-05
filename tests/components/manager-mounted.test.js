@@ -8597,6 +8597,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(impactText('essences').startsWith('1'), '1 deletable essence');
     assert.ok(impactText('components').startsWith('0'), 'carried by no components');
     assert.ok(impactText('recipes').startsWith('1'), 'and rewriting 1 recipe');
+    assert.match(
+      impactText('components'),
+      /selected essences/,
+      'and the line says WHICH set it counts, since it counts the whole selection'
+    );
     assert.ok(
       !target.querySelector('[data-essence-bulk-blocked]'),
       'nothing is blocked yet, so nothing is named'
@@ -8609,6 +8614,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.ok(impactText('essences').startsWith('1'), 'the blocked member is excluded');
     assert.ok(impactText('recipes').startsWith('1'), 'and so are the recipes only it names');
+    assert.ok(
+      impactText('components').startsWith('1'),
+      'while its CARRIER is now reported — that carrier is the reason it is skipped, and ' +
+        'counting this axis over the deletable members alone pinned it at 0 forever'
+    );
     const blocked = target.querySelector('[data-essence-bulk-blocked]');
     assert.ok(blocked, 'the blocked member is named');
     assert.ok(blocked.textContent.includes('Earth'), 'by name, not merely counted');

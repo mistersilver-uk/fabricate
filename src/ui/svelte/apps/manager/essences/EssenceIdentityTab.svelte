@@ -190,11 +190,15 @@
     gap: var(--fab-space-3);
   }
 
+  /* The ONLY definition of this block. A global twin declared the same properties at equal
+     specificity, which makes which one wins a cascade coin-toss rather than a decision, so
+     it was retired and its `min-width: 0` folded in here. */
   .manager-essence-icon-panel {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: var(--fab-space-2);
+    min-width: 0;
   }
 
   .manager-essence-colour-hint {

@@ -44,10 +44,18 @@
   hazard list states, and this nests.
 
   The identity button needs the manager's `<button>` RESET (`appearance: none`,
-  `text-align: left`, `min-height`, no border/background) or Foundry's fixed button height
-  crops it — a defect no mounted test can see. It is therefore joined into the existing
-  reset, focus and focus-visible lists in `styles/fabricate.css` beside its three siblings,
-  rather than restated here.
+  `text-align: left`, `height: auto`, `min-height`, no border/background) or Foundry's fixed
+  button height crops it — a defect no mounted test can see. It is therefore joined into the
+  existing reset, focus and focus-visible lists in `styles/fabricate.css` beside its three
+  siblings, rather than restated here.
+
+  `height: auto` was ADDED to that shared list for this change, and adding it there rather
+  than restating it on the card variant is deliberate. `min-height` alone does not defeat
+  Foundry's fixed `height`: used height is `max(height, min-height)`, so a grow-tall variant
+  still resolves to 46px. The four row-shaped siblings never noticed because their content
+  never exceeds 46px; this card, a ~150px stack of the SAME button, is the first that does.
+  CONTRIBUTING.md states the two properties as one rule, so splitting them across two blocks
+  would leave the next tall identity button to rediscover the same crop.
 -->
 <script>
   import Chip from '../Chip.svelte';
@@ -74,6 +82,7 @@
 
   const isCard = $derived(variant === 'grid');
   const disabled = $derived(essence?.enabled === false);
+  const blocked = $derived(essence?.deleteBlocked === true);
   const capabilities = $derived(
     essenceCapabilityPills(essence, { effectTransferEnabled, propertyMacrosEnabled }, text)
   );
@@ -139,13 +148,37 @@
          the muted tone beside the Disabled badge instead. -->
     <span class="manager-essence-capabilities" data-essence-capabilities>
       {#each capabilities as pill (pill.id)}
-        <Chip tone={pill.tone} icon={pill.icon} data-essence-capability={pill.id}>{pill.label}</Chip
+        <Chip
+          tone={pill.tone}
+          icon={pill.icon}
+          title={pill.title || undefined}
+          data-essence-capability={pill.id}
+          data-essence-capability-state={pill.tone === 'warning' ? 'broken' : 'ok'}
+          >{pill.label}</Chip
         >
       {/each}
     </span>
 
+    <!-- The component readout carries the BLOCKED-FROM-DELETE state, in the tone the
+         shipped row used and with a lock glyph and a title beside it. Component usage is
+         exactly what blocks the delete, so the state belongs on the number that causes it
+         rather than on a fourth pill; and stating it here is what puts the marker on BOTH
+         presentations, since the inspector only ever shows one essence at a time. -->
     <span class="manager-essence-usage-readout" data-essence-usage>
-      <span data-essence-usage-components>{componentUsage}</span>
+      <span
+        class="manager-essence-usage-components"
+        class:is-delete-blocked={blocked}
+        data-essence-usage-components
+        data-essence-delete-blocked={blocked ? 'true' : 'false'}
+        title={blocked
+          ? text(
+              'FABRICATE.Admin.Manager.Essence.DeleteBlocked',
+              'Remove component usage before deleting this essence.'
+            )
+          : undefined}
+      >
+        {#if blocked}<i class="fas fa-lock" aria-hidden="true"></i>{/if}{componentUsage}
+      </span>
       <span data-essence-usage-recipes>{recipeUsage}</span>
     </span>
 
@@ -276,6 +309,16 @@
     font-size: 0.7rem;
     line-height: 1.3;
     white-space: nowrap;
+  }
+
+  /* BLOCKED FROM DELETE. The shipped row toned its usage chip for this state and the
+     redesign must not lose it: the tone is the colour channel, the lock is the glyph
+     channel and the `title` is the words, so the marker survives greyscale. */
+  .manager-essence-usage-components.is-delete-blocked {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2xs);
+    color: var(--fab-warning-text);
   }
 
   /* A disabled essence is DIMMED as well as pilled — the pill is what carries the state,

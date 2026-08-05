@@ -38,7 +38,11 @@ const format = (_key, fallback, data) =>
   );
 
 const BOTH_GATES = { effectTransferEnabled: true, propertyMacrosEnabled: true };
-const CONFIGURED = { hasEffectTransfer: true, hasPropertyMacro: true };
+// `sourceState: 'linked'` is not decoration. `hasEffectTransfer` is `sourceState !== 'none'`
+// at the store, so a HEALTHY essence is the one that also resolves; omitting the field here
+// would describe a broken link and quietly make the healthy-tone assertions test the
+// warning path.
+const CONFIGURED = { hasEffectTransfer: true, hasPropertyMacro: true, sourceState: 'linked' };
 
 test('1036: both capability pills render for a DISABLED essence, in the muted tone', () => {
   const enabled = essenceCapabilityPills({ ...CONFIGURED, enabled: true }, BOTH_GATES, text);
@@ -56,6 +60,39 @@ test('1036: both capability pills render for a DISABLED essence, in the muted to
   );
   assert.deepEqual([...new Set(disabled.map((pill) => pill.tone))], ['neutral']);
   assert.deepEqual([...new Set(enabled.map((pill) => pill.tone))], ['info']);
+});
+
+test('1036: the Effects pill reports a BROKEN source, not merely a configured one', () => {
+  // `hasEffectTransfer` means "a source is CONFIGURED", which a `stale` or `missing` link
+  // still is. At one tone the row cannot distinguish a working link from a dead one, and
+  // the row is where most essences are ever looked at — the inspector shows one at a time
+  // and the needs-attention filter is a search, not a signal.
+  const healthy = essenceCapabilityPills({ ...CONFIGURED, enabled: true }, BOTH_GATES, text)[0];
+  assert.equal(healthy.tone, 'info');
+  assert.equal(healthy.title, '', 'a working link explains nothing, because there is nothing to fix');
+
+  for (const state of ['stale', 'missing']) {
+    const broken = essenceCapabilityPills(
+      { ...CONFIGURED, enabled: true, sourceState: state },
+      BOTH_GATES,
+      text
+    )[0];
+    assert.equal(broken.id, 'effects', `${state}: the pill is KEPT — the intention is authored`);
+    assert.equal(broken.tone, 'warning', `${state}: colour`);
+    assert.notEqual(broken.icon, healthy.icon, `${state}: glyph, so it survives greyscale`);
+    assert.match(broken.title, /no longer resolves/, `${state}: and words`);
+  }
+
+  // The breakage OUTRANKS the suppression: a disabled essence with a dead link still has a
+  // link to repair, so the muted tone must not swallow the warning.
+  assert.equal(
+    essenceCapabilityPills(
+      { ...CONFIGURED, enabled: false, sourceState: 'stale' },
+      BOTH_GATES,
+      text
+    )[0].tone,
+    'warning'
+  );
 });
 
 test('1036: a gated-off capability shows no pill even though the essence carries it', () => {

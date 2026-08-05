@@ -65,21 +65,41 @@ export const ESSENCE_EDITOR_TABS = Object.freeze([
  * essence transfers nothing". A disabled essence renders them in the MUTED tone beside the
  * Disabled badge instead.
  *
- * @param {{hasEffectTransfer?: boolean, hasPropertyMacro?: boolean, enabled?: boolean}} essence
+ * ## The Effects pill reports whether the source RESOLVES, not only that one is configured
+ *
+ * `hasEffectTransfer` is `sourceState !== 'none'` at the store — a CONFIGURED source, which
+ * a `stale` or `missing` link still is. Rendered at one tone that makes a broken link
+ * indistinguishable from a working one on the library row, and the row is the only place
+ * most essences are ever looked at: the inspector shows one essence at a time and the
+ * needs-attention filter is a search, not a signal. So a non-`linked` source keeps the pill
+ * (the intention is still authored, and hiding it would remove state) and states the
+ * breakage in its own tone, glyph and title — three channels, so it survives greyscale.
+ *
+ * @param {{hasEffectTransfer?: boolean, hasPropertyMacro?: boolean, enabled?: boolean,
+ *   sourceState?: string}} essence
  * @param {{effectTransferEnabled?: boolean, propertyMacrosEnabled?: boolean}} features
  * @param {(key: string, fallback: string) => string} text
- * @returns {{id: string, icon: string, label: string, tone: string}[]}
+ * @returns {{id: string, icon: string, label: string, tone: string, title: string}[]}
  */
 export function essenceCapabilityPills(essence, features = {}, text = (_key, fallback) => fallback) {
   const suppressed = essence?.enabled === false;
   const tone = suppressed ? 'neutral' : 'info';
   const pills = [];
   if (features.effectTransferEnabled === true && essence?.hasEffectTransfer === true) {
+    const sourceBroken = essence?.sourceState !== 'linked';
     pills.push({
       id: 'effects',
-      icon: 'fas fa-wand-magic-sparkles',
+      icon: sourceBroken ? 'fas fa-link-slash' : 'fas fa-wand-magic-sparkles',
       label: text('FABRICATE.Admin.Manager.Essence.Capability.Effects', 'Effects'),
-      tone,
+      // The breakage outranks the suppression: a disabled essence with a working source is
+      // a state the GM chose, and a broken link is one they have to repair either way.
+      tone: sourceBroken ? 'warning' : tone,
+      title: sourceBroken
+        ? text(
+            'FABRICATE.Admin.Manager.Essence.Capability.EffectsBroken',
+            'The linked effect source no longer resolves, so no effect can transfer.'
+          )
+        : '',
     });
   }
   if (features.propertyMacrosEnabled === true && essence?.hasPropertyMacro === true) {
@@ -88,6 +108,7 @@ export function essenceCapabilityPills(essence, features = {}, text = (_key, fal
       icon: 'fas fa-code',
       label: text('FABRICATE.Admin.Manager.Essence.Capability.Macro', 'Macro'),
       tone,
+      title: '',
     });
   }
   return pills;
@@ -257,19 +278,25 @@ export function essenceValidationPresentation(
   const { checks, counts } = essenceEditorValidation(essence, context);
   const byId = new Map(checks.map((check) => [check.id, check]));
 
+  // A check the evaluator did not return is DROPPED, not rendered from a half-object. The
+  // two lists come from one module today, so this never fires — but the previous form
+  // dereferenced `check.state` unguarded behind a `.filter(Boolean)` that could not drop
+  // anything (the `.map` always returned an object), so the first time the check list and
+  // the evaluator covered different sets it would have thrown INSIDE a render rather than
+  // degrading. The filter comes BEFORE the map, which is what makes it able to drop.
   const rows = (groupId) =>
-    ESSENCE_VALIDATION_CHECKS.filter((id) => CHECK_PRESENTATION[id][2] === groupId)
-      .map((id) => {
-        const check = byId.get(id);
-        const [labelKey, fallback] = CHECK_PRESENTATION[id];
-        return {
-          id,
-          status: checkStatus(check),
-          title: text(labelKey, fallback),
-          detail: essenceCheckDetail(id, check.state, text),
-        };
-      })
-      .filter(Boolean);
+    ESSENCE_VALIDATION_CHECKS.filter(
+      (id) => CHECK_PRESENTATION[id][2] === groupId && byId.has(id)
+    ).map((id) => {
+      const check = byId.get(id);
+      const [labelKey, fallback] = CHECK_PRESENTATION[id];
+      return {
+        id,
+        status: checkStatus(check),
+        title: text(labelKey, fallback),
+        detail: essenceCheckDetail(id, check.state, text),
+      };
+    });
 
   return {
     checks,

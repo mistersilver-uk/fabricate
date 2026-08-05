@@ -2907,6 +2907,7 @@
           },
           "Capability": {
             "Effects": "Effects",
+            "EffectsBroken": "The linked effect source no longer resolves, so no effect can transfer.",
             "Macro": "Macro"
           },
           "Tabs": {
@@ -2929,7 +2930,9 @@
             "RunsMacro": "Runs {name}",
             "RunsMacroHint": "Runs once per craft against the item data, before the item is created.",
             "SampleQuantity": "{name} ×2",
-            "SampleComponent": "a carrying component"
+            "SampleComponent": "a carrying component",
+            "AsARecipeInput": "As a recipe input",
+            "SampleRecipe": "a recipe that requires it"
           },
           "Macro": {
             "Heading": "Property macro",
@@ -2991,9 +2994,10 @@
             "PerEssenceNote": "Names, descriptions, linked sources and property macros stay per-essence — edit those individually.",
             "DeleteHeading": "Delete selected essences",
             "ImpactEssences": "{count} essence definitions will be deleted.",
-            "ImpactComponents": "{count} components carry them.",
+            "ImpactComponents": "{count} components carry one or more of the selected essences.",
             "ImpactRecipes": "{count} recipes will be rewritten.",
             "ImpactBlocked": "{count} selected essences are still carried by components and will be skipped: {names}",
+            "ImpactBlockedMore": "{names} and {count} more",
             "Delete": "Delete {count} essences",
             "DeleteOne": "Delete 1 essence",
             "DeleteConfirm": "Confirm delete",

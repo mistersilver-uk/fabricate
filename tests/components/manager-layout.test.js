@@ -3583,6 +3583,17 @@ test('manager essence browser defines a wrapping card row rather than a column t
     identityResetBlock.includes('min-height: 46px;'),
     'including the min-height that stops Foundry cropping it'
   );
+  // `min-height` ALONE does not stop the crop. Foundry pins a fixed `height` on every
+  // `button`, so used height is `max(height, min-height)` and a grow-tall variant still
+  // resolves to 46px — which is what the essence grid CARD is: the same button laid out as
+  // a ~150px stack. The four row-shaped siblings escape it only because their content never
+  // exceeds 46px, so the property was missing without being visible. CONTRIBUTING.md's
+  // "Instance 1 — button layout" states the pair; happy-dom computes no cascade, so this
+  // source assertion and the rendered `manager-essences-grid` frame are the only proofs.
+  assert.ok(
+    identityResetBlock.includes('height: auto;'),
+    'and the height:auto that lets the grid card grow past it'
+  );
 
   // The row still joins the four shared lists, so the one-consistent-selected-row-signal
   // rule holds by construction rather than by convention.

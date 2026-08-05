@@ -1999,11 +1999,25 @@ describe('CraftingSystemManager source contract', () => {
     // Criterion 23's four route-wiring items, pinned at the chokepoint rather than at a
     // control: the same-view skip the other guards already have, the store's `cancel` half,
     // and the `deleteEssence` boolean the root now consumes.
+    // The skip compares the ESSENCE, not only the view token. `essence-edit` is a "same
+    // token, different subject" route: `editEssence` early-returns on an unchanged id, so
+    // every call reaching the guard from inside the editor is a switch to a DIFFERENT
+    // essence, which a token-only skip waved through with the draft unsaved and no prompt.
     assert.ok(
       rootSource.includes(
+        "if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)"
+      ),
+      'the essence route guard skips a same-ESSENCE exit, as the tools and system guards do'
+    );
+    assert.ok(
+      !rootSource.includes(
         "if (activeView !== 'essence-edit' || nextView === 'essence-edit') return true;"
       ),
-      'the essence route guard skips a same-view exit, as its four siblings do'
+      'and the token-only form is gone, not merely shadowed'
+    );
+    assert.ok(
+      rootSource.includes("confirmRouteExit('essence-edit', essenceId)"),
+      'and `editEssence` supplies the target id, or the comparison can never be true'
     );
     assert.ok(
       rootSource.includes('store.cancelEssenceDraft?.()'),

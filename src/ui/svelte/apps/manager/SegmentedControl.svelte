@@ -10,12 +10,14 @@
   (Per copy / Across all copies).
 
   Props:
-   - options: [{ value, labelKey, fallback, icon?, variant?, disabled? }] — the
+   - options: [{ value, labelKey, fallback, icon?, variant?, disabled?, count? }] — the
      segments, in order. `variant` ('' | 'success' | 'danger' | 'neutral') tints the
      ACTIVE segment only and defaults to the plain active tile, so a consumer that
      sets none renders exactly as before. `disabled` is carried onto the segment's
      radio ITSELF, not merely onto a class: `select()` only guards `next !== value`,
-     so a dimmed-but-live segment would still fire onChange.
+     so a dimmed-but-live segment would still fire onChange. `count` renders a trailing
+     tally so a segment can say how many rows choosing it would show — omitted by every
+     existing consumer, and a non-finite value renders nothing rather than `NaN`.
    - value: the currently selected option `value`.
    - onChange(value): called with the chosen option's `value` on selection.
    - groupName: the shared radio `name` (must be unique per rendered control).
@@ -85,6 +87,9 @@
       />
       {#if option.icon}<i class={option.icon} aria-hidden="true"></i>{/if}
       <span class="manager-segment-label">{text(option.labelKey, option.fallback)}</span>
+      {#if Number.isFinite(option.count)}
+        <span class="manager-segment-count" data-segment-count={option.count}>{option.count}</span>
+      {/if}
     </label>
   {/each}
 </div>
@@ -125,6 +130,20 @@
     font-size: 0.72rem;
     white-space: nowrap;
     cursor: pointer;
+  }
+
+  /* The optional trailing tally. Quieter than the label it follows — it qualifies the
+     segment rather than competing with it — and `tabular-nums` so the track's width does
+     not jitter as the counts change under a search. */
+  .manager-segment-count {
+    color: var(--fab-text-muted);
+    font-weight: 600;
+    font-size: 0.66rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .manager-segment.is-active .manager-segment-count {
+    color: var(--fab-text-secondary);
   }
 
   /* Active option is a raised dark tile (issue 643 §G3), not a solid peach accent

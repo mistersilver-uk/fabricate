@@ -54,6 +54,11 @@ const CONFIGURED_DISABLED = makeEssenceRow({
   name: 'Aether',
   colorToken: 'lavender',
   enabled: false,
+  // A WORKING source, stated: the pill tones itself on a non-`linked` state, so a row
+  // claiming effect transfer without saying whether it resolves would be the broken case
+  // while reading as the healthy one.
+  sourceState: 'linked',
+  sourceName: 'Flawless Ruby',
   hasEffectTransfer: true,
   hasPropertyMacro: true,
   componentUsageCount: 2,
@@ -83,9 +88,17 @@ function vocabularyOf(root, id) {
     capabilities: [...row.querySelectorAll('[data-essence-capability]')].map(
       (pill) => pill.dataset.essenceCapability
     ),
+    // The pill's HEALTH, not only its presence: `hasEffectTransfer` means a source is
+    // configured, which a dead link still is.
+    capabilityStates: [...row.querySelectorAll('[data-essence-capability]')].map(
+      (pill) => pill.dataset.essenceCapabilityState
+    ),
     colour: row.querySelector('[data-essence-colour]')?.dataset.essenceColour || '',
     disabledWord: row.textContent.includes('Disabled'),
     components: row.querySelector('[data-essence-usage-components]').textContent.trim(),
+    // The BLOCKED-FROM-DELETE marker, which is part of the vocabulary the grid must carry
+    // too — the inspector shows one essence at a time and cannot stand in for it.
+    blocked: row.querySelector('[data-essence-usage-components]').dataset.essenceDeleteBlocked,
     recipes: row.querySelector('[data-essence-usage-recipes]').textContent.trim(),
   };
 }
@@ -108,7 +121,9 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     assert.equal(asList.enabled, 'false');
     assert.equal(asList.disabledWord, true, 'icon + word, always — never dimming alone');
     assert.deepEqual(asList.capabilities, ['effects', 'macro']);
+    assert.deepEqual(asList.capabilityStates, ['ok', 'ok'], 'a resolving source is not warned about');
     assert.equal(asList.colour, 'lavender');
+    assert.equal(asList.blocked, 'true', 'a carried essence says it cannot be deleted');
     assert.match(asList.recipes, /1/);
 
     root.querySelector('[data-essence-view-option="grid"] input').click();
@@ -148,6 +163,63 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       [],
       'a gated-off capability shows no pill even though the essence still carries it'
     );
+    harness.remount();
+  });
+
+  it('marks BLOCKED-from-delete and a BROKEN source on the row, in BOTH presentations', async () => {
+    // Two states the shipped surfaces reported and the redesign must not lose. Both live
+    // on the row rather than in the inspector, because the inspector shows one essence at a
+    // time — and the grid card is the same component, so it carries them by construction.
+    const brokenSource = makeEssenceRow({ id: 'ember', name: 'Ember', sourceState: 'stale' });
+    const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED, brokenSource]));
+
+    assert.equal(vocabularyOf(root, 'aether').blocked, 'true');
+    assert.equal(
+      vocabularyOf(root, 'water').blocked,
+      'false',
+      'negative control: a deletable row carries no lock, so the marker is not always on'
+    );
+    assert.deepEqual(
+      vocabularyOf(root, 'ember').capabilityStates,
+      ['broken'],
+      'a stale source is reported by the PILL — a filter is a search, not a signal'
+    );
+    assert.deepEqual(
+      vocabularyOf(root, 'aether').capabilityStates,
+      ['ok', 'ok'],
+      'negative control: a resolving source is not warned about'
+    );
+
+    root.querySelector('[data-essence-view-option="grid"] input').click();
+    flushSync();
+    assert.equal(vocabularyOf(root, 'aether').blocked, 'true', 'the card keeps the lock');
+    assert.deepEqual(vocabularyOf(root, 'ember').capabilityStates, ['broken']);
+    harness.remount();
+  });
+
+  it('renders each status segment with the count that choosing it would show', async () => {
+    const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED]));
+    const countOf = (value) =>
+      root
+        .querySelector(`[data-essence-status-option="${value}"] [data-segment-count]`)
+        .textContent.trim();
+
+    assert.deepEqual([countOf('all'), countOf('enabled'), countOf('disabled')], ['2', '1', '1']);
+
+    // The counts FOLLOW the search, because the number's whole job is to say what clicking
+    // the segment shows — a count over the whole roster would promise rows the GM cannot
+    // reach without clearing a filter the count says nothing about.
+    const search = root.querySelector('[aria-label="Search essences"]');
+    search.value = 'Aether';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.deepEqual([countOf('all'), countOf('enabled'), countOf('disabled')], ['1', '0', '1']);
+
+    // And the STATUS axis is widened for its own counts, or the selected segment would be
+    // the only non-zero one by construction.
+    root.querySelector('[data-essence-status-option="disabled"] input').click();
+    flushSync();
+    assert.deepEqual([countOf('all'), countOf('enabled'), countOf('disabled')], ['1', '0', '1']);
     harness.remount();
   });
 
