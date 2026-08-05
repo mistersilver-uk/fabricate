@@ -1958,7 +1958,7 @@ test('a selected browser row reads as an identity cue in the accent family, not 
   );
   const selectedSystemBlock = blockFor('.fabricate-manager .manager-system-row.is-selected');
   const identityFocusBlock = blockFor(
-    '.fabricate-manager .manager-system-identity:focus-visible,\n.fabricate-manager .manager-recipe-identity:focus-visible,\n.fabricate-manager .manager-component-identity:focus-visible,\n.fabricate-manager .manager-environment-identity:focus-visible,\n.fabricate-manager .manager-gathering-task-identity:focus-visible'
+    '.fabricate-manager .manager-system-identity:focus-visible,\n.fabricate-manager .manager-recipe-identity:focus-visible,\n.fabricate-manager .manager-component-identity:focus-visible,\n.fabricate-manager .manager-environment-identity:focus-visible,\n.fabricate-manager .manager-gathering-task-identity:focus-visible,\n.fabricate-manager .manager-essence-identity:focus-visible'
   );
 
   for (const [name, block] of [
@@ -2126,7 +2126,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-gathering-task-table-head,\n.fabricate-manager .manager-gathering-task-row'
   );
   const identityBlock = blockFor(
-    '.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity,\n.fabricate-manager .manager-gathering-task-identity'
+    '.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity,\n.fabricate-manager .manager-gathering-task-identity,\n.fabricate-manager .manager-essence-identity'
   );
   const toolsIdentityDropZoneBlock = blockFor(
     '.fabricate-manager .manager-tools-identity.is-component-drop-zone'
@@ -3521,12 +3521,21 @@ test('manager components browser defines drop target and compact responsive list
   // narrow surface reflows without a breakpoint re-templating its columns.
 });
 
-test('manager essence browser defines compact responsive table geometry', () => {
-  const tableBlock = blockFor('.fabricate-manager .manager-essences-table');
-  const noSourceBlock = blockFor('.fabricate-manager .manager-essences-table.has-no-source');
-  const identityBlock = blockFor('.fabricate-manager .manager-essence-identity');
-  const sourceImageBlock = blockFor('.fabricate-manager .manager-essence-source-cell-image');
-  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+// Issue 1036. The `--fab-mv2-essence-grid` column template, its `.has-no-source` variant,
+// the `.manager-essence-source-cell-image` block and the narrow-container `grid-template-
+// columns` stacking rule are all RETIRED here, and that is a deliberate edit rather than
+// incidental churn: the essence row is a FLEX card that wraps, so a column template on it
+// would place nothing, and the narrow join's `align-items: stretch` is a live flex property
+// that would stretch the medallion and the whole control cluster to full card height. The
+// replacement narrow behaviour is authored in `EssenceRow.svelte`'s own scoped block.
+//
+// What stays global is what a scoped child block cannot reach: the route-level `.manager-
+// main` row template, and the identity button's reset — which must beat Foundry's host
+// button geometry — joined to the three siblings that already carry it.
+test('manager essence browser defines a wrapping card row rather than a column template', () => {
+  const identityResetBlock = blockFor(
+    '.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity,\n.fabricate-manager .manager-gathering-task-identity,\n.fabricate-manager .manager-essence-identity'
+  );
 
   assert.ok(
     css.includes('.fabricate-manager[data-manager-view="essences"] .manager-main'),
@@ -3534,34 +3543,58 @@ test('manager essence browser defines compact responsive table geometry', () => 
   );
   assert.ok(
     blockFor('.fabricate-manager[data-manager-view="essences"] .manager-main').includes(
-      'grid-template-rows: auto auto minmax(0, 1fr);'
+      'grid-template-rows: auto minmax(0, 1fr) auto;'
     ),
-    'essences route should reserve rows for header, toolbar, and table'
+    'essences route should put the slack on the LIST, between the toolbar and the pager'
+  );
+
+  // The retirements, asserted as absences so a re-introduction is caught rather than
+  // silently coexisting with the flex row. Each needle carries the punctuation that only a
+  // DECLARATION or a RULE OPENER has — a bare class-name match would be satisfied by the
+  // retirement comments themselves, which name what they retired.
+  assert.equal(
+    css.includes('--fab-mv2-essence-grid:'),
+    false,
+    'the essence column template is retired with the table head it served'
+  );
+  assert.equal(
+    css.includes('.manager-essences-table.has-no-source {'),
+    false,
+    'and so is its no-source variant'
+  );
+  assert.equal(
+    css.includes('.manager-essence-source-cell-image {'),
+    false,
+    'and the source column cell, which reported one bit in a column of its own'
+  );
+  assert.equal(
+    css.includes('.manager-essence-table-head,') || css.includes('.manager-essence-table-head {'),
+    false,
+    'and the table head itself'
+  );
+
+  // The identity button JOINS the shared reset, so a `<button>` used as a row identity is
+  // not cropped by Foundry's fixed button height — a defect no mounted test can see.
+  assert.ok(
+    identityResetBlock.includes('appearance: none;'),
+    'the essence identity button joins the shared manager button reset'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-essence-grid: minmax(0, 1.55fr)'),
-    'essences table should define shrinkable compact columns for normal Foundry manager widths'
+    identityResetBlock.includes('min-height: 46px;'),
+    'including the min-height that stops Foundry cropping it'
   );
+
+  // The row still joins the four shared lists, so the one-consistent-selected-row-signal
+  // rule holds by construction rather than by convention.
   assert.ok(
-    noSourceBlock.includes('--fab-mv2-essence-grid: minmax(0, 1.7fr)'),
-    'essences table should have a no-source grid variant when effect transfer is disabled'
-  );
-  assert.ok(
-    identityBlock.includes('grid-template-columns: 44px minmax(0, 1fr);'),
-    'essence identity should reserve icon space'
-  );
-  assert.ok(
-    sourceImageBlock.includes('width: 36px;') && sourceImageBlock.includes('height: 36px;'),
-    'essence source cells should render stable image-only evidence'
-  );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-essence-row') &&
-      mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'medium manager layout should stack essence rows before columns become cramped'
+    blockFor(
+      '.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row'
+    ).includes('min-height: 76px;'),
+    'the essence row keeps the shared 76px row height'
   );
 });
 
-test('manager essence edit route defines picker-based responsive geometry', () => {
+test('manager essence edit route defines a tabbed two-row shell', () => {
   const mainBlock = blockFor('.fabricate-manager[data-manager-view="essence-edit"] .manager-main');
   const editGridBlock = blockFor('.fabricate-manager .manager-essence-edit-grid');
   const sourceSummaryBlock = blockFor('.fabricate-manager .manager-essence-source-summary');
@@ -3583,9 +3616,11 @@ test('manager essence edit route defines picker-based responsive geometry', () =
   const sourceTriggerBlock = blockFor('.fabricate-manager .essence-source-trigger');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
+  // TWO tracks now, not one: the tab strip and the scrolling tab body. A single `1fr`
+  // would stretch the strip, which is what the shipped single-card editor did not have.
   assert.ok(
-    mainBlock.includes('grid-template-rows: minmax(0, 1fr);'),
-    'essence edit route should let the identity card be the first main content'
+    mainBlock.includes('grid-template-rows: auto minmax(0, 1fr);'),
+    'essence edit route reserves a row for the tab strip and gives the body the slack'
   );
   assert.ok(
     editGridBlock.includes(

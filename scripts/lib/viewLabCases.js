@@ -1731,6 +1731,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'tags', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/TagsCategories/],
   }),
+  // ── The GM Essence Studio (issue 1036) ────────────────────────────────────────────────────────
+  //
+  // Every case below carries the SAME `sourceMatches`, and it is wider than the shipped one in two
+  // ways that both mattered: the shipped `/apps\/manager\/Essence/` is case-SENSITIVE, so it
+  // matched neither the new lowercase `essences/` directory nor the pure models under `src/utils/`,
+  // and a redesign confined to those would have published no essence frame at all.
+  //
+  // The lab fixture is what makes these frames worth capturing: smithing is the one system that
+  // declares BOTH `features.effectTransfer` and `features.propertyMacros`, four of the five
+  // essences carry a distinct colour with `air` deliberately unset, and `aether` is DISABLED while
+  // two components carry it and one recipe requires it — the feature's headline state, which no
+  // existing fixture could reach.
   managerCase({
     id: 'manager-essences-normal',
     label: 'Manager — Essences normal',
@@ -1740,38 +1752,175 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: ['Essences'],
     expectView: 'essences',
     kinds: ['manager', 'essences'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/Essence/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-essences-stacked',
     label: 'Manager — Essences stacked',
     smokeLabels: ['manager-essences-stacked'],
+    // REPOINTED, not duplicated (issue 1036). The row left the narrow `@container` join that used
+    // to re-template it into one column — `align-items: stretch` there is a live flex property and
+    // would stretch the medallion and the whole control cluster to full card height — so at 1000px
+    // it now WRAPS: identity on the first line, the capability pills, usage readout, toggle, pencil
+    // and selection box aligned right on a second. This frame is the evidence for that behaviour.
     reaches: 'exact',
     query: {},
     steps: ['Essences'],
     expectView: 'essences',
     position: { width: 1000, height: 700 },
     kinds: ['manager', 'essences', 'responsive'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/Essence/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essences-disabled-in-use',
+    label: 'Manager — Essences disabled and in use',
+    // BEYOND the smoke: the smoke walk has no step that selects a specific essence row, so there is
+    // no counterpart frame of the inspector to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The state this whole feature exists to add, and the one the prototype never depicts: an
+    // essence that is DISABLED while components carry it and a recipe requires it. Selecting it
+    // puts the inspector's suppression rows, its two stat cards and its blocked-delete note in
+    // frame beside the row's own Disabled badge and muted capability pills.
+    query: {},
+    steps: [
+      'Essences',
+      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-essence-identity' },
+    ],
+    expectView: 'essences',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essences-grid',
+    label: 'Manager — Essences grid',
+    // BEYOND the smoke: the presentation toggle is new, so nothing in the walk presses it.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The grid carries the SAME state vocabulary as the list — the Disabled pill, the capability
+    // pills and the recipe count — because a presentation toggle must not silently remove state.
+    // This frame is what proves it, beside `manager-essences-normal`'s list.
+    query: {},
+    steps: ['Essences', { selector: '[data-essence-view-option="grid"] input' }],
+    expectView: 'essences',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essences-bulk-edit',
+    label: 'Manager — Essences bulk edit',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // An ACTIVE bulk selection, so the rail shows the bulk panel rather than the inspector. Two
+    // rows are ticked and one of them (`aether`) is delete-BLOCKED, which is what puts the impact
+    // statement's three numbers, the named blocked member and the armed delete all in one frame.
+    query: {},
+    steps: [
+      'Essences',
+      { selector: '[data-essence-select="earth"]' },
+      { selector: '[data-essence-select="aether"]' },
+    ],
+    expectView: 'essences',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-essence-edit-first-state',
     label: 'Manager — Essence edit first state',
     smokeLabels: ['manager-essence-edit-first-state'],
-    // Already lands where its counterpart does: the smoke opens the FIRST essence row's Edit
-    // action and photographs the editor as it arrives. Pinned to `earth` by row rather than left
-    // on "whichever row is first", so the frame's identity card, its in-use inspector and its
-    // deletion-blocked notice cannot change under a re-order.
+    // The smoke opens an essence row's Edit action and photographs the editor as it arrives, and
+    // this lands in the same place. It is REPOINTED at `aether` (issue 1036): the editor's headline
+    // state is a DISABLED essence — the Enabled row switched off, the On-craft badge counting two
+    // configured behaviours — and `earth` cannot show it.
+    //
+    // The step still navigates by the row's FIRST `.manager-icon-button`, which must remain the
+    // Edit pencil. The row now also carries an enable toggle and a selection box: the toggle wears
+    // `.manager-status-toggle`, not `.manager-icon-button`, and `SelectionCheckbox` deliberately
+    // renders no `<button>` at all, so neither can intercept.
     reaches: 'exact',
     query: {},
     steps: [
       'Essences',
-      { selector: '.manager-essence-row[data-essence-id="earth"] .manager-icon-button' },
+      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
     ],
     expectView: 'essence-edit',
     kinds: ['manager', 'essences'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+    ],
   }),
+  managerCase({
+    id: 'manager-essence-edit-on-craft',
+    label: 'Manager — Essence edit On craft',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The tab the two persisted fields live on. `aether` carries BOTH — a linked source component
+    // and a property macro — so both sections render populated, both wear their `Suppressed` pill
+    // (the essence is disabled), and the macro card photographs in its MISSING state, because the
+    // lab world declares no `Macro` documents at all. The resolved state routes to smoke or
+    // maintainer evidence rather than being implied here.
+    query: {},
+    steps: [
+      'Essences',
+      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '[data-essence-tab="oncraft"]' },
+    ],
+    expectView: 'essence-edit',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-essence-edit-validation',
+    label: 'Manager — Essence edit Validation',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The third tab, and the only surface that reports an unresolvable property macro: at craft
+    // time such a macro is logged and SKIPPED SILENTLY, deliberately, so this is the GM's one route
+    // to the fact. `aether`'s macro does not resolve, so the tab shows a real warning rather than
+    // an all-clear.
+    query: {},
+    steps: [
+      'Essences',
+      { selector: '.manager-essence-row[data-essence-id="aether"] .manager-icon-button' },
+      { selector: '[data-essence-tab="validation"]' },
+    ],
+    expectView: 'essence-edit',
+    kinds: ['manager', 'essences'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/EssenceEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\/Essence(?:EditorTabs|IdentityTab|OnCraftTab|ValidationTab|BehaviorPreview)\.svelte$/,
+    ],
+  }),
+
   managerCase({
     id: 'manager-environments-browse-normal',
     label: 'Manager — Environments browse normal',
@@ -3815,6 +3964,38 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'checks',
     kinds: ['manager', 'checks', 'resolution-mode'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-dynamic-dc',
+    label: 'Manager — Checks crafting dynamic DC macro',
+    // BEYOND the smoke. The walk never switches the DC source, so there is no counterpart frame of
+    // the dynamic branch to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // Criterion 14's subject: the dynamic-DC macro card, which is the ONE shipped consumer this
+    // change converted from a hand-rolled `use:dragDrop` div onto the shared `ItemDropZone`. The
+    // drop zone renders only under `dcMode: 'dynamic'`.
+    //
+    // The mode is reached by CLICKING rather than by authoring, which is the same choice
+    // `manager-checks-crafting-modifiers-player-picks` records and for the same reason: `dcMode`
+    // lives on the SHARED frozen `SIMPLE_CHECK` that five lab systems declare, so authoring
+    // `dynamic` there would turn every one of their recipes' `DC 15` pills into `Dynamic DC` and
+    // move a dozen already-captured frames to photograph one card. The Checks editor stages into a
+    // draft, so the click reaches the same rendered state without persisting anything.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-dc-mode-option="dynamic"] input' },
+      { selector: '[data-check-macro-dropzone]', scroll: true },
+    ],
+    expectView: 'checks',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
+      /^src\/utils\/macroReference\.js$/,
+    ],
   }),
   managerCase({
     id: 'manager-checks-crafting-tier-step',

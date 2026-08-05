@@ -131,6 +131,25 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceEditView.svelte');
+  // The GM Essence Studio's eight components (issue 1036). They live under `essences/` —
+  // the BROWSER's directory, which the screenshot evidence map globs for the essence views.
+  // The root imports the inspector, the bulk panel and the behaviour preview STATICALLY, and
+  // the two views import the rest, so every one of them is in this root's static module
+  // graph regardless of `{#if}`. An omission HANGS every mounted manager test as
+  // `# cancelled`; it does not fail one. Add nothing speculative — an unreachable entry is
+  // silently inert.
+  for (const essenceComponent of [
+    'EssenceRow',
+    'EssenceBrowserInspector',
+    'EssenceBulkEditPanel',
+    'EssenceBehaviorPreview',
+    'EssenceEditorTabs',
+    'EssenceIdentityTab',
+    'EssenceOnCraftTab',
+    'EssenceValidationTab',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/essences/${essenceComponent}.svelte`);
+  }
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
@@ -402,6 +421,12 @@ function compileManagerRoot() {
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
     'recipeItemPreviewRow.js',
+    // The manager's ONE colour vocabulary (issue 1036). `ManagerColorPopover` and
+    // `ManagerColorPicker` both import it for the eight localized preset labels, and both
+    // are compiled into this tree through `sharedComponentNames`. This suite hand-rolls its
+    // temp tree with NO dependency validator, so omitting a raw module HANGS the whole
+    // suite as `# cancelled` rather than naming the missing file.
+    'managerColorTokens.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -473,6 +498,13 @@ function compileManagerRoot() {
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
+    // The essence library's pure list model and its bulk-edit staging model (issue 1036) —
+    // the third studio's pair, imported by `EssenceBrowserView` AND by the root, which
+    // lifts the browser state and owns the staged bulk draft. Same rule as their two
+    // siblings above: this suite hand-rolls its temp tree with no dependency validator, so
+    // omitting either HANGS the whole suite as `# cancelled` rather than naming the file.
+    'src/utils/essenceBrowserModel.js',
+    'src/utils/essenceBulkEditModel.js',
     // The category totals both browser models group with (issue 676). Imported by BOTH
     // of the two above, so omitting it HANGS every mounted manager test.
     'src/utils/browserGroupCounts.js',
@@ -492,6 +524,9 @@ function compileManagerRoot() {
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The Essence Studio's presentation adapter (issue 1036) — the sibling of the line
+    // above, and imported by five of the eight components registered in the compile loop.
+    'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     // The Knowledge surface's pure projection (issue 785). `adminStore` imports it
     // too, but it lands here because the compiled Knowledge components import it
     // directly; it is a dependency-free leaf, so this single entry suffices.
@@ -675,6 +710,11 @@ function createStore(calls = [], options = {}) {
   const selectedFeatures = options.selectedFeatures || {
     essences: true,
     effectTransfer: true,
+    // The essence property-macro gate (issue 1036). It defaults to FALSE in the real
+    // normalizer, so it is set explicitly here: without it the On-craft tab renders its
+    // both-off empty state and the Macro capability pill never appears, which would make
+    // every macro assertion in this file pass vacuously.
+    propertyMacros: true,
     itemTags: true,
     gathering: true,
     recipeCategories: true,
@@ -1090,6 +1130,18 @@ function createStore(calls = [], options = {}) {
         associatedItemName: 'Iron Ore',
         sourceName: 'Iron Ore',
         sourceState: 'linked',
+        // Issue 1036. `earth` is the ENABLED, fully-configured essence: a colour, a linked
+        // source, a property macro, and both usage axes non-zero. Its `componentUsageCount`
+        // (1) and `recipeUsageCount` (2) DIFFER on purpose — an impact statement that
+        // derived one from the other would pass against equal numbers.
+        enabled: true,
+        colorToken: 'rose',
+        propertyMacroUuid: 'Macro.earth-infusion',
+        hasEffectTransfer: true,
+        hasPropertyMacro: true,
+        recipeUsageCount: 2,
+        recipeUsageIds: ['r1', 'r2'],
+        deleteRewritesRecipes: true,
         componentUsageCount: 1,
         componentUsageItems: [
           { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp' },
@@ -1108,6 +1160,17 @@ function createStore(calls = [], options = {}) {
         associatedItemName: null,
         sourceName: '',
         sourceState: 'none',
+        // The DISABLED, unconfigured counterpart — no colour, no source, no macro, and
+        // deletable. It carries one recipe, which `earth` also carries, so the bulk
+        // impact's recipe UNION (2) is smaller than the per-essence SUM (3).
+        enabled: false,
+        colorToken: null,
+        propertyMacroUuid: null,
+        hasEffectTransfer: false,
+        hasPropertyMacro: false,
+        recipeUsageCount: 1,
+        recipeUsageIds: ['r2'],
+        deleteRewritesRecipes: true,
         componentUsageCount: 0,
         componentUsageItems: [],
         deleteBlocked: false,
@@ -1665,10 +1728,43 @@ function createStore(calls = [], options = {}) {
     // four-parameter stub records a call that looks identical whether the argument is
     // threaded or silently dropped — which is exactly how the value went missing once
     // already. Recording it is what makes the assertion below able to fail.
-    addEssence: (name, description, icon, sourceComponentId, colorToken) => {
-      calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken]);
+    //
+    // SIX arguments as of issue 1036: the sixth is the options bag carrying `enabled` and
+    // `propertyMacroUuid`, both of which the editor can author BEFORE the first save. A
+    // five-parameter stub records a call that looks identical whether they are threaded or
+    // silently dropped — which is exactly how `colorToken` went missing once already.
+    addEssence: (name, description, icon, sourceComponentId, colorToken, extra) => {
+      calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken, extra]);
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
       return options.addEssenceResult ?? true;
+    },
+    // The four essence actions issue 1036 adds beside the two above. Each is reached
+    // OPTIONAL-CHAINED from the root, so an absent export no-ops silently — these stubs are
+    // what make the wiring detectable at all.
+    duplicateEssence: (id) => {
+      calls.push(['duplicateEssence', id]);
+      return options.duplicateEssenceResult ?? `${id}-copy`;
+    },
+    setEssenceEnabled: (id, enabled) => {
+      calls.push(['setEssenceEnabled', id, enabled]);
+      return { updated: true, invalidatedRecipes: 0 };
+    },
+    applyEssenceBulkEdit: (essenceIds, edit) => {
+      const ids = [...(essenceIds || [])];
+      calls.push(['applyEssenceBulkEdit', ids, edit]);
+      if (Object.hasOwn(options, 'applyEssenceBulkEditResult')) {
+        return options.applyEssenceBulkEditResult;
+      }
+      return { updated: ids.length, essenceIds: ids };
+    },
+    deleteEssences: (essenceIds) => {
+      const ids = [...(essenceIds || [])];
+      calls.push(['deleteEssences', ids]);
+      return options.deleteEssencesResult ?? { deleted: ids.length, blocked: [], recipesUpdated: 2 };
+    },
+    cancelEssenceDraft: () => {
+      calls.push(['cancelEssenceDraft']);
+      return true;
     },
     updateEssence: (id, updates) => {
       calls.push(['updateEssence', id, updates]);
@@ -8032,23 +8128,59 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
-    assert.ok(target.textContent.includes('Essence browser'));
     assert.equal(target.querySelectorAll('.manager-essence-row').length, 2);
     assert.ok(target.textContent.includes('Earth'));
     assert.equal(target.querySelector('.manager-essence-action-band'), null);
-    assert.equal(target.textContent.includes('Linked source'), false);
-    const linkedSourceImage = target.querySelector(
-      '[data-essence-id="earth"] .manager-essence-source-cell-image'
+
+    // The DISABLED essence is marked in words, not by dimming alone, and its capability
+    // pills are absent because it has neither a source nor a macro — the ENABLED row is
+    // the negative control that the pills render at all.
+    const waterRow = target.querySelector('.manager-essence-row[data-essence-id="water"]');
+    const earthRow = target.querySelector('.manager-essence-row[data-essence-id="earth"]');
+    assert.equal(waterRow.dataset.essenceEnabled, 'false');
+    assert.equal(earthRow.dataset.essenceEnabled, 'true');
+    assert.ok(waterRow.textContent.includes('Disabled'), 'a disabled row says so in words');
+    assert.deepEqual(
+      [...earthRow.querySelectorAll('[data-essence-capability]')].map(
+        (pill) => pill.dataset.essenceCapability
+      ),
+      ['effects', 'macro'],
+      'a configured essence shows both capability pills'
     );
-    assert.ok(linkedSourceImage, 'linked essence Source column should render image evidence');
-    assert.equal(linkedSourceImage.title, 'Iron Ore');
-    assert.equal(linkedSourceImage.getAttribute('aria-label'), 'Iron Ore');
+    assert.equal(
+      waterRow.querySelectorAll('[data-essence-capability]').length,
+      0,
+      'and an unconfigured one shows neither'
+    );
+    // The two usage numbers are DIFFERENT questions and both are reported.
     assert.ok(
-      target
-        .querySelector('[data-essence-id="water"] .manager-essence-source-cell')
-        .textContent.includes('None')
+      earthRow.querySelector('[data-essence-usage-components]').textContent.includes('1'),
+      'the row states how many components carry the essence'
     );
-    assert.ok(target.textContent.includes('Deletion blocked'));
+    assert.ok(
+      earthRow.querySelector('[data-essence-usage-recipes]').textContent.includes('2'),
+      'and, separately, how many recipes require it'
+    );
+
+    // The FIRST `.manager-icon-button` in the row must remain the Edit pencil: the View Lab
+    // case `manager-essence-edit-first-state` navigates by exactly that selector.
+    assert.equal(
+      earthRow.querySelector('.manager-icon-button').getAttribute('data-essence-edit'),
+      'earth',
+      'the first icon button in a row is still the Edit pencil'
+    );
+
+    // The row toggle routes through the ONE manager write, not through updateEssence.
+    waterRow.querySelector('[data-essence-toggle="water"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(
+        (call) => call[0] === 'setEssenceEnabled' && call[1] === 'water' && call[2] === true
+      ),
+      'the row switch enables through setEssenceEnabled'
+    );
+
     assert.equal(target.querySelectorAll('.manager-essence-usage-item').length, 1);
     assert.equal(target.querySelector('.manager-essence-usage-item').title, 'Iron Ore');
     target.querySelector('.manager-essence-usage-item').click();
@@ -8073,21 +8205,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-essence-edit-row').length, 0);
     assert.equal(target.querySelectorAll('#manager-essence-create-name').length, 0);
 
-    target.querySelector('[data-essence-id="water"]').click();
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Clear current.'));
 
-    assert.equal(
-      target.querySelector('[data-essence-action="edit"]'),
-      null,
-      'essence inspector should not duplicate row Edit actions'
+    // The inspector now OWNS Edit, Duplicate and Delete — the row keeps only the pencil.
+    assert.ok(
+      target.querySelector('[data-essence-browser-inspector]'),
+      'the selected-essence inspector is an extracted component'
     );
-    assert.equal(
-      target.querySelector('[data-essence-action="delete"]'),
-      null,
-      'essence inspector should not duplicate row Delete actions'
+    assert.ok(
+      target.querySelector('[data-essence-action="duplicate"]'),
+      'the inspector offers Duplicate'
     );
     assert.ok(
       target.querySelector('[data-essence-section="usage"]'),
@@ -8099,13 +8230,25 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       'unlinked selected essence should expose a source drop zone'
     );
+    // The retained stat cards report the two counts separately.
+    assert.equal(
+      target.querySelector('[data-essence-stat="recipes"] strong').textContent.trim(),
+      '1'
+    );
     const essenceHeroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(essenceHeroRow, 'essence inspector should use the prominent hero title row');
+
+    target.querySelector('[data-essence-action="duplicate"]').click();
+    await tick();
+    flushSync();
     assert.ok(
-      essenceHeroRow.querySelector('.manager-inspector-icon.is-hero-large'),
-      'essence inspector hero should render the icon at hero-large size'
+      calls.some((call) => call[0] === 'duplicateEssence' && call[1] === 'water'),
+      'Duplicate reaches the store'
     );
 
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
+    await tick();
+    flushSync();
     const inspectorDropEvent = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(inspectorDropEvent, 'dataTransfer', {
       value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.glass-vial' }) },
@@ -8123,7 +8266,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       )
     );
 
-    target.querySelector('[data-essence-id="earth"]').click();
+    target.querySelector('[data-essence-id="earth"] .manager-essence-identity').click();
     await tick();
     flushSync();
     const inspectorSourceSummary = target.querySelector(
@@ -8143,13 +8286,6 @@ describe('CraftingSystemManager mounted behavior', () => {
         .querySelector('.manager-essence-source-copy')
         .textContent.includes('Iron Ore'),
       'linked selected essence should keep the source name readable'
-    );
-    assert.equal(
-      inspectorSourceSummary
-        .querySelector('.manager-essence-source-copy')
-        .textContent.includes('c1'),
-      false,
-      'linked selected essence should not print UUID evidence under the item name'
     );
     const inspectorSourceActions = target.querySelector(
       '[data-essence-section="source"] .manager-essence-inspector-source-actions'
@@ -8188,10 +8324,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       )
     );
 
+    // The RETAINED source-state filter, reachable only with source UI on.
     const sourceFilter = target.querySelector('[aria-label="Filter essences by source state"]');
     sourceFilter.value = 'none';
     sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
-    sourceFilter.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
@@ -8208,15 +8344,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.ok(target.textContent.includes('Edit essence'));
     assert.ok(!target.textContent.includes('Essence editor'));
-    assert.ok(
-      !target.querySelector('.manager-essence-edit-view .manager-action-group'),
-      'identity card should not duplicate route save/cancel actions'
-    );
     assert.equal(target.textContent.includes('Basic information'), false);
     assert.equal(target.textContent.includes('Essence ID'), false);
     assert.ok(
       !target.querySelector('.manager-inspector [aria-label="Edit Water"]'),
       'inspector should not show an edit action while already editing'
+    );
+    // The editor opens on IDENTITY and the shell's rail carries the live preview.
+    assert.equal(target.querySelector('[data-essence-tab-panel]').dataset.essenceTabPanel, 'identity');
+    assert.ok(
+      target.querySelector('.manager-inspector [data-essence-behavior-preview]'),
+      'the editor rail is the live behaviour preview'
     );
     assert.ok(
       target.querySelector('.essence-icon-picker-trigger'),
@@ -8224,20 +8362,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelector('.essence-icon-picker-trigger').title, 'Change icon');
     assert.ok(target.textContent.includes('Clear icon'));
-    assert.ok(
-      target.querySelector('.essence-source-trigger'),
-      'effect-transfer systems should show source picker controls'
-    );
-    assert.ok(
-      target.querySelector('.manager-essence-source-summary'),
-      'edit route should show selected source summary inside the form'
-    );
-    assert.ok(
-      target.querySelector('.manager-essence-source-drop-zone .essence-source-trigger'),
-      'edit route should show a full-width source drop/pick target'
-    );
     assert.equal(
-      target.querySelector('.manager-header-actions .manager-button.is-primary').disabled,
+      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       true
     );
 
@@ -8246,10 +8372,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Rain');
     assert.equal(
-      target.querySelector('.manager-header-actions .manager-button.is-primary').disabled,
+      target.querySelector('[data-essence-preview-identity] h3').textContent.trim(),
+      'Rain',
+      'the live preview follows the draft'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       false
+    );
+
+    // The On-craft tab carries the source picker; Identity does not.
+    assert.ok(!target.querySelector('.essence-source-trigger'), 'Identity has no source picker');
+    target.querySelector('[data-essence-tab="oncraft"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('.manager-essence-source-drop-zone .essence-source-trigger'),
+      'the On-craft tab shows a full-width source drop/pick target'
     );
     target.querySelector('.essence-source-trigger').click();
     await tick();
@@ -8260,7 +8400,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       target.querySelector('.manager-essence-source-summary').textContent.includes('Glass Vial')
     );
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
     await tick();
     flushSync();
     assert.ok(
@@ -8274,13 +8414,21 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
 
-    target.querySelector('[data-essence-id="water"] [aria-label="Delete Water"]').click();
-    assert.ok(calls.some((call) => call[0] === 'deleteEssence' && call[1] === 'water'));
+    // The DELETE lives in the inspector now, and is refused for an in-use essence.
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
     flushSync();
-    assert.equal(
-      target.querySelector('[data-essence-id="earth"] [aria-label="Delete Earth"]').disabled,
-      true
+    target.querySelector('[data-essence-action="delete"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'deleteEssence' && call[1] === 'water'));
+    target.querySelector('[data-essence-id="earth"] .manager-essence-identity').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-essence-action="delete"]').disabled, true);
+    assert.ok(
+      target.querySelector('[data-essence-delete-blocked]'),
+      'a blocked delete says why, naming the carrying components'
     );
 
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
@@ -8288,11 +8436,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(
-      target.querySelector('.manager-inspector-name').textContent.trim(),
+      target.querySelector('[data-essence-preview-identity] h3').textContent.trim(),
       'New essence draft'
     );
     assert.equal(
-      target.querySelector('.manager-header-actions .manager-button.is-primary').disabled,
+      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       true
     );
     const createName = target.querySelector('#manager-essence-edit-name');
@@ -8300,50 +8448,231 @@ describe('CraftingSystemManager mounted behavior', () => {
     createName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Air');
-
-    // A new draft has NO authored colour, and the control must say so. `colorToken`
-    // normalizes an absent value onto `sage`, so an unguarded picker painted a Sage
-    // swatch and marked Sage selected directly above copy reading "No colour — this
-    // essence renders in the theme accent".
-    const colourTrigger = target.querySelector(
-      '[data-manager-essence-colour] .manager-color-picker-trigger'
-    );
-    assert.ok(colourTrigger.classList.contains('is-unset'), 'an unauthored colour reads unset');
-    assert.ok(
-      !/--fab-tag-/.test(colourTrigger.getAttribute('style')),
-      'and the trigger paints a neutral swatch, not a palette colour'
-    );
-
-    // The palette is the WHOLE vocabulary for an essence colour (there is no custom
-    // hex), so picking a preset is the only authoring path there is.
-    colourTrigger.click();
-    await tick();
-    flushSync();
     assert.equal(
-      document.querySelectorAll('[data-manager-color-token].is-selected').length,
+      target.querySelector('[data-essence-preview-identity] h3').textContent.trim(),
+      'Air'
+    );
+
+    // A new draft has NO authored colour, and the INLINE palette must say so rather than
+    // marking Sage: `colorToken` normalizes an absent value onto `sage`, so an unguarded
+    // palette marked Sage selected directly above copy reading "No colour".
+    assert.equal(
+      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
+        .essenceColourState,
+      'none'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-manager-essence-colour] [data-manager-color-token].is-selected')
+        .length,
       0,
       'no preset claims to be the current choice while none is authored'
     );
-    document.querySelector('[data-manager-color-token="rose"]').click();
+    assert.ok(
+      target.querySelector('[data-manager-essence-colour] [data-manager-color-none]')
+        .classList.contains('is-selected'),
+      'the No-colour cell is the one marked, and it is the only route back to unset'
+    );
+    target.querySelector('[data-manager-essence-colour] [data-manager-color-token="rose"]').click();
     await tick();
     flushSync();
-    assert.ok(
-      !target
-        .querySelector('[data-manager-essence-colour] .manager-color-picker-trigger')
-        .classList.contains('is-unset'),
+    assert.equal(
+      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
+        .essenceColourState,
+      'rose',
       'authoring a colour ends the unset state'
     );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    // The Enabled row is the shared ToggleCard, and a new essence can be created disabled.
+    target.querySelector('[data-recipe-field="essence-enabled"]').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
     await tick();
     flushSync();
     const addCall = calls.find((call) => call[0] === 'addEssence' && call[1] === 'Air');
     assert.ok(addCall, 'the create call reached the store');
-    // FIVE positional arguments, and the fifth is the authored colour. A four-argument
-    // assertion passes identically whether the colour is threaded or dropped.
-    assert.equal(addCall.length, 6, 'addEssence is called with all five arguments');
+    // SEVEN recorded entries: the verb plus six arguments. The fifth argument is the
+    // authored colour and the sixth is the options bag issue 1036 added — an assertion
+    // that stopped at five passes identically whether either is threaded or dropped.
+    assert.equal(addCall.length, 7, 'addEssence is called with all six arguments');
     assert.equal(addCall[5], 'rose', 'the GM-authored colour survives the create call');
+    assert.equal(
+      addCall[6].enabled,
+      false,
+      'and so does an Enabled switch the GM turned off before the first save'
+    );
+  });
+
+  it('keeps essence library search, filter and page state across an editor round-trip', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+
+    // Search AND the status segmented control, both narrowing to one row.
+    const search = target.querySelector('[aria-label="Search essences"]');
+    search.value = 'Water';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
+
+    target.querySelector('[data-essence-view-option="grid"] input').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.manager-essences-table').dataset.essenceView, 'grid');
+    // Actions are ROW-only, so a grid card carries no pencil and grid selection routes
+    // through the inspector. That is the prototype's own division.
+    assert.ok(
+      !target.querySelector('[data-essence-id="water"] [data-essence-edit]'),
+      'a grid card carries no row actions'
+    );
+
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-action="edit"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+
+    target.querySelector('.manager-header-actions [data-essence-edit-back]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
+
+    // The whole round trip unmounted the browser. Every control is where the GM left it.
+    assert.equal(
+      target.querySelector('[aria-label="Search essences"]').value,
+      'Water',
+      'the search term survives the editor round-trip'
+    );
+    assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
+    assert.equal(
+      target.querySelector('.manager-essences-table').dataset.essenceView,
+      'grid',
+      'and so does the list/grid presentation'
+    );
+    assert.ok(
+      calls.some((call) => call[0] === 'cancelEssenceDraft'),
+      'Back republishes the persisted projections through the store'
+    );
+  });
+
+  it('states the bulk delete impact before arming, excludes blocked members, and needs two clicks', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+
+    // One ticked box is already a bulk edit, and the panel replaces the inspector.
+    target.querySelector('[data-essence-select="water"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-essence-bulk-panel]'), 'the bulk panel replaces the inspector');
+    assert.ok(
+      !target.querySelector('[data-essence-browser-inspector]'),
+      'and the single-essence inspector is gone while a selection exists'
+    );
+
+    const impactText = (row) =>
+      target.querySelector(`[data-essence-bulk-impact-row="${row}"]`).textContent.trim();
+    assert.ok(impactText('essences').startsWith('1'), '1 deletable essence');
+    assert.ok(impactText('components').startsWith('0'), 'carried by no components');
+    assert.ok(impactText('recipes').startsWith('1'), 'and rewriting 1 recipe');
+    assert.ok(
+      !target.querySelector('[data-essence-bulk-blocked]'),
+      'nothing is blocked yet, so nothing is named'
+    );
+
+    // Adding the BLOCKED essence changes all three numbers, and the recipe number is a
+    // UNION rather than a sum: `earth` names r1+r2 and `water` names r2, so 2, not 3.
+    target.querySelector('[data-essence-select="earth"]').click();
+    await tick();
+    flushSync();
+    assert.ok(impactText('essences').startsWith('1'), 'the blocked member is excluded');
+    assert.ok(impactText('recipes').startsWith('1'), 'and so are the recipes only it names');
+    const blocked = target.querySelector('[data-essence-bulk-blocked]');
+    assert.ok(blocked, 'the blocked member is named');
+    assert.ok(blocked.textContent.includes('Earth'), 'by name, not merely counted');
+
+    const deleteButton = target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+    assert.ok(deleteButton, 'the bulk delete is a real button, armed rather than dialogged');
+    deleteButton.click();
+    await tick();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteEssences'),
+      false,
+      'the FIRST click only arms — nothing is written'
+    );
+    target
+      .querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger')
+      .click();
+    await tick();
+    await tick();
+    flushSync();
+    const deleteCall = calls.find((call) => call[0] === 'deleteEssences');
+    assert.ok(deleteCall, 'the SECOND click performs the delete');
+    assert.deepEqual(deleteCall[1], ['water'], 'and it deletes only the unblocked members');
+  });
+
+  it('applies a staged essence bulk edit with falsy-but-real axes', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-select="water"]').click();
+    await tick();
+    flushSync();
+
+    // Apply is inert until something is staged.
+    assert.equal(target.querySelector('[data-essence-bulk-apply]').disabled, true);
+
+    // Clear colour and Disable are BOTH falsy-but-real staged edits. A truthiness-gated
+    // projection would emit neither.
+    target.querySelector('[data-essence-bulk-colour] [data-manager-color-none]').click();
+    target.querySelector('[data-essence-bulk-status-option="disable"] input').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-essence-bulk-apply]').disabled, false);
+
+    target.querySelector('[data-essence-bulk-apply]').click();
+    await tick();
+    await tick();
+    flushSync();
+    const applyCall = calls.find((call) => call[0] === 'applyEssenceBulkEdit');
+    assert.ok(applyCall, 'Apply reaches the set-apply store action');
+    assert.deepEqual(applyCall[1], ['water']);
+    assert.ok(Object.hasOwn(applyCall[2], 'colorToken'), 'Clear colour is a PRESENT key');
+    assert.equal(applyCall[2].colorToken, null);
+    assert.equal(applyCall[2].enabled, false, 'and Disable is a present false');
+    assert.equal(Object.hasOwn(applyCall[2], 'icon'), false, 'an unstaged axis is never sent');
   });
 
   it('hides manager essence source UI when effect transfer is disabled', async () => {
@@ -8357,6 +8686,7 @@ describe('CraftingSystemManager mounted behavior', () => {
           selectedFeatures: {
             essences: true,
             effectTransfer: false,
+            propertyMacros: false,
             itemTags: true,
             gathering: true,
             recipeCategories: true,
@@ -8372,35 +8702,58 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('[aria-label="Filter essences by source state"]'), null);
-    assert.equal(
-      target.querySelector('.manager-essences-table').classList.contains('has-no-source'),
-      true
-    );
     assert.equal(target.textContent.includes('Linked source'), false);
     assert.equal(target.textContent.includes('Source evidence'), false);
+    // The capability pills are GATED by the feature, not merely by the card's own fields:
+    // `earth` carries both, and neither renders.
+    assert.equal(
+      target.querySelectorAll('[data-essence-capability]').length,
+      0,
+      'a gated-off capability shows no pill'
+    );
 
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
     await tick();
     flushSync();
-
-    assert.equal(target.querySelector('.essence-source-trigger'), null);
-    assert.equal(target.querySelector('.manager-essence-source-summary'), null);
-    assert.equal(target.querySelector('.manager-essence-source-drop-zone'), null);
+    assert.ok(!target.querySelector('.essence-source-trigger'), 'no source picker');
+    assert.ok(!target.querySelector('.manager-essence-source-summary'), 'no source summary');
+    assert.ok(!target.querySelector('.manager-essence-source-drop-zone'), 'no source drop zone');
     assert.equal(target.textContent.includes('Source unresolved'), false);
     assert.equal(target.textContent.includes('source linkage'), false);
 
+    // With BOTH gates off the On-craft tab explains itself rather than rendering empty.
+    target.querySelector('[data-essence-tab="oncraft"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-essence-on-craft-empty]'),
+      'both gates off renders an explanatory empty state, not an empty tab'
+    );
+    assert.ok(
+      !target.querySelector('[data-essence-section="macro"]'),
+      'and no macro card at all'
+    );
+
+    target.querySelector('[data-essence-tab="identity"]').click();
+    await tick();
+    flushSync();
     const editName = target.querySelector('#manager-essence-edit-name');
     editName.value = 'Rain';
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
     await tick();
     flushSync();
 
     const updateCall = calls.find((call) => call[0] === 'updateEssence');
     assert.ok(updateCall, 'identity save should delegate an essence update');
     assert.equal(Object.prototype.hasOwnProperty.call(updateCall[2], 'sourceComponentId'), false);
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(updateCall[2], 'propertyMacroUuid'),
+      false,
+      'a gated-off macro axis is never written'
+    );
   });
 
   it('protects dirty essence edit drafts when leaving the route', async () => {

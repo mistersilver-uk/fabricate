@@ -35,7 +35,10 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-color-popover-characterization-',
-  rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES],
+  // The shared colour-token constant (issue 1036). The popover localizes its eight preset
+  // labels through it, so it is a static import of the component under test; the harness's
+  // own closure validator reports the omission by name rather than hanging on it.
+  rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES, 'src/ui/svelte/util/managerColorTokens.js'],
   compiledModules: ['src/ui/svelte/components/ManagerColorPopover.svelte'],
   componentPath: 'src/ui/svelte/components/ManagerColorPopover.svelte',
 });

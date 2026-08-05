@@ -71,8 +71,16 @@ export const ESSENCE_DEFAULT_PAGE_SIZE = 25;
  * mount-harness allowlist edits in every suite that mounts the manager, where an omission
  * HANGS the suite as `# cancelled` rather than failing it.
  *
+ * `searchTerm` lives here and NOT in the admin store, which is where the recipe browser's
+ * equivalent lives. There is no essence search in `adminStore` at all — no
+ * `essenceSearchTerm`, no pre-projection filter — so a component-local term would be
+ * destroyed by the very editor round-trip the rest of this object survives, and criterion
+ * 12 would be satisfied for the filters and silently not for the search. The TERM is
+ * carried here; the FILTER is applied by the view, because whether a source name is
+ * searchable depends on `showSourceUi`, which is a presentation fact.
+ *
  * @returns {{
- *   statusFilter: string, sourceFilter: string, viewMode: string,
+ *   searchTerm: string, statusFilter: string, sourceFilter: string, viewMode: string,
  *   sortKey: EssenceSortKey, sortDirection: SortDirection,
  *   pageIndex: number, pageSize: number, systemId: string,
  *   bulkSelectedEssenceIds: Set<string>
@@ -80,6 +88,7 @@ export const ESSENCE_DEFAULT_PAGE_SIZE = 25;
  */
 export function createEssenceBrowserState() {
   return {
+    searchTerm: '',
     statusFilter: 'all',
     sourceFilter: 'all',
     viewMode: 'list',

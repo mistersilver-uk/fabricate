@@ -21,6 +21,12 @@
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { portal } from '../actions/portal.js';
+  import { localize } from '../util/foundryBridge.js';
+  import {
+    MANAGER_COLOR_TOKENS,
+    managerColorTokenLabel,
+    normalizeManagerColorToken,
+  } from '../util/managerColorTokens.js';
 
   let {
     colorToken = 'sage',
@@ -46,6 +52,17 @@
     // Whether the palette offers the NO COLOUR cell. Default false — see the header for
     // why this is gated rather than universal.
     allowNone = false,
+    // Whether the No-colour cell is MARKED SELECTED. `null` (the default) derives it from
+    // `unset`, which is the shipped behaviour and what every popover call site wants: a
+    // model holding no colour has chosen "no colour".
+    //
+    // A bulk-edit STAGE has a third state the popover otherwise cannot express (issue
+    // 1036). Its Colour axis stages `Leave unchanged`, `Clear colour` or a token, and the
+    // first two are BOTH "no preset is marked" — so deriving the cell from `unset` alone
+    // would paint `Clear colour` as staged while the panel's own sub-hint says
+    // `Leave unchanged`, which is the one confusion this three-value axis exists to
+    // prevent. Passing `false` marks nothing at all.
+    noneSelected = null,
     // Emitted when the No-colour cell is chosen. Separate from `onChange` because the two
     // are different instructions: `onChange` always carries a token, and folding "unset"
     // into it as `colorToken: ''` would make every existing consumer have to learn a new
@@ -61,20 +78,19 @@
 
   let popoverRoot = $state(null);
 
-  const presets = [
-    { token: 'sage', label: 'Sage' },
-    { token: 'mist', label: 'Mist' },
-    { token: 'lavender', label: 'Lavender' },
-    { token: 'rose', label: 'Rose' },
-    { token: 'peach', label: 'Peach' },
-    { token: 'butter', label: 'Butter' },
-    { token: 'aqua', label: 'Aqua' },
-    { token: 'mauve', label: 'Mauve' },
-  ];
+  // LOCALIZED (issue 1036). The label is both `aria-label` and `title`, so it is the whole
+  // screen-reader surface of a colour cell; it was derived English until now. The palette
+  // itself is the shared constant, so this popover, its trigger and the essence Identity
+  // tab's inline palette cannot drift in order, membership or naming.
+  const presets = $derived(
+    MANAGER_COLOR_TOKENS.map((preset) => ({
+      token: preset.token,
+      label: managerColorTokenLabel(preset.token, localize),
+    }))
+  );
 
   function normalizedToken(value) {
-    const token = String(value || '').replace(/^--fab-tag-/, '');
-    return presets.some((preset) => preset.token === token) ? token : 'sage';
+    return normalizeManagerColorToken(value);
   }
 
   function validCustomHex(value) {
@@ -94,6 +110,7 @@
   // The No-colour cell is offered only when BOTH the gate is open and the caller supplied
   // a handler: a cell that renders and does nothing is worse than no cell.
   const showNoColour = $derived(allowNone === true && typeof onClear === 'function');
+  const noColourSelected = $derived(typeof noneSelected === 'boolean' ? noneSelected : unset);
 
   function updateCustomColor(value) {
     onChange({ colorToken: normalizedToken(colorToken), customColor: value });
@@ -120,7 +137,7 @@
     {#if showNoColour}
       <button
         type="button"
-        class={`manager-color-preset manager-color-preset-none ${unset ? 'is-selected' : ''}`}
+        class={`manager-color-preset manager-color-preset-none ${noColourSelected ? 'is-selected' : ''}`}
         aria-label={noneLabel}
         title={noneLabel}
         data-manager-color-none

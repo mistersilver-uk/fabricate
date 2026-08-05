@@ -640,17 +640,41 @@ Capabilities:
 
 - Browse, create, edit, duplicate when supported, and delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
-- Set an optional colour for an essence, chosen from the shared token palette through the manager's existing colour picker with custom hex entry disabled.
+- Set an optional colour for an essence, chosen from the shared token palette with custom hex entry disabled.
   The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
+  The editor renders that palette INLINE and offers an explicit No-colour cell, so unset is reachable from the palette itself rather than only through a separate Clear control.
+  Colour names are localized under the shared `FABRICATE.Admin.Manager.Colour.Token.*` namespace, because the same palette also serves the environments biome picker and the character-modifier picker.
 - Set optional source component identity by picker/drag-drop only when effect transfer is enabled.
   The source component may in turn expose a source item UUID.
+- Set an optional essence property macro by dropping a Macro, only when `features.propertyMacros === true`.
+  The drop is refused when the macro's own type is not `script`, and the refusal is reported on the editing surface.
 - In Manager, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
 - Manager shows component usage evidence for essence definitions and shows source-link state only when `features.effectTransfer === true`.
-- Manager does not allow inline editing on the browse essences page; the row Edit action opens a dedicated edit essence view.
+- Manager states component usage and recipe usage as two SEPARATE counts, because they answer different questions: components CARRY an essence and block its deletion, while recipes REQUIRE it and are rewritten by a deletion.
+- Manager does not allow inline editing on the browse essences page, with one exception.
+  The row's enable/disable toggle is a distinct localized named hit target, mirroring the Tools Tab's row switch; activating it neither selects the row nor opens the editor.
+  Every other row edit still opens the dedicated edit essence view.
+- The essence library offers a list and a grid presentation of the same rows.
+  The grid card carries the same state vocabulary as the list row — the Disabled marker, the capability markers and the usage counts — because a presentation toggle must not silently remove state.
+  Row actions are list-only; grid selection routes through the inspector.
+- The essence library's search, filters, sort, presentation and page position survive a round trip through the essence editor.
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
 - Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
+  The essence editor's On-craft tab gates its Active effect source section on `features.effectTransfer` and its property macro section on `features.propertyMacros`.
+  With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
+- A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
+  Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
 - Manager prevents essence deletion while one or more managed components reference that essence with a positive quantity.
+  The same refusal applies to a SET delete: blocked members are excluded from the write and named in the panel, the action is inert when every selected member is blocked, and the refusal is enforced by the store rather than by a disabled control.
+- A set delete states its impact before it is armed, and recomputes it when the selection changes.
+  The statement reports how many essence definitions will be deleted, how many components carry them and how many recipes will be rewritten.
+  The two carrier numbers are counts of DISTINCT carriers, so neither exceeds what the cascade will touch.
+- The set delete uses the two-step armed confirmation rather than a modal dialog.
+  This is a deliberate exception to the reserved-for-bulk-actions dialog rule, taken on an explicit maintainer decision, and it is paired with the impact statement above.
 - Manager source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.
+- A disabled essence is withheld from every ADD-NEW offer list and from nothing else.
+  Wherever it is already referenced — a component quantity, a recipe ingredient option — it stays rendered, marked, and clearable, because the surface that authored a value must remain the surface that can remove it.
+  Residual, recorded: the component bulk-edit panel's essences axis is a whole-map replacement, so applying that axis over a selection still rewrites every carrier's map from the staged grid.
 
 ### Tools Tab
 

@@ -191,6 +191,40 @@ test('1036/23: recipeUsageCount counts BOTH the legacy set map and a step ingred
   );
 });
 
+test('1036/17: the card carries the recipe IDENTITIES the delete-impact union needs', async () => {
+  // The MISSING PRODUCER. `describeEssenceDeleteImpact` unions carrier identities rather
+  // than summing counts — the cascade rewrites a shared recipe once for the whole
+  // selection — and it cannot union what it is not given: a row supplying no
+  // `recipeUsageIds` contributes ZERO, so without this field the bulk-delete sidebar
+  // reported "0 recipes will be rewritten" immediately before rewriting some.
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire' }), makeEssence({ id: 'water', name: 'Water' })],
+    recipes: [
+      recipeWithSetEssence('r1', 'fire'),
+      recipeWithStepEssenceOption('r2', 'fire'),
+      recipeWithSetEssence('r3', 'fire', { craftingSystemId: 'sys2' }),
+    ],
+  });
+  const store = await openStore(harness);
+
+  const fire = cardFor(store, 'fire');
+  assert.deepEqual(
+    [...fire.recipeUsageIds].sort((a, b) => a.localeCompare(b)),
+    ['r1', 'r2'],
+    'the identities are the SAME set the count reports, and exclude the other system'
+  );
+  assert.equal(
+    fire.recipeUsageIds.length,
+    fire.recipeUsageCount,
+    'count and identities come out of ONE walk, so they cannot disagree about a recipe'
+  );
+  assert.deepEqual(
+    cardFor(store, 'water').recipeUsageIds,
+    [],
+    'negative control: an unreferenced essence names no recipe, so the walk is not matching everything'
+  );
+});
+
 test('1036: recipe usage does NOT become a delete block', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [makeEssence({ id: 'fire' })],

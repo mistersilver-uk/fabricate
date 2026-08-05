@@ -2347,7 +2347,7 @@ function _sourceFieldsForEssenceSelection(system, sourceComponentId, sourceItemU
 }
 
 /**
- * How many recipes in the system REQUIRE the essence (issue 1036).
+ * WHICH recipes in the system require the essence, and therefore how many (issue 1036).
  *
  * The predicate is the shared `recipeReferencesEssence` leaf, not a second walk: the count
  * this returns is the number the bulk-delete impact statement reports, and the cascade
@@ -2356,15 +2356,24 @@ function _sourceFieldsForEssenceSelection(system, sourceComponentId, sourceItemU
  * disagree with what the delete does. The store deliberately calls no underscore-private
  * manager method, which is why the predicate was extracted rather than reached into.
  *
+ * The COUNT and the IDS come out of ONE walk, deliberately.
+ * `describeEssenceDeleteImpact` unions carrier IDENTITIES across the selection, because the
+ * cascade rewrites a shared recipe once for the whole set — so a sum of per-essence counts
+ * would tell the GM "4 recipes will be rewritten" before an operation that rewrites 2. A
+ * union cannot be derived from counts, so the row has to carry the ids; deriving the count
+ * from a second walk would let the number and the identities disagree about the same
+ * recipe.
+ *
  * @param {string} essenceId
  * @param {object[]} recipes the selected system's recipes.
- * @returns {number}
+ * @returns {{count: number, ids: string[]}}
  */
-function _essenceRecipeUsageCount(essenceId, recipes) {
-  return (Array.isArray(recipes) ? recipes : []).reduce(
-    (count, recipe) => count + (recipeReferencesEssence(recipe, essenceId) ? 1 : 0),
-    0
-  );
+function _essenceRecipeUsage(essenceId, recipes) {
+  const ids = (Array.isArray(recipes) ? recipes : [])
+    .filter((recipe) => recipeReferencesEssence(recipe, essenceId))
+    .map((recipe) => String(recipe?.id ?? ''))
+    .filter(Boolean);
+  return { count: ids.length, ids };
 }
 
 function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions, recipes = []) {
@@ -2384,7 +2393,8 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
       sourceItemUuid,
       associatedItem: sourceItem,
     });
-    const recipeUsageCount = _essenceRecipeUsageCount(def.id, recipes);
+    const recipeUsage = _essenceRecipeUsage(def.id, recipes);
+    const recipeUsageCount = recipeUsage.count;
     return {
       ...def,
       icon: normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON),
@@ -2415,6 +2425,13 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
       componentUsageCount,
       componentUsageItems,
       recipeUsageCount,
+      // The IDENTITIES behind `recipeUsageCount`, and the missing producer the bulk
+      // delete-impact statement reads. `describeEssenceDeleteImpact` unions carriers rather
+      // than summing counts, and it cannot union what it is not given: without this key the
+      // sidebar reported "0 recipes will be rewritten" for a selection whose recipes it was
+      // about to rewrite. `componentUsageItems` is the component-side twin (the union reads
+      // `{id}` off it), so neither axis is a sum.
+      recipeUsageIds: recipeUsage.ids,
       // `deleteBlocked` keeps its COMPONENT-ONLY meaning. Recipe usage is an explanatory
       // consequence with its own key, deliberately worded so it cannot read as a block:
       // deleting an essence a recipe requires is allowed and rewrites that recipe, while
@@ -6886,7 +6903,15 @@ export function createAdminStore(services) {
   // `colorToken` is the optional GM-authored per-essence colour (issue 917). It is a
   // bare `--fab-tag-*` key or null; `CraftingSystemManager` owns the palette
   // validation, so the store only has to carry the authored value through.
-  async function addEssence(name, description, icon, sourceComponentId, colorToken) {
+  //
+  // `extra` carries the two fields issue 1036 added. It is an options bag rather than two
+  // more positional parameters because the editor can now author BOTH before an essence has
+  // ever been saved: a GM who creates an essence with the Enabled switch off, or with a
+  // property macro already dropped, would otherwise have both silently discarded on the
+  // first save and would have to re-author them through `updateEssence`. Both are
+  // presence-gated on `Object.hasOwn` for the reason they always are — `enabled: false` and
+  // `propertyMacroUuid: null` are falsy but REAL.
+  async function addEssence(name, description, icon, sourceComponentId, colorToken, extra = {}) {
     const normalizedName = String(name || '').trim();
     if (!normalizedName) return false;
     const context = _selectedSystemEssences();
@@ -6899,6 +6924,8 @@ export function createAdminStore(services) {
     }
 
     const sourceFields = _sourceFieldsForEssenceSelection(system, sourceComponentId || null);
+    const options = extra && typeof extra === 'object' ? extra : {};
+    const has = (key) => Object.prototype.hasOwnProperty.call(options, key);
     const essenceDefinitions = [
       ...existing,
       {
@@ -6907,6 +6934,10 @@ export function createAdminStore(services) {
         description: String(description || ''),
         icon: normalizeEssenceIcon(icon || DEFAULT_ESSENCE_ICON),
         colorToken: colorToken || null,
+        ...(has('enabled') ? { enabled: options.enabled !== false } : {}),
+        ...(has('propertyMacroUuid')
+          ? { propertyMacroUuid: options.propertyMacroUuid || null }
+          : {}),
         ...sourceFields,
       },
     ];

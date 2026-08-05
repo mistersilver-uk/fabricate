@@ -1916,8 +1916,13 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
+/* Toolbar, then the LIST which takes the slack, then the pager (issue 1036). The shipped
+   template was `auto auto minmax(0, 1fr)`, which was correct while this route rendered a
+   page header, a toolbar and a table; the header moved into the shell and a pager arrived,
+   so the same three tracks would put the slack on the PAGER and pin the list to an
+   implicit `auto` row. */
 .fabricate-manager[data-manager-view="essences"] .manager-main {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 /* Drop zone, filter toolbar, then the TABLE which takes the slack. Named explicitly
@@ -1956,8 +1961,11 @@
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+/* Tab strip, then the scrolling tab body (issue 1036). One track was right while the
+   editor was a single flat card; the tabbed editor has two children and a single `1fr`
+   would stretch the strip. */
 .fabricate-manager[data-manager-view="essence-edit"] .manager-main {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-main,
@@ -3683,17 +3691,13 @@
   min-width: 0;
 }
 
+/* The essence library's list container (issue 1036). The `--fab-mv2-essence-grid` column
+   template and its `.has-no-source` variant are RETIRED with the table head they served:
+   the row is a flex card that wraps, so a `grid-template-columns` on it would place
+   nothing. `min-width: 0` stays — the container is a grid child of the route shell and
+   without it a long essence name pushes the whole column wider than its track. */
 .fabricate-manager .manager-essences-table {
-  --fab-mv2-essence-grid: minmax(0, 1.55fr) minmax(64px, 0.32fr) minmax(92px, 0.42fr) 92px;
-
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
   min-width: 0;
-}
-
-.fabricate-manager .manager-essences-table.has-no-source {
-  --fab-mv2-essence-grid: minmax(0, 1.7fr) minmax(92px, 0.46fr) 92px;
 }
 
 .fabricate-manager .manager-table-head,
@@ -5046,23 +5050,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-essence-table-head,
-.fabricate-manager .manager-essence-row {
-  display: grid;
-  grid-template-columns: var(--fab-mv2-essence-grid);
-  gap: var(--fab-space-2);
-  align-items: center;
-  align-content: center;
-  min-width: 0;
-}
-
 .fabricate-manager .manager-component-row > *,
 .fabricate-manager .manager-environment-table-head > *,
 .fabricate-manager .manager-environment-row > *,
 .fabricate-manager .manager-gathering-task-table-head > *,
-.fabricate-manager .manager-gathering-task-row > *,
-.fabricate-manager .manager-essence-table-head > *,
-.fabricate-manager .manager-essence-row > * {
+.fabricate-manager .manager-gathering-task-row > * {
   min-width: 0;
 }
 
@@ -5400,7 +5392,8 @@
 .fabricate-manager .manager-recipe-identity:focus,
 .fabricate-manager .manager-component-identity:focus,
 .fabricate-manager .manager-environment-identity:focus,
-.fabricate-manager .manager-gathering-task-identity:focus {
+.fabricate-manager .manager-gathering-task-identity:focus,
+.fabricate-manager .manager-essence-identity:focus {
   outline: none;
   box-shadow: none;
 }
@@ -5411,7 +5404,8 @@
 .fabricate-manager .manager-recipe-identity:focus-visible,
 .fabricate-manager .manager-component-identity:focus-visible,
 .fabricate-manager .manager-environment-identity:focus-visible,
-.fabricate-manager .manager-gathering-task-identity:focus-visible {
+.fabricate-manager .manager-gathering-task-identity:focus-visible,
+.fabricate-manager .manager-essence-identity:focus-visible {
   outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 3px;
   border-radius: 6px;
@@ -5541,7 +5535,8 @@
 .fabricate-manager .manager-recipe-identity,
 .fabricate-manager .manager-component-identity,
 .fabricate-manager .manager-environment-identity,
-.fabricate-manager .manager-gathering-task-identity {
+.fabricate-manager .manager-gathering-task-identity,
+.fabricate-manager .manager-essence-identity {
   appearance: none;
   -webkit-appearance: none;
   display: grid;
@@ -6192,47 +6187,20 @@
   grid-column: 1 / -1;
 }
 
-.fabricate-manager .manager-essence-identity {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-essence-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  color: var(--fab-mv2-accent);
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-manager .manager-essence-source-cell {
-  justify-self: start;
-}
-
-.fabricate-manager .manager-essence-source-cell-image {
-  display: block;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-20);
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-essence-row {
-  cursor: pointer;
-}
+/* `.manager-essence-icon` and the two `.manager-essence-source-cell*` rules are RETIRED
+   with the table (issue 1036): the row's tile is the shared `Medallion`, which carries the
+   essence's own colour, and the source COLUMN is gone — a broken link is now reported by
+   the capability pill plus the retained needs-attention filter rather than by an image in
+   a column of its own. `.manager-essence-identity`'s own grid template is retired too: it
+   joins the shared identity-button reset above, at that reset's 46px tile track. */
 
 .fabricate-manager .manager-essence-edit-main {
+  gap: var(--fab-space-2);
   min-height: 0;
-  overflow: auto;
+
+  /* The TAB BODY scrolls, not the whole route: a scrolling route would carry the tab strip
+     off the top of the panel. */
+  overflow: hidden;
 }
 
 .fabricate-manager .manager-essence-edit-view {
@@ -13559,11 +13527,15 @@
     align-items: stretch;
   }
 
+  /* The essence row LEAVES both of these joins (issue 1036). `align-items: stretch` is a
+     live flex property, so it would stretch the medallion and the whole control cluster to
+     full card height; and `grid-template-columns` places nothing on a flex row. Its
+     replacement narrow behaviour — identity on line one, cluster wrapped right onto line
+     two — is authored in `EssenceRow.svelte`'s own scoped block and photographed. */
   .fabricate-manager .manager-component-row,
   .fabricate-manager .manager-environment-row,
   .fabricate-manager .manager-gathering-task-row,
-  .fabricate-manager .manager-gathering-task-drop-row,
-  .fabricate-manager .manager-essence-row {
+  .fabricate-manager .manager-gathering-task-drop-row {
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     align-items: stretch;
@@ -13573,8 +13545,7 @@
   .fabricate-manager .manager-component-row > *,
   .fabricate-manager .manager-environment-row > *,
   .fabricate-manager .manager-gathering-task-row > *,
-  .fabricate-manager .manager-gathering-task-drop-row > *,
-  .fabricate-manager .manager-essence-row > * {
+  .fabricate-manager .manager-gathering-task-drop-row > * {
     min-width: 0;
   }
 

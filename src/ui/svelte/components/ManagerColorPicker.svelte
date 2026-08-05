@@ -3,6 +3,7 @@
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
   import ManagerColorPopover from './ManagerColorPopover.svelte';
+  import { normalizeManagerColorToken } from '../util/managerColorTokens.js';
 
   let {
     colorToken = 'sage',
@@ -33,11 +34,11 @@
   let popoverRoot = $state(null);
   let popoverStyle = $state('');
 
+  // The palette lived here as a third inline copy of the same eight keys (issue 1036).
+  // The trigger's swatch and the popover's selection marking have to agree about which
+  // token is which, so they read ONE constant.
   function normalizedToken(value) {
-    const token = String(value || '').replace(/^--fab-tag-/, '');
-    return ['sage', 'mist', 'lavender', 'rose', 'peach', 'butter', 'aqua', 'mauve'].includes(token)
-      ? token
-      : 'sage';
+    return normalizeManagerColorToken(value);
   }
 
   function validCustomHex(value) {

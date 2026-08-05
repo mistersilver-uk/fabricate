@@ -1,21 +1,51 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  The GM essence EDITOR (issue 1036): three tabs — Identity, On craft, Validation — beside
+  the shell's own inspector column, which the manager root fills with the live
+  `EssenceBehaviorPreview`.
+
+  This component is the editor's DRAFT owner and its form. Everything visual belongs to the
+  three tab bodies under `essences/`; what is here is the draft, the dirty computation, the
+  save, and the two async resolutions the tabs cannot do for themselves (the macro's display
+  name, and the `type !== 'script'` check on a dropped macro).
+
+  ── EVERY TAB PROP MUST ALSO BE FORWARDED HERE ────────────────────────────────────
+  This file is the essence equivalent of the `RecipeEditView` wrapper: a prop a tab declares
+  but this file does not pass silently takes its default, which for an editor means "renders
+  as if nothing were authored". Adding a field to a tab means adding it here too.
+
+  ── THE FORM ID IS A CONTRACT ─────────────────────────────────────────────────────
+  `id="manager-essence-edit-form"` is what the manager root's header Save button — now the
+  shared `ComponentEditorHeader`, wearing this studio's own hooks — submits through
+  `form="manager-essence-edit-form"`. Both halves must survive verbatim: drop either and
+  Save silently stops working. The header renders in the SHELL's action bar, not here,
+  which is why this file does not import it.
+-->
 <script>
-  import Chip from './Chip.svelte';
-  import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
-  import IconPicker from '../../components/IconPicker.svelte';
-  import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
+  import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
+  import EssenceIdentityTab from './essences/EssenceIdentityTab.svelte';
+  import EssenceOnCraftTab from './essences/EssenceOnCraftTab.svelte';
+  import EssenceValidationTab from './essences/EssenceValidationTab.svelte';
   import {
     DEFAULT_ESSENCE_ICON,
-    getEssenceIconOption,
     normalizeEssenceColorToken,
     normalizeEssenceIcon,
   } from '../../util/essenceIcons.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { resolveDropUuid } from '../../util/dropUtils.js';
+  import {
+    MACRO_DROP_REJECTED_NOT_SCRIPT,
+    evaluateMacroDrop,
+    resolveMacroName,
+  } from '../../../../utils/macroReference.js';
+  import { essenceEditorValidation } from '../../../../utils/essenceValidation.js';
+  import { essenceOnCraftCount } from './essences/essenceStudio.js';
 
   let {
     essence = null,
     managedItemOptions = [],
     showSourceUi = false,
+    showPropertyMacroUi = false,
     saving = false,
     onSave = () => {},
     onDirtyChange = () => {},
@@ -23,17 +53,23 @@
     onImportSourceDrop = null,
   } = $props();
 
+  let activeTab = $state('identity');
   let draftId = $state('');
   let name = $state('');
   let description = $state('');
   let icon = $state(DEFAULT_ESSENCE_ICON);
-  // The optional per-essence colour (issue 917). '' is the first-class "unset" state:
-  // the essence then renders in the theme accent, which is what every essence renders
-  // as today, so an unauthored system needs no migration.
+  // The optional per-essence colour (issue 917). '' is the first-class "unset" state: the
+  // essence then renders in the theme accent, which is what every essence rendered as
+  // before, so an unauthored system needs no migration.
   let colorToken = $state('');
+  let enabled = $state(true);
+  let propertyMacroUuid = $state('');
   let sourceComponentId = $state('');
   let sourceTouched = $state(false);
   let saveFailed = $state(false);
+  let macroWarning = $state('');
+  let macroName = $state('');
+  let macroMissing = $state(false);
   let lastEssenceId = $state(null);
   let lastDirty = $state(false);
   let lastDraftSignature = $state('');
@@ -44,17 +80,6 @@
       ? managedItemOptions.find((item) => item.id === sourceComponentId) || null
       : null
   );
-  const selectedIconOption = $derived(getEssenceIconOption(normalizeEssenceIcon(icon)));
-  const selectedIconLabel = $derived(
-    selectedIconOption?.label || text('FABRICATE.Admin.Manager.Essence.CustomIcon', 'Custom icon')
-  );
-  const colourSwatchStyle = $derived(colorToken ? `color: var(--fab-tag-${colorToken})` : '');
-  const colourLabel = $derived(
-    colorToken
-      ? `${colorToken.charAt(0).toUpperCase()}${colorToken.slice(1)}`
-      : text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')
-  );
-  const sourceState = $derived(essenceSourceState());
   const dirty = $derived(isDirty());
   const validName = $derived(Boolean(name.trim()));
   const draftSummary = $derived(buildDraftSummary());
@@ -65,13 +90,39 @@
       draftSummary.description,
       draftSummary.icon,
       draftSummary.colorToken || '',
+      draftSummary.enabled ? 'on' : 'off',
+      draftSummary.propertyMacroUuid || '',
       draftSummary.sourceComponentId,
       draftSummary.sourceName,
       draftSummary.sourceState,
       draftSummary.dirty ? 'dirty' : 'clean',
       draftSummary.validName ? 'valid' : 'invalid',
       showSourceUi ? 'source' : 'no-source',
-    ].join('\u001f')
+      showPropertyMacroUi ? 'macro' : 'no-macro',
+      macroName,
+    ].join('')
+  );
+
+  const onCraftCount = $derived(
+    essenceOnCraftCount(draftSummary, {
+      effectTransferEnabled: showSourceUi,
+      propertyMacrosEnabled: showPropertyMacroUi,
+    })
+  );
+  const validationContext = $derived({
+    propertyMacrosEnabled: showPropertyMacroUi,
+    effectTransferEnabled: showSourceUi,
+    // `null` while resolution is still in flight, which PASSES: a spinner must not read as
+    // a defect. Only a proven miss reports `false`.
+    macroResolved: propertyMacroUuid ? !macroMissing : null,
+    sourceState: draftSummary.sourceState,
+    componentUsageCount: essence?.componentUsageCount || 0,
+    recipeUsageCount: essence?.recipeUsageCount || 0,
+  });
+  // The tab badge's two numbers, from the SAME pure evaluator the Validation tab renders,
+  // so the badge and the tab can never disagree about how many issues there are.
+  const validationCounts = $derived(
+    essenceEditorValidation(draftSummary, validationContext).counts
   );
 
   $effect(() => {
@@ -82,10 +133,25 @@
     description = essence?.description || '';
     icon = normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON);
     colorToken = normalizeEssenceColorToken(essence?.colorToken) || '';
+    enabled = essence?.enabled !== false;
+    propertyMacroUuid = essence?.propertyMacroUuid || '';
     sourceComponentId = sourceIdentity(essence);
     sourceTouched = false;
     saveFailed = false;
+    macroWarning = '';
+    activeTab = 'identity';
     lastEssenceId = nextEssenceId;
+  });
+
+  // The macro's display NAME, resolved cancellably. The `cancelled` latch inside
+  // `resolveMacroName` is what stops a slow lookup of the OLD uuid landing after a fast
+  // lookup of the new one and naming a macro that is no longer linked.
+  $effect(() => {
+    const uuid = propertyMacroUuid;
+    return resolveMacroName(uuid, ({ name: resolved, missing }) => {
+      macroName = resolved;
+      macroMissing = missing;
+    });
   });
 
   $effect(() => {
@@ -118,32 +184,6 @@
     );
   }
 
-  function essenceSourceState() {
-    const state = draftSourceState();
-    if (state === 'linked') {
-      return {
-        label: text('FABRICATE.Admin.Manager.Essence.SourceLinked', 'Linked source'),
-        tone: 'active',
-      };
-    }
-    if (state === 'missing') {
-      return {
-        label: text('FABRICATE.Admin.Manager.Essence.SourceMissing', 'Source item missing'),
-        tone: 'warning',
-      };
-    }
-    if (state === 'stale') {
-      return {
-        label: text('FABRICATE.Admin.Manager.Essence.SourceStale', 'Source unresolved'),
-        tone: 'warning',
-      };
-    }
-    return {
-      label: text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source'),
-      tone: 'disabled',
-    };
-  }
-
   function draftSourceState() {
     if (!showSourceUi) return 'none';
     if (!sourceComponentId) {
@@ -154,15 +194,24 @@
     return 'missing';
   }
 
+  function storedSourceName() {
+    if (!showSourceUi || sourceTouched) return '';
+    return essence?.sourceName || essence?.sourceItemUuid || '';
+  }
+
   function buildUpdates() {
     const updates = {
       name: name.trim(),
       description,
       icon: normalizeEssenceIcon(icon),
-      // Always sent, so clearing an authored colour persists as null rather than
-      // leaving the stored value untouched.
+      // Always sent, so clearing an authored colour persists as null rather than leaving
+      // the stored value untouched. `enabled` and `propertyMacroUuid` follow the same rule:
+      // the store's `updateEssence` is presence-gated on `hasOwnProperty`, and both have a
+      // meaningful FALSY value (`false` disables, `null` unlinks).
       colorToken: normalizeEssenceColorToken(colorToken),
+      enabled: enabled !== false,
     };
+    if (showPropertyMacroUi) updates.propertyMacroUuid = propertyMacroUuid || null;
     if (showSourceUi && (isNew || sourceTouched)) {
       updates.sourceComponentId = sourceComponentId || null;
     }
@@ -172,6 +221,9 @@
   function buildDraftSummary() {
     const normalizedIcon = normalizeEssenceIcon(icon);
     const sourceStateId = draftSourceState();
+    const resolvedSourceName = showSourceUi
+      ? selectedSource?.name || (sourceComponentId ? sourceComponentId : storedSourceName())
+      : '';
     return {
       id: draftId || '',
       updates: buildUpdates(),
@@ -181,22 +233,19 @@
       description,
       icon: normalizedIcon,
       colorToken: normalizeEssenceColorToken(colorToken),
+      enabled: enabled !== false,
+      propertyMacroUuid: propertyMacroUuid || null,
+      // The two derived capability facts the preview, the tab badge and the row all read.
+      // Named exactly as `adminStore._buildEssenceCards` emits them, so the live draft and
+      // a persisted card are interchangeable everywhere they are consumed.
+      hasEffectTransfer: showSourceUi && sourceStateId !== 'none',
+      hasPropertyMacro: showPropertyMacroUi && Boolean(propertyMacroUuid),
       sourceComponentId: showSourceUi ? sourceComponentId || '' : '',
-      sourceName: showSourceUi
-        ? selectedSource?.name ||
-          (sourceComponentId
-            ? sourceComponentId
-            : !sourceTouched
-              ? essence?.sourceName || essence?.sourceItemUuid || ''
-              : '')
-        : '',
-      sourceState:
-        showSourceUi && !sourceComponentId && !sourceTouched && hasStoredSourceEvidence()
-          ? essence?.sourceState || 'stale'
-          : showSourceUi
-            ? sourceStateId
-            : 'none',
+      sourceName: resolvedSourceName,
+      sourceState: showSourceUi ? sourceStateId : 'none',
       componentUsageCount: essence?.componentUsageCount || 0,
+      componentUsageItems: essence?.componentUsageItems || [],
+      recipeUsageCount: essence?.recipeUsageCount || 0,
       deleteBlocked: essence?.deleteBlocked === true,
       dirty,
       validName,
@@ -210,6 +259,8 @@
         description.trim() ||
         normalizeEssenceIcon(icon) !== DEFAULT_ESSENCE_ICON ||
         colorToken ||
+        enabled === false ||
+        propertyMacroUuid ||
         (showSourceUi && sourceComponentId)
       );
     }
@@ -218,14 +269,15 @@
       description !== (essence?.description || '') ||
       normalizeEssenceIcon(icon) !== normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON) ||
       normalizeEssenceColorToken(colorToken) !== normalizeEssenceColorToken(essence?.colorToken) ||
+      (enabled !== false) !== (essence?.enabled !== false) ||
+      (propertyMacroUuid || '') !== (essence?.propertyMacroUuid || '') ||
       (showSourceUi && (sourceTouched || sourceComponentId !== sourceIdentity(essence)))
     );
   }
 
   // A throw is a failure exactly as a `false` return is, so both mark the draft failed in
-  // their own branch. There is no `result` temporary to leave unassigned, and the save is
-  // still awaited exactly once — an extra async hop here would move the failure notice a
-  // microtask later than the mounted route tests observe it.
+  // their own branch. The save is still awaited exactly once — an extra async hop here
+  // would move the failure notice a microtask later than the mounted route tests observe it.
   async function handleSave(event) {
     event.preventDefault();
     if (!validName || saving) return;
@@ -233,9 +285,7 @@
     const updates = buildUpdates();
     try {
       const result = await onSave(draftId || null, updates);
-      if (result === false) {
-        saveFailed = true;
-      }
+      if (result === false) saveFailed = true;
     } catch {
       saveFailed = true;
     }
@@ -249,6 +299,30 @@
       sourceTouched = true;
     }
   }
+
+  // The `type !== 'script'` rejection. It is HERE and not in the drop predicate: a payload's
+  // `type` is the document NAME (`'Macro'`), and the macro's own type needs `await
+  // fromUuid`, which a synchronous predicate cannot do. `evaluateMacroDrop` fails OPEN when
+  // there is no resolver, so the View Lab and mounted tests can still author a link.
+  async function handleMacroDrop(data) {
+    macroWarning = '';
+    const uuid = resolveDropUuid(data);
+    const result = await evaluateMacroDrop(uuid);
+    if (result.accepted) {
+      propertyMacroUuid = result.uuid;
+      return;
+    }
+    macroWarning =
+      result.reason === MACRO_DROP_REJECTED_NOT_SCRIPT
+        ? text(
+            'FABRICATE.Admin.Manager.Essence.Macro.NotScript',
+            'That macro is not a script macro, so Fabricate cannot run it. Change its type to Script and drop it again.'
+          )
+        : text(
+            'FABRICATE.Admin.Manager.Essence.Macro.Unresolved',
+            'That macro could not be found. Drop a macro from this world or an installed compendium.'
+          );
+  }
 </script>
 
 <main
@@ -257,233 +331,87 @@
     ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
     : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence')}
 >
+  <EssenceEditorTabs
+    {activeTab}
+    {onCraftCount}
+    blockingCount={validationCounts.blocking}
+    warningCount={validationCounts.warnings}
+    onChange={(tab) => (activeTab = tab)}
+  />
+
   <form id="manager-essence-edit-form" class="manager-essence-edit-view" onsubmit={handleSave}>
-    <section class="manager-edit-card manager-essence-identity-card">
-      <div class="manager-edit-card-heading">
-        <h3 class="manager-card-title">
-          {text('FABRICATE.Admin.Manager.Essence.Identity', 'Identity')}
-        </h3>
-      </div>
-
-      <div class="manager-essence-edit-grid">
-        <div class="manager-essence-icon-panel">
-          <span class="manager-essence-field-label"
-            >{text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}</span
-          >
-          <span class="manager-essence-icon-preview" aria-hidden="true" style={colourSwatchStyle}>
-            <i class={normalizeEssenceIcon(icon)}></i>
-          </span>
-          <div class="manager-essence-icon-actions">
-            <IconPicker
-              value={icon}
-              disabled={saving}
-              buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
-              onChange={(iconClass) => {
-                icon = iconClass;
-              }}
-            />
-            <button
-              type="button"
-              class="manager-button"
-              onclick={() => {
-                icon = DEFAULT_ESSENCE_ICON;
-              }}
-              disabled={saving || normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON}
-            >
-              <i class="fas fa-undo" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}</span>
-            </button>
-          </div>
-          <span class="manager-essence-icon-copy">
-            <strong>{selectedIconLabel}</strong>
-            <small
-              >{normalizeEssenceIcon(icon) === DEFAULT_ESSENCE_ICON
-                ? text('FABRICATE.Admin.Manager.Essence.DefaultIconLabel', 'Default essence icon')
-                : text('FABRICATE.Admin.Manager.Essence.IconLabel', 'Selected icon')}</small
-            >
-          </span>
-
-          <span class="manager-essence-field-label"
-            >{text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')}</span
-          >
-          <div class="manager-essence-icon-actions" data-manager-essence-colour>
-            <ManagerColorPicker
-              colorToken={colorToken || 'sage'}
-              customColor=""
-              allowCustom={false}
-              unset={!colorToken}
-              buttonTitle={text(
-                'FABRICATE.Admin.Manager.Essence.Colour.Change',
-                'Change essence colour'
-              )}
-              presetGridLabel={text(
-                'FABRICATE.Admin.Manager.Essence.Colour.Presets',
-                'Essence colour presets'
-              )}
-              onChange={(next) => {
-                colorToken = normalizeEssenceColorToken(next?.colorToken) || '';
-              }}
-            />
-            <button
-              type="button"
-              class="manager-button"
-              onclick={() => {
-                colorToken = '';
-              }}
-              disabled={saving || !colorToken}
-            >
-              <i class="fas fa-undo" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Essence.Colour.Clear', 'Clear colour')}</span>
-            </button>
-          </div>
-          <span class="manager-essence-icon-copy">
-            <strong>{colourLabel}</strong>
-            <small
-              >{colorToken
-                ? text(
-                    'FABRICATE.Admin.Manager.Essence.Colour.Authored',
-                    'This essence renders in its own colour.'
-                  )
-                : text(
-                    'FABRICATE.Admin.Manager.Essence.Colour.Unset',
-                    'This essence renders in the theme accent.'
-                  )}</small
-            >
-          </span>
-        </div>
-
-        <div class="manager-essence-core-fields">
-          <label class="manager-field" for="manager-essence-edit-name">
-            <span>{text('FABRICATE.Admin.Manager.Essence.Name', 'Name')}</span>
-            <input
-              id="manager-essence-edit-name"
-              type="text"
-              value={name}
-              oninput={(event) => (name = event.currentTarget.value)}
-              placeholder={text('FABRICATE.Admin.Manager.Essence.NamePlaceholder', 'Essence name')}
-              disabled={saving}
-              required
-            />
-          </label>
-
-          <label class="manager-field" for="manager-essence-edit-description">
-            <span>{text('FABRICATE.Admin.Manager.Essence.Description', 'Description')}</span>
-            <textarea
-              id="manager-essence-edit-description"
-              rows="5"
-              value={description}
-              oninput={(event) => (description = event.currentTarget.value)}
-              placeholder={text(
-                'FABRICATE.Admin.Manager.Essence.DescriptionPlaceholder',
-                'Description'
-              )}
-              disabled={saving}></textarea>
-          </label>
-        </div>
-      </div>
-
-      {#if showSourceUi}
-        <div class="manager-essence-source-panel">
-          <div class="manager-edit-card-heading">
-            <h3 class="manager-card-title">
-              {text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
-            </h3>
-            <Chip tone={sourceState.tone}>{sourceState.label}</Chip>
-          </div>
-          <div class="manager-essence-source-stack">
-            <div class="manager-essence-source-summary">
-              {#if selectedSource}
-                <img
-                  class="manager-essence-source-thumb"
-                  src={selectedSource.img || 'icons/svg/item-bag.svg'}
-                  alt=""
-                />
-              {:else}
-                <span class="manager-essence-source-thumb is-empty" aria-hidden="true">
-                  <i class="fas fa-link"></i>
-                </span>
-              {/if}
-              <div class="manager-essence-source-copy">
-                {#if selectedSource}
-                  <strong>{selectedSource.name}</strong>
-                  <p class="manager-muted">
-                    {selectedSource.originItemUuid ||
-                      text(
-                        'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
-                        'This component has no source item UUID.'
-                      )}
-                  </p>
-                {:else if essence?.sourceName || essence?.sourceItemUuid || essence?.sourceComponentId}
-                  <strong
-                    >{essence.sourceName ||
-                      essence.sourceComponentId ||
-                      essence.sourceItemUuid}</strong
-                  >
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Essence.SourceEvidenceHint',
-                      'Stored source evidence remains readable until you clear or repair it.'
-                    )}
-                  </p>
-                {:else}
-                  <strong>{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</strong>
-                  <p class="manager-muted">
-                    {text(
-                      'FABRICATE.Admin.Manager.Essence.SourceEditHint',
-                      'Pick or drop a managed component to provide the effect-transfer source.'
-                    )}
-                  </p>
-                {/if}
-              </div>
-              {#if selectedSource || sourceComponentId || hasStoredSourceEvidence()}
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  onclick={() => {
-                    sourceComponentId = '';
-                    sourceTouched = true;
-                  }}
-                  aria-label={text(
-                    'FABRICATE.Admin.Features.Essences.ClearSourceItem',
-                    'Clear source item'
-                  )}
-                  title={text(
-                    'FABRICATE.Admin.Features.Essences.ClearSourceItem',
-                    'Clear source item'
-                  )}
-                >
-                  <i class="fas fa-times" aria-hidden="true"></i>
-                </button>
-              {/if}
-            </div>
-
-            <div class="manager-essence-source-drop-zone">
-              <EssenceSourceSelector
-                value={null}
-                items={managedItemOptions}
-                onDrop={handleSourceDrop}
-                onSelect={(itemId) => {
-                  sourceComponentId = itemId || '';
-                  sourceTouched = true;
-                }}
-                onClear={() => {
-                  sourceComponentId = '';
-                  sourceTouched = true;
-                }}
-              />
-            </div>
-          </div>
-        </div>
+    <div
+      class="manager-essence-tab-panel"
+      id={`essence-panel-${activeTab}`}
+      role="tabpanel"
+      aria-labelledby={`essence-tab-${activeTab}`}
+      tabindex="-1"
+    >
+      {#if activeTab === 'identity'}
+        <EssenceIdentityTab
+          {name}
+          {description}
+          {icon}
+          {colorToken}
+          {enabled}
+          {saving}
+          onNameChange={(value) => (name = value)}
+          onDescriptionChange={(value) => (description = value)}
+          onIconChange={(value) => (icon = value)}
+          onColourChange={(value) => (colorToken = normalizeEssenceColorToken(value) || '')}
+          onEnabledChange={(value) => (enabled = value !== false)}
+        />
+      {:else if activeTab === 'oncraft'}
+        <EssenceOnCraftTab
+          {sourceComponentId}
+          {selectedSource}
+          storedSourceName={storedSourceName()}
+          macroUuid={propertyMacroUuid}
+          {macroName}
+          {macroMissing}
+          {macroWarning}
+          disabledEssence={enabled === false}
+          {managedItemOptions}
+          effectTransferEnabled={showSourceUi}
+          propertyMacrosEnabled={showPropertyMacroUi}
+          {saving}
+          onSourceSelect={(itemId) => {
+            sourceComponentId = itemId || '';
+            sourceTouched = true;
+          }}
+          onSourceDrop={handleSourceDrop}
+          onSourceClear={() => {
+            sourceComponentId = '';
+            sourceTouched = true;
+          }}
+          onMacroDrop={handleMacroDrop}
+          onMacroUnlink={() => {
+            propertyMacroUuid = '';
+            macroWarning = '';
+          }}
+        />
+      {:else}
+        <EssenceValidationTab essence={draftSummary} context={validationContext} />
       {/if}
+    </div>
 
-      {#if saveFailed}
-        <p class="manager-muted manager-form-warning">
-          {text(
-            'FABRICATE.Admin.Manager.Essence.SaveFailed',
-            'Save failed. Check for duplicate or blank names and try again.'
-          )}
-        </p>
-      {/if}
-    </section>
+    {#if saveFailed}
+      <p class="manager-muted manager-form-warning" role="alert">
+        {text(
+          'FABRICATE.Admin.Manager.Essence.SaveFailed',
+          'Save failed. Check for duplicate or blank names and try again.'
+        )}
+      </p>
+    {/if}
   </form>
 </main>
+
+<style>
+  /* Route-level placement — the two-track template and the route's own overflow — is
+     GLOBAL (`.fabricate-manager[data-manager-view="essence-edit"] .manager-main`), because
+     a scoped child block cannot reach a shell container rule. What is scoped here is only
+     what belongs to the tab body itself. */
+  .manager-essence-tab-panel {
+    min-height: 0;
+  }
+</style>
