@@ -20,6 +20,7 @@ const CHAT_KEYS = Object.freeze({
   actor: 'FABRICATE.Chat.GatherActor',
   task: 'FABRICATE.Chat.GatherTask',
   components: 'FABRICATE.Chat.GatherComponents',
+  nothing: 'FABRICATE.Chat.GatherNothing',
   events: 'FABRICATE.Chat.GatherEvents',
   toolsBroken: 'FABRICATE.Chat.GatherToolsBroken',
   stamina: 'FABRICATE.Chat.GatherStamina',
@@ -72,6 +73,26 @@ function renderSection({ heading, entries, fallbackImg, modifier }) {
 }
 
 /**
+ * Render the explicit "you found nothing" section.
+ *
+ * A successful gather that awards nothing is a legitimate outcome — in d100 mode every
+ * drop row can miss its threshold, and the attempt still reports success because status
+ * is decided by events, not by drops. Rendering NOTHING for that case produced a card
+ * with only a "Gathering Successful" banner, which is indistinguishable from the module
+ * being broken: the node and stamina were spent and the player was told nothing. Empty
+ * events and broken-tool sections stay omitted, because there "absent" correctly reads
+ * as "none happened"; only the results section needs to say so out loud.
+ */
+function renderEmptyResults(heading, message) {
+  return [
+    '<section class="fabricate-gather-chat__section fabricate-gather-chat__section--empty">',
+    `<div class="fabricate-gather-chat__heading">${esc(heading)}</div>`,
+    `<p class="fabricate-gather-chat__empty">${esc(message)}</p>`,
+    '</section>',
+  ].join('');
+}
+
+/**
  * Render a single footer stat as a bordered pill with a leading icon; returns
  * '' when the value is null/undefined.
  */
@@ -103,7 +124,11 @@ function renderStat(icon, label, value) {
 export function buildGatheringChatContent(model = {}, localize = (key) => key) {
   const loc = (key) => localize(key) ?? key;
   const succeeded = model.status === 'succeeded';
-  const stateModifier = succeeded ? 'success' : 'failure';
+  const awardedNothing =
+    succeeded && (!Array.isArray(model.components) || model.components.length === 0);
+  // A distinct modifier so a success that awarded nothing can be styled apart from a
+  // full success without changing the title — the check DID succeed.
+  const stateModifier = succeeded ? (awardedNothing ? 'empty' : 'success') : 'failure';
   const title = loc(succeeded ? CHAT_KEYS.success : CHAT_KEYS.failure);
 
   const subtitleParts = [`${esc(loc(CHAT_KEYS.actor))}: ${esc(model.actorName)}`];
@@ -112,11 +137,13 @@ export function buildGatheringChatContent(model = {}, localize = (key) => key) {
   }
 
   const sections = [
-    renderSection({
-      heading: loc(CHAT_KEYS.components),
-      entries: model.components,
-      fallbackImg: COMPONENT_FALLBACK_IMG,
-    }),
+    awardedNothing
+      ? renderEmptyResults(loc(CHAT_KEYS.components), loc(CHAT_KEYS.nothing))
+      : renderSection({
+          heading: loc(CHAT_KEYS.components),
+          entries: model.components,
+          fallbackImg: COMPONENT_FALLBACK_IMG,
+        }),
     renderSection({
       heading: loc(CHAT_KEYS.events),
       entries: model.events,

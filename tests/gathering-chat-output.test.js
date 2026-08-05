@@ -147,3 +147,64 @@ test('_terminalStart posts chat output for transparent tasks', async () => {
   assert.equal(chatCreated.length, 1, 'transparent task posts one chat card');
   assert.ok(chatCreated[0].content.includes('Herb'), 'component resolved');
 });
+
+// ---------------------------------------------------------------------------
+// A d100 gather whose drop rows all miss reports SUCCESS (d100 status is decided by
+// events, not by drops) and awards nothing. The card used to degrade to a bare
+// "Gathering Successful" header, which is what a broken module looks like.
+// ---------------------------------------------------------------------------
+
+test('a succeeded attempt that awarded nothing posts an explicit empty-results card', async () => {
+  resetChat();
+  const engine = buildEngine();
+
+  await engine._postGatheringChatMessage(
+    buildArgs({ createdResults: [], checkResult: { items: [], events: [] }, usedTools: [] })
+  );
+
+  assert.equal(chatCreated.length, 1, 'a card is still posted');
+  const { content } = chatCreated[0];
+  assert.ok(content.includes('fabricate-gather-chat--empty'), 'the empty state modifier is used');
+  assert.ok(content.includes('fabricate-gather-chat__empty'), 'the empty-state line is rendered');
+  assert.ok(
+    !/fabricate-gather-chat__item/.test(content),
+    'no phantom result rows are rendered'
+  );
+});
+
+test('an empty-results success still reports the economy it spent', async () => {
+  resetChat();
+  const engine = buildEngine();
+
+  await engine._postGatheringChatMessage(
+    buildArgs({ createdResults: [], checkResult: { items: [], events: [] }, usedTools: [] })
+  );
+
+  const { content } = chatCreated[0];
+  // The sting of the original report: the node and stamina were spent for nothing. The
+  // card has to keep showing that, or the player cannot tell the attempt cost them.
+  assert.ok(content.includes('FABRICATE.Chat.GatherStamina'), 'stamina spent is still shown');
+  assert.ok(content.includes('FABRICATE.Chat.GatherNodes'), 'nodes remaining is still shown');
+});
+
+test('a component-identified award renders its component, with no uuid to join on', async () => {
+  resetChat();
+  const engine = buildEngine();
+
+  // Exactly the shape `plan` produces for an award whose document does not exist yet:
+  // componentId, no itemUuid. Before this it fell through every lookup and rendered blank.
+  await engine._postGatheringChatMessage(
+    buildArgs({
+      createdResults: [
+        { actorUuid: 'Actor.aria', itemUuid: null, componentId: 'comp-herb', quantity: 4 },
+      ],
+      checkResult: { items: [], events: [] },
+      usedTools: [],
+    })
+  );
+
+  const { content } = chatCreated[0];
+  assert.ok(content.includes('Herb'), 'the component name resolves from componentId alone');
+  assert.ok(content.includes('4× Herb'), 'with its quantity');
+  assert.ok(!content.includes('fabricate-gather-chat__empty'), 'this is NOT an empty award');
+});

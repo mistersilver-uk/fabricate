@@ -17346,6 +17346,20 @@
   border-left-color: var(--fab-danger);
 }
 
+/* A gather whose check SUCCEEDED but whose drop rows all missed. Neither green nor
+   red: the attempt worked, it just yielded nothing, and the card has to say so rather
+   than render an empty body that reads as a broken module. */
+.fabricate-gather-chat--empty {
+  border-left-color: var(--fab-warning);
+}
+
+.fabricate-gather-chat__empty {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.9em;
+  font-style: italic;
+}
+
 .fabricate-gather-chat__header,
 .fabricate-craft-chat__header {
   display: flex;
