@@ -190,6 +190,33 @@ export function toBulkEssenceEdit(draft) {
 }
 
 /**
+ * Collect the distinct ids a set of rows names on one axis.
+ *
+ * Accepts either a bare id array or the `{id, name, img}` row shape the store's
+ * `componentUsageItems` projection already emits, so a caller never has to reshape a
+ * projection it already builds.
+ *
+ * @param {object[]} rows
+ * @param {string[]} fields the row fields to read, in preference order.
+ * @returns {Set<string>}
+ */
+function unionOfIds(rows, fields) {
+  const union = new Set();
+  for (const row of rows) {
+    for (const field of fields) {
+      const value = row?.[field];
+      if (!Array.isArray(value)) continue;
+      for (const entry of value) {
+        const id = String((entry && typeof entry === 'object' ? entry.id : entry) ?? '');
+        if (id) union.add(id);
+      }
+      break;
+    }
+  }
+  return union;
+}
+
+/**
  * What a bulk delete of the current selection would actually do — the impact statement the
  * maintainer required in the bulk-edit sidebar, stated BEFORE the action is armed.
  *
@@ -198,41 +225,42 @@ export function toBulkEssenceEdit(draft) {
  * many RECIPES will be rewritten. One essence carried by twelve components is 1 deletion
  * and 12 carriers; two essences in one recipe is 2 deletions and 1 rewrite.
  *
- * Component and recipe carriers are counted from the rows' own usage counts, which are
- * per-essence, so a component carrying two selected essences is counted twice. That is
- * stated rather than hidden: the projection has only per-essence counts to work from, and
- * the copy the panel renders says "component links", not "distinct components".
+ * **Both carrier numbers are UNIONS over identities, never sums of per-essence counts.**
+ * The operation they describe performs unions: `CraftingSystemManager.deleteEssences`
+ * rewrites each referencing recipe ONCE for the whole selection and returns
+ * `recipesUpdated` as that count, and it strips every deleted essence from a carrying
+ * component in one pass. Summing per-essence counts double-counts every shared carrier, so
+ * for the very shape the manager suite pins — 3 essences across 2 shared recipes,
+ * `recipesUpdated: 2` — a sum would tell the GM "4 recipes will be rewritten" before an
+ * operation that rewrites 2. A union cannot be computed from counts at all, which is why
+ * the rows supply IDS: `componentUsageIds` / `componentUsageItems` and `recipeUsageIds`.
+ * A row supplying neither contributes nothing on that axis rather than an over-count.
  *
  * BLOCKED members are excluded and named. The single-delete guard is a data-loss guard and
  * removing it was not what was directed, so the panel says how many it will skip and why,
  * and `canDelete` is false when every selection member is blocked — an inert action rather
  * than one that silently does less than it says.
  *
- * @param {{id?: string, name?: string, deleteBlocked?: boolean, componentUsageCount?: number,
- *   recipeUsageCount?: number}[]} rows the SELECTED projected essence rows.
+ * @param {{id?: string, name?: string, deleteBlocked?: boolean,
+ *   componentUsageIds?: string[], componentUsageItems?: {id?: string}[],
+ *   recipeUsageIds?: string[]}[]} rows the SELECTED projected essence rows.
  * @returns {{deletable: number, deletableIds: string[], blocked: number,
- *   blockedNames: string[], componentLinks: number, recipeRewrites: number,
- *   canDelete: boolean}}
+ *   blockedNames: string[], componentsAffected: number, recipeRewrites: number,
+ *   canDelete: boolean}} `componentsAffected` and `recipeRewrites` are DISTINCT-carrier
+ *   counts, so each equals what the cascade will touch rather than exceeding it.
  */
 export function describeEssenceDeleteImpact(rows) {
   const selected = Array.isArray(rows) ? rows : [];
   const deletable = selected.filter((row) => row?.deleteBlocked !== true);
   const blocked = selected.filter((row) => row?.deleteBlocked === true);
 
-  let componentLinks = 0;
-  let recipeRewrites = 0;
-  for (const row of deletable) {
-    componentLinks += Math.max(0, Number(row?.componentUsageCount) || 0);
-    recipeRewrites += Math.max(0, Number(row?.recipeUsageCount) || 0);
-  }
-
   return {
     deletable: deletable.length,
     deletableIds: deletable.map((row) => String(row?.id ?? '')).filter(Boolean),
     blocked: blocked.length,
     blockedNames: blocked.map((row) => String(row?.name ?? '')).filter(Boolean),
-    componentLinks,
-    recipeRewrites,
+    componentsAffected: unionOfIds(deletable, ['componentUsageIds', 'componentUsageItems']).size,
+    recipeRewrites: unionOfIds(deletable, ['recipeUsageIds']).size,
     canDelete: deletable.length > 0,
   };
 }

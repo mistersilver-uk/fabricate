@@ -3586,6 +3586,19 @@ export class CraftingEngine {
    * when its single summed gate is armed and executes every step live at maturity, so it
    * has no START snapshot of any kind and correctly evaluates enabled-ness at maturity.
    *
+   * **An EMPTY stored map is deliberately not distinguished from an absent one, and that
+   * is safe rather than lucky.** `_snapshotEssenceEnabled` emits exactly one entry per
+   * START `resolvedEssences` key, so the two are empty or non-empty TOGETHER: for a
+   * legitimately empty snapshot the synthesised map below is also `{}`, and the two
+   * readings coincide. A run armed before this field existed carries no `essenceEnabled`
+   * key at all (`undefined`), never `{}`, so criterion 21's all-enabled reading is reached
+   * through the absent branch either way. `{}` alongside a NON-empty `resolvedEssences` is
+   * therefore unreachable from correct code — it is the shape a dropped snapshot key
+   * produces, and reading it as "evaluate live" instead would substitute one wrong answer
+   * for another rather than closing anything. What closes it is the END-TO-END coverage in
+   * `tests/essence-timed-craft-gate.test.js`, which drives START -> persisted run -> FINISH
+   * and fails on a dropped key at either site.
+   *
    * @param {object} prepared the step's `preparedConsumption`.
    * @returns {Record<string, boolean>|null}
    * @private

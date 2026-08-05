@@ -4724,7 +4724,13 @@ export class CraftingSystemManager {
    * @param {Iterable<string>} componentIds ids of the components to mutate.
    * @param {{category?: string, addTags?: string[], removeTags?: string[],
    *   essences?: Record<string, number>, difficulty?: number|null|string}} [edit]
-   * @returns {Promise<{updated: number, componentIds: string[]}>} the ids actually changed.
+   * @returns {Promise<{updated: number, componentIds: string[]}>} the ids the edit was
+   *   APPLIED TO — the resolved cohort, not a diff. `changedIds` is pushed for every id in
+   *   the target set that resolves to a component, whether or not any value differs, so a
+   *   re-apply of the same category to three components reports "3". The return feeds the
+   *   post-apply summary count only, so no caller depends on the stronger reading, and a
+   *   diff here would have to reproduce the normalization `_normalizeComponent` performs.
+   *   Matches {@link CraftingSystemManager#applyBulkEditToEssences}'s contract exactly.
    */
   async applyBulkEditToComponents(systemId, componentIds, edit = {}) {
     this._assertGM('apply a bulk edit to components');
@@ -5629,6 +5635,28 @@ export class CraftingSystemManager {
    * AND any first-class essence OPTION (`match.type === 'essence'`) for that essence
    * from each group (dropping a group left with no options), then drop a set left with
    * no ingredient groups / ingredients / essences.
+   *
+   * **`ingredients` is REWRITTEN, not carried through the spread (issue 1036).** It is
+   * the flat legacy mirror `IngredientSet` derives from `ingredientGroups` — the first
+   * option of each group (`IngredientSet.js:42`) — and `toJSON` emits it alongside the
+   * groups, so a `...set` spread hands the STALE mirror to both the retention filter
+   * below and the `IngredientSet` constructor. Two live defects followed from that:
+   *
+   *  1. the retention filter reads `set.ingredients?.length`, so a set whose ONLY
+   *     requirement was the deleted essence survived the drop while still naming an
+   *     essence already removed from `system.essenceDefinitions` in memory.
+   *     `_validateEssenceReferences` then raised at PERSISTENCE level, `updateRecipe`
+   *     threw, and the cascade aborted with the in-memory system already mutated and
+   *     nothing written — the world settings still held the truth, but the next
+   *     unrelated `save()` from any other GM action committed the destruction;
+   *  2. `IngredientSet`'s constructor rebuilds its groups from `data.ingredients`
+   *     whenever `ingredientGroups` is empty (`IngredientSet.js:33-36`), so a stripped
+   *     set with a stale mirror RESURRECTED the deleted essence option as a fresh group.
+   *
+   * Recomputing the mirror from the stripped groups — rather than filtering the old
+   * array — is what keeps it a mirror: a group whose essence option was removed but
+   * which still carries a component option must surface THAT option, not nothing.
+   *
    * @param {object[]} sets
    * @param {string} essenceId
    * @returns {object[]}
@@ -5648,7 +5676,19 @@ export class CraftingSystemManager {
             ),
           }))
           .filter((group) => (group.options?.length || 0) > 0);
-        return { ...set, essences, ingredientGroups };
+        const ingredients =
+          (set.ingredientGroups?.length || 0) > 0
+            ? ingredientGroups.map((group) => group.options?.[0] || null).filter(Boolean)
+            : // A set authored in the LEGACY flat shape has no groups to mirror, so its
+              // own array is the authority and is filtered in place.
+              (set.ingredients || []).filter(
+                (ingredient) =>
+                  !(
+                    ingredient?.match?.type === 'essence' &&
+                    ingredient.match.essenceId === essenceId
+                  )
+              );
+        return { ...set, essences, ingredientGroups, ingredients };
       })
       .filter(
         (set) =>

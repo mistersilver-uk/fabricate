@@ -20,8 +20,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { IngredientSet } from '../src/models/IngredientSet.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { SignatureValidator } from '../src/systems/SignatureValidator.js';
 
 import {
   installEngineGlobals,
@@ -148,6 +150,140 @@ test('1036/4: a disabled essence still ACCUMULATES its quantity into the craft c
     resolvedEssences.fire,
     6,
     'enabled gates BEHAVIOUR, not ARITHMETIC — the disabled essence still accumulates 2 x 3'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Criterion 4's other two thirds: a disabled essence still MATCHES and is still CONSUMED
+//
+// The maintainer's binding decision is that `enabled` gates essence-carried BEHAVIOUR and
+// never essence ARITHMETIC — "its quantities still match, accumulate and are consumed".
+// Accumulation is pinned above. These pin the other two, which are exactly what an
+// implementer "completing the gate" would break: adding the definition lookup to the
+// matcher, or to the consumption plan, reads as finishing the job and is wrong.
+// ---------------------------------------------------------------------------
+
+/** An item whose Fabricate essence flags resolve through the real dotted-key reader. */
+function makeEssenceItem(uuid, quantity, essences) {
+  const scopes = { fabricate: { fabricate: { essences }, essences } };
+  return {
+    id: uuid,
+    uuid,
+    name: uuid,
+    system: { quantity },
+    deleted: false,
+    getFlag: (scope, key) =>
+      String(key)
+        .split('.')
+        .reduce((value, part) => (value == null ? undefined : value[part]), scopes[scope]),
+    async delete() {
+      this.deleted = true;
+    },
+    async update(payload) {
+      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    },
+  };
+}
+
+test('1036/4: a DISABLED essence still SATISFIES an ingredient set essence requirement', () => {
+  const system = makeSystem([makeEssence({ id: 'fire', enabled: false })]);
+  system.components = [{ id: 'ember', name: 'Ember', essences: { fire: 2 } }];
+  publishSystem(system);
+
+  const engine = makeEngine();
+  const validator = new SignatureValidator({
+    getSystem: () => system,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => system.components,
+  });
+  const recipes = [
+    {
+      id: 'r1',
+      name: 'Brew',
+      enabled: true,
+      // The legacy per-set essences map — the AND-required arm the matcher evaluates.
+      ingredientSets: [{ id: 'set-1', essences: { fire: 2 }, ingredientGroups: [] }],
+    },
+  ];
+  const submitted = [{ item: { id: 'i1', name: 'Ember' }, componentId: 'ember' }];
+
+  const match = engine._matchAlchemySignature(submitted, recipes, system.components, validator, {
+    system,
+  });
+
+  assert.equal(match.matched, true, 'the submission matched');
+  assert.equal(
+    match.recipe?.id,
+    'r1',
+    'the requirement is satisfied by quantity alone — matching never consults `enabled`'
+  );
+});
+
+test('1036/4 negative control: the same submission SHORT of the requirement does not match', () => {
+  const system = makeSystem([makeEssence({ id: 'fire', enabled: false })]);
+  system.components = [{ id: 'ember', name: 'Ember', essences: { fire: 2 } }];
+  publishSystem(system);
+
+  const engine = makeEngine();
+  const validator = new SignatureValidator({
+    getSystem: () => system,
+    getRecipesForSystem: () => [],
+    getComponentsForSystem: () => system.components,
+  });
+  const recipes = [
+    {
+      id: 'r1',
+      name: 'Brew',
+      enabled: true,
+      ingredientSets: [{ id: 'set-1', essences: { fire: 5 }, ingredientGroups: [] }],
+    },
+  ];
+  const submitted = [{ item: { id: 'i1', name: 'Ember' }, componentId: 'ember' }];
+
+  assert.equal(
+    engine._matchAlchemySignature(submitted, recipes, system.components, validator, { system })
+      .matched,
+    false,
+    'the matcher really is evaluating the quantity, so the pass above is not vacuous'
+  );
+});
+
+test('1036/4: a DISABLED essence is still CONSUMED — the plan draws its items down and deletes them', async () => {
+  const system = makeSystem([makeEssence({ id: 'fire', enabled: false })]);
+  publishSystem(system);
+
+  const set = new IngredientSet({
+    id: 'set-1',
+    ingredientGroups: [
+      { id: 'g-fire', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 3 } }] },
+    ],
+  });
+  const items = [makeEssenceItem('i1', 2, { fire: 1 }), makeEssenceItem('i2', 5, { fire: 1 })];
+
+  const selection = set.resolveIngredientSelection(items);
+  assert.equal(selection.success, true, 'the disabled essence still satisfies the group option');
+
+  const stockBefore = new Map(items.map((item) => [item.uuid, item.system.quantity]));
+  const engine = makeEngine();
+  const consumed = await engine._consumeIngredients(selection.plan);
+
+  assert.equal(
+    consumed.reduce((total, entry) => total + entry.quantity, 0),
+    3,
+    'exactly the required three fire-carrying units were consumed'
+  );
+  for (const { item, quantity } of selection.plan) {
+    const held = stockBefore.get(item.uuid);
+    if (quantity >= held) {
+      assert.ok(item.deleted, `${item.uuid} was drawn down entirely and deleted`);
+    } else {
+      assert.equal(item.system.quantity, held - quantity, `${item.uuid} was drawn down by ${quantity}`);
+    }
+  }
+  assert.deepEqual(
+    engine._buildEssenceContext(consumed, { craftingSystemId: SYSTEM_ID }).resolvedEssences,
+    { fire: 3 },
+    'and the consumed units accumulate exactly as an enabled essence would'
   );
 });
 
@@ -307,6 +443,26 @@ test('1036/21: a run armed BEFORE this change (no snapshot key) reads as all-ena
   assert.equal(actor.captured[0].system.school, 'fire');
 });
 
+test('1036/21: an EMPTY snapshot and an absent one coincide, because the snapshot is complete', () => {
+  // `_snapshotEssenceEnabled` emits one entry per START `resolvedEssences` key, so the two
+  // are empty or non-empty TOGETHER — which is why `_resumedEssenceEnabled` need not
+  // distinguish `{}` from an absent map. A pre-change run carries NO key at all, and
+  // reaches the all-enabled reading through the absent branch. `{}` alongside a non-empty
+  // `resolvedEssences` is the shape a DROPPED key produces, not a state correct code emits.
+  const engine = makeEngine();
+
+  assert.deepEqual(
+    engine._resumedEssenceEnabled({ resolvedEssences: {}, essenceEnabled: {} }),
+    {},
+    'an empty contribution set snapshots empty, and reads back empty either way'
+  );
+  assert.deepEqual(
+    engine._snapshotEssenceEnabled({}, makeSystem([makeEssence({ id: 'fire', enabled: false })])),
+    {},
+    'the two emptinesses really are the same fact, not a coincidence of this fixture'
+  );
+});
+
 test('1036/21: a COLLAPSED chain has no snapshot at all and evaluates enabled-ness at maturity', async () => {
   const system = makeSystem([
     makeEssence({ id: 'fire', enabled: false, propertyMacroUuid: 'Macro.fire' }),
@@ -375,7 +531,11 @@ test('1036/20: an essence property macro applies to a SALVAGE result', async () 
   assert.equal(
     actor.captured[0].system.school,
     'fire',
-    'salvage reaches the same seam, live, with the salvaged component own essences'
+    // The contribution arrives through the CONSUMED item's own essence flags, which is
+    // what `_buildEssenceContext` resolves first; the salvaged component's `essences` map
+    // is the fallback the flag pre-empts. Either way the seam is reached live, with no
+    // precomputed map and no snapshot — which is the fact this test is for.
+    'salvage reaches the same seam, live, from the consumed item essence contribution'
   );
 });
 

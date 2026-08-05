@@ -71,7 +71,8 @@ It has both a single-essence and a SET form, and the two perform the same cascad
 
 1. Require explicit GM confirmation.
    The single delete is refused outright while any component carries the essence; the set delete EXCLUDES every such member, names them, and states how many it will skip, and is inert when every selected member is blocked.
-   The set delete additionally states its impact before it is armed: how many essences will be deleted, how many component links carry them, and how many recipes will be rewritten.
+   The set delete additionally states its impact before it is armed: how many essences will be deleted, how many components carry them, and how many recipes will be rewritten.
+   Both carrier numbers are counted over DISTINCT carriers, never summed per essence: the cascade rewrites each referencing recipe once for the whole selection and strips every deleted essence from a carrying component in one pass, so a component or recipe naming two selected essences is one carrier, not two.
 2. The essence is removed from `essenceDefinitions` and from the derived `essences` id array.
 3. Every component still carrying the essence has that quantity stripped, regardless of the in-use refusal above, so no component is left naming a deleted essence.
 4. Every recipe referencing the essence — through either the legacy per-set essences map or a first-class essence ingredient option, at recipe level or step level — is rewritten to drop it.

@@ -216,6 +216,7 @@ test('1036/6: a throwing essence macro fails only that essence; every later macr
     'Macro.water': makeScriptMacro('return { "system.school": "water" };'),
   });
 
+  const before = notifications.errors.length;
   const actor = makeCapturingActor();
   const engine = makeEngine();
 
@@ -226,6 +227,16 @@ test('1036/6: a throwing essence macro fails only that essence; every later macr
     actor.captured[0].system.school,
     'water',
     'the macro AFTER the throwing one still ran and still applied'
+  );
+  // The OTHER half of the contract, and the one that separates a macro BODY throw from
+  // every silent-skip branch around it: an unresolvable uuid, a chat macro and an
+  // unwritable return path are all GM-side authoring defects and stay silent, but a macro
+  // that genuinely blew up DOES raise `ui.notifications.error`. Without this the suite
+  // reads as "essence macros never toast", which is the opposite of the design.
+  assert.equal(
+    notifications.errors.length,
+    before + 1,
+    'exactly one toast, for the macro that actually threw'
   );
 });
 

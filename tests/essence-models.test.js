@@ -284,7 +284,33 @@ describe('1036 — essenceEditorValidation', () => {
     const result = essenceEditorValidation({ ...COMPLETE, colorToken: null });
     assert.equal(check(result, 'colour').valid, true);
     assert.equal(check(result, 'colour').state, 'unset');
+    // The SEVERITY, not just the verdict. `unset` is not one of the three failure states,
+    // so `valid` stays true whatever severity the row carries — which made "a pass, not a
+    // warning" true by accident and a re-classification to `warning` invisible. The tab
+    // renders this value, so it is part of the contract.
+    assert.equal(
+      check(result, 'colour').severity,
+      'info',
+      'the colour row is INFORMATIONAL: it can never fail, and must never be presented as a warning'
+    );
     assert.deepEqual(result.counts, { passing: 7, warnings: 0, blocking: 0 });
+  });
+
+  it('pins the severity of every enumerated check, so a re-classification cannot ship silently', () => {
+    const result = essenceEditorValidation(COMPLETE, { componentUsageCount: 1 });
+    assert.deepEqual(
+      result.checks.map((entry) => [entry.id, entry.severity]),
+      [
+        ['name', 'blocking'],
+        ['icon', 'blocking'],
+        ['colour', 'info'],
+        ['description', 'warning'],
+        ['macro', 'warning'],
+        ['source', 'warning'],
+        ['usage', 'info'],
+      ],
+      'in render order, with the two informational rows explicitly informational'
+    );
   });
 
   it('warns about an unresolvable macro ONLY when features.propertyMacros is on', () => {
@@ -457,17 +483,62 @@ describe('1036 — essenceBrowserModel', () => {
 // ---------------------------------------------------------------------------
 
 describe('1036 — describeEssenceDeleteImpact', () => {
+  // The SHARED-CARRIER fixture, deliberately shaped so a sum and a union differ. This
+  // mirrors what `tests/essence-manager-set-apply.test.js` proves the manager does:
+  // 3 essences across 2 SHARED recipes is `recipesUpdated: 2`, because each referencing
+  // recipe is rewritten ONCE for the whole selection. Summing per-essence counts would
+  // report 4 — a sidebar telling the GM twice the truth. The identities are what make the
+  // two answers distinguishable at all; a counts-only fixture cannot fail this.
   const SELECTION = [
-    { id: 'fire', name: 'Fire', deleteBlocked: false, componentUsageCount: 0, recipeUsageCount: 2 },
-    { id: 'water', name: 'Water', deleteBlocked: false, componentUsageCount: 0, recipeUsageCount: 1 },
-    { id: 'earth', name: 'Earth', deleteBlocked: true, componentUsageCount: 5, recipeUsageCount: 9 },
+    {
+      id: 'fire',
+      name: 'Fire',
+      deleteBlocked: false,
+      componentUsageItems: [{ id: 'comp-a' }],
+      recipeUsageIds: ['r1', 'r2'],
+    },
+    {
+      id: 'water',
+      name: 'Water',
+      deleteBlocked: false,
+      componentUsageItems: [{ id: 'comp-a' }],
+      recipeUsageIds: ['r2'],
+    },
+    {
+      id: 'earth',
+      name: 'Earth',
+      deleteBlocked: true,
+      componentUsageItems: [{ id: 'comp-z' }],
+      recipeUsageIds: ['r9'],
+    },
   ];
 
-  it('reports three DIFFERENT numbers, none derived from another', () => {
+  it('reports the UNION of affected recipes, not the sum of per-essence counts', () => {
     const impact = describeEssenceDeleteImpact(SELECTION);
     assert.equal(impact.deletable, 2, 'selection size 3, deletable 2');
-    assert.equal(impact.componentLinks, 0);
-    assert.equal(impact.recipeRewrites, 3);
+    assert.equal(
+      impact.recipeRewrites,
+      2,
+      'r1 and r2 — the sum over the two deletable rows would be 3, and 2 is what the cascade rewrites'
+    );
+  });
+
+  it('unions the carrying COMPONENTS too, so a component carrying two selected essences counts once', () => {
+    const impact = describeEssenceDeleteImpact(SELECTION);
+    assert.equal(
+      impact.componentsAffected,
+      1,
+      'one component carries both deletable essences; the sum would be 2'
+    );
+  });
+
+  it('accepts a bare id array as well as the store `{id, …}` row shape', () => {
+    const impact = describeEssenceDeleteImpact([
+      { id: 'fire', componentUsageIds: ['comp-a', 'comp-b'], recipeUsageIds: ['r1'] },
+      { id: 'water', componentUsageIds: ['comp-b'], recipeUsageIds: ['r1'] },
+    ]);
+    assert.equal(impact.componentsAffected, 2, 'comp-a and comp-b, with comp-b counted once');
+    assert.equal(impact.recipeRewrites, 1);
   });
 
   it('excludes and NAMES the blocked members, and excludes their usage from the impact', () => {
@@ -475,6 +546,14 @@ describe('1036 — describeEssenceDeleteImpact', () => {
     assert.equal(impact.blocked, 1);
     assert.deepEqual(impact.blockedNames, ['Earth']);
     assert.deepEqual(impact.deletableIds, ['fire', 'water']);
+    assert.deepEqual(
+      [impact.recipeRewrites, impact.componentsAffected],
+      [
+        describeEssenceDeleteImpact(SELECTION.slice(0, 2)).recipeRewrites,
+        describeEssenceDeleteImpact(SELECTION.slice(0, 2)).componentsAffected,
+      ],
+      "dropping the blocked row changes nothing — its own recipe and component are not touched"
+    );
   });
 
   it('is INERT when every selection member is blocked', () => {
@@ -482,16 +561,26 @@ describe('1036 — describeEssenceDeleteImpact', () => {
     assert.equal(impact.canDelete, false);
     assert.equal(impact.deletable, 0);
     assert.deepEqual(impact.blockedNames, ['Earth']);
+    assert.equal(impact.componentsAffected, 0);
+    assert.equal(impact.recipeRewrites, 0);
   });
 
   it('recomputes from the selection it is given rather than caching', () => {
     assert.equal(describeEssenceDeleteImpact(SELECTION.slice(0, 1)).recipeRewrites, 2);
-    assert.equal(describeEssenceDeleteImpact(SELECTION.slice(0, 2)).recipeRewrites, 3);
+    assert.equal(describeEssenceDeleteImpact(SELECTION.slice(1, 2)).recipeRewrites, 1);
+  });
+
+  it('contributes NOTHING for a row supplying no identities, rather than an over-count', () => {
+    // A projection that has not been taught to emit ids yet under-reports visibly instead
+    // of inventing a number the operation will not match.
+    const impact = describeEssenceDeleteImpact([{ id: 'fire', recipeUsageCount: 7 }]);
+    assert.equal(impact.recipeRewrites, 0);
+    assert.equal(impact.componentsAffected, 0);
   });
 
   it('is total over junk rows instead of throwing under the panel', () => {
     const impact = describeEssenceDeleteImpact([null, { id: 'x' }]);
     assert.equal(impact.deletable, 2);
-    assert.equal(impact.componentLinks, 0);
+    assert.equal(impact.componentsAffected, 0);
   });
 });
