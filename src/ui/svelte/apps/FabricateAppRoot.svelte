@@ -117,11 +117,21 @@
   // craftability. Quietly re-fetch the item-derived shared stores (the Crafting and
   // Inventory views read these singletons, so both tabs update — even while closed).
   // The Gathering tab owns its own subscription (its listing is view-local).
+  //
+  // THE INVENTORY LISTING GOES THROUGH `reloadOnDocumentChange`, NEVER `load(true)`
+  // (issue 859). That store method IS the bulk-run suppression: item mutations arrive
+  // one hook fire per document, and a bulk run's burst — each row taking a roll, a
+  // message create, item CRUD and up to three flag writes — coalesces into nothing
+  // inside the subscription's trailing debounce, so a direct load here rebuilds the
+  // listing under the open panel roughly once per queued row. The guard DROPS the
+  // reload while a run is in flight; the run's own terminal `load(true)` picks it up,
+  // which is what makes the drop safe. Calling `load(true)` from here is the bypass
+  // that makes the guard dead code, so `fabricate-app-shell.test.js` pins its absence.
   $effect(() =>
     subscribeInventoryChange(
       () => {
         services?.crafting?.load?.(true);
-        services?.inventory?.load?.(true);
+        services?.inventory?.reloadOnDocumentChange?.();
         services?.alchemy?.load?.(true);
       },
       { isRelevantActor: (actorId) => isRelevantCraftingActor(actorId) }
@@ -132,11 +142,18 @@
   // recipe can change definitions surfaced on any tab (recipe names in Journal runs,
   // component metadata, availability), so quietly reload every shared data store.
   // Works cross-client via main.js's updateSetting bridge (see subscribeCraftingDataChange).
+  //
+  // The inventory listing goes through the same bulk-run guard as the item-change
+  // hook above. This one is not a per-document burst, so it is not the reload the
+  // guard was added for — but rebuilding the listing under a live bulk panel is
+  // exactly as wrong here, and the run's terminal reload covers the dropped refresh
+  // identically. One rule for every shell-driven listing reload, no exceptions to
+  // remember.
   $effect(() =>
     subscribeCraftingDataChange(() => {
       services?.craftingSources?.load?.(true);
       services?.crafting?.load?.(true);
-      services?.inventory?.load?.(true);
+      services?.inventory?.reloadOnDocumentChange?.();
       services?.alchemy?.load?.(true);
       services?.journal?.load?.(true);
     })
