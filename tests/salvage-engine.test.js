@@ -2184,3 +2184,279 @@ test('processPendingSalvageRuns() auto-completes timed salvage runs after world-
     'timed completion should create results automatically'
   );
 });
+
+// ---------------------------------------------------------------------------
+// Group 7 (issue 859): the additive `salvage()` return flags, and `suppressChat`,
+// each driven THROUGH `salvage()` rather than through the poster.
+//
+// `tests/salvage-chat-output.test.js` invokes `_postSalvageChatMessage` DIRECTLY, so a
+// poster-level test cannot see a missed thread — and the flag has TWO call sites (the
+// rolled-failure path and the success path). Forgetting one means a 10-item bulk run
+// with 4 failures posts the aggregate card PLUS 4 stray per-item cards, green.
+//
+// The assertions are therefore on the CAPTURED CONTENT, never on a `ChatMessage.create`
+// call count: the per-roll `Roll#toMessage` dice posts are deliberately KEPT (they are
+// the Dice So Nice trigger), so an interactive run legitimately creates messages even
+// with the salvage card suppressed. A count assertion would fail against correct
+// behaviour.
+// ---------------------------------------------------------------------------
+
+/** The markup root only the SALVAGE CARD carries — never a dice post. */
+const SALVAGE_CARD_MARKUP = 'fabricate-craft-chat';
+
+/**
+ * Stub `Roll` so an interactive check both evaluates to `total` AND posts its dice
+ * through `ChatMessage.create`, exactly as `Roll#toMessage` does in a live world.
+ */
+function stubInteractiveRoll(total) {
+  globalThis.Roll = class {
+    constructor(formula) {
+      this.formula = formula;
+    }
+    async evaluate() {
+      return {
+        total,
+        dice: [{ number: 1, faces: 20, total, results: [{ result: total, active: true }] }],
+        toMessage: async (data) =>
+          globalThis.ChatMessage.create({
+            ...data,
+            content: `<div class="dice-roll">${total}</div>`,
+          }),
+      };
+    }
+  };
+}
+
+/** Capture every `ChatMessage.create` payload for the duration of one test. */
+function captureSalvageChat(t) {
+  const previous = globalThis.ChatMessage;
+  const created = [];
+  globalThis.ChatMessage = {
+    create: async (payload) => {
+      created.push(payload);
+      return { id: `msg-${created.length}` };
+    },
+    getSpeaker: () => ({ alias: 'Salvager' }),
+  };
+  t.after(() => {
+    if (previous === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = previous;
+  });
+  return created;
+}
+
+/**
+ * A wired interactive salvage whose SIMPLE check rolls `total` against DC 15, with chat
+ * output enabled. `total` decides which of the poster's two call sites runs.
+ */
+function makeSuppressibleSetup(total) {
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} }),
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+  const compItem = makeItem('comp-item', 'Test Component', 3);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({
+    name: 'Test Component',
+    resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }],
+  });
+  const system = makeSystem({
+    components: [component],
+    salvageCraftingCheck: {
+      enabled: true,
+      simple: { rollFormula: '1d20', dc: 15, thresholdMode: 'meet' },
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
+    },
+  });
+  system.features.chatOutput = true;
+  setupGame(system, actor);
+  globalThis.game.i18n = { localize: (key) => key, format: (key) => key };
+  stubInteractiveRoll(total);
+  return { engine, actor, component, system, compItem };
+}
+
+/** The payloads whose content is the SALVAGE CARD, never the dice posts beside it. */
+const salvageCards = (created) =>
+  created.filter((payload) => String(payload?.content ?? '').includes(SALVAGE_CARD_MARKUP));
+
+/** Whether any captured payload is a dice post. */
+const postedDice = (created) =>
+  created.some((payload) => String(payload?.content ?? '').includes('dice-roll'));
+
+test('salvage(): the FAILURE path posts its own card when chat is not suppressed', async (t) => {
+  const created = captureSalvageChat(t);
+  const { engine, actor, component, system } = makeSuppressibleSetup(4);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, { interactive: true });
+
+  assert.equal(result.success, false, '4 < 15');
+  assert.equal(salvageCards(created).length, 1, 'the control: one per-item card');
+});
+
+test('salvage(): suppressChat kills the FAILURE card and nothing else', async (t) => {
+  const created = captureSalvageChat(t);
+  const { engine, actor, component, system } = makeSuppressibleSetup(4);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, {
+    interactive: true,
+    suppressChat: true,
+  });
+
+  assert.equal(result.success, false);
+  assert.deepEqual(salvageCards(created), [], 'no message carrying the salvage card markup');
+  assert.equal(
+    postedDice(created),
+    true,
+    'the roll STILL posts its dice — that is the Dice So Nice trigger, not the card'
+  );
+});
+
+test('salvage(): the SUCCESS path posts its own card when chat is not suppressed', async (t) => {
+  const created = captureSalvageChat(t);
+  const { engine, actor, component, system } = makeSuppressibleSetup(16);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, { interactive: true });
+
+  assert.equal(result.success, true, '16 >= 15');
+  assert.equal(salvageCards(created).length, 1, 'the control: one per-item card');
+});
+
+test('salvage(): suppressChat kills the SUCCESS card too — the SECOND call site', async (t) => {
+  // Asserted separately from the failure path on purpose: the flag has two call sites,
+  // and threading only one is the exact defect that ships green.
+  const created = captureSalvageChat(t);
+  const { engine, actor, component, system } = makeSuppressibleSetup(16);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, {
+    interactive: true,
+    suppressChat: true,
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(salvageCards(created), []);
+  assert.equal(postedDice(created), true, 'and the dice post survives here as well');
+});
+
+test('salvage(): an omitted suppressChat behaves exactly as `false`', async (t) => {
+  const created = captureSalvageChat(t);
+  const { engine, actor, component, system } = makeSuppressibleSetup(16);
+
+  await engine.salvage(actor.uuid, system.id, component.id, {
+    interactive: true,
+    suppressChat: undefined,
+  });
+
+  assert.equal(salvageCards(created).length, 1, 'only an explicit true suppresses');
+});
+
+test('salvage(): a misconfigured CHECK returns misconfigured: true', async () => {
+  // Branch one of two. A routed salvage with no authored formula: the check itself
+  // reports the misconfiguration and `salvage()` propagates the discriminator.
+  const { engine, actor, component, system } = makeMisconfiguredSetup(new SalvageRunManager());
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, false);
+  assert.equal(result.misconfigured, true, 'not a rolled failure — a GM-side config gap');
+  assert.equal(result.results, null);
+});
+
+test('salvage(): a validateSalvage ABORT returns misconfigured: true as well', async () => {
+  // Branch two of two, and the one that actually fires in a wired world: this gate runs
+  // BEFORE the check, so a GM-side config error never reaches the check's own
+  // misconfigured return. Without the flag here the player is told "Nothing recovered"
+  // for a configuration only their GM can fix — and the whole `misconfigured` row of the
+  // bulk outcome table would be dead in production.
+  const engine = makeEngine({
+    resolutionModeService: {
+      validateSalvage: () => ({ valid: false, errors: ['two success groups in simple mode'] }),
+      resolveResultGroups: () => ({ groups: [], meta: {} }),
+    },
+  });
+  const compItem = makeItem('comp-item', 'Test Component', 3);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({ name: 'Test Component' });
+  const system = makeSystem({ components: [component] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, false);
+  assert.equal(result.misconfigured, true);
+  assert.match(result.message, /Invalid salvage configuration/);
+  assert.equal(compItem.deleteCalled, false, 'and it aborts with ZERO mutation');
+  assert.equal(compItem.updateCalled, false);
+});
+
+test('salvage(): a rolled failure carries NO misconfigured flag', async (t) => {
+  // The negative control. Without it, an implementation that flagged every failure would
+  // pass both tests above while telling every unlucky player to talk to their GM.
+  captureSalvageChat(t);
+  const { engine, actor, component, system } = makeSuppressibleSetup(4);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id, { interactive: true });
+
+  assert.equal(result.success, false);
+  assert.equal(result.misconfigured, undefined);
+  assert.equal(result.waiting, undefined);
+});
+
+test('salvage(): a time-gated run returns waiting: true ALONGSIDE success: true', async () => {
+  // The flag exists so a caller need not re-derive "started, come back later" from
+  // `results == null` — which is also what a no-result success looks like. `success` is
+  // deliberately unchanged, so no existing consumer regresses.
+  const salvageRunManager = new SalvageRunManager();
+  const engine = makeEngine({
+    resolutionModeService: {
+      validateSalvage: () => ({ valid: true, errors: [] }),
+      resolveResultGroups: () => ({ groups: [], meta: {} }),
+    },
+    salvageRunManager,
+  });
+  const compItem = makeItem('comp-item', 'Test Component', 3);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({ name: 'Test Component' });
+  component.salvage.timeRequirement = { minutes: 5 };
+  const system = makeSystem({ components: [component] });
+  setupGame(system, actor);
+  globalThis.game.fabricate.getSalvageRunManager = () => salvageRunManager;
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.waiting, true);
+  assert.equal(result.success, true, 'the run STARTED — success is unchanged');
+  assert.equal(result.results, null, 'and it has awarded nothing yet');
+  assert.equal(result.salvageRun?.status, 'waitingTime');
+  assert.equal(compItem.deleteCalled, false, 'nothing is consumed by merely starting');
+});
+
+test('salvage(): a genuine no-result success carries NO waiting flag', async () => {
+  // The counter-case that makes the flag worth having: this return also has empty
+  // results, so `results == null` cannot tell the two apart and the flag can.
+  const fakeResolutionService = {
+    validateSalvage: () => ({ valid: true, errors: [] }),
+    resolveResultGroups: () => ({ groups: [], meta: {} }),
+  };
+  const engine = makeEngine({ resolutionModeService: fakeResolutionService });
+  engine._runSalvageCraftingCheck = async () => ({
+    success: true,
+    outcome: null,
+    value: null,
+    data: {},
+  });
+  const compItem = makeItem('comp-item', 'Test Component', 3);
+  const actor = makeActor('actor-1', [compItem]);
+  const component = makeComponent({
+    name: 'Test Component',
+    resultGroups: [{ id: 'rg-1', name: 'Scraps', results: [] }],
+  });
+  const system = makeSystem({ components: [component] });
+  setupGame(system, actor);
+
+  const result = await engine.salvage(actor.uuid, system.id, component.id);
+
+  assert.equal(result.success, true);
+  assert.equal(result.waiting, undefined);
+  assert.deepEqual(result.results, [], 'it resolved; it just had nothing to award');
+});

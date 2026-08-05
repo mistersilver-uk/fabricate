@@ -97,6 +97,12 @@ function salvageRow() {
       mode: 'simple',
       checkUsable: false,
       misconfigured: false,
+      // The builder emits BOTH of these on every salvage projection
+      // (`_buildSalvage`), and the bulk partition reads `toolsAvailable` as a blocked
+      // reason — an omission here would read as a `toolsUnavailable` row rather than a
+      // queueable one.
+      toolStates: [],
+      toolsAvailable: true,
       allowPlayerResultReorder: true,
       results: [{ id: 'r1', componentId: 'c2', name: 'Iron Shard', img: null, quantity: 2 }],
       routedOutcomes: [],
@@ -261,5 +267,134 @@ describe('InventoryView — salvage reload keeps the tab and reads the remaining
       target.querySelector('[data-inventory-salvage-ribbon]'),
       'and the success ribbon is on that reopened tab'
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // Bulk salvage (issue 859), driven through the SAME real store.
+  //
+  // The mocked-store suite pins the panel's markup from props; this one pins the
+  // GESTURE — shift-click, Shift+Enter and Escape actually moving the real store's
+  // selection and the view re-rendering off it. A POJO store cannot show that at all.
+  // -------------------------------------------------------------------------
+
+  /** Dispatch a real bubbling event on `node` with the modifier keys set. */
+  function fire(node, type, init = {}) {
+    const EventClass = type.startsWith('key')
+      ? node.ownerDocument.defaultView.KeyboardEvent
+      : node.ownerDocument.defaultView.MouseEvent;
+    node.dispatchEvent(new EventClass(type, { bubbles: true, cancelable: true, ...init }));
+  }
+
+  /** Mount the view over a real store with the salvage row already inspected. */
+  async function mountWithInspectedRow() {
+    const services = makeServices();
+    services.inventory = createInventoryStore({ services });
+    const target = await harness.mount({ services });
+    await settle();
+    services.inventory.select('sys:c1');
+    await settle();
+    return { target, services };
+  }
+
+  it('a shift-click enters bulk: the panel renders and the detail body does not', async () => {
+    const { target, services } = await mountWithInspectedRow();
+    assert.ok(target.querySelector('[data-inventory-detail="sys:c1"]'), 'the inspector is open');
+
+    fire(target.querySelector('[data-inventory-card="sys:c9"] button'), 'click', {
+      shiftKey: true,
+    });
+    await settle();
+
+    // Acceptance 1: the FIRST shift-click promotes the inspected card, so both are in.
+    assert.deepEqual(services.inventory.bulkSelectedKeys, ['sys:c1', 'sys:c9']);
+    assert.ok(target.querySelector('[data-inventory-bulk-panel]'), 'the panel replaced the body');
+    assert.ok(
+      !target.querySelector('[data-inventory-detail="sys:c1"]'),
+      'and the single-item inspector is gone, not merely hidden behind it'
+    );
+    assert.ok(
+      target.querySelector('[data-inventory-card-bulk-selected]'),
+      'the grid marks the selected cards'
+    );
+  });
+
+  it('Shift+Enter on a card does exactly the same thing', async () => {
+    const { target, services } = await mountWithInspectedRow();
+
+    fire(target.querySelector('[data-inventory-card="sys:c9"] button'), 'keydown', {
+      key: 'Enter',
+      shiftKey: true,
+    });
+    await settle();
+
+    assert.deepEqual(services.inventory.bulkSelectedKeys, ['sys:c1', 'sys:c9']);
+    assert.ok(target.querySelector('[data-inventory-bulk-panel]'));
+  });
+
+  it('partitions the selection: the salvageable row queues, the rest is blocked', async () => {
+    // `Zzz Filler` carries no salvage config at all, so it is `salvageDisabled` — the
+    // blocked half — while `Iron Ore` queues. One gesture, two lists.
+    const { target } = await mountWithInspectedRow();
+    fire(target.querySelector('[data-inventory-card="sys:c9"] button'), 'click', {
+      shiftKey: true,
+    });
+    await settle();
+
+    assert.ok(target.querySelector('[data-inventory-bulk-queue-row="sys:c1"]'), 'Iron Ore queues');
+    assert.ok(
+      target.querySelector('[data-inventory-bulk-blocked-row="salvageDisabled"]'),
+      'and the unsalvageable row names its reason'
+    );
+  });
+
+  it('Escape leaves bulk and restores the inspector', async () => {
+    const { target, services } = await mountWithInspectedRow();
+    fire(target.querySelector('[data-inventory-card="sys:c9"] button'), 'click', {
+      shiftKey: true,
+    });
+    await settle();
+    assert.ok(target.querySelector('[data-inventory-bulk-panel]'), 'bulk is active');
+
+    fire(target.querySelector('[data-inventory-grid]'), 'keydown', { key: 'Escape' });
+    await settle();
+
+    assert.deepEqual(services.inventory.bulkSelectedKeys, []);
+    assert.ok(!target.querySelector('[data-inventory-bulk-panel]'), 'the panel is gone');
+    assert.ok(
+      target.querySelector('[data-inventory-detail="sys:c1"]'),
+      'and Clear/Escape return to the SAME card, because selectedKey is retained'
+    );
+  });
+
+  it('a plain click leaves bulk and inspects the clicked card', async () => {
+    const { target, services } = await mountWithInspectedRow();
+    fire(target.querySelector('[data-inventory-card="sys:c9"] button'), 'click', {
+      shiftKey: true,
+    });
+    await settle();
+
+    fire(target.querySelector('[data-inventory-card="sys:c9"] button'), 'click');
+    await settle();
+
+    assert.deepEqual(services.inventory.bulkSelectedKeys, []);
+    assert.ok(
+      target.querySelector('[data-inventory-detail="sys:c9"]'),
+      'inspecting the clicked one'
+    );
+  });
+
+  it('InventoryDetail imports NOTHING from the bulk tree — the router bypass', async () => {
+    // The same assertion the mocked-store suite makes, restated HERE because this suite
+    // is the one whose `compiledModules` list would have to grow if the bypass were ever
+    // routed through `InventoryDetail`: a `{#if}` in a router does not keep a branch out
+    // of the compiled module's STATIC imports, so the bulk tree would silently join
+    // `recipe-item-editor-mounted` and `manager-mounted`'s graphs too.
+    const { readFileSync } = await import('node:fs');
+    const detail = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/inventory/InventoryDetail.svelte'),
+      'utf8'
+    );
+    assert.equal(detail.includes('/bulk/'), false, 'no bulk import of any kind');
+    assert.equal(detail.includes('InventoryBulk'), false, 'nor a bulk component by name');
   });
 });
