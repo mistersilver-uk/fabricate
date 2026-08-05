@@ -8361,7 +8361,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       'edit route should use the shared icon picker trigger'
     );
     assert.equal(target.querySelector('.essence-icon-picker-trigger').title, 'Change icon');
-    assert.ok(target.textContent.includes('Clear icon'));
+    // The icon RESET sits beside the picker as an icon-only control rather than under it as
+    // a second full-width button, so its label is its accessible name and its tooltip
+    // rather than visible text. Asserted on the control, which is what a GM operates.
+    assert.equal(
+      target.querySelector('[data-essence-icon-reset]').getAttribute('aria-label'),
+      'Clear icon'
+    );
+    assert.equal(target.querySelector('[data-essence-icon-reset]').title, 'Clear icon');
     assert.equal(
       target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       true

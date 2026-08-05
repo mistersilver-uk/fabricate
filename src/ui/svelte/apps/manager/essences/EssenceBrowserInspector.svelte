@@ -177,7 +177,77 @@
     {macroName}
     showIdentity={false}
     showLiveNote={false}
+    showEffectiveKicker={false}
   />
+</section>
+
+<!--
+  THE ACTIONS SIT ABOVE `Source` AND `Usage`, not below them (issue 1036 fidelity pass).
+  The prototype's rail is hero, stats, `On craft`, then the actions — the primary `Edit
+  essence` is the loudest control on the panel and it is on screen. Ordered after two
+  supplementary detail cards it fell past the fold at the 1280×820 capture size, so the
+  rail's one loud thing was invisible in every frame of it. `Source` and `Usage` are
+  reference, so they follow the verb rather than delaying it.
+-->
+<section class="manager-inspector-card" data-essence-section="actions">
+  <div class="manager-essence-inspector-actions">
+    <button
+      type="button"
+      class="manager-button"
+      data-essence-action="duplicate"
+      onclick={() => onDuplicate(essence.id)}
+    >
+      <i class="fas fa-clone" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Essence.Duplicate', 'Duplicate essence')}</span>
+    </button>
+    <button
+      type="button"
+      class="manager-button is-primary"
+      data-essence-action="edit"
+      onclick={() => onEdit(essence.id)}
+    >
+      <i class="fas fa-pen" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}</span>
+    </button>
+    <!-- The SINGLE delete keeps the `confirmDialog` the store already owns. The two-step
+         ARM is the BULK panel's, per the maintainer's decision for that action alone;
+         wearing both idioms on one screen for one verb would teach the GM neither. The
+         control is `disabled` only as a courtesy — `store.deleteEssence` re-checks the
+         in-use refusal against the system, because `deleteBlocked` is a UI-only card
+         field and the guard it stands for is a data-loss guard. -->
+    <button
+      type="button"
+      class="manager-button is-danger"
+      data-essence-action="delete"
+      disabled={essence.deleteBlocked === true}
+      aria-label={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
+        name: essence.name,
+      })}
+      onclick={() => onDelete(essence.id)}
+    >
+      <i class="fas fa-trash" aria-hidden="true"></i>
+      <span>{text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}</span>
+    </button>
+  </div>
+  {#if essence.deleteBlocked}
+    <p class="manager-muted manager-essence-delete-note" data-essence-delete-blocked>
+      <i class="fas fa-lock" aria-hidden="true"></i>
+      {format(
+        'FABRICATE.Admin.Manager.Essence.UsageBlockedNamed',
+        'In use by {count} components. Remove it from those components before deleting the definition.',
+        { count: essence.componentUsageCount || 0 }
+      )}
+    </p>
+  {:else if essence.deleteRewritesRecipes}
+    <p class="manager-muted manager-essence-delete-note" data-essence-delete-rewrites>
+      <i class="fas fa-circle-info" aria-hidden="true"></i>
+      {format(
+        'FABRICATE.Admin.Manager.Essence.DeleteRewritesRecipes',
+        'Deleting this essence rewrites {count} recipes that require it.',
+        { count: essence.recipeUsageCount || 0 }
+      )}
+    </p>
+  {/if}
 </section>
 
 {#if showSourceUi}
@@ -274,67 +344,6 @@
         </button>
       {/each}
     </div>
-  {/if}
-</section>
-
-<section class="manager-inspector-card" data-essence-section="actions">
-  <div class="manager-essence-inspector-actions">
-    <button
-      type="button"
-      class="manager-button"
-      data-essence-action="duplicate"
-      onclick={() => onDuplicate(essence.id)}
-    >
-      <i class="fas fa-clone" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Essence.Duplicate', 'Duplicate essence')}</span>
-    </button>
-    <button
-      type="button"
-      class="manager-button is-primary"
-      data-essence-action="edit"
-      onclick={() => onEdit(essence.id)}
-    >
-      <i class="fas fa-pen" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}</span>
-    </button>
-    <!-- The SINGLE delete keeps the `confirmDialog` the store already owns. The two-step
-         ARM is the BULK panel's, per the maintainer's decision for that action alone;
-         wearing both idioms on one screen for one verb would teach the GM neither. The
-         control is `disabled` only as a courtesy — `store.deleteEssence` re-checks the
-         in-use refusal against the system, because `deleteBlocked` is a UI-only card
-         field and the guard it stands for is a data-loss guard. -->
-    <button
-      type="button"
-      class="manager-button is-danger"
-      data-essence-action="delete"
-      disabled={essence.deleteBlocked === true}
-      aria-label={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
-        name: essence.name,
-      })}
-      onclick={() => onDelete(essence.id)}
-    >
-      <i class="fas fa-trash" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}</span>
-    </button>
-  </div>
-  {#if essence.deleteBlocked}
-    <p class="manager-muted manager-essence-delete-note" data-essence-delete-blocked>
-      <i class="fas fa-lock" aria-hidden="true"></i>
-      {format(
-        'FABRICATE.Admin.Manager.Essence.UsageBlockedNamed',
-        'In use by {count} components. Remove it from those components before deleting the definition.',
-        { count: essence.componentUsageCount || 0 }
-      )}
-    </p>
-  {:else if essence.deleteRewritesRecipes}
-    <p class="manager-muted manager-essence-delete-note" data-essence-delete-rewrites>
-      <i class="fas fa-circle-info" aria-hidden="true"></i>
-      {format(
-        'FABRICATE.Admin.Manager.Essence.DeleteRewritesRecipes',
-        'Deleting this essence rewrites {count} recipes that require it.',
-        { count: essence.recipeUsageCount || 0 }
-      )}
-    </p>
   {/if}
 </section>
 

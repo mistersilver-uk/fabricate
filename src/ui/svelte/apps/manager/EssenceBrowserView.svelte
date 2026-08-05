@@ -288,40 +288,6 @@
           ui.pageIndex = 0;
         }}
       />
-      <!-- RETAINED from the shipped browser and reachable only with source UI on: a broken
-           source link is otherwise unfindable, which is the only reason `needs-attention`
-           exists. The `aria-label` is the select's accessible name. -->
-      {#if showSourceUi}
-        <select
-          class="manager-essence-source-filter"
-          data-essence-source-filter
-          value={ui.sourceFilter}
-          onchange={(event) => {
-            ui.sourceFilter = event.currentTarget.value;
-            ui.pageIndex = 0;
-          }}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Essence.SourceFilterLabel',
-            'Filter essences by source state'
-          )}
-        >
-          <option value="all"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceAll', 'All sources')}</option
-          >
-          <option value="linked"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceLinkedFilter', 'Linked')}</option
-          >
-          <option value="none"
-            >{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</option
-          >
-          <option value="needs-attention"
-            >{text(
-              'FABRICATE.Admin.Manager.Essence.SourceNeedsAttention',
-              'Needs attention'
-            )}</option
-          >
-        </select>
-      {/if}
       <SegmentedControl
         options={viewModeOptions}
         value={ui.viewMode}
@@ -333,6 +299,19 @@
       />
     </div>
 
+    <!-- ROW TWO carries how the list is ARRANGED — the ordering controls and the retained
+         source filter — plus the active-filter chips and the count. They were three separate
+         rows, which made a toolbar the prototype draws as one bar four rows tall, and the
+         chip row was usually EMPTY, so it rendered as a blank band holding nothing but a
+         right-aligned count.
+
+         The source filter moved DOWN here rather than staying on row one, so row one is
+         exactly the three controls the prototype draws: search, the status segments, and the
+         presentation toggle. It is a filter sitting among view controls, which is a register
+         mix — but the alternative is a four-control row whose minimum widths sum to within a
+         pixel of the space the 1280px capture has, and a row that wraps is the defect this
+         pass exists to remove. The count keeps its `margin-left: auto`, so it still sits at
+         the far end of the bar. -->
     <div class="manager-essence-filter-row is-secondary">
       <div class="manager-essence-filter-field">
         <span class="manager-essence-filter-label"
@@ -371,9 +350,42 @@
           >
         </button>
       </div>
-    </div>
 
-    <div class="manager-essence-filter-row is-chips">
+      <!-- RETAINED from the shipped browser and reachable only with source UI on: a broken
+           source link is otherwise unfindable, which is the only reason `needs-attention`
+           exists. The `aria-label` is the select's accessible name. -->
+      {#if showSourceUi}
+        <select
+          class="manager-essence-source-filter"
+          data-essence-source-filter
+          value={ui.sourceFilter}
+          onchange={(event) => {
+            ui.sourceFilter = event.currentTarget.value;
+            ui.pageIndex = 0;
+          }}
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Essence.SourceFilterLabel',
+            'Filter essences by source state'
+          )}
+        >
+          <option value="all"
+            >{text('FABRICATE.Admin.Manager.Essence.SourceAll', 'All sources')}</option
+          >
+          <option value="linked"
+            >{text('FABRICATE.Admin.Manager.Essence.SourceLinkedFilter', 'Linked')}</option
+          >
+          <option value="none"
+            >{text('FABRICATE.Admin.Manager.Essence.SourceNone', 'No source')}</option
+          >
+          <option value="needs-attention"
+            >{text(
+              'FABRICATE.Admin.Manager.Essence.SourceNeedsAttention',
+              'Needs attention'
+            )}</option
+          >
+        </select>
+      {/if}
+
       {#each chips as chip (chip.id)}
         <Chip tone="info" class="manager-essence-filter-chip" data-essence-filter-chip={chip.id}>
           <span>{chipLabel(chip)}</span>
@@ -495,40 +507,17 @@
 </main>
 
 <style>
-  /* The library's own toolbar rhythm and the two list presentations. Everything a scoped
-     block cannot reach — the route-level `.manager-main` row template and the row's shared
-     skin, geometry, hover and selected-ring joins — stays in `styles/fabricate.css`. */
-  .manager-essence-toolbar {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-  }
+  /* The two list presentations, and the count. The TOOLBAR's own rhythm is no longer here:
+     `.manager-essence-toolbar`, `.manager-essence-filter-row` (and its `.is-secondary` /
+     `.is-selection` variants), `.manager-essence-filter-field`, `.manager-essence-filter-label`
+     and the toolbar's `select` treatment all JOIN the recipe and component filter-bar rules
+     in `styles/fabricate.css`, which is the one bar all three studios render.
 
-  .manager-essence-filter-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-    width: 100%;
-  }
-
-  .manager-essence-filter-row.is-chips {
-    gap: var(--fab-space-2);
-  }
-
-  .manager-essence-filter-field {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-essence-filter-label {
-    color: var(--fab-text-muted);
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
+     That is a correctness fix, not tidying. `BulkSelectionToolbar` renders
+     `<div class="{rowClass} is-selection">` in ITS OWN template, so a rule scoped to THIS
+     component never reached it: the selection row shipped with no row metrics at all, which
+     is why it floated centred with its `Clear` action stranded mid-row. A row class a shared
+     primitive wears has to be authored where that primitive can see it. */
 
   .manager-essence-count {
     margin-left: auto;
@@ -558,11 +547,17 @@
 
   /* The GRID presentation. `auto-fill` rather than a fixed count so the card width stays
      inside the readable range at every manager width, which is what stops the narrow
-     breakpoint needing a second template. */
+     breakpoint needing a second template.
+
+     Cards STRETCH to the tallest in their row (issue 1036 fidelity pass). `align-items: start`
+     sized every card to its own copy, so a row of four ran four different heights — a ragged
+     shelf where the prototype shows a level one. The card's own control cluster takes
+     `margin-top: auto` in `EssenceRow.svelte`, so the extra height lands between the
+     description and the footer and the footers line up across the row. */
   .manager-essences-table.is-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    align-items: start;
+    align-items: stretch;
   }
 
   /* Search wraps onto its own line before the segmented controls start colliding. The row

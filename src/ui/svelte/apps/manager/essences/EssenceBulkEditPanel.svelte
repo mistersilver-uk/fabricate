@@ -44,6 +44,7 @@
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import Callout from '../Callout.svelte';
+  import Chip from '../Chip.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
@@ -248,12 +249,37 @@
   {onClearSelection}
   {onApply}
 >
+  <!--
+    THE AXIS RESET IS A TRAILING CHIP, NOT A SECOND FULL-WIDTH BUTTON (issue 1036 fidelity
+    pass). Both axes shipped as three stacked full-width elements — a sub-hint, a full-width
+    control, and a full-width `Leave unchanged` button under it — where the prototype draws
+    one compact row per axis. `BulkEditSection` already owns a slot for exactly this: its
+    `trailing` snippet puts a staged-axis control on the label's baseline, which is where the
+    Component Studio puts its own `Will overwrite` / `Unchanged` chips. Reusing that slot
+    removes two full-width buttons from the rail and costs no new primitive.
+  -->
   <BulkEditSection
     label={text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}
     subhint={stagedIconLabel}
     subhintAttr="data-essence-bulk-icon-state"
     subhintValue={draft?.icon ? 'staged' : 'unchanged'}
-  />
+  >
+    {#snippet trailing()}
+      <!-- The `Leave unchanged` RESET. `''` is the model's unstaged sentinel, so this is a
+           real instruction rather than a second way of picking an icon. Inert when nothing
+           is staged, because there is then nothing to undo. -->
+      <Chip
+        tag="button"
+        type="button"
+        tone={draft?.icon ? 'warning' : 'neutral'}
+        icon="fas fa-undo"
+        data-essence-bulk-icon-reset
+        disabled={inert || !draft?.icon}
+        onclick={() => onDraftChange(setBulkEssenceIcon(draft, ''))}
+        >{text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')}</Chip
+      >
+    {/snippet}
+  </BulkEditSection>
   <div class="manager-essence-bulk-icon">
     <IconPicker
       value={draft?.icon || ''}
@@ -261,18 +287,6 @@
       buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
       onChange={(icon) => onDraftChange(setBulkEssenceIcon(draft, icon))}
     />
-    <!-- The `Leave unchanged` RESET. `''` is the model's unstaged sentinel, so this is a
-         real instruction rather than a second way of picking an icon. -->
-    <button
-      type="button"
-      class="manager-button"
-      data-essence-bulk-icon-reset
-      disabled={inert || !draft?.icon}
-      onclick={() => onDraftChange(setBulkEssenceIcon(draft, ''))}
-    >
-      <i class="fas fa-undo" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')}</span>
-    </button>
   </div>
 
   <BulkEditSection
@@ -280,7 +294,20 @@
     subhint={stagedColourLabel}
     subhintAttr="data-essence-bulk-colour-state"
     subhintValue={colourValue || 'unchanged'}
-  />
+  >
+    {#snippet trailing()}
+      <Chip
+        tag="button"
+        type="button"
+        tone={colourValue === ESSENCE_BULK_COLOUR_UNCHANGED ? 'neutral' : 'warning'}
+        icon="fas fa-undo"
+        data-essence-bulk-colour-reset
+        disabled={inert || colourValue === ESSENCE_BULK_COLOUR_UNCHANGED}
+        onclick={() => onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_UNCHANGED))}
+        >{text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')}</Chip
+      >
+    {/snippet}
+  </BulkEditSection>
   <!--
     THREE instructions, never two: leave unchanged, clear to the theme accent, or a token.
     The palette is rendered INLINE (`layout="inline"`) with the No-colour cell switched on,
@@ -305,16 +332,6 @@
       onClear={() => onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_NONE))}
       onChange={(next) => onDraftChange(setBulkEssenceColour(draft, next?.colorToken || ''))}
     />
-    <button
-      type="button"
-      class="manager-button"
-      data-essence-bulk-colour-reset
-      disabled={inert || colourValue === ESSENCE_BULK_COLOUR_UNCHANGED}
-      onclick={() => onDraftChange(setBulkEssenceColour(draft, ESSENCE_BULK_COLOUR_UNCHANGED))}
-    >
-      <i class="fas fa-undo" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged')}</span>
-    </button>
   </div>
 
   <BulkEditSection label={text('FABRICATE.Admin.Manager.Essence.Status.Label', 'Status')} />
@@ -397,11 +414,16 @@
 </section>
 
 <style>
+  /* ONE control each, now that both axis resets live on their section's label row. The
+     stack survives because each wrapper is still the hook the mounted tests and the
+     `data-essence-bulk-colour` state attribute hang on, and because the palette is a grid
+     that must occupy the rail's full width to lay its cells out. */
   .manager-essence-bulk-icon,
   .manager-essence-bulk-colour {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
+    min-width: 0;
   }
 
   .manager-essence-bulk-delete {

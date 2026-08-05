@@ -195,6 +195,33 @@
     box-shadow: none;
   }
 
+  /* INLINE SWATCH GEOMETRY (issue 1036 fidelity pass), and it is the reason the palette
+     shipped enormous. The global grid is `repeat(4, 1fr)` and the cell is `aspect-ratio: 1`
+     — sized by the POPOVER's fixed 220px width, that is a ~46px square, which is what the
+     three popover call sites still get. Inline, the same rules take the width of whatever
+     column hosts them: ~62px squares in the 300px bulk rail, and ~165px squares across the
+     editor's main column, where ten of them consumed more height than every other control
+     on the tab combined.
+
+     So the inline mode sizes the cell instead of letting the container do it. The height is
+     fixed at the 28px this file's own `.manager-color-custom input` already uses, the square
+     constraint is released, and the columns are `auto-fit` over a 44px floor — which
+     resolves to one row of nine across the editor and two rows (5 + 4) in the rail, both of
+     which are the prototype's own composition. `auto-fit` rather than `auto-fill` so the
+     cells stretch to fill a wide row instead of leaving collapsed tracks beside them.
+
+     Three classes plus the hash, as the block above, so this beats the two-class global
+     rules on specificity rather than on source order. */
+  .manager-color-picker-popover.is-inline .manager-color-preset-grid {
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  }
+
+  .manager-color-picker-popover.is-inline .manager-color-preset {
+    aspect-ratio: auto;
+    height: 28px;
+    min-height: 28px;
+  }
+
   /* The NO COLOUR cell reads as an absence rather than as a ninth colour: the theme's own
      surface behind a struck-through glyph, not a swatch. Flat by contract — no gradient
      (`tests/components/flat-ui-style-contract.test.js`). */

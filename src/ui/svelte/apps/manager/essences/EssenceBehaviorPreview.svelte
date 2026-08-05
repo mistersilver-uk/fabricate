@@ -40,6 +40,11 @@
     sampleComponentName = '',
     showIdentity = true,
     showLiveNote = true,
+    // Whether the rules list titles ITSELF. In the editor's rail it must, because three
+    // other kickers precede it. In the browser inspector the enclosing card already carries
+    // an `On craft` heading, so the kicker rendered a second heading immediately under the
+    // first for one list — which is the prototype's ONE `ON CRAFT` kicker drawn twice.
+    showEffectiveKicker = true,
   } = $props();
 
   function text(key, fallback) {
@@ -145,9 +150,11 @@
     </div>
   {/if}
 
-  <p class="manager-kicker">
-    {text('FABRICATE.Admin.Manager.Essence.Preview.Effective', 'Effective behaviour')}
-  </p>
+  {#if showEffectiveKicker}
+    <p class="manager-kicker">
+      {text('FABRICATE.Admin.Manager.Essence.Preview.Effective', 'Effective behaviour')}
+    </p>
+  {/if}
   <ul class="manager-essence-preview-rules">
     {#each facts as fact (fact.id)}
       <li data-essence-preview-rule={fact.id} data-essence-preview-suppressed={fact.suppressed}>
@@ -204,11 +211,20 @@
     font-size: 0.7rem;
   }
 
+  /* The two samples are WELLS, like the identity card above them (issue 1036 fidelity
+     pass). They shipped as bare runs of text on the rail background, so `How it appears`
+     read as one bordered card followed by two loose lines; the prototype draws all three as
+     the same card. Same border, radius and fill as `-identity`, one step tighter because a
+     sample is a single line rather than a 44px medallion row. */
   .manager-essence-preview-sample {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 8px;
+    background: var(--fab-overlay-light-03);
     font-size: 0.7rem;
   }
 

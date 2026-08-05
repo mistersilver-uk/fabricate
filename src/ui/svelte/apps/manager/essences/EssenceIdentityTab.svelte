@@ -73,15 +73,21 @@
             buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
             onChange={(iconClass) => onIconChange(iconClass)}
           />
+          <!-- ICON-ONLY, and beside the picker rather than stacked under it. The prototype
+               composes the icon control as a tile plus ONE affordance; a second full-width
+               button under a full-width trigger made it three stacked elements. The label
+               survives as the accessible name and the tooltip, which is the treatment every
+               other manager row action already uses. -->
           <button
             type="button"
-            class="manager-button"
+            class="manager-icon-button"
             data-essence-icon-reset
             disabled={saving || normalizedIcon === DEFAULT_ESSENCE_ICON}
+            aria-label={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
+            title={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             onclick={() => onIconChange(DEFAULT_ESSENCE_ICON)}
           >
             <i class="fas fa-undo" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}</span>
           </button>
         </div>
       </div>

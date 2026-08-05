@@ -353,9 +353,16 @@
     line-clamp: 3;
   }
 
+  /* `margin-top: auto` is what turns the stretched grid row into a level shelf: the card
+     is a flex column, the list stretches every card to the tallest in its row, and this
+     pushes the pills-and-counts footer to the bottom of whatever height the card was given.
+     Without it the extra height falls BELOW the footer and the footers stay ragged, which
+     is the same defect one step further down. `--fab-space-3` survives as the minimum gap
+     for the shortest card in a row, which is the one `auto` resolves to zero for. */
   .manager-essence-row.is-card .manager-essence-cluster {
     flex-wrap: wrap;
-    margin-top: var(--fab-space-3);
+    margin-top: auto;
+    padding-top: var(--fab-space-3);
     margin-left: 0;
   }
 

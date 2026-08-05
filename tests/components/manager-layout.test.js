@@ -1878,12 +1878,17 @@ test('the bulk-selected row state is one joined selector across both studios', (
   }
 
   // The selection ROW joins the same way, for the same reason: one primitive renders it in
-  // both toolbars and its `rowClass` prop picks which half applies.
+  // all three toolbars and its `rowClass` prop picks which third applies.
+  //
+  // The essence library joined for issue 1036, and its absence was a live defect rather
+  // than a cosmetic one: it passed `rowClass="manager-essence-filter-row"` while authoring
+  // that class only in its own scoped `<style>`, which a child component's root element
+  // cannot see. The selection row therefore rendered with NO row metrics at all.
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-recipe-filter-row.is-selection,\n.fabricate-manager .manager-component-filter-row.is-selection {'
+      '.fabricate-manager .manager-recipe-filter-row.is-selection,\n.fabricate-manager .manager-component-filter-row.is-selection,\n.fabricate-manager .manager-essence-filter-row.is-selection {'
     ),
-    'the recipe toolbar joins the selection-row block rather than authoring a second one'
+    'every toolbar rendering the shared selection row joins one selection-row block'
   );
   assert.equal(
     css.includes('has no selection row at all'),
@@ -1915,7 +1920,7 @@ test('long-labelled switches escape the status cell geometry', () => {
   // The micro-label is what titles the control, and `white-space: nowrap` is the whole
   // reason "Sort by" no longer breaks onto two lines in the flagship frame.
   const filterLabelBlock = blockFor(
-    '.fabricate-manager .manager-recipe-filter-label,\n.fabricate-manager .manager-component-filter-label'
+    '.fabricate-manager .manager-recipe-filter-label,\n.fabricate-manager .manager-component-filter-label,\n.fabricate-manager .manager-essence-filter-label'
   );
   assert.ok(filterLabelBlock.includes('white-space: nowrap;'), 'a filter micro-label never wraps');
   assert.ok(
@@ -3487,17 +3492,28 @@ test('manager components browser defines drop target and compact responsive list
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
   // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its
   // own selects carried no font-size at all and were rendering at Foundry's 14px app base.
+  // The essence library joined both lists for issue 1036 — see the selection-row assertion
+  // above for why its scoped copy of them was not equivalent.
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row'
+      '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row,\n.fabricate-manager .manager-essence-filter-row'
     ).includes('flex-wrap: wrap;'),
-    'the component filter rows share the recipe filter row rule'
+    'the component and essence filter rows share the recipe filter row rule'
   );
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar select'
+      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar select,\n.fabricate-manager .manager-essence-toolbar .manager-search input,\n.fabricate-manager .manager-essence-toolbar select'
     ).includes('font-size: var(--fab-recipe-control-font);'),
-    'the component toolbar controls are typed by the shared control font, not the Foundry bleed'
+    'the component and essence toolbar controls are typed by the shared control font, not the Foundry bleed'
+  );
+  // The essence toolbar's selects also take the Fabricate select TREATMENT. Without it they
+  // rendered with Foundry core's own chrome — full-width, taller than the segmented controls
+  // beside them, and wrapping one filter row into three.
+  assert.ok(
+    blockFor(
+      '.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar select,\n.fabricate-manager .manager-essence-toolbar select'
+    ).includes('height: 34px;'),
+    'every studio filter bar dresses its own selects rather than inheriting Foundry core chrome'
   );
   assert.ok(
     blockFor(

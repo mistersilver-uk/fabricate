@@ -4229,22 +4229,43 @@
    below rather than re-deriving a second, drifting filter bar. Its selects carried NO
    font-size rule at all and were rendering at Foundry's 14px `.application` base — a
    live bleed, because the Component Studio's own bleed patch covers `.manager-search
-   input` and `.manager-toolbar .manager-button`, but not `select`. */
+   input` and `.manager-toolbar .manager-button`, but not `select`.
+
+   The essence library (issue 1036) is the THIRD studio on this bar and joins it for the
+   same reason. It had re-derived the bar in its own scoped `<style>`, which looked
+   equivalent and was not, in two ways a source read cannot show:
+
+    - a SCOPED rule cannot reach `BulkSelectionToolbar`'s root. That primitive renders
+      `<div class="{rowClass} is-selection">` in ITS OWN template, so the essence view's
+      scoped `.manager-essence-filter-row` never applied to it — the selection row had no
+      `display: flex`, no `width: 100%` and no hairline, its `Clear` action's
+      `margin-left: auto` was inert, and `.manager-toolbar`'s `align-items: center` (which
+      the scoped block did not override) centred the whole row in the panel. The row class
+      a shared primitive WEARS therefore has to be authored here, beside the two studios
+      whose rows it already joins;
+    - nothing gave the essence toolbar's `select` elements the Fabricate select treatment
+      or the shared control font, so the source and sort dropdowns rendered with Foundry
+      core's own chrome at the 14px `.application` base — full-width, taller than the
+      controls beside them, and wrapping the one filter row into three. */
 .fabricate-manager .manager-recipe-toolbar .manager-search input,
 .fabricate-manager .manager-recipe-toolbar select,
 .fabricate-manager .manager-component-toolbar .manager-search input,
-.fabricate-manager .manager-component-toolbar select {
+.fabricate-manager .manager-component-toolbar select,
+.fabricate-manager .manager-essence-toolbar .manager-search input,
+.fabricate-manager .manager-essence-toolbar select {
   font-size: var(--fab-recipe-control-font);
 }
 
 /* The search field takes the selects' 9px radius rather than the shared 6px, so the bar
    does not mix two corner radii across adjacent controls. */
-.fabricate-manager .manager-component-toolbar .manager-search input {
+.fabricate-manager .manager-component-toolbar .manager-search input,
+.fabricate-manager .manager-essence-toolbar .manager-search input {
   border-radius: 9px;
 }
 
 .fabricate-manager .manager-recipe-filter-row,
-.fabricate-manager .manager-component-filter-row {
+.fabricate-manager .manager-component-filter-row,
+.fabricate-manager .manager-essence-filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-2);
@@ -4254,7 +4275,8 @@
 }
 
 .fabricate-manager .manager-recipe-filter-row.is-secondary,
-.fabricate-manager .manager-component-filter-row.is-secondary {
+.fabricate-manager .manager-component-filter-row.is-secondary,
+.fabricate-manager .manager-essence-filter-row.is-secondary {
   gap: var(--fab-space-3);
 }
 
@@ -4277,9 +4299,12 @@
    render the one shared `BulkSelectionToolbar` — its `rowClass` prop is what selects which
    half of this selector applies. (This block used to say the recipe toolbar "has no
    selection row at all"; issue 1010 gave it one, so that reason is retired rather than
-   left standing as a false claim.) */
+   left standing as a false claim.) The essence library joins it for issue 1036: it renders
+   the same primitive, and a `rowClass` naming a row this sheet does not author leaves that
+   primitive's root with no row at all. */
 .fabricate-manager .manager-recipe-filter-row.is-selection,
-.fabricate-manager .manager-component-filter-row.is-selection {
+.fabricate-manager .manager-component-filter-row.is-selection,
+.fabricate-manager .manager-essence-filter-row.is-selection {
   gap: var(--fab-space-2);
   padding-top: var(--fab-space-2);
   border-top: 1px solid var(--fab-mv2-border);
@@ -4291,7 +4316,8 @@
    they rendered with before (issue 643). The two-class-plus-element selector (0,2,1)
    outranks Foundry core's aggressive `select` rules. */
 .fabricate-manager .manager-recipe-toolbar select,
-.fabricate-manager .manager-component-toolbar select {
+.fabricate-manager .manager-component-toolbar select,
+.fabricate-manager .manager-essence-toolbar select {
   height: 34px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
@@ -4306,7 +4332,8 @@
    sentence case reads as a form, not a bar. */
 .fabricate-manager .manager-recipe-category-filter,
 .fabricate-manager .manager-component-category-filter,
-.fabricate-manager .manager-component-essence-filter {
+.fabricate-manager .manager-component-essence-filter,
+.fabricate-manager .manager-essence-source-filter {
   flex: 0 0 auto;
   min-width: 0;
   max-width: 180px;
@@ -4315,7 +4342,8 @@
 
 /* A row-two field: its uppercase micro-label, then its control. */
 .fabricate-manager .manager-recipe-filter-field,
-.fabricate-manager .manager-component-filter-field {
+.fabricate-manager .manager-component-filter-field,
+.fabricate-manager .manager-essence-filter-field {
   display: flex;
   gap: var(--fab-space-2);
   align-items: center;
@@ -4329,7 +4357,8 @@
   free to fold, and in the flagship frame it did.
 */
 .fabricate-manager .manager-recipe-filter-label,
-.fabricate-manager .manager-component-filter-label {
+.fabricate-manager .manager-component-filter-label,
+.fabricate-manager .manager-essence-filter-label {
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
   font-size: 0.55rem;
@@ -6251,15 +6280,25 @@
   line-height: 1.2;
 }
 
+/* ONE ROW under the tile, not a stack (issue 1036 fidelity pass). The prototype's icon
+   control is a tile plus a single `Change` affordance; this shipped as a grid of two
+   FULL-WIDTH controls — a picker trigger that reads as a bare dropdown, and a second
+   full-width `Clear icon` button under it — which is three stacked elements where the
+   design composes one. The picker keeps the flexible track and the reset shrinks to the
+   34px icon-button rhythm, so the whole control is one control-height row. */
 .fabricate-manager .manager-essence-icon-actions {
-  display: grid;
+  display: flex;
   gap: var(--fab-space-chip);
+  align-items: center;
   min-width: 0;
 }
 
-.fabricate-manager .manager-essence-icon-actions .manager-button {
-  width: 100%;
-  justify-content: center;
+.fabricate-manager .manager-essence-icon-actions .essence-icon-picker {
+  flex: 1 1 auto;
+}
+
+.fabricate-manager .manager-essence-icon-actions .manager-icon-button {
+  flex: 0 0 auto;
 }
 
 .fabricate-manager .manager-essence-core-fields {
