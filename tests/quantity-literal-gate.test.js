@@ -27,12 +27,14 @@
  *
  * ## Known blind spot, recorded rather than papered over
  *
- * No literal scan can see CONSTANT-MEDIATED access. Before this change
- * `SvelteCraftingSystemManagerApp.svelte.js` read the quantity via
+ * The gate sees the shapes enumerated in `SHAPES` and NOTHING else. Any spelling that is
+ * not one of them is uncovered, and constant-mediated access is only the worked example:
+ * before this change `SvelteCraftingSystemManagerApp.svelte.js` read the quantity via
  * `DEFAULT_QUANTITY_PATH.split('.').reduce(...)`, which contains neither spelling — no
- * grep and no gate could match it. The structural defence is that the constant was
- * DELETED rather than re-pointed, turning that invisible miss into a build error; the
- * final test in this file pins that deletion. Do not assume the scan covers this class.
+ * grep and no gate could match it. The structural defence there is that the constant was
+ * DELETED rather than re-pointed, turning that invisible miss into a build error, and the
+ * final test in this file pins that deletion. Treat `SHAPES` as the whole coverage claim;
+ * a new spelling needs a new shape, not an assumption that the scan generalizes.
  *
  * ## Vacuity
  *
@@ -45,12 +47,12 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
-const repoRoot = resolve(import.meta.dirname, '..');
+import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
+
 const srcRoot = join(repoRoot, 'src');
-const SCANNED_EXTENSIONS = ['.js', '.mjs', '.svelte'];
 
 /**
  * The ONE legitimate home for the literal, with the exact number of code occurrences it
@@ -80,70 +82,6 @@ const SHAPES = [
 ];
 
 /**
- * Blank out comment text, preserving line and column positions.
- *
- * Quote state is tracked so a `//` inside a string literal is not read as a comment, and
- * it RESETS at every newline. That reset is deliberate: an unbalanced quote inside a
- * regular expression (`/['"]/`) would otherwise put the scanner into string state and
- * swallow the rest of the file, which is exactly how a gate goes quietly vacuous. Bounded
- * this way, such a mistake can only affect its own line.
- *
- * @param {string} source
- * @returns {string} The source with comment characters replaced by spaces.
- */
-export function stripComments(source) {
-  let inBlockComment = false;
-  return String(source ?? '')
-    .split('\n')
-    .map((line) => {
-      let out = '';
-      let index = 0;
-      let quote = null;
-      while (index < line.length) {
-        const character = line[index];
-        const next = line[index + 1];
-        if (inBlockComment) {
-          if (character === '*' && next === '/') {
-            inBlockComment = false;
-            out += '  ';
-            index += 2;
-          } else {
-            out += ' ';
-            index += 1;
-          }
-          continue;
-        }
-        if (quote) {
-          out += character;
-          if (character === '\\') {
-            out += next ?? '';
-            index += 2;
-            continue;
-          }
-          if (character === quote) quote = null;
-          index += 1;
-          continue;
-        }
-        if (character === '/' && next === '/') {
-          out += ' '.repeat(line.length - index);
-          break;
-        }
-        if (character === '/' && next === '*') {
-          inBlockComment = true;
-          out += '  ';
-          index += 2;
-          continue;
-        }
-        if (character === "'" || character === '"' || character === '`') quote = character;
-        out += character;
-        index += 1;
-      }
-      return out;
-    })
-    .join('\n');
-}
-
-/**
  * Scan a `{ path: text }` corpus for hardcoded item stack-quantity paths.
  *
  * Taking a corpus rather than reading the filesystem is what makes this gate testable:
@@ -169,19 +107,8 @@ export function findQuantityLiterals(sources) {
   return findings;
 }
 
-function collectSources(dir) {
-  const sources = {};
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      Object.assign(sources, collectSources(full));
-    } else if (SCANNED_EXTENSIONS.some((extension) => entry.endsWith(extension))) {
-      sources[relative(repoRoot, full).replaceAll('\\', '/')] = readFileSync(full, 'utf8');
-    }
-  }
-  return sources;
-}
-
+// The comment stripper is shared with `tests/actor-type-literal-gate.test.js` through
+// `tests/helpers/sourceScan.js`, and is proved here — once — rather than in both gates.
 describe('the comment stripper', () => {
   it('blanks a line comment, a block comment and a JSDoc block', () => {
     const stripped = stripComments(
@@ -305,6 +232,11 @@ describe('src/** carries no hardcoded item stack-quantity path', () => {
       'src/systems/CraftingEngine.js',
       'src/models/IngredientSet.js',
       'src/config/stackQuantityPathPresets.js',
+      // A `.svelte` path, so that dropping `.svelte` from `SCANNED_EXTENSIONS` reds this
+      // test rather than silently halving the corpus. Components are not a theoretical
+      // host for the literal: `SvelteCraftingSystemManagerApp.svelte.js` held one of the
+      // routed sites, and a `.svelte` file can read a stack count inline.
+      'src/ui/svelte/apps/manager/PartyExpandedBody.svelte',
     ]) {
       assert.ok(paths.includes(path), `${path} must be in the scanned corpus`);
     }

@@ -80,7 +80,8 @@ import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
-import { configureItemStackQuantityPath, probeStackQuantityPath } from './systems/itemStackQuantity.js';
+import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
+import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
@@ -240,11 +241,27 @@ function applyItemStackQuantityPathSetting({ notify = false } = {}) {
 
   // `game.items` only. This is a bounded, synchronous, read-only scan of the world item
   // directory — it resolves nothing and rewrites nothing.
-  const report = probeStackQuantityPath(game.items ?? [], { path });
+  //
+  // That scope is a REAL LIMIT, not just an implementation note: a world whose items all
+  // live in compendia and on actor sheets yields `total === 0`, verdict `'no-items'`, and
+  // no warning at all — while every craft, salvage and alchemy consume on those same
+  // actor-owned items is destroying stacks. A `'no-items'` verdict is SILENCE, never a
+  // clean bill of health. Widening the scan to actors and packs would make module startup
+  // walk the whole world, which is why it is not done here.
+  //
+  // The suggested correction is the ACTIVE SYSTEM's preset, not the built-in default. On
+  // tormenta20 those differ, and passing the built-in would print "system.quantity" as
+  // "your game system's usual field" on the one system this whole feature exists for —
+  // contradicting the setting's own hint, which is formatted from the same preset.
+  const report = probeStackQuantityPath(game.items ?? [], {
+    path,
+    defaultPath: stackQuantityPathPresetFor(game.system?.id),
+  });
   const message = describeStackQuantityProbe(report);
-  // PERMANENT: this notification is the entire remaining defence against a typo'd path
-  // destroying stacks. The object-valued write guard cannot see the failure, because all
-  // four consume sites take `item.delete()` INSTEAD of `item.update(...)`.
+  // PERMANENT: subject to the scope caveat above, this notification is the remaining
+  // defence against a typo'd path destroying stacks. The object-valued write guard cannot
+  // see the failure, because all four consume sites take `item.delete()` INSTEAD of
+  // `item.update(...)`.
   if (message) ui.notifications?.warn?.(message, { permanent: true });
   return path;
 }
@@ -252,27 +269,22 @@ function applyItemStackQuantityPathSetting({ notify = false } = {}) {
 /**
  * The GM-facing advisory for a stack-quantity probe result, or `null` when healthy.
  *
- * The string names the CONSEQUENCE in plain language, not just the counts. A GM reading
- * "0 of 412" has no reason to connect it to inventory destruction and may reasonably
- * read it as "nothing has this field yet — fine, I just set it up".
+ * The DECISION — which of the three strings applies, and with what data — belongs to
+ * `stackQuantityAdvisory` in the accessor module, where it is a pure function and can be
+ * tested against a report. This wrapper is only the i18n edge, because the accessor module
+ * never touches `game`.
+ *
+ * The chosen string names the CONSEQUENCE in plain language, not just the counts. A GM
+ * reading "0 of 412" has no reason to connect it to inventory destruction and may
+ * reasonably read it as "nothing has this field yet — fine, I just set it up".
  *
  * @param {object} report A `probeStackQuantityPath` report.
  * @returns {string|null} The notification text, or `null`.
  */
 function describeStackQuantityProbe(report) {
-  if (!report || report.verdict === 'ok' || report.verdict === 'no-items') return null;
-  const key =
-    report.verdict === 'schema-discard'
-      ? 'FABRICATE.Settings.ItemStackQuantityPath.SchemaDiscard'
-      : 'FABRICATE.Settings.ItemStackQuantityPath.Unresolved';
-  const data = {
-    path: report.path,
-    total: report.total,
-    resolved: report.resolved,
-    default: report.defaultPath,
-    defaultResolved: report.defaultResolved,
-  };
-  return game.i18n?.format?.(key, data) ?? key;
+  const advisory = stackQuantityAdvisory(report);
+  if (!advisory) return null;
+  return game.i18n?.format?.(advisory.key, advisory.data) ?? advisory.key;
 }
 
 function getGatheringRunViewer({ run } = {}) {
@@ -3038,9 +3050,17 @@ Hooks.once('ready', async () => {
   // `(doc, options, userId)` and `updateSetting` emits `(doc, change, options, userId)`,
   // so a handler written as `(setting, changed) => …` would receive `options` in
   // `changed` on the create leg.
-  // The whole body is wrapped in try/catch. A throw inside a setting callback propagates
-  // out of `#handleUpdateDocuments` BEFORE `Hooks.callAll("updateSetting")`, silently
-  // killing the broadcast for that whole batch on every client.
+  // The whole body is wrapped in try/catch, but NOT because a throw here would kill the
+  // `updateSetting` broadcast — `Hooks.#call` wraps every listener in its own try/catch
+  // and routes a throw to `Hooks.onError` (byte-identical in 13.351 and 14.361), so the
+  // remaining listeners still run. That "a throw escapes and kills the broadcast" hazard
+  // is real for a `SettingConfig.onChange` callback, which runs inside `doc._onUpdate`
+  // ahead of `Hooks.callAll` — and it is documented where it applies, beside the two
+  // `onChange`-free registrations in `settings.js`.
+  //
+  // What this try/catch buys is a Fabricate-owned failure signal. Without it the error
+  // surfaces as a core `Hooks.onError` line naming an anonymous listener, with no clue
+  // which of the four branches below failed or which setting triggered it.
   const handleFabricateSettingDocumentChange = (setting) => {
     try {
       const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;

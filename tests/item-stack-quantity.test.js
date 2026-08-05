@@ -17,7 +17,10 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
+import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
 import {
   DEFAULT_ITEM_STACK_QUANTITY_PATH,
   ITEM_STACK_QUANTITY_PATH_PRESETS,
@@ -33,6 +36,8 @@ import {
   readStoredStackQuantity,
   resetItemStackQuantityPath,
   setStackQuantity,
+  STACK_QUANTITY_ADVISORY_KEYS,
+  stackQuantityAdvisory,
   stackQuantityUpdate,
   updateStackQuantity,
 } from '../src/systems/itemStackQuantity.js';
@@ -67,6 +72,31 @@ function itemAt(path, value) {
 // The absent-field default is a SECOND, INDEPENDENT axis from the stored-0 axis.
 // Both are exercised here so that folding them together (which silently inflates or
 // deflates every stack in the world by one) reds this file.
+//
+// ## The SIX declared behaviour deltas
+//
+// Consolidating four hand-rolled readers onto three shared ones changed behaviour at six
+// classes of stored value, all of them inputs no healthy system produces. They are listed
+// here — in the tree, not only in a commit message — and every one is pinned by a row
+// below, so a later "simplification" that quietly reverts one reds this file:
+//
+//   1. NEGATIVE. The `Number(x) || 1` sites passed a negative through; `readStackQuantity`
+//      now returns 1. `readStoredStackQuantity` still reports it as stored, because at a
+//      delete site "-3" must not read as "3 available".
+//   2. `Infinity`. Same sites, same shape: `Number(Infinity) || 1` is `Infinity`, so
+//      `CraftingEngine.selectedQuantityItems` did `remaining -= Infinity` and stopped
+//      selecting after ONE item. `readStackQuantity` now returns 1.
+//   3. NUMERIC STRING. The `?? 1` sites returned the string `'3'`; the accessors coerce.
+//   4. `NaN`. The `?? 1` sites returned `NaN` (it is neither `undefined` nor `null`), which
+//      propagates through every sum it touches. The accessors fall back instead.
+//   5. EXPLICIT `null`. The two `!== undefined` presence probes treated a stored `null` as
+//      present; `hasStackQuantity` treats it as absent, so an item whose count field is
+//      explicitly null no longer counts as stackable.
+//   6. A FRACTION BELOW ONE. `essenceResolver.js`'s multiplier was
+//      `Math.max(1, Number(...) || 1)`, which clamped `0.5` up to `1`; `readStackQuantity`
+//      keeps it fractional, because its floor is at zero and not at one. This is the only
+//      delta that CHANGES A RESULT for a value a system could plausibly store, so it is
+//      called out rather than filed under "inputs nobody produces".
 // ---------------------------------------------------------------------------
 
 const ABSENT = Symbol('absent');
@@ -81,8 +111,21 @@ const READ_CASES = [
   { label: 'null', stored: null, read: 1, stored1: 1, stored0: 0, has: false },
   { label: 'NaN', stored: Number.NaN, read: 1, stored1: 1, stored0: 0, has: true },
   { label: 'fractional 2.5', stored: 2.5, read: 2.5, stored1: 2.5, stored0: 2.5, has: true },
-  // Not in the criterion's list, but the ONE place the three consolidated helpers
-  // disagreed before this change, so it is pinned rather than left to chance.
+  // Delta 6. `essenceResolver` clamped this to 1 before the routing change and now keeps
+  // it, so a component storing half a unit multiplies essences by 0.5 rather than by 1.
+  { label: 'fractional 0.5', stored: 0.5, read: 0.5, stored1: 0.5, stored0: 0.5, has: true },
+  // Delta 2. `Number(Infinity) || 1` is `Infinity`, so `selectedQuantityItems` did
+  // `remaining -= Infinity` and terminated after a single item. It now reads as 1.
+  {
+    label: 'Infinity',
+    stored: Number.POSITIVE_INFINITY,
+    read: 1,
+    stored1: 1,
+    stored0: 0,
+    has: true,
+  },
+  // Delta 1. Not in the criterion's list, but the ONE place the three consolidated
+  // helpers disagreed before this change, so it is pinned rather than left to chance.
   { label: 'negative', stored: -3, read: 1, stored1: -3, stored0: -3, has: true },
   { label: 'non-numeric text', stored: 'many', read: 1, stored1: 1, stored0: 0, has: true },
 ];
@@ -120,66 +163,263 @@ describe('the three read semantics, over every awkward stored value', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Criterion 8, second half — the per-site mapping table.
+// Criterion 8, second half — the per-site mapping table, checked against LIVE SOURCE.
 //
-// Each routed call site declares which accessor it uses and, for the stored reader,
-// which absent default preserves what it did before the routing change. A reviewer can
-// diff this table against the code; a deliberate change to any row has to be made here
-// too, which is what makes it DECLARED rather than discovered.
+// Each routed call site declares its file, which accessor it uses, how many occurrences
+// it accounts for, and — for the stored reader — which absent default preserves what it
+// did before the routing change.
+//
+// The earlier revision of this table was CIRCULAR: every assertion read `SITE_MAPPING`
+// and asserted a fact about `SITE_MAPPING`, so nothing read `src/**` and the table
+// discovered nothing. A reviewer proved it by flipping `gatheringResultCreation`'s
+// `absentDefault: 0` to `1` — the exact "silently inflates every stack by one" failure
+// the table exists to prevent — and the whole file still passed.
+//
+// So the table is now MECHANICAL. Every declared `(file, accessor, sites)` triple is
+// reconciled against a comment-stripped scan of `src/**`, in BOTH directions: a declared
+// site that no longer exists reds, and a call site in a file the table does not name reds
+// too. That makes a deliberate change to any row something that has to be declared here,
+// which is what "declared rather than discovered" was supposed to mean.
 // ---------------------------------------------------------------------------
 
+/** Every accessor the table polices. `stackQuantityUpdate` has no `src` call site, and
+ *  is listed so that acquiring one without a row is a red test rather than a silent gap. */
+const ACCESSORS = Object.freeze([
+  'hasStackQuantity',
+  'readStackQuantity',
+  'readStoredStackQuantity',
+  'setStackQuantity',
+  'stackQuantityUpdate',
+  'updateStackQuantity',
+]);
+
+/** The three READ semantics, which must not be collapsed into fewer. */
+const READ_ACCESSORS = Object.freeze([
+  'hasStackQuantity',
+  'readStackQuantity',
+  'readStoredStackQuantity',
+]);
+
 const SITE_MAPPING = [
-  // { site, accessor, absentDefault, storedZero }
-  { site: 'componentStacking.awardedQuantityOf', accessor: 'readStackQuantity' },
+  // { site, file, accessor, sites, absentDefault }
+  {
+    site: 'componentStacking.awardedQuantityOf',
+    file: 'src/systems/componentStacking.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
   {
     site: 'componentStacking.createOrStackComponentItem (existing stack)',
+    file: 'src/systems/componentStacking.js',
     accessor: 'readStoredStackQuantity',
-    absentDefault: 1,
-  },
-  { site: 'CraftingEngine.selectedQuantityItems', accessor: 'readStackQuantity' },
-  {
-    site: 'CraftingEngine._consumeAlchemyExtraItems (delete site)',
-    accessor: 'readStoredStackQuantity',
+    sites: 1,
     absentDefault: 1,
   },
   {
-    site: 'CraftingEngine._consumeSubmittedAlchemyItems (delete site)',
-    accessor: 'readStoredStackQuantity',
-    absentDefault: 1,
+    site: 'componentStacking.createOrStackComponentItem (increment write)',
+    file: 'src/systems/componentStacking.js',
+    accessor: 'updateStackQuantity',
+    sites: 1,
   },
   {
-    site: 'CraftingEngine._consumeIngredients (delete site, craft + timed step)',
-    accessor: 'readStoredStackQuantity',
-    absentDefault: 1,
+    site: 'CraftingEngine.selectedQuantityItems + salvage totalAvailable + _consumeComponentItems',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'readStackQuantity',
+    sites: 3,
+    // Only `_consumeComponentItems` is a delete-on-underrun site; the other two are the
+    // selection helper and the salvage availability gate.
+    deleteSites: 1,
   },
-  { site: 'CraftingEngine salvage totalAvailable', accessor: 'readStackQuantity' },
-  { site: 'CraftingEngine._consumeComponentItems (delete site)', accessor: 'readStackQuantity' },
+  {
+    site: 'CraftingEngine._consumeAlchemyExtraItems + _consumeSubmittedAlchemyItems + _consumeIngredients',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'readStoredStackQuantity',
+    sites: 3,
+    absentDefault: 1,
+    deleteSites: 3,
+  },
+  {
+    site: 'CraftingEngine award creation stackability probe',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'hasStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'CraftingEngine._restoreComponentItem + award creation (payload writes)',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'setStackQuantity',
+    sites: 2,
+  },
+  {
+    site: 'CraftingEngine decrement writes on the four delete sites',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'updateStackQuantity',
+    sites: 4,
+  },
   {
     site: 'GatheringEngine.normalizeRunItems (source term only)',
+    file: 'src/systems/GatheringEngine.js',
     accessor: 'readStoredStackQuantity',
+    sites: 1,
     absentDefault: 1,
   },
-  { site: 'RecipeManager have counts (x3)', accessor: 'readStackQuantity' },
-  { site: 'InventoryListingBuilder owned counts', accessor: 'readStackQuantity' },
-  { site: 'AlchemyListingBuilder held counts', accessor: 'readStackQuantity' },
-  { site: 'IngredientSet._initialRemaining (ledger seed)', accessor: 'readStackQuantity' },
-  { site: 'essenceResolver multiplyByQuantity', accessor: 'readStackQuantity' },
-  { site: 'alchemySubmissions unit expansion (keeps its own Math.trunc)', accessor: 'readStackQuantity' },
-  { site: 'SvelteCraftingSystemManagerApp knowledge owned copies', accessor: 'readStackQuantity' },
-  { site: 'sourceUuid.findStackableMatch (stackability probe)', accessor: 'hasStackQuantity' },
+  {
+    site: 'RecipeManager have counts',
+    file: 'src/systems/RecipeManager.js',
+    accessor: 'readStackQuantity',
+    sites: 3,
+  },
+  {
+    site: 'InventoryListingBuilder owned counts',
+    file: 'src/systems/InventoryListingBuilder.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'AlchemyListingBuilder held counts',
+    file: 'src/systems/AlchemyListingBuilder.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'IngredientSet._initialRemaining (ledger seed)',
+    file: 'src/models/IngredientSet.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'essenceResolver multiplyByQuantity',
+    file: 'src/utils/essenceResolver.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'alchemySubmissions unit expansion (keeps its own Math.trunc)',
+    file: 'src/utils/alchemySubmissions.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'SvelteCraftingSystemManagerApp knowledge owned copies',
+    file: 'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'sourceUuid.findStackableMatch (stackability probe)',
+    file: 'src/utils/sourceUuid.js',
+    accessor: 'hasStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'gatheringResultCreation award stackability probe',
+    file: 'src/gatheringResultCreation.js',
+    accessor: 'hasStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'gatheringResultCreation new-award payload write',
+    file: 'src/gatheringResultCreation.js',
+    accessor: 'setStackQuantity',
+    sites: 1,
+  },
   {
     site: 'gatheringResultCreation stack-onto-existing',
+    file: 'src/gatheringResultCreation.js',
     accessor: 'readStoredStackQuantity',
+    sites: 1,
     absentDefault: 0,
+  },
+  {
+    site: 'gatheringResultCreation stack-onto-existing write',
+    file: 'src/gatheringResultCreation.js',
+    accessor: 'updateStackQuantity',
+    sites: 1,
+  },
+  {
+    site: 'toolBreakageRuntime replacement payload write',
+    file: 'src/toolBreakageRuntime.js',
+    accessor: 'setStackQuantity',
+    sites: 1,
   },
 ];
 
-describe('the per-site accessor mapping', () => {
-  it('names exactly three read semantics, and no fourth', () => {
-    assert.deepEqual(
-      [...new Set(SITE_MAPPING.map((entry) => entry.accessor))].sort(),
-      ['hasStackQuantity', 'readStackQuantity', 'readStoredStackQuantity']
+/** The accessor module itself, which DEFINES these names and must not be counted. */
+const ACCESSOR_MODULE = 'src/systems/itemStackQuantity.js';
+
+/**
+ * Count comment-stripped `accessor(` occurrences per file across the whole `src` tree.
+ *
+ * Comments are stripped for the same reason the two literal gates strip them: the routed
+ * modules DESCRIBE their accessor choice in prose (`componentStacking.js` names
+ * `readStackQuantity` in a comment explaining why it does NOT use it), and counting prose
+ * would make the table unmaintainable and then vacuous.
+ *
+ * @returns {Map<string, number>} `${file}::${accessor}` -> occurrences.
+ */
+function countAccessorCallSites() {
+  const sources = collectSources(join(repoRoot, 'src'));
+  const counts = new Map();
+  for (const [path, text] of Object.entries(sources)) {
+    if (path === ACCESSOR_MODULE) continue;
+    const code = stripComments(text);
+    for (const accessor of ACCESSORS) {
+      const matches = code.match(new RegExp(String.raw`\b${accessor}\s*\(`, 'g'));
+      if (matches?.length) counts.set(`${path}::${accessor}`, matches.length);
+    }
+  }
+  return counts;
+}
+
+/** The same shape, built from the declared table. */
+function declaredAccessorCallSites() {
+  const counts = new Map();
+  for (const entry of SITE_MAPPING) {
+    const key = `${entry.file}::${entry.accessor}`;
+    counts.set(key, (counts.get(key) ?? 0) + entry.sites);
+  }
+  return counts;
+}
+
+/** `[key, count]` pairs, sorted, so a diff names the file and accessor that drifted. */
+const asSortedPairs = (counts) => [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+/** Comment-stripped occurrences of `absentDefault: <value>` per file. */
+function countAbsentDefaults(value) {
+  const sources = collectSources(join(repoRoot, 'src'));
+  const counts = new Map();
+  for (const [path, text] of Object.entries(sources)) {
+    if (path === ACCESSOR_MODULE) continue;
+    const matches = stripComments(text).match(
+      new RegExp(String.raw`absentDefault:\s*${value}\b`, 'g')
     );
+    if (matches?.length) counts.set(path, matches.length);
+  }
+  return counts;
+}
+
+describe('the per-site accessor mapping', () => {
+  it('matches live src/** occurrence-for-occurrence, in both directions', () => {
+    // THE load-bearing assertion of this whole table. Un-routing a site, adding a new one
+    // in a file the table does not name, or moving a site between files all red here.
+    assert.deepEqual(asSortedPairs(countAccessorCallSites()), asSortedPairs(declaredAccessorCallSites()));
+  });
+
+  it('scanned real source — a scan that matched nothing would pass vacuously', () => {
+    const counts = countAccessorCallSites();
+    const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
+    assert.ok(total >= 30, `expected the routed call sites, counted ${total}`);
+    assert.ok(counts.has('src/systems/CraftingEngine.js::readStackQuantity'));
+  });
+
+  it('names exactly three read semantics, and no fourth', () => {
+    const readSites = SITE_MAPPING.filter((entry) => READ_ACCESSORS.includes(entry.accessor));
+    assert.deepEqual([...new Set(readSites.map((entry) => entry.accessor))].sort(), [
+      ...READ_ACCESSORS,
+    ]);
+    for (const entry of SITE_MAPPING) {
+      assert.ok(ACCESSORS.includes(entry.accessor), `${entry.site} names an unknown accessor`);
+    }
   });
 
   it('uses only 1 and 0 as absent defaults, and only on the stored reader', () => {
@@ -195,19 +435,52 @@ describe('the per-site accessor mapping', () => {
     }
   });
 
-  it('records exactly one site on the absent-default-0 behaviour', () => {
+  it('records exactly one absent-default-0 site, and live source agrees', () => {
     // `gatheringResultCreation` is the odd one out and is deliberately NOT consolidated
-    // onto `createOrStackComponentItem`, which defaults an absent field to 1.
+    // onto `createOrStackComponentItem`, which defaults an absent field to 1. Flipping
+    // that 0 to a 1 inflates every gathered stack by one on the very first award onto an
+    // existing item, and it is the drift a reviewer used to prove the earlier table
+    // discovered nothing — so it is asserted against SOURCE, not against the table.
     const zeroDefault = SITE_MAPPING.filter((entry) => entry.absentDefault === 0);
     assert.deepEqual(
       zeroDefault.map((entry) => entry.site),
       ['gatheringResultCreation stack-onto-existing']
     );
+    assert.deepEqual(
+      [...countAbsentDefaults(0).entries()],
+      [['src/gatheringResultCreation.js', 1]],
+      'exactly one `absentDefault: 0` in src/**, and only in gatheringResultCreation.js'
+    );
   });
 
-  it('records exactly four delete-on-underrun sites', () => {
-    const deleteSites = SITE_MAPPING.filter((entry) => entry.site.includes('delete site'));
-    assert.equal(deleteSites.length, 4, 'craft, salvage, alchemy-extra, alchemy-no-match');
+  it('every declared absent-default-1 site is spelled that way in live source', () => {
+    const declared = new Map();
+    for (const entry of SITE_MAPPING) {
+      if (entry.absentDefault !== 1) continue;
+      declared.set(entry.file, (declared.get(entry.file) ?? 0) + entry.sites);
+    }
+    assert.deepEqual(asSortedPairs(countAbsentDefaults(1)), asSortedPairs(declared));
+  });
+
+  it('records exactly four delete-on-underrun sites, and four decrement writes beside them', () => {
+    // Counted from an explicit field rather than parsed out of the label: a label-substring
+    // filter reads as a check while actually depending on prose nobody validates.
+    const total = SITE_MAPPING.reduce((sum, entry) => sum + (entry.deleteSites ?? 0), 0);
+    assert.equal(total, 4, 'craft, salvage, alchemy-extra, alchemy-no-match');
+    for (const entry of SITE_MAPPING) {
+      assert.ok(
+        (entry.deleteSites ?? 0) <= entry.sites,
+        `${entry.site} cannot have more delete sites than call sites`
+      );
+    }
+    // Each delete site has an `await (underrun ? item.delete() : updateStackQuantity(...))`
+    // partner, so the engine's write count must equal its delete-site count. A routed read
+    // whose write half was missed reads 20 and writes 19 to another field forever.
+    const engineWrites = SITE_MAPPING.filter(
+      (entry) =>
+        entry.file === 'src/systems/CraftingEngine.js' && entry.accessor === 'updateStackQuantity'
+    ).reduce((sum, entry) => sum + entry.sites, 0);
+    assert.equal(engineWrites, 4);
   });
 });
 
@@ -466,6 +739,118 @@ describe('probeStackQuantityPath', () => {
     assert.equal(report.total, 0);
     assert.equal(report.verdict, 'no-items');
   });
+
+  it('measures the SUGGESTED default it was given, not the built-in one', () => {
+    // On tormenta20 the suggested correction is `system.qtd`, and the counts printed
+    // beside it in the advisory have to be counts FOR IT. Measuring `system.quantity`
+    // while naming `system.qtd` is worse than printing no counts at all.
+    const items = [
+      itemWithSource({ prepared: { qtd: 20 }, source: { qtd: 20 } }),
+      itemWithSource({ prepared: { qtd: 3 }, source: { qtd: 3 } }),
+    ];
+    const report = probeStackQuantityPath(items, {
+      path: 'system.quantidade',
+      defaultPath: 'system.qtd',
+    });
+    assert.equal(report.verdict, 'unresolved');
+    assert.equal(report.defaultPath, 'system.qtd');
+    assert.equal(report.defaultResolved, 2, 'counted against the PASSED default');
+    assert.equal(report.resolved, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The advisory selector. `src/main.js` cannot be imported under `node --test`, which is
+// exactly why this decision lives in the accessor module: a three-way branch pinned only
+// by grepping `main.js` is not evidence that the right string reaches the right world.
+// ---------------------------------------------------------------------------
+
+describe('stackQuantityAdvisory', () => {
+  const reportFor = (overrides) => ({
+    path: 'system.qtd',
+    defaultPath: 'system.qtd',
+    total: 10,
+    resolved: 0,
+    sourceCandidates: 0,
+    sourceResolved: 0,
+    defaultResolved: 0,
+    verdict: 'unresolved',
+    ...overrides,
+  });
+
+  it('says nothing for a healthy world, an empty one, or a missing report', () => {
+    assert.equal(stackQuantityAdvisory(reportFor({ verdict: 'ok', resolved: 10 })), null);
+    assert.equal(stackQuantityAdvisory(reportFor({ verdict: 'no-items', total: 0 })), null);
+    assert.equal(stackQuantityAdvisory(null), null);
+    assert.equal(stackQuantityAdvisory(undefined), null);
+  });
+
+  it('asserts the CERTAINTY when the configured path is not the suggested one', () => {
+    const advisory = stackQuantityAdvisory(
+      reportFor({ path: 'system.quantidade', defaultPath: 'system.qtd', defaultResolved: 10 })
+    );
+    assert.equal(advisory.key, STACK_QUANTITY_ADVISORY_KEYS.unresolved);
+    assert.deepEqual(advisory.data, {
+      path: 'system.quantidade',
+      total: 10,
+      resolved: 0,
+      default: 'system.qtd',
+      defaultResolved: 10,
+    });
+  });
+
+  it('keeps the certainty even when the suggested default resolves on nothing either', () => {
+    // The tempting "suppress whenever the default resolves nothing" shortcut would delete
+    // the warning for a GM who typo'd on a system whose real field is neither path — the
+    // exact user this advisory exists for.
+    const advisory = stackQuantityAdvisory(
+      reportFor({ path: 'system.qty', defaultPath: 'system.qtd', defaultResolved: 0 })
+    );
+    assert.equal(advisory.key, STACK_QUANTITY_ADVISORY_KEYS.unresolved);
+  });
+
+  it('states the CONDITIONAL when the configured path already IS the suggested default', () => {
+    // A dnd5e world whose Item directory holds only spells, feats, classes and
+    // backgrounds. Nothing is wrong, nothing has been typed, and the previous copy told
+    // this GM — permanently, on every login — to change the setting to the value it
+    // already had, while asserting imminent inventory destruction that is not happening.
+    const advisory = stackQuantityAdvisory(
+      reportFor({ path: 'system.quantity', defaultPath: 'system.quantity', defaultResolved: 0 })
+    );
+    assert.equal(advisory.key, STACK_QUANTITY_ADVISORY_KEYS.unresolvedAtDefault);
+    assert.notEqual(advisory.key, STACK_QUANTITY_ADVISORY_KEYS.unresolved);
+    assert.equal(advisory.data.path, 'system.quantity');
+  });
+
+  it('still WARNS in that case — the defence is reworded, never removed', () => {
+    const advisory = stackQuantityAdvisory(
+      reportFor({ path: 'system.quantity', defaultPath: 'system.quantity', defaultResolved: 0 })
+    );
+    assert.ok(advisory, 'a world on the default with nothing resolving still gets a warning');
+  });
+
+  it('routes a schema discard ahead of every unresolved branch', () => {
+    const advisory = stackQuantityAdvisory(
+      reportFor({ verdict: 'schema-discard', resolved: 10, sourceCandidates: 10 })
+    );
+    assert.equal(advisory.key, STACK_QUANTITY_ADVISORY_KEYS.schemaDiscard);
+  });
+
+  it('puts the report defaultPath — and nothing else — into {default}', () => {
+    // `{default}` is what the GM is told to type. It has to be the ACTIVE SYSTEM's preset,
+    // which `main.js` supplies as the probe's `defaultPath`; the built-in
+    // `system.quantity` is wrong on tormenta20 and contradicts the setting's own hint.
+    for (const defaultPath of ['system.qtd', 'system.quantity', 'system.stack.count']) {
+      const advisory = stackQuantityAdvisory(reportFor({ path: 'system.nope', defaultPath }));
+      assert.equal(advisory.data.default, defaultPath);
+    }
+    assert.notEqual(
+      stackQuantityAdvisory(reportFor({ path: 'system.nope', defaultPath: 'system.qtd' })).data
+        .default,
+      DEFAULT_ITEM_STACK_QUANTITY_PATH,
+      'the built-in default must not leak in when a preset was supplied'
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -590,17 +975,48 @@ describe('the item stack-quantity path setting', () => {
       readFileSync(resolve(import.meta.dirname, '../lang/en.json'), 'utf8')
     );
     const strings = lang.FABRICATE.Settings.ItemStackQuantityPath;
-    for (const key of ['Name', 'Hint', 'Unresolved', 'SchemaDiscard']) {
+    for (const key of ['Name', 'Hint', 'Unresolved', 'UnresolvedAtDefault', 'SchemaDiscard']) {
       assert.equal(typeof strings?.[key], 'string', `missing FABRICATE…ItemStackQuantityPath.${key}`);
     }
     assert.match(strings.Hint, /\{default}/, 'the hint interpolates the active default');
-    // The probe advisories are the entire remaining defence against a typo destroying
-    // stacks, so each must name the CONSEQUENCE in plain language, not just counts.
+    // The probe advisories are the remaining defence against a typo destroying stacks, so
+    // each must name the CONSEQUENCE in plain language, not just counts.
     for (const key of ['Unresolved', 'SchemaDiscard']) {
       assert.match(strings[key], /delete/i, `${key} must name what goes wrong`);
       assert.match(strings[key], /\{path}/, `${key} must name the configured path`);
       assert.match(strings[key], /\{default}/, `${key} must suggest the system default`);
     }
+  });
+
+  it('resolves EVERY advisory key the selector can return', () => {
+    // The selector and the language file are two hand-maintained halves of one contract:
+    // a key added to one and not the other renders as the raw key id in a toast.
+    const lang = JSON.parse(readFileSync(join(repoRoot, 'lang', 'en.json'), 'utf8'));
+    for (const key of Object.values(STACK_QUANTITY_ADVISORY_KEYS)) {
+      const resolved = key
+        .split('.')
+        .reduce((node, segment) => (node === undefined ? undefined : node?.[segment]), lang);
+      assert.equal(typeof resolved, 'string', `${key} has no entry in lang/en.json`);
+      assert.notEqual(resolved.trim(), '');
+    }
+  });
+
+  it('states the already-on-the-default case CONDITIONALLY, not as a certainty', () => {
+    const lang = JSON.parse(readFileSync(join(repoRoot, 'lang', 'en.json'), 'utf8'));
+    const copy = lang.FABRICATE.Settings.ItemStackQuantityPath.UnresolvedAtDefault;
+    assert.match(copy, /\{path}/, 'it still names the configured path');
+    assert.match(copy, /delete/i, 'and still names the consequence');
+    // The two halves of the conditional, which is the whole point of this third string:
+    // the benign reading has to be offered, and the destructive one has to be hedged.
+    assert.match(copy, /no stackable items yet|has no stackable items/i, 'offers the benign reading');
+    assert.match(copy, /\bif your items do carry stack counts\b/i, 'and hedges the destructive one');
+    // The retired copy told a GM already on the default to change the setting to the
+    // value it already had, and asserted destruction that was not happening.
+    assert.equal(
+      /Until you correct it/i.test(copy),
+      false,
+      'a world sitting on its own default has not necessarily got anything to correct'
+    );
   });
 });
 
@@ -630,6 +1046,37 @@ describe('main.js wiring', () => {
     );
   });
 
+  it('suggests the ACTIVE SYSTEM preset, not the built-in default', async () => {
+    // `stackQuantityAdvisory` puts `report.defaultPath` into `{default}`, so whatever
+    // `main.js` passes here is literally the field the GM is told to type. Passing no
+    // `defaultPath` falls back to `system.quantity`, which on tormenta20 — the one system
+    // this whole feature exists for — resolves on 0 items and contradicts the setting's
+    // own hint, formatted from the same preset by `withActiveSystemDefaults`.
+    const source = await mainSource;
+    assert.match(
+      source,
+      /probeStackQuantityPath\(game\.items \?\? \[], \{\s*path,\s*defaultPath: stackQuantityPathPresetFor\(game\.system\?\.id\),\s*}\)/,
+      'the probe must be given the active system preset as its suggested correction'
+    );
+    assert.match(
+      source,
+      /import \{ stackQuantityPathPresetFor } from '\.\/config\/stackQuantityPathPresets\.js';/
+    );
+  });
+
+  it('formats the advisory from the shared pure selector', async () => {
+    // The three-way branch lives in the accessor module because `main.js` cannot be
+    // imported here; if it moved back inline, the branch would only ever be grep-pinned.
+    const source = await mainSource;
+    assert.match(source, /stackQuantityAdvisory\(report\)/);
+    assert.match(source, /game\.i18n\?\.format\?\.\(advisory\.key, advisory\.data\)/);
+    assert.equal(
+      /'FABRICATE\.Settings\.ItemStackQuantityPath\.(Unresolved|SchemaDiscard)'/.test(source),
+      false,
+      'main.js must not re-spell the advisory keys it no longer selects'
+    );
+  });
+
   it('RE-CONFIGURES before it probes', async () => {
     const source = await mainSource;
     // Without this ordering a GM editing the path mid-session gets a notification
@@ -651,9 +1098,11 @@ describe('main.js wiring', () => {
     assert.ok(listener.length > 0, 'the shared listener exists');
     assert.match(listener, /SETTING_KEYS\.ITEM_STACK_QUANTITY_PATH/);
     assert.match(listener, /applyItemStackQuantityPathSetting\(\{ notify: true }\)/);
-    // A throw inside a setting callback propagates out of `#handleUpdateDocuments`
-    // BEFORE `Hooks.callAll("updateSetting")`, killing the broadcast for the whole batch
-    // on every client.
+    // The listener body is wrapped so a failure in ONE branch is logged as Fabricate's
+    // own line naming the setting, rather than as a core `Hooks.onError` entry against an
+    // anonymous listener. `Hooks.#call` already try/catches each listener, so this is not
+    // what stops a throw escaping into the broadcast — that hazard belongs to
+    // `SettingConfig.onChange`, and is why `settings.js` registers none.
     assert.match(listener, /try \{/, 'the listener body is wrapped in try/catch');
     assert.match(listener, /} catch \(error\) \{/);
   });

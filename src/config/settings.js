@@ -295,10 +295,15 @@ const BASE_DEFINITIONS = Object.freeze({
   // `config: false` — edited through the settings-menu picker
   // (`registerPlayerCharacterTypesMenu`), not a raw text field, because the valid
   // values are the actor types the active world declares and a free-text list would
-  // be unguessable. No `onChange`: propagation runs through the shared setting
-  // listener in `main.js`, and registering both would double-fire (Foundry calls
-  // `doc._onUpdate` — which invokes `onChange` — and THEN `Hooks.callAll` on the same
-  // document in the same callback).
+  // be unguessable. No `onChange`, for two independent reasons: propagation already runs
+  // through the shared setting listener in `main.js`, and registering both would
+  // double-fire (Foundry calls `doc._onUpdate` — which invokes `onChange` — and THEN
+  // `Hooks.callAll` on the same document in the same callback); and an `onChange` is the
+  // one setting callback with no error containment around it. It runs inside
+  // `doc._onUpdate`, BEFORE `Hooks.callAll('updateSetting')`, so a throw there propagates
+  // and kills the broadcast for the whole batch on every client. A `Hooks.on` listener has
+  // no such hazard — `Hooks.#call` try/catches each listener and routes to
+  // `Hooks.onError`.
   [SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES]: {
     name: 'FABRICATE.Settings.PlayerCharacterActorTypes.Name',
     hint: 'FABRICATE.Settings.PlayerCharacterActorTypes.Hint',
@@ -332,13 +337,25 @@ const keys = Object.values(SETTING_KEYS);
  * rather than restated, so it cannot drift as settings are added or re-scoped.
  *
  * These are the keys an ordinary player cannot update. The real gate is
- * `BaseSetting.#canModify` -> `user.hasPermission('SETTINGS_MODIFY')`. There is NO
- * `requiredRoles` field in V13 (an earlier version of this comment asserted
- * `[GAMEMASTER]`, which does not exist); `SETTINGS_MODIFY` has `defaultRole: ASSISTANT`
- * and a GM may grant it to any role. The guardrail is unchanged either way — a plain
- * player still cannot write a world setting by default — but the mechanism is a
- * PERMISSION, not a role list, so the accurate description is "SETTINGS_MODIFY only",
- * never "GM only".
+ * `BaseSetting.#canModify` -> `user.hasPermission('SETTINGS_MODIFY')`, identical in V13
+ * and V14, and `SETTINGS_MODIFY` has `defaultRole: ASSISTANT` in both — so a GM may grant
+ * it to any role, and it is a PERMISSION rather than a role list.
+ *
+ * `requiredRoles` is version-dependent, and both earlier versions of this comment got it
+ * wrong in opposite directions:
+ *
+ *   - V13's `SETTINGS_MODIFY` has NO `requiredRoles` (it declares `disableGM: false`), so
+ *     a GM's permission there is grantable and revocable like any other.
+ *   - V14 (which `module.json` verifies against, and which the smoke boots) DOES declare
+ *     `requiredRoles: [USER_ROLES.GAMEMASTER]` in `common/constants.mjs`, and
+ *     `User#hasPermission` returns `true` up front when the user's role appears in it.
+ *     That means "these roles hold this permission UNREVOKABLY" — a GM cannot be denied
+ *     `SETTINGS_MODIFY` — and NOT "only these roles hold it"; the `defaultRole` ladder
+ *     still runs for everyone else.
+ *
+ * The guardrail is unchanged under every reading — a plain player cannot write a world
+ * setting by default — but the accurate description is "SETTINGS_MODIFY only", never
+ * "GM only".
  *
  * A code path reachable by a user without that permission which writes one of these
  * fails at the server with `User <name> lacks permission to update Setting [...]`, so

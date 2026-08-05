@@ -65,6 +65,7 @@
 
 import {
   ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES_KEY,
+  BASE_DOCUMENT_TYPE_FALLBACK,
   buildActorTypeOptions,
   normalizeAdditionalPlayerCharacterTypes,
   readAdditionalPlayerCharacterActorTypes,
@@ -132,9 +133,22 @@ function escapeHtml(value) {
  * @returns {string[]}
  */
 export function enumerateActorTypes() {
-  const declared = globalThis.game?.documentTypes?.Actor ?? [];
-  const baseType = globalThis.CONST?.BASE_DOCUMENT_TYPE ?? 'base';
-  return normalizeAdditionalPlayerCharacterTypes(declared).filter((type) => type !== baseType);
+  return normalizeAdditionalPlayerCharacterTypes(
+    globalThis.game?.documentTypes?.Actor ?? []
+  ).filter((type) => type !== baseDocumentType());
+}
+
+/**
+ * The world's abstract base document type, or the fallback spelling.
+ *
+ * `playerCharacterTypes.js` is global-free by design, so it cannot read `CONST` itself and
+ * takes the resolved value instead. Resolving it once here keeps the enumeration filter
+ * and `buildActorTypeOptions`'s defensive second filter agreeing by construction.
+ *
+ * @returns {string}
+ */
+function baseDocumentType() {
+  return globalThis.CONST?.BASE_DOCUMENT_TYPE ?? BASE_DOCUMENT_TYPE_FALLBACK;
 }
 
 /**
@@ -258,6 +272,7 @@ export async function openPlayerCharacterTypesDialog() {
     declaredTypes: enumerateActorTypes(),
     selectedTypes: readAdditionalPlayerCharacterActorTypes(),
     labelFor: actorTypeLabel,
+    baseDocumentType: baseDocumentType(),
   });
 
   const result = await DialogV2.wait({

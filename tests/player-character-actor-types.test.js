@@ -786,10 +786,21 @@ describe('empty-state copy', () => {
     );
   });
 
-  it('neither string implies an unconfigured actor cannot use Fabricate at all', () => {
-    // It cannot be SELECTED IN THE BAR, but it stays attempt-authorized: gathering and
-    // crafting authorization is ownership-based and this change does not narrow it.
-    assert.match(barEmpty, /still be used for crafting and gathering attempts/i);
+  it('neither string implies an unconfigured actor is banned, and neither promises a way to pick it', () => {
+    // Two failure modes, and the copy has to miss BOTH. Implying a ban is wrong:
+    // authorization is ownership-based (`isGatheringActorSelectableByUser`) and this change
+    // does not narrow it. But promising the actor "can still be used for crafting and
+    // gathering attempts" is also wrong, because every UI path runs through the narrowed
+    // bar list and `actorBarStore.selectScopedActor` no-ops for an owned non-PC — so a
+    // player who goes looking finds nothing. The honest line is "not blocked, but not
+    // pickable here".
+    assert.match(barEmpty, /does not block/i, 'no implied ban');
+    assert.match(barEmpty, /cannot be picked here/i, 'and no promised affordance');
+    assert.equal(
+      /still be used for crafting and gathering attempts/i.test(barEmpty),
+      false,
+      'the retired line pointed the player at a selection they cannot make anywhere'
+    );
     for (const copy of [barEmpty, partyEmpty]) {
       assert.equal(/cannot use Fabricate/i.test(copy), false);
       assert.equal(/not supported/i.test(copy), false);

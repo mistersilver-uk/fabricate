@@ -373,3 +373,62 @@ export function probeStackQuantityPath(
   report.verdict = 'ok';
   return report;
 }
+
+/**
+ * The localization keys the probe advisory can select.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const STACK_QUANTITY_ADVISORY_KEYS = Object.freeze({
+  unresolved: 'FABRICATE.Settings.ItemStackQuantityPath.Unresolved',
+  unresolvedAtDefault: 'FABRICATE.Settings.ItemStackQuantityPath.UnresolvedAtDefault',
+  schemaDiscard: 'FABRICATE.Settings.ItemStackQuantityPath.SchemaDiscard',
+});
+
+/**
+ * Choose the GM-facing advisory for a probe report — the localization key and the data it
+ * interpolates — or `null` when there is nothing to say.
+ *
+ * This is a PURE selector, and lives here rather than in `src/main.js` so that the branch
+ * it makes is testable. `main.js` cannot be imported under `node --test`, so an advisory
+ * decision taken there can only ever be pinned by grepping its own source, which is not
+ * evidence that the right string is chosen for a given world.
+ *
+ * ## Three strings, not two
+ *
+ * `'unresolved'` covers two situations that a GM must not be told are the same thing:
+ *
+ *   - The configured path is NOT the suggested default. Somebody typed something, and it
+ *     resolves on nothing. That is a live misconfiguration and the certainty is earned.
+ *   - The configured path IS the suggested default and the default resolves on nothing
+ *     either. A dnd5e world whose Item directory holds only spells, feats, classes and
+ *     backgrounds — extremely common — is in exactly this state, and there is nothing
+ *     wrong with it. Telling that GM, permanently and on every login, to change the
+ *     setting to the value it already has is a self-contradictory false alarm.
+ *
+ * The second case gets its own string stating the CONDITIONAL rather than the certainty.
+ * It is deliberately NOT suppressed: a GM whose system really does store stack counts
+ * somewhere else, and who never touched the setting, is in the same state and is losing
+ * inventory. Suppressing on `defaultResolved === 0` would delete the warning for exactly
+ * the world that needs it.
+ *
+ * @param {StackQuantityProbeReport} report
+ * @returns {{key: string, data: object}|null}
+ */
+export function stackQuantityAdvisory(report) {
+  if (!report || report.verdict === 'ok' || report.verdict === 'no-items') return null;
+  const data = {
+    path: report.path,
+    total: report.total,
+    resolved: report.resolved,
+    default: report.defaultPath,
+    defaultResolved: report.defaultResolved,
+  };
+  if (report.verdict === 'schema-discard') {
+    return { key: STACK_QUANTITY_ADVISORY_KEYS.schemaDiscard, data };
+  }
+  if (report.path === report.defaultPath && report.defaultResolved === 0) {
+    return { key: STACK_QUANTITY_ADVISORY_KEYS.unresolvedAtDefault, data };
+  }
+  return { key: STACK_QUANTITY_ADVISORY_KEYS.unresolved, data };
+}

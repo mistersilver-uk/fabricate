@@ -10,10 +10,11 @@
  *
  * ## Shapes matched, and why each one
  *
- * The gate matches BOTH quote styles and BOTH the optional-chained (`actor?.type`) and
- * UNCHAINED (`actor.type`) spellings. The unchained one is not hypothetical:
- * `PartyExpandedBody.svelte` was written that way, and a gate matching only the
- * optional-chained form would have repeated the exact defect that made an earlier
+ * The gate matches ALL THREE quote styles — including the backtick, which is what a
+ * template literal in a `.svelte` expression reaches for — and BOTH the optional-chained
+ * (`actor?.type`) and UNCHAINED (`actor.type`) spellings. The unchained one is not
+ * hypothetical: `PartyExpandedBody.svelte` was written that way, and a gate matching only
+ * the optional-chained form would have repeated the exact defect that made an earlier
  * quantity gate vacuous.
  *
  * It anchors on the `.type` PROPERTY rather than merely on the string `'character'`,
@@ -22,13 +23,25 @@
  * gate anchored on the bare string flags them, and the natural reaction is a file-level
  * allowlist, which would then exempt an entire module from the gate that polices it.
  *
+ * ## Comments are stripped before scanning, deliberately
+ *
+ * The retired predicate is named in prose all over this codebase, because naming it is
+ * how the design is DOCUMENTED — `// was: actor.type === 'character'` is the honest way
+ * to record what a routed site used to do. A gate that flagged that would be answered
+ * with a file-level allowlist, exempting exactly the modules it exists to police, so the
+ * shared `stripComments` from `tests/helpers/sourceScan.js` blanks comment text first and
+ * the synthetic corpora below prove both halves: a real literal is still found, a
+ * comment-only mention is not.
+ *
  * ## Known blind spot, recorded rather than papered over
  *
- * No literal scan can see constant-mediated access — a `const PC_TYPE = 'character'`
- * somewhere else, compared as `actor.type === PC_TYPE`. Nothing here covers that. The
- * defence is structural instead: `playerCharacterTypes.js` owns the only legitimate
- * home for the literal and exports the predicate, so there is no reason to introduce
- * such a constant. Do not assume the scan covers it.
+ * The gate sees the shapes enumerated in `SHAPES` and NOTHING else. Any spelling that is
+ * not one of them is uncovered; constant-mediated access (a `const PC_TYPE = 'character'`
+ * elsewhere, compared as `actor.type === PC_TYPE`) is the worked example rather than the
+ * whole of it. The defence against that one is structural instead:
+ * `playerCharacterTypes.js` owns the only legitimate home for the literal and exports the
+ * predicate, so there is no reason to introduce such a constant. Treat `SHAPES` as the
+ * whole coverage claim; a new spelling needs a new shape.
  *
  * ## Vacuity
  *
@@ -41,26 +54,30 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join } from 'node:path';
 
-const repoRoot = resolve(import.meta.dirname, '..');
+import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js';
+
 const srcRoot = join(repoRoot, 'src');
-const SCANNED_EXTENSIONS = ['.js', '.mjs', '.svelte'];
 
 // Hardcoded so GROWTH is a visible diff on a number rather than a new line in a list a
 // reviewer skims past. The routed implementation leaves zero occurrences.
 const EXPECTED_FINDING_COUNT = 0;
 
+// All three quote characters are accepted everywhere a quoted `character` or `type` can
+// appear, matching the `quoted path` shape in `quantity-literal-gate.test.js`. A backtick
+// is not exotic in this codebase: `.svelte` expressions reach for template literals by
+// habit, and `actor.type === `character`` is valid, readable, and would otherwise sail
+// straight through.
 const SHAPES = [
   // `actor.type === 'character'` and `actor?.type === "character"`.
-  { name: 'dot access', pattern: /\??\.type\s*===\s*(['"])character\1/ },
+  { name: 'dot access', pattern: /\??\.type\s*===\s*(['"`])character\1/ },
   // `actor['type'] === 'character'` — bracket access defeats a `.type` match.
-  { name: 'bracket access', pattern: /\[\s*(['"])type\1\s*]\s*===\s*(['"])character\2/ },
+  { name: 'bracket access', pattern: /\[\s*(['"`])type\1\s*]\s*===\s*(['"`])character\2/ },
   // `'character' === actor.type` — a reversed comparison reads the same to a human.
   {
     name: 'reversed comparison',
-    pattern: /(['"])character\1\s*===\s*[A-Za-z_$][\w$]*\??\.type\b/,
+    pattern: /(['"`])character\1\s*===\s*[A-Za-z_$][\w$]*\??\.type\b/,
   },
 ];
 
@@ -77,7 +94,7 @@ const SHAPES = [
 export function findActorTypeLiterals(sources) {
   const findings = [];
   for (const [path, text] of Object.entries(sources || {})) {
-    const lines = String(text ?? '').split('\n');
+    const lines = stripComments(text).split('\n');
     lines.forEach((line, index) => {
       for (const shape of SHAPES) {
         if (shape.pattern.test(line)) {
@@ -88,19 +105,6 @@ export function findActorTypeLiterals(sources) {
     });
   }
   return findings;
-}
-
-function collectSources(dir) {
-  const sources = {};
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      Object.assign(sources, collectSources(full));
-    } else if (SCANNED_EXTENSIONS.some((extension) => entry.endsWith(extension))) {
-      sources[relative(repoRoot, full).replaceAll('\\', '/')] = readFileSync(full, 'utf8');
-    }
-  }
-  return sources;
 }
 
 describe('the actor-type literal gate can actually fail', () => {
@@ -119,14 +123,21 @@ describe('the actor-type literal gate can actually fail', () => {
     );
   });
 
-  it('matches the UNCHAINED spelling and the double-quoted one', () => {
+  it('matches the UNCHAINED spelling and every quote style, including the backtick', () => {
     const findings = findActorTypeLiterals({
       // The PartyExpandedBody spelling. A gate that only matched `actor?.type` would
       // have let this exact line through.
       'src/fake/unchained.svelte': ".filter((actor) => actor.type === 'character')",
       'src/fake/double.js': 'if (actor.type === "character") return true;',
+      // A template literal, which is what a `.svelte` expression reaches for by habit.
+      'src/fake/backtick.svelte': '{#if actor.type === `character`}',
+      'src/fake/backtick-bracket.js': 'if (actor[`type`] === `character`) return true;',
+      'src/fake/backtick-reversed.js': 'if (`character` === actor.type) return true;',
     });
-    assert.equal(findings.length, 2);
+    assert.deepEqual(
+      findings.map((finding) => finding.shape),
+      ['dot access', 'dot access', 'dot access', 'bracket access', 'reversed comparison']
+    );
   });
 
   it('matches bracket access and a reversed comparison', () => {
@@ -140,7 +151,7 @@ describe('the actor-type literal gate can actually fail', () => {
     );
   });
 
-  it('does NOT flag the `entry.kind === \'character\'` near-miss, or prose', () => {
+  it('does NOT flag the `entry.kind === \'character\'` near-miss', () => {
     const findings = findActorTypeLiterals({
       // Four real lines from GatheringTaskEditView.svelte's task-requirement entries.
       'src/fake/kind.svelte': [
@@ -149,16 +160,48 @@ describe('the actor-type literal gate can actually fail', () => {
         "  disabled={entry.kind === 'character'}",
         '  // the character entry kind is unrelated to actor types',
       ].join('\n'),
-      // Prose naming the retired literal, which is how the design is DOCUMENTED.
+      // The literal in its ONE legitimate home, which is a declaration and not a
+      // comparison.
+      'src/fake/home.js': "export const ALWAYS_PLAYER_CHARACTER_TYPE = 'character';",
+    });
+    assert.deepEqual(findings, []);
+  });
+
+  it('does NOT flag prose, which is how this design is DOCUMENTED', () => {
+    // The earlier revision of this gate split raw text, so a comment naming the retired
+    // predicate VERBATIM — the honest way to record what a routed site used to do — was a
+    // finding. With `EXPECTED_FINDING_COUNT = 0` and no allowlist, the only ways out were
+    // rewording the comment or gutting the gate.
+    const findings = findActorTypeLiterals({
       'src/fake/prose.js': [
         '/**',
-        " * The predicate used to be `actor.type` compared against the character type.",
-        ' * It is now resolved from a configurable set.',
+        " * The predicate used to be `actor.type === 'character'` at five sites, and the",
+        " * `.svelte` one was written `actor?.type === \"character\"`.",
         ' */',
-        "const ALWAYS_PLAYER_CHARACTER_TYPE = 'character';",
+        "// was: return actor.type === 'character';",
+        'export const isPc = (actor) => isPlayerCharacterActor(actor);',
+        "const kept = 1; // legacy: 'character' === actor.type",
+      ].join('\n'),
+      'src/fake/prose.svelte': [
+        '<script>',
+        "  // filter was actor.type === 'character' before issue 1024",
+        '  const rows = actors.filter((actor) => actor.isPlayerCharacter);',
+        '</script>',
       ].join('\n'),
     });
     assert.deepEqual(findings, []);
+  });
+
+  it('still finds a REAL literal on a line that also carries a comment', () => {
+    // The other half of the stripper contract: blanking comment text must not blank the
+    // code that precedes it on the same line.
+    const findings = findActorTypeLiterals({
+      'src/fake/mixed.js': "if (actor.type === 'character') return true; // the old way",
+    });
+    assert.deepEqual(
+      findings.map((finding) => [finding.line, finding.shape]),
+      [[1, 'dot access']]
+    );
   });
 });
 

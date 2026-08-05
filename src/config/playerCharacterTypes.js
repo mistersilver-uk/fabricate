@@ -55,6 +55,20 @@ export const ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES_KEY = 'additionalPlayerChar
 export const ALWAYS_PLAYER_CHARACTER_TYPE = 'character';
 
 /**
+ * The fallback spelling of `CONST.BASE_DOCUMENT_TYPE`.
+ *
+ * The abstract base type is always present in `game.documentTypes.Actor` and is not a real
+ * actor type, so core's own enumeration recipe filters it. This module cannot read `CONST`
+ * — it is deliberately global-free apart from the one guarded settings read — so the
+ * resolved value is passed IN by `playerCharacterTypesMenu.js`, which reads
+ * `globalThis.CONST?.BASE_DOCUMENT_TYPE ?? BASE_DOCUMENT_TYPE_FALLBACK`. One spelling of
+ * the literal, in one place, used by both.
+ *
+ * @type {string}
+ */
+export const BASE_DOCUMENT_TYPE_FALLBACK = 'base';
+
+/**
  * Coerce a stored setting value into a clean list of additional type ids.
  *
  * Everything that is not a non-empty string is dropped, and duplicates collapse
@@ -172,17 +186,21 @@ export const isPlayerCharacterActor = createPlayerCharacterActorPredicate(
  * @param {unknown} [options.selectedTypes] The stored additional types.
  * @param {(type: string) => string} [options.labelFor] Label resolver; falls back to
  *   the raw id.
+ * @param {string} [options.baseDocumentType] The world's `CONST.BASE_DOCUMENT_TYPE`.
  * @returns {Array<{id: string, label: string, checked: boolean, locked: boolean, known: boolean}>}
  */
 export function buildActorTypeOptions({
   declaredTypes = [],
   selectedTypes = [],
   labelFor = null,
+  baseDocumentType = BASE_DOCUMENT_TYPE_FALLBACK,
 } = {}) {
   const declared = normalizeAdditionalPlayerCharacterTypes(declaredTypes).filter(
-    // `CONST.BASE_DOCUMENT_TYPE` is always present in `game.documentTypes` and is not
-    // a real actor type — core's own enumeration recipe filters it.
-    (type) => type !== 'base'
+    // A second, defensive pass: `enumerateActorTypes()` already drops the base type, but
+    // this function is also called with a hand-built list. It takes the resolved constant
+    // rather than re-spelling `'base'`, so the caller and this filter can never disagree
+    // about what the base type is called.
+    (type) => type !== baseDocumentType
   );
   const selected = new Set(normalizeAdditionalPlayerCharacterTypes(selectedTypes));
   const declaredSet = new Set(declared);
