@@ -178,8 +178,35 @@ describe('the three read semantics, over every awkward stored value', () => {
 // So the table is now MECHANICAL. Every declared `(file, accessor, sites)` triple is
 // reconciled against a comment-stripped scan of `src/**`, in BOTH directions: a declared
 // site that no longer exists reds, and a call site in a file the table does not name reds
-// too. That makes a deliberate change to any row something that has to be declared here,
-// which is what "declared rather than discovered" was supposed to mean.
+// too. That closes un-routing, a new site, a site moved between files, and absent-default
+// drift.
+//
+// ## What the per-file counts CANNOT see, and what the anchors add
+//
+// Per-file counts are blind to two accessors being SWAPPED BETWEEN SITES IN ONE FILE:
+// every reconciled count survives such a swap intact. A reviewer proved that too, by
+// exchanging the accessors at `CraftingEngine.selectedQuantityItems` and
+// `CraftingEngine._consumeIngredients` — `readStackQuantity` stayed at 3,
+// `readStoredStackQuantity` stayed at 3, `absentDefault: 1` stayed at 3, and every suite in
+// the repo passed.
+//
+// Including `tests/item-stack-quantity-routing.test.js`, which retires a claim this comment
+// used to make. That file does NOT cover this boundary: its fixtures all carry a PRESENT,
+// POSITIVE stack count, and the two readers only diverge at a stored `0`, a negative, and a
+// non-numeric — the axes `READ_CASES` above isolates and no routed-path fixture exercises.
+// The swap is not cosmetic: under it an item stored at `0` stops decrementing `remaining`
+// in `selectedQuantityItems`, so every candidate enters the consumption plan and the delete
+// branch walks them one by one.
+//
+// So every row belonging to a file that contributes MORE THAN ONE row also declares
+// `anchors`: short source snippets pinning each accessor to the site it serves, whose match
+// counts must add up to that row's declared `sites`. Deliberately NOT line numbers — a
+// per-line pin rots on every edit above it.
+//
+// A file contributing exactly ONE row needs none, and that is a boundary rather than a
+// concession: one row means one accessor, so there is no second accessor in that file to
+// swap it with. `anchorsRequired` below enforces the rule instead of hand-listing files, so
+// a file that GAINS a second row has to anchor both.
 // ---------------------------------------------------------------------------
 
 /** Every accessor the table polices. `stackQuantityUpdate` has no `src` call site, and
@@ -201,12 +228,13 @@ const READ_ACCESSORS = Object.freeze([
 ]);
 
 const SITE_MAPPING = [
-  // { site, file, accessor, sites, absentDefault }
+  // { site, file, accessor, sites, absentDefault, anchors }
   {
     site: 'componentStacking.awardedQuantityOf',
     file: 'src/systems/componentStacking.js',
     accessor: 'readStackQuantity',
     sites: 1,
+    anchors: [/return readStackQuantity\(item\);/],
   },
   {
     site: 'componentStacking.createOrStackComponentItem (existing stack)',
@@ -214,12 +242,16 @@ const SITE_MAPPING = [
     accessor: 'readStoredStackQuantity',
     sites: 1,
     absentDefault: 1,
+    anchors: [
+      /const base = readStoredStackQuantity\(existing, \{ absentDefault: 1, path: quantityPath \}\)/,
+    ],
   },
   {
     site: 'componentStacking.createOrStackComponentItem (increment write)',
     file: 'src/systems/componentStacking.js',
     accessor: 'updateStackQuantity',
     sites: 1,
+    anchors: [/updateStackQuantity\(existing, base \+ delta, quantityPath\)/],
   },
   {
     site: 'CraftingEngine.selectedQuantityItems + salvage totalAvailable + _consumeComponentItems',
@@ -229,6 +261,15 @@ const SITE_MAPPING = [
     // Only `_consumeComponentItems` is a delete-on-underrun site; the other two are the
     // selection helper and the salvage availability gate.
     deleteSites: 1,
+    // The first anchor is the one that matters most. `selectedQuantityItems` is the
+    // hazard-COMPOUNDING site: read it with the stored reader and an item stored at 0
+    // stops decrementing `remaining`, so every candidate enters the plan the delete
+    // branch then walks.
+    anchors: [
+      /remaining -= readStackQuantity\(item\);/,
+      /sum \+ readStackQuantity\(item\)/,
+      /const available = readStackQuantity\(item\);/,
+    ],
   },
   {
     site: 'CraftingEngine._consumeAlchemyExtraItems + _consumeSubmittedAlchemyItems + _consumeIngredients',
@@ -237,24 +278,37 @@ const SITE_MAPPING = [
     sites: 3,
     absentDefault: 1,
     deleteSites: 3,
+    // The two alchemy consume sites are spelled identically, so the first anchor accounts
+    // for two of the three occurrences and the totals assertion covers the rest.
+    anchors: [
+      /const qty = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
+      /const itemQuantity = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
+    ],
   },
   {
     site: 'CraftingEngine award creation stackability probe',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'hasStackQuantity',
     sites: 1,
+    anchors: [/if \(hasStackQuantity\(itemData\) \|\| !sourceItem\)/],
   },
   {
     site: 'CraftingEngine._restoreComponentItem + award creation (payload writes)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'setStackQuantity',
     sites: 2,
+    anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, result\.quantity\);/],
   },
   {
     site: 'CraftingEngine decrement writes on the four delete sites',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'updateStackQuantity',
     sites: 4,
+    anchors: [
+      /updateStackQuantity\(item, qty - count\)/,
+      /updateStackQuantity\(item, itemQuantity - quantity\)/,
+      /updateStackQuantity\(item, available - toConsume\)/,
+    ],
   },
   {
     site: 'GatheringEngine.normalizeRunItems (source term only)',
@@ -316,12 +370,14 @@ const SITE_MAPPING = [
     file: 'src/gatheringResultCreation.js',
     accessor: 'hasStackQuantity',
     sites: 1,
+    anchors: [/if \(hasStackQuantity\(itemData\) \|\| result\.quantity\)/],
   },
   {
     site: 'gatheringResultCreation new-award payload write',
     file: 'src/gatheringResultCreation.js',
     accessor: 'setStackQuantity',
     sites: 1,
+    anchors: [/setStackQuantity\(itemData, Number\(result\.quantity \|\| 1\)\)/],
   },
   {
     site: 'gatheringResultCreation stack-onto-existing',
@@ -329,12 +385,14 @@ const SITE_MAPPING = [
     accessor: 'readStoredStackQuantity',
     sites: 1,
     absentDefault: 0,
+    anchors: [/readStoredStackQuantity\(existing, \{ absentDefault: 0 \}\)/],
   },
   {
     site: 'gatheringResultCreation stack-onto-existing write',
     file: 'src/gatheringResultCreation.js',
     accessor: 'updateStackQuantity',
     sites: 1,
+    anchors: [/updateStackQuantity\(existing, next\)/],
   },
   {
     site: 'toolBreakageRuntime replacement payload write',
@@ -398,11 +456,57 @@ function countAbsentDefaults(value) {
   return counts;
 }
 
+/** Occurrences of `pattern` in `text`, counted with a fresh global regex. */
+function countMatches(text, pattern) {
+  return text.match(new RegExp(pattern.source, 'g'))?.length ?? 0;
+}
+
+/** Files contributing more than one row, which therefore have accessors to swap. */
+function anchorsRequired() {
+  const rowsPerFile = new Map();
+  for (const entry of SITE_MAPPING) {
+    rowsPerFile.set(entry.file, (rowsPerFile.get(entry.file) ?? 0) + 1);
+  }
+  return new Set([...rowsPerFile].filter(([, rows]) => rows > 1).map(([file]) => file));
+}
+
 describe('the per-site accessor mapping', () => {
   it('matches live src/** occurrence-for-occurrence, in both directions', () => {
     // THE load-bearing assertion of this whole table. Un-routing a site, adding a new one
     // in a file the table does not name, or moving a site between files all red here.
     assert.deepEqual(asSortedPairs(countAccessorCallSites()), asSortedPairs(declaredAccessorCallSites()));
+  });
+
+  it('pins every row of a multi-row file to the source snippet it serves', () => {
+    // The assertion the per-file counts cannot make. Exchanging two accessors between
+    // sites in one file leaves every declared count intact; it moves an anchor's match
+    // count to zero, which reds here.
+    const sources = collectSources(join(repoRoot, 'src'));
+    for (const entry of SITE_MAPPING) {
+      if (!entry.anchors) continue;
+      const code = stripComments(sources[entry.file] ?? '');
+      let matched = 0;
+      for (const anchor of entry.anchors) {
+        const occurrences = countMatches(code, anchor);
+        assert.ok(occurrences > 0, `${entry.site}: ${anchor} matches nothing in ${entry.file}`);
+        matched += occurrences;
+      }
+      assert.equal(matched, entry.sites, `${entry.site}: anchors must account for every site`);
+    }
+  });
+
+  it('requires those anchors on every row of every multi-row file', () => {
+    // A rule, not a hand-picked file list: a file that gains a second row — and therefore
+    // a second accessor to be confused with — has to anchor both of them.
+    const required = anchorsRequired();
+    assert.ok(required.size >= 3, `expected the multi-row files, found ${[...required]}`);
+    for (const entry of SITE_MAPPING) {
+      if (!required.has(entry.file)) continue;
+      assert.ok(
+        entry.anchors?.length > 0,
+        `${entry.site} shares ${entry.file} with another accessor and must declare anchors`
+      );
+    }
   });
 
   it('scanned real source — a scan that matched nothing would pass vacuously', () => {

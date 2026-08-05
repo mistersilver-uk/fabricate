@@ -312,6 +312,8 @@ It then treats every stack as though it holds only one unit and deletes the whol
    Pointing at a container instead of the number is the most common way this setting is misconfigured, and it produces exactly the destructive symptom described above.
 5. If Fabricate detects a problem, it posts a standing warning naming how many of your world's items resolve a usable number at the configured field, compared with your system's expected field, and stating plainly that crafting, salvage, and alchemy will delete whole stacks until the field is corrected.
    Follow the warning back to **Item Stack Quantity Field** in the Fabricate module settings and correct it there.
+   That check only looks at your world's **Items** directory, so a world that keeps everything in compendia and on character sheets is never warned even when the field is wrong.
+   Silence is not a clean bill of health: if stacks are being destroyed, work through the checks above rather than waiting for a warning.
 
 **See also:** [Recipe Appears Uncraftable Despite Owning Recipe Item or Components](#recipe-appears-uncraftable-despite-owning-recipe-item-or-components) covers a related but different craftability problem.
 
