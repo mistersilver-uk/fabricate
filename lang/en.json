@@ -5229,7 +5229,8 @@
         "NoCurrentRealm": "No party realm set."
       },
       "Diagnostics": {
-        "ResultSourceUnresolved": "A gathering result points at an item that no longer resolves."
+        "ResultSourceUnresolved": "A gathering result points at an item that no longer resolves.",
+        "RoutedTierUnrouted": "A gathering success tier has no result group named after it."
       },
       "Realm": {
         "UndiscoveredPlaceholder": "Undiscovered realm"

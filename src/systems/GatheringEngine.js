@@ -2963,6 +2963,33 @@ export class GatheringEngine {
     const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
       firstOnly: false,
     });
+    // A success tier that matches NO group routes nowhere. This used to report
+    // `succeeded` with an empty result set, which spent the node and the stamina and
+    // awarded nothing — the routed twin of the d100 miss in issue 1027, but a content
+    // BUG rather than a legitimate roll.
+    //
+    // Gathering routes by NAME (crafting routes by tier id), so this is not only an
+    // authoring omission: renaming a tier on the SYSTEM silently unroutes every task
+    // whose groups were named for the old tier, and every routed gather from then on
+    // succeeds and awards nothing. Reporting it as misconfigured surfaces the drift on
+    // the first roll and — because `_resolveImmediateAttempt` turns a misconfigured
+    // outcome into a blocked start before `_commitRichAttempt` — costs the player
+    // nothing.
+    //
+    // A group that EXISTS and is empty is deliberate authoring ("this tier succeeds and
+    // awards nothing") and is left alone: it matches by name, so it never reaches here,
+    // and it renders the explicit nothing-found card from issue 1027.
+    if (matched.length === 0) {
+      return misconfiguredOutcome({
+        code: 'ROUTED_TIER_UNROUTED',
+        checkResult,
+        diagnostic: {
+          code: 'ROUTED_TIER_UNROUTED',
+          messageKey: 'FABRICATE.Gathering.Diagnostics.RoutedTierUnrouted',
+          message: `Gathering success tier "${outcomeName}" has no result group of that name on task "${task?.name || task?.id || 'unnamed'}"`,
+        },
+      });
+    }
     return normalizeTerminalOutcome({
       status: 'succeeded',
       outcome: outcomeName,
