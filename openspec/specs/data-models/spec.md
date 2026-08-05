@@ -670,7 +670,9 @@ EssenceDefinition = {
 9. `propertyMacroUuid` is the GM-authored per-essence property macro.
    It shares its name and its meaning with `Result.propertyMacroUuid` — a macro that rewrites crafted item data before creation — and runs under the same `features.propertyMacros` gate, additionally gated on `features.essences`.
    Normalization applies a document-UUID **shape** check and stores `null` for anything else; it deliberately does not require a `Macro.` prefix, because legacy four-segment compendium uuids still resolve and a stricter test would reject a usable macro.
-   Whether the uuid resolves to a script Macro is decided by the editor's drop handler and by the essence editor's validation surface; at craft time an unresolvable value is logged and skipped silently.
+   The editor's drop handler and the essence editor's validation surface refuse a macro whose own type is not `script` at authoring time.
+   That check is repeated at craft time as a backstop, because `command` is a required string on a `chat` macro too and `type` defaults to `chat`, so an imported system or a hand-edited world setting can carry a `propertyMacroUuid` that never passed through the drop handler at all.
+   At craft time an unresolvable uuid, or one that resolves to a Macro whose own type is not `script`, is logged and skipped silently.
 10. Both new fields survive export, import and copy-import unchanged, and the import reference resolver collects `propertyMacroUuid` as a macro reference owned by the essence.
 
 ## RecipeItemDefinition
@@ -2407,13 +2409,24 @@ Input context must include:
 - `result`
 - `step`
 
+An essence property macro (`EssenceDefinition.propertyMacroUuid`, see `recipes-and-steps/spec.md` _Essence Property Macros_) receives two further context members the result's own property macro does not:
+
+- `essence` — the resolved `EssenceDefinition` whose macro is running.
+- `essenceQuantity` — that essence's resolved quantity for this craft or salvage result, taken from `resolvedEssences[essence.id]`.
+
+Without these two members a macro shared across essences could not tell which essence invoked it, making the archetypal "+1 damage per unit of Fire" macro impossible to author.
+
 Return shape:
 
 ```js
 { [propertyPath: string]: any }
 ```
 
-Returned values are merged into created item data before document creation.
+Each returned path is applied with `foundry.utils.setProperty`, immediately after that macro returns.
+Returns are never spread-merged into one map first, because the returns are string paths and a subtree return is not order-equivalent to a leaf return under a merge.
+Two macros writing the same path is supported, resolves last-writer-wins, and is not an error.
+A path that cannot be written (for example because an intermediate segment is `null` or a primitive) is logged and skipped.
+For the essence property macro loop specifically, that failure is isolated to the essence whose macro produced the unwritable path: every other essence's macro, and the result's own macro, still runs and still applies.
 
 ### Success Macro Contract (Removed in 1.8.0)
 

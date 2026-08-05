@@ -523,6 +523,9 @@ Each returned object has the following shape:
 | `name` | `string` | Display name |
 | `description` | `string` | Flavour text (may be empty) |
 | `icon` | `string` | FontAwesome class string. Always a non-empty string, and defaults to `fas fa-mortar-pestle`. |
+| `colorToken` | `string\|null` | Palette key for the essence's colour, or `null` for the theme accent default |
+| `enabled` | `boolean` | Default `true`. Gates essence-carried *behaviour* only, never essence arithmetic: a disabled essence still matches, accumulates, and is consumed, but neither its effect transfer nor its property macro runs. See [Essences]({% link essences.md %}#enabling-and-disabling-an-essence). |
+| `propertyMacroUuid` | `string\|null` | UUID of a script Macro run against every result this essence contributes to, before that item is created. Requires `features.propertyMacros` and `features.essences`. See [Essences]({% link essences.md %}#the-essence-property-macro). |
 | `sourceItemUuid` | `string\|null` | Authoritative field. The `componentId` of the component linked to this essence, or `null`. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

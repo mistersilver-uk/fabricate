@@ -309,6 +309,7 @@ There is therefore no symmetry with the property-macro veto described below, whi
 The sibling essence-carried behaviour to effect transfer: it walks the same contributing-essence set and shares the same `features.essences` gate.
 
 An `EssenceDefinition.propertyMacroUuid` names a script Macro run against the item data of every result the essence contributed to, before that item is created.
+In addition to the shared property-macro context (`data-models/spec.md` *Property Macro Contract*), each essence macro's context carries `essence` (the resolved `EssenceDefinition`) and `essenceQuantity` (that essence's resolved quantity for this result), so a macro shared across essences can identify its own contribution.
 
 1. Two gates apply, and both are read explicitly: `CraftingSystem.features.propertyMacros === true` (which defaults to false) AND `CraftingSystem.features.essences === true`.
    Essence contributions are resolved regardless of the master switch, so the macro loop cannot inherit that gate from the contribution walk.

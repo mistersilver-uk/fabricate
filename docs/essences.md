@@ -9,38 +9,48 @@ nav_order: 6
 {: .gm }
 > Requires the **Essences** feature to be enabled on the crafting system.
 
-Essences are abstract properties that can be assigned to components.
-They provide a flexible way to categorise ingredients beyond simple tags.
-For example, an item might contain "2 units of Fire essence and 1 unit of Arcane essence".
+Essences are abstract properties you assign to components, so a recipe can ask for a total amount of a quality instead of one specific item.
+For example, an item might contain "3 units of Fire essence and 1 unit of Arcane essence".
 
 Consider a Dragon Scale that radiates heat and hums with faint magical energy, or a Frost Crystal that chills anything it touches.
-Rather than treating these as unrelated ingredients, essences let you tag each component with the *qualities* it carries: three units of Fire and one of Arcane on the scale, four units of Frost on the crystal.
+Rather than treating these as unrelated ingredients, essences let you tag each component with the qualities it carries.
+Three units of Fire and one of Arcane on the scale, four units of Frost on the crystal.
 When a recipe calls for "at least 3 Fire and 2 Arcane", players can mix and match any combination of components whose essence totals meet the threshold, opening up creative flexibility at the crafting table.
-Essences can also drive automatic [effect transfer](#effect-transfer-via-essences), so a sword forged from fire-heavy ingredients inherits flame-related properties.
-Below you will find the fields that [define an essence](#defining-essences) and how to [assign essence quantities](#assigning-essences-to-items) to your components.
+
+An essence can also drive automatic [effect transfer](#effect-transfer-via-essences) and an optional [property macro](#the-essence-property-macro), so a sword forged from fire-heavy ingredients can inherit flame-related properties, or have its properties rewritten as it is created.
 
 ---
 
-## Defining Essences
+## Open the Essence Studio
 
-Essences are defined at the crafting system level.
-Each essence definition has the following fields:
+Open the Crafting System Manager and select a crafting system.
+Choose the top-level **Essences** entry.
+
+Each library row shows the essence's icon, name, colour, an **Effects** pill and a **Macro** pill for the behaviours it carries, a **Disabled** marker when it is turned off, how many components carry it, how many recipes require it, and a per-row enable/disable switch.
+Choose **List** or **Grid** to change how the library is presented, search or filter by status to narrow it, and select a row to inspect it in the panel on the right.
+Choose **Edit** to open the essence editor.
+
+Your search, filters, presentation choice, and page position all survive opening the editor and coming back.
+
+## Create or edit an essence
+
+Choose **Create essence** to start a new one, or **Edit** an existing row.
+
+The editor has three tabs:
+
+- **Identity** sets the name, an icon, a description, an optional colour from the shared palette, and whether the essence is **Enabled**.
+- **On craft** sets what the essence does when it contributes to a crafted result, an active effect source and a property macro.
+See [Effect Transfer via Essences](#effect-transfer-via-essences) and [The Essence Property Macro](#the-essence-property-macro) below.
+- **Validation** lists anything unfinished, such as a missing description or a macro that no longer resolves.
+
+A live preview panel shows how the essence appears and what it currently does, updating as you edit.
+
+Choose **Save** when you are done.
+An essence always saves, even with warnings, unless it has a blocking issue such as a missing name or icon.
+
+### Example essences
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
-
-| Field | Description |
-|:------|:------------|
-| Name | Display name, for example "Fire", "Arcane", or "Nature" |
-| Icon | A FontAwesome icon class. Leave it blank to use the default mortar-and-pestle icon. |
-| Description | Flavour text |
-| Source item | The component whose active effects represent this essence, used for effect transfer. Leave it unset if the essence is not linked to an item. |
-
-<!-- markdownlint-enable markdownlint-sentences-per-line -->
-
-When you link an essence to a source item, Fabricate checks that the component still exists.
-If the linked component is later removed, the link is cleared.
-
-### Example Essences
 
 | Essence | Description |
 |:--------|:------------|
@@ -49,9 +59,13 @@ If the linked component is later removed, the link is cleared.
 | Arcane | Pure magical energy |
 | Nature | The vitality of the natural world |
 
-## Assigning Essences to Items
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+## Assigning Essences to Components
 
 In the **Items** tab of the GM admin, each component can have essences assigned with quantities:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 | Item | Fire | Frost | Arcane |
 |:-----|:-----|:------|:-------|
@@ -59,6 +73,33 @@ In the **Items** tab of the GM admin, each component can have essences assigned 
 | Frost Crystal | 0 | 4 | 0 |
 | Arcane Dust | 0 | 0 | 2 |
 | Phoenix Feather | 5 | 0 | 2 |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+## Enabling and disabling an essence
+
+Every essence has an **Enabled** switch, both on its library row and on its **Identity** tab.
+Disabling an essence never deletes anything.
+Every component that carries it, and every recipe that requires it, keeps that reference and keeps rendering it, marked **Disabled**.
+
+Disabling only suppresses what the essence does to a crafted result.
+
+- A disabled essence's active effect transfer does not run.
+- A disabled essence's property macro does not run.
+
+{: .note }
+> Disabling an essence does **not** stop it counting.
+> A disabled essence still matches an ingredient requirement, still accumulates across the items you hold, and is still consumed by a craft, exactly as before.
+> Only its behaviour on the crafted result is suppressed, never its quantity.
+> This is deliberate.
+> Toggling an essence mid-session must not change what an item you already hold is worth.
+
+## A disabled essence blocks recipe activation
+
+A recipe cannot be enabled while it requires a disabled essence.
+Disabling an essence does not retroactively disable a recipe that is already enabled, but Fabricate warns you how many currently-enabled recipes can no longer be re-enabled while the essence stays disabled.
+
+Re-enabling the essence clears the block, with no other change to the recipes it had blocked.
 
 ## Using Essences in Recipes
 
@@ -71,7 +112,10 @@ For example, an option requiring "3 Fire essence" is satisfied by any combinatio
 - 3x Ember Shard (1 Fire each) also meets it.
 
 Because an essence is an option like any other, it can sit inside a group as one of several **Accept instead** alternatives on the recipe editor's Ingredients tab, or stand alone in its own group as a hard requirement.
-A group holding only a single essence option is a required essence: the crafter must supply that essence amount in addition to the recipe's other groups.
+A group holding only a single essence option is a required essence, meaning the crafter must supply that essence amount in addition to the recipe's other groups.
+
+A disabled essence is withheld only from the **add new** picker in the recipe and component editors.
+Anywhere it is already referenced, such as an existing recipe requirement or an existing component quantity, it keeps showing, marked **Disabled**, and you can still edit or clear it.
 
 {: .note }
 > Earlier versions attached essence requirements to the whole ingredient set through a separate essence map.
@@ -80,33 +124,50 @@ Fabricate migrates existing recipes automatically, rewriting each former require
 
 ## Effect Transfer via Essences
 
-When effect transfer is enabled on a recipe and essences are active, Fabricate can transfer active effects from essence source items to crafted results:
+When effect transfer is enabled on a recipe and essences are active, Fabricate can transfer active effects from an essence's source item to crafted results.
+See [Effect Transfer]({% link effect-transfer.md %}) for the full feature, including how to link a source item to an essence.
 
-1. Fabricate works out which essences are contributed by the ingredients that were used
-2. For each essence linked to a source item, it collects that item's active effects
-3. Those effects are applied to the created result items
+A disabled essence never transfers effects, even when the recipe and both feature toggles are on.
 
-This lets you create systems where crafting with fire-essence ingredients automatically gives the result fire-related properties.
+## The essence property macro
 
-## Managing Essences in the GM Admin
+Turn on **Property macros** in the crafting system's feature toggles, then drop a macro onto an essence's **On craft** tab to give that essence the ability to rewrite a crafted result's data before it is created.
 
-Essence definitions are configured from the **Systems** tab of the GM admin, inside the **Essences** feature card.
-The card is visible only when advanced options are enabled and the **Essences** feature toggle is on.
+The macro receives the recipe, the crafting system, the crafting character, every ingredient and tool involved, every essence the craft resolved and how much of each was used, which essence is invoking it and how much of that one was used, the check result, the step, and which of the recipe's results is being created.
+Knowing which essence is invoking it, and how much of it was used, lets one shared macro answer differently for different essences, such as adding damage per unit of Fire.
 
-1. Open **Manage Crafting Systems**
-2. Select your system in the sidebar
-3. Enable **Show advanced options**
-4. Enable the **Essences** feature toggle
-5. In the Essences card, fill in the name, description, icon, and optional source item, then click **Add**
-6. Existing essence definitions are shown in a list below the form.
-   Click the trash icon to remove one
+The macro should return the set of property changes to make to the item being created.
+When more than one essence on a crafted result carries a property macro, they run one at a time, in the order the essences are listed in the crafting system, before the result's own property macro runs last.
+If one essence's macro fails, only that essence's changes are skipped.
+Every other essence's macro, and the result's own macro, still runs.
 
-The icon field accepts any FontAwesome icon class.
-If you leave it blank, a default mortar-and-pestle icon is used.
+{: .warning }
+> Fabricate only runs a **script** macro from an essence.
+> A **chat** macro, which is what a newly created Foundry macro defaults to, is refused with a warning when you drop it onto the essence, and is refused again, silently, at craft time if one somehow reaches an essence anyway, for example through an imported crafting system.
+> Change the macro's type to **Script** before linking it.
 
-The source item dropdown lists components already added to this crafting system.
-Selecting one links the essence to that component for effect transfer purposes.
-The label in the UI reads **Source item**.
+{: .note }
+> A macro stored in a compendium pack works for you as the GM, but a player crafting with that essence needs permission to read the pack the macro lives in.
+> Without it, the macro quietly does nothing for that player while it keeps working for you.
+
+## Bulk edit and bulk delete
+
+Select more than one essence in the library, using the checkbox on each row, to open the bulk edit panel in place of the single-essence inspector.
+
+From there you can:
+
+- stage an icon, a colour, or an enabled/disabled status across every selected essence, leaving anything you do not touch unchanged
+- see how many essences are currently selected before you apply
+
+Names, descriptions, linked source items, and property macros are never touched by a bulk edit.
+Edit those on the essence itself.
+
+**Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry them, and how many recipes will be rewritten to drop them.
+An essence still carried by a component is excluded from the delete and named in the panel, exactly as deleting a single in-use essence is blocked.
+
+Deleting is a two-step action.
+The first click arms the **Delete** button, and a second click confirms it.
+Click elsewhere to back out instead.
 
 ---
 
