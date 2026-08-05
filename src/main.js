@@ -3059,8 +3059,9 @@ Hooks.once('ready', async () => {
   // `onChange`-free registrations in `settings.js`.
   //
   // What this try/catch buys is a Fabricate-owned failure signal. Without it the error
-  // surfaces as a core `Hooks.onError` line naming an anonymous listener, with no clue
-  // which of the four branches below failed or which setting triggered it.
+  // surfaces as a core `Hooks.onError` line naming this handler (a named `const`, so the
+  // line is not anonymous), with no clue which of the four branches below failed or
+  // which setting triggered it.
   const handleFabricateSettingDocumentChange = (setting) => {
     try {
       const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;

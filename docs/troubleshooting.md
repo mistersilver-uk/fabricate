@@ -257,6 +257,66 @@ Additional causes:
 
 ---
 
+## Character Missing From the Character Bar or Rosters
+
+**Symptom:** A player's character does not appear in the character-selection bar at the top of the unified Fabricate window, in the GM's gathering stamina roster, in the Access or Knowledge rosters in the Crafting Admin panel, or in the party member picker.
+The player owns the actor, and it is otherwise a normal player character for the game system.
+
+**Likely cause:**
+
+- Fabricate only recognises certain actor types as player characters.
+  By default, only the "Character" actor type counts.
+- Some game systems use more than one actor type for a player character.
+  For example, a game system might use one actor type for an ordinary character sheet and a separate actor type for a robot or vehicle sheet.
+  Fabricate does not know about an additional type until a GM adds it.
+
+**Step-by-step checks:**
+
+1. Open Foundry's **Game Settings**, choose **Configure Settings**, and open the **Fabricate** module settings.
+2. Find **Player Character Actor Types** and click **Choose Actor Types**.
+3. Confirm the missing actor's type is ticked in the list.
+   "Character" is always ticked and cannot be unticked.
+4. Click **Save**.
+   The change takes effect for every connected player immediately, without a reload.
+
+**What this setting does and does not change:** Adding an actor type here only changes which actors are offered in the character bar, the gathering stamina roster, the Access and Knowledge rosters, and the party member picker.
+It does not change who is allowed to attempt a craft or a gathering task.
+That always depends on who owns or controls the actor.
+An actor of an unconfigured type remains fully usable for crafting and gathering.
+It is simply not offered as a choice in those four lists.
+
+**See also:** [Gathering Environments]({% link gathering-environments.md %}#actor-selection-bar) covers the character bar from the player's side.
+
+---
+
+## Crafting, Salvage, or Alchemy Deletes a Whole Stack Instead of Reducing It
+
+**Symptom:** Crafting, salvage, or an alchemy attempt consumes an entire stack of an ingredient or component at once instead of reducing it by the amount actually used.
+Using one unit from a stack of twenty destroys all twenty.
+
+**Likely cause:**
+
+Fabricate reads and writes how many units are in an item's stack through a single game-system-specific field, configured as the **Item Stack Quantity Field** setting.
+Fabricate already ships a working default for most game systems, matching the same field the system itself displays as an item's quantity, so this rarely needs to change.
+If the field is set to point at something other than the number of units itself, Fabricate can no longer tell how large a stack is.
+It then treats every stack as though it holds only one unit and deletes the whole item the moment any amount is consumed.
+
+**Step-by-step checks:**
+
+1. Open Foundry's **Game Settings**, choose **Configure Settings**, and open the **Fabricate** module settings.
+2. Find **Item Stack Quantity Field**.
+   Its hint text names the field your game system is expected to use.
+3. Confirm the configured value matches that expected field, unless you know your game system stores stack counts somewhere else.
+   Fabricate ships a correct default for most systems and documents a small number of known exceptions.
+4. Make sure the field points at the number of units itself, not at a section, table, or category the number happens to live inside.
+   Pointing at a container instead of the number is the most common way this setting is misconfigured, and it produces exactly the destructive symptom described above.
+5. If Fabricate detects a problem, it posts a standing warning naming how many of your world's items resolve a usable number at the configured field, compared with your system's expected field, and stating plainly that crafting, salvage, and alchemy will delete whole stacks until the field is corrected.
+   Follow the warning back to **Item Stack Quantity Field** in the Fabricate module settings and correct it there.
+
+**See also:** [Recipe Appears Uncraftable Despite Owning Recipe Item or Components](#recipe-appears-uncraftable-despite-owning-recipe-item-or-components) covers a related but different craftability problem.
+
+---
+
 ## Recipe Appears Uncraftable Despite Owning Recipe Item or Components
 
 **Symptom:** A recipe shows as "Cannot craft" or is excluded from the "Craftable only" filter even though the player's actor owns a copy of the linked recipe item and all required components.

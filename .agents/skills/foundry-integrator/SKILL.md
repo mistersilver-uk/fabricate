@@ -72,7 +72,7 @@ Audit the issue's `openspec-delta` for Foundry-integration soundness:
 
 Check the assigned target's base-relative Foundry-facing diff against the real Foundry behaviour you researched:
 
-- API calls use correct signatures and return shapes; hooks are registered and timed correctly; runtime globals are used, never imported; V13 document/collection shapes are honoured (e.g. `game.documentTypes.Item` is a `Set`).
+- API calls use correct signatures and return shapes; hooks are registered and timed correctly; runtime globals are used, never imported; V13 document/collection shapes are honoured (e.g. `game.documentTypes.Item` is a plain **array** — `Object.keys(types)` — never a `Set`, in both V13 and V14).
 - `module.json` compatibility metadata is updated when a new Foundry API requirement is introduced.
 - no deprecated path is reintroduced, and version-sensitive behaviour is handled.
 - emit a verdict on the first line: `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, with findings tied to specific files/symbols and their cited sources.

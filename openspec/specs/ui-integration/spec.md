@@ -1767,9 +1767,10 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
   `suggested` allocation.
 - `carriers[].ownedUnits` is the units remaining AFTER the set's non-essence
   consumption plan has claimed, derived from the resolver's own ledger.
-  No UI or helper re-reads `item.system.quantity` to compute it: that field is
-  game-system-specific and can be absent or `NaN`, and a raw stack count would
-  offer the player units the craft cannot spend.
+  No UI or helper re-reads the item's stack count at the configured
+  stack-quantity path to compute it: that field is game-system-specific and can
+  be absent or `NaN`, and a raw stack count would offer the player units the
+  craft cannot spend.
 - `requirements[].delivered` and `requirements[].owned` are named apart
   deliberately.
   `delivered` is the essence amount the resolved allocation supplies to that
@@ -2130,7 +2131,7 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 - The unified window selects the gathering actor through a shared **Actor selection top bar** rendered above all tabs (see _Unified Window Actor Selection Top Bar_), rather than only a per-tab header control.
 - The bar's selectable list is restricted to **player characters** — the actor type(s) a system designates as player characters, owned for non-GM users, all for GMs.
-  The current dnd5e/pf2e implementation of that concept is `actor.type === 'character'` (the predicate `isPlayerCharacterActor`); other player-character types are a known limitation.
+  The predicate is `isPlayerCharacterActor`, and the type set is GM-configurable: `'character'` always counts, and a GM may add further actor types the active game system declares through a settings-menu picker (`resolvePlayerCharacterTypes()`).
   This restriction is a selection-list concern only and does not change which actors are authorized to make a gathering attempt.
 - The top header/bar shows the selected actor and, when enabled, gathering stamina current/max values plus regeneration or adjustment affordances where permitted.
 - Persist the last selected actor in `fabricate.lastGatheringActor`.
