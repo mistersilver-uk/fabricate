@@ -10,7 +10,7 @@ import {
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
-import { runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
@@ -3015,8 +3015,11 @@ export class GatheringEngine {
       if (!choice || choice.confirmed === false) {
         return { status: 'cancelled', resultGroups: [], checkResult: null };
       }
-      const parsedBonus = Number(choice.bonus);
-      extraModifier = Number.isFinite(parsedBonus) ? parsedBonus : 0;
+      // The bonus field is free text, so `Number(...)` alone silently turned a dice
+      // expression ("2d20", "1d4 + 1") into NaN and then 0. Reduce it to a scalar —
+      // rolling it when it is not already a plain number — because each percentile
+      // throw takes a flat numeric modifier, not a formula.
+      extraModifier = await evaluateSituationalBonus(choice.bonus, actor);
     }
 
     const resolved = await this.richState.resolveD100Attempt({

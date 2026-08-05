@@ -255,8 +255,13 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
       // unavailable (headless/tests), fall through — the runner's try/catch is the
       // backstop there.
       const combined = `${effectiveFormula} + (${bonus})`;
-      const validate = globalThis.Roll?.validate;
-      if (typeof validate === 'function' && validate(combined) === false) {
+      // `Roll.validate` is a STATIC that does `new this(formula)` internally, so it MUST
+      // be invoked as a method. Detaching it (`const validate = Roll.validate`) leaves
+      // `this` undefined, `new this(...)` throws inside Foundry's own try/catch, and it
+      // returns false for EVERY formula — which silently dropped the situational bonus
+      // from every roll, whole number and dice expression alike.
+      const RollClass = globalThis.Roll;
+      if (typeof RollClass?.validate === 'function' && RollClass.validate(combined) === false) {
         console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
       } else {
         effectiveFormula = combined;
@@ -339,6 +344,54 @@ export function resolveCheckFormulaDisplay(formula, actor, craftingModifier = nu
     !/@/.test(display) &&
     (typeof Roll.validate !== 'function' || Roll.validate(display) === true);
   return { display, resolved };
+}
+
+/**
+ * Reduce a free-text situational bonus to a NUMBER.
+ *
+ * The d100 gathering path folds a flat modifier into every percentile throw
+ * (`GatheringRichStateService#resolveD100Attempt`), so unlike {@link evaluateCheckRoll} —
+ * which appends the raw bonus to the formula and lets Foundry's `Roll` evaluate it — it
+ * needs a scalar and cannot take a formula string.
+ *
+ * The roll prompt's bonus field is deliberately free text, so a player may enter `3`,
+ * `1d4`, `2 + 1` or `@prof`. A plain number is used as-is (no dice engine needed, so the
+ * headless path is unchanged); anything else is rolled through Foundry. Never returns NaN
+ * — a malformed entry degrades to 0 rather than throwing mid-attempt, mirroring the safety
+ * net in {@link evaluateCheckRoll}.
+ *
+ * @param {string|number|null|undefined} bonus The raw situational bonus.
+ * @param {object|null} [actor] Actor supplying roll data for `@` placeholders.
+ * @returns {Promise<number>} The bonus as a finite number (0 when absent or unusable).
+ */
+export async function evaluateSituationalBonus(bonus, actor = null) {
+  const text = typeof bonus === 'string' ? bonus.trim() : bonus;
+  if ([null, undefined, ''].includes(text)) return 0;
+  // A plain number needs no dice engine — this keeps the common case (and the headless
+  // path, where `Roll` may be absent or a minimal stub) behaving exactly as before.
+  const direct = Number(text);
+  if (Number.isFinite(direct)) return direct;
+  const RollClass = globalThis.Roll;
+  if (typeof RollClass !== 'function') return 0;
+  const formula = String(text);
+  // Called as a METHOD, not detached — see the note in `evaluateCheckRoll`.
+  if (typeof RollClass.validate === 'function' && RollClass.validate(formula) === false) {
+    console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
+    return 0;
+  }
+  try {
+    const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+    // `allowInteractive: false` keeps a client configured for manual fulfilment from
+    // surfacing a roll resolver mid-attempt (the same footgun the check roll avoids).
+    const rolled = await new RollClass(formula, rollData).evaluate({
+      allowInteractive: false,
+    });
+    const total = Number(rolled?.total);
+    return Number.isFinite(total) ? total : 0;
+  } catch (error) {
+    console.warn('Fabricate | Ignoring invalid situational bonus', bonus, error);
+    return 0;
+  }
 }
 
 /**
