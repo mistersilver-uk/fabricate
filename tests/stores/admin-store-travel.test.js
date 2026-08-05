@@ -215,7 +215,10 @@ describe('adminStore travel section', () => {
     const { services } = createServices({
       parties: [{ id: 'p1', name: 'Vanguard', enabled: false, memberActorUuids: [], travelActorUuid: null, currentRealmOverrides: {} }],
       realms: [{ id: 'r1', name: 'Verdant', enabled: true, secret: false, biomes: ['forest'], description: 'Old wood', img: 'verdant.webp' }],
-      actors: [{ uuid: 'Actor.a', id: 'a', name: 'Aria', img: '' }]
+      actors: [
+        { uuid: 'Actor.a', id: 'a', name: 'Aria', img: '', isPlayerCharacter: true },
+        { uuid: 'Actor.n', id: 'n', name: 'Grubb', img: '', isPlayerCharacter: false }
+      ]
     });
     const store = createAdminStore(services);
     await store.refresh();
@@ -237,7 +240,15 @@ describe('adminStore travel section', () => {
       environments: [],
       parties: []
     });
-    assert.equal(state.actorOptions.length, 1);
+    assert.equal(state.actorOptions.length, 2);
+    // Issue 1024: the projected `isPlayerCharacter` flag must SURVIVE `_clonePlain`.
+    // That clone is the seam where a projected field goes missing without a word, and
+    // the party member picker filters on this flag with a strict `=== true`, so a
+    // dropped field silently empties the picker rather than erroring.
+    assert.deepEqual(
+      state.actorOptions.map((actor) => [actor.uuid, actor.isPlayerCharacter]),
+      [['Actor.a', true], ['Actor.n', false]]
+    );
     assert.equal(state.selectedPartyId, 'p1');
     store.destroy();
   });

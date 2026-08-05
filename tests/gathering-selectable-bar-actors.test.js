@@ -3,16 +3,23 @@ import assert from 'node:assert/strict';
 
 import { createGatheringSelectableActorsGetter } from '../src/gatheringBootstrapAdapters.js';
 import { isGatheringActorSelectableByUser } from '../src/config/preferencesCleanup.js';
+import {
+  createPlayerCharacterActorPredicate,
+  isPlayerCharacterActor
+} from '../src/config/playerCharacterTypes.js';
 
-// Mirror main.js's player-character concept seam and the bar selection predicate.
-// These are intentionally re-stated here (rather than importing module-private
-// helpers from main.js) so the test routes through the SAME injected-dependency
-// boundary used by tests/gathering-engine-listing.test.js, without touching
-// game.actors / game.settings.
-function isPlayerCharacterActor(actor) {
-  return actor?.type === 'character';
-}
-
+// This file used to RE-IMPLEMENT the player-character predicate locally, on the
+// grounds that there was nothing importable in `main.js`. Issue 1024 destroyed that
+// justification by extracting the concept into `src/config/playerCharacterTypes.js`,
+// so both mirrors are gone: left alone, the local copy would have asserted the OLD
+// hardcoded behaviour forever and the bar's PC narrowing would have lost all
+// behavioural coverage.
+//
+// `isPlayerCharacterActor` is the settings-bound binding. Under `node --test` there is
+// no `game`, so its reader degrades to `[]` and it resolves to `{'character'}` — which
+// is exactly the un-configured world these cases model. The configured-`robot` case
+// below uses `createPlayerCharacterActorPredicate` with an injected reader rather than
+// installing a `game` global, so nothing leaks between test files.
 function isSelectableBarActor({ actor, viewer }) {
   return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);
 }
@@ -43,12 +50,18 @@ const otherPc = {
   id: 'pc-2', uuid: 'Actor.pc-2', name: 'Borin', img: null,
   type: 'character', isOwner: false
 };
+// GoldenGamin's reported actor: a Fallout PC on the second player-character sheet.
+const ownedRobot = {
+  id: 'pc-3', uuid: 'Actor.pc-3', name: 'Robby', img: null,
+  type: 'robot', isOwner: true
+};
 
-function makeBarGetter(actors) {
+function makeBarGetter(actors, isPlayerCharacter = isPlayerCharacterActor) {
   return createGatheringSelectableActorsGetter({
     getActors: () => actors,
     getCurrentUser: () => player,
-    isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })
+    isSelectable: (actor, viewer) =>
+      isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacter(actor)
   });
 }
 
@@ -64,6 +77,29 @@ test('a GM sees all player characters but not non-player-character actors', () =
   const selected = getter({ viewer: gm });
 
   assert.deepEqual(selected.map((a) => a.id).sort(), ['pc-1', 'pc-2'], 'all PCs, no npc');
+});
+
+test('an owned `robot` is absent from the bar until the GM configures that actor type', () => {
+  // Un-configured: the reported bug. `isSelectableBarActor` routes through the real
+  // settings-bound predicate, which sees no `game` and resolves to {'character'}.
+  const unconfigured = makeBarGetter([ownedPc, ownedRobot]);
+  assert.deepEqual(
+    unconfigured({ viewer: player }).map((a) => a.id),
+    ['pc-1'],
+    'the robot is invisible before configuration'
+  );
+  assert.equal(isSelectableBarActor({ actor: ownedRobot, viewer: player }), false);
+
+  // Configured: the same actor now appears, with no change to the composition rule.
+  const configured = makeBarGetter(
+    [ownedPc, ownedRobot],
+    createPlayerCharacterActorPredicate(() => ['robot'])
+  );
+  assert.deepEqual(
+    configured({ viewer: player }).map((a) => a.id).sort(),
+    ['pc-1', 'pc-3'],
+    'a configured additional type joins the bar without displacing `character`'
+  );
 });
 
 test('an owned non-PC stays attempt-authorized while absent from the bar list', () => {

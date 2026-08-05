@@ -43,6 +43,7 @@ import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
 import { isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
+import { readStoredStackQuantity } from './itemStackQuantity.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
@@ -4378,7 +4379,11 @@ function normalizeRunItems(items, { actor = null } = {}) {
           stringOrNull(actor?.uuid);
         const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
         const componentId = stringOrNull(item.componentId);
-        const quantity = Number(item.quantity ?? source.system?.quantity ?? 1);
+        // Only the SOURCE term is a stack read; `item.quantity` is the run entry's own
+        // awarded amount and is preferred whenever it is present.
+        const quantity = Number(
+          item.quantity ?? readStoredStackQuantity(source, { absentDefault: 1 })
+        );
         const entry = {
           actorUuid,
           itemUuid,

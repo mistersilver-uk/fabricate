@@ -91,12 +91,30 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
 });
 
 test('actor-selection bar wiring filters to player characters and returns redaction-safe records', () => {
-  // Guard the hand-maintained predicate so a future change to the PC concept or
-  // the ownership-AND-type composition fails here rather than silently widening
-  // the bar's actor list (the unit test re-states this logic on the DI boundary).
+  // ANTI-PIN (issue 1024). The old pin asserted the hardcoded literal
+  // `return actor?.type === 'character';` — the exact bug. Its replacement asserts the
+  // literal is ABSENT, in both the predicate's old home and the stamina roster, plus
+  // the import that supplies the shared predicate.
+  //
+  // A positive `includes('isPlayerCharacterActor')` would be the wrong shape: the
+  // identifier survives a WRONG import (a stale local re-declaration, a re-export of
+  // something else), whereas the absence assertion is provably red on the code as it
+  // stood before this change.
+  assert.equal(
+    mainSource.includes("actor?.type === 'character'"),
+    false,
+    'main.js must not re-hardcode the dnd5e/pf2e player-character actor type'
+  );
+  assert.equal(
+    mainSource.includes('actor.type === "character"'),
+    false,
+    'nor the double-quoted spelling of it'
+  );
   assert.ok(
-    mainSource.includes("return actor?.type === 'character';"),
-    "isPlayerCharacterActor should realise the player-character concept as type === 'character'"
+    mainSource.includes(
+      "import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';"
+    ),
+    'main.js should import the shared, GM-configurable player-character predicate'
   );
   assert.ok(
     mainSource.includes('return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);'),

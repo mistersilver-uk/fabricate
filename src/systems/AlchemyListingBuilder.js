@@ -38,6 +38,7 @@ import { getFabricateFlag } from '../config/flags.js';
 import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
 import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
 
+import { readStackQuantity } from './itemStackQuantity.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 function stringOrEmpty(value) {
@@ -51,12 +52,6 @@ function stringOrNull(value) {
 
 function actorKey(actor) {
   return actor?.id ?? actor?.uuid ?? null;
-}
-
-/** Per-item stack size, defaulting a missing/invalid/non-positive count to 1. */
-function itemStackQuantity(item) {
-  const raw = Number(item?.system?.quantity);
-  return Number.isFinite(raw) && raw > 0 ? raw : 1;
 }
 
 export class AlchemyListingBuilder {
@@ -345,7 +340,7 @@ export class AlchemyListingBuilder {
         // duplicate-lineage component.
         const component = resolveAlchemySubmissionComponent(item, components, system?.id);
         if (!component?.id) continue;
-        held.set(component.id, (held.get(component.id) || 0) + itemStackQuantity(item));
+        held.set(component.id, (held.get(component.id) || 0) + readStackQuantity(item));
       }
     }
     const rows = [];

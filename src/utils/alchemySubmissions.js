@@ -1,3 +1,5 @@
+import { readStackQuantity } from '../systems/itemStackQuantity.js';
+
 import { getItemMatchUuids, resolveComponentForItem } from './sourceUuid.js';
 
 /**
@@ -96,7 +98,12 @@ export function resolveAlchemySubmissions(
     for (const item of items) {
       const component = resolveAlchemySubmissionComponent(item, components, systemId);
       if (!component?.id) continue;
-      const units = Math.max(1, Math.trunc(Number(item?.system?.quantity ?? 1)) || 1);
+      // The `Math.trunc` stays HERE and is deliberately not folded into the shared
+      // accessor: expanding a stack into discrete submissions is a SUBMISSION rule
+      // ("one submission = one unit", `openspec/specs/resolution-modes/spec.md:397`),
+      // not a stack-reading rule. Truncating inside the accessor would silently
+      // truncate every other read in the module, including craftability `have` counts.
+      const units = Math.max(1, Math.trunc(readStackQuantity(item)) || 1);
       const queue = available.get(component.id) ?? [];
       for (let unit = 0; unit < units; unit += 1) queue.push(item);
       available.set(component.id, queue);

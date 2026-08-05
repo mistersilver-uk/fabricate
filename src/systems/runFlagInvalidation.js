@@ -13,6 +13,8 @@
  * the hook silently never fires.
  */
 
+import { hasByPath } from '../utils/objectPath.js';
+
 /**
  * @typedef {object} RunContainerDescriptor
  * @property {string} manager the run-manager key ('crafting' | 'salvage' | 'gathering')
@@ -26,15 +28,6 @@ export const RUN_CONTAINER_FLAG_PATHS = Object.freeze([
   { manager: 'gathering', flagPath: 'flags.fabricate.gatheringRuns' },
 ]);
 
-function defaultHasProperty(object, path) {
-  let current = object;
-  for (const segment of String(path).split('.')) {
-    if (current == null || typeof current !== 'object' || !(segment in current)) return false;
-    current = current[segment];
-  }
-  return true;
-}
-
 /**
  * Return the run managers whose container flag is touched by an `updateActor` diff.
  *
@@ -43,9 +36,9 @@ function defaultHasProperty(object, path) {
  *   (`foundry.utils.hasProperty` at runtime; a POSIX-dotted default for tests)
  * @returns {string[]} the matched manager keys (subset of 'crafting'|'salvage'|'gathering')
  */
-export function runContainersChanged(changes, hasProperty = defaultHasProperty) {
+export function runContainersChanged(changes, hasProperty = hasByPath) {
   if (!changes || typeof changes !== 'object') return [];
-  const probe = typeof hasProperty === 'function' ? hasProperty : defaultHasProperty;
+  const probe = typeof hasProperty === 'function' ? hasProperty : hasByPath;
   return RUN_CONTAINER_FLAG_PATHS.filter(({ flagPath }) => probe(changes, flagPath)).map(
     ({ manager }) => manager
   );

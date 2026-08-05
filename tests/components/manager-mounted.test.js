@@ -421,6 +421,12 @@ function compileManagerRoot() {
     // hand-rolled with no validator, so omitting a transitive raw module HANGS this
     // suite as `# cancelled` rather than failing it.
     'src/utils/essenceAllocation.js',
+    // IngredientSet seeds its remaining-quantity ledger through the canonical
+    // stack-quantity accessor (issue 1024), which pulls in the shared path walker and
+    // the per-system preset table. Same rule as above: omit one and the suite hangs.
+    'src/systems/itemStackQuantity.js',
+    'src/config/stackQuantityPathPresets.js',
+    'src/utils/objectPath.js',
     'src/models/IngredientGroup.js',
     'src/models/Result.js',
     'src/models/Tool.js',

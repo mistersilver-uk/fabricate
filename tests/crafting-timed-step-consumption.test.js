@@ -73,9 +73,12 @@ class FakeItem {
   async delete() {
     this._deleted = true;
   }
+  // Applies ANY flattened payload key by dotted path rather than the hardcoded default
+  // stack-quantity one (issue 1024). A fake keyed on one literal cannot tell a routed
+  // site from an unrouted one, because the unconfigured default IS that literal.
   async update(payload) {
     this._updates.push({ ...payload });
-    if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    for (const [key, value] of Object.entries(payload)) setProperty(this, key, value);
   }
   toObject() {
     return { name: this.name, img: this.img, type: 'loot', system: { ...this.system } };
@@ -312,6 +315,61 @@ test('timed step consumes components at START (gate arm), leaving a waitingTime 
   assert.equal(step.preparedConsumption.selectedIngredientSetId, 'set-1');
   assert.equal(step.preparedConsumption.consumedSummary.length, 1);
   assert.equal(step.preparedConsumption.consumedSummary[0].componentId, 'wood');
+});
+
+// ---------------------------------------------------------------------------
+// 2c. The same START consumption under a CONFIGURED stack-quantity path (issue 1024,
+//     acceptance criterion 6). The wood carries ONLY `system.qtd` — no `system.quantity`
+//     key at all — so the assertions below cannot pass on an unrouted engine, which is
+//     the whole point: the unconfigured default IS `system.quantity`, so a fixture that
+//     carried both would stay green either way.
+// ---------------------------------------------------------------------------
+
+const { configureItemStackQuantityPath, resetItemStackQuantityPath } = await import(
+  '../src/systems/itemStackQuantity.js'
+);
+
+test('a timed step START decrements the CONFIGURED stack-quantity field, never deleting the stack', async (t) => {
+  // FIRST statement, before the configure call, so a mid-test throw still resets the
+  // ambient module state.
+  t.after(resetItemStackQuantityPath);
+  configureItemStackQuantityPath('system.qtd');
+
+  const system = {
+    id: 'sys-timed-qtd',
+    resolutionMode: 'simple',
+    features: { craftingChecks: false, essences: false },
+    craftingCheck: { enabled: false, consumption: {} },
+    components: [{ id: 'wood', name: 'Wood' }],
+  };
+  setupGame(system, 1000);
+
+  const wood = new FakeItem('wood', 'Wood', 5);
+  delete wood.system.quantity;
+  wood.system.qtd = 5;
+
+  const craftingActor = new FakeActor('Crafter');
+  const sourceActor = new FakeActor('Source', [wood]);
+  const set = buildIngredientSet('set-1', [{ componentId: 'wood', quantity: 2 }]);
+  const resultGroups = [{ id: 'rg-1', results: [{ id: 'r-1', componentId: 'plank', quantity: 1 }] }];
+  const recipe = buildRecipe({
+    craftingSystemId: system.id,
+    ingredientSets: [set],
+    resultGroups,
+    steps: [timedStep({ ingredientSets: [set], resultGroups })],
+  });
+
+  const runManager = new CraftingRunManager();
+  const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
+  engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
+
+  const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
+
+  assert.equal(result.success, false, 'START arms the timed gate');
+  assert.equal(wood._deleted, false, 'a stack of five must survive consuming two');
+  assert.deepEqual(wood._updates, [{ 'system.qtd': 3 }], 'and only the configured field is written');
+  assert.equal(wood.system.qtd, 3);
+  assert.equal(wood.system.quantity, undefined, 'the item never grew a default-path key');
 });
 
 // ---------------------------------------------------------------------------

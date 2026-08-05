@@ -638,6 +638,17 @@ Assert the write key equals the capture key in a store↔engine test (the #766 f
 When claiming "there is no data to migrate", prove it by showing **no writer has ever existed**, not that nothing reads it: "nothing reads it" does not imply absence.
 - **`BaseSetting.canUserCreate` is a UI helper, NOT authorization** — it requires `SETTINGS_MODIFY` (default ASSISTANT), which players lack, and reads like a blocker for user-scoped player writes.
 Real authz is `#canModify`, which passes any user writing their **own** user-scoped setting. `config: false` is orthogonal: only WORLD scope is GM-gated in the settings UI.
+- **The first write to a `world`-scoped setting is a `create`, not an `update`.** `ClientSettings#setWorld` only calls `current.update(...)` when a `Setting` document already exists; `get()` synthesises an `_id`-less document when nothing is stored, so the very first `game.settings.set` for a given key fires `createSetting` and never `updateSetting`.
+Any module reacting to a world setting must listen on **both** hooks, and the two do not share a signature: `createSetting` emits `(doc, options, userId)`, `updateSetting` emits `(doc, change, options, userId)` — a handler written as `(setting, changed) => …` receives `options` in `changed` on the create leg.
+Verified against Foundry 13.351 and 14.361 (issue 1024).
+- **A registered `onChange` and a `Hooks.on` listener for the same setting BOTH fire, redundantly.** `Setting._onCreate`/`_onUpdate` invoke the registered `onChange` directly, then `Hooks.callAll` runs on the same document in the same callback — so registering both for one setting double-runs whatever they drive (e.g. two full world scans and two notifications per save).
+Pick one.
+A throw inside `onChange` escapes and kills the batch's broadcast entirely, whereas a throw inside a `Hooks.on` listener is caught by `Hooks.#call` and routed to `Hooks.onError`, so a `Hooks.on` listener is the safer place for a fallible reaction.
+Verified against Foundry 13.351 and 14.361 (issue 1024).
+- **`SETTINGS_MODIFY` changed shape between V13 and V14.** V13 declares `disableGM: false` and no `requiredRoles`; V14 adds `requiredRoles: [GAMEMASTER]`, and a new CASE 1 in `User#hasPermission` makes the permission UNREVOKABLE for a GM specifically (not exclusive to a GM — any other role a GM grants it to still holds it too).
+`defaultRole: ASSISTANT` is unchanged in both versions.
+`restricted: true` on `registerMenu` is a display gate only (`SettingsConfig._prepareCategoryData` hides the entry from a user lacking `SETTINGS_MODIFY`); the real write gate is always `BaseSetting.#canModify` -> `user.hasPermission('SETTINGS_MODIFY')`.
+Verified against Foundry 13.351 and 14.361 (issue 1024).
 - **A synced `updateWorldTime` handler runs on EVERY client**, so any per-user state read inside one reads the **executing** user, not the owner — and with no primary-GM gate or ownership filter, whichever client wins the race executes.
 Capture owner-scoped state onto the record at start instead of reading it at resume; that makes the invariant structural rather than documented.
 Issue 651's salvage `resultOrder` is the worked example (`SalvageRunManager.createRun` already stamps `userId`, so the capture is auditable).

@@ -16,6 +16,16 @@
  */
 
 import { stampItemDataRoleIdentity } from './config/flags.js';
+// Routed onto the configured stack-quantity path (issue 1024) but deliberately NOT
+// consolidated onto `createOrStackComponentItem`: two behaviour deltas separate them
+// (the absent-field default above, and this path's own stack-match resolution), so
+// merging them is its own change.
+import {
+  hasStackQuantity,
+  readStoredStackQuantity,
+  setStackQuantity,
+  updateStackQuantity,
+} from './systems/itemStackQuantity.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 
 export function flattenGatheringResults(resultGroups = []) {
@@ -201,8 +211,8 @@ export function createGatheringResultCreator(craftingSystemManager) {
             : {},
         };
         itemData.system ??= {};
-        if (itemData.system.quantity !== undefined || result.quantity) {
-          itemData.system.quantity = Number(result.quantity || 1);
+        if (hasStackQuantity(itemData) || result.quantity) {
+          setStackQuantity(itemData, Number(result.quantity || 1));
         }
         if (source.uuid) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
@@ -237,8 +247,13 @@ export function createGatheringResultCreator(craftingSystemManager) {
           system?.id
         );
         if (existing) {
-          const next = Number(existing.system?.quantity || 0) + Number(result.quantity || 1);
-          await existing.update({ 'system.quantity': next });
+          // absentDefault 0, not 1: this site treated a missing stack quantity as zero
+          // before the routing change (an award onto a field-less item authors exactly
+          // the awarded amount), unlike every other stacking site.
+          const next =
+            readStoredStackQuantity(existing, { absentDefault: 0 }) +
+            Number(result.quantity || 1);
+          await updateStackQuantity(existing, next);
           created.push(gatheringRunItemRef(actor, existing, result.quantity, componentId));
           continue;
         }
