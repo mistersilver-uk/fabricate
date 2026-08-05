@@ -8,6 +8,8 @@ import {
   applyFabricateTheme,
 } from '../ui/theme.js';
 
+import { ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES_KEY } from './playerCharacterTypes.js';
+import { registerPlayerCharacterTypesMenu } from './playerCharacterTypesMenu.js';
 import { registerRepairItemDataMenu } from './repairItemData.js';
 
 export const FABRICATE_SETTINGS_NAMESPACE = 'fabricate';
@@ -56,6 +58,11 @@ export const SETTING_KEYS = Object.freeze({
   // resolve to a component by name ONLY. Bumped past `OWNED_ITEM_COMPONENT_STAMP_TARGET`
   // once the pass has run so it never repeats.
   OWNED_ITEM_COMPONENT_STAMP_VERSION: 'ownedItemComponentStampVersion',
+  // Issue 1024: the ADDITIONAL actor types a GM designates as player characters.
+  // `'character'` is unioned in by `resolvePlayerCharacterTypes` and is never stored
+  // here, so an existing dnd5e/pf2e world is unaffected by the default `[]`. Edited
+  // through the `playerCharacterActorTypes` settings menu, not a config field.
+  ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES: ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES_KEY,
 });
 
 // The target version for the one-shot recipe-item flag auto-stamp. When the stored
@@ -275,6 +282,21 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Number,
     default: 0,
   },
+  // `config: false` — edited through the settings-menu picker
+  // (`registerPlayerCharacterTypesMenu`), not a raw text field, because the valid
+  // values are the actor types the active world declares and a free-text list would
+  // be unguessable. No `onChange`: propagation runs through the shared setting
+  // listener in `main.js`, and registering both would double-fire (Foundry calls
+  // `doc._onUpdate` — which invokes `onChange` — and THEN `Hooks.callAll` on the same
+  // document in the same callback).
+  [SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES]: {
+    name: 'FABRICATE.Settings.PlayerCharacterActorTypes.Name',
+    hint: 'FABRICATE.Settings.PlayerCharacterActorTypes.Hint',
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: [],
+  },
 });
 
 const keys = Object.values(SETTING_KEYS);
@@ -303,6 +325,8 @@ export function registerFabricateSettings() {
   }
   // GM maintenance button, surfaced alongside the theme selector in module settings.
   registerRepairItemDataMenu();
+  // Player-character actor-types picker (issue 1024), same panel.
+  registerPlayerCharacterTypesMenu();
 }
 
 export function getSetting(key) {
