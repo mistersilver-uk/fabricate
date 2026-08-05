@@ -141,7 +141,10 @@ jobs:
         # next_version/next_tag to this step's $GITHUB_OUTPUT, but ONLY when a release is minted.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        # Local bin rather than `npx` per Sonar S6505/S8543 — see the note on ci.yml's commitlint
+        # step. This step holds a write-scoped GITHUB_TOKEN, so an on-demand registry fetch here is
+        # the worst place in the repo to leave one.
+        run: ./node_modules/.bin/semantic-release
 
       - name: Assert the drafted release carries both assets
         # Catch an ASSETLESS draft at PRODUCTION time (issue #628, task 2.3). @semantic-release/github's
