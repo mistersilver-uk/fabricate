@@ -466,10 +466,13 @@ describe('inventoryStore', () => {
       assert.equal(store.salvagingKey, null, 'the busy state is released');
     });
 
-    it('AC9: a time-gated salvage (success with null results) shows a waiting state, no ribbon', async () => {
+    it('AC9: a time-gated salvage (waiting: true) shows a waiting state, no ribbon', async () => {
       const { services, notes } = salvageServices({
         result: {
           success: true,
+          // Issue 859: the store reads the engine's explicit `waiting` flag now,
+          // not `results == null` — see `salvage()`'s own docblock.
+          waiting: true,
           results: null,
           message: 'Salvage started for Iron (60s remaining)',
         },
