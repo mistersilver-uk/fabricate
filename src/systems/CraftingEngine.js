@@ -4833,6 +4833,15 @@ export class CraftingEngine {
       if (!validation.valid) {
         return {
           success: false,
+          // The SAME additive discriminator the misconfigured-check abort carries
+          // (issue 859), and the branch that actually fires in a wired world: this gate
+          // runs BEFORE `_runSalvageCraftingCheck`, so a GM-side config error
+          // (unsupported mode, a routed success tier routing nowhere, a simple mode with
+          // two success groups) never reaches the check's own misconfigured return.
+          // Without the flag here a caller reads a broken config as a rolled failure and
+          // tells the player "nothing recovered" — so they retry a config only their GM
+          // can fix. `success` is unchanged, so nothing existing regresses.
+          misconfigured: true,
           results: null,
           message: `Invalid salvage configuration: ${validation.errors.join(', ')}`,
           salvageRun: null,
