@@ -36,6 +36,7 @@ import {
   prepareForImport,
   makeExportFilename,
 } from '../../../systems/CraftingSystemExporter.js';
+import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
 import {
   isGeneralRecipeCategory,
   normalizeCustomRecipeCategories,
@@ -2345,7 +2346,28 @@ function _sourceFieldsForEssenceSelection(system, sourceComponentId, sourceItemU
   };
 }
 
-function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions) {
+/**
+ * How many recipes in the system REQUIRE the essence (issue 1036).
+ *
+ * The predicate is the shared `recipeReferencesEssence` leaf, not a second walk: the count
+ * this returns is the number the bulk-delete impact statement reports, and the cascade
+ * `CraftingSystemManager.deleteEssence` actually performs is driven by the SAME function.
+ * Two implementations of "does this recipe require that essence?" would let the row's count
+ * disagree with what the delete does. The store deliberately calls no underscore-private
+ * manager method, which is why the predicate was extracted rather than reached into.
+ *
+ * @param {string} essenceId
+ * @param {object[]} recipes the selected system's recipes.
+ * @returns {number}
+ */
+function _essenceRecipeUsageCount(essenceId, recipes) {
+  return (Array.isArray(recipes) ? recipes : []).reduce(
+    (count, recipe) => count + (recipeReferencesEssence(recipe, essenceId) ? 1 : 0),
+    0
+  );
+}
+
+function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions, recipes = []) {
   const managedItemById = new Map(managedItemOptions.map((item) => [item.id, item]));
   return essenceDefinitions.map((def) => {
     const sourceComponentId = _sourceComponentIdForEssence(def, managedItemById);
@@ -2362,9 +2384,17 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
       sourceItemUuid,
       associatedItem: sourceItem,
     });
+    const recipeUsageCount = _essenceRecipeUsageCount(def.id, recipes);
     return {
       ...def,
       icon: normalizeEssenceIcon(def.icon || DEFAULT_ESSENCE_ICON),
+      // `enabled` is DEFAULT-TRUE and the spread above carries whatever the definition
+      // holds, including `undefined` for a definition that predates the field. Folding it
+      // explicitly here means every consumer reads a real boolean and none has to repeat
+      // the `!== false` convention — a consumer that wrote `if (card.enabled)` against an
+      // absent key would treat every legacy essence as disabled.
+      enabled: def.enabled !== false,
+      propertyMacroUuid: def.propertyMacroUuid || null,
       sourceComponentId,
       sourceItemUuid,
       associatedSystemItemId: sourceComponentId || null,
@@ -2374,8 +2404,22 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
         associatedItem?.name ||
         (sourceState === 'stale' ? sourceComponentId || sourceItemUuid : ''),
       sourceState,
+      // The two capability facts the library row, the inspector and the On-craft tab all
+      // read. `hasEffectTransfer` is "a source is CONFIGURED", not "the source resolves":
+      // a `stale` or `missing` link is still an authored intention, and the source-state
+      // marker beside the pill is what says whether it currently works. Deriving it from
+      // resolution instead would make a broken link look like no link at all, which is
+      // exactly the state the browser's needs-attention filter exists to surface.
+      hasEffectTransfer: sourceState !== 'none',
+      hasPropertyMacro: String(def.propertyMacroUuid || '').trim() !== '',
       componentUsageCount,
       componentUsageItems,
+      recipeUsageCount,
+      // `deleteBlocked` keeps its COMPONENT-ONLY meaning. Recipe usage is an explanatory
+      // consequence with its own key, deliberately worded so it cannot read as a block:
+      // deleting an essence a recipe requires is allowed and rewrites that recipe, while
+      // deleting one a component carries is refused.
+      deleteRewritesRecipes: recipeUsageCount > 0,
       deleteBlocked: componentUsageCount > 0,
     };
   });
@@ -5215,13 +5259,28 @@ export function createAdminStore(services) {
           : null;
         return {
           ...def,
+          // The two persisted fields added in issue 1036, stated EXPLICITLY rather than
+          // left to the spread. This object and `_buildSelectedSystemViewData`'s
+          // `selectedSystem` are hand-built projections, and this repo has repeatedly
+          // shipped a correct normalizer and write path whose field was invisible to the
+          // UI because a projection like this one did not name it (see the
+          // `componentCategories` and `categoryIcons` notes there). Naming them makes the
+          // allowlist say what it carries, and folds `enabled` onto its default-true
+          // convention once, at the boundary.
+          enabled: def.enabled !== false,
+          propertyMacroUuid: def.propertyMacroUuid || null,
           sourceComponentId,
           associatedSystemItemId: sourceComponentId || null,
           associatedItem,
           associatedItemName: associatedItem?.name || null,
         };
       });
-      essenceCards = _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions);
+      essenceCards = _buildEssenceCards(
+        essenceDefinitions,
+        managedItems,
+        managedItemOptions,
+        recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || []
+      );
 
       selectedSystemData = _buildSelectedSystemViewData(
         selectedSystem,
@@ -6753,23 +6812,88 @@ export function createAdminStore(services) {
 
   // --- Essence management ---
 
+  /**
+   * The comparison key for an essence NAME.
+   *
+   * One function, because `addEssence`, `updateEssence` and `duplicateEssence` must agree
+   * exactly on what "already exists" means. `addEssence` and `updateEssence` both REFUSE a
+   * case-insensitive collision while `_uniqueKey` de-duplicates only the ID, so a
+   * duplicate that landed a second same-named definition would leave NEITHER of the two
+   * ever savable again — silently and permanently.
+   */
+  function _essenceNameKey(value) {
+    return String(value ?? '')
+      .trim()
+      .toLowerCase();
+  }
+
+  /**
+   * Whether any OTHER essence already carries this name, case-insensitively.
+   *
+   * @param {object[]} existing the system's essence definitions.
+   * @param {string} name
+   * @param {string} [ignoreId] the essence being renamed, which cannot collide with itself.
+   */
+  function _essenceNameTaken(existing, name, ignoreId = '') {
+    const key = _essenceNameKey(name);
+    return existing.some((def) => def.id !== ignoreId && _essenceNameKey(def.name) === key);
+  }
+
+  /**
+   * A name derived from `baseName` that {@link _essenceNameTaken} rejects for no existing
+   * essence — what `duplicateEssence` must produce for its copy to be savable.
+   *
+   * Counts upwards rather than appending repeatedly, so duplicating three times yields
+   * three DISTINCT names rather than "(copy)", "(copy) (copy)", "(copy) (copy) (copy)".
+   * The loop is bounded by the definition count plus one, which is the most collisions
+   * that can exist.
+   */
+  function _uniqueEssenceName(existing, baseName) {
+    const first =
+      services.localize?.('FABRICATE.Admin.Manager.Essence.DuplicateName', { name: baseName }) ||
+      `${baseName} (copy)`;
+    if (!_essenceNameTaken(existing, first)) return first;
+    for (let index = 2; index <= existing.length + 2; index += 1) {
+      const candidate =
+        services.localize?.('FABRICATE.Admin.Manager.Essence.DuplicateNameIndexed', {
+          name: baseName,
+          index,
+        }) || `${baseName} (copy ${index})`;
+      if (!_essenceNameTaken(existing, candidate)) return candidate;
+    }
+    return `${baseName} ${crypto.randomUUID().slice(0, 8)}`;
+  }
+
+  /**
+   * The selected system plus its essence definitions, or `null` when either is missing.
+   * Every essence write below opens with the same three reads; hoisting them keeps the
+   * write functions about their own subject.
+   */
+  function _selectedSystemEssences() {
+    const systemManager = services.getCraftingSystemManager();
+    const sysId = get(selectedSystemId);
+    if (!sysId) return null;
+    const system = systemManager.getSystem(sysId);
+    if (!system) return null;
+    return {
+      systemManager,
+      sysId,
+      system,
+      existing: Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [],
+    };
+  }
+
   // `colorToken` is the optional GM-authored per-essence colour (issue 917). It is a
   // bare `--fab-tag-*` key or null; `CraftingSystemManager` owns the palette
   // validation, so the store only has to carry the authored value through.
   async function addEssence(name, description, icon, sourceComponentId, colorToken) {
     const normalizedName = String(name || '').trim();
     if (!normalizedName) return false;
-    const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
-    if (!sysId) return false;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return false;
+    const context = _selectedSystemEssences();
+    if (!context) return false;
+    const { systemManager, sysId, system, existing } = context;
 
-    const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const duplicate = existing.some(
-      (def) => String(def.name || '').toLowerCase() === normalizedName.toLowerCase()
-    );
-    if (duplicate) {
+    if (_essenceNameTaken(existing, normalizedName)) {
       services.notify.warn(`Essence "${normalizedName}" already exists in this system.`);
       return false;
     }
@@ -6791,102 +6915,368 @@ export function createAdminStore(services) {
     return true;
   }
 
+  /**
+   * The patched definition one `updateEssence` call produces, given the current one.
+   *
+   * Extracted so `updateEssence` stays a guard-and-write function while the per-field
+   * partial semantics live in one readable place. Every field follows the SAME rule, which
+   * is the whole contract of this method: an ABSENT key leaves the stored value alone, and
+   * a PRESENT key writes — including when the value it writes is falsy. Four of the fields
+   * have a meaningful falsy value (`colorToken: null` clears the colour, `enabled: false`
+   * disables, `propertyMacroUuid: null` unlinks the macro, `sourceComponentId: null`
+   * unlinks the source), so a truthiness test here would silently drop four ordinary
+   * operations.
+   *
+   * @param {object} current the stored definition.
+   * @param {object} updates the caller's partial patch.
+   * @param {object} system the selected system, for source resolution.
+   * @param {{name: string, description: string, icon: string}} resolved the three fields
+   *   `updateEssence` has already validated.
+   * @returns {object} a NEW definition; `current` is not mutated.
+   */
+  function _patchedEssenceDefinition(current, updates, system, resolved) {
+    const has = (key) => Object.prototype.hasOwnProperty.call(updates, key);
+    const next = {
+      ...current,
+      name: resolved.name,
+      description: resolved.description,
+      icon: resolved.icon,
+    };
+
+    // The authored colour (issue 917) is nullable BY DESIGN, so absence and null are
+    // different instructions. Palette validation belongs to `CraftingSystemManager`.
+    if (has('colorToken')) next.colorToken = updates.colorToken || null;
+    // The enabled state (issue 1036). Written from the editor's Enabled row; the library
+    // row toggle and the bulk Status axis go through `setEssenceEnabled` and
+    // `applyEssenceBulkEdit` instead, which are ONE manager write each.
+    if (has('enabled')) next.enabled = updates.enabled !== false;
+    // The essence-scoped property macro (issue 1036). Shape validation belongs to
+    // `_normalizeEssenceDefinition`; whether the uuid resolves to a SCRIPT macro is
+    // decided at the drop and reported by the editor's Validation tab.
+    if (has('propertyMacroUuid')) next.propertyMacroUuid = updates.propertyMacroUuid || null;
+
+    if (!has('sourceComponentId') && !has('sourceItemUuid')) return next;
+    return {
+      ...next,
+      ..._sourceFieldsForEssenceSelection(
+        system,
+        has('sourceComponentId') ? updates.sourceComponentId || null : null,
+        has('sourceItemUuid') ? updates.sourceItemUuid || null : null
+      ),
+    };
+  }
+
   async function updateEssence(essenceId, updates = {}) {
     if (!essenceId || !updates || typeof updates !== 'object') return false;
-    const systemManager = services.getCraftingSystemManager();
-    const sysId = get(selectedSystemId);
-    if (!sysId) return false;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return false;
+    const context = _selectedSystemEssences();
+    if (!context) return false;
+    const { systemManager, sysId, system, existing } = context;
 
-    const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const current = existing.find((def) => def.id === essenceId);
     if (!current) return false;
 
-    const nextName = Object.prototype.hasOwnProperty.call(updates, 'name')
-      ? String(updates.name || '').trim()
-      : String(current.name || '').trim();
+    const hasName = Object.prototype.hasOwnProperty.call(updates, 'name');
+    const nextName = String((hasName ? updates.name : current.name) || '').trim();
     if (!nextName) return false;
 
-    const duplicate = existing.some(
-      (def) =>
-        def.id !== essenceId &&
-        String(def.name || '')
-          .trim()
-          .toLowerCase() === nextName.toLowerCase()
-    );
-    if (duplicate) {
+    if (_essenceNameTaken(existing, nextName, essenceId)) {
       services.notify.warn(`Essence "${nextName}" already exists in this system.`);
       return false;
     }
 
-    const nextDescription = Object.prototype.hasOwnProperty.call(updates, 'description')
-      ? String(updates.description || '')
-      : String(current.description || '');
-    const nextIcon = Object.prototype.hasOwnProperty.call(updates, 'icon')
-      ? normalizeEssenceIcon(updates.icon)
-      : normalizeEssenceIcon(current.icon);
-    // The authored colour (issue 917) is nullable BY DESIGN, so absence and null are
-    // different instructions: an absent `colorToken` leaves the stored value alone (the
-    // spread below preserves it), while an explicit null is the editor's Clear control
-    // unsetting the colour. Palette validation belongs to `CraftingSystemManager`.
-    const hasColorTokenUpdate = Object.prototype.hasOwnProperty.call(updates, 'colorToken');
-    const nextColorToken = hasColorTokenUpdate ? updates.colorToken || null : null;
-    const hasSourceUpdate =
-      Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId') ||
-      Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid');
-    const nextSourceFields = hasSourceUpdate
-      ? _sourceFieldsForEssenceSelection(
-          system,
-          Object.prototype.hasOwnProperty.call(updates, 'sourceComponentId')
-            ? updates.sourceComponentId || null
-            : null,
-          Object.prototype.hasOwnProperty.call(updates, 'sourceItemUuid')
-            ? updates.sourceItemUuid || null
-            : null
-        )
-      : null;
+    const hasDescription = Object.prototype.hasOwnProperty.call(updates, 'description');
+    const hasIcon = Object.prototype.hasOwnProperty.call(updates, 'icon');
+    const resolved = {
+      name: nextName,
+      description: String((hasDescription ? updates.description : current.description) || ''),
+      icon: normalizeEssenceIcon(hasIcon ? updates.icon : current.icon),
+    };
 
-    const essenceDefinitions = existing.map((def) => {
-      if (def.id !== essenceId) return def;
-      const nextDefinition = {
-        ...def,
-        name: nextName,
-        description: nextDescription,
-        icon: nextIcon,
-      };
-      if (hasColorTokenUpdate) nextDefinition.colorToken = nextColorToken;
-      if (!hasSourceUpdate) return nextDefinition;
-      return {
-        ...nextDefinition,
-        ...nextSourceFields,
-      };
-    });
+    const essenceDefinitions = existing.map((def) =>
+      def.id === essenceId ? _patchedEssenceDefinition(def, updates, system, resolved) : def
+    );
 
     await systemManager.updateSystem(sysId, { essenceDefinitions });
     await refresh();
     return true;
   }
 
-  async function removeEssence(essenceId) {
+  /**
+   * Copy an essence into a NEW definition the GM can then edit (issue 1036).
+   *
+   * The copy takes a name `updateEssence` will still accept. Both `addEssence` and
+   * `updateEssence` refuse a case-insensitive name collision and `_uniqueKey` de-duplicates
+   * the ID only, so a naive duplicate would land two same-named definitions after which
+   * NEITHER could ever be saved again.
+   *
+   * Everything else is carried verbatim, including a `false` `enabled` and the property
+   * macro: a duplicate is a starting point for the GM's next essence, and silently
+   * re-enabling a copy of a disabled essence would give it behaviour its original does not
+   * have. The SOURCE link is carried too — it names an in-system component, so the copy
+   * points at the same component the original does.
+   *
+   * @param {string} essenceId
+   * @returns {Promise<?string>} the new essence id, or `null` when nothing was written.
+   */
+  async function duplicateEssence(essenceId) {
+    if (!essenceId) return null;
+    const context = _selectedSystemEssences();
+    if (!context) return null;
+    const { systemManager, sysId, existing } = context;
+
+    const current = existing.find((def) => def.id === essenceId);
+    if (!current) return null;
+
+    const id = crypto.randomUUID();
+    const essenceDefinitions = [
+      ...existing,
+      {
+        ...current,
+        id,
+        name: _uniqueEssenceName(existing, String(current.name || '').trim() || essenceId),
+      },
+    ];
+
+    await systemManager.updateSystem(sysId, { essenceDefinitions });
+    await refresh();
+    return id;
+  }
+
+  /**
+   * Enable or disable ONE essence (issue 1036) — the library row's toggle.
+   *
+   * Routed through the manager's set-apply primitive rather than a bespoke write, so the
+   * single toggle and the bulk Status axis share one code path and one
+   * `_assertNoAlchemySignatureCollisions` check. `applyBulkEditToEssences` is
+   * presence-gated on `Object.hasOwn`, so `{ enabled: false }` is a real staged edit rather
+   * than an empty one.
+   *
+   * Disabling does NOT retro-disable an already-enabled recipe: the disabled-essence
+   * blocker lives in `_validateRecipeForActivation`, so an enabled recipe requiring this
+   * essence stays enabled until someone tries to re-activate it. That is deliberate — a
+   * mid-session toggle must not silently switch off a table's recipes — but it is also
+   * invisible, so the count of enabled recipes the toggle just invalidated is REPORTED.
+   * Re-enabling clears the issue without touching recipe state.
+   *
+   * @param {string} essenceId
+   * @param {boolean} enabled
+   * @returns {Promise<{updated: boolean, invalidatedRecipes: number}>}
+   */
+  async function setEssenceEnabled(essenceId, enabled) {
+    const idle = { updated: false, invalidatedRecipes: 0 };
+    if (!essenceId) return idle;
+    const context = _selectedSystemEssences();
+    if (!context) return idle;
+    const { systemManager, sysId } = context;
+
+    // Counted BEFORE the write, over recipes that are enabled TODAY. Reading it first
+    // states that this is a fact about the state the GM is leaving rather than one the
+    // write produced — the write does not touch a recipe.
+    const invalidatedRecipes =
+      enabled === true ? 0 : _enabledRecipesRequiringEssence(sysId, essenceId);
+
+    try {
+      const result = await systemManager.applyBulkEditToEssences(sysId, [essenceId], {
+        enabled: enabled === true,
+      });
+      await refresh();
+      const updated = Number(result?.updated) > 0;
+      if (updated && invalidatedRecipes > 0) {
+        services.notify?.warn?.(
+          services.localize?.('FABRICATE.Admin.Manager.Essence.DisabledInvalidatesRecipes', {
+            count: invalidatedRecipes,
+          }) ||
+            `${invalidatedRecipes} enabled recipe(s) require this essence and can no longer be re-enabled while it is disabled.`
+        );
+      }
+      return { updated, invalidatedRecipes };
+    } catch (err) {
+      console.error('Fabricate | Failed to change essence enabled state:', err);
+      services.notify?.error?.(err?.message || 'Failed to change essence enabled state');
+      return idle;
+    }
+  }
+
+  /** How many CURRENTLY-ENABLED recipes in the system require the essence. */
+  function _enabledRecipesRequiringEssence(sysId, essenceId) {
+    const recipes = services.getRecipeManager?.()?.getRecipes({ craftingSystemId: sysId }) || [];
+    return recipes.filter(
+      (recipe) => recipe?.enabled !== false && recipeReferencesEssence(recipe, essenceId)
+    ).length;
+  }
+
+  /**
+   * Apply one staged bulk edit to a SET of essences (issue 1036) through the manager's
+   * set-apply primitive: ONE `craftingSystems` write and ONE refresh for the whole
+   * selection.
+   *
+   * `edit` is forwarded VERBATIM. Two of its three keys are falsy but REAL —
+   * `colorToken: null` (Clear colour) and `enabled: false` (Disable) — so pruning "empty"
+   * keys would collapse a present `colorToken: null` into an absent one, and those are
+   * different instructions. Everything downstream tests key presence, never truthiness.
+   *
+   * `null` means nothing was written, for any reason: a bad or empty argument, no selected
+   * system, or a throw that has already been reported to the GM. The manager routes the
+   * write through `updateSystem`, which runs `_assertNoAlchemySignatureCollisions` and
+   * THROWS on a collision, so the alchemy block reaches the GM here rather than shipping a
+   * system it would refuse to load.
+   *
+   * @param {Iterable<string>} essenceIds
+   * @param {object} [edit]
+   * @returns {Promise<{updated: number, essenceIds: string[]}|null>}
+   */
+  async function applyEssenceBulkEdit(essenceIds, edit = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
-    if (!sysId) return;
-    const system = systemManager.getSystem(sysId);
-    if (!system) return;
-    const essence = (system.essenceDefinitions || []).find((def) => def.id === essenceId);
-    if (!essence) return;
+    const ids = Array.from(essenceIds || [], String).filter(Boolean);
+    if (ids.length === 0 || !sysId) return null;
+    if (!edit || typeof edit !== 'object') return null;
+    if (Object.keys(edit).length === 0) return null;
 
+    try {
+      const result = await systemManager.applyBulkEditToEssences(sysId, ids, edit);
+      await refresh();
+      return {
+        updated: Number(result?.updated) || 0,
+        essenceIds: Array.isArray(result?.essenceIds) ? result.essenceIds : [],
+      };
+    } catch (err) {
+      console.error('Fabricate | Failed to apply essence bulk edit:', err);
+      services.notify?.error?.(err?.message || 'Failed to apply essence bulk edit');
+      return null;
+    }
+  }
+
+  /**
+   * Whether deleting this essence is refused because a COMPONENT still carries it.
+   *
+   * Recomputed from the system rather than read off a card, because the refusal is a
+   * data-loss guard and must not depend on a projection the caller happens to hold.
+   */
+  function _essenceDeleteBlocked(system, essenceId) {
+    return _essenceUsageCount(essenceId, _getManagedItems(system)) > 0;
+  }
+
+  /**
+   * Delete ONE essence definition, after asking (issue 1036).
+   *
+   * Renamed from `removeEssence` so the singular and the plural share one verb, localized,
+   * and it now RETURNS a boolean: the old `undefined` could not tell a caller whether the
+   * GM had cancelled, whether the essence existed, or whether the write happened.
+   *
+   * The in-use refusal is enforced HERE rather than by a disabled control.
+   * `CraftingSystemManager.deleteEssence` deliberately strips the essence from carrying
+   * components regardless of `deleteBlocked`, which is a UI-only card field, so a caller
+   * that reached this function with a carried essence would silently destroy authored
+   * component data.
+   *
+   * @param {string} essenceId
+   * @returns {Promise<boolean>} whether the definition was deleted.
+   */
+  async function deleteEssence(essenceId) {
+    const context = _selectedSystemEssences();
+    if (!context) return false;
+    const { systemManager, sysId, system, existing } = context;
+
+    const essence = existing.find((def) => def.id === essenceId);
+    if (!essence) return false;
+    if (_essenceDeleteBlocked(system, essenceId)) {
+      services.notify?.warn?.(
+        services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteBlocked') ||
+          'Remove component usage before deleting this essence.'
+      );
+      return false;
+    }
+
+    const name = String(essence.name || '');
     const confirmed = await services.confirmDialog({
-      title: `Delete ${essence.name}?`,
-      content: `<p>Delete essence <strong>${essence.name}</strong> and remove it from recipes in this system?</p>`,
+      title:
+        services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Title', { name }) ||
+        `Delete ${name}?`,
+      content: `<p>${
+        services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content', { name }) ||
+        `Delete essence ${name} and remove it from recipes in this system?`
+      }</p>`,
       yes: () => true,
       no: () => false,
     });
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     await systemManager.deleteEssence(sysId, essenceId);
     await refresh();
+    return true;
+  }
+
+  /**
+   * Delete a SET of essence definitions (issue 1036) through the manager's batched
+   * primitive: ONE `craftingSystems` write and ONE `recipes` write for the whole set.
+   *
+   * The blocked-in-use PARTITION is the store's job, not a disabled control's: the manager
+   * primitive deliberately does not consult `deleteBlocked`, so a blocked id handed to it
+   * would have its essence stripped from every carrying component. Blocked members are
+   * therefore excluded here and returned by name, and the whole call is a no-op when every
+   * selected essence is blocked.
+   *
+   * Confirmation is the CALLER's, not this function's: the bulk delete is armed in the
+   * panel (`ArmedDangerButton`) beside an impact statement naming the counts, which is
+   * strictly more information than a modal can carry.
+   *
+   * @param {Iterable<string>} essenceIds
+   * @returns {Promise<{deleted: number, blocked: string[], recipesUpdated: number}>}
+   */
+  async function deleteEssences(essenceIds) {
+    const empty = { deleted: 0, blocked: [], recipesUpdated: 0 };
+    const context = _selectedSystemEssences();
+    if (!context) return empty;
+    const { systemManager, sysId, system, existing } = context;
+
+    const requested = new Set(Array.from(essenceIds || [], String).filter(Boolean));
+    if (requested.size === 0) return empty;
+
+    const resolved = existing.filter((def) => requested.has(String(def?.id ?? '')));
+    const blocked = resolved.filter((def) => _essenceDeleteBlocked(system, def.id));
+    const deletable = resolved.filter((def) => !_essenceDeleteBlocked(system, def.id));
+    const blockedNames = blocked.map((def) => String(def.name || def.id));
+    if (deletable.length === 0) return { ...empty, blocked: blockedNames };
+
+    try {
+      const result = await systemManager.deleteEssences(
+        sysId,
+        deletable.map((def) => String(def.id))
+      );
+      await refresh();
+      return {
+        deleted: Number(result?.deleted) || 0,
+        blocked: blockedNames,
+        recipesUpdated: Number(result?.recipesUpdated) || 0,
+      };
+    } catch (err) {
+      console.error('Fabricate | Failed to delete essences:', err);
+      services.notify?.error?.(err?.message || 'Failed to delete essences');
+      return { ...empty, blocked: blockedNames };
+    }
+  }
+
+  /**
+   * Abandon the essence draft the editor is holding (issue 1036).
+   *
+   * The draft itself is lifted into `CraftingSystemManagerRoot`, not held here, so the
+   * STORE's half of Cancel is exactly this: write NOTHING, and republish the persisted
+   * projections so the browser and the inspector show what is actually stored rather than
+   * whatever the abandoned draft last rendered. "Writes nothing" is the half worth having a
+   * name for — a cancel that reached `updateSystem` would persist the edit it exists to
+   * discard.
+   *
+   * It is a store export for the same reason `cancelEnvironmentDraft` and
+   * `cancelToolsDraft` are: the route guard's discard branch and the editor's Cancel button
+   * must reach ONE function, and the alternative is each caller re-deriving what cancelling
+   * means.
+   *
+   * @returns {Promise<boolean>} always `true`; cancelling cannot fail.
+   */
+  async function cancelEssenceDraft() {
+    await refresh();
+    return true;
   }
 
   async function updateGatheringConditions(updates = {}) {
@@ -9105,7 +9495,15 @@ export function createAdminStore(services) {
     removeTag,
     addEssence,
     updateEssence,
-    removeEssence,
+    duplicateEssence,
+    setEssenceEnabled,
+    applyEssenceBulkEdit,
+    // Singular and plural share one verb (issue 1036): `removeEssence` is gone, not
+    // aliased. An alias would leave two names for one write in a file this size, and the
+    // rename is the point — `deleteEssence`/`deleteEssences` read as a pair.
+    deleteEssence,
+    deleteEssences,
+    cancelEssenceDraft,
     updateGatheringConditions,
     updateGatheringVocabulary,
     toggleGatheringConditionEnabled,

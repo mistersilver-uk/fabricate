@@ -5,6 +5,11 @@
     adjustComponentEssenceQuantity,
     clampComponentEssenceQuantity,
   } from '../util/componentEditor.js';
+  // The add-new offer projection (issue 1036). This standalone window reaches the SAME
+  // whitelist rebuild the in-manager editor does — `handleSave` hands `essenceDraft`
+  // straight to `buildComponentEditorUpdates` — so the draft stays whole and only the
+  // rendered grid narrows.
+  import { visibleEssenceOptions } from '../../../utils/essenceValidation.js';
 
   let {
     editorState = {
@@ -31,11 +36,21 @@
       id: option.id,
       name: option.name,
       icon: option.icon,
+      // Carried through the clone, or the offer filter below can never see it.
+      enabled: option.enabled !== false,
       quantity: clampComponentEssenceQuantity(option.quantity),
     }));
 
   let tagDraft = $state([]);
   let essenceDraft = $state([]);
+  // Every ENABLED essence, plus any disabled one this component already carries. The
+  // draft stays whole; only the offer narrows (issue 1036).
+  const offeredEssences = $derived(
+    visibleEssenceOptions(
+      essenceDraft,
+      (option) => clampComponentEssenceQuantity(option?.quantity) > 0
+    )
+  );
   let saving = $state(false);
 
   $effect(() => {
@@ -103,7 +118,7 @@
         <h3>{localize('FABRICATE.Admin.Items.Essences')}</h3>
         {#if essenceDraft.length > 0}
           <div class="essence-grid">
-            {#each essenceDraft as option (option.id)}
+            {#each offeredEssences as option (option.id)}
               <article class="essence-card">
                 <button
                   type="button"

@@ -18,6 +18,11 @@
     normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
   import { clampComponentEssenceQuantity } from '../../util/componentEditor.js';
+  // The add-new offer projection (issue 1036). The DRAFT stays unfiltered — it is the sole
+  // source `buildComponentEditorUpdates` rebuilds `updates.essences` from — and only what
+  // this grid RENDERS is narrowed, so a disabled essence disappears from the offer while
+  // one that already carries a quantity stays visible and clearable.
+  import { visibleEssenceOptions } from '../../../../utils/essenceValidation.js';
   import {
     SALVAGE_DC_CUSTOM,
     buildSalvageDcOptions,
@@ -74,6 +79,16 @@
   let tagDraft = $state([]);
   let categoryDraft = $state(GENERAL_COMPONENT_CATEGORY);
   let essenceDraft = $state([]);
+  // The rendered subset (issue 1036): every ENABLED essence, plus any disabled one this
+  // component already carries a positive quantity of. `essenceDraft` itself stays whole —
+  // it is what `buildComponentEditorUpdates` rebuilds `updates.essences` from, so
+  // narrowing it would delete a disabled essence's authored quantity on the next save.
+  const offeredEssences = $derived(
+    visibleEssenceOptions(
+      essenceDraft,
+      (option) => clampComponentEssenceQuantity(option?.quantity) > 0
+    )
+  );
   // Deep clone of component.salvage so edits never mutate the upstream card. Only
   // the authoring fields (resultGroups, outcomeRouting, dcOverride) are edited
   // here; the remaining salvage fields (enabled, ingredientQuantity, toolIds, …)
@@ -184,6 +199,9 @@
       id: option.id,
       name: option.name,
       icon: option.icon,
+      // Carried through the clone or the offer filter below could never see it, and every
+      // disabled essence would be offered as if enabled (issue 1036).
+      enabled: option.enabled !== false,
       quantity: clampComponentEssenceQuantity(option.quantity),
     }));
   }
@@ -954,7 +972,7 @@
         </div>
         {#if essenceDraft.length > 0}
           <div class="manager-component-essence-grid">
-            {#each essenceDraft as option (option.id)}
+            {#each offeredEssences as option (option.id)}
               <!-- The card is the shared `EssenceQuantityCard` (issue 772). It was
                      hand-rolled here — a `manager-icon-button` −, a raw
                      `<input type="number">` and a + — and the bulk-edit panel renders the

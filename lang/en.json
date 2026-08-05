@@ -2853,6 +2853,13 @@
           "Delete": "Delete essence",
           "DeleteBlocked": "Remove component usage before deleting this essence.",
           "DeleteBlockedShort": "In use",
+          "DeleteConfirm": {
+            "Title": "Delete {name}?",
+            "Content": "Delete essence {name} and remove it from recipes in this system?"
+          },
+          "DuplicateName": "{name} (copy)",
+          "DuplicateNameIndexed": "{name} (copy {index})",
+          "DisabledInvalidatesRecipes": "{count} enabled recipe(s) require this essence and can no longer be re-enabled while it is disabled.",
           "Selected": "Selected essence",
           "Inspector": "Selected essence inspector",
           "BasicInformation": "Basic information",

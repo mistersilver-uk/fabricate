@@ -60,10 +60,36 @@ test('buildComponentEditorState exposes tag and essence sections when essences a
     { tag: 'fire', checked: true },
     { tag: 'flora', checked: false }
   ]);
+  // `enabled` is part of the row shape (issue 1036): the option list is a whitelist
+  // rebuild, so a field it does not name is invisible to the add-new offer filter no
+  // matter how correct the persisted field is. Neither definition above declares it, so
+  // both must default to TRUE here — a `false` fixture is asserted below.
   assert.deepEqual(state.essenceOptions, [
-    { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
-    { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), quantity: 1 }
+    { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', enabled: true, quantity: 2 },
+    { id: 'ess-shadow', name: 'Shadow', icon: getDefaultEssenceIcon(), enabled: true, quantity: 1 }
   ]);
+});
+
+test('1036/2: buildEditableEssenceOptions carries a FALSE enabled onto its option row', () => {
+  const system = makeSystem({
+    features: { itemTags: false, essences: true },
+    essenceDefinitions: [
+      { id: 'ess-fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: true }
+    ]
+  });
+  const state = buildComponentEditorState(system, makeItem({ essences: { 'ess-fire': 3 } }));
+
+  // Pinned with a FALSE fixture on purpose. `enabled` is default-true, so a `true` fixture
+  // round-trips green through a row shape that drops the field entirely and proves nothing.
+  assert.equal(state.essenceOptions.find((o) => o.id === 'ess-fire').enabled, false);
+  assert.equal(state.essenceOptions.find((o) => o.id === 'ess-water').enabled, true);
+
+  // And the row is still THERE, carrying its authored quantity: the offer withholds a
+  // disabled essence, the DATA never does. `buildComponentEditorUpdates` rebuilds
+  // `updates.essences` solely from these rows, so a filter here would destroy the 3.
+  assert.equal(state.essenceOptions.length, 2, 'the option list is unfiltered');
+  assert.deepEqual(buildComponentEditorUpdates(state).essences, { 'ess-fire': 3 });
 });
 
 test('buildComponentEditorState sorts essence options alphabetically by display name', () => {

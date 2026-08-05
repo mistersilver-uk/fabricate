@@ -35,11 +35,16 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-simple-check-characterization-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/utils/craftingCheckExpression.js',
+    // Added by the conversion, and ONLY the dependency manifest: no assertion below moved.
+    // The harness closure validator throws for an undeclared static import rather than
+    // hanging, so this list has to name what the tree imports.
+    'src/utils/macroReference.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
-    'src/utils/craftingCheckExpression.js',
   ],
   compiledModules: [
+    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',

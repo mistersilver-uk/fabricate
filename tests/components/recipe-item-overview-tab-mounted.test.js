@@ -92,10 +92,14 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     dropzone.dispatchEvent(drop);
     assert.deepEqual(calls, ['Compendium.fabricate.items.Item.primer']);
 
+    // Issue 1036/7: still rejects every payload that is not an Item naming a document.
+    // `{ type: 'Item', pack, id }` moved OUT of this list deliberately — see below.
     for (const payload of [
       { type: 'Actor', uuid: 'Actor.hero' },
-      { type: 'Item', pack: 'fabricate.items', id: 'legacy-shape' },
+      { type: 'Macro', uuid: 'Macro.dc' },
+      { type: 'Item' },
       { type: 'Item', uuid: '   ' },
+      { type: 'Item', pack: 'fabricate.items' },
     ]) {
       const rejectedDrop = new Event('drop', { bubbles: true, cancelable: true });
       Object.defineProperty(rejectedDrop, 'dataTransfer', {
@@ -106,8 +110,26 @@ describe('RecipeItemOverviewTab (mounted)', () => {
     assert.deepEqual(
       calls,
       ['Compendium.fabricate.items.Item.primer'],
-      'the shared Item drop zone rejects non-Item and UUID-less legacy drag shapes'
+      'the shared Item drop zone rejects non-Item and document-less drag shapes'
     );
+
+    // The legacy COMPENDIUM shape `{ pack, id }` — no `uuid` — is now ACCEPTED (issue
+    // 1036). The zone's guard read `data.uuid` directly, which made it stricter than every
+    // one of its own consumers: each already calls `resolveDropUuid` in its `onDrop` and
+    // would have handled this shape, but the zone refused it first. Foundry emits exactly
+    // this payload for a compendium drag, so the effect was that dragging an item out of a
+    // compendium silently did nothing.
+    const legacyDrop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(legacyDrop, 'dataTransfer', {
+      value: {
+        getData: () => JSON.stringify({ type: 'Item', pack: 'fabricate.items', id: 'legacy' }),
+      },
+    });
+    dropzone.dispatchEvent(legacyDrop);
+    assert.deepEqual(calls, [
+      'Compendium.fabricate.items.Item.primer',
+      'Compendium.fabricate.items.legacy',
+    ]);
   });
 
   it('fires onUnlinkItem when Unlink is clicked', async () => {

@@ -14,6 +14,9 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  // The add-new offer projection (issue 1036). This picker only ever ADDS a requirement,
+  // so unlike the per-option picker it needs no retained-choice arm.
+  import { selectableEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import RecipeIngredientGroupCard from './RecipeIngredientGroupCard.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
 
@@ -62,12 +65,13 @@
     (componentOptions || []).map((item) => ({ id: item.id, label: item.name, img: item.img }))
   );
 
-  // The set-level "Add essence requirement" picker offers EVERY system essence: an
-  // essence is now a first-class ingredient match type (issue 649), so the set-add
-  // appends a single-option essence GROUP (an AND-required requirement, preserving the
-  // old per-set semantics) and an essence may legitimately repeat across groups.
+  // The set-level "Add essence requirement" picker offers every ENABLED system essence
+  // (issue 1036 narrowed it from every essence): an essence is now a first-class
+  // ingredient match type (issue 649), so the set-add appends a single-option essence
+  // GROUP (an AND-required requirement, preserving the old per-set semantics) and an
+  // essence may legitimately repeat across groups.
   const essencePickerOptions = $derived(
-    (essenceOptions || []).map((essence) => ({
+    selectableEssenceOptions(essenceOptions).map((essence) => ({
       id: essence.id,
       label: essence.name,
       icon: essence.icon || 'fas fa-flask-vial',
@@ -276,8 +280,8 @@
     {#if (essenceOptions || []).length > 0}
       <!-- §B6: the set-level essence add. Essence is now a first-class match type
            (issue 649), so this appends a single-option essence GROUP (AND-required,
-           preserving the old per-set semantics). The picker offers every system
-           essence; an essence may repeat across groups. -->
+           preserving the old per-set semantics). The picker offers every ENABLED system
+           essence (issue 1036); an essence may repeat across groups. -->
       <SearchablePopover
         options={essencePickerOptions}
         pickerClass="manager-recipe-essence-picker"

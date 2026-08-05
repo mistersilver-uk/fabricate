@@ -32,6 +32,13 @@
    - mono: numerals in the mono face with `tabular-nums`, so columns of counts, DCs and
      quantities line up. Counts are mono everywhere in the manager.
    - icon: Font Awesome classes for a leading glyph, e.g. `fas fa-lock`.
+   - swatch: a BARE `--fab-tag-*` palette key (`sage`, `mauve`, …) rendering a leading
+     COLOUR DOT (issue 1036). The colour pill is a variant of the one chip rather than a
+     tenth pill shape. It is deliberately NOT the `is-tag` fill treatment: `--fab-chip-color`
+     is DECLARED inside `.manager-chip.is-tag` and consumed only by that rule, so setting it
+     on a non-tag chip paints literally nothing — a declaration that renders as a no-op is a
+     failed visual change, not a subtle one — and eight pastel fills down a dense library
+     list is not what a colour pill should look like. `swatch` composes with every tone.
    - class: additional classes for a caller that also needs layout context from the
      global sheet (`manager-editor-tab-badge` positions a badge inside a tab button, for
      instance). Those rules sit at a higher specificity than this scoped block by
@@ -51,12 +58,26 @@
     tone = '',
     mono = false,
     icon = '',
+    swatch = '',
     class: extraClass = '',
     truncate = false,
     element = $bindable(null),
     children,
     ...rest
   } = $props();
+
+  // The token is interpolated into a `style` attribute, so it is constrained to the shape
+  // a bare palette key can have; anything else is dropped and the dot is not rendered at
+  // all, rather than emitting whatever the caller composed. Both spellings are tolerated
+  // because `ManagerColorPicker` already accepts both.
+  const safeSwatch = $derived(
+    /^[a-z0-9-]+$/.test(String(swatch || '').replace(/^--fab-tag-/, ''))
+      ? String(swatch).replace(/^--fab-tag-/, '')
+      : ''
+  );
+  const swatchStyle = $derived(
+    safeSwatch ? `--fab-chip-color:var(--fab-tag-${safeSwatch})` : undefined
+  );
 
   // Colour families this component paints. Anything else a caller passes is dropped
   // rather than emitted as an unstyled `is-*` class, so a typo shows up as the default
@@ -83,6 +104,7 @@
     [
       'manager-chip',
       TONES.has(tone) ? `is-${tone}` : '',
+      safeSwatch ? 'has-swatch' : '',
       mono ? 'is-mono' : '',
       truncate ? 'is-truncated' : '',
       extraClass,
@@ -95,8 +117,13 @@
 <!-- Written without internal whitespace on purpose: a newline between the glyph and the
      content becomes a text node, and callers assert on the chip's exact `textContent`
      (a count badge reading ' 1' instead of '1' is a real defect, not a test artefact). -->
-<svelte:element this={tag} bind:this={element} class={classes} {...rest}
-  >{#if icon}<i class={icon} aria-hidden="true"></i>{/if}{@render children?.()}</svelte:element
+<svelte:element this={tag} bind:this={element} class={classes} style={swatchStyle} {...rest}
+  >{#if safeSwatch}<span
+      class="manager-chip-swatch"
+      data-chip-swatch={safeSwatch}
+      aria-hidden="true"
+    ></span>{/if}{#if icon}<i class={icon} aria-hidden="true"
+    ></i>{/if}{@render children?.()}</svelte:element
 >
 
 <style>
@@ -257,6 +284,19 @@
   .manager-chip.is-neutral {
     border-color: var(--fab-border);
     color: var(--fab-text-muted);
+  }
+
+  /* The colour DOT (issue 1036). One rule, painting the leading span from the
+     `--fab-chip-color` the root sets inline. Named `manager-chip-swatch` rather than
+     anything matching `manager-chip` on its own, because `manager-layout.test.js`'s
+     hand-rolled-chip ratchet greps for that exact token and must stay at empty. */
+  .manager-chip-swatch {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border: 1px solid color-mix(in srgb, var(--fab-chip-color) 60%, var(--fab-border));
+    border-radius: 50%;
+    background: var(--fab-chip-color);
   }
 
   /* An item TAG (issue 772). Purple, through the same `--fab-chip-color` + `color-mix`

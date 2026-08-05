@@ -206,3 +206,111 @@ export function makeOwnedStack(name, quantity = 1) {
     },
   };
 }
+
+/**
+ * A `createAdminStore` services stub whose crafting-system manager implements the FOUR
+ * essence write primitives the store's new exports route through (issue 1036).
+ *
+ * Hoisted here rather than written per suite for the same reason `makeEssence` is: the
+ * SonarCloud duplication gate counts `tests/**` exactly like `src/**`, and the essence
+ * store, projection and offer suites all need the same manager.
+ *
+ * The stub MUTATES one system object in place, so a suite can assert on `harness.system`
+ * after a write instead of threading a capture array through every call. Writes are also
+ * recorded in `harness.writes` for the tests that care how MANY there were, since "one
+ * world write per bulk operation" is a contract this change makes.
+ *
+ * @param {{essences?: object[], components?: object[], recipes?: object[],
+ *   features?: object, confirm?: boolean}} [options]
+ */
+export function makeEssenceStoreHarness(options = {}) {
+  const writes = [];
+  const notifications = { info: [], warn: [], error: [] };
+  const recipes = options.recipes ? [...options.recipes] : [];
+  const system = {
+    id: 'sys1',
+    name: 'System One',
+    description: '',
+    resolutionMode: 'simple',
+    visibilityMode: 'item',
+    features: { essences: true, effectTransfer: true, ...(options.features || {}) },
+    categories: [],
+    itemTags: [],
+    essenceDefinitions: options.essences ? options.essences.map((def) => ({ ...def })) : [],
+    components: options.components ? options.components.map((item) => ({ ...item })) : [],
+    requirements: { time: { enabled: false }, currency: { enabled: false, units: [] } },
+    craftingCheck: { mode: 'passFail', macroUuid: null, outcomes: [] },
+    recipeVisibility: { listMode: 'global' },
+    recipeItemDefinitions: [],
+  };
+
+  function definitions() {
+    return Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+  }
+
+  const systemManager = {
+    getSystems: () => [system],
+    getSystem: (id) => (id === system.id ? system : null),
+    getItems: () => system.components,
+    updateSystem: async (id, updates) => {
+      writes.push({ kind: 'updateSystem', updates });
+      Object.assign(system, updates);
+    },
+    // Mirrors the shipped primitive's presence gating: `Object.hasOwn`, never truthiness,
+    // because `colorToken: null` and `enabled: false` are falsy but REAL staged edits.
+    applyBulkEditToEssences: async (id, essenceIds, edit = {}) => {
+      writes.push({ kind: 'applyBulkEditToEssences', essenceIds: [...essenceIds], edit });
+      const targets = new Set([...essenceIds].map(String));
+      const changed = [];
+      system.essenceDefinitions = definitions().map((def) => {
+        if (!targets.has(String(def.id))) return def;
+        changed.push(String(def.id));
+        const next = { ...def };
+        if (Object.hasOwn(edit, 'icon') && String(edit.icon || '').trim()) next.icon = edit.icon;
+        if (Object.hasOwn(edit, 'colorToken')) next.colorToken = edit.colorToken;
+        if (Object.hasOwn(edit, 'enabled')) next.enabled = edit.enabled === true;
+        return next;
+      });
+      return { updated: changed.length, essenceIds: changed };
+    },
+    deleteEssence: async (id, essenceId) => {
+      writes.push({ kind: 'deleteEssence', essenceId });
+      system.essenceDefinitions = definitions().filter((def) => def.id !== essenceId);
+      return true;
+    },
+    deleteEssences: async (id, essenceIds) => {
+      writes.push({ kind: 'deleteEssences', essenceIds: [...essenceIds] });
+      const removed = new Set([...essenceIds].map(String));
+      system.essenceDefinitions = definitions().filter((def) => !removed.has(String(def.id)));
+      return { deleted: removed.size, essenceIds: [...removed], recipesUpdated: 0 };
+    },
+  };
+
+  const services = {
+    getSetting: (key) => (key === 'lastManagedCraftingSystem' ? 'sys1' : ''),
+    setSetting: async () => {},
+    getCraftingSystemManager: () => systemManager,
+    getRecipeManager: () => ({
+      getRecipes: (filter) =>
+        filter?.craftingSystemId
+          ? recipes.filter((recipe) => recipe.craftingSystemId === filter.craftingSystemId)
+          : recipes,
+      getRecipe: (id) => recipes.find((recipe) => recipe.id === id) || null,
+      updateRecipe: async () => {},
+    }),
+    getScriptMacros: () => [],
+    getSceneOptions: () => [],
+    getWorldUsers: () => [],
+    // Keys are returned verbatim, which is what makes "is this string localized?" visible
+    // in an assertion: a hardcoded English sentence cannot be mistaken for a key.
+    localize: (key) => key,
+    confirmDialog: async () => options.confirm !== false,
+    notify: {
+      info: (message) => notifications.info.push(String(message)),
+      warn: (message) => notifications.warn.push(String(message)),
+      error: (message) => notifications.error.push(String(message)),
+    },
+  };
+
+  return { services, systemManager, system, recipes, writes, notifications };
+}

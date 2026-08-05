@@ -38,7 +38,10 @@ const panel = createMountedComponentHarness({
     // Its shared leaf (issue 1010): the four selection helpers now live here and
     // `componentBulkEditModel.js` re-exports them under their original names, so this is a
     // STATIC import of that module and belongs in every closure that names it.
-    'src/utils/bulkSelectionModel.js'
+    'src/utils/bulkSelectionModel.js',
+    // The add-new essence offer projection (issue 1036). A STATIC import of the mounted
+    // tree, so the harness closure validator throws without it.
+    'src/utils/essenceValidation.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -240,6 +243,67 @@ describe('ComponentBulkEditPanel apply enablement (issue 772)', () => {
 });
 
 describe('ComponentBulkEditPanel staged-axis indicators (issue 772)', () => {
+  // Issue 1036, criteria 2 and 18. This panel's staged map is a WHOLE-MAP replacement, so
+  // its grid is simultaneously the add-new offer AND the only place a staged value can be
+  // edited back down. Both halves are asserted, each with its negative control.
+  it('1036/18: the essence grid withholds a DISABLED essence from the offer', async () => {
+    const { root } = await mountPanel({
+      essenceDefinitions: [
+        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
+      ]
+    });
+
+    assert.ok(
+      Boolean(root.querySelector('[data-component-edit-essence="earth"]')),
+      'negative control: the ENABLED essence IS offered, so the grid is not simply empty'
+    );
+    assert.ok(
+      !root.querySelector('[data-component-edit-essence="fire"]'),
+      'the disabled essence is withheld from the offer'
+    );
+  });
+
+  it('1036/2: a disabled essence carrying a STAGED quantity stays visible and clearable', async () => {
+    const draft = createComponentBulkDraft();
+    const { root, state } = await mountPanel({
+      draft: { ...draft, essencesStaged: true, essences: { fire: 3 } },
+      essenceDefinitions: [
+        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
+      ]
+    });
+
+    const staged = root.querySelector('[data-component-edit-essence="fire"]');
+    assert.ok(Boolean(staged), 'a staged disabled essence is still rendered');
+
+    staged.querySelector('[data-stepper-decrement]').click();
+    flushSync();
+    assert.equal(state.draft.essences.fire, 2, 'and is still editable back down');
+  });
+
+  it('1036/18: the essenceDefinitions PROP stays unfiltered — the warning count reads it', async () => {
+    // The prop boundary. `countComponentsChangingEssences` compares the staged map against
+    // every AUTHORED value on the selected rows, so a filtered prop would silently stop
+    // counting a carrier of a disabled essence and the destructive-overwrite warning would
+    // under-report exactly the rows most at risk.
+    const { root } = await mountPanel({
+      draft: { ...createComponentBulkDraft(), essencesStaged: true, essences: { earth: 1 } },
+      essenceDefinitions: [
+        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false },
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true }
+      ],
+      selectedCards: [{ id: 'a', essences: [{ id: 'fire', quantity: 3 }] }]
+    });
+
+    const warning = root.querySelector('[data-component-bulk-essence-warning]');
+    assert.ok(
+      Boolean(warning),
+      'the carrier of the DISABLED essence is still counted in the overwrite warning'
+    );
+    assert.equal(warning.getAttribute('data-component-bulk-essence-warning'), '1');
+  });
+
   it('arms the essence axis DIRECTLY, because Stepper emits nothing at the zero boundary', async () => {
     const { root, state } = await mountPanel();
     const chip = root.querySelector('[data-component-bulk-essences-staged]');

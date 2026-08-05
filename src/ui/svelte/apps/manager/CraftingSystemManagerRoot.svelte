@@ -4045,7 +4045,11 @@
     if (!essenceId) return;
     const essence = essenceCards.find((card) => card.id === essenceId);
     if (essence?.deleteBlocked) return;
-    store.removeEssence?.(essenceId);
+    // `deleteEssence` (issue 1036) — the store's singular delete, renamed from
+    // `removeEssence` so it pairs with the new `deleteEssences` set delete. It now returns
+    // a boolean and re-checks the in-use refusal itself, because `deleteBlocked` is a
+    // UI-only card field and the manager primitive deliberately ignores it.
+    store.deleteEssence?.(essenceId);
   }
 
   function importEssenceSourceDrop(data) {

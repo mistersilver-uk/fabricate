@@ -29,6 +29,10 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/componentEditor.js',
+    // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
+    // withhold a disabled essence from the quantity grid. A missing raw module HANGS the
+    // suite rather than failing it, so the shared harness validator throws for it up front.
+    'src/utils/essenceValidation.js',
     'src/utils/componentCategories.js',
     'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
     // The salvage mode pill's label source (issue 676) — it already carries 'Routed by

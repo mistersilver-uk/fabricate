@@ -50,6 +50,36 @@ export function selectableEssenceOptions(essenceOptions) {
 }
 
 /**
+ * What an essence-editing surface RENDERS: everything {@link selectableEssenceOptions}
+ * offers, plus everything the caller says is already in play.
+ *
+ * The two component-quantity grids and the recipe option picker are each simultaneously an
+ * offer AND the editing surface for what is already authored, and the rule for those is
+ * one sentence: **only the ADD-NEW offer withholds a disabled essence.** A disabled
+ * essence that already carries a positive quantity, or is already chosen, stays rendered
+ * and clearable — otherwise the surface that authored the value becomes the one place the
+ * GM cannot remove it.
+ *
+ * `isRetained` is a predicate rather than a fixed field because "already in play" is a
+ * different question per surface: a positive quantity in the component editor, a positive
+ * STAGED quantity in the bulk panel, the currently-chosen id in a recipe option picker.
+ * One projection with a predicate keeps that decision at the call site while the offer
+ * rule stays here — three near-identical inline filters would be three places for it to
+ * drift, and SonarCloud counts the copies.
+ *
+ * Input order is preserved, which is the system's own vocabulary order.
+ *
+ * @param {{id?: string, enabled?: boolean}[]} essenceOptions the UNFILTERED option list.
+ * @param {(option: object) => boolean} [isRetained] whether this option is already in play.
+ * @returns {object[]} a new array; the input is not mutated.
+ */
+export function visibleEssenceOptions(essenceOptions, isRetained = () => false) {
+  const options = Array.isArray(essenceOptions) ? essenceOptions : [];
+  const offered = new Set(selectableEssenceOptions(options).map((option) => option?.id));
+  return options.filter((option) => offered.has(option?.id) || isRetained(option) === true);
+}
+
+/**
  * The Validation tab's check ids, in render order.
  *
  * A frozen list rather than an inline literal so the presentation adapter's label map and

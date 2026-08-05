@@ -18,6 +18,7 @@ import {
   TOOL_DISPLAY_PRECEDENCE_CASES,
   TOOL_PRECEDENCE_MANAGED_ITEMS,
 } from '../helpers/toolDisplayPrecedenceCases.js';
+import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
@@ -453,6 +454,17 @@ function compileManagerRoot() {
     // module. This suite hand-rolls its temp tree and has NO dependency validator, so
     // omitting it hangs silently rather than naming the missing file.
     'src/utils/bulkSelectionModel.js',
+    // The add-new essence OFFER projection (issue 1036). ComponentEditView, the component
+    // bulk-edit panel and all three recipe ingredient components import it to withhold a
+    // DISABLED essence from their add controls, so it is a STATIC import of this mounted
+    // tree. Same rule as its neighbours: this suite hand-rolls its temp tree with no
+    // dependency validator, so omitting it HANGS the whole suite as `# cancelled`.
+    'src/utils/essenceValidation.js',
+    // The shared macro-name resolver (issue 1036), lifted out of SimpleCraftingCheckEditor
+    // so the essence editor's property-macro card resolves names the same way. That editor
+    // is in this mounted tree, so omitting this entry HANGS the WHOLE suite as
+    // `# cancelled 225` — which is exactly what it did before this line existed.
+    'src/utils/macroReference.js',
     // The recipe browser's bulk selection + staging model (issue 1010). RecipesBrowserView
     // imports it for the selection helpers, so it is a STATIC import of the mounted tree.
     // Omitting it kills this suite in its `before` hook, which `node --test` reports as
@@ -1663,7 +1675,13 @@ function createStore(calls = [], options = {}) {
       if (options.updateEssenceReject) return Promise.reject(new Error('update failed'));
       return options.updateEssenceResult ?? true;
     },
-    removeEssence: (id) => calls.push(['removeEssence', id]),
+    // Renamed from `removeEssence` in issue 1036 so the singular delete pairs with the
+    // new `deleteEssences` set delete. The store now returns a boolean rather than
+    // `undefined`, which is what lets a caller tell a cancelled confirm from a write.
+    deleteEssence: (id) => {
+      calls.push(['deleteEssence', id]);
+      return true;
+    },
     addCategory: (value, icon) => {
       calls.push(['addCategory', value, icon]);
       if (options.addCategoryReject) return Promise.reject(new Error('add category failed'));
@@ -8257,7 +8275,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
 
     target.querySelector('[data-essence-id="water"] [aria-label="Delete Water"]').click();
-    assert.ok(calls.some((call) => call[0] === 'removeEssence' && call[1] === 'water'));
+    assert.ok(calls.some((call) => call[0] === 'deleteEssence' && call[1] === 'water'));
     await tick();
     flushSync();
     assert.equal(
@@ -11523,14 +11541,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelector('[data-tool-result-count]').textContent.trim(), '1 tool');
     assert.equal(createCard.querySelector('summary, select, button'), null);
-    const drop = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(drop, 'dataTransfer', {
-      value: { getData: () => JSON.stringify({ type: 'Item', uuid: worldItem.uuid }) },
-    });
-    createCard.dispatchEvent(drop);
+    dispatchDrop(createCard, { type: 'Item', uuid: worldItem.uuid });
     await tick();
     flushSync();
     assert.deepEqual(dropped, [{ type: 'Item', uuid: worldItem.uuid }]);
+
+    // Issue 1036/7, at THIS call site: `ItemDropZone`'s guard now reads
+    // `resolveDropUuid(data)` rather than `data.uuid`, so the document-type check is what
+    // keeps a non-Item out of the Tool creation surface. Asserted per call site, because
+    // the criterion is about the SITES rather than about the primitive in isolation.
+    dispatchRejectedDrops(createCard);
+    await tick();
+    flushSync();
+    assert.equal(dropped.length, 1, 'the tool create zone still refuses every non-Item payload');
 
     target.querySelector('.manager-tools-enabled-toggle').click();
     target.querySelector('.manager-tools-library-actions .manager-icon-button').click();
