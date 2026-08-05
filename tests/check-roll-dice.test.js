@@ -45,18 +45,32 @@ function installRollStub() {
       this.toMessageCalls.push({ messageData, options });
       return { id: 'msg' };
     }
+    /**
+     * Approximate Foundry's `Roll.validate` with a parenthesis-balance check, so the
+     * interactive safety net can reject a malformed situational bonus (e.g. "oops)"
+     * → "1d20 + (oops))", unbalanced) while accepting "1d20 + (2)".
+     *
+     * Deliberately a `this`-DEPENDENT static. Foundry's real `Roll.validate` does
+     * `new this(formula)` internally (`client/dice/roll.mjs`), so calling it detached
+     * (`const validate = Roll.validate; validate(f)`) leaves `this` undefined, throws
+     * inside Foundry's own try/catch, and returns false for EVERY formula — silently
+     * dropping the bonus from every roll. A `this`-free stub cannot see that bug, which
+     * is exactly how it shipped. Mirror the `this`-dependence so it stays catchable.
+     *
+     * Returns false (rather than throwing) when detached, matching what Foundry really
+     * does, so a regression surfaces as a clean formula assertion. Deliberately does NOT
+     * call `new this(...)`: constructing a FakeRoll would clobber the `lastRoll` tracker.
+     */
+    static validate(formula) {
+      if (this?.prototype !== FakeRoll.prototype) return false;
+      const text = String(formula);
+      const open = (text.match(/\(/g) || []).length;
+      const close = (text.match(/\)/g) || []).length;
+      return open === close;
+    }
   }
   // A trivial `@`-substitution so `resolveCheckFormulaDisplay` returns a string.
   FakeRoll.replaceFormulaData = (formula) => String(formula);
-  // Approximate Foundry's `Roll.validate` with a parenthesis-balance check so the
-  // interactive safety net can reject a malformed situational bonus (e.g. "oops)"
-  // → "1d20 + (oops))", unbalanced) while accepting "1d20 + (2)".
-  FakeRoll.validate = (formula) => {
-    const text = String(formula);
-    const open = (text.match(/\(/g) || []).length;
-    const close = (text.match(/\)/g) || []).length;
-    return open === close;
-  };
   globalThis.Roll = FakeRoll;
 }
 
@@ -193,6 +207,32 @@ test('evaluateCheckRoll: a valid situational bonus appends "+ (2)" to the formul
       flavor: 'Crafting check',
     });
     assert.equal(lastRoll.formula, '1d20 + (2)', 'valid bonus appended');
+  } finally {
+    clearStubs();
+  }
+});
+
+// Regression, as reported: "Inputting a whole number into situational bonus does not add
+// it to the total roll amount. This also seems to apply to trying 2d20, 3d6, or any
+// combination of dice." A DICE bonus must reach the rolled formula too — Foundry's
+// `Roll.validate` accepts a non-deterministic term because it calls `evaluateSync` with
+// `strict: false` (`client/dice/terms/dice.mjs` throws only when `strict` is set).
+test('evaluateCheckRoll: a dice situational bonus is appended to the rolled formula', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    for (const bonus of ['2d20', '3d6', '1d4 + 1']) {
+      await evaluateCheckRoll('1d20 + 5', actor, {
+        interactive: true,
+        prompt: async () => ({ confirmed: true, bonus }),
+        flavor: 'Crafting check',
+      });
+      assert.equal(
+        lastRoll.formula,
+        `1d20 + 5 + (${bonus})`,
+        `dice bonus "${bonus}" reaches the rolled formula`
+      );
+    }
   } finally {
     clearStubs();
   }
