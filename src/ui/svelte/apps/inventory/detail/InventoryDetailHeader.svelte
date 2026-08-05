@@ -33,6 +33,20 @@
      have an icon and no artwork). `icon` wins when set.
    - name: the item name (serif — reserved for item/product names, brief §2).
    - total: the ALREADY-localized "N total" line, so this stays i18n-free.
+   - totalAttrs: extra attributes spread onto that line, matching the `attrs` /
+     `chip.attrs` idiom. It exists because the count line is BOTH the shell's
+     `total` slot and, for the bulk panel (issue 859), a polite live region: the
+     panel announces "n selected · n salvageable · n skipped" as the selection
+     changes. Without this prop the panel would have to re-roll
+     `.inventory-detail-total` inside its own body — the drift this file exists
+     to prevent.
+   - headerAction: an optional snippet pinned to the RIGHT of the header (the
+     bulk panel's Clear). It renders inside its OWN wrapper carrying
+     `margin-left: auto; flex: 0 0 auto` rather than putting that rule on
+     `.inventory-detail-heading` — a consumer passing no action then adds no flex
+     child at all, so both existing consumers' geometry is provably byte-identical.
+     `.inventory-detail-header` is a `flex` row whose heading declares no `flex`
+     and sizes to content only because it is the last child today.
    - size: the header thumbnail's px dimension. 64 is canonical.
    - chips: `{ id, label, icon?, tone?, attrs? }[]` rendered as the header's chip
      row. Data, not a snippet: the chip markup and every tone then live here once,
@@ -49,8 +63,10 @@
     icon = '',
     name = '',
     total = '',
+    totalAttrs = {},
     size = 64,
     chips = [],
+    headerAction = null,
     children = null,
   } = $props();
 
@@ -72,7 +88,7 @@
     {/if}
     <div class="inventory-detail-heading">
       <p class="inventory-detail-name">{name}</p>
-      <p class="inventory-detail-total">{total}</p>
+      <p class="inventory-detail-total" {...totalAttrs}>{total}</p>
       {#if chipList.length > 0}
         <div class="inventory-detail-chips">
           {#each chipList as chip (chip.id)}
@@ -84,6 +100,9 @@
         </div>
       {/if}
     </div>
+    {#if headerAction}
+      <div class="inventory-detail-header-action">{@render headerAction()}</div>
+    {/if}
   </header>
 
   {@render children?.()}
@@ -143,6 +162,16 @@
     font-weight: 400;
     color: var(--fab-text-subtle);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* The rule lives HERE and not on `.inventory-detail-heading` deliberately: the
+     heading has no `flex` and sizes to content only because it is the last child
+     when no action is passed. Putting `margin-left: auto` on the heading would
+     change every consumer; putting it on a wrapper that only exists when an
+     action is passed changes none of them. */
+  .inventory-detail-header-action {
+    margin-left: auto;
+    flex: 0 0 auto;
   }
 
   .inventory-detail-chips {

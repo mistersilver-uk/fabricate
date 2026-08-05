@@ -10,12 +10,26 @@
   on a component-source change, on a scene change, and on world-time advancement —
   mirroring the Crafting tab, with which it shares the selected character and
   component-source actors.
+
+  BULK SALVAGE (issue 859) renders as a SIBLING of `InventoryDetail`, not through
+  it. `InventoryDetail` is a documented public entry point — `RecipeItemEditor`
+  renders it for the GM's preview — so routing bulk through it would buy a
+  permanent prop-forwarding surface for a feature preview can never use, AND a
+  router import would pull the whole bulk tree into `recipe-item-editor-mounted`
+  and `manager-mounted`'s static module graphs (a `{#if}` in a router does not keep
+  a branch out of the graph; the compiled module imports every child statically).
+
+  This view also owns the BULK i18n BOUNDARY, following the `onResetSalvageOrder`
+  precedent: the store holds no localized text, so the destroy confirmation's copy
+  and the selection-cap notice are composed here and handed down/in already
+  localized.
 -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
   import InventoryFilters from './InventoryFilters.svelte';
   import InventoryGrid from './InventoryGrid.svelte';
   import InventoryDetail from './InventoryDetail.svelte';
+  import InventoryBulkPanel from './bulk/InventoryBulkPanel.svelte';
 
   let { services = null } = $props();
 
@@ -97,6 +111,80 @@
       : null
   );
 
+  // --- Bulk salvage / destroy (issue 859) ---------------------------------------
+  const bulkActive = $derived(Boolean(store?.bulkActive));
+  const bulkEntries = $derived(store?.bulkEntries ?? []);
+
+  // The whole-stack unit total the confirmation must name alongside the row count —
+  // the TARGET actor's units, matching what destroy actually deletes.
+  const bulkUnitCount = $derived(
+    bulkEntries.reduce((sum, entry) => sum + (Number(entry?.actorQuantity) || 0), 0)
+  );
+  // Composed ONCE and reused by both the trigger label and the dialog copy, so the
+  // two can never name the numbers differently. Independently pluralized, because a
+  // row count and a unit count reach 1 at different times.
+  const bulkComponentsText = $derived(
+    localize(
+      bulkEntries.length === 1
+        ? 'FABRICATE.App.Inventory.Bulk.DestroyComponentsOne'
+        : 'FABRICATE.App.Inventory.Bulk.DestroyComponentsMany',
+      { count: bulkEntries.length }
+    )
+  );
+  const bulkUnitsText = $derived(
+    localize(
+      bulkUnitCount === 1
+        ? 'FABRICATE.App.Inventory.Bulk.DestroyUnitsOne'
+        : 'FABRICATE.App.Inventory.Bulk.DestroyUnitsMany',
+      { count: bulkUnitCount }
+    )
+  );
+  const bulkDestroyLabel = $derived(
+    localize('FABRICATE.App.Inventory.Bulk.DestroyAction', {
+      components: bulkComponentsText,
+      units: bulkUnitsText,
+    })
+  );
+
+  // The store signals a refused 26th selection rather than authoring a message; the
+  // notice is localized here. It carries no number: the panel's live count line
+  // already states the limit on the click that REACHED it.
+  function onBulkToggle(key) {
+    const outcome = store?.toggleBulkSelection?.(key);
+    if (outcome?.refused === true) {
+      services?.notify?.(localize('FABRICATE.App.Inventory.Bulk.LimitReached'));
+    }
+  }
+  function onBulkClear() {
+    store?.clearBulkSelection?.();
+  }
+  function onBulkRemove(key) {
+    store?.removeFromBulkSelection?.(key);
+  }
+  function onBulkSalvage() {
+    return store?.bulkSalvage?.();
+  }
+  // The dialog names BOTH numbers, and its copy states plainly that destroying is
+  // not salvaging — a tool sitting in the pack broken is there precisely because its
+  // GM chose NOT to destroy it on break, so this must not read like that rule firing.
+  function onBulkDestroy() {
+    return store?.bulkDestroy?.({
+      title: localize('FABRICATE.App.Inventory.Bulk.DestroyTitle', {
+        components: bulkComponentsText,
+      }),
+      content:
+        `<p>${localize('FABRICATE.App.Inventory.Bulk.DestroyBody', {
+          components: bulkComponentsText,
+          units: bulkUnitsText,
+        })}</p>` + `<p>${localize('FABRICATE.App.Inventory.Bulk.DestroyRule')}</p>`,
+      yes: {
+        label: localize('FABRICATE.App.Inventory.Bulk.DestroyConfirm'),
+        callback: () => true,
+      },
+      no: () => false,
+    });
+  }
+
   // Refetch on mount and whenever the shared actor selection changes. The shared
   // top bar is the single source of truth for the selected character; persist its
   // selection into the crafting setting BEFORE loading (the inventory listing
@@ -172,31 +260,54 @@
           pageSize={store?.pageSize ?? 25}
           {filtering}
           {onSelect}
+          bulkSelectedKeys={store?.bulkSelectedKeys ?? []}
+          {onBulkToggle}
+          {onBulkClear}
           onPageChange={(index) => store?.setPage(index)}
           onPageSizeChange={(size) => store?.setPageSize(size)}
         />
       </div>
 
       <section class="inventory-view-column inventory-view-column-right" data-inventory-detail>
-        <InventoryDetail
-          item={store?.selectedItem ?? null}
-          {activeSystem}
-          {onSelectSystem}
-          learningRecipeId={store?.learningRecipeId ?? null}
-          salvaging={store?.salvagingKey != null}
-          {salvageResult}
-          salvageStages={store?.orderedSalvageStages ?? []}
-          salvageAnnouncement={store?.salvageOrderAnnouncement ?? ''}
-          {onOpenRecipe}
-          {onLearn}
-          {onLearnAll}
-          {onSalvage}
-          {onResetSalvage}
-          {onReorderSalvageStage}
-          {onSalvageReorderSettled}
-          salvageOrderIsCustom={store?.salvageOrderIsCustom ?? false}
-          {onResetSalvageOrder}
-        />
+        {#if bulkActive}
+          <InventoryBulkPanel
+            counts={store?.bulkCounts ?? null}
+            entries={bulkEntries}
+            salvageable={store?.bulkSalvageable ?? []}
+            blocked={store?.bulkBlocked ?? []}
+            yieldRows={store?.bulkYieldPreview ?? []}
+            running={store?.bulkRunning ?? false}
+            destroying={store?.bulkDestroying ?? false}
+            progress={store?.bulkProgress ?? null}
+            report={store?.bulkReport ?? null}
+            destroyLabel={bulkDestroyLabel}
+            onClear={onBulkClear}
+            onRemove={onBulkRemove}
+            onSalvage={onBulkSalvage}
+            onDestroy={onBulkDestroy}
+            onDone={onBulkClear}
+          />
+        {:else}
+          <InventoryDetail
+            item={store?.selectedItem ?? null}
+            {activeSystem}
+            {onSelectSystem}
+            learningRecipeId={store?.learningRecipeId ?? null}
+            salvaging={store?.salvagingKey != null}
+            {salvageResult}
+            salvageStages={store?.orderedSalvageStages ?? []}
+            salvageAnnouncement={store?.salvageOrderAnnouncement ?? ''}
+            {onOpenRecipe}
+            {onLearn}
+            {onLearnAll}
+            {onSalvage}
+            {onResetSalvage}
+            {onReorderSalvageStage}
+            {onSalvageReorderSettled}
+            salvageOrderIsCustom={store?.salvageOrderIsCustom ?? false}
+            {onResetSalvageOrder}
+          />
+        {/if}
       </section>
     </div>
   </div>

@@ -59,6 +59,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
+    // The bulk tree (issue 859). `InventoryView` renders the panel as a SIBLING of
+    // `InventoryDetail`, so these are static imports of the view itself; an omission
+    // HANGS this suite (# cancelled), and a speculative entry throws outright.
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkSection.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/inventory/InventoryView.svelte',

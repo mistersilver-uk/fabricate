@@ -163,8 +163,8 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    38,
-    'expected 38 legitimate namespace bases to resolve to an object — ' +
+    39,
+    'expected 39 legitimate namespace bases to resolve to an object — ' +
       'update this count only if the number of such bases genuinely changes'
   );
 });
