@@ -15,13 +15,19 @@
  *    craft that SUCCEEDS, and that success is a function of four fixture facts: the seed, the check
  *    formula, the threshold and the crafter's roll data. All four are READ from the fixtures rather
  *    than copied, so moving any one of them fails here by name instead of surfacing later as an
- *    unexplained frame diff.
+ *    unexplained frame diff. `player-inventory-bulk-roll-prompt` (issue 859) is the same class of
+ *    claim about a different prompt: whether that dialog opens AT ALL, and whether it offers three
+ *    buttons or one, are functions of the salvage check the batch's own fixtures author.
  * 3. COMPOSITION — that the shim actually installs a constructor. Asserting the class in isolation
  *    left the whole capability revertible with the suite green.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+
+import { getCaseById } from '../scripts/lib/viewLabCases.js';
+import { resolveSalvageCheck } from '../src/systems/salvageCheckUsability.js';
+import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
 
 import { createLabRoll } from './view-lab/foundry/labRoll.js';
 import { installLabRandom } from './view-lab/foundry/labRandom.js';
@@ -98,6 +104,68 @@ test('the seeded smithing check clears its own threshold', () => {
         `successful craft: rolled ${evaluated.total} of ${rollFormula} against ${thresholds.success}`
     );
   });
+});
+
+test('the bulk roll prompt frame is what its own subjects authored', () => {
+  // COMPOSED, and about a frame that exists: `player-inventory-bulk-roll-prompt` publishes the ONE
+  // dialog a whole batch answers, and two of its visible properties are decided entirely by fixture
+  // data rather than by anything the panel does.
+  //
+  //   1. THE DIALOG OPENS AT ALL. `BulkSalvageService._resolveRollDecision` filters the batch to
+  //      the subjects whose own system's salvage check is USABLE and returns without prompting when
+  //      none is. Blank that formula and the case stops being capturable — which is the good
+  //      failure — but the silent one is the reverse: a second subject gaining a usable check
+  //      changes the "One roll setting for N items" heading and the strip beneath it with every
+  //      assertion in the registry still passing.
+  //   2. HOW MANY BUTTONS IT DRAWS. `allowAdvantage` is all-or-nothing over those usable subjects
+  //      and asks whether each AUTHORED formula carries a plain `1d20`. Rewriting the fixture's
+  //      formula to, say, `2d10 + @abilities.int.mod` collapses the published Advantage / Normal /
+  //      Disadvantage row to a single Roll button, and the case's own `expectSelector` — which
+  //      names the subject strip — would not notice.
+  //
+  // The subjects are DERIVED FROM THE CASE, never listed here. Hardcoding them is what decouples a
+  // pin from the frame it claims to be about: re-pointing the case at other cards would leave this
+  // asserting facts about two components the picture no longer contains.
+  //
+  // The same two predicates the service itself calls, imported rather than re-derived — a private
+  // regex here would agree with the service right up until one of them changed.
+  const viewCase = getCaseById('player-inventory-bulk-roll-prompt');
+  assert.ok(viewCase, 'the bulk roll-prompt case is still in the registry');
+
+  const keys = (viewCase.steps ?? [])
+    .map((step) => /data-inventory-card="([^"]+)"/.exec(step?.selector ?? '')?.[1])
+    .filter(Boolean);
+  assert.equal(keys.length, 2, `expected the case to select two cards, saw ${keys.join(', ')}`);
+
+  // A card key is `<systemId>:<componentId>`, and the system half is the participation the row
+  // ACTS on: a bulk row acts on the selected participation when its card is the inspected one and
+  // the primary otherwise, and both of these cards resolve to the system their key names.
+  const content = buildLabContent();
+  const checks = keys.map((key) => {
+    const systemId = key.slice(0, key.indexOf(':'));
+    const system = content.systems.find((entry) => entry.id === systemId);
+    assert.ok(system, `the case selects a card from "${systemId}", which the world no longer has`);
+    return { key, ...resolveSalvageCheck(system) };
+  });
+
+  const usable = checks.filter((check) => check.checkUsable);
+  assert.deepEqual(
+    checks.map((check) => `${check.key}=${check.checkUsable}`),
+    ['lab-herbalism:hb-cracked-alembic=true', 'lab-smithing:sm-air-shard=false'],
+    'the published frame is a MIXED batch — one subject that rolls and one that does not — over a ' +
+      'heading that counts BOTH. Changing which is which changes the picture'
+  );
+  assert.ok(
+    usable.length > 0,
+    'no subject in the batch has a usable salvage check, so the service would never prompt and ' +
+      'the case can no longer be captured'
+  );
+  assert.ok(
+    usable.every((check) => hasPlainD20(check.rollFormula)),
+    `the frame publishes an Advantage / Normal / Disadvantage row, which the service offers only ` +
+      `when EVERY usable-check subject's authored formula carries a plain 1d20: ` +
+      `${usable.map((check) => `${check.key} rolls ${check.rollFormula}`).join(', ')}`
+  );
 });
 
 test('the same seed replays the same faces', async () => {

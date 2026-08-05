@@ -218,6 +218,65 @@ const CRAFTING_ROUTED_INGREDIENTS = craftingMode('routedByIngredients');
 const CRAFTING_ROUTED_CHECK = craftingMode('routedByCheck');
 const CRAFTING_PROGRESSIVE = craftingMode('progressive');
 
+/**
+ * Bulk salvage / bulk destroy (issue 859): the fields every one of its cases shares.
+ *
+ * Spread rather than restated, for the reason the case factories exist at all — five fields times
+ * six entries is thirty lines that say nothing, and a duplication detector counts `scripts/**`.
+ *
+ *   - `reaches: 'beyond'` + `smokeLabels: []`. The live smoke walks no bulk selection at all, so
+ *     there is no counterpart to fall short of. The two go together: `view-lab-cases.test.js`
+ *     requires a `beyond` case to claim ZERO smoke labels.
+ *   - `sourceMatches` is the SAME pair the six existing inventory cases carry. Deliberately no new
+ *     pattern for `apps/inventory/bulk/`: `^src/ui/svelte/apps/inventory/` already covers it, so
+ *     `view-lab-source-coverage` is satisfied in both directions, and a narrower pattern would only
+ *     mean a change to the panel selects fewer frames of the screen it changes.
+ *
+ * A case that opens a dialog overrides `query` wholesale, which is why the query lives here as a
+ * whole object rather than as a bare tab name.
+ */
+const BULK_DEFAULTS = Object.freeze({
+  reaches: 'beyond',
+  smokeLabels: [],
+  query: { tab: 'inventory' },
+  kinds: ['player', 'inventory', 'bulk'],
+  sourceMatches: [
+    /^src\/ui\/svelte\/apps\/inventory\//,
+    /^src\/ui\/svelte\/stores\/inventoryStore/,
+  ],
+});
+
+/**
+ * The inventory grid card for one listing key.
+ *
+ * Keys are `system:component` for a component card and `essence:<system>:<id>` /
+ * `recipeitem:<system>:<id>` for the two card kinds that are never salvageable.
+ *
+ * @param {string} key The listing key.
+ * @returns {string} A selector for the card element.
+ */
+const CARD = (key) => `.inventory-card[data-inventory-card="${key}"]`;
+
+/**
+ * The button INSIDE that card, which is what a selection gesture actually clicks — the card element
+ * itself carries no handler.
+ *
+ * @param {string} key The listing key.
+ * @returns {string} A selector for the card's button.
+ */
+const CARD_BUTTON = (key) => `${CARD(key)} .inventory-card-button`;
+
+/**
+ * A shift-click step: the one gesture that both ENTERS and extends a bulk selection.
+ *
+ * The first shift-click also promotes the currently-inspected card, so a plain click followed by a
+ * shift-click selects TWO — which is what `player-inventory-bulk-mixed` is held to.
+ *
+ * @param {string} key The listing key.
+ * @returns {object} A step for the capture driver.
+ */
+const SHIFT_CLICK = (key) => ({ selector: CARD_BUTTON(key), modifiers: ['Shift'] });
+
 /** One player screen and one manager screen: enough to show a shared-primitive change in context. */
 const REPRESENTATIVE_CASE_IDS = Object.freeze(['fabricate-app-shell', 'manager-components-normal']);
 
@@ -2613,6 +2672,205 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
     ],
+  }),
+  // ─── Bulk salvage / bulk destroy (issue 859) ──────────────────────────────────────────────────
+  //
+  // Every card named below sits on PAGE ONE of the 25-per-page grid, verified by rendering rather
+  // than inferred: the listing sorts A→Z over the whole roster, so page-1 membership is fragile and
+  // is exactly what the six existing inventory cases narrow with a search box to avoid. A search
+  // filter cannot be used here — bulk selection needs SEVERAL cards on screen at once, and a filter
+  // narrow enough to guarantee one card's position removes the others. Page size is the fallback if
+  // that ever stops holding (`{selector: '.inventory-grid-pagination select', select: '75'}`), and
+  // no case needs it today.
+  //
+  // TWO STATES THIS SET DELIBERATELY DOES NOT PHOTOGRAPH, both because the lab world cannot reach
+  // them, and both recorded here rather than left as an unexplained absence:
+  //
+  //   - `running`. The lab's `Roll` is seeded and SYNCHRONOUS, so a run completes before the frame
+  //     is taken. Reaching it would need a harness hook that stalls the `salvageComponents` seam
+  //     mid-run. Its markup is pinned by a mounted component test instead. (It is visible BEHIND
+  //     the standing prompt in `player-inventory-bulk-roll-prompt`, which is incidental.)
+  //   - a broken-but-salvageable QUEUE row, and the whole post-run REPORT. Both need fixture work
+  //     in `tests/view-lab/world/` — see the report of this change for the two specific gaps.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-mixed',
+    label: 'Player app — Inventory bulk selection (mixed)',
+    // THE HEADLINE FRAME: one plain click, then three shift-clicks, and the panel partitions the
+    // result into a queue, a best-case yield and a blocked list.
+    //
+    // The four cards are chosen so the frame carries every partition rule at once rather than one
+    // per frame: Air Shard is salvageable and multi-system (so its row names the ACTING system),
+    // Cracked Alembic is progressive (so it can only ever be Possible), Bent Clasp is blocked on a
+    // GM misconfiguration and Field Toolchest on a missing tool — the two blocked reasons whose
+    // copy differs most.
+    steps: [
+      // PLAIN, not shift: this is the card the first shift-click must PROMOTE. Selecting it here
+      // is what makes the promotion assertion below mean something.
+      { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
+      SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
+      SHIFT_CLICK('lab-jewelry:jw-bent-clasp'),
+      SHIFT_CLICK('lab-smithing:sm-toolchest'),
+    ],
+    // ONE selector carrying TWO assertions, because the driver takes one and the frame has to
+    // answer for both. Scoped to the app root, which is the only common ancestor of the grid and
+    // the panel:
+    //
+    //   1. THE PROMOTION. The plain-clicked card must carry the bulk-selected marker. It is in the
+    //      selection only because the first shift-click pulled it in, so a promotion that stopped
+    //      working would publish a three-card selection under a case whose count line says four —
+    //      and every other assertion here would still pass.
+    //   2. BOTH CERTAINTIES in the yield aggregate. The preview's whole job is to distinguish what
+    //      the batch WILL return from what it MIGHT, and a rule that collapsed one into the other
+    //      renders a plausible list of the wrong colour.
+    //
+    // What it deliberately does NOT assert is the routed "up to" affix. That affix needs a
+    // component name whose aggregate is `0 < guaranteed < quantity`, and no lab selection produces
+    // one: the guaranteed set here is {Whetstone} and the possible set is {Empty Vial, Ground
+    // Reagent, Frostcap Mushroom}, which do not intersect — and the world's only ROUTED salvage
+    // config (`rw-slag`) is deliberately held by nobody. Stated rather than asserted, because a
+    // selector for an element the fixtures cannot produce is a case that can never be captured.
+    expectSelector:
+      '.fabricate-app-shell' +
+      `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
+      ':has([data-inventory-bulk-yield] [data-status-pill="success"])' +
+      ':has([data-inventory-bulk-yield] [data-status-pill="accent"])',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-mixed-narrow',
+    label: 'Player app — Inventory bulk selection (narrowest window)',
+    // The same selection at the NARROWEST window the app permits. `SvelteFabricateApp` clamps to
+    // `MIN_WINDOW_WIDTH = 1024` in `_updatePosition`, which both `setPosition()` and a drag-resize
+    // go through, so this is the real floor rather than a chosen size — 900 is refused by the
+    // harness's own geometry gate before anything renders.
+    //
+    // IT DOES NOT REACH THE CONTAINER BREAKPOINT, and saying so is the point of this comment.
+    // `.inventory-view-container` measures 938px inside a 1024px window, and
+    // `@container fabricate-inventory (max-width: 900px)` therefore never matches — by design:
+    // `MIN_WINDOW_WIDTH`'s own comment says the floor keeps the columns usable "before the
+    // narrow-width stacking breakpoint takes over". `player-gathering-stacked` sits at the same
+    // 1024 and is in the same position. So this frame is evidence about the narrowest permitted
+    // GEOMETRY, not about the stacked block: the detail column falls from ~500px to 342px, which
+    // is where a queue row's name competes with its certainty chip, its broken chip and its remove
+    // control, and where the footer's note-left / actions-right row is most likely to break.
+    steps: [
+      { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
+      SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
+      SHIFT_CLICK('lab-jewelry:jw-bent-clasp'),
+      SHIFT_CLICK('lab-smithing:sm-toolchest'),
+    ],
+    position: { width: 1024, height: 860 },
+    kinds: ['player', 'inventory', 'bulk', 'responsive'],
+    expectSelector:
+      '.fabricate-app-shell' +
+      `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
+      ':has([data-inventory-bulk-queue="preview"] [data-inventory-bulk-queue-row])',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-none-salvageable',
+    label: 'Player app — Inventory bulk selection with nothing salvageable',
+    // The EMPTY state, and the only frame that proves the footer's asymmetry: Salvage is withheld
+    // because there is nothing to salvage, while Destroy stays live because destroy is not gated on
+    // salvageability at all — it deletes whole stacks including blocked rows.
+    //
+    // Three ordinary stacks carrying no salvage config, across two systems, with the Empty Vial
+    // also backing a herbalism TOOL so the grid selection is not three interchangeable ore cards.
+    // The `essence` and `recipeItem` reasons would have made a richer list and are NOT reachable
+    // from a case: `view-lab-fixture-identifiers.test.js` validates every `data-inventory-card`
+    // value against a set built as `<system>:<component>`, which the two composite card kinds
+    // (`essence:…`, `recipeitem:…`) are not in. They are covered by the store's own unit tests.
+    steps: [
+      { selector: CARD_BUTTON('lab-smithing:sm-coal') },
+      SHIFT_CLICK('lab-smithing:sm-copper-ore'),
+      SHIFT_CLICK('lab-herbalism:hb-empty-vial'),
+    ],
+    // The panel state alone would be satisfied by an empty panel with a footer in any condition,
+    // and the footer IS what this case is named for — so both buttons are named, in the direction
+    // each must be in.
+    expectSelector:
+      '[data-inventory-bulk-panel="empty"]' +
+      ':has([data-inventory-bulk-empty])' +
+      ':has([data-inventory-bulk-salvage][disabled])' +
+      ':has([data-inventory-bulk-destroy]:not([disabled]))',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-tools-blocked',
+    label: 'Player app — Inventory bulk selection blocked on missing tools',
+    // `toolsUnavailable` is the one blocked reason a player can ACT on, and the only one whose copy
+    // is data-driven — "Needs {tools}", filled from the row's own missing-tool names through a
+    // locale-correct list format rather than a hand-joined comma list. It is worth its own frame
+    // beside `-mixed` because there it competes with a second blocked row: here it is the only one,
+    // above a queue that is still running, which is the other half of the claim (a blocked row
+    // skips itself; it does not stop the batch).
+    //
+    // The Field Toolchest is stocked on Vosk, who carries the tongs its salvage names and not the
+    // anvil — tool availability is scoped to the target salvage actor, so this is the one card in
+    // the world that can reach the reason.
+    steps: [
+      { selector: CARD_BUTTON('lab-smithing:sm-toolchest') },
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
+    ],
+    expectSelector:
+      '[data-inventory-bulk-panel="preview"]' +
+      ':has([data-inventory-bulk-blocked-row="toolsUnavailable"])' +
+      ':has([data-inventory-bulk-queue="preview"] [data-inventory-bulk-queue-row])',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-roll-prompt',
+    label: 'Player app — Inventory bulk roll prompt',
+    // ONE prompt for the whole batch — the answer to the issue's own open question, and the state
+    // acceptance 4 is about. `dialog: 'open'` leaves it standing and unanswered, which is the only
+    // way to photograph one: the lab's default `enter` presses the footer's default button and the
+    // dialog is gone long before the capture.
+    //
+    // The batch prompts at all only because the Cracked Alembic's system authors a usable
+    // progressive salvage formula — the service computes `anyCheckUsable` and never opens a modal
+    // when nothing in the selection could roll. The Air Shard beside it salvages under smithing,
+    // which authors no salvage check, so the frame is also the honest picture of a MIXED batch:
+    // one prompt covering an item that rolls and an item that does not.
+    query: { tab: 'inventory', dialog: 'open' },
+    steps: [
+      { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    // Held to the PROMPT's own element, never to the tab. A dialog is a SIBLING of the application
+    // window, so `expectTab` is satisfied by an inventory tab with nothing over it — which is
+    // exactly the screen a prompt that never opened would publish. The subject strip is what
+    // distinguishes the bulk dialog from the single-subject one: `promptCheckRoll` renders no
+    // `__subjects` at all, so this cannot be satisfied by the wrong prompt either.
+    expectSelector: '.application.dialog .fabricate-roll-prompt__subjects',
+    // It keeps the shared inventory `sourceMatches` and does NOT add
+    // `apps/crafting/rollPrompt.js`, which builds the dialog. Declaring it would be more accurate
+    // as a mapping — but `view-lab-cases.test.js` treats any case matching `apps/crafting` as a
+    // CRAFTING case and pins their number, so an inventory case reaching into that folder is
+    // counted as one and the census fails. `player-crafting-roll-prompt` already claims the file,
+    // so the change still selects a frame of a roll prompt; it selects the single-subject one.
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-destroy-confirm',
+    label: 'Player app — Inventory bulk destroy confirmation',
+    // The confirmation for the destructive half, standing unanswered. It names BOTH numbers — the
+    // component count and the unit count — because destroy takes whole stacks, and "3 components"
+    // alone would hide how much is actually about to go. The second paragraph is the consequence
+    // sentence that could not fit a button label, which is the whole reason this action confirms
+    // through a dialog rather than an armed button.
+    query: { tab: 'inventory', dialog: 'open' },
+    steps: [
+      { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      { selector: '[data-inventory-bulk-destroy]' },
+    ],
+    // Same failure mode as the roll prompt, and the same answer: hold it to the confirm's own COPY.
+    // `p + p` is the two-paragraph body — the removal sentence and the "nothing is recovered"
+    // rule — under a yes/no button pair, which no other dialog reachable from this tab renders.
+    expectSelector: '.application.dialog:has(button[data-action="yes"]) .dialog-content p + p',
   }),
   playerCase({
     id: 'player-gathering-events',
