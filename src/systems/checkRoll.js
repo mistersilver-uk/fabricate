@@ -138,6 +138,13 @@ function modifierChoiceValue(modifierChoice, id) {
  * @param {(args: {formula: string, resolvedFormula: string|null, dc: *, label: *})
  *   => Promise<{confirmed?: boolean, bonus?: string|null, rollMode?: string}>}
  *   [options.prompt] The confirm dialog (see `promptCheckRoll`).
+ * @param {{bonus?: string|null, rollMode?: string, advantage?: string}|null}
+ *   [options.rollDecision] A PRE-RESOLVED roll decision (issue 859 bulk salvage):
+ *   `promptCheckRoll`'s return shape MINUS `confirmed`. When present on an interactive
+ *   roll it is used as the player's `choice` and NO dialog is shown, so one answer can
+ *   drive N rolls. Everything downstream of the choice is identical to a prompted roll
+ *   (`@craftingmod` substitution, advantage transform, the `Roll.validate` net,
+ *   `effectiveRollMode`). Absent on every single-item path.
  * @param {string} [options.rollMode] The effective chat roll mode.
  * @param {string} [options.flavor] Chat message flavor / dialog label.
  * @param {object} [options.speaker] Chat message speaker.
@@ -185,34 +192,55 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   let effectiveRollMode = options?.rollMode;
   let effectiveFlavor = options?.flavor;
 
-  // Interactive roll (opt-in): confirm with the player and optionally append a
-  // situational modifier before rolling. A cancelled prompt short-circuits with
-  // `cancelled: true` so the runner can abort with zero mutation.
-  if (options?.interactive && typeof options.prompt === 'function') {
-    // For a deferred modifier choice the `@craftingmod` value is the player's radio
-    // pick, which isn't known until the dialog resolves. Show the modifier slot as a
-    // neutral `(modifier)` placeholder rather than a static default number — a specific
-    // number would misrepresent a non-default pick (and cleanHTML strips inline
-    // handlers, so a live-updating preview is not available). Other `@` placeholders
-    // still resolve to numbers; the per-radio value chips carry each option's value.
-    const promptFormula = useDeferredChoice
-      ? effectiveFormula.replaceAll(/@craftingmod\b/g, '(modifier)')
-      : effectiveFormula;
-    const promptResolved = useDeferredChoice
-      ? resolveCheckFormulaDisplay(promptFormula, actor)
-      : resolved;
-    const choice = await options.prompt({
-      formula: promptFormula,
-      resolvedFormula: promptResolved?.display ?? null,
-      dc: options.dc,
-      label: options.flavor,
-      name: options.name,
-      activity: options.activity,
-      img: options.img,
-      modifierChoice,
-      // Advantage/Disadvantage are offered only for a plain-d20 check.
-      allowAdvantage: hasPlainD20(effectiveFormula),
-    });
+  // A PRE-RESOLVED decision (issue 859): one prompt answer applied to every roll of a
+  // bulk run. It stands in for the dialog's return value, so the whole block below —
+  // and only that block — has two ways to obtain a `choice`.
+  const preResolved = options?.rollDecision ?? null;
+
+  // Interactive roll (opt-in): confirm with the player (or reuse a pre-resolved
+  // decision) and optionally append a situational modifier before rolling. A cancelled
+  // prompt short-circuits with `cancelled: true` so the runner can abort with zero
+  // mutation.
+  //
+  // The `Boolean(preResolved) ||` half is load-bearing: without it a decision supplied
+  // with no `prompt` is silently discarded and the BASE formula rolls — the bulk run's
+  // situational bonus, advantage and roll mode all vanish with no error.
+  if (
+    options?.interactive === true &&
+    (Boolean(preResolved) || typeof options.prompt === 'function')
+  ) {
+    // Prompt-only work, so it lives in the prompt arm and is never computed for a
+    // pre-resolved roll (which shows no dialog and needs no display formula).
+    const askPlayer = async () => {
+      // For a deferred modifier choice the `@craftingmod` value is the player's radio
+      // pick, which isn't known until the dialog resolves. Show the modifier slot as a
+      // neutral `(modifier)` placeholder rather than a static default number — a specific
+      // number would misrepresent a non-default pick (and cleanHTML strips inline
+      // handlers, so a live-updating preview is not available). Other `@` placeholders
+      // still resolve to numbers; the per-radio value chips carry each option's value.
+      const promptFormula = useDeferredChoice
+        ? effectiveFormula.replaceAll(/@craftingmod\b/g, '(modifier)')
+        : effectiveFormula;
+      const promptResolved = useDeferredChoice
+        ? resolveCheckFormulaDisplay(promptFormula, actor)
+        : resolved;
+      return options.prompt({
+        formula: promptFormula,
+        resolvedFormula: promptResolved?.display ?? null,
+        dc: options.dc,
+        label: options.flavor,
+        name: options.name,
+        activity: options.activity,
+        img: options.img,
+        modifierChoice,
+        // Advantage/Disadvantage are offered only for a plain-d20 check.
+        allowAdvantage: hasPlainD20(effectiveFormula),
+      });
+    };
+    const choice = preResolved ?? (await askPlayer());
+    // LOAD-BEARING `=== false`: a pre-resolved `rollDecision` carries NO `confirmed`
+    // key (it is `promptCheckRoll`'s shape minus that flag), so tightening this to
+    // `!choice.confirmed` would turn every bulk roll into a cancellation.
     if (!choice || choice.confirmed === false) {
       return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
     }
