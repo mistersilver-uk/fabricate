@@ -48,6 +48,39 @@ function installToObject(document) {
 }
 
 /**
+ * Foundry's `Document#delete()`: the document removes itself from its parent's collection.
+ *
+ * Load-bearing, and the reason no bulk salvage run could complete in the lab before this.
+ * `CraftingEngine._consumeComponentItems` BRANCHES on stack size — it reduces `system.quantity`
+ * when it takes part of a stack and calls `item.delete()` when it takes all of one. Every
+ * salvageable stack in this world is a single unit, so salvage always takes the delete branch,
+ * and a duck-typed item without the method threw `item.delete is not a function` into the engine's
+ * catch: every subject came back `outcome: 'error'` and the console errors failed the capture
+ * gate. Crafting never surfaced it because Brenna holds her ingredients in quantity, so the update
+ * branch covered her.
+ *
+ * The ALTERNATIVE was to raise one salvageable stack above a single unit, which dodges the branch
+ * rather than implementing it — and the delete branch is the one a real ×1 salvage takes, so a lab
+ * that cannot execute it cannot photograph the commonest case.
+ *
+ * It DELEGATES to the actor's own `deleteEmbeddedDocuments` rather than splicing itself out, so
+ * the lab keeps ONE removal path. A stub that merely did not throw would be worse than the crash
+ * it replaced: the run would report a salvage the still-populated listing contradicts, and the
+ * frame would document a UI that consumed nothing.
+ *
+ * @param {object} item The item to equip.
+ * @param {object} actor The actor whose collection holds it.
+ * @returns {object} The same item.
+ */
+function installDeleteSemantics(item, actor) {
+  item.delete = async () => {
+    const [removed] = await actor.deleteEmbeddedDocuments('Item', [item.id]);
+    return removed ?? item;
+  };
+  return item;
+}
+
+/**
  * One owned item. `system.quantity` is where dnd5e keeps stack size, which is what Fabricate reads.
  *
  * @param {string} componentId Component this stack is an instance of.
@@ -136,6 +169,7 @@ const INVENTORIES = {
     'sm-oak-haft': 4,
     'sm-whetstone': 2,
     'sm-ruby': 1,
+    // The world's one BROKEN stack, and still salvageable — see {@link BROKEN_STACKS}.
     'sm-longsword': 1,
     'sm-tool-hammer': 1,
     'sm-tool-anvil': 1,
@@ -197,6 +231,43 @@ const INVENTORIES = {
     'sm-toolchest': 1,
   },
 };
+
+/**
+ * Stacks seeded BROKEN, per actor and by component id.
+ *
+ * ONE entry, and it exists because "broken AND salvageable" was unreachable in this world while
+ * being the state the bulk panel argues hardest about: brokenness is about USABILITY and does not
+ * gate salvage, so a broken row belongs in the queue beside its certainty chip and not in the
+ * blocked list (`bulkBlockedReasonFor` omits `broken` deliberately). Nothing here was broken at
+ * all — `ownedItem` builds every stack with `flags: {}`, and the only other source
+ * (`InventoryListingBuilder._isToolBroken`'s `limitedUses` exhaustion) needs a `toolUsage` flag no
+ * fixture seeded — so the card's whole broken presentation was unphotographed too.
+ *
+ * WHY THE FLAG AND NOT NEW SALVAGE CONFIG. The four tool-backed components (`sm-iron-ingot`,
+ * `sm-steel-ingot`, `hb-mortar-dust`, `hb-empty-vial`) carry no salvage config, so seeding a flag
+ * on a tool alone reaches a BLOCKED row, not a queued one; authoring salvage onto one of them
+ * would change what those components are for on the four frames that use them as tools. Seeding
+ * the flag on a stack that is already salvageable moves one fixture and nothing else.
+ *
+ * WHY THE LONGSWORD. Of the salvageable stacks Brenna holds it is the one named by the FEWEST
+ * cases — one (`player-salvage-no-check`), against five for the Cracked Alembic and six for the
+ * Air Shard, both of which are in the existing bulk selections and would have put a danger pill on
+ * frames that are not about brokenness. Its salvage is also the clearer evidence: smithing authors
+ * no salvage check, so the queue row carries a GUARANTEED chip beside the danger one and the frame
+ * shows the two are independent. And a broken sword stripped for "Reclaimed stock" is what the
+ * state is for.
+ *
+ * IT IS REACHABLE IN PRODUCTION, which is the bar a fixture has to clear. `Tool#applyUsage`'s
+ * `flagBroken` action writes this flag on the ITEM it matched, and a tool may be registered by
+ * item reference with no component at all (`componentId: null`, as all five Runework tools are) —
+ * so a tool registered on the same item that backs a salvageable component breaks exactly this
+ * way. The flag is seeded at production's own depth (`flags.fabricate.fabricate.toolBroken`, what
+ * `setFabricateFlag`'s dotted update expands to), never at the shallower spelling, so the lab
+ * cannot answer a depth bug from a copy production never writes.
+ */
+const BROKEN_STACKS = Object.freeze({
+  'lab-actor-brenna': ['sm-longsword'],
+});
 
 /**
  * Owned RECIPE-ITEM copies — the books and scrolls the GM Knowledge surface audits.
@@ -349,9 +420,12 @@ export function buildLabActors(content) {
 
   return ACTOR_DEFINITIONS.map((definition) => {
     const stacks = INVENTORIES[definition.id] ?? {};
-    const items = Object.entries(stacks).map(([componentId, quantity], index) =>
-      ownedItem(componentId, componentsById.get(componentId), quantity, index)
-    );
+    const broken = new Set(BROKEN_STACKS[definition.id] ?? []);
+    const items = Object.entries(stacks).map(([componentId, quantity], index) => {
+      const item = ownedItem(componentId, componentsById.get(componentId), quantity, index);
+      if (broken.has(componentId)) seedFabricateFlag(item, ['fabricate', 'toolBroken'], true);
+      return item;
+    });
     for (const copy of RECIPE_ITEM_COPIES[definition.id] ?? []) {
       items.push(recipeItemCopy(copy));
     }
@@ -406,6 +480,9 @@ export function buildLabActors(content) {
           item.setFlag = makeSetFlag(item);
           installUpdateSemantics(item);
           installToObject(item);
+          // A crafted or awarded stack is consumed by exactly the same engine branch as a seeded
+          // one, so it needs the same self-removal. See {@link installDeleteSemantics}.
+          installDeleteSemantics(item, actor);
           return item;
         });
         items.push(...created);
@@ -421,6 +498,9 @@ export function buildLabActors(content) {
     actor.getFlag = makeGetFlag(actor);
     actor.setFlag = makeSetFlag(actor);
     installUpdateSemantics(actor);
+    // Installed HERE rather than in `ownedItem`/`recipeItemCopy`, because an item can only remove
+    // itself from a collection that exists — and the actor holding it is built after its items.
+    for (const item of items) installDeleteSemantics(item, actor);
     const learned = LEARNED_RECIPES[definition.id];
     // `flags.fabricate.fabricate.learnedRecipes`, which is where production's dotted-top-level-key
     // `update` lands it after V13 expands the path — the same doubly-nested depth every Fabricate

@@ -2683,15 +2683,21 @@ export const VIEW_LAB_CASES = Object.freeze([
   // that ever stops holding (`{selector: '.inventory-grid-pagination select', select: '75'}`), and
   // no case needs it today.
   //
-  // TWO STATES THIS SET DELIBERATELY DOES NOT PHOTOGRAPH, both because the lab world cannot reach
-  // them, and both recorded here rather than left as an unexplained absence:
+  // ONE STATE THIS SET DELIBERATELY DOES NOT PHOTOGRAPH, recorded here rather than left as an
+  // unexplained absence:
   //
   //   - `running`. The lab's `Roll` is seeded and SYNCHRONOUS, so a run completes before the frame
   //     is taken. Reaching it would need a harness hook that stalls the `salvageComponents` seam
   //     mid-run. Its markup is pinned by a mounted component test instead. (It is visible BEHIND
   //     the standing prompt in `player-inventory-bulk-roll-prompt`, which is incidental.)
-  //   - a broken-but-salvageable QUEUE row, and the whole post-run REPORT. Both need fixture work
-  //     in `tests/view-lab/world/` — see the report of this change for the two specific gaps.
+  //
+  // The other two absences this comment used to record — a broken-but-salvageable QUEUE row and the
+  // post-run REPORT — were fixture gaps, not design decisions, and both are now captured below.
+  // Each needed one change in `tests/view-lab/world/labActors.js`: the queue row needed something in
+  // the world that is broken AND salvageable at once (`BROKEN_STACKS`), and the report needed a run
+  // that can COMPLETE — every salvageable stack here is a single unit, so the engine's consume step
+  // always takes its `item.delete()` branch and the duck-typed item had no such method
+  // (`installDeleteSemantics`), which failed every subject with an error.
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-mixed',
@@ -2871,6 +2877,86 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `p + p` is the two-paragraph body — the removal sentence and the "nothing is recovered"
     // rule — under a yes/no button pair, which no other dialog reachable from this tab renders.
     expectSelector: '.application.dialog:has(button[data-action="yes"]) .dialog-content p + p',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-broken-queued',
+    label: 'Player app — Inventory bulk broken but salvageable',
+    // ACCEPTANCE 3, and the most-argued behaviour in the whole feature: brokenness is about
+    // USABILITY and does not gate salvage, so a broken row belongs in the QUEUE beside its
+    // certainty chip and not in the blocked list. `bulkBlockedReasonFor` omits `broken` on purpose;
+    // this is the frame that shows it was omitted on purpose rather than by oversight.
+    //
+    // The Longsword is the world's one broken stack (`BROKEN_STACKS` in `labActors.js`, which
+    // records why it and not another). Smithing authors no salvage check, so its row carries a
+    // GUARANTEED chip — and the danger chip sits beside that rather than replacing it, which is the
+    // arrangement the assertion below is built to be the only match for.
+    //
+    // The Cracked Alembic is plain-clicked first for two reasons: a shift-click is what ENTERS a
+    // bulk selection at all, and its row is the unbroken, rolled control the broken one is read
+    // against — two rows, two certainties, one danger chip. Name-sorted, so it renders above.
+    //
+    // THE ONLY CASE IN THE SET THAT PAGES, and the reason is measured rather than assumed: the grid
+    // sorts A→Z over all 50 cards at 25 per page, and the Longsword sorts 31st — page TWO. Every
+    // other bulk case's cards happen to sit on page one, which is why the block comment above names
+    // this exact step as the standing fallback. Raising the page size is preferred over navigating
+    // to page two because the only OTHER salvageable card there is none: the world's four remaining
+    // salvage configs all sort onto page one, so a page-two selection could pair the broken row
+    // with nothing but blocked ones, and the unbroken queue row this frame reads against would be
+    // unreachable. It is the first step so the two card clicks land on a settled grid.
+    steps: [
+      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
+      SHIFT_CLICK('lab-smithing:sm-longsword'),
+    ],
+    // ONE queue row carrying BOTH pills, which is the whole claim in one selector. The three ways
+    // this could go wrong each publish a plausible screen that a looser selector accepts:
+    //   - the row falls into the blocked list (`[data-inventory-bulk-blocked-row]`), which is the
+    //     regression this behaviour is most likely to grow, and any panel-level selector matches
+    //     the resulting frame;
+    //   - the danger chip REPLACES the certainty chip instead of joining it, which a selector
+    //     naming only the danger pill matches;
+    //   - the danger chip renders elsewhere in the panel — the report's `failed` outcome pill is
+    //     the same tone — which a bare `[data-status-pill="danger"]` matches.
+    // Requiring both pills on the same `[data-inventory-bulk-queue-row]` refuses all three. Only a
+    // queued, guaranteed, broken row can satisfy it.
+    expectSelector:
+      '[data-inventory-bulk-panel="preview"]' +
+      ' [data-inventory-bulk-queue="preview"]' +
+      ' [data-inventory-bulk-queue-row]' +
+      ':has([data-status-pill="success"])' +
+      ':has([data-status-pill="danger"])',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-report',
+    label: 'Player app — Inventory bulk report',
+    // What a finished batch says it did — the state the whole panel exists to arrive at, and the
+    // only one that shows a per-item outcome, a per-item rolled total, and the two aggregates
+    // ("added to your pack" / "not recovered") the player actually reads.
+    //
+    // The SAME two cards as `player-inventory-bulk-roll-prompt`, minus its `dialog: 'open'`. That
+    // pairing is deliberate: the two frames are the same batch either side of one gesture, so the
+    // report can be read as the answer to the prompt above it. The lab's default dialog answer is
+    // `enter`, which presses the button Foundry marks default — Roll, for a check prompt — so the
+    // batch proceeds and the panel lands on its report without the case doing anything special.
+    // (`confirmDialog` defaults to **No**, which is why the destroy half cannot be photographed
+    // this way and is not attempted here.)
+    //
+    // It is also a MIXED batch by construction, which is the interesting report rather than the
+    // trivial one: `view-lab-roll.test.js` pins that exactly one of these two subjects has a usable
+    // salvage check, so one row can carry a rolled total and one cannot.
+    steps: [
+      { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
+      SHIFT_CLICK('lab-smithing:sm-air-shard'),
+      { selector: '[data-inventory-bulk-salvage]' },
+    ],
+    // The panel STATE plus the report's own subject list. The state alone is not enough: the panel
+    // reports `report` for a run that threw as well as one that ran, and an error report renders a
+    // banner over no subjects at all. Naming the subject list means the frame has to contain the
+    // per-item outcomes it is published for.
+    expectSelector:
+      '[data-inventory-bulk-panel="report"] [data-inventory-bulk-subjects] [data-inventory-bulk-subject]',
   }),
   playerCase({
     id: 'player-gathering-events',
