@@ -1140,6 +1140,42 @@ describe('inventoryStore', () => {
   }
 
   /**
+   * A reorderable PROGRESSIVE row — the only kind of card that can carry a pending stage
+   * order into a bulk run. Stage ids are derived from `componentId`, so two of these
+   * never collide.
+   *
+   * ONE definition, not one per describe: three tests drive this exact shape, and the
+   * copies were a normalized self-duplication Sonar counts.
+   */
+  function progressiveBulkRow(componentId, name) {
+    return bulkRow(
+      componentId,
+      name,
+      salvageProjection({
+        mode: 'progressive',
+        checkUsable: true,
+        allowPlayerResultReorder: true,
+        stages: [
+          {
+            id: `${componentId}-s1`,
+            componentId: 'x',
+            name: 'Shard',
+            difficulty: 5,
+            threshold: 5,
+          },
+          {
+            id: `${componentId}-s2`,
+            componentId: 'y',
+            name: 'Slag',
+            difficulty: 3,
+            threshold: 8,
+          },
+        ],
+      })
+    );
+  }
+
+  /**
    * A store loaded with `rows`, plus a recording services object covering the four
    * bulk seams. `reporter` is a FUNCTION carrying a `dismiss` — the shape
    * `createProgressReporter` returns and `bulkSalvage`'s `finally` calls both halves of.
@@ -1186,6 +1222,9 @@ describe('inventoryStore', () => {
       },
       confirmDialog: async (prompt) => {
         log.push(['confirmDialog', prompt]);
+        // A caller-held gate, so a test can act WHILE the modal stands — the window in
+        // which the listing can reload out from under the set the player is agreeing to.
+        if (overrides.confirmGate) await overrides.confirmGate;
         // NOT `?? true`: `null` and `undefined` are two of the falsy values under test.
         return 'confirmed' in overrides ? overrides.confirmed : true;
       },
@@ -1714,21 +1753,7 @@ describe('inventoryStore', () => {
 
   describe('inventoryStore - bulkSalvage', () => {
     it('flushes the pending order ONCE before the run', async () => {
-      const { store, log } = await loadedBulkStore([
-        bulkRow(
-          'c1',
-          'Iron',
-          salvageProjection({
-            mode: 'progressive',
-            checkUsable: true,
-            allowPlayerResultReorder: true,
-            stages: [
-              { id: 's1', componentId: 'x', name: 'Shard', difficulty: 5, threshold: 5 },
-              { id: 's2', componentId: 'y', name: 'Slag', difficulty: 3, threshold: 8 },
-            ],
-          })
-        ),
-      ]);
+      const { store, log } = await loadedBulkStore([progressiveBulkRow('c1', 'Iron')]);
       store.select('sys:c1');
       flushSync();
       store.reorderSalvageStage(0, 1, '');
@@ -1749,28 +1774,11 @@ describe('inventoryStore', () => {
     it('ABORTS before anything starts when the order flush rejects', async () => {
       // A queued row must not run against a stale order — the same contract the
       // single-item path has. Nothing runs, no toast, no reload.
-      const { store, log } = await loadedBulkStore(
-        [
-          bulkRow(
-            'c1',
-            'Iron',
-            salvageProjection({
-              mode: 'progressive',
-              checkUsable: true,
-              allowPlayerResultReorder: true,
-              stages: [
-                { id: 's1', componentId: 'x', name: 'Shard', difficulty: 5, threshold: 5 },
-                { id: 's2', componentId: 'y', name: 'Slag', difficulty: 3, threshold: 8 },
-              ],
-            })
-          ),
-        ],
-        {
-          setOrder: () => {
-            throw new Error('no');
-          },
-        }
-      );
+      const { store, log } = await loadedBulkStore([progressiveBulkRow('c1', 'Iron')], {
+        setOrder: () => {
+          throw new Error('no');
+        },
+      });
       store.select('sys:c1');
       flushSync();
       store.reorderSalvageStage(0, 1, '');
@@ -2112,6 +2120,90 @@ describe('inventoryStore', () => {
       assert.equal(result.error, 'the delete blew up');
     });
 
+    it('never OPENS the progress toast on a destroy that ticked zero times', async () => {
+      // The mirror of `bulkSalvage`'s own zero-tick gate, and reachable WITHOUT a throw:
+      // a destroy every row of which the facade's owner gate REFUSES returns a full
+      // result set having called `onProgress` not once. `createDefaultProgressReporter`
+      // opens its toast lazily on its FIRST call, so an unconditional terminal `pct: 1`
+      // in the `finally` opens a toast for the first time at 100% — a completion
+      // notification for a run that deleted nothing.
+      const { store, log } = await loadedBulkStore([bulkRow('c1', 'Iron')], {
+        destroyResult: {
+          items: [{ outcome: 'notPermitted', unitsDeleted: 0, documentsDeleted: 0 }],
+          unitsDeleted: 0,
+          documentsDeleted: 0,
+        },
+      });
+      store.toggleBulkSelection('sys:c1');
+      flushSync();
+
+      await store.bulkDestroy({});
+      flushSync();
+
+      assert.deepEqual(
+        log.filter(([name]) => name === 'progress'),
+        [],
+        'nothing ticked, so the reporter was never called and no toast ever opened'
+      );
+      assert.deepEqual(
+        log.filter(([name]) => name === 'dismiss'),
+        [['dismiss']],
+        'and the terminal dismissal still runs — a no-op against a toast that never opened'
+      );
+      assert.equal(
+        store.bulkReport.items[0].outcome,
+        'notPermitted',
+        'while the refusal itself is still reported in the panel'
+      );
+    });
+
+    it('destroys the set SNAPSHOTTED before the dialog, not the one it reloaded into', async () => {
+      // The listing reloads on world-time, scene and source changes, any of which can
+      // fire while the modal stands. The set the caller counted for the confirmation copy
+      // — "3 components (47 items)" — has to be the set that is destroyed, so the
+      // snapshot is taken BEFORE the await on `confirmDialog`, never after. Re-read
+      // afterwards, this run finds an empty selection and deletes nothing at all while
+      // still reporting a confirmed destroy.
+      const rows = [bulkRow('c1', 'Iron'), bulkRow('c2', 'Ash')];
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const { store, log } = await loadedBulkStore(rows, {
+        confirmGate: gate,
+        // The reload behind the modal returns a listing holding NEITHER selected card.
+        listings: [rows, []],
+      });
+      store.toggleBulkSelection('sys:c1');
+      store.toggleBulkSelection('sys:c2');
+      flushSync();
+
+      const running = store.bulkDestroy({});
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        if (log.some(([name]) => name === 'confirmDialog')) break;
+        await Promise.resolve();
+      }
+      assert.ok(
+        log.some(([name]) => name === 'confirmDialog'),
+        'the modal is observably open'
+      );
+
+      await store.load(true);
+      flushSync();
+      assert.deepEqual(store.bulkEntries, [], 'and the listing went out from under it');
+
+      release();
+      await running;
+      flushSync();
+
+      const destroyed = log.find(([name]) => name === 'destroyComponents');
+      assert.ok(destroyed, 'the run went ahead against the set the player agreed to');
+      assert.deepEqual(
+        destroyed[1].targets.map((entry) => entry.componentId),
+        ['c1', 'c2']
+      );
+    });
+
     it('records a destroy report carrying the unit counts', async () => {
       const rows = [bulkRow('c1', 'Iron')];
       const { store } = await loadedBulkStore(rows, {
@@ -2135,35 +2227,8 @@ describe('inventoryStore', () => {
   });
 
   describe('inventoryStore - the pendingOrderKey fix', () => {
-    /** Two progressive cards, so a selection change between gesture and flush is real. */
-    function progressiveBulkRow(componentId, name) {
-      return bulkRow(
-        componentId,
-        name,
-        salvageProjection({
-          mode: 'progressive',
-          checkUsable: true,
-          allowPlayerResultReorder: true,
-          stages: [
-            {
-              id: `${componentId}-s1`,
-              componentId: 'x',
-              name: 'Shard',
-              difficulty: 5,
-              threshold: 5,
-            },
-            {
-              id: `${componentId}-s2`,
-              componentId: 'y',
-              name: 'Slag',
-              difficulty: 3,
-              threshold: 8,
-            },
-          ],
-        })
-      );
-    }
-
+    // Two progressive cards (the shared `progressiveBulkRow` above), so a selection
+    // change between the gesture and the flush is real.
     it('commits the key captured when the reorder was SCHEDULED, not the live one', async () => {
       // The latent bug this change fixes: `reorderSalvageStage` computed the order key at
       // SCHEDULE time but `flushSalvageOrder` re-derived it at FLUSH time, so a selection

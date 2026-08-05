@@ -2433,6 +2433,87 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     );
   });
 
+  /**
+   * Each run row paired with the TONE of its trailing status chip — `subtle` waiting,
+   * `accent` in progress, `success` done. The row keys alone say nothing about which row
+   * the panel claims is being worked on, which is the whole subject below.
+   */
+  function runRowTones(target) {
+    return [...target.querySelectorAll('[data-inventory-bulk-run-row]')].map((node) => [
+      node.getAttribute('data-inventory-bulk-run-row'),
+      node.querySelector('[data-status-pill]')?.getAttribute('data-status-pill') ?? null,
+    ]);
+  }
+
+  /** The three-row busy panel every run-state case below drives, at one progress value. */
+  function busyServices(bulk) {
+    const rows = [
+      bulkEntry({ key: 'sys:a', name: 'Alpha' }),
+      bulkEntry({ key: 'sys:b', name: 'Beta' }),
+      bulkEntry({ key: 'sys:c', name: 'Gamma' }),
+    ];
+    return makeServices(makeItem(), {
+      selectedKeys: rows.map((entry) => entry.key),
+      entries: rows,
+      salvageable: rows,
+      counts: { selected: 3, salvageable: 3, blocked: 0, atMax: false },
+      ...bulk,
+    });
+  }
+
+  it('claims NO row in progress before a salvage run has ticked once', async () => {
+    // `salvageComponents` opens the ONE batch roll prompt BEFORE it touches the first
+    // target, so `current: 0` means "waiting on the player", not "row 1 running". A
+    // dismissed prompt ends the run having called the engine zero times, and a row left
+    // wearing "In progress" would be claiming work that never started.
+    const { services } = busyServices({ running: true, progress: { current: 0, total: 3 } });
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(runRowTones(target), [
+      ['sys:a', 'subtle'],
+      ['sys:b', 'subtle'],
+      ['sys:c', 'subtle'],
+    ]);
+    const progress = target.querySelector('[data-inventory-bulk-progress]');
+    assert.equal(
+      progress.getAttribute('data-inventory-bulk-progress'),
+      '0',
+      'and the bar is empty, not a third full'
+    );
+  });
+
+  it('marks done / in progress / waiting once the first tick has landed', async () => {
+    // `current` counts COMPLETED rows, so one tick means row 1 is done and row 2 is the
+    // one being worked on. This is the value at which the guarded expression and the
+    // unguarded one agree — which is exactly why the case above exists.
+    const { services } = busyServices({ running: true, progress: { current: 1, total: 3 } });
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(runRowTones(target), [
+      ['sys:a', 'success'],
+      ['sys:b', 'accent'],
+      ['sys:c', 'subtle'],
+    ]);
+  });
+
+  it('a DESTROY run marks its first row active from tick zero — the asymmetry', async () => {
+    // Destroy has no pre-first-target gap: its confirmation is answered BEFORE the store
+    // raises the busy flag at all, so `current: 0` there really does mean row 1 is being
+    // deleted. Holding destroy to salvage's rule would show a three-row queue with
+    // nothing happening for the whole run.
+    const { services } = busyServices({ destroying: true, progress: { current: 0, total: 3 } });
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(runRowTones(target), [
+      ['sys:a', 'accent'],
+      ['sys:b', 'subtle'],
+      ['sys:c', 'subtle'],
+    ]);
+  });
+
   it('shows only Done in the REPORT state, and no footer actions', async () => {
     const { services, calls } = makeServices(makeItem(), {
       selectedKeys: ['sys:c1'],
@@ -2463,6 +2544,42 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     fire(done, 'click');
     await settle();
     assert.deepEqual(calls.bulkClear, [true], 'Done returns to the single-item inspector');
+  });
+
+  it('WITHHOLDS the count line, and its live region, in the REPORT state', async () => {
+    // The run consumed its rows, so they no longer resolve in the listing and every count
+    // collapses to zero. Left in place, the polite live region announces
+    // "1 selected · 0 salvageable · 0 skipped" directly above "Batch complete" at the
+    // moment the run SUCCEEDED — both true, together a contradiction, and the one a
+    // screen-reader user hears is the wrong one. The report's own banner is the summary
+    // in that state, so the header line stands down rather than competing with it.
+    const { services } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      // What the store really holds once the terminal reload has dropped the consumed
+      // row: a selection that still names a card, and zeroes for everything else.
+      counts: { selected: 1, salvageable: 0, blocked: 0, atMax: false },
+      report: {
+        mode: 'salvage',
+        cancelled: false,
+        counts: { total: 1, succeeded: 1 },
+        posted: true,
+        error: null,
+        items: [
+          { key: 'sys:c1', name: 'Mordant Gland', img: null, outcome: 'succeeded', results: [] },
+        ],
+      },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    const panel = target.querySelector('[data-inventory-bulk-panel]');
+    assert.equal(panel.getAttribute('data-inventory-bulk-panel'), 'report');
+    const total = panel.querySelector('.inventory-detail-total');
+    assert.equal(total.textContent.trim(), '', 'no count line is rendered at all');
+    assert.equal(total.getAttribute('aria-live'), null, 'and the node is not a live region');
+    assert.equal(total.getAttribute('aria-atomic'), null);
   });
 
   it('wires the footer actions and the per-row remove', async () => {

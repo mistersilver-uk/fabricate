@@ -216,13 +216,33 @@ describe('_postBulkSalvageChatMessage: speaker → visibility → create, in tha
     assert.equal(body.includes('user:'), false, 'the discarded key appears nowhere');
   });
 
-  it('builds the speaker BEFORE applying visibility', () => {
+  it('has the speaker ON `chatData` BEFORE visibility is applied', () => {
     // `ChatMessage.applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so
     // a visibility pass over speaker-less data THROWS for any player whose client default
     // is In-Character — and takes the whole card with it.
+    //
+    // WHAT IS PINNED IS THE COMPOSED LITERAL, not the bare token. `speaker` first occurs
+    // in its own `const` declaration, which sits above the applier under EVERY reordering
+    // — so `indexOf('speaker') < indexOf(applier)` pins the DECLARATION site and stays
+    // green for a poster that attaches the speaker to `chatData` after the applier has
+    // already run, or never attaches it at all. Both of those are the exact throw above.
     const body = mainMethodSource(POSTER);
-    assert.ok(body.includes('applyBulkChatVisibility'), 'visibility is applied at all');
-    assert.ok(body.indexOf('speaker') < body.indexOf('applyBulkChatVisibility'));
+    // Key ORDER inside the literal is free; membership is not.
+    const composed = /const chatData = \{[^}]*\bspeaker\b[^}]*\};/.exec(body);
+    const visibility = body.indexOf('applyBulkChatVisibility');
+    assert.ok(composed, 'the speaker is a member of the `chatData` literal as CONSTRUCTED');
+    assert.ok(visibility !== -1, 'and visibility is applied at all');
+    // Both indices are real, so neither comparison can pass on a `-1` for an absent
+    // token — the vacuity `assert.ok(-1 < N)` would have handed us.
+    assert.ok(
+      composed.index < visibility,
+      'the speaker-bearing construction precedes the visibility pass'
+    );
+    assert.equal(
+      body.includes('chatData.speaker'),
+      false,
+      'and it is never attached post-hoc, which is how it could land after the applier'
+    );
   });
 
   it('applies visibility BEFORE create, and never as a create option', () => {
