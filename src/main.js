@@ -1743,9 +1743,12 @@ class Fabricate {
    * is injected here, so the service itself reaches no Foundry global and stays
    * unit-testable against plain objects.
    *
-   * Safe to cache: `this.craftingEngine` and `this.craftingSystemManager` are
-   * constructed once during `initialize()` and never reassigned, so a cached service can
-   * never hold a stale collaborator.
+   * Safe to cache because every collaborator below is read off `this` at CALL time and
+   * none is captured at construction time. That — not immutability — is what makes the
+   * cache sound: `this.craftingEngine` is assigned twice (`null` in the constructor, then
+   * the real engine in `initialize()`), so a service that had captured the field's value
+   * instead of the receiver could hold `null` forever.
+   * {@link Fabricate#_getBulkDestroyService} states the same rule for the same reason.
    *
    * @returns {BulkSalvageService}
    * @private
@@ -1780,7 +1783,8 @@ class Fabricate {
       // including its case-SENSITIVE name fallback: a destroy that matched more broadly
       // than salvage would delete things the player was shown as a different component.
       // Read off `this.craftingEngine` at CALL time, not at construction time, because
-      // this service is cached and the engine is (re)assigned during setup.
+      // this service is cached and the engine is assigned during `initialize()` — the
+      // constructor leaves the field `null`.
       findComponentItems: (actor, component, system) =>
         this.craftingEngine.findComponentItems(actor, component, system),
       // Must RETURN the deleted documents: the service derives `unitsDeleted` from what

@@ -192,7 +192,12 @@ function renderSubject(subject, loc) {
  */
 export function buildBulkSalvageChatContent(model = {}, localize = (key) => key) {
   const loc = (key) => localize(key) ?? key;
-  const status = STATUS_MODIFIERS[model.status] ? model.status : 'mixed';
+  // `Object.hasOwn`, not a truthiness test on the lookup: a bare `STATUS_MODIFIERS[x]`
+  // reaches the PROTOTYPE, so a status of `constructor` reads as truthy `Object` and that
+  // function then interpolates into a class name. Only ever theoretical — `rollUpStatus`
+  // returns three tokens — but the frozen map is the whole vocabulary, so asking it what
+  // it OWNS is also the more direct question.
+  const status = Object.hasOwn(STATUS_MODIFIERS, model.status) ? model.status : 'mixed';
   const title = loc(BULK_SALVAGE_CHAT_KEYS[status]);
 
   const actorNames = (model.actorNames || []).filter(Boolean);
