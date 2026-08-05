@@ -942,11 +942,18 @@ test('routed: task.dcOverride shifts the base DC for the formula tier match', as
   }
 });
 
-test('routed: a winning tier whose name matches no result group awards nothing without crashing', async () => {
+test('routed: a winning tier whose name matches no result group is blocked, without crashing', async () => {
   const calls = {};
   // Roll 18 vs dc 15 wins the success tier "Iron" (delta 0 → threshold 15), but the
   // task has no result group named "Iron" — so nothing routes and the attempt
   // resolves safely (no provider call, no result items, no throw).
+  //
+  // This test previously pinned `accepted: true` — it was a CRASH-SAFETY test, as its
+  // name said, and the empty success it documented was the routed twin of the d100 miss
+  // in issue 1027: node and stamina spent, nothing awarded, nobody told. Since gathering
+  // routes by NAME, a tier rename on the system silently unroutes every task, so this is
+  // a content bug rather than a legitimate outcome and is now reported as such. The
+  // no-throw guarantee the test was written for is unchanged and still asserted.
   const task = routedTask({
     failureOutcome: { mode: 'text', text: 'No useful finds.' },
     resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
@@ -969,7 +976,8 @@ test('routed: a winning tier whose name matches no result group awards nothing w
 
     const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
 
-    assert.equal(result.accepted, true);
+    assert.equal(result.accepted, false, 'an unroutable success tier is a misconfiguration');
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
     assert.deepEqual(calls.createResults, []);
   } finally {
     delete globalThis.Roll;
@@ -1091,8 +1099,10 @@ test('_resolveRoutedFormulaOutcome: a matched failure tier resolves to a termina
   }
 });
 
-test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group succeeds but awards nothing', async () => {
-  // Tier 'Iron' wins but the only result group is named 'Copper'.
+test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group is MISCONFIGURED', async () => {
+  // Tier 'Iron' wins but the only result group is named 'Copper'. This previously
+  // asserted `succeeded` with an empty result set — the routed twin of the d100 miss in
+  // issue 1027, except that here nothing rolled badly: the content is simply unrouted.
   const task = routedTask({
     resultGroups: [{ id: 'group-copper', name: 'Copper', results: [{ id: 'result-a', componentId: 'comp-a', quantity: 1 }] }]
   });
@@ -1106,8 +1116,10 @@ test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group
       actor,
       task
     });
-    assert.equal(outcome.status, 'succeeded');
+    assert.equal(outcome.status, 'misconfigured');
+    assert.equal(outcome.code, 'ROUTED_TIER_UNROUTED');
     assert.deepEqual(outcome.resultGroups, []);
+    // The roll is still reported, so the GM can see which tier failed to route.
     assert.equal(outcome.checkResult.outcome, 'Iron');
   } finally {
     delete globalThis.Roll;
@@ -1247,6 +1259,96 @@ test('immediate interactive cancel (progressive): dismissing the roll dialog abo
     assertNoTerminalSideEffects(calls);
   } finally {
     restoreFoundry();
+    delete globalThis.Roll;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// A routed SUCCESS tier that matches no result group.
+//
+// Gathering routes by NAME, so this is not only an authoring omission: renaming a
+// tier on the system silently unroutes every task whose groups were named for the old
+// tier. It used to report `succeeded` with an empty result set — spending the node and
+// the stamina, awarding nothing, and telling nobody.
+// ---------------------------------------------------------------------------
+
+test('a routed success tier with NO matching result group is blocked, not a silent empty success', async () => {
+  const calls = {};
+  // The system's success tier is 'Iron'; the task's only group is named 'Copper', so
+  // the tier routes nowhere.
+  const task = routedTask({
+    resultGroups: [
+      { id: 'group-copper', name: 'Copper', results: [{ id: 'r', componentId: 'comp-a', quantity: 1 }] }
+    ]
+  });
+  routedRoll(true);
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: routedSystemCheck({ tierName: 'Iron' }),
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, false, 'the attempt is blocked, not accepted as a success');
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('an unrouted success tier consumes nothing — no run, no results, no tools', async () => {
+  const calls = {};
+  const task = routedTask({
+    toolIds: ['tool-pick'],
+    resultGroups: [
+      { id: 'group-copper', name: 'Copper', results: [{ id: 'r', componentId: 'comp-a', quantity: 1 }] }
+    ]
+  });
+  routedRoll(true);
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: routedSystemCheck({ tierName: 'Iron' }),
+      libraryTools: [{ id: 'tool-pick', componentId: 'pick' }],
+      calls
+    });
+
+    await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    // The block lands before createTerminalRun and before the rich commit, so the
+    // player can retry once the GM fixes the routing.
+    assert.equal(calls.createTerminalRun.length, 0, 'no terminal run is written');
+    assert.equal(calls.createResults.length, 0, 'nothing is awarded');
+    assert.equal(calls.applyTools.length, 0, 'no tool wear is applied');
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('a tier whose group EXISTS but is empty still succeeds — deliberate no-award authoring', async () => {
+  const calls = {};
+  // Named for the tier, but holding no results: the GM's way of saying "this tier
+  // succeeds and awards nothing". It matches by name, so it must NOT be treated as a
+  // misconfiguration — it renders the explicit nothing-found card instead.
+  const task = routedTask({
+    resultGroups: [{ id: 'group-iron', name: 'Iron', results: [] }]
+  });
+  routedRoll(true);
+  try {
+    const engine = makeEngine({
+      task,
+      gatheringCraftingCheck: routedSystemCheck({ tierName: 'Iron' }),
+      calls
+    });
+
+    const result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    assert.equal(result.accepted, true, 'an explicitly empty group is legal authoring');
+    assert.equal(result.state, 'succeeded');
+    assert.deepEqual(result.createdResults, [], 'and it awards nothing');
+  } finally {
     delete globalThis.Roll;
   }
 });
