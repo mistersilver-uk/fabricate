@@ -320,9 +320,14 @@ An `EssenceDefinition.propertyMacroUuid` names a script Macro run against the it
    Returns are applied per macro, in loop order, immediately after that macro returns — never merged into one map first, because a subtree return and a leaf return are not order-equivalent under a merge.
    Two essences writing one path is supported, resolves last-writer-wins, and is not an error.
 7. Each macro is isolated: a throw fails that essence only, and every later macro still runs and still applies.
-   A `propertyMacroUuid` that does not resolve to a Macro carrying a string command is logged and skipped SILENTLY, without a user-facing notification, because a per-essence-per-result notification would report a GM-side authoring defect on the crafting player's screen on every craft in the system.
+   Isolation covers APPLYING a macro's return as well as running its body, because writing a returned path can itself throw when an intermediate segment of that path is `null` or a primitive — shapes that are ordinary in real item data — and the macro loop runs after ingredient consumption, currency deduction and tool wear, so an escaping throw would destroy the inputs and produce no result item at all.
+   A path that cannot be written is logged and skips the remaining paths of THAT macro only, without a user-facing notification.
+   A `propertyMacroUuid` that does not resolve to a `script` Macro carrying a string command is likewise logged and skipped SILENTLY, because a per-essence-per-result notification would report a GM-side authoring defect on the crafting player's screen on every craft in the system.
+   Only a macro BODY throw raises a user-facing notification.
+   The `script` type is checked at craft time and not only where the macro is linked: `command` is a required string on chat macros too and the Macro type defaults to `chat`, so a chat macro whose command is not valid JavaScript would otherwise be compiled and throw, and imported systems and hand-edited settings never pass through the editor's drop handler at all.
 8. A result that ANY macro — essence or result — mutated must never merge into an existing stack, because stacking discards the mutated item data wholesale.
    The stacking veto is the OR across every macro that applied at least one path.
+   A macro that applied some of its paths before one of them failed to write counts as having applied, because the item data really was mutated.
 9. Essence property macros also run for SALVAGE awards, live, with the salvaged component's own essences as the contributing set, consistent with effect transfer already running at that seam.
    Salvage never transfers effects (its synthetic recipe view sets `transferEffects: false`), so the macro half is the only essence-carried behaviour reachable there.
 10. A time-gated craft evaluates the disabled-essence gate from the enabled-ness snapshot taken at START (see `data-models/spec.md` *CraftingRunStep*), never from the live definitions.

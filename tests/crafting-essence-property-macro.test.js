@@ -37,6 +37,34 @@ import {
 const SYSTEM_ID = 'sys-1036';
 const INGOT = { id: 'ingot', name: 'Iron Ingot' };
 
+/**
+ * The same component, but with a REGISTERED source item — so `itemData` is
+ * `sourceItem.toObject()` rather than the synthesized `{ system: {} }` fallback, which is
+ * the only shape in which the apply loop's throw is reachable.
+ */
+const LOOT_INGOT = { ...INGOT, registeredItemUuid: 'Item.ingot-source' };
+
+/**
+ * A source item carrying the ORDINARY dnd5e loot shape: `system.container` is `null` and
+ * `system.quantity` is an integer. `foundry.utils.setProperty` vivifies an intermediate
+ * only when it is `=== undefined`, so it traverses INTO the `null` and assigns ONTO the
+ * integer, and both throw in strict mode from inside core. Neither is exotic data — this
+ * is what a plain dnd5e loot item serializes to.
+ */
+function makeLootSourceItem() {
+  return {
+    uuid: LOOT_INGOT.registeredItemUuid,
+    toObject: () => ({
+      name: INGOT.name,
+      img: 'icons/svg/item-bag.svg',
+      type: 'loot',
+      system: { container: null, quantity: 1 },
+      effects: [],
+      flags: {},
+    }),
+  };
+}
+
 const notifications = installEngineGlobals();
 
 function makeEngine() {
@@ -48,10 +76,10 @@ function makeEngine() {
  * component present so `_createSingleResult` resolves a managed component (the
  * precondition for stacking to be considered at all).
  */
-function makeSystem({ essenceDefinitions, features = {} }) {
+function makeSystem({ essenceDefinitions, features = {}, components = [INGOT] }) {
   return {
     id: SYSTEM_ID,
-    components: [INGOT],
+    components,
     essenceDefinitions,
     features: { essences: true, propertyMacros: true, ...features },
   };
@@ -199,6 +227,170 @@ test('1036/6: a throwing essence macro fails only that essence; every later macr
     'water',
     'the macro AFTER the throwing one still ran and still applied'
   );
+});
+
+// ---------------------------------------------------------------------------------------
+// Applying a return can throw too — and the apply loop runs AFTER consumption.
+//
+// `foundry.utils.setProperty` vivifies an intermediate only on `=== undefined`, so a
+// `null` intermediate is traversed into and a primitive one is assigned onto; both throw
+// in strict mode from inside core. `itemData` is `sourceItem.toObject()`, where both are
+// ordinary. Unguarded, that throw escapes `_runEssencePropertyMacros` ->
+// `_createSingleResult` -> `_createResultItems`, and `craft()` wraps none of them — its
+// only `try` blocks are around consumption — so the craft ends with the ingredients gone,
+// no result item, and the recipe's own result macro never run.
+//
+// `tests/helpers/essenceFixtures.js` transcribes the real helper for exactly this reason:
+// a stub that vivified on `== null` made this whole class of defect untestable.
+// ---------------------------------------------------------------------------------------
+
+test('1036/6: a macro returning an UNWRITABLE path fails only that essence; the craft still produces its result', async () => {
+  const system = makeSystem({
+    components: [LOOT_INGOT],
+    essenceDefinitions: [
+      makeEssence({ id: 'fire', name: 'Fire', propertyMacroUuid: 'Macro.badpath' }),
+      makeEssence({ id: 'water', propertyMacroUuid: 'Macro.water' }),
+    ],
+  });
+  publishSystem(system, {
+    [LOOT_INGOT.registeredItemUuid]: makeLootSourceItem(),
+    // `system.container` is `null`, so core traverses into it and throws.
+    'Macro.badpath': makeScriptMacro('return { "system.container.tier": 3 };'),
+    'Macro.water': makeScriptMacro('return { "system.school": "water" };'),
+  });
+
+  const before = notifications.errors.length;
+  const actor = makeCapturingActor();
+  const engine = makeEngine();
+
+  await award(engine, actor, { precomputedEssences: { fire: 1, water: 1 } });
+
+  assert.equal(actor.captured.length, 1, 'the craft still produced its result item');
+  assert.equal(
+    actor.captured[0].system.school,
+    'water',
+    'the essence AFTER the failing one still ran and still applied'
+  );
+  assert.equal(
+    actor.captured[0].system.container,
+    null,
+    'the unwritable path left the item data untouched'
+  );
+  assert.equal(
+    notifications.errors.length,
+    before,
+    'a bad returned PATH is a GM-side authoring defect: logged, never toasted at the player'
+  );
+});
+
+test('1036/8: a PARTIALLY applied essence macro still vetoes stacking', async () => {
+  // Object key order is insertion order, so `system.school` lands and then
+  // `system.quantity.value` throws — core cannot create a property on the integer `1`.
+  // The item data really was mutated, so `hasPropertyUpdates` must be true: stacking
+  // DISCARDS `itemData` wholesale, which would silently erase the applied path.
+  const system = makeSystem({
+    components: [LOOT_INGOT],
+    essenceDefinitions: [makeEssence({ id: 'fire', propertyMacroUuid: 'Macro.partial' })],
+  });
+  publishSystem(system, {
+    [LOOT_INGOT.registeredItemUuid]: makeLootSourceItem(),
+    'Macro.partial': makeScriptMacro(
+      'return { "system.school": "fire", "system.quantity.value": 9 };'
+    ),
+  });
+
+  const owned = makeOwnedStack(INGOT.name, 3);
+  const actor = makeCapturingActor([owned]);
+  const engine = makeEngine();
+
+  await award(engine, actor, { precomputedEssences: { fire: 1 } });
+
+  assert.equal(owned.updates.length, 0, 'the existing plain stack was NOT incremented');
+  assert.equal(actor.captured.length, 1, 'a distinct item was created instead');
+  assert.equal(
+    actor.captured[0].system.school,
+    'fire',
+    'the path that DID apply survived onto the created item'
+  );
+});
+
+test('1036: a CHAT macro is skipped silently rather than compiled as JavaScript', async () => {
+  // `command` is a required string on BOTH Macro types and `type` defaults to `chat`
+  // (Foundry 14.361 `common/documents/macro.mjs`), so `typeof command === 'string'` is not
+  // a script test. Compiling `/roll 1d20` as JS is a SyntaxError, which the macro-body
+  // catch turns into one `ui.notifications.error` per essence, per result, on every craft.
+  const system = makeSystem({
+    essenceDefinitions: [makeEssence({ id: 'fire', propertyMacroUuid: 'Macro.chat' })],
+  });
+  publishSystem(system, { 'Macro.chat': { type: 'chat', command: '/roll 1d20' } });
+
+  const before = notifications.errors.length;
+  const owned = makeOwnedStack(INGOT.name, 1);
+  const actor = makeCapturingActor([owned]);
+  const engine = makeEngine();
+
+  await award(engine, actor, { precomputedEssences: { fire: 1 } });
+
+  assert.equal(
+    notifications.errors.length,
+    before,
+    'no ui.notifications.error reached the crafting player'
+  );
+  assert.equal(owned.system.quantity, 2, 'nothing applied, so the plain result still stacks');
+});
+
+test('1036: no essence context is built when no runnable essence carries a macro', async () => {
+  // `_buildEssenceContext` re-runs `resolveItemEssences` over every consumed item. A
+  // system that enabled `propertyMacros` for a single RECIPE-level macro would otherwise
+  // pay that on every craft AND salvage result for a loop that finds nothing to run.
+  const system = makeSystem({
+    essenceDefinitions: [
+      makeEssence({ id: 'fire', propertyMacroUuid: null }),
+      // Carries a macro but is DISABLED, so it is not runnable either.
+      makeEssence({ id: 'water', enabled: false, propertyMacroUuid: 'Macro.water' }),
+    ],
+  });
+  publishSystem(system, {
+    'Macro.water': makeScriptMacro('return { "system.school": "water" };'),
+  });
+
+  const actor = makeCapturingActor();
+  const engine = makeEngine();
+  let contextBuilds = 0;
+  const buildEssenceContext = engine._buildEssenceContext.bind(engine);
+  engine._buildEssenceContext = (...args) => {
+    contextBuilds += 1;
+    return buildEssenceContext(...args);
+  };
+
+  await award(engine, actor, { precomputedEssences: { fire: 1, water: 1 } });
+
+  assert.equal(contextBuilds, 0, 'the essence loop short-circuited before resolving anything');
+  assert.equal(actor.captured.length, 1, 'the craft still awarded its result');
+});
+
+test('1036: the essence context IS built when a runnable essence carries a macro', async () => {
+  // The negative control for the short-circuit above: same harness, one runnable macro.
+  const system = makeSystem({
+    essenceDefinitions: [makeEssence({ id: 'fire', propertyMacroUuid: 'Macro.fire' })],
+  });
+  publishSystem(system, {
+    'Macro.fire': makeScriptMacro('return { "system.school": "fire" };'),
+  });
+
+  const actor = makeCapturingActor();
+  const engine = makeEngine();
+  let contextBuilds = 0;
+  const buildEssenceContext = engine._buildEssenceContext.bind(engine);
+  engine._buildEssenceContext = (...args) => {
+    contextBuilds += 1;
+    return buildEssenceContext(...args);
+  };
+
+  await award(engine, actor, { precomputedEssences: { fire: 1 } });
+
+  assert.equal(contextBuilds, 1, 'the short-circuit above was not passing vacuously');
+  assert.equal(actor.captured[0].system.school, 'fire');
 });
 
 test('1036/6: no essence macro runs when features.propertyMacros is off', async () => {

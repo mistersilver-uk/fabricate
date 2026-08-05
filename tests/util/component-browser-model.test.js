@@ -268,6 +268,21 @@ describe('component browser model (issue 676)', () => {
     assert.equal(page.pageCount, 1);
   });
 
+  // Issue 1036 review: `paginateComponents` now delegates to the shared `paginateRows`,
+  // and the one input class no pinned test covered was a `pageSize` that is falsy but
+  // NUMERIC. `Number(0)` and `Number(null)` are both finite, so neither reaches the
+  // default — they reach `Math.max(1, 0)` and clamp to a one-row page. Unreachable
+  // through `Pagination.svelte`'s `next > 0` guard, but it is what makes the extraction
+  // self-evidently neutral rather than neutral-by-argument.
+  it('clamps a zero or null pageSize to one row per page rather than defaulting', () => {
+    for (const pageSize of [0, null]) {
+      const page = paginateComponents(ROWS, { pageIndex: 0, pageSize });
+      assert.deepEqual(names(page.components), ['Iron Ore'], `pageSize ${pageSize} yields ONE row`);
+      assert.equal(page.pageCount, ROWS.length, `pageSize ${pageSize} yields one page per row`);
+      assert.deepEqual([page.rangeStart, page.rangeEnd], [1, 1]);
+    }
+  });
+
   it('tolerates junk input throughout', () => {
     assert.deepEqual(filterComponents(null, {}), []);
     assert.deepEqual(sortComponents(null, {}), []);

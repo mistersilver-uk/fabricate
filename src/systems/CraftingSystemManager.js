@@ -5424,7 +5424,13 @@ export class CraftingSystemManager {
    * @param {Iterable<string>} essenceIds ids of the essences to mutate. A foreign or
    *   dangling id is simply absent from the resolved cohort rather than an error.
    * @param {{icon?: string, colorToken?: ?string, enabled?: boolean}} [edit]
-   * @returns {Promise<{updated: number, essenceIds: string[]}>} the ids actually changed.
+   * @returns {Promise<{updated: number, essenceIds: string[]}>} the ids the edit was
+   *   APPLIED TO — the resolved cohort, not a diff. An essence already carrying the staged
+   *   value is rewritten to it and still counted, so `updated` is a selection size: a
+   *   re-apply of the same colour to three essences reports "3". The return feeds the
+   *   post-apply summary count only, so no caller depends on the stronger reading, and a
+   *   diff here would have to reproduce the normalization the map below performs (the
+   *   `enabled` write alone rewrites a legacy `undefined` to `true`).
    * @throws {Error} when the system does not resolve, or when the resulting system would
    *   carry an alchemy signature collision.
    */

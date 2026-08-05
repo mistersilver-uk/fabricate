@@ -42,14 +42,50 @@ function getProperty(object, path) {
     .reduce((value, key) => (value == null ? undefined : value[key]), object);
 }
 
+const SKIPPED_PROPERTIES = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * `foundry.utils.setProperty`, transcribed from the REAL helper
+ * (`common/utils/helpers.mjs`) rather than approximated, because its edge semantics are
+ * the whole point of the essence apply loop's guard.
+ *
+ * Three of them are load-bearing and an approximation gets each of them wrong:
+ *
+ *  1. **It vivifies on `=== undefined`, NOT on `== null`.** A `null` intermediate is
+ *     traversed INTO and a primitive intermediate is assigned ONTO, and both throw in
+ *     strict mode. `itemData` is `sourceItem.toObject()`, where both are ordinary — dnd5e
+ *     loot carries `system.container: null` and an integer `system.quantity` — so a macro
+ *     returning `system.container.tier` throws. A `== null` stub silently substitutes `{}`
+ *     and keeps going, which makes that entire defect class untestable.
+ *  2. **It refuses `__proto__`, `constructor` and `prototype`** — as the whole key and as
+ *     any dotted part — and returns `false` without writing.
+ *  3. **It returns whether the value actually CHANGED**, not whether it was written.
+ *
+ * @param {object} object
+ * @param {string} path
+ * @param {*} value
+ * @returns {boolean} whether the value changed from its previous value.
+ */
 function setProperty(object, path, value) {
-  const parts = String(path).split('.');
-  let current = object;
-  for (let index = 0; index < parts.length - 1; index += 1) {
-    if (current[parts[index]] == null) current[parts[index]] = {};
-    current = current[parts[index]];
+  if (!path || SKIPPED_PROPERTIES.has(path)) return false;
+
+  let target = object;
+  let key = String(path);
+  if (key.includes('.')) {
+    const parts = key.split('.');
+    if (parts.some((part) => SKIPPED_PROPERTIES.has(part))) return false;
+    key = parts.pop();
+    target = parts.reduce((node, part) => {
+      if (node[part] === undefined) node[part] = {};
+      return node[part];
+    }, object);
   }
-  current[parts.at(-1)] = value;
+
+  if (target[key] !== value) {
+    target[key] = value;
+    return true;
+  }
+  return false;
 }
 
 /**

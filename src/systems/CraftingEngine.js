@@ -3642,6 +3642,13 @@ export class CraftingEngine {
    * re-runs `resolveItemEssences` over every consumed item, so a per-essence call would
    * rebuild the identical context N+1 times per result on the synchronous craft path.
    *
+   * For the same reason the "does any runnable essence even carry a macro" test is hoisted
+   * ABOVE `_buildEssenceContext`. Only the contributing-set filter needs the context, and a
+   * system that turned `propertyMacros` on for a single RECIPE-level macro would otherwise
+   * pay a full `resolveItemEssences` re-resolution on every craft AND salvage result for a
+   * loop that then finds nothing to run. `_runPropertyMacro` already short-circuits the
+   * same way on its own `if (!macroUuid) return null`.
+   *
    * @param {object} itemData the crafted item data, mutated in place.
    * @returns {Promise<boolean>} whether ANY essence macro applied at least one path — the
    *   essence half of `_createSingleResult`'s `hasPropertyUpdates` stacking veto.
@@ -3669,6 +3676,14 @@ export class CraftingEngine {
     const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
     if (definitions.length === 0) return false;
 
+    // Everything this predicate reads is on the definition itself, so it is decidable
+    // BEFORE the essence context exists. Only the contributing-set membership below is not.
+    const carriesRunnableMacro = (definition) =>
+      typeof definition?.propertyMacroUuid === 'string' &&
+      definition.propertyMacroUuid !== '' &&
+      this._essenceCarriesBehaviour(definition, definition.id, essenceEnabled);
+    if (!definitions.some(carriesRunnableMacro)) return false;
+
     const { resolvedEssences, essenceSources } = this._buildEssenceContext(
       consumedItems,
       recipe,
@@ -3677,10 +3692,7 @@ export class CraftingEngine {
     );
     const runnable = definitions.filter(
       (definition) =>
-        typeof definition?.propertyMacroUuid === 'string' &&
-        definition.propertyMacroUuid &&
-        Object.hasOwn(resolvedEssences, definition.id) &&
-        this._essenceCarriesBehaviour(definition, definition.id, essenceEnabled)
+        carriesRunnableMacro(definition) && Object.hasOwn(resolvedEssences, definition.id)
     );
     if (runnable.length === 0) return false;
 
@@ -3718,10 +3730,60 @@ export class CraftingEngine {
         essenceQuantity: resolvedEssences[definition.id],
       });
       if (!updates) continue;
+      if (this._applyEssencePropertyUpdates(itemData, updates, definition)) applied = true;
+    }
+    return applied;
+  }
+
+  /**
+   * Apply ONE macro's flat path -> value map to the crafted item data, isolating a
+   * failure to that essence.
+   *
+   * **This guard is not defensive padding: without it a craft aborts AFTER consumption.**
+   * `foundry.utils.setProperty` vivifies an intermediate only when it is `=== undefined`,
+   * so a `null` intermediate is traversed INTO and a primitive intermediate is assigned
+   * ONTO — both throw, in strict mode, from inside core. `itemData` is
+   * `sourceItem.toObject()`, where both shapes are ordinary rather than exotic: dnd5e loot
+   * carries `system.container: null` and an integer `system.quantity`. So a macro
+   * returning `system.container.tier` throws here, not in the macro body, and this loop
+   * sits outside `_runOneEssencePropertyMacro`'s try. `craft()` has no try around
+   * `_createResultItems`, and ingredients, currency and tool wear are already spent by
+   * then, so the unguarded outcome is: inputs consumed, NO result item, and the recipe's
+   * own result macro never runs either.
+   *
+   * TWO deliberate choices, both pinned by tests:
+   *
+   *  1. **Logged, not toasted.** A path core refuses to write is a bad macro RETURN, which
+   *     the same design already warns about silently (a non-object return), and it is a
+   *     GM-side authoring defect that would otherwise raise one notification per essence
+   *     per result on the crafting PLAYER's screen on every craft in the system. That is
+   *     the exact harm `_runOneEssencePropertyMacro`'s silent-skip branch exists to
+   *     prevent. A macro BODY throw keeps its `ui.notifications.error` — this does not
+   *     widen that catch.
+   *  2. **A partial application still counts as applied.** When three paths land and the
+   *     fourth throws, `itemData` really was mutated, so the stacking veto must fire:
+   *     `createOrStackComponentItem` discards `itemData` wholesale when it stacks, and a
+   *     `false` here would silently merge those three mutations away. The remaining paths
+   *     of THAT essence are skipped; every later essence still runs and still applies.
+   *
+   * @param {object} itemData mutated in place.
+   * @param {object} updates the macro's flat path -> value map.
+   * @param {object} definition the essence whose macro produced `updates`.
+   * @returns {boolean} whether at least one path was applied.
+   * @private
+   */
+  _applyEssencePropertyUpdates(itemData, updates, definition) {
+    let applied = false;
+    try {
       for (const [path, value] of Object.entries(updates)) {
         foundry.utils.setProperty(itemData, path, value);
         applied = true;
       }
+    } catch (error) {
+      console.error(
+        `Fabricate | Essence "${definition?.name || definition?.id}" property macro returned a path that could not be applied; the remaining paths of that essence were skipped (${definition?.propertyMacroUuid})`,
+        error
+      );
     }
     return applied;
   }
@@ -3729,12 +3791,33 @@ export class CraftingEngine {
   /**
    * Run ONE essence property macro and return its flat path -> value map, or `null`.
    *
-   * An UNRESOLVABLE `propertyMacroUuid` — one that does not resolve to a Macro carrying a
-   * string `command` — is logged and skipped SILENTLY. It deliberately does NOT raise
-   * `ui.notifications.error`: the result-macro precedent fires one toast per recipe, while
-   * this would fire one per essence per result, on every craft in the system, on the
+   * An UNRESOLVABLE `propertyMacroUuid` — one that does not resolve to a `script` Macro
+   * carrying a string `command` — is logged and skipped SILENTLY. It deliberately does NOT
+   * raise `ui.notifications.error`: the result-macro precedent fires one toast per recipe,
+   * while this would fire one per essence per result, on every craft in the system, on the
    * crafting PLAYER's screen, for a GM-side authoring defect only the GM can fix. The
    * editor's drop handler and the Validation tab are where that defect is surfaced.
+   *
+   * **`type === 'script'` is checked here and not left to the drop handler.** `command` is
+   * a required `StringField` on BOTH Macro types and `type` DEFAULTS to `chat`, so
+   * `typeof macro.command === 'string'` is not a script test — a chat macro passes it, and
+   * `MacroExecutor.run` then compiles its command as JavaScript, where `/roll 1d20` is a
+   * `SyntaxError` that reaches the catch below and toasts once per essence per result. A
+   * drop-handler check guards only NEWLY AUTHORED values; an imported system, a hand-edited
+   * world setting, or a macro whose type the GM changes after linking all arrive here
+   * unguarded, and `_normalizeEssencePropertyMacroUuid` is deliberately a shape check that
+   * cannot see the document. The two checks are complementary, not redundant. The literal
+   * matches `CONST.MACRO_TYPES.SCRIPT`; the codebase reads the literal rather than the
+   * global (see `SvelteCraftingSystemManagerApp.svelte.js`'s macro picker filter).
+   *
+   * The uuid is resolved here AND again inside `MacroExecutor.run`. That double resolve is
+   * DELIBERATE, not an oversight to optimise away: `MacroExecutor.run` THROWS for an
+   * unresolvable uuid, and a throw is what raises the player-facing toast, so the only way
+   * to distinguish "the GM's link is broken" (silent) from "the macro itself blew up"
+   * (toast) is to settle the first question before entering the try. Collapsing the two
+   * resolutions re-introduces exactly the notification this design exists to prevent. Both
+   * hit `fromUuid`'s already-loaded collections for a world macro; a compendium macro costs
+   * one extra cached `database.get`.
    *
    * Return handling matches the result macro exactly: `null`/`undefined` is a no-op, and a
    * non-object or Array return is warned about and ignored.
@@ -3752,9 +3835,9 @@ export class CraftingEngine {
     } catch {
       macro = null;
     }
-    if (!macro || typeof macro.command !== 'string') {
+    if (!macro || macro.type !== 'script' || typeof macro.command !== 'string') {
       console.warn(
-        `Fabricate | Essence "${definition.name || definition.id}" property macro could not be resolved and was skipped (${macroUuid})`
+        `Fabricate | Essence "${definition.name || definition.id}" property macro could not be resolved to a script macro and was skipped (${macroUuid})`
       );
       return null;
     }
