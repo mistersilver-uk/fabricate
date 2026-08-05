@@ -20,9 +20,8 @@
 
 import { hasUnresolvedDirectives } from '../utils/plainTextDescription.js';
 
-// Matches FABRICATE_SETTINGS_NAMESPACE in settings.js; hardcoded to avoid a settings
-// ↔ repair import cycle (this module registers a menu into that settings namespace).
-const NAMESPACE = 'fabricate';
+import { registerDialogSettingsMenu } from './settingsMenu.js';
+
 const REPAIR_MENU_KEY = 'repairItemData';
 
 function localize(key, data = null) {
@@ -196,29 +195,19 @@ export function notifyUnresolvedItemDescriptions() {
  * Register the "Repair Item Data" button into Fabricate's module settings
  * (the same panel as the theme selector). No-op when Foundry's settings/menu API is
  * unavailable (e.g. under the test harness).
+ *
+ * The registration shell lives in `settingsMenu.js` and is shared with the
+ * player-character actor-types picker (issue 1024). The explicit `id` preserves this
+ * menu's original DOM id, which predates the shared default.
  */
 export function registerRepairItemDataMenu() {
-  const ApplicationV2 = globalThis.foundry?.applications?.api?.ApplicationV2;
-  if (!ApplicationV2 || typeof globalThis.game?.settings?.registerMenu !== 'function') return;
-
-  // Defined lazily so `extends ApplicationV2` only evaluates when Foundry is present.
-  // Overriding render() turns the menu button into a direct action (open the confirm
-  // dialog) rather than opening a window.
-  class RepairItemDataMenu extends ApplicationV2 {
-    static DEFAULT_OPTIONS = { id: 'fabricate-repair-item-data' };
-
-    async render() {
-      await openRepairItemDataDialog();
-      return this;
-    }
-  }
-
-  globalThis.game.settings.registerMenu(NAMESPACE, REPAIR_MENU_KEY, {
+  return registerDialogSettingsMenu({
+    key: REPAIR_MENU_KEY,
+    id: 'fabricate-repair-item-data',
     name: 'FABRICATE.Settings.RepairItemData.Name',
     label: 'FABRICATE.Settings.RepairItemData.Label',
     hint: 'FABRICATE.Settings.RepairItemData.Hint',
     icon: 'fas fa-wrench',
-    type: RepairItemDataMenu,
-    restricted: true,
+    open: () => openRepairItemDataDialog(),
   });
 }
