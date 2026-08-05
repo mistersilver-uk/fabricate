@@ -3473,15 +3473,25 @@ export class GatheringEngine {
 
       const components = normalizeList(createdResults).map((entry) => {
         const itemUuid = stringOrNull(entry?.itemUuid);
-        const componentId = stringOrNull(itemsByUuid.get(itemUuid)?.componentId);
+        // Prefer the identity the award itself carries. Falling back to the
+        // uuid→componentId join alone left component-sourced awards (which have no uuid
+        // before their document exists) with nothing to look up, so they rendered as a
+        // bare uuid or an empty name.
+        const componentId =
+          stringOrNull(entry?.componentId) || stringOrNull(itemsByUuid.get(itemUuid)?.componentId);
         const component = componentId ? componentsById.get(componentId) : null;
         const resolvedDoc = component ? null : resolveItemDoc(itemUuid);
         return {
           name:
-            stringOrEmpty(component?.name) || stringOrEmpty(resolvedDoc?.name) || itemUuid || '',
+            stringOrEmpty(component?.name) ||
+            stringOrEmpty(resolvedDoc?.name) ||
+            stringOrEmpty(entry?.name) ||
+            itemUuid ||
+            '',
           img:
             stringOrNull(component?.img) ||
             stringOrNull(resolvedDoc?.img) ||
+            stringOrNull(entry?.img) ||
             'icons/svg/item-bag.svg',
           quantity: Number(entry?.quantity) || 1,
         };
@@ -4330,28 +4340,39 @@ function hasRichGatheringData(environment, task) {
 }
 
 function normalizeRunItems(items, { actor = null } = {}) {
-  return normalizeList(items)
-    .filter((item) => item && typeof item === 'object')
-    .map((item) => {
-      const source = item.item && typeof item.item === 'object' ? item.item : item;
-      const actorUuid =
-        stringOrNull(item.actorUuid) || stringOrNull(item.actor?.uuid) || stringOrNull(actor?.uuid);
-      const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
-      const quantity = Number(item.quantity ?? source.system?.quantity ?? 1);
-      const entry = {
-        actorUuid,
-        itemUuid,
-        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-      };
-      // Carry name/img (when known) so the run journal can list the gathered items,
-      // not just a count — the awarded item document is in hand here.
-      const name = stringOrNull(item.name) || stringOrNull(source.name);
-      const img = stringOrNull(item.img) || stringOrNull(source.img);
-      if (name) entry.name = name;
-      if (img) entry.img = img;
-      return entry;
-    })
-    .filter((item) => item.actorUuid && item.itemUuid);
+  return (
+    normalizeList(items)
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const source = item.item && typeof item.item === 'object' ? item.item : item;
+        const actorUuid =
+          stringOrNull(item.actorUuid) ||
+          stringOrNull(item.actor?.uuid) ||
+          stringOrNull(actor?.uuid);
+        const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
+        const componentId = stringOrNull(item.componentId);
+        const quantity = Number(item.quantity ?? source.system?.quantity ?? 1);
+        const entry = {
+          actorUuid,
+          itemUuid,
+          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+        };
+        if (componentId) entry.componentId = componentId;
+        // Carry name/img (when known) so the run journal can list the gathered items,
+        // not just a count — the awarded item document is in hand here.
+        const name = stringOrNull(item.name) || stringOrNull(source.name);
+        const img = stringOrNull(item.img) || stringOrNull(source.img);
+        if (name) entry.name = name;
+        if (img) entry.img = img;
+        return entry;
+      })
+      // A ref needs SOME identity, but not necessarily a uuid. Planned awards are built
+      // before their documents exist, so a result resolving to a bare component has no
+      // uuid yet and a uuid-only filter discarded it — emptying the chat card and the run
+      // journal for a gather that really did award items. `componentId` is that missing
+      // pre-creation identity.
+      .filter((item) => item.actorUuid && (item.itemUuid || item.componentId))
+  );
 }
 
 function normalizeOutcomeText(value) {
