@@ -16,6 +16,25 @@
  * — same markup, same `fabricate-craft-chat` styles — reading only as a salvage
  * analogue rather than a second, unrelated format (issue 675). Sharing the core
  * this way also keeps the two callers from duplicating the renderer.
+ *
+ * ## The markup ATOMS are exported, not just the card (issue 859)
+ *
+ * `buildResultCard` has ONE `subjectName`, ONE `rollValue` and ONE `status`, so it
+ * cannot express the N subjects a bulk salvage run produces. Rather than let
+ * {@link module:src/systems/BulkSalvageChatCard} re-spell the same `<li>`/`<section>`
+ * shapes — which would drift from the stylesheet the moment either side is edited —
+ * {@link esc}, {@link renderItem}, {@link renderSection}, {@link renderRollTotal} and
+ * {@link tierStepText} are exported so the aggregate card composes the SAME atoms
+ * against the SAME `fabricate-craft-chat` rules. The promotion is purely additive:
+ * every function keeps its body, so the crafting and salvage cards are byte-identical
+ * to what `tests/salvage-chat-card.test.js` already pins.
+ *
+ * {@link tierStepText} is an EXTRACTION rather than a promotion: the bulk card needs
+ * the tier-step SENTENCE inline in a subject row, not the block-level notice
+ * `renderTierStep` wraps it in, and two derivations of one sentence is exactly the
+ * pattern this module exists to avoid. `renderTierStep` now renders what
+ * `tierStepText` returns, and the `null` return preserves its "no note at all" branch
+ * exactly (see that function's contract).
  */
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
@@ -41,7 +60,7 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
 });
 
 /** Escape text destined for HTML so user-authored names cannot inject markup. */
-function esc(value) {
+export function esc(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -53,7 +72,7 @@ function esc(value) {
  * Render one image-backed entry (created result, consumed ingredient, or tool)
  * as a list item. `quantity` is rendered as a `N×` prefix when present and > 1.
  */
-function renderItem({ name, img, quantity }) {
+export function renderItem({ name, img, quantity }) {
   const label = Number(quantity) > 1 ? `${Number(quantity)}× ${esc(name)}` : esc(name);
   return [
     '<li class="fabricate-craft-chat__item">',
@@ -70,7 +89,7 @@ function renderItem({ name, img, quantity }) {
  * printing "0"/"null". The number is set apart from its label so it reads as the
  * roll result, not more subtitle metadata.
  */
-function renderRollTotal(value, label) {
+export function renderRollTotal(value, label) {
   if (!Number.isFinite(value)) return '';
   return [
     '<div class="fabricate-craft-chat__roll">',
@@ -81,37 +100,50 @@ function renderRollTotal(value, label) {
 }
 
 /**
- * Render localized tier-step evidence (issue 975) for a realized tier change, as a
+ * The localized tier-step SENTENCE (issue 975) for a realized tier change, as a
  * three-way dispatch on the resolved NET `mode`. A `target` step is directionless
- * and countless — "you were placed on Masterwork" has no magnitude — so it renders
- * its own key; a relative `up`/`down` step renders the realized magnitude.
+ * and countless — "you were placed on Masterwork" has no magnitude — so it reads its
+ * own key; a relative `up`/`down` step renders the realized magnitude.
  *
- * The `{steps}` placeholder is substituted HERE rather than by the caller: both card
- * modules take `localize` as a key-only `(key) => string` (its default is identity),
- * so it cannot format, and widening that signature would ripple through both modules,
- * their two wrappers and their tests for one string.
+ * The `{steps}` placeholder is substituted HERE rather than by the caller: every card
+ * module takes `localize` as a key-only `(key) => string` (its default is identity),
+ * so it cannot format, and widening that signature would ripple through the modules,
+ * their wrappers and their tests for one string.
+ *
+ * ## `null` means "no note at all", and is NOT the same as an empty sentence
+ *
+ * The two are distinguished so {@link renderTierStep} stays byte-identical to the
+ * pre-extraction version under ANY `localize`: a `target` step renders its wrapper
+ * even when the lookup yields nothing, whereas a malformed relative step renders no
+ * wrapper. Collapsing both onto `''` would silently drop the first case.
+ *
+ * @param {{mode?:'target'|'up'|'down', steps?:number}|null|undefined} tierStep
+ * @param {object} keys Label-key map (e.g. {@link CRAFTING_CHAT_KEYS}).
+ * @param {(key:string)=>string} [localize] Key-only lookup; defaults to identity.
+ * @returns {string|null} The sentence, or `null` when there is no note to render.
  */
-function renderTierStep(tierStep, keys, localize) {
+export function tierStepText(tierStep, keys, localize = (key) => key) {
   const mode = tierStep?.mode;
-  let text;
-  if (mode === 'target') {
-    text = localize(keys.tierStepTarget);
-  } else if (mode === 'up' || mode === 'down') {
-    // Evidence is present only on a REALIZED move, so a relative step always carries a
-    // positive magnitude; anything else is malformed and renders no note at all rather
-    // than a broken "stepped up  tiers" sentence.
-    const steps = Number(tierStep.steps);
-    if (!Number.isFinite(steps) || steps <= 0) return '';
-    const key = mode === 'up' ? keys.tierStepUp : keys.tierStepDown;
-    text = String(localize(key)).replace('{steps}', String(steps));
-  } else {
-    return '';
-  }
+  if (mode === 'target') return localize(keys.tierStepTarget);
+  if (mode !== 'up' && mode !== 'down') return null;
+  // Evidence is present only on a REALIZED move, so a relative step always carries a
+  // positive magnitude; anything else is malformed and reads as no note at all rather
+  // than a broken "stepped up  tiers" sentence.
+  const steps = Number(tierStep.steps);
+  if (!Number.isFinite(steps) || steps <= 0) return null;
+  const key = mode === 'up' ? keys.tierStepUp : keys.tierStepDown;
+  return String(localize(key)).replace('{steps}', String(steps));
+}
+
+/** Render {@link tierStepText} as the card's block-level tier-step notice. */
+function renderTierStep(tierStep, keys, localize) {
+  const text = tierStepText(tierStep, keys, localize);
+  if (text === null) return '';
   return `<div class="fabricate-craft-chat__notice fabricate-craft-chat__tier-step">${esc(text)}</div>`;
 }
 
 /** Render a titled section with an icon grid; returns '' when there are no entries. */
-function renderSection({ heading, entries, modifier }) {
+export function renderSection({ heading, entries, modifier }) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const sectionClass = modifier
     ? `fabricate-craft-chat__section fabricate-craft-chat__section--${modifier}`
