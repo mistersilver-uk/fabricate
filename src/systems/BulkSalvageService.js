@@ -141,6 +141,32 @@ function consumedUnits(result, component, outcome) {
   return Number(component?.salvage?.ingredientQuantity) || 1;
 }
 
+/**
+ * Tell an optional listener that one more target has resolved — and NEVER let that
+ * listener cost the player the rest of the batch.
+ *
+ * A bulk run is mid-flight document mutation: sources have been consumed, results
+ * created and tools broken by the time the first tick fires. So a throw out of a
+ * consumer's callback must not propagate, for the same reason `_runOne` turns a thrown
+ * `salvage()` into an `error` row rather than an abort — reporting is strictly less
+ * important than the twenty-four rows that have not run yet. Notification is FIRE AND
+ * FORGET: the return value is ignored and never awaited, so a listener that returns a
+ * promise cannot pace the loop either.
+ *
+ * @param {Function|null} onProgress The caller's listener, or anything that is not a
+ *   function (including the `null` default), which reports nothing at all.
+ * @param {number} completed Targets resolved so far, 1-based and monotonic.
+ * @param {number} total Targets this run was given.
+ */
+function reportBulkProgress(onProgress, completed, total) {
+  if (typeof onProgress !== 'function') return;
+  try {
+    onProgress(completed, total);
+  } catch (error) {
+    console.error('Fabricate | A bulk salvage progress listener threw; the run continues:', error);
+  }
+}
+
 /** Sum a run record's `consumedComponents`, or `null` when there is no record. */
 function salvageRunConsumed(salvageRun) {
   if (!Array.isArray(salvageRun?.consumedComponents)) return null;
@@ -201,12 +227,17 @@ export class BulkSalvageService {
    *   line up with the queue the player committed.
    * @param {boolean} [params.interactive=true] When true the run opens ONE roll prompt
    *   and applies the player's answer to every roll.
+   * @param {Function} [params.onProgress] Called `(completed, total)` after each target
+   *   resolves — see {@link reportBulkProgress}. OPTIONAL by design: every caller that
+   *   wants no progress simply omits it, and a run without one behaves identically.
+   *   Nothing downstream of the callback is awaited, so a listener can neither pace nor
+   *   stall a loop that is mutating documents.
    * @returns {Promise<{cancelled: boolean, items: object[], counts: object,
    *   posted: boolean}>} Plain models only — NEVER Item documents. A consumed source's
    *   document is already deleted by the time this returns, so handing one back would
    *   hand back a document that no longer exists.
    */
-  async run({ targets = [], interactive = true } = {}) {
+  async run({ targets = [], interactive = true, onProgress = null } = {}) {
     const entries = this._preflight(targets);
     const runnable = entries.filter((entry) => entry.outcome === null);
 
@@ -214,9 +245,20 @@ export class BulkSalvageService {
     if (decision.cancelled)
       return { cancelled: true, items: [], counts: countBy([]), posted: false };
 
-    for (const entry of runnable) {
-      // SEQUENTIAL BY CONTRACT — see the module docblock. Never `Promise.all`.
-      await this._runOne(entry, { interactive, rollDecision: decision.rollDecision });
+    // Progress is reported over EVERY entry, pre-flight skips included, rather than over
+    // `runnable`. The panel marks the rows the player queued, in this same order, so a
+    // counter that silently omitted the skipped ones would mark the wrong rows done and
+    // would stop short of its own total on any run carrying a skip.
+    let completed = 0;
+    for (const entry of entries) {
+      // SEQUENTIAL BY CONTRACT — see the module docblock. Never `Promise.all`. A
+      // pre-flight-classified row never reaches the engine, but it is still one of the
+      // rows being worked through, so it advances the count like any other.
+      if (entry.outcome === null) {
+        await this._runOne(entry, { interactive, rollDecision: decision.rollDecision });
+      }
+      completed += 1;
+      reportBulkProgress(onProgress, completed, entries.length);
     }
 
     const items = entries.map((entry) => entry.item);

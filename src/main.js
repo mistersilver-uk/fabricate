@@ -1948,10 +1948,19 @@ class Fabricate {
    * @param {boolean} [options.interactive] When true the run opens ONE roll prompt and
    *   applies the player's answer to every roll. Defaults true — this facade exists for
    *   a player gesture, unlike the automation-facing {@link Fabricate#salvageComponent}.
+   * @param {Function} [options.onProgress] Called `(completed, total)` after each target
+   *   resolves, so a caller can render determinate progress for a run that is knowable
+   *   precisely because it is sequential. OPTIONAL, and a listener that throws never
+   *   costs the run — see the service's own `reportBulkProgress`.
+   *
+   *   STATED LIMIT: `total` counts the rows the SERVICE was given, which is this call's
+   *   targets MINUS any the gate refused. A run containing a `notPermitted` row
+   *   therefore finishes below the caller's own denominator rather than reporting a
+   *   refusal as work; the caller owns its terminal state either way.
    * @returns {Promise<{cancelled: boolean, items: object[], counts: object,
    *   posted: boolean}>} Plain models only, in the caller's target order.
    */
-  async salvageComponents({ actorId = null, targets = [], interactive = true } = {}) {
+  async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {
     this._requireReady();
     const gated = this._gateBulkTargets(targets, actorId);
     const runnable = gated.filter((entry) => entry.actor);
@@ -1964,7 +1973,8 @@ class Fabricate {
         systemId: target.systemId,
         componentId: target.componentId
       })),
-      interactive
+      interactive,
+      onProgress
     });
     // A dismissed prompt returns before the first engine call, so nothing ran and there
     // is no per-row story to tell — pass the service's zero-mutation shape straight
@@ -2012,9 +2022,12 @@ class Fabricate {
    * @param {string|null} [options.actorId] The run-level actor id.
    * @param {Array<{actorId?: string, systemId: string, componentId: string}>}
    *   [options.targets]
+   * @param {Function} [options.onProgress] Called `(completed, total)` after each target
+   *   is destroyed, under the same optional-and-cannot-break-the-run contract — and the
+   *   same stated limit about refused rows — as {@link Fabricate#salvageComponents}.
    * @returns {Promise<{items: object[], unitsDeleted: number, documentsDeleted: number}>}
    */
-  async destroyComponents({ actorId = null, targets = [] } = {}) {
+  async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
     this._requireReady();
     const gated = this._gateBulkTargets(targets, actorId);
     const runnable = gated.filter((entry) => entry.actor);
@@ -2029,7 +2042,8 @@ class Fabricate {
         actorName: actor.name,
         systemId: target.systemId,
         componentId: target.componentId
-      }))
+      })),
+      onProgress
     });
 
     const items = this._mergeBulkRows(gated, result.items, (target) => ({

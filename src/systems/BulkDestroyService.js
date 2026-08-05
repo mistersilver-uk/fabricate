@@ -85,15 +85,22 @@ export class BulkDestroyService {
    * @param {Array<{actor: object, actorId: string, actorName: string, systemId: string,
    *   componentId: string}>} params.targets Targets carrying an ALREADY-RESOLVED actor
    *   document; the facade owns resolution and the ownership gate.
+   * @param {Function} [params.onProgress] Called `(completed, total)` after each target
+   *   resolves — see {@link reportDestroyProgress}. OPTIONAL: a run without one behaves
+   *   identically, and nothing the listener returns is awaited.
    * @returns {Promise<{items: object[], unitsDeleted: number, documentsDeleted: number}>}
    *   Plain models only — the documents are gone by the time this returns.
    */
-  async run({ targets = [] } = {}) {
+  async run({ targets = [], onProgress = null } = {}) {
     const items = [];
-    for (const target of targets || []) {
+    const queue = targets || [];
+    for (const target of queue) {
       // Sequential for the same reason bulk salvage is: two rows can resolve to the
       // same owned document, and row k+1 must see what row k deleted.
       items.push(await this._destroyOne(target));
+      // Every target ticks, a skip included: `_destroyOne` resolves each one, and the
+      // panel is marking the rows the player confirmed, in this order.
+      reportDestroyProgress(onProgress, items.length, queue.length);
     }
     return {
       items,
@@ -218,6 +225,33 @@ export class BulkDestroyService {
       }
     }
     return { requestedIds, deletedIds };
+  }
+}
+
+/**
+ * Report one more destroyed target to an optional listener, absorbing anything it
+ * throws.
+ *
+ * Destroy is irreversible and the loop is already mid-flight when the first tick fires,
+ * so a consumer's broken callback must never be able to abandon the rest of the queue —
+ * that would leave the player with a half-destroyed selection and a report that no
+ * longer describes their pack. The listener is called for effect only: the return value
+ * is ignored and never awaited.
+ *
+ * Deliberately local rather than imported from the salvage service: destroy shares no
+ * module with salvage on purpose, and a shared import for six lines would be the first
+ * thread between them.
+ *
+ * @param {Function|null} onProgress The listener, or anything that is not a function.
+ * @param {number} completed Targets destroyed so far, 1-based and monotonic.
+ * @param {number} total Targets this run was given.
+ */
+function reportDestroyProgress(onProgress, completed, total) {
+  if (typeof onProgress !== 'function') return;
+  try {
+    onProgress(completed, total);
+  } catch (error) {
+    console.error('Fabricate | A bulk destroy progress listener threw; the run continues:', error);
   }
 }
 

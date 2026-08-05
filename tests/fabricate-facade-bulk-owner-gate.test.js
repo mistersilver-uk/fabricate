@@ -44,10 +44,15 @@ import {
   makeFacadeActor,
 } from './helpers/fabricateFacadeHarness.js';
 
+// LOCATORS, not assertions: each names the signature `mainMethodSource` slices from, so
+// it has to be the CURRENT one verbatim. An option added to either facade — `onProgress`
+// was — moves the locator and nothing else; the assertions below are about the gate the
+// method delegates to, and each one is re-run unchanged against the new slice.
 const GATE = '_gateBulkTargets(targets, actorId) {';
 const SALVAGE =
-  'async salvageComponents({ actorId = null, targets = [], interactive = true } = {}) {';
-const DESTROY = 'async destroyComponents({ actorId = null, targets = [] } = {}) {';
+  'async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {';
+const DESTROY =
+  'async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {';
 
 describe('the bounded slice is genuinely bounded', () => {
   it('stops at the method it names, and does not run to end of file', () => {
