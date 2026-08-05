@@ -34,8 +34,26 @@ export function resolveGatheringSystemComponents(system, craftingSystemManager) 
   return Array.isArray(resolved) ? resolved : [];
 }
 
-export function resolveGatheringResultSource(result, system, craftingSystemManager) {
-  if (result?.itemUuid) return resolveUuidSync(result.itemUuid);
+/**
+ * Resolve a result row to the thing that will be awarded.
+ *
+ * Returns `{ source, componentId }`. `componentId` is non-null ONLY when the award
+ * resolved through a MANAGED COMPONENT — the identity stamp (issue 780) keys off
+ * that fact, not off what the row happened to author. A row can carry an `itemUuid`
+ * AND a `componentId` (every d100 drop row does), so "the row named a component" and
+ * "the award resolved as that component" are different questions and only the second
+ * one may stamp.
+ *
+ * An `itemUuid` that fails to resolve now FALLS BACK to the component lookup instead
+ * of giving up. That asymmetry was a real defect: the `registeredItemUuid` branch
+ * below has always fallen back to the bare component, while the `itemUuid` branch
+ * returned null and the caller silently dropped the award.
+ */
+export function resolveGatheringResultAward(result, system, craftingSystemManager) {
+  if (result?.itemUuid) {
+    const resolved = resolveUuidSync(result.itemUuid);
+    if (resolved) return { source: resolved, componentId: null };
+  }
   const componentId = result?.componentId || result?.systemItemId;
   const component =
     (system?.components ?? []).find((entry) => entry.id === componentId) ??
@@ -43,9 +61,53 @@ export function resolveGatheringResultSource(result, system, craftingSystemManag
       ?.getSystem?.(system?.id)
       ?.components?.find((entry) => entry.id === componentId) ??
     null;
-  if (!component) return null;
-  if (component.registeredItemUuid) return resolveUuidSync(component.registeredItemUuid) ?? component;
-  return component;
+  if (!component) return { source: null, componentId: null };
+  if (component.registeredItemUuid) {
+    return {
+      source: resolveUuidSync(component.registeredItemUuid) ?? component,
+      componentId: component.id,
+    };
+  }
+  return { source: component, componentId: component.id };
+}
+
+export function resolveGatheringResultSource(result, system, craftingSystemManager) {
+  return resolveGatheringResultAward(result, system, craftingSystemManager).source;
+}
+
+/** Human-readable identity for a result row that could not be resolved to an award. */
+export function describeUnresolvedResult(result) {
+  return (
+    stringOrNull(result?.itemUuid) ||
+    stringOrNull(result?.componentId) ||
+    stringOrNull(result?.systemItemId) ||
+    stringOrNull(result?.id) ||
+    'an unnamed result row'
+  );
+}
+
+function stringOrNull(value) {
+  const text = String(value ?? '').trim();
+  return text.length > 0 ? text : null;
+}
+
+/**
+ * Resolve every row up front so an unresolvable one is caught BEFORE anything is
+ * created. Returns `{ awards, unresolved }`; `unresolved` holds the descriptions of
+ * rows with no award source.
+ */
+function resolveAllResults(resultGroups, system, craftingSystemManager) {
+  const awards = [];
+  const unresolved = [];
+  for (const result of flattenGatheringResults(resultGroups)) {
+    const award = resolveGatheringResultAward(result, system, craftingSystemManager);
+    if (!award.source) {
+      unresolved.push(describeUnresolvedResult(result));
+      continue;
+    }
+    awards.push({ result, ...award });
+  }
+  return { awards, unresolved };
 }
 
 export function resolveUuidSync(uuid) {
@@ -66,30 +128,69 @@ export function normalizeFoundryCollection(collection) {
   return [];
 }
 
-export function gatheringRunItemRef(actor, item, quantity = 1) {
-  return {
+/**
+ * `componentId` is carried so a ref built BEFORE creation still has an identity. A
+ * planned award that resolves to a bare component has no `uuid` yet — the document
+ * does not exist until `create` runs — and a uuid-only identity meant every such
+ * planned award was discarded downstream, emptying the chat card and run journal for
+ * a gather that really did award items.
+ */
+export function gatheringRunItemRef(actor, item, quantity = 1, componentId = null) {
+  const ref = {
     actorUuid: actor?.uuid ?? null,
     itemUuid: item?.uuid ?? item?.registeredItemUuid ?? null,
     quantity: Number.isFinite(Number(quantity)) && Number(quantity) > 0 ? Number(quantity) : 1,
   };
+  // ONLY the resolved award may supply this. A created Foundry Item's `id` is a
+  // document id, not a component id, so falling back to it would stamp a bogus identity.
+  const id = stringOrNull(componentId);
+  if (id) ref.componentId = id;
+  const name = stringOrNull(item?.name);
+  const img = stringOrNull(item?.img);
+  if (name) ref.name = name;
+  if (img) ref.img = img;
+  return ref;
 }
 
 export function createGatheringResultCreator(craftingSystemManager) {
   return {
+    // Reports UNRESOLVED rows as diagnostics rather than quietly returning a short
+    // list. The engine turns diagnostics into a blocked, misconfigured start, which
+    // happens BEFORE the node and stamina are committed — so a broken drop reference
+    // costs the player nothing and can be retried once the GM fixes it. Dropping the
+    // row instead (the old behaviour) spent the node and told nobody.
     async plan({ actor, system, resultGroups = [] } = {}) {
-      return flattenGatheringResults(resultGroups)
-        .map((result) => {
-          const source = resolveGatheringResultSource(result, system, craftingSystemManager);
-          return source ? gatheringRunItemRef(actor, source, result.quantity) : null;
-        })
-        .filter(Boolean);
+      const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
+      if (unresolved.length > 0) {
+        return {
+          diagnostics: unresolved.map((reference) => ({
+            code: 'RESULT_SOURCE_UNRESOLVED',
+            messageKey: 'FABRICATE.Gathering.Diagnostics.ResultSourceUnresolved',
+            message: `Gathering result could not be resolved to an item: ${reference}`,
+          })),
+        };
+      }
+      return awards.map((award) =>
+        gatheringRunItemRef(actor, award.source, award.result.quantity, award.componentId)
+      );
     },
 
     async create({ actor, system, resultGroups = [] } = {}) {
+      const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
+      // `plan` already blocked this attempt, so reaching here means the two disagreed.
+      // Throw rather than create a partial award: a half-granted gather is worse than a
+      // loud one, and silence here is exactly what hid this class of bug.
+      if (unresolved.length > 0) {
+        const error = new Error(
+          `Fabricate | Refusing to award a gathering result with unresolved sources: ${unresolved.join(', ')}`
+        );
+        error.code = 'RESULT_SOURCE_UNRESOLVED';
+        throw error;
+      }
+
       const created = [];
-      for (const result of flattenGatheringResults(resultGroups)) {
-        const source = resolveGatheringResultSource(result, system, craftingSystemManager);
-        if (!source) continue;
+      for (const award of awards) {
+        const { result, source, componentId } = award;
 
         const itemData = source.toObject?.() ?? {
           name: source.name ?? 'Gathered Item',
@@ -109,21 +210,19 @@ export function createGatheringResultCreator(craftingSystemManager) {
 
         // Stamp the awarded component's durable per-system identity (issue 780) on the
         // CREATED award item so a gathered part resolves to its OWN component through the
-        // identity tier once #601 removes the name fallback. The id is the one the RESULT
-        // authored (`result.componentId || result.systemItemId`) — NEVER `source.id`: in the
+        // identity tier once #601 removes the name fallback. NEVER `source.id`: in the
         // `registeredItemUuid` case `source` is the registered source Item, whose id is a
-        // Foundry Item id, not the component id. `resolveGatheringResultSource` returns an
-        // `itemUuid` source BEFORE component resolution, so ANY itemUuid-resolved result
-        // (even one carrying a stray `result.componentId`) has no managed component and must
-        // stamp nothing — key off the resolved-component branch, not a raw `result.componentId`
-        // read. The stack branch below never touches `itemData`, so this stays create-only.
-        if (!result?.itemUuid) {
-          stampItemDataRoleIdentity(
-            itemData,
-            system?.id,
-            'componentId',
-            result?.componentId || result?.systemItemId
-          );
+        // Foundry Item id, not the component id.
+        //
+        // The gate is `componentId` from the RESOLVER — i.e. "this award really is that
+        // managed component" — not a raw `result.componentId` read. A row can carry both an
+        // `itemUuid` and a `componentId` (every d100 drop row does), so a uuid-resolved award
+        // with a stray componentId still stamps nothing, while a row whose uuid failed and
+        // fell back to its component now correctly DOES stamp. Reading the row directly would
+        // get both cases wrong. The stack branch below never touches `itemData`, so this
+        // stays create-only.
+        if (componentId) {
+          stampItemDataRoleIdentity(itemData, system?.id, 'componentId', componentId);
         }
 
         // Stack onto an existing matching item (same source UUID chain) that uses
@@ -140,12 +239,12 @@ export function createGatheringResultCreator(craftingSystemManager) {
         if (existing) {
           const next = Number(existing.system?.quantity || 0) + Number(result.quantity || 1);
           await existing.update({ 'system.quantity': next });
-          created.push(gatheringRunItemRef(actor, existing, result.quantity));
+          created.push(gatheringRunItemRef(actor, existing, result.quantity, componentId));
           continue;
         }
 
         const [item] = await actor.createEmbeddedDocuments('Item', [itemData]);
-        if (item) created.push(gatheringRunItemRef(actor, item, result.quantity));
+        if (item) created.push(gatheringRunItemRef(actor, item, result.quantity, componentId));
       }
       return created;
     },
