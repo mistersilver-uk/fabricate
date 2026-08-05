@@ -374,12 +374,15 @@
     font-weight: 700;
   }
 
+  /* `tabular-nums` WITHOUT the mono family: this is a sentence ("2 recovered · 0
+     recovered nothing · 0 unresolved"), not a figure, and the mono face set it as code
+     directly under the detail total. Tabular figures still keep the counts from
+     jittering as the run resolves. */
   .bulk-banner-summary {
     font-size: 11px;
     font-weight: 400;
     line-height: 1.5;
     color: var(--fab-text-muted);
-    font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;
   }
 

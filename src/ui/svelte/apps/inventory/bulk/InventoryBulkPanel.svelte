@@ -129,6 +129,14 @@
   // The count line is also the panel's polite live region. At the cap it SAYS so, so
   // the limit is announced on the click that reaches 25 rather than only on the
   // refused click after it — which changes nothing on screen and would be silent.
+  //
+  // IT IS WITHHELD ENTIRELY IN THE `report` STATE. The run consumed its rows, so they
+  // no longer resolve in the listing and every count collapses to zero — leaving a
+  // live region to announce "2 selected · 0 salvageable · 0 skipped" directly above
+  // "Batch complete · 2 recovered" at the moment the run SUCCEEDED. Both readings are
+  // literally true and together they are a contradiction, and the one a screen-reader
+  // user hears is the wrong one. The report's own banner is the summary in that state,
+  // so the header line stands down rather than competing with it.
   const countLine = $derived(
     [
       localize(
@@ -224,10 +232,21 @@
     )
   );
 
-  /** Which of waiting / in progress / done one row is at, from the completed count. */
+  /**
+   * Which of waiting / in progress / done one row is at, from the completed count.
+   *
+   * A SALVAGE run claims NO row in progress until its first `onProgress` tick has
+   * landed. `salvageComponents` opens the one batch roll prompt BEFORE it touches the
+   * first target, so `current: 0` means "waiting on the player", not "row 1 running" —
+   * and a dismissed prompt ends the run having called the engine zero times, which
+   * would have left a row wearing "In progress" for work that never started.
+   * Destroy has no such gap (its confirmation is answered before the store raises the
+   * busy flag at all), so it keeps its first row marked active from tick zero.
+   */
   function runStateOf(index) {
     if (index < progressCurrent) return RUN_STATES.done;
-    return index === progressCurrent ? RUN_STATES.active : RUN_STATES.pending;
+    if (index !== progressCurrent) return RUN_STATES.pending;
+    return destroying === true || progressCurrent > 0 ? RUN_STATES.active : RUN_STATES.pending;
   }
 </script>
 
@@ -265,8 +284,8 @@
   }}
   icon="fas fa-layer-group"
   name={localize('FABRICATE.App.Inventory.Bulk.Title')}
-  total={countLine}
-  totalAttrs={{ 'aria-live': 'polite', 'aria-atomic': 'true' }}
+  total={state === 'report' ? '' : countLine}
+  totalAttrs={state === 'report' ? {} : { 'aria-live': 'polite', 'aria-atomic': 'true' }}
   headerAction={state === 'report' ? null : clearAction}
 >
   <div class="bulk-body">
@@ -555,7 +574,22 @@
      collapsing; the note then owns a full-width line. `margin-left: auto` rather than
      `justify-content: space-between` keeps the actions right in BOTH layouts —
      space-between left-aligns a wrapped line that holds only one item. */
+  /* STICKY, and that is a correctness fix rather than polish. The panel only grows —
+     the queue is capped at 25 rows and carries a yield preview and a blocked list under
+     it — so the commit pair sat below the scroll fold with as few as FOUR rows selected
+     at the default window width. A commit control the player has to hunt for past the
+     material it acts on is, for the population this feature exists for, effectively not
+     there. Pinned to the bottom of `.inventory-detail`'s scrollport, it is reachable in
+     every selection size.
+     It needs the column's OWN fill (`.inventory-view-column-right` is
+     `--fab-surface-soft`) because rows now scroll behind it.
+     `.bulk-body`'s `padding-bottom` STAYS: it is the Chromium flex-overflow trap
+     recorded above, and it is also what keeps this footer's natural (fully scrolled)
+     resting place off the window edge — sticky can only pull an element UP to the
+     scrollport, never past its own containing block's content edge. */
   .bulk-footer {
+    position: sticky;
+    bottom: 0;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -563,6 +597,8 @@
     gap: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
     padding-top: var(--fab-space-3);
+    padding-bottom: var(--fab-space-2);
+    background: var(--fab-surface-soft);
   }
 
   .bulk-footer-note {

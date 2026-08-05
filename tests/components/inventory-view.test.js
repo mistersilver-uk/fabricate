@@ -2502,9 +2502,16 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
 
     assert.equal(calls.bulkDestroy.length, 1, 'the store owns the confirmation');
     const prompt = calls.bulkDestroy[0];
-    assert.ok(prompt.title, 'the dialog is titled');
+    // `window.title`, NOT a top-level `title`: `confirmDialog` forwards this bag to
+    // `DialogV2.confirm` untouched and DialogV2 reads the frame title off `window.title`,
+    // so a top-level one renders a BLANK title bar. Asserting the nesting is the only
+    // way this pin can tell the difference — `assert.ok(prompt.title)` passed against
+    // the untitled dialog.
+    assert.ok(prompt.window?.title, 'the dialog is titled through DialogV2 window options');
+    assert.equal(prompt.title, undefined, 'and not through a top-level title DialogV2 ignores');
     assert.ok(prompt.content, 'and carries the consequence a button label cannot');
     assert.ok(prompt.yes?.label, 'with an explicit affirmative label');
+    assert.ok(prompt.yes?.icon, 'and its own destructive icon rather than the default checkmark');
   });
 
   it('Escape clears the bulk selection from anywhere in the app', async () => {

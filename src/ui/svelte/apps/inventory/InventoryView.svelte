@@ -169,19 +169,35 @@
   // GM chose NOT to destroy it on break, so this must not read like that rule firing.
   function onBulkDestroy() {
     return store?.bulkDestroy?.({
-      title: localize('FABRICATE.App.Inventory.Bulk.DestroyTitle', {
-        components: bulkComponentsText,
-      }),
+      // `window: { title }`, NEVER a top-level `title`. `services.confirmDialog`
+      // (`src/ui/foundryCompat.js`) forwards its options bag to `DialogV2.confirm`
+      // untouched, and DialogV2 reads its frame title from `window.title` — so a
+      // top-level title is silently dropped and the one destructive confirmation in
+      // this tab renders with a BLANK title bar. Fixed here rather than in
+      // `confirmDialog` on purpose: every manager-side caller passes a top-level
+      // title too, so absorbing it centrally would retitle ~25 confirms this change
+      // does not own. Those are tracked as their own follow-up.
+      window: {
+        title: localize('FABRICATE.App.Inventory.Bulk.DestroyTitle', {
+          components: bulkComponentsText,
+        }),
+      },
       content:
         `<p>${localize('FABRICATE.App.Inventory.Bulk.DestroyBody', {
           components: bulkComponentsText,
           units: bulkUnitsText,
         })}</p>` + `<p>${localize('FABRICATE.App.Inventory.Bulk.DestroyRule')}</p>`,
       yes: {
+        // Without an explicit icon the confirm button wears `DialogV2.confirm`'s
+        // default checkmark, which reads as approval on a permanent deletion.
+        icon: 'fa-solid fa-trash',
         label: localize('FABRICATE.App.Inventory.Bulk.DestroyConfirm'),
         callback: () => true,
       },
-      no: () => false,
+      // No `no` override: `DialogV2.confirm`'s own default already returns false and
+      // is the DEFAULT button. A `no: () => false` here configured nothing —
+      // `mergeObject` reads `Object.keys()` of a function, which is empty — so it
+      // only read as if it did.
     });
   }
 
