@@ -170,6 +170,71 @@
           count: impact.deletable,
         })
   );
+
+  // Same ternary the rest of this panel already uses (`headingLabel`, `applyLabel`,
+  // `deleteLabel`): a literal `…One` sibling key for the count-is-1 case, so the impact
+  // statement never says "1 essence definitions" or "1 components carry".
+  const impactEssencesLabel = $derived(
+    impact.deletable === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactEssencesOne',
+          '1 essence definition will be deleted.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactEssences',
+          '{count} essence definitions will be deleted.',
+          { count: impact.deletable }
+        )
+  );
+  const impactComponentsLabel = $derived(
+    impact.componentsAffected === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactComponentsOne',
+          '1 component carries one or more of the selected essences.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactComponents',
+          '{count} components carry one or more of the selected essences.',
+          { count: impact.componentsAffected }
+        )
+  );
+  const impactRecipesLabel = $derived(
+    impact.recipeRewrites === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactRecipesOne',
+          '1 recipe will be rewritten.'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactRecipes',
+          '{count} recipes will be rewritten.',
+          { count: impact.recipeRewrites }
+        )
+  );
+  const impactBlockedLabel = $derived(
+    impact.blocked === 1
+      ? format(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlockedOne',
+          '1 selected essence is still carried by components and will be skipped: {names}',
+          { names: blockedNamesLabel }
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlocked',
+          '{count} selected essences are still carried by components and will be skipped: {names}',
+          { count: impact.blocked, names: blockedNamesLabel }
+        )
+  );
+  const deleteAriaLabel = $derived(
+    impact.deletable === 1
+      ? text(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteAriaOne',
+          'Delete 1 essence definition'
+        )
+      : format(
+          'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteAria',
+          'Delete {count} essence definitions',
+          { count: impact.deletable }
+        )
+  );
 </script>
 
 <BulkEditPanelShell
@@ -287,11 +352,7 @@
   <!-- Stated BEFORE the action is armed, and recomputed from the selection. -->
   <ul class="manager-essence-bulk-impact" data-essence-bulk-impact>
     <li data-essence-bulk-impact-row="essences">
-      {format(
-        'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactEssences',
-        '{count} essence definitions will be deleted.',
-        { count: impact.deletable }
-      )}
+      {impactEssencesLabel}
     </li>
     <!--
       Counted over the WHOLE SELECTION, not over the deletable members, and worded to say
@@ -301,29 +362,17 @@
       See `describeEssenceDeleteImpact`.
     -->
     <li data-essence-bulk-impact-row="components">
-      {format(
-        'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactComponents',
-        '{count} components carry one or more of the selected essences.',
-        { count: impact.componentsAffected }
-      )}
+      {impactComponentsLabel}
     </li>
     <li data-essence-bulk-impact-row="recipes">
-      {format(
-        'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactRecipes',
-        '{count} recipes will be rewritten.',
-        { count: impact.recipeRewrites }
-      )}
+      {impactRecipesLabel}
     </li>
   </ul>
 
   {#if impact.blocked > 0}
     <Callout
       tone="warning"
-      text={format(
-        'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlocked',
-        '{count} selected essences are still carried by components and will be skipped: {names}',
-        { count: impact.blocked, names: blockedNamesLabel }
-      )}
+      text={impactBlockedLabel}
       dataAttr="data-essence-bulk-blocked"
       dataValue={String(impact.blocked)}
     />
@@ -335,14 +384,10 @@
     disabled={!impact.canDelete || inert}
     idleLabel={deleteLabel}
     armedLabel={text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteConfirm', 'Confirm delete')}
-    idleAriaLabel={format(
-      'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteAria',
-      'Delete {count} essence definitions',
-      { count: impact.deletable }
-    )}
+    idleAriaLabel={deleteAriaLabel}
     armedAriaLabel={format(
       'FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteConfirmAria',
-      'Confirm deleting {count} essence definitions and rewriting {recipes} recipes',
+      'Confirm deleting {count} essence definition(s) and rewriting {recipes} recipe(s)',
       { count: impact.deletable, recipes: impact.recipeRewrites }
     )}
     onArm={onArmDelete}

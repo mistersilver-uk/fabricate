@@ -4266,7 +4266,7 @@
     const sentences = [
       text(
         'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
-        'Deleted {count} essences and rewrote {recipes} recipes.'
+        'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
       )
         .replace('{count}', Number(result?.deleted) || 0)
         .replace('{recipes}', Number(result?.recipesUpdated) || 0),

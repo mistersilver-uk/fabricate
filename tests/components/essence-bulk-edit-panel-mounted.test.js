@@ -255,6 +255,103 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
   });
 });
 
+describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at count 1', () => {
+  // The shipped defect (View Lab frame `manager-essences-bulk-delete-armed`): every number
+  // in the impact statement read a bare plural noun against `{count}` — "1 essence
+  // definitions", "1 components carry", "1 recipes", "1 selected essences" — because the
+  // panel had no `…One` sibling for these four keys, unlike its own `Heading`/`Apply`/
+  // `Delete` labels a few lines above, which already do. This fixture puts all four
+  // numbers at exactly 1 simultaneously, so a single mount proves every string.
+  const ONE_OF_EACH = [
+    // Deletable: carries no component, so it is NOT blocked.
+    makeEssenceRow({ id: 'earth', name: 'Earth', recipeUsageIds: ['r1'] }),
+    // Blocked: the one carrying component in the WHOLE selection, so `componentsAffected`
+    // (unioned over every selected row) and `blocked` are both exactly 1 too.
+    makeEssenceRow({
+      id: 'fire',
+      name: 'Fire',
+      componentUsageItems: [{ id: 'comp-a' }],
+      componentUsageCount: 1,
+    }),
+  ];
+
+  it('states every number in the singular, not a bare plural noun after "1"', async () => {
+    const root = await harness.mount(props(ONE_OF_EACH));
+
+    assert.equal(
+      impactRow(root, 'essences'),
+      '1 essence definition will be deleted.',
+      'not "1 essence definitions"'
+    );
+    assert.equal(
+      impactRow(root, 'components'),
+      '1 component carries one or more of the selected essences.',
+      'not "1 components carry"'
+    );
+    assert.equal(
+      impactRow(root, 'recipes'),
+      '1 recipe will be rewritten.',
+      'not "1 recipes"'
+    );
+
+    const blocked = root.querySelector('[data-essence-bulk-blocked]');
+    assert.equal(blocked.dataset.essenceBulkBlocked, '1');
+    assert.equal(
+      blocked.textContent.trim(),
+      '1 selected essence is still carried by components and will be skipped: Fire',
+      'not "1 selected essences"'
+    );
+
+    assert.match(
+      deleteButton(root).getAttribute('aria-label'),
+      /^Delete 1 essence definition$/,
+      'the idle button\'s consequence sentence, not "1 essence definitions"'
+    );
+    harness.remount();
+  });
+
+  it('still uses the plural form when a number is not 1', async () => {
+    // Negative control: the fixture already exercised by the earlier suite (2, 4, 3) must
+    // still read as the ordinary plural, so the fix above is a real branch, not a rename.
+    const root = await harness.mount(props(SELECTION));
+
+    assert.equal(impactRow(root, 'essences'), '2 essence definitions will be deleted.');
+    assert.equal(
+      impactRow(root, 'components'),
+      '4 components carry one or more of the selected essences.'
+    );
+    assert.equal(impactRow(root, 'recipes'), '3 recipes will be rewritten.');
+    assert.match(
+      deleteButton(root).getAttribute('aria-label'),
+      /^Delete 2 essence definitions$/
+    );
+    harness.remount();
+  });
+
+  it('the armed confirm sentence reads correctly when both counts are 1', async () => {
+    // `DeleteConfirmAria` carries TWO independent counts (essences and recipes) with no
+    // established two-axis "…One" convention anywhere in the repo (checked: no sibling key
+    // pluralizes two numbers in one sentence). It uses the same "(s)" idiom the essence
+    // namespace already uses nearby (`Essence.DisabledInvalidatesRecipes`) rather than
+    // inventing a four-way key matrix.
+    const root = await harness.mount(props(ONE_OF_EACH, { deleteArmed: true }));
+    assert.equal(
+      deleteButton(root).getAttribute('aria-label'),
+      'Confirm deleting 1 essence definition(s) and rewriting 1 recipe(s)'
+    );
+    harness.remount();
+  });
+
+  it('the armed confirm sentence still carries both counts when neither is 1', async () => {
+    const root = await harness.mount(props(SELECTION, { deleteArmed: true }));
+    assert.equal(
+      deleteButton(root).getAttribute('aria-label'),
+      'Confirm deleting 2 essence definition(s) and rewriting 3 recipe(s)'
+    );
+    harness.remount();
+  });
+});
+
 describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
   it('takes TWO clicks, and the first writes nothing', async () => {
     const armed = [];
