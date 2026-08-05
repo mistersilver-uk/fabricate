@@ -17346,6 +17346,15 @@
   border-left-color: var(--fab-danger);
 }
 
+/* NO `.fabricate-craft-chat--mixed` rule, deliberately (issue 859). The aggregated bulk
+   salvage card emits that modifier when some items succeeded and some did not, and the
+   base rule above already paints `--fab-accent-strong` — neutral, neither the green of
+   an unqualified success nor the red of an unqualified failure — which is exactly what
+   "some worked, some did not" should read as. A dedicated rule was considered and
+   declined: the only colour it could add is a third ramp for a state whose whole meaning
+   is "not one of the other two". Recorded here because a reader searching this block for
+   `--mixed` would otherwise find nothing and assume an omission. */
+
 /* A gather whose check SUCCEEDED but whose drop rows all missed. Neither green nor
    red: the attempt worked, it just yielded nothing, and the card has to say so rather
    than render an empty body that reads as a broken module. */
@@ -19513,6 +19522,63 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Bulk check prompt (`promptBulkCheckRoll`, issue 859). One answer for a whole batch,
+   so the body drops the formula and the DC — a batch has no single subject — and
+   replaces them with a subject strip and a note saying the answer lands on every roll.
+
+   These rules live HERE rather than in a scoped `<style>` block because the dialog body
+   is an HTML STRING handed to DialogV2, which renders outside every Svelte component's
+   scope: a scoped selector would compile to a `.svelte-xxxx` attribute no element in the
+   dialog carries. They reuse the `.fabricate-roll-prompt` root so the die row, the
+   heading, the bonus input, the picker and the footer buttons are already painted, and
+   only the three genuinely new leaves are added. Tokens only; every selector namespaced. */
+.fabricate-roll-prompt__subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fixed 30px squares, matching the row-thumb size the bulk panel uses, so the dialog
+   and the panel behind it show the queue at one scale. `flex: 0 0 auto` because a
+   wrapped strip must not stretch its last row's thumbs to fill the line. */
+.fabricate-roll-prompt__subject {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--fab-border);
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--fab-bg-1);
+}
+
+/* The "+K more" overflow chip. Same pill treatment as the DC / modifier-value chips
+   (comma-joined there rather than duplicated here only because those two share a
+   background this one deliberately does not — it sits ON the strip, not in a panel). */
+.fabricate-roll-prompt__subjects-more {
+  flex: 0 0 auto;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-06);
+}
+
+/* The note sits BELOW the picker, because it describes what the two controls above it
+   will do — the player reads it after seeing the fields it is about, not before. */
+.fabricate-roll-prompt__bulk-note {
+  margin: 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--fab-text-muted);
 }
 
 /* Footer buttons: three equal Advantage/Normal/Disadvantage (or a single Roll),
