@@ -505,11 +505,24 @@
     background: var(--fab-accent);
   }
 
+  /* The reason is BOUNDED, and that bound is the whole point of this rule.
+     `InventoryBulkRow`'s trailing group is `flex: 0 0 auto` and must stay that way — it
+     is what keeps a chip and the remove control from being squeezed — so the row's name
+     is the side that shrinks, and the only lever here that protects it is to cap the
+     reason itself. Uncapped, a long reason such as the unfinished-results one wins the
+     entire row at the 1024 floor and renders "Bent Clasp" as "B..". A reason attached to
+     a row the player cannot identify is worth nothing, so the name keeps a usable
+     minimum and the reason wraps into two or three short right-aligned lines instead —
+     which loses nothing, unlike an ellipsis. */
   .bulk-blocked-reason {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 13em;
     font-size: 10.5px;
     font-weight: 600;
     line-height: 1.4;
     text-align: right;
+    overflow-wrap: break-word;
     color: var(--fab-text-muted);
   }
 
@@ -529,12 +542,23 @@
     color: var(--fab-text-subtle);
   }
 
-  /* A ruled action row: the note explains the gesture's cost on the left, the
-     actions sit right at their own width — `.salvage-footer`'s shape. */
+  /* `.salvage-footer`'s shape — a ruled row, the note explaining the gesture's cost on
+     the left, the actions at their own width on the right — with the one divergence it
+     has to have. That footer carries a SINGLE short button; this one carries two, and
+     the destroy button's label names both a component count and a unit count, so the
+     pair is about as wide as the whole inspector column. Taken literally, the shape
+     therefore left the note a ~70px ribbon eight lines tall at the default window — and
+     this note is the only place the player is told, before committing, that one gesture
+     rolls the whole batch, so unreadable is the same as absent.
+     The row WRAPS instead. The note carries a real flex basis, and flex decides wrapping
+     from base sizes BEFORE it shrinks anything, so the line breaks rather than the note
+     collapsing; the note then owns a full-width line. `margin-left: auto` rather than
+     `justify-content: space-between` keeps the actions right in BOTH layouts —
+     space-between left-aligns a wrapped line that holds only one item. */
   .bulk-footer {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
@@ -542,6 +566,9 @@
   }
 
   .bulk-footer-note {
+    /* Takes any room left over beside the actions, but is never sized below its basis:
+       that is what makes the row wrap instead of crushing the note. */
+    flex: 1 1 22em;
     margin: 0;
     min-width: 0;
     font-size: 10.5px;
@@ -550,8 +577,15 @@
     color: var(--fab-text-subtle);
   }
 
+  /* `0 1 auto`, not `0 0 auto`: at the narrow floor the two buttons together are wider
+     than the inspector column, and a group that cannot shrink overflows it instead of
+     letting its own `flex-wrap` act — the column clips horizontally, so the salvage
+     button loses its right edge with nothing on screen to say so. Shrinkable, the group
+     takes the line's width and the buttons stack, still right-aligned. */
   .bulk-footer-actions {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: auto;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
