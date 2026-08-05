@@ -53,16 +53,19 @@ const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
  * is read from {@link SALVAGE_CHAT_KEYS} rather than re-spelled here, so the aggregate
  * card cannot drift from the single card's vocabulary.
  *
- * Every key is a FLAT leaf under `FABRICATE.Chat`, matching the prefix convention the
+ * Every key is a FLAT leaf in the `Chat` namespace, matching the prefix convention the
  * crafting, gathering and salvage cards already follow. A `BulkSalvage` CONTAINER
- * object beneath `FABRICATE.Chat` must never be authored: some locale would sooner or
+ * object beneath that namespace must never be authored: some locale would sooner or
  * later author it as a string, which silently shadows every child key beneath it.
  * `tests/ui-lang-keys-resolve.test.js` exists because that failure is invisible at
  * runtime — `localize` returns the key verbatim on a non-string result.
  *
- * The container path is deliberately NOT spelled out above as a dotted literal: that
- * guard scans raw source TEXT and does not strip comments, so naming it in prose makes
- * the gate demand a key whose whole point is that it must not exist.
+ * NEITHER the namespace NOR the container path is spelled out above as a dotted
+ * literal, and that is the general rule for prose anywhere in `src`: the guard scans
+ * raw source TEXT and does not strip comments, so ANY dotted name in a comment is
+ * counted as a real reference. Naming the container makes the gate demand a key whose
+ * whole point is that it must not exist; naming the namespace inflates the guard's
+ * exact tally of namespace bases with one that no code actually uses.
  *
  * @type {Readonly<Record<string, string>>}
  */
