@@ -225,7 +225,6 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // that facade is unimplemented or absent, exactly like every other seam here.
       salvageComponents: (opts = {}) => game?.fabricate?.salvageComponents?.(opts) ?? null,
       destroyComponents: (opts = {}) => game?.fabricate?.destroyComponents?.(opts) ?? null,
-      promptBulkSalvageRoll: (opts = {}) => game?.fabricate?.promptBulkSalvageRoll?.(opts) ?? null,
       // The player app has no confirm-dialog seam today; `confirmDialog` is a thin
       // wrapper the manager app already exposes identically (`confirmDialog:
       // (options) => confirmDialog(options)`, `SvelteCraftingSystemManagerApp.svelte.js`) —
