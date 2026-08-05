@@ -23,6 +23,16 @@
  * elsewhere in `src/main.js`, so an unbounded "must not contain `_resolveCraftingSources`"
  * assertion would be permanently red and would have to be deleted rather than fixed. The
  * first test below proves the bound is real by asserting exactly that.
+ *
+ * ## And what else rides on that slicer
+ *
+ * Two more `src/main.js` facts are pinned here because this is where the bounded slicer
+ * already lives, and because both are invisible to every behavioural test: that each
+ * facade FORWARDS its `onProgress` listener into the service call (dropping it freezes
+ * the panel at `0 of N` in silence), and that `_postBulkSalvageChatMessage` keeps its
+ * speaker → visibility → create order (getting it wrong publishes a blind run's whole
+ * result table, or throws for a player whose client default is In-Character). Neither is
+ * mirrored into the harness: a hand-copied poster would be evidence about the copy.
  */
 
 import { describe, it } from 'node:test';
@@ -162,6 +172,70 @@ describe('both facades delegate to the one gate', () => {
     assert.ok(
       mainMethodSource('_buildNotPermittedRow(target) {').includes("outcome: 'notPermitted'")
     );
+  });
+
+  for (const [label, signature] of [
+    ['salvageComponents', SALVAGE],
+    ['destroyComponents', DESTROY],
+  ]) {
+    it(`${label} FORWARDS onProgress into the service call`, () => {
+      // Accepting the option and forwarding it are two different edits, and deleting the
+      // forward is silent: the run still completes, the report is still correct, and the
+      // panel's progress bar simply freezes at `0 of N` for the whole run. Nothing else
+      // can see it — the store hands the facade a listener and never hears back, and the
+      // service defaults `onProgress` to `null` and reports nothing.
+      const body = mainMethodSource(signature);
+      const call = body.indexOf('.run({');
+      assert.ok(call > 0, 'the facade delegates to the service');
+      assert.ok(
+        body.slice(call).includes('onProgress'),
+        'the listener reaches `run()`, not just the signature'
+      );
+      assert.ok(
+        body.indexOf('onProgress') < call,
+        'and the signature accepts one, so the forward is not reading a global'
+      );
+    });
+  }
+});
+
+describe('_postBulkSalvageChatMessage: speaker → visibility → create, in that order', () => {
+  // NOT mirrored into the harness: a hand-copied poster would be evidence about the copy
+  // rather than about `src/main.js`. The bounded slicer is the honest tool — the suite
+  // above proves it is genuinely bounded, and proves it throws rather than degrading to
+  // `''` when the signature moves.
+  const POSTER =
+    'async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {';
+
+  it('creates with `author`, and never the discarded `user` key', () => {
+    // The V14 schema defines `author` and has NO `user` field and no shim, so a message
+    // created with `user` is silently attributed by defaulting instead — which works
+    // often enough that nothing catches it.
+    const body = mainMethodSource(POSTER);
+    assert.ok(body.includes('author: game.user?.id'));
+    assert.equal(body.includes('user:'), false, 'the discarded key appears nowhere');
+  });
+
+  it('builds the speaker BEFORE applying visibility', () => {
+    // `ChatMessage.applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded, so
+    // a visibility pass over speaker-less data THROWS for any player whose client default
+    // is In-Character — and takes the whole card with it.
+    const body = mainMethodSource(POSTER);
+    assert.ok(body.includes('applyBulkChatVisibility'), 'visibility is applied at all');
+    assert.ok(body.indexOf('speaker') < body.indexOf('applyBulkChatVisibility'));
+  });
+
+  it('applies visibility BEFORE create, and never as a create option', () => {
+    // The legacy `rollMode` CREATE OPTION is honoured only for a message carrying rolls,
+    // and this card carries none — so `create(chatData, { rollMode })` would post every
+    // blind bulk card publicly. That exact mutation is what the applier module exists to
+    // prevent.
+    const body = mainMethodSource(POSTER);
+    const visibility = body.indexOf('applyBulkChatVisibility');
+    const create = body.indexOf('ChatMessage.create');
+    assert.ok(visibility > 0 && create > 0);
+    assert.ok(visibility < create);
+    assert.equal(body.includes('create(chatData, {'), false, 'no create-option smuggling');
   });
 });
 
@@ -358,6 +432,28 @@ describe('salvageComponents: an unresolvable actor is refused, never retargeted'
     assert.equal(result.items[0].img, 'icons/ore.webp');
   });
 
+  it('threads a progress listener through to the service, over the GATED queue', async () => {
+    // The behavioural face of the forwarding pin above, through the real service. It also
+    // pins the STATED LIMIT: `total` is what the SERVICE was given — this call's targets
+    // minus the rows the gate refused — so a run carrying a refusal finishes below the
+    // caller's own denominator rather than reporting a refusal as work done.
+    const mine = makeFacadeActor('a-mine', { ownerUserIds: ['u1'] });
+    const theirs = makeFacadeActor('a-theirs', { ownerUserIds: ['u2'] });
+    const { facade } = salvageHarness({
+      user: { id: 'u1', isGM: false },
+      actors: [mine, theirs],
+    });
+    const ticks = [];
+
+    await facade.salvageComponents({
+      targets: [target('a-mine'), target('a-theirs')],
+      interactive: false,
+      onProgress: (completed, total) => ticks.push([completed, total]),
+    });
+
+    assert.deepEqual(ticks, [[1, 1]], 'one tick for the one row that was permitted to run');
+  });
+
   it('passes the service shape straight through when the prompt was dismissed', async () => {
     // Nothing ran, so there is no per-row story to tell — reporting refusals for a run
     // the player cancelled would invent one.
@@ -484,6 +580,24 @@ describe('destroyComponents: the same gate, the same refusal', () => {
     assert.deepEqual(owned.deletedIds, [], "the persisted selection's items are untouched");
     assert.equal(result.items[0].outcome, 'notPermitted');
     assert.equal(result.unitsDeleted, 0);
+  });
+
+  it('threads a progress listener through to the destroy service too', async () => {
+    const docs = [ownedItem('i-mine', 'Iron Ore', 4)];
+    const mine = makeDeletableFacadeActor('a-mine', { ownerUserIds: ['u1'], documents: docs });
+    const { facade } = destroyHarness({
+      user: { id: 'u1', isGM: false },
+      actors: [mine],
+      documentsByActor: { 'a-mine': docs },
+    });
+    const ticks = [];
+
+    await facade.destroyComponents({
+      targets: [target('a-mine')],
+      onProgress: (completed, total) => ticks.push([completed, total]),
+    });
+
+    assert.deepEqual(ticks, [[1, 1]]);
   });
 
   it('refuses before ready, rather than deleting from an uninitialized module', async () => {

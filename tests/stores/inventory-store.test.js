@@ -1149,6 +1149,22 @@ describe('inventoryStore', () => {
     const listings = Array.isArray(overrides.listings) ? [...overrides.listings] : null;
     const reporter = (update) => log.push(['progress', update]);
     reporter.dismiss = () => log.push(['dismiss']);
+    /**
+     * Emit the INTERMEDIATE ticks the real services report, so the store's own
+     * `onProgress` callback body runs. A fake that accepts `args` and never calls
+     * `args.onProgress` leaves that body dead: only the terminal `bulkProgress === null`
+     * is then observable, and a store that had stopped updating the panel counter or the
+     * toast fraction mid-run would look identical.
+     */
+    const emitProgress = (args) => {
+      for (const tick of overrides.progressTicks ?? []) {
+        // A bare number ticks against the queue it was handed; a `[current, total]` pair
+        // reports a DIFFERENT denominator, which is what the facade really does when its
+        // owner gate refused a row.
+        const [current, total] = Array.isArray(tick) ? tick : [tick, args.targets.length];
+        args?.onProgress?.(current, total);
+      }
+    };
     const services = {
       listInventoryForActor: async () => {
         log.push(['load']);
@@ -1175,6 +1191,7 @@ describe('inventoryStore', () => {
       },
       salvageComponents: async (args) => {
         log.push(['salvageComponents', args]);
+        emitProgress(args);
         // A caller-held gate, so a test can observe the store MID-RUN. Without it the
         // whole run resolves inside the first microtask turn and `bulkRunning` is never
         // observably true.
@@ -1184,6 +1201,7 @@ describe('inventoryStore', () => {
       },
       destroyComponents: async (args) => {
         log.push(['destroyComponents', args]);
+        emitProgress(args);
         if (overrides.destroyThrows) throw new Error('the delete blew up');
         return overrides.destroyResult ?? { items: [], unitsDeleted: 0, documentsDeleted: 0 };
       },
@@ -1895,6 +1913,44 @@ describe('inventoryStore', () => {
       );
     });
 
+    it('advances bulkProgress and the toast on each INTERMEDIATE tick', async () => {
+      // Observed MID-RUN, behind the gate: the terminal state is `null` for a run that
+      // reported nothing at all, so a store that never advanced would be indistinguishable
+      // at the end.
+      //
+      // The tick below deliberately reports `1 of 1` for a queue of TWO — the facade's
+      // own stated limit, since its `total` counts only the rows the owner gate let
+      // through. The denominator the player sees must stay the store's OWN snapshot
+      // length, or a refused row would visibly SHRINK the bar mid-run.
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const { store, log } = await loadedBulkStore([bulkRow('c1', 'Iron'), bulkRow('c2', 'Ash')], {
+        salvageGate: gate,
+        progressTicks: [[1, 1]],
+      });
+      store.toggleBulkSelection('sys:c1');
+      store.toggleBulkSelection('sys:c2');
+      flushSync();
+
+      const running = store.bulkSalvage();
+      await waitForBulkRunning(store);
+      flushSync();
+
+      assert.deepEqual(store.bulkProgress, { current: 1, total: 2 }, 'one of two, mid-run');
+      assert.deepEqual(
+        log.filter(([name]) => name === 'progress'),
+        [['progress', { pct: 0.5 }]],
+        'and the toast is half full, not still empty'
+      );
+
+      release();
+      await running;
+      flushSync();
+      assert.equal(store.bulkProgress, null, 'and the terminal state still clears');
+    });
+
     it('refuses to start a second run while one is in flight', async () => {
       let release;
       const gate = new Promise((resolve) => {
@@ -1981,6 +2037,28 @@ describe('inventoryStore', () => {
       assert.deepEqual(
         args.targets.map((entry) => entry.componentId),
         ['c1', 'c2']
+      );
+    });
+
+    it('reports each destroy tick to the toast before the terminal one', async () => {
+      // Destroy has no mid-run gate to observe `bulkProgress` behind, but the reporter log
+      // SURVIVES the run: the intermediate fractions have to be there, in order, ahead of
+      // the `finally` block's terminal 1. A callback body that never ran would leave only
+      // that terminal entry.
+      const { store, log } = await loadedBulkStore(
+        [bulkRow('c1', 'Iron'), bulkRow('c2', 'Ash'), bulkRow('c3', 'Zinc')],
+        { progressTicks: [1, 2, 3] }
+      );
+      for (const key of ['sys:c1', 'sys:c2', 'sys:c3']) store.toggleBulkSelection(key);
+      flushSync();
+
+      await store.bulkDestroy({});
+      flushSync();
+
+      assert.deepEqual(
+        log.filter(([name]) => name === 'progress').map(([, update]) => update.pct),
+        [1 / 3, 2 / 3, 1, 1],
+        'three ticks, then the terminal one the finally block always sends'
       );
     });
 

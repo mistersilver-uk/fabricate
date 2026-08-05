@@ -471,3 +471,77 @@ describe('BulkDestroyService.run: target-actor scoping', () => {
     assert.equal(result.unitsDeleted, 4, 'and the run total is not doubled');
   });
 });
+
+describe('BulkDestroyService.run: progress over an IRREVERSIBLE queue', () => {
+  it('ticks once per target, in order, a REFUSED row included', async () => {
+    // Every target ticks, a refusal included: `_destroyOne` resolves each one, and the
+    // panel is marking the rows the player CONFIRMED. A counter that skipped the refused
+    // row would mark the wrong rows done and stop at `1 of 2` for a queue that finished.
+    const items = [ownedItem('i1', 'Iron Ore', 4)];
+    const { actor, deleteItems } = deleteCapableActor({ items });
+    const service = makeService({ findComponentItems: () => items, deleteItems });
+    const ticks = [];
+
+    const result = await service.run({
+      targets: [
+        destroyTarget(actor, { componentId: 'comp-nope' }),
+        destroyTarget(actor, { componentId: 'comp-ore' }),
+      ],
+      onProgress: (completed, total) => ticks.push([completed, total]),
+    });
+
+    assert.deepEqual(ticks, [
+      [1, 2],
+      [2, 2],
+    ]);
+    assert.equal(result.items[0].skipReason, BULK_DESTROY_SKIP_REASONS.unknownComponent);
+    assert.equal(result.unitsDeleted, 4, 'and the row after the refusal still ran');
+  });
+
+  it('a THROWING listener never abandons a half-destroyed queue', async (t) => {
+    // Destroy is IRREVERSIBLE, and the loop is already mid-flight when the first tick
+    // fires, so a consumer's broken callback must never cost the rest of the queue — that
+    // would leave the player with a half-destroyed selection and a report that no longer
+    // describes their pack. EVERY tick throws, because the guard has to hold per call
+    // rather than once.
+    const original = console.error;
+    const logged = [];
+    console.error = (...args) => logged.push(args.map(String).join(' '));
+    t.after(() => {
+      console.error = original;
+    });
+
+    /** The same two-component queue, run with whatever listener the test supplies. */
+    const runBoth = async (onProgress) => {
+      const items = [ownedItem('i1', 'Iron Ore', 4), ownedItem('i2', 'Boar Hide', 6)];
+      const { actor, deleteItems, deleteCalls } = deleteCapableActor({ items });
+      const service = makeService({
+        findComponentItems: (actorArg, component) =>
+          items.filter((item) => item.name === component.name),
+        deleteItems,
+      });
+      const result = await service.run({
+        targets: [
+          destroyTarget(actor, { componentId: 'comp-ore' }),
+          destroyTarget(actor, { componentId: 'comp-hide' }),
+        ],
+        onProgress,
+      });
+      return { result, deleteCalls };
+    };
+
+    const control = await runBoth(undefined);
+    const observed = await runBoth(() => {
+      throw new Error('the panel went away');
+    });
+
+    assert.deepEqual(observed.deleteCalls, control.deleteCalls, 'both stacks were still submitted');
+    assert.equal(observed.result.unitsDeleted, 10, 'and both really went (4 + 6)');
+    assert.equal(observed.result.documentsDeleted, 2);
+    assert.deepEqual(observed.result.items, control.result.items, 'the report is unchanged');
+    assert.ok(
+      logged.some((line) => line.includes('progress listener threw')),
+      'the throw is reported to the console rather than swallowed'
+    );
+  });
+});

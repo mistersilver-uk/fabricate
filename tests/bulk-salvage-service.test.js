@@ -996,3 +996,140 @@ describe('BulkSalvageService.run: the per-system chatOutput gate', () => {
     assert.equal(result.posted, false);
   });
 });
+
+describe('BulkSalvageService.run: the private-roll token reaches the poster', () => {
+  /** Post one aggregate card and hand back every message the poster was given. */
+  async function postedMessages({ rollFormula = '', promptRollDecision }) {
+    const posted = [];
+    const service = makeService({
+      systems: [bulkSystem({ rollFormula, components: [ORE] })],
+      salvage: async () => ({ success: true, results: [] }),
+      promptRollDecision,
+      postChatMessage: async (message) => posted.push(message),
+    });
+    await service.run({ targets: [bulkTarget({})], interactive: true });
+    return posted;
+  }
+
+  it('forwards the chosen roll mode, so a BLIND bulk run is not published', async () => {
+    // The middle hop of a four-link chain: the prompt returns the token, THIS forwards it,
+    // `_postBulkSalvageChatMessage` applies it and `applyBulkChatVisibility` translates it.
+    // Replacing the forward with a literal `null` posts every blindroll/gmroll/selfroll
+    // bulk card PUBLICLY — the dice hidden and the entire result table published to the
+    // table. Nothing else in the chain can notice, because the poster is downstream of it.
+    const posted = await postedMessages({
+      rollFormula: '1d20 + 3',
+      promptRollDecision: async () => ({
+        confirmed: true,
+        bonus: '2',
+        rollMode: 'blindroll',
+        advantage: 'normal',
+      }),
+    });
+
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].rollMode, 'blindroll', "the player's own visibility choice");
+  });
+
+  it('hands the poster NULL when nothing prompted, rather than inventing a default', async () => {
+    // `null` is not "public": it is the poster's signal to fall back to the CLIENT's own
+    // `core.rollMode`. Substituting `publicroll` here would override a player who runs
+    // their whole session whispered. The prompt below WOULD have said `gmroll` — it is
+    // never opened, because the fixture formula is blank and no check is usable.
+    const posted = await postedMessages({
+      promptRollDecision: async () => ({ confirmed: true, rollMode: 'gmroll' }),
+    });
+
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].rollMode, null);
+  });
+});
+
+describe('BulkSalvageService.run: progress ticks over EVERY entry', () => {
+  const SEALED = bulkComponent({ id: 'comp-off', name: 'Sealed Vial', salvageEnabled: false });
+
+  /**
+   * Run the SAME three-row queue — runnable, pre-flight skip, runnable — with whatever
+   * listener the test supplies, on a service built fresh each time so two runs can be
+   * compared directly.
+   */
+  async function runQueue(onProgress) {
+    const { seam, calls } = recordingSalvage();
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE, SEALED, HIDE] })],
+      salvage: seam,
+    });
+    const result = await service.run({
+      targets: ['comp-ore', 'comp-off', 'comp-hide'].map((componentId) =>
+        bulkTarget({ componentId })
+      ),
+      interactive: false,
+      onProgress,
+    });
+    return { result, calls };
+  }
+
+  it('ticks once per entry, in queue order, a PRE-FLIGHT SKIP included', async () => {
+    // Documented as correctness-critical. The panel marks the rows the player queued, in
+    // this same order, so a counter that ticked only over `runnable` would mark the wrong
+    // rows done AND would stop at `2 of 3` on any run carrying a skip — a progress bar
+    // that never completes for a queue that did.
+    const ticks = [];
+    const { result } = await runQueue((completed, total) => ticks.push([completed, total]));
+
+    assert.deepEqual(ticks, [
+      [1, 3],
+      [2, 3],
+      [3, 3],
+    ]);
+    assert.equal(result.items[1].outcome, 'skipped', 'the middle row really did skip');
+    assert.equal(result.items[1].skipReason, BULK_SALVAGE_SKIP_REASONS.salvageDisabled);
+  });
+
+  it('reports NOTHING at all when no listener is given, and runs identically', async () => {
+    const { result, calls } = await runQueue(undefined);
+
+    assert.equal(calls.length, 2, 'the two runnable rows still ran');
+    assert.equal(result.counts.succeeded, 2);
+  });
+
+  it('ignores a listener that is not a function rather than throwing at row one', async () => {
+    for (const listener of [null, 'later', 42, {}]) {
+      const { result } = await runQueue(listener);
+      assert.equal(result.counts.succeeded, 2, `onProgress: ${String(listener)}`);
+    }
+  });
+
+  it('a THROWING listener never costs the player the rest of the batch', async (t) => {
+    // The safety invariant, and the reason the report is wrapped at all. A bulk run is
+    // mid-flight document mutation — sources consumed, results created, tools broken — by
+    // the time the first tick fires, so a consumer's broken callback must not be able to
+    // abandon the queue. Every tick throws, not just the first, because the guard has to
+    // hold per call rather than once.
+    const logged = silenceErrors(t);
+    const ticks = [];
+    const control = await runQueue(undefined);
+
+    const observed = await runQueue((completed, total) => {
+      ticks.push([completed, total]);
+      throw new Error('the panel went away');
+    });
+
+    assert.deepEqual(
+      ticks,
+      [
+        [1, 3],
+        [2, 3],
+        [3, 3],
+      ],
+      'the loop kept ticking after each throw'
+    );
+    assert.equal(observed.calls.length, 2, 'both runnable rows still reached the engine');
+    assert.deepEqual(observed.result.items, control.result.items, 'the rows are unchanged');
+    assert.deepEqual(observed.result.counts, control.result.counts, 'and so are the counts');
+    assert.ok(
+      logged.some((line) => line.includes('progress listener threw')),
+      'the throw is reported to the console rather than swallowed'
+    );
+  });
+});

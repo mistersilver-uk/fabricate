@@ -2362,6 +2362,49 @@ test('salvage(): a misconfigured CHECK returns misconfigured: true', async () =>
   assert.equal(result.results, null);
 });
 
+test('an UNSUPPORTED salvage mode is refused on all three MUTATING engine paths', async () => {
+  // `resolveSalvageCheck` coerces an unsupported token to `simple` for display and pairs
+  // it with `unsupportedMode: true`, so every reader that would MUTATE has to test the
+  // flag before reading the mode. That contract is pinned in the pure resolver's own
+  // suite; these three are the real, mutating call sites, where getting it wrong awards
+  // `resultGroups[0]` and breaks tools for a configuration `validateSalvage` already
+  // rejects. Defence in depth — `validateSalvage` refuses the same system first — so this
+  // is one cheap assertion per path rather than a suite.
+  const engine = makeEngine();
+  const component = makeComponent({ name: 'Test Component' });
+  const system = makeSystem({
+    salvageResolutionMode: 'tiered', // a LEGACY token the normalizer should have rewritten
+    components: [component],
+    salvageCraftingCheck: {
+      enabled: true,
+      // Authored under `simple`, which is exactly what the coercion would read: each
+      // assertion below therefore has something real to return if the guard is removed.
+      simple: { rollFormula: '', checkBreakage: { triggers: [{ id: 't1', breakTools: true }] } },
+      outcomes: [],
+      progressive: null,
+      consumption: { consumeComponentOnFail: true, breakToolsOnFail: false },
+    },
+  });
+  const actor = makeActor('actor-1', []);
+  setupGame(system, actor);
+
+  const checkResult = await engine._runSalvageCraftingCheck(component, system, actor);
+
+  assert.equal(checkResult.misconfigured, true, 'the check reports a GM-side config defect');
+  assert.equal(checkResult.success, false);
+  assert.match(checkResult.message, /Unsupported salvage resolution mode: tiered/);
+  assert.deepEqual(
+    engine._resolveSalvageResultGroups(component, system, checkResult),
+    [],
+    "and nothing is awarded — never the coerced `simple` mode's first group"
+  );
+  assert.equal(
+    engine._resolveSalvageCheckBreakage(system),
+    null,
+    "nor are a foreign mode's breakage triggers read"
+  );
+});
+
 test('salvage(): a validateSalvage ABORT returns misconfigured: true as well', async () => {
   // Branch two of two, and the one that actually fires in a wired world: this gate runs
   // BEFORE the check, so a GM-side config error never reaches the check's own

@@ -327,7 +327,17 @@ class FabricateFacadeUnderTest {
   }
 
   // --- Faithful copy of Fabricate#salvageComponents --------------------------
-  async salvageComponents({ actorId = null, targets = [], interactive = true } = {}) {
+  //
+  // `onProgress` is accepted and FORWARDED, exactly as the real facade does. A mirror
+  // that quietly dropped it would report a frozen `0 of N` here while the real facade
+  // ticked — and, worse, would let a test assert progress behaviour that the copy was
+  // supplying rather than the code under test.
+  async salvageComponents({
+    actorId = null,
+    targets = [],
+    interactive = true,
+    onProgress = null,
+  } = {}) {
     this._requireReady();
     const gated = this._gateBulkTargets(targets, actorId);
     const runnable = gated.filter((entry) => entry.actor);
@@ -341,6 +351,7 @@ class FabricateFacadeUnderTest {
         componentId: target.componentId,
       })),
       interactive,
+      onProgress,
     });
     if (result.cancelled) return result;
 
@@ -366,7 +377,7 @@ class FabricateFacadeUnderTest {
   }
 
   // --- Faithful copy of Fabricate#destroyComponents --------------------------
-  async destroyComponents({ actorId = null, targets = [] } = {}) {
+  async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
     this._requireReady();
     const gated = this._gateBulkTargets(targets, actorId);
     const runnable = gated.filter((entry) => entry.actor);
@@ -379,6 +390,7 @@ class FabricateFacadeUnderTest {
         systemId: target.systemId,
         componentId: target.componentId,
       })),
+      onProgress,
     });
 
     const items = this._mergeBulkRows(gated, result.items, (target) => ({
