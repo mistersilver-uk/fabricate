@@ -330,6 +330,16 @@ const SITE_MAPPING = [
     sites: 1,
   },
   {
+    // Bulk destroy removes WHOLE STACKS, so the pre-delete capture has to read the
+    // stack count through the configured accessor — `unitsDeleted` is derived from it.
+    // `updateStackQuantity` is deliberately absent: a delete is not a schema-filtered
+    // update, so this file contributes exactly one row and needs no anchors.
+    site: 'BulkDestroyService pre-delete capture',
+    file: 'src/systems/BulkDestroyService.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+  },
+  {
     site: 'AlchemyListingBuilder held counts',
     file: 'src/systems/AlchemyListingBuilder.js',
     accessor: 'readStackQuantity',
