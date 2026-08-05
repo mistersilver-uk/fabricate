@@ -57,6 +57,18 @@ export const V14_CHAT_MODE_BY_LEGACY_ROLL_MODE = Object.freeze({
  * `CONFIG.ChatMessage.documentClass` inherits and therefore cannot fool — decides the
  * method and the translation in one step; they are never chosen independently.
  *
+ * ## An unmapped token is CONTAINED BY THE CALLER, not here
+ *
+ * Pass-through is right for `ic` and for any other real V14 mode key, but it also means
+ * a token that is NEITHER a legacy key nor a V14 mode key reaches `applyMode`, which
+ * THROWS on one. Nothing in this function catches that. Today the single call site —
+ * `Fabricate#_postBulkSalvageChatMessage`, reached through
+ * `BulkSalvageService#_postAggregateCard` — sits inside a `try`/`catch` that logs and
+ * returns `posted: false`, so a bad token costs the run its chat card and never the
+ * awards it already made. That containment is the CALLER'S and a future caller must
+ * bring its own; calling this on a naked path would let a chat-visibility token abort
+ * whatever it is embedded in.
+ *
  * ## The caller must set `chatData.speaker` FIRST
  *
  * `applyMode`'s `ic` branch reads `chatData.speaker.actor` UNGUARDED. This function does

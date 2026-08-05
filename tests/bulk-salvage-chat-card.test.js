@@ -151,6 +151,29 @@ describe('buildBulkSalvageChatContent: the three roll-up statuses', () => {
     assert.doesNotMatch(html, /--partial/, '`partial` already names a progressive award mode');
   });
 
+  it('falls back for an INHERITED status key too, never interpolating a prototype member', () => {
+    // `status` is data, and the modifier lookup is a plain index into a frozen map, so a
+    // truthiness test on the lookup reaches `Object.prototype`: `STATUS_MODIFIERS.constructor`
+    // is the truthy `Object` function, and stringifying it into the class attribute emitted
+    // `class="fabricate-craft-chat--function Object() { [native code] }"` — attribute
+    // injection from a status token. `Object.hasOwn` is what closes it, and this is the pin
+    // that keeps it closed; the `partial` case above passes either way, since `partial` is
+    // not a prototype member.
+    for (const status of ['constructor', 'toString', '__proto__']) {
+      const html = card({ status, actorNames: ['Akra'], subjects: [] });
+      assert.match(
+        html,
+        /fabricate-craft-chat--mixed"/,
+        `${status} should fall back to the mixed modifier`
+      );
+      assert.doesNotMatch(
+        html,
+        /native code/,
+        `${status} must never reach a prototype member and interpolate it into the class name`
+      );
+    }
+  });
+
   it('substitutes every count the summary sentence offers a placeholder for', () => {
     const html = buildBulkSalvageChatContent(
       {
