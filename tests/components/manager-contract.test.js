@@ -3018,9 +3018,33 @@ describe('CraftingSystemManager source contract', () => {
     }
 
     // The roster is player characters only — the same predicate the Access roster uses.
+    //
+    // ANTI-PIN (issue 1024). The old assertion pinned the exact
+    // `game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'`
+    // reach-around this change deletes. Replacing it with a positive
+    // `includes('isPlayerCharacterActor(actor)')` would be a tautology that survives a
+    // WRONG import — so instead assert the hardcoded literal is ABSENT (provably red
+    // before this change, at both the Access and Knowledge rosters) plus the import.
+    assert.equal(
+      appSource.includes("actor?.type === 'character'"),
+      false,
+      'the manager app must not re-hardcode the dnd5e/pf2e player-character actor type'
+    );
+    assert.equal(
+      appSource.includes("actor.type === 'character'"),
+      false,
+      'nor the unchained spelling of it'
+    );
+    assert.equal(
+      appSource.includes('game.fabricate?.isPlayerCharacterActor'),
+      false,
+      'the predicate is not published on game.fabricate, so no site may reach for it there'
+    );
     assert.ok(
-      appSource.includes('game.fabricate?.isPlayerCharacterActor?.(actor)'),
-      'the Knowledge roster reuses the shared player-character predicate'
+      appSource.includes(
+        "import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';"
+      ),
+      'the manager app imports the shared, GM-configurable player-character predicate'
     );
   });
 
