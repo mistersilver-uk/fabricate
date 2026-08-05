@@ -66,6 +66,7 @@ import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
+import { readStackQuantity } from './itemStackQuantity.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
@@ -100,16 +101,6 @@ function actorKey(actor) {
 function finiteOrNull(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
-}
-
-/**
- * The per-item stack size, defaulting a missing/invalid/non-positive count to 1
- * (a present item is at least one). Mirrors the engine's `item.system.quantity`
- * read but never collapses a genuine larger stack.
- */
-function itemStackQuantity(item) {
-  const raw = Number(item?.system?.quantity);
-  return Number.isFinite(raw) && raw > 0 ? raw : 1;
 }
 
 /**
@@ -599,7 +590,7 @@ export class InventoryListingBuilder {
       for (const item of items) {
         const entity = match(item);
         if (!entity?.id) continue;
-        const qty = itemStackQuantity(item);
+        const qty = readStackQuantity(item);
         let entry = owned.get(entity.id);
         if (!entry) {
           entry = { [entityKey]: entity, sources: new Map(), item, documents: [] };

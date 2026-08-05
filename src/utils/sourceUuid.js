@@ -2,6 +2,7 @@
  * @module sourceUuid
  */
 import { getFabricateFlag, isSafeFlagKeySegment } from '../config/flags.js';
+import { hasStackQuantity } from '../systems/itemStackQuantity.js';
 
 /**
  * Resolve the compendium source UUID of a Foundry item document.
@@ -603,8 +604,8 @@ function resolveSourceComponentIdentity(source, components, systemId) {
 
 /**
  * Find an existing actor item that should stack with a freshly-awarded source —
- * one that shares a source-UUID reference with `source` AND carries a
- * `system.quantity` field (so it can be incremented). Items without a quantity
+ * one that shares a source-UUID reference with `source` AND carries a value at the
+ * configured stack-quantity path (so it can be incremented). Items without such a
  * field (unique gear) or with no shared source never match, so they create a new
  * document instead of stacking.
  *
@@ -633,8 +634,10 @@ export function findStackableMatch(items, source, components = [], systemId) {
   if (sourceRefs.size === 0) return null;
   const sourceComponent = resolveSourceComponentIdentity(source, components, systemId);
   for (const item of Array.isArray(items) ? items : []) {
-    const quantity = item?.system?.quantity;
-    if (quantity === undefined || quantity === null) continue;
+    // Stackability, not a count: `hasStackQuantity` tests PRESENCE, so an item with a
+    // stored 0 still stacks (as it did before) and unique gear with no such field
+    // never does.
+    if (!hasStackQuantity(item)) continue;
     const candidateComponent = resolveComponentForItem(item, components, systemId);
     // Skip ONLY when both identities resolve and name different components.
     if (sourceComponent && candidateComponent && sourceComponent.id !== candidateComponent.id) {

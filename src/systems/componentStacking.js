@@ -7,20 +7,20 @@
  * rather than spawn a duplicate stack. Both engine paths funnel their per-item
  * creation through {@link createOrStackComponentItem}, so the behaviour is shared.
  *
- * The quantity read/write path defaults to `system.quantity` — the path every
- * Fabricate crafting/salvage quantity read already uses — and is injectable so
- * issue #853 (configurable per-system quantity path) can supply a resolved path
- * without reworking this seam.
+ * The stack-quantity read/write path is the GM-configured one resolved by
+ * `itemStackQuantity.js` (issue 1024, #853 proposal 1). The `quantityPath` parameter on
+ * {@link createOrStackComponentItem} remains as a pure test seam, now defaulting to the
+ * configured path rather than to a hardcoded literal.
  */
 
-export const DEFAULT_QUANTITY_PATH = 'system.quantity';
+import {
+  itemStackQuantityPath,
+  readStackQuantity,
+  readStoredStackQuantity,
+  updateStackQuantity,
+} from './itemStackQuantity.js';
 
 const AWARDED_QUANTITY_KEY = '_fabricateAwardedQuantity';
-
-function readByPath(target, path) {
-  if (!target || !path) return;
-  return path.split('.').reduce((acc, key) => acc?.[key], target);
-}
 
 /**
  * Tag a produced/updated item with the quantity contributed by THIS award, so
@@ -50,7 +50,7 @@ export function tagAwardedQuantity(item, quantity) {
       enumerable: false,
     });
   } catch {
-    /* frozen document stub — reporting falls back to system.quantity */
+    /* frozen document stub — reporting falls back to the item's own stack quantity */
   }
   return item;
 }
@@ -67,7 +67,7 @@ export function tagAwardedQuantity(item, quantity) {
 export function awardedQuantityOf(item) {
   const tagged = Number(item?.[AWARDED_QUANTITY_KEY]);
   if (Number.isFinite(tagged) && tagged > 0) return tagged;
-  return Number(item?.system?.quantity || 1);
+  return readStackQuantity(item);
 }
 
 /**
@@ -86,8 +86,8 @@ export function awardedQuantityOf(item) {
  * @param {Array<object>} [params.matchingItems] - existing inventory items already
  *   resolved to the produced component; the first updatable one is stacked onto.
  * @param {number}   [params.awardedQuantity] - quantity produced by this call.
- * @param {string}   [params.quantityPath]   - dotted quantity path (default
- *   `system.quantity`); injectable for issue #853.
+ * @param {string}   [params.quantityPath]   - dotted stack-quantity path; defaults to
+ *   the GM-configured path (issue 1024) and stays injectable as a pure test seam.
  * @returns {Promise<object|null>} the created or updated item.
  */
 export async function createOrStackComponentItem({
@@ -95,7 +95,7 @@ export async function createOrStackComponentItem({
   itemData,
   matchingItems = [],
   awardedQuantity = 1,
-  quantityPath = DEFAULT_QUANTITY_PATH,
+  quantityPath = itemStackQuantityPath(),
 }) {
   const amount = Number(awardedQuantity);
   const delta = Number.isFinite(amount) && amount > 0 ? amount : 1;
@@ -105,11 +105,11 @@ export async function createOrStackComponentItem({
     : null;
 
   if (existing) {
-    const current = Number(readByPath(existing, quantityPath));
     // A finite current quantity (including a legitimate 0) is kept; only an
-    // absent/non-numeric quantity defaults to a single unit (issue 858 review).
-    const base = Number.isFinite(current) ? current : 1;
-    await existing.update({ [quantityPath]: base + delta });
+    // absent/non-numeric quantity defaults to a single unit (issue 858 review) — hence
+    // the stored-value reader with an absent default of 1, not `readStackQuantity`.
+    const base = readStoredStackQuantity(existing, { absentDefault: 1, path: quantityPath });
+    await updateStackQuantity(existing, base + delta, quantityPath);
     return existing;
   }
 

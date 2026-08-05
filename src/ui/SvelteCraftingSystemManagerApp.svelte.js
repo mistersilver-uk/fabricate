@@ -30,7 +30,7 @@ import { buildImportReportContent } from '../systems/importReportContent.js';
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 import { getFabricateFlag } from '../config/flags.js';
 import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';
-import { DEFAULT_QUANTITY_PATH } from '../systems/componentStacking.js';
+import { readStackQuantity } from '../systems/itemStackQuantity.js';
 import {
   KNOWLEDGE_MESSAGES,
   deleteOwnedRecipeItemCopy,
@@ -38,12 +38,6 @@ import {
   expendOwnedRecipeItemUse,
   resetActorKnowledgeState,
 } from './svelte/apps/manager/knowledge/knowledgeMutations.js';
-
-function readItemQuantity(item) {
-  const raw = DEFAULT_QUANTITY_PATH.split('.').reduce((value, key) => value?.[key], item);
-  const quantity = Number(raw);
-  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
-}
 
 function getFolderCollectionValues(folders) {
   if (!folders) return [];
@@ -1182,7 +1176,7 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         itemUuid: item.uuid || '',
         name: item.name || '',
         img: item.img || '',
-        quantity: readItemQuantity(item),
+        quantity: readStackQuantity(item),
         timesUsed: usage.timesUsed,
         inert: usage.inert === true,
         matchTier: tier,

@@ -20,7 +20,7 @@
  *   `itemKey` is an index into the ALREADY-RESOLVED ledger, never a uuid to resolve — nothing
  *   here reads a document, so the public facade cannot become a cross-actor document probe.
  *   `perUnit` is the essence map one unit of that stack delivers; `ownedUnits` is the units
- *   left after every component/tag group has claimed, not the raw `system.quantity`.
+ *   left after every component/tag group has claimed, not the raw stack quantity.
  * - **allocation** — `{ [itemKey]: units }`, the units the block draws from each carrier.
  * - **delivered** — `{ [essenceId]: amount }`, what an allocation actually yields.
  *

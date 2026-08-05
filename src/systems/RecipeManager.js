@@ -19,6 +19,7 @@ import {
 import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
+import { readStackQuantity } from './itemStackQuantity.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -1135,7 +1136,7 @@ export class RecipeManager {
       ...this._resolveIngredientVisual(recipe, chosenOption, context.availableItems, consumedItem),
       ...base,
       need: Number(chosenOption?.quantity || 1),
-      have: matching.reduce((sum, item) => sum + (item.system?.quantity || 1), 0),
+      have: matching.reduce((sum, item) => sum + readStackQuantity(item), 0),
       satisfied: true,
     };
   }
@@ -1377,7 +1378,7 @@ export class RecipeManager {
     const matchingItems = availableItems.filter((item) =>
       this.ingredientMatchesItem(recipe, option, item)
     );
-    const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
+    const have = matchingItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
     const need = Number(option?.quantity || 1);
     const choice = {
       optionIndex,
@@ -1413,7 +1414,7 @@ export class RecipeManager {
         itemId: item.uuid || item.id,
         name: item.name ?? '',
         img: item.img ?? null,
-        have: Number(item.system?.quantity || 1),
+        have: readStackQuantity(item),
       }));
   }
 
@@ -1579,8 +1580,9 @@ export class RecipeManager {
    *
    * Every quantity here comes from the RESOLVER's own ledger. In particular
    * `carriers[].ownedUnits` is the units left AFTER the set's non-essence plan has
-   * claimed: no surface re-reads `item.system.quantity`, which is game-system-specific,
-   * can be absent or `NaN`, and would offer the player units the craft cannot spend.
+   * claimed: no surface re-reads the item's raw stack quantity, which lives at a
+   * game-system-specific configured path, can be absent or `NaN`, and would offer the
+   * player units the craft cannot spend.
    *
    * @param {Recipe} recipe
    * @param {IngredientSet} ingredientSet

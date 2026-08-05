@@ -36,6 +36,11 @@ const RAW_MODULES = [
   // IngredientSet imports the shared essence allocator (issue 917); the harness's
   // dependency validator throws a named "add it to rawModules" error without it.
   'src/utils/essenceAllocation.js',
+  // …and, since issue 1024, the canonical stack-quantity accessor plus its own two
+  // dependencies (the shared path walker and the per-system preset table).
+  'src/systems/itemStackQuantity.js',
+  'src/config/stackQuantityPathPresets.js',
+  'src/utils/objectPath.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
   'src/systems/toolCheckBonus.js',

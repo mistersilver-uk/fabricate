@@ -1,4 +1,5 @@
 import { getFabricateFlag } from '../config/flags.js';
+import { readStackQuantity } from '../systems/itemStackQuantity.js';
 
 import { findComponentByName } from './componentNameMatch.js';
 import { itemHasComponentIdentityFlag, resolveComponentForItem } from './sourceUuid.js';
@@ -90,7 +91,7 @@ export function accumulateItemEssences(
 
   for (const item of items || []) {
     const essences = resolveItemEssences(item, components, systemId, resolveComponent);
-    const multiplier = multiplyByQuantity ? Math.max(1, Number(item?.system?.quantity) || 1) : 1;
+    const multiplier = multiplyByQuantity ? readStackQuantity(item) : 1;
 
     for (const [type, quantity] of Object.entries(essences)) {
       accumulated[type] = (accumulated[type] || 0) + quantity * multiplier;
