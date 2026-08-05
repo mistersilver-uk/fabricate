@@ -638,6 +638,8 @@ EssenceDefinition = {
   icon: string,
   colorToken?: string | null, // a `--fab-tag-*` palette key, or null for the accent default
   description?: string,
+  enabled: boolean, // default true; gates essence-carried BEHAVIOUR, never essence arithmetic
+  propertyMacroUuid?: string | null, // a script Macro run against every result this essence contributes to
   sourceComponentId?: string | null,
   sourceItemUuid?: string | null, // compatibility alias; may contain a legacy component id
   associatedSystemItemId?: string | null, // compatibility alias for sourceComponentId
@@ -654,6 +656,22 @@ EssenceDefinition = {
    It has **no** `customColor` sibling — the palette is the whole vocabulary, because a free hex cannot be guaranteed legible against all seven themes.
    Normalization emits it in **both** branches of essence-definition normalization (the object branch and the legacy id-string branch), so a definition never reaches a surface with the field absent.
    A `null` or unrecognized token renders as the theme accent, which is what every essence renders as today, so no migration is required.
+6. `enabled` defaults to **true** and is emitted in **both** branches of essence-definition normalization, as `colorToken` is.
+   The object branch reads `entry.enabled !== false`; the legacy id-string branch emits `true`.
+   No migration is required and adding one would be wrong: essence-definition normalization is a whitelist rebuild that has never emitted the key, so no stored definition carries one and an absent key already reads as enabled.
+   The same holds across export, import, copy-import and the export-payload migration, none of which can write a spurious `false`.
+7. `enabled` gates essence-carried **behaviour**, never essence **arithmetic**.
+   A disabled essence still matches, accumulates and is consumed exactly as before, because a mid-session toggle must not change what an already-held item is worth.
+   It carries nothing onto a crafted result: neither its property macro nor its active-effect transfer runs.
+   A disabled essence is soft-disabled and fully reversible — nothing is deleted, and every stored reference is preserved and still rendered.
+8. A disabled essence MUST NOT be removed from the valid-essence-id set threaded into component normalization, and MUST NOT be filtered out of the component-essence or recipe-essence option sets.
+   Three separate whitelist rebuilds are driven by those sets — component essence-quantity normalization, the component editor's update projection, and the component bulk edit's staged essence map — and each would silently destroy authored quantities for a disabled essence.
+   Only the ADD-NEW offer list withholds a disabled essence; a disabled essence that already carries a positive quantity, or is already referenced, is rendered with a disabled marker and stays editable and clearable.
+9. `propertyMacroUuid` is the GM-authored per-essence property macro.
+   It shares its name and its meaning with `Result.propertyMacroUuid` — a macro that rewrites crafted item data before creation — and runs under the same `features.propertyMacros` gate, additionally gated on `features.essences`.
+   Normalization applies a document-UUID **shape** check and stores `null` for anything else; it deliberately does not require a `Macro.` prefix, because legacy four-segment compendium uuids still resolve and a stricter test would reject a usable macro.
+   Whether the uuid resolves to a script Macro is decided by the editor's drop handler and by the essence editor's validation surface; at craft time an unresolvable value is logged and skipped silently.
+10. Both new fields survive export, import and copy-import unchanged, and the import reference resolver collects `propertyMacroUuid` as a macro reference owned by the essence.
 
 ## RecipeItemDefinition
 
@@ -1674,6 +1692,7 @@ CraftingRunStepState = {
     selectedIngredientSetId: string | null,
     currencySpends: Array<{ unit: string, amount: number }>, // SETTLED spends only
     resolvedEssences: object,
+    essenceEnabled: Record<string, boolean>, // COMPLETE map over every resolvedEssences key
     consumedSummary: Array<{
       itemUuid: string | null, actorUuid: string | null, quantity: number,
       name: string | null, img: string | null, componentId: string | null,
@@ -1749,6 +1768,11 @@ CraftingRunStepState = {
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
+8. `preparedConsumption.essenceEnabled` records each contributing essence's `enabled` state as it stood at START, and the FINISH phase evaluates the essence behaviour gate from it rather than from the live definitions.
+   Evaluating at FINISH would let a mid-run GM toggle change the outcome of a craft whose inputs are already consumed.
+   It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
+   An ABSENT map — a run armed before the field existed — reads as all-enabled.
+   A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
 
 ## Actor Flags
 

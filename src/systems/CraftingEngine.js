@@ -1043,8 +1043,7 @@ export class CraftingEngine {
         toolValidation.tools,
         checkResult,
         options?.resultGroupId || null,
-        null,
-        resolveComponent
+        { resolveComponent }
       );
 
       if (runManager && run) {
@@ -1297,6 +1296,13 @@ export class CraftingEngine {
       null,
       resolveComponent
     );
+    // Enabled-ness is snapshotted HERE, at START, alongside the quantities (issue 1036):
+    // evaluating the behaviour gate at FINISH would let a mid-run GM toggle change the
+    // outcome of a craft whose inputs are already gone.
+    const essenceEnabled = this._snapshotEssenceEnabled(
+      resolvedEssences,
+      this._getRecipeSystem(executionRecipe)
+    );
     const consumedSummary = consumedItems.map(({ item, quantity, ingredient }) => ({
       itemUuid: item.uuid ?? null,
       actorUuid: item.parent?.uuid ?? null,
@@ -1314,6 +1320,7 @@ export class CraftingEngine {
       selectedIngredientSetId: ingredientSet.id,
       currencySpends: currencySettlement.settledSpends,
       resolvedEssences,
+      essenceEnabled,
       consumedSummary,
     });
 
@@ -1381,6 +1388,9 @@ export class CraftingEngine {
       prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
         ? prepared.resolvedEssences
         : {};
+    // Enabled-ness is read from the START snapshot, never live (issue 1036): a mid-run
+    // toggle must not change the outcome of a craft whose inputs are already consumed.
+    const essenceEnabled = this._resumedEssenceEnabled(prepared);
     const summary = Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [];
     const consumedLiveItems = resolveLiveInventoryItemsByUuid(
       componentSourceActors,
@@ -1578,7 +1588,7 @@ export class CraftingEngine {
       toolItems,
       checkResult,
       options?.resultGroupId || null,
-      resolvedEssences
+      { precomputedEssences: resolvedEssences, essenceEnabled }
     );
 
     // Timed misconfiguration (issue 85). Unlike the immediate path, a timed step
@@ -1751,7 +1761,7 @@ export class CraftingEngine {
       toolItems,
       checkResult,
       resultGroupId,
-      resolvedEssences
+      { precomputedEssences: resolvedEssences }
     );
 
     if (runManager && run) {
@@ -3208,6 +3218,11 @@ export class CraftingEngine {
 
   /**
    * Create the result items based on recipe configuration
+   *
+   * The three essence-resolution inputs travel together in one trailing options bag,
+   * matching {@link CraftingEngine#_createSingleResult}'s own shape: they are one
+   * cohesive fact ("how essences resolve for THIS execution"), and only the time-gated
+   * FINISH path supplies the snapshot pair at all.
    * @private
    */
   async _createResultItems(
@@ -3219,8 +3234,11 @@ export class CraftingEngine {
     toolItems,
     checkResult = null,
     selectedResultGroupId = null,
-    precomputedEssences = null,
-    resolveComponent = findMatchingComponent
+    {
+      precomputedEssences = null,
+      essenceEnabled = null,
+      resolveComponent = findMatchingComponent,
+    } = {}
   ) {
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
@@ -3253,7 +3271,7 @@ export class CraftingEngine {
             ...checkResult,
             resolutionMeta: resolved?.meta || {},
           },
-          { step, precomputedEssences, resolveComponent }
+          { step, precomputedEssences, essenceEnabled, resolveComponent }
         );
 
         // De-dup: when two result rows produce the SAME managed component, the second
@@ -3283,7 +3301,7 @@ export class CraftingEngine {
     toolItems,
     recipe,
     checkResult = null,
-    { step = null, precomputedEssences = null, resolveComponent } = {}
+    { step = null, precomputedEssences = null, essenceEnabled = null, resolveComponent } = {}
   ) {
     // Get the source item
     let sourceItem;
@@ -3334,7 +3352,22 @@ export class CraftingEngine {
       setStackQuantity(itemData, result.quantity);
     }
 
-    // Apply macro-based property updates
+    // Apply macro-based property updates. Every CONTRIBUTING essence's own property
+    // macro runs FIRST (issue 1036), in `essenceDefinitions` library order, so the
+    // result's own macro is the LAST writer at any path the two share.
+    const essenceMacrosApplied = await this._runEssencePropertyMacros(itemData, {
+      system,
+      recipe,
+      craftingActor,
+      result,
+      consumedItems,
+      toolItems,
+      checkResult,
+      step,
+      precomputedEssences,
+      essenceEnabled,
+      resolveComponent,
+    });
     const propertyUpdates = await this._runPropertyMacro(
       result.propertyMacroUuid,
       recipe,
@@ -3347,15 +3380,20 @@ export class CraftingEngine {
       precomputedEssences,
       resolveComponent
     );
-    const hasPropertyUpdates =
+    const resultMacroApplied =
       propertyUpdates &&
       typeof propertyUpdates === 'object' &&
       Object.keys(propertyUpdates).length > 0;
-    if (hasPropertyUpdates) {
+    if (resultMacroApplied) {
       for (const [path, value] of Object.entries(propertyUpdates)) {
         foundry.utils.setProperty(itemData, path, value);
       }
     }
+    // The stacking veto is the OR across EVERY macro that applied a path — essence or
+    // result (issue 1036). `createOrStackComponentItem` DISCARDS `itemData` wholesale
+    // when it stacks, so an essence-mutated output that failed to set this would merge
+    // into a plain stack and lose every mutation with no error at all.
+    const hasPropertyUpdates = Boolean(essenceMacrosApplied || resultMacroApplied);
 
     // Stamp the durable component identity on the crafted output so the inventory
     // matcher attributes it to its OWN component and not a sibling reached through a
@@ -3407,7 +3445,8 @@ export class CraftingEngine {
         consumedItems,
         recipe,
         precomputedEssences,
-        resolveComponent
+        resolveComponent,
+        essenceEnabled
       );
     }
 
@@ -3424,6 +3463,17 @@ export class CraftingEngine {
    *   3. Transfer collected effects to the result item via createEmbeddedDocuments.
    *
    * The old ingredient-level extractEffects / effectFilter path has been removed.
+   *
+   * A DISABLED essence carries no behaviour onto a crafted result (issue 1036): its
+   * effects are not collected, exactly as its property macro does not run. Its
+   * quantities still match, accumulate and are consumed — `enabled` gates essence-carried
+   * BEHAVIOUR, never essence ARITHMETIC, so a mid-session toggle cannot change what an
+   * already-held item is worth.
+   *
+   * This walk deliberately stays SEPARATE from the essence property-macro loop, which
+   * iterates `essenceDefinitions` for GM-authorable order. Collapsing the two would
+   * change the order of the `effectsData` array handed to
+   * `createEmbeddedDocuments('ActiveEffect', ...)`.
    * @private
    */
   async _transferEffects(
@@ -3431,7 +3481,8 @@ export class CraftingEngine {
     consumedItems,
     recipe,
     precomputedEssences = null,
-    resolveComponent = findMatchingComponent
+    resolveComponent = findMatchingComponent,
+    essenceEnabled = null
   ) {
     // 1. Get the crafting system and verify essences are enabled
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
@@ -3455,6 +3506,10 @@ export class CraftingEngine {
 
     for (const essenceId of contributingEssenceIds) {
       const definition = essenceDefinitions.find((d) => d.id === essenceId);
+      // BEFORE `_sourceUuidForEssenceDefinition`, and null-safe: `.find(...)` returns
+      // `undefined` for an essence deleted between a timed craft's START and FINISH, a
+      // state the shipped code survives only because that helper guards `!definition`.
+      if (!this._essenceCarriesBehaviour(definition, essenceId, essenceEnabled)) continue;
       const sourceItemUuid = this._sourceUuidForEssenceDefinition(definition, system);
       if (!sourceItemUuid) continue;
 
@@ -3470,6 +3525,253 @@ export class CraftingEngine {
     // 4. Transfer all collected effects to the result item
     if (effectsData.length === 0) return;
     await resultItem.createEmbeddedDocuments('ActiveEffect', effectsData);
+  }
+
+  /**
+   * Whether an essence carries its BEHAVIOUR onto this result — the ONE predicate behind
+   * both essence-carried behaviours (issue 1036), so the effect transfer and the property
+   * macro can never disagree about a disabled essence.
+   *
+   * A time-gated craft evaluates the SNAPSHOT taken at START (`preparedConsumption
+   * .essenceEnabled`), never the live definition: evaluating at FINISH would let a
+   * mid-run GM toggle change the outcome of a craft whose inputs are already consumed.
+   * The snapshot is a COMPLETE map over the START `resolvedEssences` keys, so a key
+   * present in it always wins; an ABSENT key (a run armed before this change, or a
+   * collapsed multi-step chain, which has no snapshot at all and executes live at
+   * maturity) falls through to the live definition and therefore reads as enabled.
+   *
+   * @param {object|undefined} definition the live essence definition, or `undefined` for
+   *   an essence deleted since the contribution was resolved.
+   * @param {string} essenceId
+   * @param {Record<string, boolean>|null} [essenceEnabled] the START snapshot.
+   * @returns {boolean}
+   * @private
+   */
+  _essenceCarriesBehaviour(definition, essenceId, essenceEnabled = null) {
+    if (
+      essenceEnabled &&
+      typeof essenceEnabled === 'object' &&
+      Object.hasOwn(essenceEnabled, essenceId)
+    ) {
+      return essenceEnabled[essenceId] !== false;
+    }
+    return definition?.enabled !== false;
+  }
+
+  /**
+   * The START-phase enabled-ness snapshot for a time-gated step: one entry for EVERY
+   * contributing essence, not only the disabled ones (issue 1036).
+   *
+   * Completeness is load-bearing rather than tidy. Run persistence is `actor.setFlag` via
+   * `persistFabricateRunContainer`, whose merge cannot delete a key inside a SURVIVING
+   * run, so a key omitted from a later write resurrects with its old value. A map of only
+   * the disabled ids would also be indistinguishable from an absent map for an all-enabled
+   * craft, which is exactly the state the absent-map fallback has to keep meaning
+   * "evaluate live".
+   *
+   * @param {object} resolvedEssences the START `resolvedEssences` map.
+   * @param {object|null} system
+   * @returns {Record<string, boolean>}
+   * @private
+   */
+  /**
+   * The enabled-ness map a RESUMING time-gated step evaluates its behaviour gate from.
+   *
+   * A run armed BEFORE `essenceEnabled` existed carries no map, and resuming it must read
+   * as ALL-ENABLED — the behaviour it was armed under — rather than falling through to the
+   * live definitions, which the GM may have toggled while it was counting down. This
+   * therefore synthesises a complete all-true map over the START keys rather than
+   * returning `null`: `null` means "no snapshot at all, evaluate live", which is the
+   * COLLAPSED-chain carve-out and a genuinely different fact. That chain consumes nothing
+   * when its single summed gate is armed and executes every step live at maturity, so it
+   * has no START snapshot of any kind and correctly evaluates enabled-ness at maturity.
+   *
+   * @param {object} prepared the step's `preparedConsumption`.
+   * @returns {Record<string, boolean>|null}
+   * @private
+   */
+  _resumedEssenceEnabled(prepared) {
+    const stored = prepared?.essenceEnabled;
+    if (stored && typeof stored === 'object' && Object.keys(stored).length > 0) return stored;
+    const resolved = prepared?.resolvedEssences;
+    if (!resolved || typeof resolved !== 'object') return null;
+    return Object.fromEntries(Object.keys(resolved).map((essenceId) => [essenceId, true]));
+  }
+
+  _snapshotEssenceEnabled(resolvedEssences, system) {
+    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const snapshot = {};
+    for (const essenceId of Object.keys(resolvedEssences || {})) {
+      const definition = definitions.find((def) => def?.id === essenceId);
+      snapshot[essenceId] = definition?.enabled !== false;
+    }
+    return snapshot;
+  }
+
+  /**
+   * Run every contributing essence's own property macro against the crafted item data,
+   * before the result's own macro (issue 1036).
+   *
+   * The seam is `_createSingleResult`, immediately after `itemData` is populated and
+   * before the item is created — which makes this run for SALVAGE awards too, live and
+   * with the salvaged component's own essences as the contributing set, exactly as
+   * `_transferEffects` already does there.
+   *
+   * Ordering is by `essenceDefinitions` LIBRARY POSITION, filtered to the contributing
+   * set — never by iterating `resolvedEssences`. That object is accumulated over
+   * `consumedItems`, so its key order is integer-like ids first in ascending numeric
+   * order (reachable: `_toKey` permits digit-only slugs) and then inventory scan order.
+   * Neither is stable or authorable, and with last-writer-wins that would make the
+   * crafted result non-deterministic. `_transferEffects` iterates `resolvedEssences`
+   * directly, but it APPENDS to a list and is order-insensitive, so it is no precedent
+   * for an order-sensitive consumer.
+   *
+   * Updates are applied per macro, in loop order, immediately after that macro returns —
+   * never spread-merged into one map first, because the returns are string PATHS and a
+   * spread is not order-equivalent when one macro returns a subtree and another a leaf.
+   * Two essences writing one path is supported, not an error, and warns about nothing.
+   *
+   * TWO gates apply: `features.propertyMacros` (which defaults to false) AND
+   * `features.essences`, the latter matching `_transferEffects`. `_buildEssenceContext`
+   * resolves contributions regardless of the master switch, so this reads it explicitly
+   * rather than inheriting it.
+   *
+   * The system, both gates and the essence context are resolved ONCE and then iterated.
+   * This deliberately does not call `_runPropertyMacro` per essence: that re-resolves the
+   * manager, re-checks the gate and rebuilds the whole context, and `_buildEssenceContext`
+   * re-runs `resolveItemEssences` over every consumed item, so a per-essence call would
+   * rebuild the identical context N+1 times per result on the synchronous craft path.
+   *
+   * @param {object} itemData the crafted item data, mutated in place.
+   * @returns {Promise<boolean>} whether ANY essence macro applied at least one path — the
+   *   essence half of `_createSingleResult`'s `hasPropertyUpdates` stacking veto.
+   * @private
+   */
+  async _runEssencePropertyMacros(
+    itemData,
+    {
+      system,
+      recipe,
+      craftingActor,
+      result,
+      consumedItems,
+      toolItems,
+      checkResult = null,
+      step = null,
+      precomputedEssences = null,
+      essenceEnabled = null,
+      resolveComponent = findMatchingComponent,
+    } = {}
+  ) {
+    const features = system?.features || {};
+    if (features.propertyMacros !== true || features.essences !== true) return false;
+
+    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    if (definitions.length === 0) return false;
+
+    const { resolvedEssences, essenceSources } = this._buildEssenceContext(
+      consumedItems,
+      recipe,
+      precomputedEssences,
+      resolveComponent
+    );
+    const runnable = definitions.filter(
+      (definition) =>
+        typeof definition?.propertyMacroUuid === 'string' &&
+        definition.propertyMacroUuid &&
+        Object.hasOwn(resolvedEssences, definition.id) &&
+        this._essenceCarriesBehaviour(definition, definition.id, essenceEnabled)
+    );
+    if (runnable.length === 0) return false;
+
+    const context = {
+      recipe: recipe?.toJSON?.() || recipe,
+      craftingSystem: system,
+      craftingActor,
+      ingredientPool: consumedItems.map(({ item, quantity, ingredient }) => ({
+        item,
+        quantity,
+        ingredient,
+      })),
+      resolvedIngredients: consumedItems.map(({ item, quantity, ingredient }) => ({
+        item,
+        quantity,
+        ingredient,
+      })),
+      resolvedTools: toolItems.map(({ item, tool }) => ({ item, tool })),
+      resolvedEssences,
+      essenceSources,
+      checkResult,
+      result: result?.toJSON?.() || result,
+      step,
+    };
+
+    let applied = false;
+    for (const definition of runnable) {
+      // Each macro is ISOLATED: a throw fails that essence only and every later macro
+      // still runs and still applies. `essence` and `essenceQuantity` are what let the
+      // archetypal macro ("+1 damage per unit of Fire") find its OWN contribution —
+      // without them a shared macro cannot tell which essence invoked it.
+      const updates = await this._runOneEssencePropertyMacro(definition, {
+        ...context,
+        essence: definition,
+        essenceQuantity: resolvedEssences[definition.id],
+      });
+      if (!updates) continue;
+      for (const [path, value] of Object.entries(updates)) {
+        foundry.utils.setProperty(itemData, path, value);
+        applied = true;
+      }
+    }
+    return applied;
+  }
+
+  /**
+   * Run ONE essence property macro and return its flat path -> value map, or `null`.
+   *
+   * An UNRESOLVABLE `propertyMacroUuid` — one that does not resolve to a Macro carrying a
+   * string `command` — is logged and skipped SILENTLY. It deliberately does NOT raise
+   * `ui.notifications.error`: the result-macro precedent fires one toast per recipe, while
+   * this would fire one per essence per result, on every craft in the system, on the
+   * crafting PLAYER's screen, for a GM-side authoring defect only the GM can fix. The
+   * editor's drop handler and the Validation tab are where that defect is surfaced.
+   *
+   * Return handling matches the result macro exactly: `null`/`undefined` is a no-op, and a
+   * non-object or Array return is warned about and ignored.
+   *
+   * @param {object} definition
+   * @param {object} context
+   * @returns {Promise<object|null>}
+   * @private
+   */
+  async _runOneEssencePropertyMacro(definition, context) {
+    const macroUuid = definition.propertyMacroUuid;
+    let macro;
+    try {
+      macro = await fromUuid(macroUuid);
+    } catch {
+      macro = null;
+    }
+    if (!macro || typeof macro.command !== 'string') {
+      console.warn(
+        `Fabricate | Essence "${definition.name || definition.id}" property macro could not be resolved and was skipped (${macroUuid})`
+      );
+      return null;
+    }
+
+    try {
+      const updates = await MacroExecutor.run(macroUuid, context);
+      if (updates == null) return null;
+      if (typeof updates !== 'object' || Array.isArray(updates)) {
+        console.warn(`Fabricate | Essence property macro ${macroUuid} did not return an object`);
+        return null;
+      }
+      return updates;
+    } catch (error) {
+      console.error(`Fabricate | Essence property macro failed (${macroUuid})`, error);
+      ui?.notifications?.error?.(`Property macro failed: ${error.message || macroUuid}`);
+      return null;
+    }
   }
 
   _sourceUuidForEssenceDefinition(definition, system) {

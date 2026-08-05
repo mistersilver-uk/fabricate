@@ -464,6 +464,11 @@ function compileManagerRoot() {
     // The category totals both browser models group with (issue 676). Imported by BOTH
     // of the two above, so omitting it HANGS every mounted manager test.
     'src/utils/browserGroupCounts.js',
+    // The shared page-window model (issue 1036) — the second leaf BOTH browser models
+    // above now import, extracted so the third studio's pager is not a third copy of the
+    // same arithmetic. Its sibling `browserGroupCounts.js` documents the consequence of
+    // omitting it: the suite HANGS as `# cancelled` rather than naming the missing file.
+    'src/utils/browserPagination.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     // foundryBridge imports the shared rich-text-to-plain-text normalizer when it

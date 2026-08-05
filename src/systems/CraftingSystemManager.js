@@ -29,6 +29,7 @@ import {
   normalizeCustomRecipeCategories,
   normalizeRecipeCategory,
 } from '../utils/recipeCategories.js';
+import { recipeReferencesEssence } from '../utils/recipeEssenceReferences.js';
 import { resolveRecipeCheckTierOptions } from '../utils/routedOutcomeKeywords.js';
 import {
   getCompendiumSourceUuid,
@@ -1279,10 +1280,36 @@ export class CraftingSystemManager {
     return token || null;
   }
 
+  /**
+   * The GM-authored per-essence property macro (issue 1036): a macro run against every
+   * crafted (and salvaged) result the essence contributes to, before the result's own
+   * `propertyMacroUuid`, under `features.propertyMacros` AND `features.essences`.
+   *
+   * This is a SHAPE check, not a macro check. `_looksLikeDocumentUuid` admits `Item.`,
+   * `Actor.` and any `Compendium.` prefix, and it must stay that permissive because
+   * `foundry.utils.parseUuid` still re-interprets legacy four-segment compendium uuids —
+   * a `/^Macro\./` tightening would reject a resolvable macro. Whether the uuid resolves
+   * to a *script* Macro is decided in two other places: the editor's drop handler (which
+   * only ever writes a uuid it resolved) and the Validation tab's resolvability check. At
+   * craft time an unresolvable value is logged and skipped SILENTLY — see
+   * `CraftingEngine._runEssencePropertyMacros`.
+   * @private
+   */
+  _normalizeEssencePropertyMacroUuid(value) {
+    return this._looksLikeDocumentUuid(value) ? value : null;
+  }
+
   _normalizeEssenceDefinition(entry, usedIds = new Set()) {
     // BOTH branches below are whitelist REBUILDS that drop any key they do not name,
     // so every persisted field must appear in both or it is silently lost on the next
-    // save. `colorToken` is the newest such field (issue 917).
+    // save. `colorToken` (issue 917) and `enabled` / `propertyMacroUuid` (issue 1036)
+    // are the newest such fields.
+    //
+    // `enabled` needs NO migration, and adding one would be wrong: this whitelist has
+    // never emitted the key, so no stored definition carries one and `entry.enabled !==
+    // false` reads absent as `true`. The in-file precedent is
+    // `_normalizeRecipeItemDefinition` (`_normalizeTool` delegates to the `Tool` model,
+    // which is where its own default-true lives).
     if (typeof entry === 'string') {
       const base = entry.trim();
       if (!base) return null;
@@ -1292,6 +1319,8 @@ export class CraftingSystemManager {
         description: '',
         icon: 'fas fa-mortar-pestle',
         colorToken: null,
+        enabled: true,
+        propertyMacroUuid: null,
         sourceComponentId: null,
         sourceItemUuid: null,
         associatedSystemItemId: null, // transitional alias
@@ -1316,6 +1345,8 @@ export class CraftingSystemManager {
       description: String(entry.description || '').trim(),
       icon: String(entry.icon || '').trim() || 'fas fa-mortar-pestle',
       colorToken: this._normalizeEssenceColorToken(entry.colorToken),
+      enabled: entry.enabled !== false,
+      propertyMacroUuid: this._normalizeEssencePropertyMacroUuid(entry.propertyMacroUuid),
       sourceComponentId,
       sourceItemUuid,
       associatedSystemItemId: sourceComponentId, // transitional alias
@@ -5342,16 +5373,7 @@ export class CraftingSystemManager {
         ingredientSets: this._stripEssenceFromSets(step.ingredientSets, essenceId),
       }));
 
-      const hasResults =
-        (updated.resultGroups?.length || 0) > 0 ||
-        (updated.results?.length || 0) > 0 ||
-        (updated.steps || []).some((step) => (step.resultGroups?.length || 0) > 0);
-      const hasIngredientSets =
-        (updated.ingredientSets?.length || 0) > 0 ||
-        (updated.steps || []).some((step) => (step.ingredientSets?.length || 0) > 0);
-      if (!hasIngredientSets || !hasResults) {
-        updated.enabled = false;
-      }
+      if (this._recipeLostItsShape(updated)) updated.enabled = false;
 
       await this.recipeManager.updateRecipe(recipe.id, updated, {
         notify: false,
@@ -5372,6 +5394,205 @@ export class CraftingSystemManager {
     await this._reconcileAlchemySignaturesAfterDeletion(system);
 
     return true;
+  }
+
+  /**
+   * Apply a bulk edit — any of icon, colour and enabled status — to a SET of essence
+   * definitions in ONE `craftingSystems` write (issue 1036).
+   *
+   * The essence twin of {@link CraftingSystemManager#applyBulkEditToComponents}. It
+   * routes through {@link CraftingSystemManager#updateSystem} rather than mutating
+   * `system.essenceDefinitions` and calling `save()` directly, because that is where the
+   * alchemy guard lives: an essences edit to an ALREADY-alchemy system runs
+   * `_assertNoAlchemySignatureCollisions`, which THROWS, so a status flip that would
+   * collapse two recipes onto one signature is BLOCKED — per
+   * `destructive-changes-and-migrations/spec.md` §Alchemy Uniqueness Revalidation clauses
+   * 3 and 5 — instead of silently disabling recipes. `updateSystem` issues exactly one
+   * `save()` for an essences-only patch and emits the one systems-changed hook.
+   *
+   * **Every axis is presence-gated on `Object.hasOwn`, NEVER truthiness.** `enabled:
+   * false` (Disable) and `colorToken: null` (Clear colour) are FALSY BUT REAL staged
+   * edits, and a truthiness test would silently drop the two most ordinary operations the
+   * panel offers. Both shipped precedents — `applyBulkEditToComponents`'s
+   * `essences`/`difficulty` guard and `applyBulkEditToRecipes`'s `enabled`/`locked`/
+   * `checkTierId` guard — document exactly this trap in their own comments.
+   *
+   * An empty `edit` (nothing staged) is a no-op returning `{ updated: 0 }` and issues NO
+   * write at all, so an accidental Apply cannot re-normalize a whole system's essences.
+   *
+   * @param {string} systemId
+   * @param {Iterable<string>} essenceIds ids of the essences to mutate. A foreign or
+   *   dangling id is simply absent from the resolved cohort rather than an error.
+   * @param {{icon?: string, colorToken?: ?string, enabled?: boolean}} [edit]
+   * @returns {Promise<{updated: number, essenceIds: string[]}>} the ids actually changed.
+   * @throws {Error} when the system does not resolve, or when the resulting system would
+   *   carry an alchemy signature collision.
+   */
+  async applyBulkEditToEssences(systemId, essenceIds, edit = {}) {
+    this._assertGM('apply a bulk edit to essences');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const targetIds = new Set(normalizeSelectionIds(essenceIds));
+    if (targetIds.size === 0) return { updated: 0, essenceIds: [] };
+
+    const bulkEdit = edit && typeof edit === 'object' ? edit : {};
+    const hasIcon = Object.hasOwn(bulkEdit, 'icon') && String(bulkEdit.icon || '').trim() !== '';
+    const hasColorToken = Object.hasOwn(bulkEdit, 'colorToken');
+    const hasEnabled = Object.hasOwn(bulkEdit, 'enabled');
+    if (!hasIcon && !hasColorToken && !hasEnabled) return { updated: 0, essenceIds: [] };
+
+    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const changedIds = [];
+    const next = definitions.map((definition) => {
+      if (!targetIds.has(String(definition?.id ?? ''))) return definition;
+      changedIds.push(String(definition.id));
+      return {
+        ...definition,
+        icon: hasIcon ? String(bulkEdit.icon).trim() : definition.icon,
+        colorToken: hasColorToken ? bulkEdit.colorToken : definition.colorToken,
+        enabled: hasEnabled ? bulkEdit.enabled === true : definition.enabled !== false,
+      };
+    });
+    if (changedIds.length === 0) return { updated: 0, essenceIds: [] };
+
+    await this.updateSystem(systemId, { essenceDefinitions: next });
+    return { updated: changedIds.length, essenceIds: changedIds };
+  }
+
+  /**
+   * Delete a SET of essence definitions in ONE `craftingSystems` write and ONE `recipes`
+   * write (issue 1036).
+   *
+   * **The batched recipe cascade is the point of this method existing.**
+   * {@link RecipeManager#updateRecipe} ends in its own `save()` — a full replace of the
+   * `recipes` world setting — so looping {@link CraftingSystemManager#deleteEssence} would
+   * issue one `recipes` write per rewritten recipe, each triggering `reload()` plus a full
+   * serialization diff plus `Hooks.callAll` on EVERY connected client, and a recipe
+   * referencing two deleted essences would be written twice. Instead the union rewrite is
+   * computed per recipe ONCE, each is written with `{ persist: false, emitChange: false }`,
+   * and exactly one `recipeManager.save()`, one `this.save()`, one `_notifySystemsChanged()`,
+   * one summary notification and one `_reconcileAlchemySignaturesAfterDeletion` follow.
+   *
+   * Because both settings are REPLACED rather than merged, neither needs a `-=` deletion key.
+   *
+   * The recipe rewrites deliberately run BEFORE `await this.save()`, exactly as
+   * {@link CraftingSystemManager#deleteEssence} does. That ordering is only safe because the
+   * disabled-essence activation blocker lives in `_validateRecipeForActivation` and NOT in
+   * `_validateRecipeForPersistence`: a persistence-level blocker would throw partway through
+   * this loop with `essenceDefinitions` and the component essence maps already mutated in
+   * memory, some recipes written, and nothing persisted.
+   *
+   * Blocked-in-use refusal is NOT enforced here. `deleteBlocked` is a UI-only card field and
+   * {@link CraftingSystemManager#deleteEssence} deliberately strips the essence from carrying
+   * components regardless of it; the caller partitions the selection before calling.
+   *
+   * @param {string} systemId
+   * @param {Iterable<string>} essenceIds
+   * @returns {Promise<{deleted: number, essenceIds: string[], recipesUpdated: number}>}
+   */
+  async deleteEssences(systemId, essenceIds) {
+    this._assertGM('delete essences');
+    const system = this.getSystem(systemId);
+    if (!system) throw new Error(`Crafting system not found: ${systemId}`);
+
+    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const requested = new Set(normalizeSelectionIds(essenceIds));
+    const removed = definitions.filter((def) => requested.has(String(def?.id ?? '')));
+    if (removed.length === 0) return { deleted: 0, essenceIds: [], recipesUpdated: 0 };
+
+    const removedIds = removed.map((def) => String(def.id));
+    const removedIdSet = new Set(removedIds);
+
+    system.essenceDefinitions = definitions.filter(
+      (def) => !removedIdSet.has(String(def?.id ?? ''))
+    );
+    system.essences = system.essenceDefinitions.map((def) => def.id);
+
+    // Defensively strip every deleted essence from any component that still carries it.
+    for (const component of system.components || []) {
+      if (!component.essences) continue;
+      for (const essenceId of removedIds) {
+        if (essenceId in component.essences) delete component.essences[essenceId];
+      }
+    }
+
+    const recipesUpdated = await this._stripEssencesFromRecipes(systemId, removedIds);
+
+    await this.save();
+    this._notifySystemsChanged();
+
+    if (recipesUpdated > 0) {
+      ui?.notifications?.info?.(
+        `Removed ${removedIds.length} essence(s) and updated ${recipesUpdated} recipe(s).`
+      );
+    }
+
+    await this._reconcileAlchemySignaturesAfterDeletion(system);
+
+    return { deleted: removedIds.length, essenceIds: removedIds, recipesUpdated };
+  }
+
+  /**
+   * Strip every deleted essence from every referencing recipe in ONE `recipes` write.
+   *
+   * Each recipe is rewritten ONCE for the whole set — a recipe referencing two deleted
+   * essences must not be written twice — and the trailing `save()` is the only persist.
+   *
+   * @param {string} systemId
+   * @param {string[]} removedIds
+   * @returns {Promise<number>} how many recipes were rewritten.
+   * @private
+   */
+  async _stripEssencesFromRecipes(systemId, removedIds) {
+    const recipes = this.recipeManager
+      .getRecipes({})
+      .filter(
+        (recipe) =>
+          recipe.craftingSystemId === systemId &&
+          removedIds.some((essenceId) => recipeReferencesEssence(recipe, essenceId))
+      );
+
+    for (const recipe of recipes) {
+      const updated = recipe.toJSON();
+      for (const essenceId of removedIds) {
+        updated.ingredientSets = this._stripEssenceFromSets(updated.ingredientSets, essenceId);
+        updated.steps = (updated.steps || []).map((step) => ({
+          ...step,
+          ingredientSets: this._stripEssenceFromSets(step.ingredientSets, essenceId),
+        }));
+      }
+      if (this._recipeLostItsShape(updated)) updated.enabled = false;
+
+      await this.recipeManager.updateRecipe(recipe.id, updated, {
+        persist: false,
+        notify: false,
+        emitChange: false,
+        allowIncomplete: true,
+      });
+    }
+
+    if (recipes.length > 0) await this.recipeManager.save();
+    return recipes.length;
+  }
+
+  /**
+   * Whether a rewritten recipe has lost its ingredient sets or its results entirely and
+   * must therefore be clamped to disabled. Shared by the single and set essence deletes so
+   * the two cannot disagree about what "no longer craftable" means.
+   * @param {object} updated a plain recipe JSON.
+   * @returns {boolean}
+   * @private
+   */
+  _recipeLostItsShape(updated) {
+    const hasResults =
+      (updated.resultGroups?.length || 0) > 0 ||
+      (updated.results?.length || 0) > 0 ||
+      (updated.steps || []).some((step) => (step.resultGroups?.length || 0) > 0);
+    const hasIngredientSets =
+      (updated.ingredientSets?.length || 0) > 0 ||
+      (updated.steps || []).some((step) => (step.ingredientSets?.length || 0) > 0);
+    return !hasIngredientSets || !hasResults;
   }
 
   /**
@@ -5431,28 +5652,19 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Whether a recipe references the given essence in any ingredient set — via EITHER
-   * the legacy per-set `essences` map (back-compat read) OR a first-class essence
-   * ingredient OPTION (`match.type === 'essence'`) inside an ingredient group. Walks
-   * both recipe-level and step-level ingredient sets.
+   * Whether a recipe references the given essence in any ingredient set.
+   *
+   * A thin delegator to the shared {@link recipeReferencesEssence} leaf (issue 1036),
+   * which the admin store's `recipeUsageCount` projection also reads — the store calls no
+   * underscore-private manager method, and two walks would let the row's count disagree
+   * with the cascade this manager actually performs. Retained as a method so existing
+   * callers and subclasses are unaffected.
    * @param {object} recipe
    * @param {string} essenceId
    * @returns {boolean}
    */
   _recipeReferencesEssence(recipe, essenceId) {
-    const data = typeof recipe.toJSON === 'function' ? recipe.toJSON() : recipe;
-    const sets = [
-      ...(data.ingredientSets || []),
-      ...(data.steps || []).flatMap((step) => step.ingredientSets || []),
-    ];
-    return sets.some((set) => {
-      if (set.essences && essenceId in set.essences) return true;
-      return (set.ingredientGroups || []).some((group) =>
-        (group.options || []).some(
-          (option) => option?.match?.type === 'essence' && option.match.essenceId === essenceId
-        )
-      );
-    });
+    return recipeReferencesEssence(recipe, essenceId);
   }
 
   /**

@@ -120,6 +120,15 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
     'IssueIngredientSetEssenceQuantity',
     'Ingredient set "{set}" has an invalid essence quantity',
   ],
+  // ACTIVATION-only essence blocker (issue 1036). A disabled essence carries no behaviour
+  // onto a crafted result, so a recipe requiring one may still be SAVED but may not be
+  // ENABLED. Only a DEFINED essence can be disabled, and `_normalizeEssenceDefinition`
+  // guarantees every definition a non-empty `name`, so this always names the essence and
+  // needs no name-free twin.
+  ingredientSetDisabledEssence: [
+    'IssueIngredientSetDisabledEssence',
+    'Ingredient set "{set}" requires essence "{essence}", which is disabled in this system',
+  ],
   // Tag-placeholder issue from RecipeManager (issue 595). The group is named by
   // name-or-position; the tag is an authored tag name, not an id.
   ingredientGroupUnknownTag: [

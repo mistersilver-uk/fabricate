@@ -202,7 +202,7 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 1. Consume ingredients and apply tool usage/breakage (destroying or flagging-broken exhausted tools) according to success/failure policy.
 2. Build result item payloads.
-3. Apply property macros per result item when enabled.
+3. Apply property macros per result item when enabled: every contributing essence's own property macro runs first, in essence-library order, and then the result's own macro, so a recipe-specific macro is the last writer at any path the two share.
 4. Create result items.
 
 ### Run Progression
@@ -286,15 +286,46 @@ The dead-end memory is distinct from run history: it is leak-safe (a fizzle matc
 
 ## Effect Transfer Semantics
 
-When `recipe.transferEffects === true` and essences are enabled:
+Effect transfer runs only when all three conditions hold: `recipe.transferEffects === true`, `CraftingSystem.features.effectTransfer === true`, and `CraftingSystem.features.essences === true`.
 
 1. Determine contributing essence IDs from resolved ingredients using the same item-flag-first, component-definition-fallback essence resolution used by craftability checks.
-2. For each contributing essence, resolve the essence source from `EssenceDefinition.sourceComponentId` when present, then from that component's `originItemUuid` or compatible source evidence when available.
-3. If no source component is configured, use legacy `EssenceDefinition.sourceItemUuid` as compatibility input when it resolves directly to a Foundry item.
-4. Skip stale source components, missing source item UUIDs, and unresolved legacy source UUIDs without throwing.
-5. Transfer collected effects to created result items using the standard effect-transfer pipeline.
+2. Skip any contributing essence whose definition is DISABLED (`EssenceDefinition.enabled === false`), before its source is resolved.
+   A disabled essence carries no behaviour onto a crafted result, so its effects are not collected; its quantities still match, accumulate and are consumed.
+   A contributing essence with no definition at all — one deleted between a timed craft's START and FINISH — is skipped without throwing.
+3. For each remaining contributing essence, resolve the essence source from `EssenceDefinition.sourceComponentId` when present, then from that component's `originItemUuid` or compatible source evidence when available.
+4. If no source component is configured, use legacy `EssenceDefinition.sourceItemUuid` as compatibility input when it resolves directly to a Foundry item.
+5. Skip stale source components, missing source item UUIDs, and unresolved legacy source UUIDs without throwing.
+6. Transfer collected effects to created result items using the standard effect-transfer pipeline.
 
 Transfer scaling by essence quantity is out of scope for this phase.
+
+The anti-stacking veto stays FLAG-derived and is deliberately not made essence-aware.
+It is computed from `recipe.transferEffects` and `features.effectTransfer` BEFORE the contributing-essence walk, so a result whose every contributing essence is disabled still declines to stack onto an existing plain item — exactly as a result whose every essence source is unresolvable already does.
+Narrowing it would make stacking depend on a mid-session GM toggle, which is the hazard the behaviour gate exists to prevent.
+There is therefore no symmetry with the property-macro veto described below, which IS an OR across the macros that actually applied a path.
+
+## Essence Property Macros
+
+The sibling essence-carried behaviour to effect transfer: it walks the same contributing-essence set and shares the same `features.essences` gate.
+
+An `EssenceDefinition.propertyMacroUuid` names a script Macro run against the item data of every result the essence contributed to, before that item is created.
+
+1. Two gates apply, and both are read explicitly: `CraftingSystem.features.propertyMacros === true` (which defaults to false) AND `CraftingSystem.features.essences === true`.
+   Essence contributions are resolved regardless of the master switch, so the macro loop cannot inherit that gate from the contribution walk.
+2. The contributing set is the resolved-essence map for the craft; an essence contributing nothing does not run.
+3. A DISABLED essence's property macro does not run, per the essence behaviour gate.
+4. Macros run in ESSENCE-LIBRARY order — the system's `essenceDefinitions` order, filtered to the contributing set — and never in resolved-essence map order, which is accumulated over consumed items and is neither stable nor GM-authorable.
+5. Every essence macro runs BEFORE the result's own `propertyMacroUuid`, so a recipe-specific macro is the last writer.
+6. Each macro returns a flat map of property PATH to value; `null` or `undefined` is a no-op and a non-object or array return is warned about and ignored.
+   Returns are applied per macro, in loop order, immediately after that macro returns — never merged into one map first, because a subtree return and a leaf return are not order-equivalent under a merge.
+   Two essences writing one path is supported, resolves last-writer-wins, and is not an error.
+7. Each macro is isolated: a throw fails that essence only, and every later macro still runs and still applies.
+   A `propertyMacroUuid` that does not resolve to a Macro carrying a string command is logged and skipped SILENTLY, without a user-facing notification, because a per-essence-per-result notification would report a GM-side authoring defect on the crafting player's screen on every craft in the system.
+8. A result that ANY macro — essence or result — mutated must never merge into an existing stack, because stacking discards the mutated item data wholesale.
+   The stacking veto is the OR across every macro that applied at least one path.
+9. Essence property macros also run for SALVAGE awards, live, with the salvaged component's own essences as the contributing set, consistent with effect transfer already running at that seam.
+   Salvage never transfers effects (its synthetic recipe view sets `transferEffects: false`), so the macro half is the only essence-carried behaviour reachable there.
+10. A time-gated craft evaluates the disabled-essence gate from the enabled-ness snapshot taken at START (see `data-models/spec.md` *CraftingRunStep*), never from the live definitions.
 
 ## Persistence and Run State
 

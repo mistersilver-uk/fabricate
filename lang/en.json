@@ -1644,6 +1644,7 @@
           "IssueIngredientSetUnknownEssence": "Ingredient set \"{set}\" references an essence that is not defined in this system",
           "IssueIngredientSetEssenceQuantityNamed": "Ingredient set \"{set}\" has an invalid quantity for essence \"{essence}\"",
           "IssueIngredientSetEssenceQuantity": "Ingredient set \"{set}\" has an invalid essence quantity",
+          "IssueIngredientSetDisabledEssence": "Ingredient set \"{set}\" requires essence \"{essence}\", which is disabled in this system",
           "IssueIngredientGroupUnknownTag": "Ingredient group \"{group}\" references unknown tag \"{tag}\""
         },
         "SystemOverview": {
