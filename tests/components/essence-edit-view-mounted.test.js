@@ -227,6 +227,92 @@ describe('1036 EssenceEditView — the On-craft tab', () => {
     harness.remount();
   });
 
+  // The maintainer's round-2 ruling: "the linked item active effect source needs to appear
+  // the same way a linked item in the tool studio editor view does". Four defects were named
+  // off `manager-essence-edit-on-craft.png`, and each has an assertion here, because every
+  // one of them is invisible in source unless you already know to look.
+  it('renders a linked source exactly as the Tool Studio renders a linked Item', async () => {
+    const copied = [];
+    const root = await harness.mount(props({ onCopySourceUuid: (uuid) => copied.push(uuid) }));
+    openTab(root, 'oncraft');
+
+    const card = root.querySelector('[data-item-drop-zone="essence-source"]');
+    assert.ok(card, 'the linked source is the SHARED drop-zone card, not a hand-rolled summary');
+    assert.ok(card.textContent.includes('Flawless Ruby'), 'named in bold, as the Tool Studio is');
+
+    // 1. the sub-line was the raw uuid where the Tool Studio gives an instruction.
+    assert.ok(
+      card.textContent.includes('Drop another Item here to replace the linked source.'),
+      'the sub-line instructs rather than restating the uuid'
+    );
+    assert.equal(card.textContent.includes('Item.ruby'), false, 'so the uuid is not the sub-line');
+
+    // 2. one square clear button became the Tool Studio's grouped pair.
+    const actions = card.querySelectorAll('.manager-item-drop-zone-actions .manager-icon-button');
+    assert.equal(actions.length, 2, 'copy source uuid and unlink, grouped and right-aligned');
+    actions[0].click();
+    flushSync();
+    assert.deepEqual(copied, ['Item.ruby'], 'and copy reaches the clipboard seam with the uuid');
+
+    // 3. the duplicated `Drop or pick` zone under the linked card is gone. The card IS the
+    //    drop target, which is exactly what `ToolOverviewTab` does with the same primitive.
+    assert.equal(
+      root.querySelector('[data-essence-section="effect-source"] .manager-essence-source-drop-zone'),
+      null,
+      'no second drop zone says the same thing twice under the linked card'
+    );
+
+    // ...and the picker returns the moment the link is gone, because an essence source is an
+    // in-system COMPONENT and the pick half is the only route to that list.
+    actions[1].click();
+    flushSync();
+    assert.equal(
+      root.querySelector('[data-item-drop-zone="essence-source"]'),
+      null,
+      'unlinking removes the card'
+    );
+    assert.ok(
+      root.querySelector(
+        '[data-essence-section="effect-source"] .manager-essence-source-drop-zone .essence-source-trigger'
+      ),
+      'and restores the drop-or-pick target in its place'
+    );
+    harness.remount();
+  });
+
+  // 4. the property macro card had the SAME defect in a worse form: `macroName` falls back to
+  //    the uuid when the macro does not resolve, and `hint` was the uuid too, so the card
+  //    printed `Macro.lab-aether-binding` as its title AND again as its sub-line.
+  it('gives the property macro card an instruction rather than repeating its own uuid', async () => {
+    globalThis.fromUuid = async () => null;
+    const root = await harness.mount(props());
+    openTab(root, 'oncraft');
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+
+    const card = root.querySelector('[data-essence-section="macro"] [data-manager-item-drop-zone]');
+    const title = card.querySelector('.manager-item-drop-zone-copy strong').textContent.trim();
+    const sublines = [...card.querySelectorAll('.manager-item-drop-zone-copy small')].map(
+      (line) => line.textContent.trim()
+    );
+
+    assert.equal(title, 'Macro.binding', 'an unresolved macro is named by the uuid — its only name');
+    assert.equal(
+      sublines.includes(title),
+      false,
+      'and no sub-line repeats it back: the card said the same string twice'
+    );
+    assert.ok(
+      sublines.includes('Drop another Macro here to replace the linked script.'),
+      'the first sub-line instructs, as the Tool Studio does'
+    );
+    assert.ok(
+      sublines.some((line) => line.includes('no longer resolves')),
+      'and the missing-link warning survives beside it'
+    );
+    harness.remount();
+  });
+
   it('paints an unresolvable linked macro as MISSING', async () => {
     globalThis.fromUuid = async () => null;
     const root = await harness.mount(props());

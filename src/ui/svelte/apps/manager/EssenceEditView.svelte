@@ -51,6 +51,11 @@
     onDirtyChange = () => {},
     onDraftChange = () => {},
     onImportSourceDrop = null,
+    // The clipboard seam for the linked source's copy-uuid action (issue 1036, maintainer
+    // round 2). Null-by-default rather than a no-op: `ItemDropZone` renders the copy button
+    // only when it is given a handler, so an absent seam hides the control instead of
+    // shipping one that silently does nothing.
+    onCopySourceUuid = null,
   } = $props();
 
   let activeTab = $state('identity');
@@ -391,6 +396,7 @@
             sourceComponentId = '';
             sourceTouched = true;
           }}
+          {onCopySourceUuid}
           onMacroDrop={handleMacroDrop}
           onMacroUnlink={() => {
             propertyMacroUuid = '';

@@ -69,7 +69,6 @@
     variant = 'row',
     selected = false,
     bulkSelected = false,
-    colourLabel = '',
     effectTransferEnabled = false,
     propertyMacrosEnabled = false,
     text = (_key, fallback) => fallback,
@@ -119,13 +118,12 @@
       size={40}
     />
     <span class="manager-system-copy">
+      <!-- NO colour-name chip (issue 1036, maintainer round 2). The medallion beside this
+           row already carries the essence's colour, and a maintained display name for every
+           theme colour is upkeep with no reader. Removing it also un-wraps the DISABLED
+           pill, which had been pushed to a second line beside the chip. -->
       <span class="manager-essence-name-row">
         <span class="manager-system-name" title={essence.name}>{essence.name}</span>
-        {#if essence.colorToken}
-          <Chip tone="neutral" swatch={essence.colorToken} data-essence-colour={essence.colorToken}>
-            {colourLabel}
-          </Chip>
-        {/if}
         {#if disabled}
           <StatusPill
             tone="neutral"
@@ -351,6 +349,51 @@
   .manager-essence-row.is-card .manager-essence-description {
     -webkit-line-clamp: 3;
     line-clamp: 3;
+  }
+
+  /* ── EVERYTHING THAT CAN GROW IS BOUNDED (issue 1036, maintainer round 2) ────────
+     Equal height inside a row is guaranteed by `align-items: stretch` plus the zeroed
+     Foundry `<li>` margin (see `styles/fabricate.css`). That makes the cards in ONE row
+     identical; it does not stop one long name making every card in that row half a screen
+     tall. So each growable part of the card states its own ceiling:
+
+      - the NAME truncates to one line with an ellipsis. The maintainer named this
+        mechanism. The `<span>` already carries `title={essence.name}`, so the full name is
+        still reachable — this hides no text, it only stops the card reflowing around it.
+        `min-width: 0` is required: without it the name is a flex item at its
+        max-content width and `overflow: hidden` never engages.
+      - the NAME ROW does not wrap. With the colour chip removed the only remaining sibling
+        is the Disabled pill, and a wrap here would put the pill on its own line and add a
+        third variable to the card's height.
+      - the DESCRIPTION keeps its 3-line clamp (above).
+      - the CAPABILITY chips do not wrap: there are at most two and a wrap moves the whole
+        footer.
+
+     The LIST row is untouched — its name is beside a 76px-tall row that already clamps its
+     description, and truncating there would hide names the list has room for. */
+  .manager-essence-row.is-card .manager-essence-name-row {
+    flex-wrap: nowrap;
+  }
+
+  .manager-essence-row.is-card .manager-system-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The pill never shrinks: the NAME is the elastic cell, so a long name eats its own
+     width rather than squeezing the one word that states the essence is off. */
+  .manager-essence-row.is-card .manager-essence-name-row :global(.fab-status-pill) {
+    flex: 0 0 auto;
+  }
+
+  /* No `overflow: hidden` here on purpose. The cluster above already wraps, so a pair of
+     chips that does not fit moves to its own line instead of overflowing — and clipping
+     would silently delete a state marker, which is the one thing this card must never do. */
+  .manager-essence-row.is-card .manager-essence-capabilities {
+    flex-wrap: nowrap;
+    min-width: 0;
   }
 
   /* `margin-top: auto` is what turns the stretched grid row into a level shelf: the card

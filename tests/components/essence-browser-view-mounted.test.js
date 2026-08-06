@@ -93,7 +93,15 @@ function vocabularyOf(root, id) {
     capabilityStates: [...row.querySelectorAll('[data-essence-capability]')].map(
       (pill) => pill.dataset.essenceCapabilityState
     ),
-    colour: row.querySelector('[data-essence-colour]')?.dataset.essenceColour || '',
+    // The essence's COLOUR, read off the tinted medallion (issue 1036, maintainer round 2).
+    // It used to be read off a `Chip` naming the colour token — "Lavender", "Sage" — and
+    // that chip is gone: the tile already carries the colour and a display name per theme
+    // colour is upkeep with no reader. The STATE did not go with it, so this reads it where
+    // it actually lives now, and the grid must still carry it.
+    colour: row.querySelector('[data-medallion-tint]')?.dataset.medallionTint || '',
+    // And the chip must not come back: it is the one piece of vocabulary this redesign
+    // deliberately REMOVED, so a re-added one has to fail rather than pass as "more state".
+    colourChip: Boolean(row.querySelector('[data-essence-colour]')),
     disabledWord: row.textContent.includes('Disabled'),
     components: row.querySelector('[data-essence-usage-components]').textContent.trim(),
     // The BLOCKED-FROM-DELETE marker, which is part of the vocabulary the grid must carry
@@ -122,7 +130,8 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     assert.equal(asList.disabledWord, true, 'icon + word, always — never dimming alone');
     assert.deepEqual(asList.capabilities, ['effects', 'macro']);
     assert.deepEqual(asList.capabilityStates, ['ok', 'ok'], 'a resolving source is not warned about');
-    assert.equal(asList.colour, 'lavender');
+    assert.equal(asList.colour, 'lavender', 'the tinted tile carries the colour');
+    assert.equal(asList.colourChip, false, 'and no chip restates it as a word');
     assert.equal(asList.blocked, 'true', 'a carried essence says it cannot be deleted');
     assert.match(asList.recipes, /1/);
 

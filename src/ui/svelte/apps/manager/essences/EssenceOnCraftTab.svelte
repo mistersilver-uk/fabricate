@@ -3,11 +3,33 @@
   The essence editor's ON CRAFT tab (issue 1036): what this essence carries onto a crafted
   result — an active-effect source, and a property macro.
 
-  ── THE TWO CARDS ARE STRUCTURALLY DIFFERENT, DELIBERATELY ────────────────────────
-  The prototype draws them identically. They are not. The active-effect source is an
-  in-system managed COMPONENT, so it stays `EssenceSourceSelector`; the property macro is a
-  document uuid, so it is `ItemDropZone` with `documentType="Macro"`. Making the source a
-  drop zone would ask the GM to drop an Item where the model stores a component id.
+  ── ONE CARD WHEN LINKED, THE PICKER WHEN NOT (issue 1036, maintainer round 2) ────
+  The maintainer's ruling: "the linked item active effect source needs to appear the same way
+  a linked item in the tool studio editor view does". The Tool Studio renders exactly one
+  control for this — an `ItemDropZone` that IS the drop target in both states — so this tab
+  does the same:
+
+   - LINKED  -> `ItemDropZone`: the item image, the item name in bold, an instructional
+                sub-line, and the grouped copy-uuid / unlink icon pair right-aligned.
+   - UNLINKED -> `EssenceSourceSelector`, which is the drop-or-PICK affordance.
+
+  Three defects go with the rewrite, all read off `manager-essence-edit-on-craft.png`:
+
+   1. the hand-rolled `.manager-essence-source-summary` card stated the raw uuid
+      (`Item.sm-ruby`) where the Tool Studio states what to do with the card.
+   2. it carried ONE square ✕ where the Tool Studio has the rounded icon pair, and it had no
+      copy-uuid at all although the browser inspector two clicks away does.
+   3. the `Drop or pick` zone rendered BELOW the linked card as well, so the card and the
+      zone said the same thing twice. An earlier review called that "`ItemDropZone`'s shipped
+      behaviour"; it is not — `ToolOverviewTab` proves the primitive already suppresses the
+      second zone, because there is only ever one zone to begin with.
+
+  `ItemDropZone` itself is UNCHANGED. It already accepts a `documentType`, a `subline`, and a
+  `state`, and it already renders the grouped actions; nothing about its other consumers
+  moves. The essence source is still a managed COMPONENT id rather than a document uuid, and
+  that is why the UNLINKED state stays `EssenceSourceSelector`: only the picker can offer the
+  in-system component list. What the drop handler receives is the same raw Item payload in
+  both states, which the root already resolves to a component.
 
   ── BOTH SECTIONS ARE GATED, AND THE BOTH-OFF STATE IS EXPLAINED ──────────────────
   `features.effectTransfer` and `features.propertyMacros` gate their own sections. With both
@@ -52,6 +74,7 @@
     onSourceSelect = () => {},
     onSourceDrop = () => {},
     onSourceClear = () => {},
+    onCopySourceUuid = null,
     onMacroDrop = () => {},
     onMacroUnlink = () => {},
   } = $props();
@@ -98,6 +121,21 @@
   }
 
   const macroItem = $derived(macroUuid ? { name: macroName || macroUuid, img: '' } : null);
+
+  // The linked source, in the shape `ItemDropZone` renders. `img` is what makes the card show
+  // the real item art rather than the empty-drop glyph, so an unresolved link (a stored name
+  // with no component behind it) deliberately yields a card with the fallback bag icon rather
+  // than no card at all — the GM must be able to see and clear a link that no longer resolves.
+  const sourceLinked = $derived(Boolean(selectedSource || sourceComponentId || storedSourceName));
+  const sourceItem = $derived(
+    sourceLinked
+      ? {
+          name: selectedSource?.name || storedSourceName || sourceComponentId,
+          img: selectedSource?.img || 'icons/svg/item-bag.svg',
+        }
+      : null
+  );
+  const sourceUuid = $derived(selectedSource?.originItemUuid || '');
 
   const explainerItems = $derived([
     {
@@ -183,55 +221,50 @@
             )}
       </p>
 
-      {#if selectedSource || sourceComponentId || storedSourceName}
-        <div class="manager-essence-source-summary">
-          {#if selectedSource}
-            <img
-              class="manager-essence-source-thumb"
-              src={selectedSource.img || 'icons/svg/item-bag.svg'}
-              alt=""
-            />
-          {:else}
-            <span class="manager-essence-source-thumb is-empty" aria-hidden="true">
-              <i class="fas fa-link"></i>
-            </span>
-          {/if}
-          <div class="manager-essence-source-copy">
-            <strong>{selectedSource?.name || storedSourceName || sourceComponentId}</strong>
-            <p class="manager-muted">
-              {selectedSource?.originItemUuid ||
-                text(
-                  'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
-                  'This component has no source item UUID.'
-                )}
-            </p>
-          </div>
-          <button
-            type="button"
-            class="manager-icon-button"
-            data-essence-source-clear
-            aria-label={text(
-              'FABRICATE.Admin.Features.Essences.ClearSourceItem',
-              'Remove source item'
+      {#if sourceLinked}
+        <!-- The Tool Studio's linked card, from the same primitive `ToolOverviewTab` renders.
+             The sub-line is the INSTRUCTION, not the uuid: the card is itself the drop
+             target, and telling the GM so is the thing the uuid was occupying the line
+             instead of doing. The uuid is still reachable — `Copy source UUID` is the first
+             of the grouped pair, and its `title` shows it. -->
+        <ItemDropZone
+          item={sourceItem}
+          kind="essence-source"
+          title={sourceItem.name}
+          hint={text(
+            'FABRICATE.Admin.Manager.Essence.OnCraft.SourceReplaceHint',
+            'Drop another Item here to replace the linked source.'
+          )}
+          disabled={saving}
+          copyLabel={sourceUuid ||
+            text(
+              'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
+              'This component has no source item UUID.'
             )}
-            title={text('FABRICATE.Admin.Features.Essences.ClearSourceItem', 'Remove source item')}
-            onclick={() => onSourceClear()}
-          >
-            <i class="fas fa-times" aria-hidden="true"></i>
-          </button>
+          unlinkLabel={text(
+            'FABRICATE.Admin.Features.Essences.ClearSourceItem',
+            'Remove source item'
+          )}
+          onDrop={onSourceDrop}
+          onCopy={onCopySourceUuid && sourceUuid ? () => onCopySourceUuid(sourceUuid) : null}
+          onUnlink={() => onSourceClear()}
+        />
+      {:else}
+        <!-- UNLINKED only. `EssenceSourceSelector` is the drop-or-PICK affordance, and the
+             pick half is why it survives at all: an essence source is an in-system managed
+             component, so there is a list to choose from that a document drop zone cannot
+             offer. Rendering it BESIDE the linked card is what said the same thing twice. -->
+        <div class="manager-essence-source-drop-zone">
+          <EssenceSourceSelector
+            value={null}
+            items={managedItemOptions}
+            disabled={saving}
+            onDrop={onSourceDrop}
+            onSelect={(itemId) => onSourceSelect(itemId || '')}
+            onClear={() => onSourceClear()}
+          />
         </div>
       {/if}
-
-      <div class="manager-essence-source-drop-zone">
-        <EssenceSourceSelector
-          value={null}
-          items={managedItemOptions}
-          disabled={saving}
-          onDrop={onSourceDrop}
-          onSelect={(itemId) => onSourceSelect(itemId || '')}
-          onClear={() => onSourceClear()}
-        />
-      </div>
     </section>
   {/if}
 
@@ -263,6 +296,12 @@
            at craft time an unresolvable uuid is logged and SKIPPED SILENTLY, deliberately,
            because a toast would fire once per essence per result on the crafting player's
            screen for a GM-side authoring defect. -->
+      <!-- `hint` is the INSTRUCTION, not the uuid (issue 1036, maintainer round 2). It was
+           `macroUuid`, and `macroItem.name` falls back to the same uuid when the macro does
+           not resolve — which is precisely the lab's state — so the card rendered
+           `Macro.lab-aether-binding` as its title AND again as its sub-line. The Tool Studio
+           gives that line to a useful sentence, so this does too; the uuid survives as the
+           card's title in the unresolved case, which is the one case it is diagnostic in. -->
       <ItemDropZone
         item={macroItem}
         kind="essence-macro"
@@ -270,7 +309,15 @@
         state={macroMissing ? 'missing' : 'linked'}
         disabled={saving}
         title={text('FABRICATE.Admin.Manager.Essence.Macro.DropTitle', 'Drop a script macro here')}
-        hint={macroUuid}
+        hint={macroUuid
+          ? text(
+              'FABRICATE.Admin.Manager.Essence.Macro.ReplaceHint',
+              'Drop another Macro here to replace the linked script.'
+            )
+          : text(
+              'FABRICATE.Admin.Manager.Essence.Macro.EmptyHint',
+              'Drop a script Macro from this world or an installed compendium.'
+            )}
         subline={macroMissing
           ? text(
               'FABRICATE.Admin.Manager.Essence.Macro.Missing',

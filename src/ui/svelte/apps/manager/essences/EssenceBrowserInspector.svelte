@@ -29,10 +29,10 @@
   import Chip from '../Chip.svelte';
   import EssenceBehaviorPreview from './EssenceBehaviorPreview.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
+  import InspectorActionButton from '../InspectorActionButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { managerColorTokenLabel } from '../../../util/managerColorTokens.js';
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
 
   let {
@@ -68,9 +68,6 @@
 
   const disabled = $derived(essence?.enabled === false);
   const description = $derived(truncate(essence?.description));
-  const colourName = $derived(
-    essence?.colorToken ? managerColorTokenLabel(essence.colorToken, localize) : ''
-  );
   const usageItems = $derived(
     Array.isArray(essence?.componentUsageItems) ? essence.componentUsageItems : []
   );
@@ -113,12 +110,11 @@
         {text('FABRICATE.Admin.Manager.Essence.Selected', 'Selected essence')}
       </p>
       <h2 class="manager-inspector-name" title={essence.name}>{essence.name}</h2>
+      <!-- NO colour-name chip (issue 1036, maintainer round 2). The tinted medallion two
+           columns left already carries the colour, and a display name per theme colour is
+           upkeep with no reader. The palette caption in the EDITOR keeps its name, because
+           there it labels the swatch the GM just picked rather than restating a tile. -->
       <div class="manager-chip-row">
-        {#if colourName}
-          <Chip tone="neutral" swatch={essence.colorToken} data-essence-colour={essence.colorToken}
-            >{colourName}</Chip
-          >
-        {/if}
         <StatusPill
           tone={disabled ? 'neutral' : 'positive'}
           icon={disabled ? 'fas fa-circle-pause' : 'fas fa-circle-check'}
@@ -190,44 +186,42 @@
   reference, so they follow the verb rather than delaying it.
 -->
 <section class="manager-inspector-card" data-essence-section="actions">
+  <!-- The three verbs render through `InspectorActionButton`, the extracted point-of-arrival
+       button for every right inspector (issue 1036, maintainer round 2). What changes here
+       is not only the size: the primary was `.manager-button.is-primary`, which is the
+       SUCCESS family, so `Edit essence` painted green where the design's primary — and the
+       recipe and component inspectors a click away — is the accent. -->
   <div class="manager-essence-inspector-actions">
-    <button
-      type="button"
-      class="manager-button"
+    <InspectorActionButton
+      icon="fas fa-clone"
+      label={text('FABRICATE.Admin.Manager.Essence.Duplicate', 'Duplicate essence')}
       data-essence-action="duplicate"
-      onclick={() => onDuplicate(essence.id)}
-    >
-      <i class="fas fa-clone" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Essence.Duplicate', 'Duplicate essence')}</span>
-    </button>
-    <button
-      type="button"
-      class="manager-button is-primary"
+      onClick={() => onDuplicate(essence.id)}
+    />
+    <InspectorActionButton
+      tone="primary"
+      icon="fas fa-pen"
+      label={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
       data-essence-action="edit"
-      onclick={() => onEdit(essence.id)}
-    >
-      <i class="fas fa-pen" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}</span>
-    </button>
+      onClick={() => onEdit(essence.id)}
+    />
     <!-- The SINGLE delete keeps the `confirmDialog` the store already owns. The two-step
          ARM is the BULK panel's, per the maintainer's decision for that action alone;
          wearing both idioms on one screen for one verb would teach the GM neither. The
          control is `disabled` only as a courtesy — `store.deleteEssence` re-checks the
          in-use refusal against the system, because `deleteBlocked` is a UI-only card
          field and the guard it stands for is a data-loss guard. -->
-    <button
-      type="button"
-      class="manager-button is-danger"
-      data-essence-action="delete"
+    <InspectorActionButton
+      tone="danger"
+      icon="fas fa-trash"
+      label={text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}
       disabled={essence.deleteBlocked === true}
-      aria-label={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
+      ariaLabel={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
         name: essence.name,
       })}
-      onclick={() => onDelete(essence.id)}
-    >
-      <i class="fas fa-trash" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}</span>
-    </button>
+      data-essence-action="delete"
+      onClick={() => onDelete(essence.id)}
+    />
   </div>
   {#if essence.deleteBlocked}
     <p class="manager-muted manager-essence-delete-note" data-essence-delete-blocked>
@@ -268,31 +262,31 @@
           <strong>{essence.associatedItem.name || essence.sourceName}</strong>
         </div>
       </div>
+      <!-- The SAME primitive as the three verbs above. These two are a pair in a two-column
+           grid rather than a stack, but they are the same meaning in the same rail, and a
+           rail that sized its source actions differently from its entity actions is the
+           drift the extraction exists to remove. `warning` carries the amber the shipped
+           `Unlink Source` wore: unlinking breaks a reference, it destroys nothing. -->
       <div class="manager-essence-inspector-source-actions">
-        <button
-          type="button"
-          class="manager-button"
-          data-essence-action="copy-source"
+        <InspectorActionButton
+          icon="fas fa-copy"
+          label={text('FABRICATE.Admin.Manager.Essence.CopySource', 'Copy source UUID')}
           title={sourceUuid ||
             text(
               'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
               'This component has no source item UUID.'
             )}
           disabled={!sourceUuid}
-          onclick={() => onCopySource()}
-        >
-          <i class="fas fa-copy" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Essence.CopySource', 'Copy source UUID')}</span>
-        </button>
-        <button
-          type="button"
-          class="manager-button is-warning-action"
+          data-essence-action="copy-source"
+          onClick={() => onCopySource()}
+        />
+        <InspectorActionButton
+          tone="warning"
+          icon="fas fa-unlink"
+          label={text('FABRICATE.Admin.Manager.Essence.UnlinkSource', 'Unlink Source')}
           data-essence-action="unlink-source"
-          onclick={() => onUnlinkSource()}
-        >
-          <i class="fas fa-unlink" aria-hidden="true"></i>
-          <span>{text('FABRICATE.Admin.Manager.Essence.UnlinkSource', 'Unlink Source')}</span>
-        </button>
+          onClick={() => onUnlinkSource()}
+        />
       </div>
     {:else}
       <div class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone">

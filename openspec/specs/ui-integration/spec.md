@@ -96,6 +96,26 @@ Two live non-conformances are recorded here rather than left to be discovered, b
 - `tests/components/mounted-harness-primitive-allowlist.test.js` requires every `SHARED_PRIMITIVES` entry to be reachable from `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`, so the allowlist that encodes "this is a shared primitive" is structurally manager-scoped in exactly the way this rule is not.
   Only its second test carries that assumption; the fix is to widen it to a declared root set rather than one root.
 
+#### Right-inspector actions
+
+Every GM studio's right-hand inspector ends in a stack of verbs for the selected entity — Duplicate, Edit, Delete, Copy source UUID, Unlink.
+That is one meaning, so those controls render through one shared primitive, and it is the POINT OF ARRIVAL: a new studio's inspector MUST import it rather than declaring a fourth treatment.
+
+The primitive takes the Tool Studio's editor-header buttons as its base, because that is the refined treatment: a label a notch below body text, the compact control height, a 6px radius, and an icon before the label.
+It is not a variant of the manager's general-purpose button class, since that class's tone modifiers are declared in the global sheet at a specificity a scoped primitive block cannot beat, which would leave the primitive's own tones losing to it.
+It therefore carries the Foundry `<button>` reset itself and states its appearance in its own scoped block.
+
+Tone is a fixed vocabulary and each member has a meaning:
+
+- `primary` is the ACCENT, never the success family, and there is at most one per rail — it is the rail's loudest control.
+  A studio that paints its primary in success has coloured "edit" as "confirm".
+- `danger` is danger text on the panel surface: destructive, and never louder than the primary.
+- `warning` is amber, for a verb that BREAKS A LINK rather than destroying a record — unlinking a source is not deleting one.
+- the default is the quiet panel-surface treatment.
+
+Recorded non-conformance: the recipe, component, Tool Studio, and Tags & Categories inspectors still render their own treatments and are the declared conversion backlog.
+The essence inspector is converted; a primitive that coexists with unconverted duplicates has added a variant rather than removed one, so the remainder is a debt with an owner rather than an accepted state.
+
 #### No-state messages
 
 Every manager "nothing here" message renders through one shared no-state primitive, in one of three treatments.
@@ -659,15 +679,29 @@ Capabilities:
 - Manager does not allow inline editing on the browse essences page, with one exception.
   The row's enable/disable toggle is a distinct localized named hit target, mirroring the Tools Tab's row switch; activating it neither selects the row nor opens the editor.
   Every other row edit still opens the dedicated edit essence view.
+- An essence's colour is carried by its tinted medallion and by every chip that spells the essence's own name, and is NOT restated as a colour-token display name anywhere it stands beside such a tile.
+  A maintained display name per theme colour is upkeep with no reader on a row, a grid card, an inspector hero, or a live-preview identity block.
+  The editor's palette caption is the one exception and keeps its name: there the name labels the swatch the GM is choosing, and the No-colour cell has no tile to speak for it.
 - The essence library offers a list and a grid presentation of the same rows.
   The grid card carries the same state vocabulary as the list row — the Disabled marker, the capability markers and the usage counts — because a presentation toggle must not silently remove state.
   Row actions are list-only; grid selection routes through the inspector.
+- Every grid card in a row is the same height regardless of its content or its position in the list, and that equality is structural rather than incidental.
+  Two things are required and neither is sufficient alone.
+  The grid stretches its cards and the card pushes its footer to the bottom of the height it is given, which levels the shelf; and the card carries NO margin, because Foundry core gives every `<li>` a bottom margin and exempts the last child, and a stretched grid sizes an item's margin box to its row — so the last card in the list silently takes its siblings' margin as extra height.
+  Each growable part of the card also states its own ceiling: the name truncates to one line with an ellipsis and keeps its full text as a title, the description keeps a fixed line clamp, and neither the name row nor the capability run wraps.
+  Equal height within a row does not cover a name that wraps, because every card in that row grows with it.
+- An essence's linked active-effect source and linked property macro are presented exactly as the Tool Studio presents a linked Item: ONE card, carrying the linked document's image, its name, an instructional sub-line, and its actions as a grouped icon pair.
+  The card is itself the drop target, so no second drop prompt renders beneath it — a card and a zone side by side state the same affordance twice.
+  A sub-line states what the GM can do with the card; it never restates the card's own title or the raw uuid, which is what a copy-uuid action is for.
+  The essence source's UNLINKED state keeps the drop-or-pick control, because an essence source is an in-system managed component and the pick half is the only route to that list.
   The presentation toggle renders through the shared segmented control's icon-only variant, because a list glyph and a grid glyph ARE the two layouts, while the status filter beside it keeps its words.
 - A browser row that leads with the 40px medallion states selection as the accent ring alone and drops the inset left bar, which would otherwise bite into the medallion; the essence row is one of them, and on its grid card a left bar is not even the correct axis.
 - A browser that supports bulk selection states the ticked-row treatment through the one shared rule every such browser joins, so the state looks identical in every studio.
   A studio that writes the ticked class without joining that rule renders a ticked row indistinguishable from an unticked one, which is a defect rather than an omission.
 - The essence library's search, filters, sort, presentation and page position survive a round trip through the essence editor.
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
+  The editor's icon control is one column: the preview tile fills that column's width and the picker and its reset sit inside the same edge, so no control overhangs the tile it belongs to.
+  The tile's glyph is sized for the tile rather than inheriting the shared row-medallion glyph size, which reads as a speck at editor scale.
 - Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
   The essence editor's On-craft tab gates its Active effect source section on `features.effectTransfer` and its property macro section on `features.propertyMacros`.
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.

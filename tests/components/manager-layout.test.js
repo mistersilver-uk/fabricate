@@ -3657,9 +3657,6 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   const mainBlock = blockFor('.fabricate-manager[data-manager-view="essence-edit"] .manager-main');
   const editGridBlock = blockFor('.fabricate-manager .manager-essence-edit-grid');
   const sourceSummaryBlock = blockFor('.fabricate-manager .manager-essence-source-summary');
-  const inspectorSourceSummaryBlock = blockFor(
-    '.fabricate-manager .manager-essence-inspector-source-summary'
-  );
   const inspectorSourceActionsBlock = blockFor(
     '.fabricate-manager .manager-essence-inspector-source-actions'
   );
@@ -3683,21 +3680,23 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   );
   assert.ok(
     editGridBlock.includes(
-      'grid-template-columns: var(--fab-mv2-essence-icon-column, 156px) minmax(0, 1fr);'
+      'grid-template-columns: var(--fab-mv2-essence-icon-column, 176px) minmax(0, 1fr);'
     ),
     'essence edit identity fields should reserve stable icon picker space'
   );
+  // TWO tracks. The third reserved an inline clear button that no surface renders any more
+  // (issue 1036, maintainer round 2): the editor's linked source is the shared `ItemDropZone`
+  // card, whose actions are the primitive's own, and the browser inspector always overrode
+  // the third track away. The per-inspector override is retired with it, so this asserts the
+  // ONE geometry rather than a base and the rule that cancelled it.
   assert.ok(
-    sourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) 34px;'),
-    'essence source summary should reserve source image, evidence, and clear action columns'
+    sourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr);'),
+    'essence source summary should be the linked item evidence card, image beside evidence'
   );
-  assert.ok(
-    !inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) auto;'),
-    'inspector source summary should not crowd evidence and unlink into a three-column row'
-  );
-  assert.ok(
-    inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr);'),
-    'inspector source summary should be only the linked item evidence card'
+  assert.equal(
+    css.includes('.fabricate-manager .manager-essence-inspector-source-summary {'),
+    false,
+    'and no per-inspector override survives to re-declare it'
   );
   assert.ok(
     inspectorSourceActionsBlock.includes('margin-top: var(--fab-space-3);'),

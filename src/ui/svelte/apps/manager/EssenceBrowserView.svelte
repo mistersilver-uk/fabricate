@@ -33,7 +33,6 @@
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import EssenceRow from './essences/EssenceRow.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import { managerColorTokenLabel } from '../../util/managerColorTokens.js';
   import {
     ESSENCE_SORT_KEYS,
     buildEssenceBrowserModel,
@@ -244,10 +243,6 @@
     ui.statusFilter = 'all';
     ui.sourceFilter = 'all';
     ui.pageIndex = 0;
-  }
-
-  function colourLabel(token) {
-    return managerColorTokenLabel(token, localize);
   }
 </script>
 
@@ -489,7 +484,6 @@
             variant={ui.viewMode}
             selected={selectedEssenceId === essence.id}
             bulkSelected={bulkSelectedIds.has(essence.id)}
-            colourLabel={colourLabel(essence.colorToken)}
             effectTransferEnabled={showSourceUi}
             propertyMacrosEnabled={showPropertyMacroUi}
             {text}

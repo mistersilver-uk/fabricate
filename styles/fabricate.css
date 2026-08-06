@@ -5337,6 +5337,42 @@
   color: var(--fab-mv2-text);
 }
 
+/* ── THE FOUNDRY `<li>` MARGIN LEAK, AND WHY IT ONLY SHOWS ON THE GRID CARD ──────────
+   Foundry V13/V14 core (`css/foundry2.css`, inside `@layer`) declares:
+
+     ul li, ol li          { margin-bottom: 0.25rem; }
+     ul li:last-child, ol li:last-child { margin-bottom: 0; }
+
+   and neutralises it only for AppV1 (`body.game .app ul li { margin: unset }`). The manager
+   is an ApplicationV2 (`.application`), so that neutraliser never reaches it and every
+   manager browser row that is an `<li>` — recipe, component and essence — carries an extra
+   4px below itself. In a single-column LIST that reads as a slightly roomier gap and nothing
+   more, which is why it survived unnoticed.
+
+   On the essence GRID it is a real defect. `align-items: stretch` sizes an item's MARGIN
+   box to the grid row, so the last card in the list — the only one Foundry exempts — takes
+   the 4px its siblings spend on margin as extra BORDER-box height. That is exactly the
+   `Water` card the maintainer read off `manager-essences-grid.png`: one card in a row of
+   three, 4px taller than its neighbours, with its footer 4px lower, and no content
+   difference to explain it. Equal height was never guaranteed here — it was true of any row
+   that happened not to contain the last card.
+
+   Zeroing the margin on the CARD is what makes it structural: with no margins at all,
+   stretch equalises the border boxes and a row of cards is identical regardless of content
+   or position. `tests/components/essence-grid-card-height.test.js` measures that in
+   Chromium against the real Foundry rule.
+
+   Deliberately scoped to the CARD and not to `.manager-essence-row` at large: the list
+   presentation shares its 12px rendered pitch with the recipe and component libraries, and
+   silently tightening one studio's list to 8px would re-type a surface this change is not
+   photographing. The leak on those rows is recorded for a follow-up, not fixed here.
+
+   It lives in the GLOBAL sheet because it must beat Foundry's host CSS, which is one of the
+   two standing exceptions to the co-located-primitive-CSS rule. */
+.fabricate-manager .manager-essence-row.is-card {
+  margin: 0;
+}
+
 .fabricate-manager .manager-recipe-row:hover,
 .fabricate-manager .manager-component-row:hover,
 .fabricate-manager .manager-environment-row:hover,
@@ -6276,9 +6312,15 @@
   overflow: auto;
 }
 
+/* The icon column WIDENED from 156px to 176px (issue 1036, maintainer round 2). 156px was
+   sized for the picker trigger alone and left the trigger plus its icon-only reset at ~154px
+   — technically inside the track, but flush against it, and beside a 96px tile it read as a
+   small tile with a gap. The tile now fills this track (`Medallion block`), so the track IS
+   the icon control's width and 176px gives the trigger room for a two-word icon name without
+   crowding its reset. */
 .fabricate-manager .manager-essence-edit-grid {
   display: grid;
-  grid-template-columns: var(--fab-mv2-essence-icon-column, 156px) minmax(0, 1fr);
+  grid-template-columns: var(--fab-mv2-essence-icon-column, 176px) minmax(0, 1fr);
   gap: var(--fab-space-3);
   min-width: 0;
 }
@@ -6351,9 +6393,16 @@
   min-width: 0;
 }
 
+/* TWO tracks, not three (issue 1036, maintainer round 2). The third reserved a 34px cell for
+   an inline clear button, and the ONE surface that rendered one — the editor's On-craft tab —
+   now renders the Tool Studio's `ItemDropZone` card instead, whose grouped actions are the
+   primitive's own. The browser inspector is the only consumer left and it has always
+   overridden the third track away, so the base stated a geometry nothing used and the
+   override existed only to cancel it. The `.manager-essence-inspector-source-summary` rule
+   is retired with it; the class stays on the element as the hook mounted tests select. */
 .fabricate-manager .manager-essence-source-summary {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 34px;
+  grid-template-columns: 54px minmax(0, 1fr);
   gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
@@ -6361,11 +6410,6 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-dark-14);
-}
-
-.fabricate-manager .manager-essence-inspector-source-summary {
-  grid-template-columns: 54px minmax(0, 1fr);
-  align-items: center;
 }
 
 .fabricate-manager .manager-essence-inspector-source-actions {
@@ -6376,17 +6420,13 @@
   margin-top: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-essence-inspector-source-actions .manager-button {
-  width: 100%;
-  max-width: 100%;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-essence-inspector-source-actions .manager-button span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* The two `.manager-button` child rules that used to sit here are RETIRED (issue 1036,
+   maintainer round 2). Copy source UUID and Unlink Source now render through
+   `InspectorActionButton`, which owns `width: 100%` and the single-line ellipsis label in
+   its own scoped block, so restating them here would be the global sheet re-deriving a
+   primitive's appearance — and they would have matched nothing anyway. The grid ABOVE
+   stays: placing two controls side by side in this card is a layout-context rule the
+   component cannot reach. */
 
 .fabricate-manager .manager-essence-source-thumb {
   display: inline-grid;

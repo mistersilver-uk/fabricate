@@ -30,6 +30,7 @@ const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEdi
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
+const onCraftSource = read('src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte');
 const segmentedControlSource = read('src/ui/svelte/apps/manager/SegmentedControl.svelte');
 const globalCss = read('styles/fabricate.css');
 
@@ -125,6 +126,218 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
         styleBlock(rowSource)
       ),
       'and the card pushes its footer to the bottom of the height it was given'
+    );
+    // Neither of the two above is SUFFICIENT, which is the whole lesson of the maintainer's
+    // second round: both declarations were already in place while the published frame showed
+    // one card 4px taller than its row siblings. What actually varied was Foundry's `<li>`
+    // margin, which the last card is exempt from. The rendered proof is
+    // `tests/components/essence-grid-card-height.test.js`, which measures the cards in
+    // Chromium; this pins the declaration that test exists to protect, so deleting the rule
+    // fails here with the reason attached rather than only there with a number.
+    assert.ok(
+      /\.fabricate-manager \.manager-essence-row\.is-card \{[^}]*margin: 0;/s.test(globalCss),
+      'and the card zeroes the Foundry li margin that made its last member taller'
+    );
+  });
+
+  // ── The five items from the maintainer's SECOND review round ────────────────────
+
+  it('removes the colour-name chip everywhere it merely restated a tinted tile', () => {
+    // The rendered symptom: "Lavender", "Sage", "Peach", "Aqua", "Butter" chips beside every
+    // essence name in the row, the grid card and the inspector hero, plus a colour-name
+    // sub-line in the live preview's identity block. The medallion beside each already
+    // carries the colour, so the chip was a maintained display name per theme colour with
+    // no reader — and in the inspector it wrapped the `In use` pill onto a second line.
+    for (const [label, source] of [
+      ['row/card', rowSource],
+      ['inspector', inspectorSource],
+      ['preview identity', previewSource],
+    ]) {
+      assert.equal(
+        /managerColorTokenLabel/.test(source),
+        false,
+        `${label} must not resolve a colour display name`
+      );
+      assert.equal(
+        source.includes('data-essence-colour='),
+        false,
+        `${label} must not render a colour chip`
+      );
+    }
+    // The colour itself is NOT removed — only the word. The tile still carries it in both
+    // presentations, which is what makes this a removal of duplication rather than of state.
+    assert.ok(rowSource.includes('tint={essence.colorToken'), 'the row tile stays tinted');
+    assert.ok(
+      inspectorSource.includes("tint={essence.colorToken || ''}"),
+      'and so does the inspector tile'
+    );
+    // The EDITOR's palette caption keeps its name, and that is a decision rather than an
+    // oversight: there the name labels the swatch the GM is choosing, and the No-colour cell
+    // has no tile to speak for it at all.
+    assert.ok(
+      identityTabSource.includes('managerColorTokenLabel(colorToken, localize)'),
+      'the palette caption still names the selected swatch'
+    );
+  });
+
+  it('truncates a grid card name rather than letting it re-size its row', () => {
+    // The rendered symptom the maintainer named as the mechanism: "name should be truncated".
+    // Equal-height-within-a-row does not cover this — an unclamped name wraps and every card
+    // in the row grows WITH it, which still satisfies "all the same height".
+    const styles = styleBlock(rowSource);
+    assert.ok(
+      /\.manager-essence-row\.is-card \.manager-system-name \{[^}]*white-space: nowrap;/s.test(
+        styles
+      ),
+      'the card name is one line'
+    );
+    assert.ok(
+      /\.manager-essence-row\.is-card \.manager-system-name \{[^}]*text-overflow: ellipsis;/s.test(
+        styles
+      ),
+      'with an ellipsis'
+    );
+    assert.ok(
+      /\.manager-essence-row\.is-card \.manager-system-name \{[^}]*min-width: 0;/s.test(styles),
+      'and the min-width without which overflow never engages on a flex item'
+    );
+    // The full name stays reachable. Truncation that loses text is a defect, not a fix.
+    assert.ok(rowSource.includes('title={essence.name}'), 'the whole name survives as a title');
+    // LIST rows are untouched: a 76px row beside a clamped description has the width, and
+    // truncating there would hide names the list can show.
+    assert.equal(
+      /\.manager-essence-row \.manager-system-name \{/.test(styles),
+      false,
+      'and the list row keeps its full name'
+    );
+  });
+
+  it('renders every inspector action through the shared point-of-arrival button', () => {
+    // The rendered symptom: chunky rail buttons at the app's inherited body size beside a
+    // Tool Studio whose header buttons are 0.72rem, and a PRIMARY painted in the success
+    // family — `Edit essence` was green where the design's primary, and the recipe and
+    // component inspectors one click away, are the accent.
+    assert.ok(
+      inspectorSource.includes(
+        "import InspectorActionButton from '../InspectorActionButton.svelte';"
+      ),
+      'the inspector imports the shared button'
+    );
+    assert.equal(
+      /class="manager-button/.test(inspectorSource),
+      false,
+      'and hand-rolls no manager button of its own'
+    );
+    const primitive = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/InspectorActionButton.svelte'),
+      'utf8'
+    );
+    const styles = styleBlock(primitive);
+    assert.ok(
+      /\.fab-inspector-action \{[^}]*font-size: 0\.72rem;/s.test(styles),
+      'at the Tool Studio header label size, which is the treatment the maintainer named'
+    );
+    assert.ok(
+      /\.fab-inspector-action\.is-primary \{[^}]*background: var\(--fab-accent\);/s.test(styles),
+      'with the primary in the ACCENT family'
+    );
+    assert.ok(
+      /\.fab-inspector-action\.is-danger \{[^}]*color: var\(--fab-danger-text\);/s.test(styles),
+      'and the danger treatment preserved on delete'
+    );
+    // It must beat Foundry's host button geometry itself, because it is not `.manager-button`
+    // and therefore inherits none of the manager's reset.
+    for (const declaration of ['appearance: none;', 'height: auto;', 'font-family: inherit;']) {
+      assert.ok(styles.includes(declaration), `the Foundry button reset states ${declaration}`);
+    }
+    // Its CSS is co-located, never in the global sheet: required-screenshot detection maps
+    // file paths to views, and a global rule would widen every tweak to a theme-wide frame set.
+    assert.equal(
+      globalCss.includes('fab-inspector-action'),
+      false,
+      'the primitive owns its appearance in its own scoped block'
+    );
+  });
+
+  it('gives the editor icon control a tile that fills its own column', () => {
+    // The rendered symptom: a 96px square tile in a 156px column with a ~154px picker row
+    // under it, so the controls overhung the tile by ~58px and left a ragged gap — and a
+    // 0.9rem (~14px) glyph inside a 96px tile, which reads as a speck.
+    assert.ok(
+      identityTabSource.includes('block'),
+      'the tile opts into the fill-width variant'
+    );
+    assert.ok(
+      /<Medallion[^/]*block[^/]*glyph=\{\d+\}/s.test(identityTabSource),
+      'and sizes its glyph for the tile it now is'
+    );
+    assert.ok(
+      /\.manager-essence-icon-panel \{[^}]*align-items: stretch;/s.test(
+        styleBlock(identityTabSource)
+      ),
+      'so the tile and the controls beneath it share one edge instead of sizing themselves'
+    );
+    assert.ok(
+      globalCss.includes(
+        'grid-template-columns: var(--fab-mv2-essence-icon-column, 176px) minmax(0, 1fr);'
+      ),
+      'in a column widened to hold the picker and its reset without crowding'
+    );
+    // Unset must stay byte-identical, or this re-types ~40 medallions across the manager.
+    const medallion = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/components/Medallion.svelte'),
+      'utf8'
+    );
+    assert.ok(
+      styleBlock(medallion).includes('font-size: var(--fab-medallion-glyph, 0.9rem);'),
+      'the glyph size reads its token through a fallback, so an unset medallion is unchanged'
+    );
+  });
+
+  it('renders a linked active-effect source the way the Tool Studio renders a linked Item', () => {
+    // The rendered symptom, four ways: a raw-uuid sub-line, one square clear button where the
+    // Tool Studio has a grouped pair, a duplicate `Drop or pick` zone under the linked card,
+    // and a macro card whose title and sub-line were the same uuid.
+    assert.ok(
+      onCraftSource.includes('kind="essence-source"'),
+      'the linked source is the shared ItemDropZone, as ToolOverviewTab is'
+    );
+    assert.equal(
+      onCraftSource.includes('data-essence-source-clear'),
+      false,
+      'the hand-rolled single clear button is gone'
+    );
+    assert.equal(
+      /class="manager-essence-source-summary"/.test(onCraftSource),
+      false,
+      'and so is the hand-rolled summary card it sat in'
+    );
+    // The second zone renders ONLY in the unlinked branch. An earlier round called the
+    // duplicate "ItemDropZone's shipped behaviour"; the Tool Studio proves otherwise, so the
+    // branch is what this pins.
+    const linkedBranch = onCraftSource.indexOf('{#if sourceLinked}');
+    const elseBranch = onCraftSource.indexOf('{:else}', linkedBranch);
+    const zone = onCraftSource.indexOf('manager-essence-source-drop-zone');
+    assert.ok(linkedBranch > 0 && elseBranch > linkedBranch, 'the source has two branches');
+    assert.ok(zone > elseBranch, 'and the drop-or-pick zone renders only when nothing is linked');
+    // `ItemDropZone` itself must not have been bent to do it — it has other consumers.
+    assert.equal(
+      readFileSync(
+        resolve(repoRoot, 'src/ui/svelte/apps/manager/ItemDropZone.svelte'),
+        'utf8'
+      ).includes('essence-source'),
+      false,
+      'the primitive is used as shipped, never special-cased for this caller'
+    );
+    // And the macro card's sub-line is an instruction rather than its own title again.
+    assert.equal(
+      onCraftSource.includes('hint={macroUuid}'),
+      false,
+      'the macro card no longer repeats its uuid as its sub-line'
+    );
+    assert.ok(
+      onCraftSource.includes("'FABRICATE.Admin.Manager.Essence.Macro.ReplaceHint'"),
+      'it instructs instead'
     );
   });
 

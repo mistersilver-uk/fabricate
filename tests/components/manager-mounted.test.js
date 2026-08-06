@@ -156,6 +156,10 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/ChecklistCardRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EditorValidationSurface.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemDropZone.svelte');
+  // THE right-inspector action button (issue 1036, maintainer round 2). The essence browser
+  // inspector imports it statically, so it is in this root's static module graph; omitting it
+  // HANGS every mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/InspectorActionButton.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RollDataExpressionInput.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte');
@@ -8310,9 +8314,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     const unlinkSourceAction = inspectorSourceActions.querySelector(
       '[data-essence-action="unlink-source"]'
     );
+    // The AMBER survives the extraction (issue 1036, maintainer round 2). Both source
+    // actions now render through `InspectorActionButton`, the shared right-inspector button,
+    // and the modifier moved with them: `.manager-button.is-warning-action` was the global
+    // sheet's, `is-warning` is the primitive's own tone. Unlinking breaks a reference and
+    // destroys nothing, so it must not land in the danger family on the way across.
     assert.ok(
-      unlinkSourceAction.classList.contains('is-warning-action'),
-      'unlink source should use the amber warning action style'
+      unlinkSourceAction.classList.contains('fab-inspector-action'),
+      'unlink source should render through the shared right-inspector button'
+    );
+    assert.ok(
+      unlinkSourceAction.classList.contains('is-warning'),
+      'and keep the amber warning tone rather than becoming destructive'
+    );
+    assert.ok(
+      copySourceAction.classList.contains('fab-inspector-action'),
+      'as should its copy-uuid partner'
     );
     unlinkSourceAction.click();
     await tick();
@@ -8404,8 +8421,35 @@ describe('CraftingSystemManager mounted behavior', () => {
     document.querySelector('.essence-source-picker-option[title="Glass Vial"]').click();
     await tick();
     flushSync();
+    // ONE card once linked (issue 1036, maintainer round 2), and it is the shared
+    // `ItemDropZone` the Tool Studio's LINKED ITEM renders — not a hand-rolled summary with
+    // a second drop zone still sitting under it. Asserting the zone's ABSENCE is the half
+    // that pins the maintainer's actual complaint: the card and the zone said the same
+    // thing twice.
+    const linkedSource = target.querySelector('[data-item-drop-zone="essence-source"]');
+    assert.ok(linkedSource, 'the linked source renders through the shared item drop zone');
+    assert.ok(linkedSource.textContent.includes('Glass Vial'), 'naming the linked component');
     assert.ok(
-      target.querySelector('.manager-essence-source-summary').textContent.includes('Glass Vial')
+      linkedSource.textContent.includes('Drop another Item here to replace the linked source.'),
+      'and instructing the GM, where it used to restate the raw uuid'
+    );
+    assert.equal(
+      target.querySelector('.manager-essence-source-drop-zone'),
+      null,
+      'and no second drop zone renders beneath it'
+    );
+    // The Tool Studio's grouped icon pair, not one square clear button. `Glass Vial` (c2)
+    // carries no `originItemUuid`, so the pair is correctly one here: copy-uuid renders only
+    // when there IS a uuid to copy, which is the drop zone's own `onCopy`-is-null contract
+    // and is honest in a way a permanently inert copy button would not be. What matters is
+    // that both are the primitive's rounded icon buttons in its own right-aligned group.
+    const linkedActions = linkedSource.querySelectorAll(
+      '.manager-item-drop-zone-actions .manager-icon-button'
+    );
+    assert.equal(linkedActions.length, 1, 'a source with no uuid offers unlink alone');
+    assert.ok(
+      linkedActions[0].querySelector('.fa-link-slash'),
+      'and it is the unlink glyph, in the grouped icon treatment'
     );
     target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
     await tick();

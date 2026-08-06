@@ -28,7 +28,6 @@
   import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { managerColorTokenLabel } from '../../../util/managerColorTokens.js';
   import { projectEssenceBehaviourFacts } from './essenceStudio.js';
 
   let {
@@ -64,11 +63,6 @@
   const name = $derived(
     essence?.name || text('FABRICATE.Admin.Manager.Essence.Untitled', 'Untitled essence')
   );
-  const colourName = $derived(
-    essence?.colorToken
-      ? managerColorTokenLabel(essence.colorToken, localize)
-      : text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')
-  );
   const facts = $derived(
     projectEssenceBehaviourFacts(
       essence,
@@ -94,9 +88,13 @@
         tint={essence?.colorToken || ''}
         size={44}
       />
+      <!-- NO colour-name sub-line (issue 1036, maintainer round 2). The medallion beside
+           it is already tinted with that colour, so the name restated the tile in words —
+           the same upkeep-for-nothing the row and inspector chips were removed for. The
+           EDITOR's palette caption keeps its name: there it labels the swatch the GM is
+           choosing, which is a different job. -->
       <div class="manager-essence-preview-copy">
         <h3 title={name}>{name}</h3>
-        <p class="manager-muted">{colourName}</p>
       </div>
       {#if disabled}
         <StatusPill
@@ -206,10 +204,9 @@
     white-space: nowrap;
   }
 
-  .manager-essence-preview-copy p {
-    margin: 0;
-    font-size: 0.7rem;
-  }
+  /* `.manager-essence-preview-copy p` is RETIRED with the colour-name sub-line it sized
+     (issue 1036, maintainer round 2). The identity block is a tinted tile beside a name, and
+     the name of the tile's own colour is not a second fact about the essence. */
 
   /* The two samples are WELLS, like the identity card above them (issue 1036 fidelity
      pass). They shipped as bare runs of text on the rail background, so `How it appears`

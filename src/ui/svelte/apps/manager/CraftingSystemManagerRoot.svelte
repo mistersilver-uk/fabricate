@@ -7268,6 +7268,7 @@
         }}
         onDraftChange={handleEssenceDraftChange}
         onImportSourceDrop={importEssenceSourceDrop}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
     {:else if currentView === 'tags' && selectedSystem}
       <TagsCategoriesView
