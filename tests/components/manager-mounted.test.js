@@ -150,7 +150,7 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/essences/${essenceComponent}.svelte`);
   }
-  // The behaviour preview's "How it appears" card (issue 1036, round 3) mounts the REAL
+  // The behaviour preview's "How players see it" card (issue 1036, round 3) mounts the REAL
   // player InventoryItemCard for the essence tile AND the fake carrying component. It is a
   // static import of EssenceBehaviorPreview, so it is in this root's module graph; omitting
   // it HANGS every mounted manager test as `# cancelled`, it does not fail one.
@@ -430,7 +430,7 @@ function compileManagerRoot() {
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
     'recipeItemPreviewRow.js',
-    // The essence editor's "How it appears" preview builds its two synthetic tiles with this
+    // The essence editor's "How players see it" preview builds its two synthetic tiles with this
     // pure helper (issue 1036, round 3); it imports only craftingImageDefaults (already
     // listed). This suite has NO dependency validator, so an omission HANGS it (# cancelled).
     'essencePreviewRow.js',

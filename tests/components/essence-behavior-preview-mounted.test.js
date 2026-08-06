@@ -4,7 +4,7 @@
  * The round-3 note replaced the schematic swatch-chip samples ("On a component", "As a
  * recipe input") with the REAL player `InventoryItemCard`, mounted twice from synthetic rows
  * — the essence's own inventory tile and a fake carrying component. This suite pins that the
- * "How it appears" card mounts both real tiles without cancelling, and that the inspector
+ * "How players see it" card mounts both real tiles without cancelling, and that the inspector
  * path (`showIdentity={false}`) mounts NO card, so that surface is unaffected.
  */
 import { after, before, describe, it } from 'node:test';
@@ -31,7 +31,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
-    // The REAL player tile the "How it appears" card mounts for both samples. A `.svelte` in
+    // The REAL player tile the "How players see it" card mounts for both samples. A `.svelte` in
     // the closure but absent HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
@@ -42,7 +42,7 @@ const harness = createMountedComponentHarness({
 before(() => harness.setup());
 after(() => harness.teardown());
 
-describe('EssenceBehaviorPreview — "How it appears" mounts the real player tiles', () => {
+describe('EssenceBehaviorPreview — "How players see it" mounts the real player tiles', () => {
   it('renders the essence tile AND a fake carrying component, plus the rules and live note', async () => {
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire', icon: 'fas fa-fire' }),
@@ -147,13 +147,13 @@ describe('EssenceBehaviorPreview — "How it appears" mounts the real player til
     assert.match(
       root.querySelector('.manager-essence-preview-appears-head').textContent,
       /Disabled/,
-      'the disabled state is still surfaced beside the "How it appears" kicker'
+      'the disabled state is still surfaced beside the "How players see it" kicker'
     );
     assert.ok(root.querySelector('[data-essence-preview-tile]'), 'and the real tile still renders');
     harness.remount();
   });
 
-  it('mounts NO "How it appears" card on the inspector path, leaving that surface unaffected', async () => {
+  it('mounts NO "How players see it" card on the inspector path, leaving that surface unaffected', async () => {
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
       showIdentity: false,

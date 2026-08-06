@@ -35,7 +35,7 @@ const harness = createMountedComponentHarness({
     'src/utils/macroReference.js',
     'src/utils/essenceValidation.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
-    // The behaviour preview's "How it appears" card mounts the REAL player InventoryItemCard
+    // The behaviour preview's "How players see it" card mounts the REAL player InventoryItemCard
     // (issue 1036, round 3), fed synthetic rows by the pure essencePreviewRow helper — both
     // import only craftingImageDefaults, so these three entries suffice.
     'src/ui/svelte/util/essencePreviewRow.js',

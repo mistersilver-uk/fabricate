@@ -450,6 +450,24 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       ),
       'and reveals on tile hover or button focus-visible, independent of pointer'
     );
+    // The hidden state must hide with `pointer-events`, NOT `visibility: hidden`. A
+    // `visibility: hidden` button is dropped from the tab order, so a keyboard user could
+    // never focus it and the `:focus-visible` reveal above could never fire — the reveal
+    // would be a dead rule and the control hover-only in practice. `opacity: 0` keeps it
+    // focusable; this pins that so a revert to `visibility: hidden` fails here.
+    assert.ok(
+      /\.manager-essence-icon-tile \.manager-essence-icon-reset \{[^}]*pointer-events: none;/s.test(
+        identityStyles
+      ),
+      'the hidden overlay uses pointer-events so it stays keyboard-focusable'
+    );
+    assert.equal(
+      /\.manager-essence-icon-tile \.manager-essence-icon-reset \{[^}]*visibility: hidden;/s.test(
+        identityStyles
+      ),
+      false,
+      'visibility: hidden would strand a keyboard user — the button could never be focused to reveal it'
+    );
     // The actions row is left with the picker alone: no `manager-icon-button` between the
     // row's own opening and closing tags.
     const actionsClose = identityTabSource.indexOf('</div>', actionsOpen);

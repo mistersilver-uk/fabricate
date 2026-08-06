@@ -232,24 +232,24 @@
   /* Hidden by default. Revealed on tile HOVER and on button FOCUS independently — never
      folded into one `:hover, :focus` rule — because a hover-only reveal is unreachable
      without a pointer and `:focus-visible` (not `:focus`) keeps a stray mouse-click focus
-     from pinning it open outside keyboard use. The transition covers both properties so a
-     screen reader's accessibility tree update (`visibility`) and the pointer-visible fade
-     (`opacity`) settle together rather than one snapping ahead of the other. */
+     from pinning it open outside keyboard use. Hidden with `opacity` + `pointer-events`,
+     NOT `visibility: hidden`: `visibility: hidden` removes the button from the tab order, so
+     a keyboard user could never focus it and the `:focus-visible` reveal below could never
+     fire — the exact catch-22 this design exists to avoid. `opacity: 0` keeps it focusable;
+     `pointer-events: none` stops the invisible corner intercepting a click until revealed. */
   .manager-essence-icon-tile .manager-essence-icon-reset {
     position: absolute;
     top: var(--fab-space-1);
     right: var(--fab-space-1);
     opacity: 0;
-    visibility: hidden;
-    transition:
-      opacity 120ms ease,
-      visibility 120ms ease;
+    pointer-events: none;
+    transition: opacity 120ms ease;
   }
 
   .manager-essence-icon-tile:hover .manager-essence-icon-reset,
   .manager-essence-icon-tile .manager-essence-icon-reset:focus-visible {
     opacity: 1;
-    visibility: visible;
+    pointer-events: auto;
   }
 
   .manager-essence-colour-hint {

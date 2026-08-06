@@ -45,7 +45,7 @@
     bulkActive = false,
     onSelect = null,
     onBulkToggle = null,
-    // Issue 1036: the essence editor's "How it appears" preview mounts this REAL player
+    // Issue 1036: the essence editor's "How players see it" preview mounts this REAL player
     // component twice with `onSelect`/`onBulkToggle` null, purely to show the tile. Left
     // interactive, that dropped two focusable, keyboard-operable, aria-pressed buttons that
     // no-op into the editor's tab order — a keyboard/screen-reader trap. `interactive`
@@ -281,7 +281,7 @@
   }
 
   /* Non-interactive preview rendering (issue 1036): a plain, unfocusable `<div>` in place
-     of the button, so a "How it appears" preview never adds a no-op keyboard/screen-reader
+     of the button, so a "How players see it" preview never adds a no-op keyboard/screen-reader
      trap to the host app's tab order. `pointer-events: none` matches the missing hover/focus
      affordance a static tile should show. */
   .inventory-card-button.is-static {

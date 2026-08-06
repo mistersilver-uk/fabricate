@@ -84,7 +84,7 @@
     )
   );
 
-  // The two synthetic rows the "How it appears" card mounts on the REAL player
+  // The two synthetic rows the "How players see it" card mounts on the REAL player
   // `InventoryItemCard`. The carrying component's display name is the essence's first real
   // carrier when one exists (`sampleComponentName`), and the schematic fallback otherwise.
   const previewRows = $derived(
@@ -183,7 +183,7 @@
     min-width: 0;
   }
 
-  /* The "How it appears" header carries the kicker and, for a disabled essence, the
+  /* The "How players see it" header carries the kicker and, for a disabled essence, the
      Disabled pill that used to sit inside the retired identity well. */
   .manager-essence-preview-appears-head {
     display: flex;

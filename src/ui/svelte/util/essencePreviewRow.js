@@ -21,7 +21,7 @@ function str(value) {
 }
 
 /**
- * Build the essence-tile + carrying-component preview rows for the "How it appears" card.
+ * Build the essence-tile + carrying-component preview rows for the "How players see it" card.
  *
  * @param {object} [essence] the live essence draft — `{ id, name, icon, colorToken }`.
  * @param {object} [options]
