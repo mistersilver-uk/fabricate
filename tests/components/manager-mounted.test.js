@@ -8617,11 +8617,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(target.querySelector('.manager-essences-table').dataset.essenceView, 'grid');
-    // Actions are ROW-only, so a grid card carries no pencil and grid selection routes
-    // through the inspector. That is the prototype's own division.
+    // The grid card carries its actions in a divided footer now (issue 1036, maintainer
+    // round): the edit pencil and the enable toggle live on the card, matching the prototype.
     assert.ok(
-      !target.querySelector('[data-essence-id="water"] [data-essence-edit]'),
-      'a grid card carries no row actions'
+      target.querySelector('[data-essence-id="water"] [data-essence-edit]'),
+      'a grid card carries the edit pencil in its footer'
     );
 
     target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();

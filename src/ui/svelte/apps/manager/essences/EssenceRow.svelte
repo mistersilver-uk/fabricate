@@ -167,6 +167,51 @@
   />
 {/snippet}
 
+<!-- The enable/disable toggle and the edit pencil. Shared by the LIST row's trailing cluster
+     and the GRID card's footer (issue 1036, maintainer round): the prototype's grid card carries
+     these actions in a divided footer, not only in the inspector. -->
+{#snippet statusToggle()}
+  <button
+    type="button"
+    class={`manager-status-toggle ${disabled ? 'is-off' : 'is-on'}`}
+    data-essence-toggle={essence.id}
+    aria-pressed={!disabled}
+    aria-label={format(
+      disabled
+        ? 'FABRICATE.Admin.Manager.Essence.EnableNamed'
+        : 'FABRICATE.Admin.Manager.Essence.DisableNamed',
+      disabled ? 'Enable {name}' : 'Disable {name}',
+      { name: essence.name }
+    )}
+    onclick={(event) => {
+      event.stopPropagation();
+      onToggleEnabled(essence.id, disabled);
+    }}
+  >
+    <span class="manager-status-toggle-track" aria-hidden="true"
+      ><span class="manager-status-toggle-knob"></span></span
+    >
+  </button>
+{/snippet}
+
+{#snippet editButton()}
+  <button
+    type="button"
+    class="manager-icon-button manager-essence-edit"
+    data-essence-edit={essence.id}
+    aria-label={format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
+      name: essence.name,
+    })}
+    title={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
+    onclick={(event) => {
+      event.stopPropagation();
+      onEdit(essence.id);
+    }}
+  >
+    <i class="fas fa-pen" aria-hidden="true"></i>
+  </button>
+{/snippet}
+
 <li
   class={`manager-essence-row ${isCard ? 'is-card' : ''} ${selected ? 'is-selected' : ''} ${disabled ? 'is-off' : ''}`}
   class:is-bulk-selected={bulkSelected}
@@ -177,26 +222,49 @@
   aria-current={selected ? 'true' : undefined}
 >
   {#if isCard}
-    <!-- GRID CARD. A fixed stack so every element lands at the same offset in every card
-         (issue 1036, maintainer round): a header row pairing the medallion with the capability
-         chips, then the name, then a description box with a FIXED 3-line height, then the usage
-         counts in the slot directly beneath it. The identity `<button>` wraps the whole stack
-         because clicking the card body selects it; the selection box is its only sibling. -->
+    <!-- GRID CARD (issue 1036, maintainer round) — the prototype's left-aligned stack, in order:
+         a HEADER pairing the medallion with the name to its right; a BADGES row (Disabled pill +
+         capability chips); the DESCRIPTION; a bordered FACTS box carrying the component and recipe
+         counts; then a divided FOOTER with the enable toggle and the edit pencil. Every row has a
+         fixed height so the cards in a shelf stay level. The identity `<button>` wraps only the
+         non-interactive body (header → facts); the checkbox (absolute, top-right) and the footer
+         controls are its siblings so no interactive element nests inside the button. -->
     <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
       <span class="manager-essence-card-header">
         {@render medallionTile()}
+        <span class="manager-essence-card-heading">
+          <span class="manager-system-name" title={essence.name}>{essence.name}</span>
+        </span>
+      </span>
+      <span class="manager-essence-card-badges">
+        {#if disabled}
+          <StatusPill
+            tone="neutral"
+            icon="fas fa-circle-pause"
+            label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
+          />
+        {/if}
         {@render capabilityPills()}
       </span>
-      {@render nameRow()}
       <span
         class="manager-system-description manager-essence-description"
         title={essence.description}
       >
         {description}
       </span>
-      {@render usageReadout()}
+      <span class="manager-essence-card-facts" data-essence-usage>
+        <span class="manager-essence-usage-components" data-essence-usage-components
+          >{componentUsage}</span
+        >
+        <span class="manager-essence-card-facts-sep" aria-hidden="true"></span>
+        <span data-essence-usage-recipes>{recipeUsage}</span>
+      </span>
     </button>
     {@render selectionBox()}
+    <div class="manager-essence-card-footer">
+      {@render statusToggle()}
+      {@render editButton()}
+    </div>
   {:else}
     <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
       {@render medallionTile()}
@@ -214,46 +282,9 @@
     <div class="manager-essence-cluster">
       {@render capabilityPills()}
       {@render usageReadout()}
-
-      <button
-        type="button"
-        class={`manager-status-toggle ${disabled ? 'is-off' : 'is-on'}`}
-        data-essence-toggle={essence.id}
-        aria-pressed={!disabled}
-        aria-label={format(
-          disabled
-            ? 'FABRICATE.Admin.Manager.Essence.EnableNamed'
-            : 'FABRICATE.Admin.Manager.Essence.DisableNamed',
-          disabled ? 'Enable {name}' : 'Disable {name}',
-          { name: essence.name }
-        )}
-        onclick={(event) => {
-          event.stopPropagation();
-          onToggleEnabled(essence.id, disabled);
-        }}
-      >
-        <span class="manager-status-toggle-track" aria-hidden="true"
-          ><span class="manager-status-toggle-knob"></span></span
-        >
-      </button>
-
-      <!-- FIRST `.manager-icon-button` in the row. See the header. -->
-      <button
-        type="button"
-        class="manager-icon-button manager-essence-edit"
-        data-essence-edit={essence.id}
-        aria-label={format('FABRICATE.Admin.Manager.Essence.EditNamed', 'Edit {name}', {
-          name: essence.name,
-        })}
-        title={text('FABRICATE.Admin.Manager.Essence.Edit', 'Edit essence')}
-        onclick={(event) => {
-          event.stopPropagation();
-          onEdit(essence.id);
-        }}
-      >
-        <i class="fas fa-pen" aria-hidden="true"></i>
-      </button>
-
+      {@render statusToggle()}
+      <!-- FIRST `.manager-icon-button` in the row stays the edit pencil (View Lab navigates by it). -->
+      {@render editButton()}
       {@render selectionBox()}
     </div>
   {/if}
@@ -340,18 +371,21 @@
   /* The GRID card. A column rather than a row, with the selection box floated into the
      top-right corner over the tile — which is what the prototype shows and what keeps the
      card's body a single readable stack. */
+  /* GRID CARD (issue 1036, maintainer round) — the prototype's left-aligned vertical stack.
+     `align-items: stretch` overrides the shared identity reset's `center`. Every row has a
+     bounded height (fixed medallion header, reserved badge row, fixed 2-line description,
+     one-line facts box, footer) so the cards in a shelf stay level regardless of content. */
   .manager-essence-row.is-card {
     position: relative;
     flex-direction: column;
     align-items: stretch;
     min-height: 0;
-    padding: var(--fab-space-4);
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-3);
   }
 
-  /* The card's identity is a FIXED VERTICAL STACK: header (medallion + chips), name,
-     description, usage. The global reset makes the identity a two-column grid for the list
-     row, so the card re-declares `display: flex` to override the mode rather than only the
-     template — the card's children are one column of siblings, not a tile-beside-copy pair. */
+  /* The identity `<button>` is the card BODY (header → facts). The global reset makes it a
+     two-column grid for the list row, so the card re-declares flex-column to stack its rows. */
   .manager-essence-row.is-card .manager-essence-identity {
     display: flex;
     flex-direction: column;
@@ -360,49 +394,22 @@
     gap: var(--fab-space-2);
   }
 
-  /* The header row: medallion on the left, capability chips pushed to the right, so every
-     card's chips sit in the same top-right slot regardless of how many it has. */
+  /* HEADER: medallion on the left, the name to its right. `padding-right` reserves room for the
+     absolute selection checkbox pinned in the top-right corner, so the name never runs under it. */
   .manager-essence-card-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    align-items: flex-start;
     gap: var(--fab-space-2);
+    padding-right: 2.25rem;
   }
 
-  /* The description keeps its 3-line clamp AND reserves that height even when it is shorter,
-     so the usage counts beneath it land at the same offset in every card. This is the
-     "same place" half of the maintainer's ask; equal card height is the other half and is
-     structural (see the bounded-growth note below). */
-  .manager-essence-row.is-card .manager-essence-description {
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    line-height: 1.4;
-    min-height: calc(1.4em * 3);
-  }
-
-  /* ── EVERYTHING THAT CAN GROW IS BOUNDED (issue 1036, maintainer round 2) ────────
-     Equal height inside a row is guaranteed by `align-items: stretch` plus the zeroed
-     Foundry `<li>` margin (see `styles/fabricate.css`). With every growable part of the
-     card also bounded — the header is the fixed medallion height, the name is one line, the
-     description reserves a fixed 3-line box (above), and the usage row is one line — the
-     card's total height is the same for every card regardless of content, so the shelf is
-     level without any `margin-top: auto` footer trick. Each ceiling:
-
-      - the NAME truncates to one line with an ellipsis. The maintainer named this
-        mechanism. The `<span>` already carries `title={essence.name}`, so the full name is
-        still reachable — this hides no text, it only stops the card reflowing around it.
-        `min-width: 0` is required: without it the name is a flex item at its
-        max-content width and `overflow: hidden` never engages.
-      - the NAME ROW does not wrap. With the colour chip removed the only remaining sibling
-        is the Disabled pill, and a wrap here would put the pill on its own line and add a
-        variable to the card's height.
-      - the DESCRIPTION keeps its 3-line clamp and reserves that height (above).
-      - the CAPABILITY chips do not wrap: there are at most two and a wrap moves the header.
-
-     The LIST row is untouched — its name is beside a 76px-tall row that already clamps its
-     description, and truncating there would hide names the list has room for. */
-  .manager-essence-row.is-card .manager-essence-name-row {
-    flex-wrap: nowrap;
+  .manager-essence-card-heading {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 40px;
   }
 
   .manager-essence-row.is-card .manager-system-name {
@@ -410,29 +417,72 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--fab-font-serif);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.2;
   }
 
-  /* The pill never shrinks: the NAME is the elastic cell, so a long name eats its own
-     width rather than squeezing the one word that states the essence is off. */
-  .manager-essence-row.is-card .manager-essence-name-row :global(.fab-status-pill) {
-    flex: 0 0 auto;
+  /* BADGES row: the Disabled pill and the capability chips, left-aligned. A reserved min-height
+     keeps a card with no badges the same height as one that has them. */
+  .manager-essence-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fab-space-1);
+    min-height: 1.35rem;
   }
 
-  /* No `overflow: hidden` here on purpose. Clipping would silently delete a state marker,
-     which is the one thing this card must never do; the chips never wrap so at most two sit
-     in the header's right slot. */
   .manager-essence-row.is-card .manager-essence-capabilities {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    gap: var(--fab-space-1);
     min-width: 0;
+  }
+
+  /* DESCRIPTION: a fixed 2-line box so the facts box and footer beneath land at the same
+     offset in every card. `title` on the span keeps the full text reachable. */
+  .manager-essence-row.is-card .manager-essence-description {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.4;
+    min-height: calc(1.4em * 2);
+    font-size: 0.72rem;
+  }
+
+  /* FACTS box: the component and recipe counts in a bordered well, split by a hairline —
+     the prototype's "in · out / steps" box, carrying the essence's two usage counts. */
+  .manager-essence-card-facts {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2xs) var(--fab-space-2);
+    border: 1px solid var(--fab-mv2-border);
+    border-radius: 8px;
+    color: var(--fab-text-muted);
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .manager-essence-card-facts-sep {
     flex: 0 0 auto;
+    width: 1px;
+    height: 0.9em;
+    background: var(--fab-mv2-border);
   }
 
-  .manager-essence-row.is-card .manager-essence-usage-readout {
-    align-items: flex-start;
+  /* FOOTER: a divider, then the enable toggle on the left and the edit pencil on the right —
+     the prototype's card actions, which the essence grid previously routed only to the inspector. */
+  .manager-essence-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-1);
+    padding-top: var(--fab-space-2);
+    border-top: 1px solid var(--fab-mv2-border);
   }
 
-  /* The card's selection box is the only action it carries, so it is pinned to the corner
-     over the header rather than stacked into the body where it would read as a fourth stat. */
+  /* The card's selection box is pinned to the top-right corner over the header. */
   .manager-essence-row.is-card :global(.fab-selection-checkbox) {
     position: absolute;
     top: var(--fab-space-3);

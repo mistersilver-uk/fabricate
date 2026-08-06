@@ -142,19 +142,20 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
       'the grid card removes no state; that is what makes the toggle a PRESENTATION toggle'
     );
 
-    // What legitimately differs is the ACTIONS: they are row-only, and grid selection
-    // routes through the inspector.
+    // The card ACTIONS live in a divided footer now (issue 1036, maintainer round): the
+    // prototype's grid card carries the enable toggle and the edit pencil in the card itself,
+    // not only in the inspector. The selection box stays too, pinned to the top-right corner.
     assert.ok(
-      !root.querySelector('[data-essence-edit="aether"]'),
-      'a grid card carries no edit pencil'
+      root.querySelector('[data-essence-edit="aether"]'),
+      'the grid card footer carries the edit pencil'
     );
     assert.ok(
-      !root.querySelector('[data-essence-toggle="aether"]'),
-      'and no enable switch'
+      root.querySelector('[data-essence-toggle="aether"]'),
+      'and the enable switch'
     );
     assert.ok(
       root.querySelector('[data-essence-select="aether"]'),
-      'but it keeps the selection box, because bulk selection is how a card is acted on'
+      'and it keeps the selection box, because bulk selection is how a card is acted on'
     );
     harness.remount();
   });
