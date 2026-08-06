@@ -2991,6 +2991,7 @@
             "Enable": "Enable",
             "Disable": "Disable",
             "IconStaged": "Every selected essence",
+            "ColourStaged": "Every selected essence",
             "PerEssenceNote": "Names, descriptions, linked sources and property macros stay per-essence — edit those individually.",
             "DeleteHeading": "Delete selected essences",
             "ImpactEssences": "{count} essence definitions will be deleted.",

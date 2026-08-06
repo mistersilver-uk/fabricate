@@ -50,7 +50,6 @@
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { managerColorTokenLabel } from '../../../util/managerColorTokens.js';
   import {
     ESSENCE_BULK_COLOUR_NONE,
     ESSENCE_BULK_COLOUR_UNCHANGED,
@@ -142,6 +141,9 @@
   );
   const stagedColourLabel = $derived(colourStageLabel(colourValue));
 
+  // No colour-NAME copy here (maintainer feedback): naming the staged swatch is overhead
+  // across every theme and colour combination, and the palette cell below already marks
+  // which one is staged. `No colour` and `Leave unchanged` both name no colour and stay.
   function colourStageLabel(value) {
     if (value === ESSENCE_BULK_COLOUR_UNCHANGED) {
       return text('FABRICATE.Admin.Manager.BulkEdit.LeaveUnchanged', 'Leave unchanged');
@@ -149,7 +151,7 @@
     if (value === ESSENCE_BULK_COLOUR_NONE) {
       return text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour');
     }
-    return managerColorTokenLabel(value, localize);
+    return text('FABRICATE.Admin.Manager.Essence.BulkEdit.ColourStaged', 'Every selected essence');
   }
 
   const deleteLabel = $derived(

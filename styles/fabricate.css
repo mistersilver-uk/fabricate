@@ -6317,8 +6317,10 @@
    — technically inside the track, but flush against it, and beside a 96px tile it read as a
    small tile with a gap. The tile is a fixed 124px SQUARE (issue 1036, maintainer round 3),
    so the track is narrowed to that same 124px: the icon column IS the tile's width and the
-   picker + reset row beneath shrinks to fit under it rather than the old 176px track leaving
-   the square tile with a ragged gap to its right. */
+   picker beneath shrinks to fit under it rather than the old 176px track leaving the square
+   tile with a ragged gap to its right. The reset no longer shares this row at all — it is a
+   hover/focus overlay on the tile itself (later maintainer feedback), scoped in
+   `EssenceIdentityTab.svelte`. */
 .fabricate-manager .manager-essence-edit-grid {
   display: grid;
   grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);
@@ -6345,10 +6347,12 @@
    control is a tile plus a single `Change` affordance; this shipped as a grid of two
    FULL-WIDTH controls — a picker trigger that reads as a bare dropdown, and a second
    full-width `Clear icon` button under it — which is three stacked elements where the
-   design composes one. The picker keeps the flexible track and the reset shrinks to the
-   34px icon-button rhythm, so the whole control is one control-height row. It may WRAP
-   (issue 1036, maintainer round 3): under the square tile's narrowed 124px column the
-   picker + reset can drop the reset onto a second line rather than overflow the tile. */
+   design composes one.
+
+   Later maintainer feedback moved the reset OFF this row entirely, onto a hover/focus
+   overlay on the tile above, so this row now lays out the picker alone. `flex-wrap` and
+   `min-width: 0` survive unchanged: the picker's own label can still need to wrap under the
+   square tile's narrowed 124px column, even with nothing beside it any more. */
 .fabricate-manager .manager-essence-icon-actions {
   display: flex;
   flex-wrap: wrap;
@@ -6359,10 +6363,6 @@
 
 .fabricate-manager .manager-essence-icon-actions .essence-icon-picker {
   flex: 1 1 auto;
-}
-
-.fabricate-manager .manager-essence-icon-actions .manager-icon-button {
-  flex: 0 0 auto;
 }
 
 .fabricate-manager .manager-essence-core-fields {

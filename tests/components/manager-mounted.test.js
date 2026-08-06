@@ -8385,14 +8385,22 @@ describe('CraftingSystemManager mounted behavior', () => {
       'edit route should use the shared icon picker trigger'
     );
     assert.equal(target.querySelector('.essence-icon-picker-trigger').title, 'Change icon');
-    // The icon RESET sits beside the picker as an icon-only control rather than under it as
-    // a second full-width button, so its label is its accessible name and its tooltip
-    // rather than visible text. Asserted on the control, which is what a GM operates.
-    assert.equal(
-      target.querySelector('[data-essence-icon-reset]').getAttribute('aria-label'),
-      'Clear icon'
+    // The icon RESET is an icon-only overlay control on the tile itself now (maintainer
+    // feedback), not a control beside the picker, so its label is its accessible name and
+    // its tooltip rather than visible text. Asserted on the control, which is what a GM
+    // operates, plus the structural claim that it lives on the tile rather than in the
+    // picker's row.
+    const iconResetButton = target.querySelector('[data-essence-icon-reset]');
+    assert.equal(iconResetButton.getAttribute('aria-label'), 'Clear icon');
+    assert.equal(iconResetButton.title, 'Clear icon');
+    assert.ok(
+      iconResetButton.closest('.manager-essence-icon-tile'),
+      'the reset overlays the icon tile rather than sitting in the picker row'
     );
-    assert.equal(target.querySelector('[data-essence-icon-reset]').title, 'Clear icon');
+    assert.ok(
+      !target.querySelector('.manager-essence-icon-actions [data-essence-icon-reset]'),
+      'and the actions row beside the picker no longer carries a second reset control'
+    );
     assert.equal(
       target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       true
@@ -8549,6 +8557,16 @@ describe('CraftingSystemManager mounted behavior', () => {
         .essenceColourState,
       'rose',
       'authoring a colour ends the unset state'
+    );
+    // No colour-NAME copy (maintainer feedback): the caption states Authored/Unset without
+    // ever naming the swatch, unlike the palette cell itself, which still carries "Rose" as
+    // its own accessible name/title (shared `managerColorTokens.js` vocabulary, untouched).
+    assert.equal(
+      target
+        .querySelector('[data-manager-essence-colour] [data-essence-colour-state]')
+        .textContent.includes('Rose'),
+      false,
+      'the caption never renders the colour name as visible text'
     );
 
     // The Enabled row is the shared ToggleCard, and a new essence can be created disabled.

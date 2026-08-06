@@ -26,7 +26,6 @@
   import Medallion from '../../../components/Medallion.svelte';
   import ToggleCard from '../ToggleCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { managerColorTokenLabel } from '../../../util/managerColorTokens.js';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
 
   let {
@@ -49,11 +48,6 @@
   }
 
   const normalizedIcon = $derived(normalizeEssenceIcon(icon));
-  const colourName = $derived(
-    colorToken
-      ? managerColorTokenLabel(colorToken, localize)
-      : text('FABRICATE.Admin.Manager.Essence.Colour.None', 'No colour')
-  );
 </script>
 
 <div class="manager-essence-tab-stack" data-essence-tab-panel="identity">
@@ -70,26 +64,22 @@
              the column WIDTH and kept `size` only as its height, so a widened column
              stretched the tile into a rectangle. The maintainer's note is that the icon must
              read as a square: `size={124}` alone sets both dimensions, and the column below
-             is narrowed to that same 124px (`--fab-mv2-essence-icon-column`) so the picker +
-             reset row shrinks to fit beneath the tile rather than hanging past it. `glyph`
+             is narrowed to that same 124px (`--fab-mv2-essence-icon-column`) so the picker
+             row shrinks to fit beneath the tile rather than hanging past it. `glyph`
              stays: at the shared 0.9rem (~14px) default the flame was a speck in a 124px
-             tile, and the prototype's flame fills roughly a third of the tile's edge. -->
-        <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
-        <div class="manager-essence-icon-actions">
-          <IconPicker
-            value={icon}
-            disabled={saving}
-            buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
-            onChange={(iconClass) => onIconChange(iconClass)}
-          />
-          <!-- ICON-ONLY, and beside the picker rather than stacked under it. The prototype
-               composes the icon control as a tile plus ONE affordance; a second full-width
-               button under a full-width trigger made it three stacked elements. The label
-               survives as the accessible name and the tooltip, which is the treatment every
-               other manager row action already uses. -->
+             tile, and the prototype's flame fills roughly a third of the tile's edge.
+
+             The RESET is an OVERLAY on the tile now (maintainer feedback), not a second
+             control beside the picker: `Medallion` is a closed leaf with no slot, so this
+             wrapper gives the reset something to position against. It is invisible until the
+             tile is hovered or the button itself takes keyboard focus — `:focus-visible`
+             keeps it keyboard-reachable independent of hover, which a hover-only reveal would
+             have made unreachable without a pointer. -->
+        <div class="manager-essence-icon-tile">
+          <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
           <button
             type="button"
-            class="manager-icon-button"
+            class="manager-icon-button manager-essence-icon-reset"
             data-essence-icon-reset
             disabled={saving || normalizedIcon === DEFAULT_ESSENCE_ICON}
             aria-label={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
@@ -98,6 +88,14 @@
           >
             <i class="fas fa-undo" aria-hidden="true"></i>
           </button>
+        </div>
+        <div class="manager-essence-icon-actions">
+          <IconPicker
+            value={icon}
+            disabled={saving}
+            buttonTitle={text('FABRICATE.Admin.Manager.Essence.ChangeIcon', 'Change icon')}
+            onChange={(iconClass) => onIconChange(iconClass)}
+          />
         </div>
       </div>
 
@@ -160,11 +158,13 @@
       onClear={() => onColourChange('')}
       onChange={(next) => onColourChange(next?.colorToken || '')}
     />
+    <!-- No colour-NAME copy here (maintainer feedback): naming the swatch was overhead the
+         palette already carries visually, across every theme and colour combination. The
+         Authored/Unset sentence stays — it names no colour, only whether one is set. -->
     <p
       class="manager-muted manager-essence-colour-state"
       data-essence-colour-state={colorToken || 'none'}
     >
-      <strong>{colourName}</strong>
       <span
         >{colorToken
           ? text(
@@ -211,14 +211,45 @@
 
      `align-items: stretch` (issue 1036). The tile is now a fixed 124px SQUARE and the column
      is narrowed to that same 124px, so stretch makes the actions row beneath fill the
-     column too — the picker + reset shrink to the tile's width and share its edges rather
-     than the picker's natural width hanging off the right of the narrower tile. */
+     column too — the picker shrinks to the tile's width and shares its edges rather than
+     the picker's natural width hanging off the right of the narrower tile. */
   .manager-essence-icon-panel {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: var(--fab-space-2);
     min-width: 0;
+  }
+
+  /* The tile wrapper `Medallion` needs because it is a closed leaf with no slot (maintainer
+     feedback): the reset now overlays the tile instead of sitting beside the picker as a
+     second control, and `position: relative` is what an absolutely-positioned overlay
+     positions against. */
+  .manager-essence-icon-tile {
+    position: relative;
+  }
+
+  /* Hidden by default. Revealed on tile HOVER and on button FOCUS independently — never
+     folded into one `:hover, :focus` rule — because a hover-only reveal is unreachable
+     without a pointer and `:focus-visible` (not `:focus`) keeps a stray mouse-click focus
+     from pinning it open outside keyboard use. The transition covers both properties so a
+     screen reader's accessibility tree update (`visibility`) and the pointer-visible fade
+     (`opacity`) settle together rather than one snapping ahead of the other. */
+  .manager-essence-icon-tile .manager-essence-icon-reset {
+    position: absolute;
+    top: var(--fab-space-1);
+    right: var(--fab-space-1);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 120ms ease,
+      visibility 120ms ease;
+  }
+
+  .manager-essence-icon-tile:hover .manager-essence-icon-reset,
+  .manager-essence-icon-tile .manager-essence-icon-reset:focus-visible {
+    opacity: 1;
+    visibility: visible;
   }
 
   .manager-essence-colour-hint {

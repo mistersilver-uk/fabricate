@@ -404,4 +404,39 @@ describe('1036/10 EssenceBulkEditPanel — the staged axes', () => {
     );
     harness.remount();
   });
+
+  it('stages a real colour token without naming it in the section sub-hint (maintainer feedback)', async () => {
+    // No colour-NAME copy in the essence editor, "unnecessary overhead for all theme and
+    // colour combinations" — the palette cell (`[data-manager-color-token].is-selected`)
+    // already marks which token is staged, so the sub-hint states the generic fact instead
+    // of resolving and repeating the token's display name.
+    const drafts = [];
+    const root = await harness.mount(
+      props(SELECTION, { onDraftChange: (next) => drafts.push(next) })
+    );
+    root.querySelector('[data-essence-bulk-colour] [data-manager-color-token="rose"]').click();
+    flushSync();
+    const staged = drafts.at(-1);
+    await harness.setProps(props(SELECTION, { draft: staged }));
+
+    assert.equal(
+      root.querySelector('[data-essence-bulk-colour]').dataset.essenceBulkColour,
+      'rose',
+      'the panel still states which token is staged, via the machine-readable attribute'
+    );
+    const subhint = root.querySelector('[data-essence-bulk-colour-state]');
+    assert.ok(subhint, 'the colour section carries a sub-hint');
+    assert.equal(
+      subhint.textContent.includes('Rose'),
+      false,
+      'the visible sub-hint never names the staged colour'
+    );
+    assert.ok(
+      root
+        .querySelector('[data-essence-bulk-colour] [data-manager-color-token="rose"]')
+        .classList.contains('is-selected'),
+      'the palette cell itself is what marks the staged token'
+    );
+    harness.remount();
+  });
 });

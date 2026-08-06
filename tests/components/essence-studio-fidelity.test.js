@@ -171,12 +171,40 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       inspectorSource.includes("tint={essence.colorToken || ''}"),
       'and so does the inspector tile'
     );
-    // The EDITOR's palette caption keeps its name, and that is a decision rather than an
-    // oversight: there the name labels the swatch the GM is choosing, and the No-colour cell
-    // has no tile to speak for it at all.
+  });
+
+  it('drops the editor and bulk-panel colour-name caption too (later maintainer feedback)', () => {
+    // The maintainer's follow-up round: no colour-NAME copy anywhere in the essence editor,
+    // "unnecessary overhead for all theme and colour combinations" — reversing the earlier
+    // decision that the editor's palette caption should keep naming the selected swatch.
+    // Both surfaces stop resolving a display name at all.
+    for (const [label, source] of [
+      ['editor identity caption', identityTabSource],
+      ['bulk edit panel', bulkPanelSource],
+    ]) {
+      assert.equal(
+        /managerColorTokenLabel/.test(source),
+        false,
+        `${label} must not resolve a colour display name`
+      );
+    }
+    // The EDITOR's caption keeps the Authored/Unset sentence — it names no colour, only
+    // whether one is set — and drops only the `<strong>` that named the swatch.
+    assert.equal(
+      /<strong>\s*\{colourName\}\s*<\/strong>/.test(identityTabSource),
+      false,
+      'the editor no longer renders a colour-name element in the caption'
+    );
     assert.ok(
-      identityTabSource.includes('managerColorTokenLabel(colorToken, localize)'),
-      'the palette caption still names the selected swatch'
+      identityTabSource.includes("'FABRICATE.Admin.Manager.Essence.Colour.Authored'") &&
+        identityTabSource.includes("'FABRICATE.Admin.Manager.Essence.Colour.Unset'"),
+      'the Authored/Unset explanatory sentence survives, since it names no colour'
+    );
+    // The No-colour vocabulary key stays too — it is the inline palette's `noneLabel`, and
+    // "No colour" names the absence of a colour, not a colour.
+    assert.ok(
+      identityTabSource.includes("'FABRICATE.Admin.Manager.Essence.Colour.None'"),
+      'the palette keeps its no-colour cell label'
     );
   });
 
@@ -374,21 +402,67 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     );
   });
 
-  it('composes the editor icon control as one row', () => {
-    // The rendered symptom: a full-width picker trigger that reads as a bare dropdown, with
-    // a second full-width `Clear icon` button stacked under it. The prototype has a tile
-    // and one affordance.
+  it('composes the editor icon control as a picker row under a tile whose own reset overlays it', () => {
+    // The rendered symptom, round 1: a full-width picker trigger that reads as a bare
+    // dropdown, with a second full-width `Clear icon` button stacked under it. Round 2
+    // (this maintainer round): even the icon-only reset beside the picker was a second
+    // control — the prototype has a tile and ONE affordance, so the reset now overlays the
+    // tile itself rather than sharing the row below it with the picker.
+    const identityStyles = styleBlock(identityTabSource);
     assert.ok(
-      /class="manager-icon-button"\s+data-essence-icon-reset/.test(identityTabSource),
-      'the icon reset is an icon-only control beside the picker'
+      /<div class="manager-essence-icon-tile">/.test(identityTabSource),
+      'the tile is wrapped so the closed-leaf Medallion has something to overlay'
+    );
+    assert.ok(
+      /\.manager-essence-icon-tile \{[^}]*position: relative;/s.test(identityStyles),
+      'the tile wrapper is the positioning context for the overlay'
+    );
+    assert.ok(
+      /class="manager-icon-button manager-essence-icon-reset"\s+data-essence-icon-reset/.test(
+        identityTabSource
+      ),
+      'the reset is still the icon-only control, now rendered inside the tile wrapper'
+    );
+    // The reset must render BEFORE the actions row closes, i.e. inside the tile, never
+    // beside the picker in `.manager-essence-icon-actions` any more.
+    const tileOpen = identityTabSource.indexOf('<div class="manager-essence-icon-tile">');
+    const resetHook = identityTabSource.indexOf('data-essence-icon-reset');
+    const actionsOpen = identityTabSource.indexOf('<div class="manager-essence-icon-actions">');
+    assert.ok(
+      tileOpen >= 0 && resetHook > tileOpen && resetHook < actionsOpen,
+      'the reset sits inside the tile wrapper, ahead of the separate actions row'
     );
     assert.ok(
       identityTabSource.includes("aria-label={text('FABRICATE.Admin.Manager.Essence.ClearIcon'"),
       'and its label survives as the accessible name'
     );
+    // Hidden by default, and revealed by hover AND by keyboard focus independently — never
+    // hover-only, which would strand a keyboard user with no way to see the control at all.
+    assert.ok(
+      /\.manager-essence-icon-tile \.manager-essence-icon-reset \{[^}]*opacity: 0;/s.test(
+        identityStyles
+      ),
+      'the overlay starts hidden'
+    );
+    assert.ok(
+      /\.manager-essence-icon-tile:hover \.manager-essence-icon-reset,\s*\n\s*\.manager-essence-icon-tile \.manager-essence-icon-reset:focus-visible \{[^}]*opacity: 1;/s.test(
+        identityStyles
+      ),
+      'and reveals on tile hover or button focus-visible, independent of pointer'
+    );
+    // The actions row is left with the picker alone: no `manager-icon-button` between the
+    // row's own opening and closing tags.
+    const actionsClose = identityTabSource.indexOf('</div>', actionsOpen);
+    const actionsBody = identityTabSource.slice(actionsOpen, actionsClose);
+    assert.ok(actionsOpen > 0 && actionsClose > actionsOpen, 'the actions row is found intact');
+    assert.equal(
+      actionsBody.includes('manager-icon-button'),
+      false,
+      'no manager-icon-button remains beside the picker in the actions row'
+    );
     assert.ok(
       /\.fabricate-manager \.manager-essence-icon-actions \{[^}]*display: flex;/s.test(globalCss),
-      'the actions under the tile are a row, not a stack of full-width buttons'
+      'the actions row under the tile lays out the picker, still as a row'
     );
   });
 
