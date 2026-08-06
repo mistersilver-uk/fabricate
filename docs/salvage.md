@@ -181,6 +181,42 @@ This is separate from salvaging a broken tool, covered in [Broken Tools](#broken
 There, the broken tool is itself the thing being recycled.
 Here, a working tool is a prerequisite for recycling something else.
 
+### Salvaging (Or Destroying) Several Items at Once
+
+Players can select several owned items in the Inventory grid and act on all of them together, instead of opening the inspector one card at a time.
+Shift-click a card, or press Shift+Enter or Shift+Space with a card focused, to add it to the selection.
+Shift-clicking a selected card removes it again.
+Pressing Escape clears the whole selection.
+
+Once at least one item is selected, the inspector shows the bulk panel instead of a single item's detail.
+The panel sorts the selection into two lists:
+
+- **Will be broken down** lists every selected item that can be salvaged, together with a **Best case** preview of what the whole batch could recover if every roll went well.
+- **Skipped** lists everything in the selection that cannot be salvaged, each with the reason why: it is an essence, it is a book or scroll, salvage is turned off for it, your GM has not finished configuring its salvage setup, a required tool is not available, or you hold none of it.
+  Skipped items are never removed from your inventory.
+  You can remove any single item from either list before committing, or use **Clear** to empty the whole selection.
+
+A batch accepts up to 25 items.
+Selecting past that limit is refused with a message telling you to remove one before adding another.
+
+Pressing **Salvage** rolls the whole batch.
+One roll prompt sets a bonus, roll mode, and advantage choice for the entire batch, and that same choice is applied to every roll in it.
+Every item still rolls its own check against its own crafting system, so a batch spanning several systems still respects each system's own rules.
+A broken tool stays in the batch and can still be salvaged.
+The roll prompt is skipped entirely when nothing in the batch has a check to roll.
+
+When the batch finishes, the panel shows a report: a banner summarising how the batch went, a line-by-line list of what happened to each item, everything that was added to your pack, and everything that was not recovered.
+The run also posts one chat card for the whole batch, naming every item whose own crafting system has the **Chat output** feature on, instead of one card per item.
+Nothing is posted when no item in the batch belongs to a system with Chat output on.
+Dismissing the roll prompt cancels the whole batch: nothing is consumed, no tool breaks, and no chat card is posted.
+The report still opens, telling you the prompt was dismissed and nothing was broken down.
+Each item salvaged this way adds an entry to your character's salvage history in the [Journal]({% link journal.md %}), and history keeps only your most recent runs, so a large batch can push older salvage entries out of it.
+
+The panel also offers **Destroy**, which permanently removes the selected items' whole stacks from your pack.
+Destroy asks for confirmation first, naming how many components and how many items in total it is about to remove.
+Unlike Salvage, Destroy has no roll, is available even for items that are skipped from the salvage list, recovers nothing, and posts no chat card.
+This cannot be undone.
+
 ### Making the Attempt
 
 The footer holds a single button that rolls and commits in one press.
