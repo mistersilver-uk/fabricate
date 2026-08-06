@@ -355,6 +355,7 @@
   .manager-essence-row.is-card .manager-essence-identity {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     flex: 0 0 auto;
     gap: var(--fab-space-2);
   }

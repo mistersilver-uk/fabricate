@@ -45,10 +45,12 @@ export function buildEssencePreviewRow(
   // tints its glyph to the essence colour identically to the real player inventory.
   const colorToken = str(essence?.colorToken) || null;
 
-  // The essence pip the carrying component's card reads: the essence's own id, name and
-  // authored icon, shaped exactly like the `essences[]` entries the builder folds onto a
-  // component row (the card keys pips on `id`).
-  const pip = { id: str(id), name, icon: icon || 'fas fa-mortar-pestle' };
+  // The essence pip the carrying component's card reads: the essence's own id, name,
+  // authored icon and chosen colour token, shaped exactly like the `essences[]` entries the
+  // builder folds onto a component row (the card keys pips on `id`). `colorToken` is the
+  // same sanitised bare `--fab-tag-*` token as the row above — null when unset — so the pip
+  // tints to the essence's colour instead of the fixed `--fab-text` glyph.
+  const pip = { id: str(id), name, icon: icon || 'fas fa-mortar-pestle', colorToken };
 
   // (1) The synthetic per-essence aggregate — `img: null`, `icon: <essence glyph>`,
   // `isEssenceSource: true` — so `InventoryItemCard` renders its essence-glyph tile branch.

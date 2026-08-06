@@ -287,6 +287,29 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     );
   });
 
+  it('matches the bulk-delete armed danger button to the inspector-action label size', () => {
+    // The rendered symptom (maintainer feedback): `ArmedDangerButton` renders a bare
+    // `.manager-button`, which carries no font-size of its own, so "Delete N essences" /
+    // armed "Confirm delete" inherited the app's body size — visibly larger than every
+    // other right-rail button, `InspectorActionButton`'s `.fab-inspector-action` (0.72rem)
+    // included. happy-dom cannot compute the cascade, so this is a source assertion; the
+    // rendered proof is the re-captured frame.
+    const styles = styleBlock(bulkPanelSource);
+    assert.ok(
+      /\.manager-essence-bulk-delete :global\(\.manager-button\) \{[^}]*font-size: 0\.72rem;/s.test(
+        styles
+      ),
+      'the delete card scopes its button to the shared inspector-action label size'
+    );
+    // Scoped to the delete card only — the danger/armed colour treatment stays in the
+    // global sheet, untouched.
+    assert.equal(
+      styles.includes('.manager-button.is-danger'),
+      false,
+      'the colour treatment is not re-declared here, only the type scale'
+    );
+  });
+
   it('gives the editor icon control a SQUARE tile its column is sized to', () => {
     // The rendered symptom (maintainer round 3): the round-2 `block` filled the column WIDTH
     // and kept `size` only as the height, so a widened column stretched the icon tile into a
@@ -589,6 +612,27 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       styleBlock(rowSource).includes('.is-bulk-selected'),
       false,
       'the answer is the shared joined rule, never a per-studio copy scoped to the row'
+    );
+  });
+
+  it('left-aligns the grid card body instead of inheriting the shared centred identity', () => {
+    // The rendered symptom: the shared `.manager-essence-identity` reset (styles/fabricate.css)
+    // is a grid with `align-items: center`, and the card's own rule only reflows it into a
+    // flex COLUMN without stating `align-items`, so the centred cross-axis value survives the
+    // reflow and centres the name, description and usage counts. The prototype (and the
+    // maintainer) want them flush left.
+    const styles = styleBlock(rowSource);
+    assert.ok(
+      /\.manager-essence-row\.is-card \.manager-essence-identity \{[^}]*align-items: stretch;/s.test(
+        styles
+      ),
+      'the card identity stretches its children to the card width so their left-aligned content is not centred'
+    );
+    // The LIST row must stay untouched — it keeps the shared grid's centred cross-axis.
+    assert.equal(
+      /\.manager-essence-row \.manager-essence-identity \{[^}]*align-items:/s.test(styles),
+      false,
+      'the list row identity is not given its own align-items override'
     );
   });
 });

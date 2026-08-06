@@ -199,7 +199,11 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
       !carried.querySelector('[data-essence-bulk-blocked]'),
       'no member is skipped, so nothing is called out'
     );
-    assert.match(impactRow(carried, 'essences'), /^4\b/, 'all four delete, including the carried pair');
+    assert.match(
+      impactRow(carried, 'essences'),
+      /^4\b/,
+      'all four delete, including the carried pair'
+    );
     harness.remount();
   });
 
@@ -247,11 +251,7 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
       '1 component carries one or more of the selected essences.',
       'not "1 components carry"'
     );
-    assert.equal(
-      impactRow(root, 'recipes'),
-      '1 recipe will be rewritten.',
-      'not "1 recipes"'
-    );
+    assert.equal(impactRow(root, 'recipes'), '1 recipe will be rewritten.', 'not "1 recipes"');
 
     assert.match(
       deleteButton(root).getAttribute('aria-label'),
@@ -272,10 +272,7 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
       '4 components carry one or more of the selected essences.'
     );
     assert.equal(impactRow(root, 'recipes'), '3 recipes will be rewritten.');
-    assert.match(
-      deleteButton(root).getAttribute('aria-label'),
-      /^Delete 4 essence definitions$/
-    );
+    assert.match(deleteButton(root).getAttribute('aria-label'), /^Delete 4 essence definitions$/);
     harness.remount();
   });
 
@@ -327,7 +324,9 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     // The owner holds the armed latch, so the armed render is a PROP change, exactly as the
     // manager root drives it.
     assert.equal(isArmed, true);
-    await harness.setProps(props(SELECTION, { deleteArmed: true, onDelete: (ids) => deleted.push(ids) }));
+    await harness.setProps(
+      props(SELECTION, { deleteArmed: true, onDelete: (ids) => deleted.push(ids) })
+    );
     assert.match(
       deleteButton(root).textContent,
       /Confirm/,
@@ -356,6 +355,24 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
       button.getAttribute('aria-label'),
       /4 essence definitions/,
       'the consequence sentence is on the control, not only in the panel body'
+    );
+    harness.remount();
+  });
+
+  it('sits inside the delete card that scopes it to the inspector-action label size', async () => {
+    // happy-dom cannot compute the cascade (see essence-studio-fidelity.test.js for the
+    // source-level font-size pin), but it CAN prove the structural half of that fix: the
+    // button the scoped `.manager-essence-bulk-delete :global(.manager-button)` rule
+    // targets is actually a descendant of that card, in both the idle and armed states.
+    const root = await harness.mount(props(SELECTION));
+    assert.ok(
+      deleteButton(root).closest('.manager-essence-bulk-delete'),
+      'the idle delete button is inside the scoped card'
+    );
+    await harness.setProps(props(SELECTION, { deleteArmed: true }));
+    assert.ok(
+      deleteButton(root).closest('.manager-essence-bulk-delete'),
+      'the armed confirm button stays inside it too'
     );
     harness.remount();
   });

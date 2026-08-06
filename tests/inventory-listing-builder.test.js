@@ -690,8 +690,38 @@ describe('InventoryListingBuilder — multi-system + essences', () => {
     const { builder } = makeBuilder();
     const listing = builder.buildListing({ craftingActor: actor('a1', 'Akra', [item('Iron', 1)]) });
     assert.deepEqual(rowByComponent(listing, 'c1').essences, [
-      { id: 'fire', name: 'Fire', icon: 'fas fa-fire', quantity: 2 },
+      { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: null, quantity: 2 },
     ]);
+  });
+
+  it('carries the essence definition colorToken on a component’s essence pip too (issue 1036)', () => {
+    // The same colour the synthetic essence row carries (see the sibling test above it),
+    // folded onto the CARRYING COMPONENT's own `essences[]` pip, so the player inventory
+    // card can tint that pip to the essence's colour instead of the fixed neutral glyph.
+    const { builder } = makeBuilder({
+      systems: [
+        makeSystem({
+          essenceDefinitions: [
+            { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: '--fab-tag-mauve' },
+            { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' },
+          ],
+          components: [
+            { id: 'c1', name: 'Iron', img: 'icons/iron.webp', essences: { fire: 2 } },
+            { id: 'c2', name: 'Loam', img: 'icons/loam.webp', essences: { earth: 1 } },
+          ],
+          tools: [],
+        }),
+      ],
+    });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Loam', 1)]),
+    });
+    assert.equal(rowByComponent(listing, 'c1').essences[0].colorToken, '--fab-tag-mauve');
+    assert.equal(
+      rowByComponent(listing, 'c2').essences[0].colorToken,
+      null,
+      'unset stays null, not undefined or dropped'
+    );
   });
 
   it('suppresses essence rows and content when the system has essences disabled', () => {

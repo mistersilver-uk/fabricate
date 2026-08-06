@@ -140,6 +140,42 @@ describe('EssenceBehaviorPreview — "How players see it" mounts the real player
     harness.remount();
   });
 
+  it('tints the "On a component" preview pip to the essence colour when one is chosen', async () => {
+    // Maintainer feedback: the fake carrying-component's essence PIP rendered in the fixed
+    // `--fab-text` regardless of the essence's own colour. `buildEssencePreviewRow` now
+    // shapes `colorToken` onto the pip, and `InventoryItemCard` emits the `--fab-pip-tint`
+    // inline var for it — the same mechanism the essence tile above already uses.
+    const root = await harness.mount({
+      essence: makeEssenceRow({ id: 'fire', name: 'Fire', colorToken: '--fab-tag-mauve' }),
+      sampleComponentName: 'Ember Ash',
+    });
+    const pip = root.querySelector(
+      '[data-essence-preview-component] [data-inventory-pip="essence"]'
+    );
+    assert.ok(pip, 'the carrying component renders the essence pip');
+    assert.equal(pip.getAttribute('data-inventory-pip-tint'), 'mauve');
+    assert.match(
+      pip.getAttribute('style') || '',
+      /--fab-pip-tint:\s*var\(--fab-tag-mauve\)/,
+      'the pip carries the tint var, so the preview matches the coloured player pip'
+    );
+    harness.remount();
+  });
+
+  it('leaves the "On a component" preview pip untinted when the essence has no colour', async () => {
+    const root = await harness.mount({
+      essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
+      sampleComponentName: 'Ember Ash',
+    });
+    const pip = root.querySelector(
+      '[data-essence-preview-component] [data-inventory-pip="essence"]'
+    );
+    assert.ok(pip, 'the carrying component renders the essence pip');
+    assert.equal(pip.hasAttribute('data-inventory-pip-tint'), false);
+    assert.doesNotMatch(pip.getAttribute('style') || '', /--fab-pip-tint/);
+    harness.remount();
+  });
+
   it('flags a disabled essence with the Disabled pill in the card header', async () => {
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'aether', name: 'Aether', enabled: false }),

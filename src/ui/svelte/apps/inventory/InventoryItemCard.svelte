@@ -61,18 +61,21 @@
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
   );
+  // Shared by the essence glyph tile below AND each carrying-component pip: a raw
+  // `colorToken` sanitises to a bare `--fab-tag-*` palette key (the leading prefix
+  // tolerated, since the builder and the picker both accept either spelling), or to ''
+  // for anything else — including unset — so a caller can always safely interpolate the
+  // result into a `style` custom property.
+  function sanitizeTintToken(rawToken) {
+    const bare = String(rawToken || '').replace(/^--fab-tag-/, '');
+    return /^[a-z0-9-]+$/.test(bare) ? bare : '';
+  }
+
   // Issue 1036: the essence glyph tile renders in the essence's CHOSEN colour when one is set,
-  // and stays the theme accent when it is not — mirroring the manager `Medallion` tint. The
-  // token arrives as a bare `--fab-tag-*` palette key (the leading prefix is tolerated exactly
-  // as Medallion does, since the builder and the picker both accept either spelling) and is
-  // interpolated into a `style` custom property, so it is constrained to the shape a key can
-  // have. Anything else DROPS to '' → no inline var is emitted → the CSS `var()` fallback paints
-  // the accent, byte-identical to the pre-1036 render.
-  const essenceTint = $derived(
-    /^[a-z0-9-]+$/.test(String(item?.colorToken || '').replace(/^--fab-tag-/, ''))
-      ? String(item.colorToken).replace(/^--fab-tag-/, '')
-      : ''
-  );
+  // and stays the theme accent when it is not — mirroring the manager `Medallion` tint.
+  // Anything unsanitisable DROPS to '' → no inline var is emitted → the CSS `var()` fallback
+  // paints the accent, byte-identical to the pre-1036 render.
+  const essenceTint = $derived(sanitizeTintToken(item?.colorToken));
   const essenceTintStyle = $derived(
     essenceTint ? `--fab-essence-tint:var(--fab-tag-${essenceTint})` : undefined
   );
@@ -191,11 +194,14 @@
       {#if essencePips.length > 0}
         <span class="inventory-card-pips" data-inventory-pips>
           {#each essencePips as pip (pip.id)}
+            {@const pipTint = sanitizeTintToken(pip.colorToken)}
             <span
               class="inventory-card-pip"
               data-inventory-pip="essence"
+              data-inventory-pip-tint={pipTint || undefined}
               title={pip.name}
               aria-label={pip.name}
+              style={pipTint ? `--fab-pip-tint:var(--fab-tag-${pipTint})` : undefined}
             >
               <i class={pip.icon || 'fas fa-mortar-pestle'} aria-hidden="true"></i>
             </span>
@@ -464,6 +470,10 @@
     max-width: calc(100% - 32px);
   }
 
+  /* Issue 1036: the pip glyph tints to the carried essence's OWN chosen colour when one is
+     set — mirroring the essence-source tile above and `Medallion` — and stays `--fab-text`
+     when it is not, via the same `var()` fallback pattern so an uncoloured pip is
+     byte-identical to the pre-1036 render. */
   .inventory-card-pip {
     display: inline-flex;
     align-items: center;
@@ -473,7 +483,7 @@
     border-radius: 999px;
     border: 1px solid var(--fab-overlay-light-28);
     background: var(--fab-overlay-dark-78);
-    color: var(--fab-text);
+    color: var(--fab-pip-tint, var(--fab-text));
   }
 
   .inventory-card-pip i {

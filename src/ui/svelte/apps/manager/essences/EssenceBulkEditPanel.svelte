@@ -401,6 +401,20 @@
     gap: var(--fab-space-2);
   }
 
+  /* The armed danger button reads at the shared inspector-action label size (issue 1036,
+     maintainer round). `ArmedDangerButton` renders a bare `.manager-button`, which carries
+     no font-size of its own and so inherited the app's body size — visibly chunkier than
+     every other right-rail control, `InspectorActionButton`'s `.fab-inspector-action`
+     included (`0.72rem`). Scoped to this card only: the row-level `ArmedDangerButton` uses
+     elsewhere in the manager are untouched, and the danger/armed colour treatment from
+     `styles/fabricate.css` is untouched too — only the type scale changes. */
+  .manager-essence-bulk-delete :global(.manager-button) {
+    min-height: 34px;
+    padding: 0 var(--fab-space-3);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
   /* WEIGHT, not size. This is the sentence the GM is asked to act on and it sits under a
      louder warning `Callout`; at the muted tone it was the quietest thing on a destructive
      card. It keeps the small type — the card is a rail, not a dialog — and gains the
