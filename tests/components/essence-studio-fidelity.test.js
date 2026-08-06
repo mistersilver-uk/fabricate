@@ -30,6 +30,7 @@ const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEdi
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
 const previewSource = read('src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte');
+const segmentedControlSource = read('src/ui/svelte/apps/manager/SegmentedControl.svelte');
 const globalCss = read('styles/fabricate.css');
 
 // The scoped `<style>` block of a component, so an assertion about its CSS cannot be
@@ -201,6 +202,84 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     assert.ok(
       inspectorSource.includes('showEffectiveKicker={false}'),
       'and the inspector, whose card already carries the heading, suppresses it'
+    );
+  });
+
+  // ── The two defects the maintainer read off the published frames ────────────────
+
+  it('compacts the presentation toggle to glyph tiles without losing its name', () => {
+    // The rendered symptom: the prototype draws list/grid as two compact glyph tiles
+    // (~86px for the pair); the shipped toggle spelled out "List" and "Grid" and measured
+    // ~135px, which made a presentation switch shout as loudly as the status FILTER beside
+    // it and pushed row one to the edge of the 1280px capture.
+    const viewControl = browserSource.slice(browserSource.indexOf('options={viewModeOptions}'));
+    assert.ok(
+      /^[^/]*?\biconOnly\b/s.test(viewControl.slice(0, viewControl.indexOf('/>'))),
+      'the view-mode segmented control opts into the compact variant'
+    );
+    // Opt-IN, so the status filter one line above must not have been swept along: "All /
+    // Enabled / Disabled" is a vocabulary, not two glyphs, and it has no icons to fall back
+    // on — an icon-only status filter would render three empty tiles.
+    const statusControl = browserSource.slice(
+      browserSource.indexOf('options={statusOptions}'),
+      browserSource.indexOf('options={viewModeOptions}')
+    );
+    assert.equal(
+      /\biconOnly\b/.test(statusControl),
+      false,
+      'the status filter keeps its words — its options are not glyphs'
+    );
+
+    // The label is CLIPPED, never removed. The `<label>` IS the radio's accessible name, so
+    // `display: none` (or dropping the span) would leave every tile anonymous to a screen
+    // reader — the defect this variant must not trade the width saving for.
+    const segmentedStyles = styleBlock(segmentedControlSource);
+    const clipRule = segmentedStyles.slice(
+      segmentedStyles.indexOf('.manager-segmented.is-icon-only .manager-segment-label {')
+    );
+    const clipBlock = clipRule.slice(0, clipRule.indexOf('}'));
+    assert.ok(clipBlock.length > 0, 'the icon-only variant must state how it hides the label');
+    assert.ok(clipBlock.includes('clip-path: inset(50%);'), 'the label is clipped out of view');
+    assert.equal(
+      /display: none|visibility: hidden/.test(clipBlock),
+      false,
+      'and never removed from the accessibility tree'
+    );
+    assert.ok(
+      /\.manager-segmented\.is-icon-only \.manager-segment \{[^}]*min-width: 32px;/s.test(
+        segmentedStyles
+      ),
+      'the tile is sized as a square target, not left to hug a ~12px glyph'
+    );
+  });
+
+  it('joins the essence row to the selected-row bar opt-out it now qualifies for', () => {
+    // The rendered symptom: a 3px accent bar inset into the LEFT edge of a selected essence
+    // row, biting into the 40px Medallion this redesign gave it — the exact defect the
+    // recipe and component rows opted out of in issue 676, on a row that only acquired the
+    // medallion here. On a GRID CARD it is not even the right axis.
+    assert.ok(
+      globalCss.includes(
+        '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected,\n.fabricate-manager .manager-essence-row.is-selected {\n  box-shadow: none;\n}'
+      ),
+      'the essence row joins the medallion-led rows that drop the inset bar'
+    );
+    // And the ticked-row treatment it was already asking for: `EssenceRow` writes
+    // `class:is-bulk-selected`, and until now nothing in either sheet matched it, so a
+    // ticked essence looked exactly like an unticked one in the one studio whose bulk panel
+    // can delete what is ticked.
+    assert.ok(
+      rowSource.includes('class:is-bulk-selected={bulkSelected}'),
+      'the row writes the ticked class'
+    );
+    assert.ok(
+      globalCss.includes('.fabricate-manager .manager-essence-row.is-bulk-selected {'),
+      'and the sheet now answers it'
+    );
+    assert.equal(
+      styleBlock(rowSource).includes('.is-bulk-selected'),
+      false,
+      'the answer is the shared joined rule, never a per-studio copy scoped to the row'
     );
   });
 });

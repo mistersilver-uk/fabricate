@@ -288,9 +288,20 @@
           ui.pageIndex = 0;
         }}
       />
+      <!-- ICON-ONLY (issue 1036). The prototype draws this axis as two glyph tiles, and it
+           is the one control on the bar whose options need no words: a list glyph and a
+           grid glyph ARE the two layouts, unlike the status filter beside it, where
+           "All / Enabled / Disabled" is the vocabulary. The labelled track measured ~135px
+           against the prototype's ~86px and crowded the row hard enough that an earlier
+           pass moved the source filter off it to compensate. The compact track lands at
+           ~72px: it is sized to sit with the 34px `.manager-icon-button`s in a toolbar row
+           rather than to match the prototype's pixel count, which is the constraint that
+           actually keeps the row level. The label survives in the a11y tree — see the
+           `is-icon-only` block in `SegmentedControl.svelte`. -->
       <SegmentedControl
         options={viewModeOptions}
         value={ui.viewMode}
+        iconOnly
         groupName="manager-essence-view-mode"
         ariaLabel={text('FABRICATE.Admin.Manager.Essence.ViewModeLabel', 'Essence presentation')}
         dataAttr="data-essence-view-mode"

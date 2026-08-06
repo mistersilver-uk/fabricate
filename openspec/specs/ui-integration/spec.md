@@ -152,6 +152,11 @@ The primitive takes two optional PER-OPTION fields alongside the existing icon (
 `disabled` is carried onto the segment's radio INPUT rather than only onto a class, because the control's change handler guards only "the chosen value differs" and a dimmed-but-live segment would still emit a change; a disabled segment also suppresses the hover recolour, or it still reads as choosable.
 Each rendered control takes a radio group name unique per CONTROL, since a host that renders two of them in one card would otherwise have the browser treat both radio sets as one group.
 
+The primitive also takes an OPT-IN per-control icon-only variant (issue 1036) for an axis whose options are self-evident as glyphs, such as a list/grid presentation toggle.
+It renders the same DOM as the labelled variant and differs only in CSS: the segment becomes a compact square tile and its label is CLIPPED out of view, never dropped and never removed from the accessibility tree, because the `<label>` IS the radio's accessible name and an icon-only track whose segments are anonymous to a screen reader is not an acceptable rendering.
+The variant additionally titles each tile with that same label, which is the pointer equivalent of the name the clipped text already gives assistive technology; the labelled variant adds no such tooltip, since it would only repeat words already on screen.
+Because the markup is unchanged, a per-option test or capture hook still resolves to the enclosing `<label>` in both variants — the click target a screenshot step depends on.
+
 ## Responsive Product UI
 
 Foundry ApplicationV2 windows can be resized independently of the browser viewport.
@@ -657,6 +662,10 @@ Capabilities:
 - The essence library offers a list and a grid presentation of the same rows.
   The grid card carries the same state vocabulary as the list row — the Disabled marker, the capability markers and the usage counts — because a presentation toggle must not silently remove state.
   Row actions are list-only; grid selection routes through the inspector.
+  The presentation toggle renders through the shared segmented control's icon-only variant, because a list glyph and a grid glyph ARE the two layouts, while the status filter beside it keeps its words.
+- A browser row that leads with the 40px medallion states selection as the accent ring alone and drops the inset left bar, which would otherwise bite into the medallion; the essence row is one of them, and on its grid card a left bar is not even the correct axis.
+- A browser that supports bulk selection states the ticked-row treatment through the one shared rule every such browser joins, so the state looks identical in every studio.
+  A studio that writes the ticked class without joining that rule renders a ticked row indistinguishable from an unticked one, which is a defect rather than an omission.
 - The essence library's search, filters, sort, presentation and page position survive a round trip through the essence editor.
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
 - Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.

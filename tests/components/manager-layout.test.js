@@ -1739,12 +1739,29 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   // Selection is the accent BORDER. A ring plus an inset left bar is the same statement
   // made twice, and the bar bit into the row's medallion. The COMPONENT row joined the
   // opt-out in issue 676: it now leads with the same Medallion, so it had the same defect.
+  // The ESSENCE row joined in issue 1036 on the same precondition — its redesign gave it
+  // the 40px Medallion lead — and it is also the only one of the three that renders as a
+  // GRID CARD, where an inset left bar is not even the right axis. The environment and
+  // gathering-task rows are deliberately NOT here: they still lead differently.
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected'
+      '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected,\n.fabricate-manager .manager-essence-row.is-selected'
     ).includes('box-shadow: none;'),
-    'the selected recipe and component rows ring in the accent and add no left bar'
+    'the selected recipe, component and essence rows ring in the accent and add no left bar'
   );
+  for (const row of ['manager-environment-row', 'manager-gathering-task-row']) {
+    assert.equal(
+      css.includes(`.fabricate-manager .${row}.is-selected,\n`) ||
+        css.includes(`.fabricate-manager .${row}.is-selected {`),
+      true,
+      `${row} still declares the shared selected treatment`
+    );
+    assert.equal(
+      new RegExp(`\\.${row}\\.is-selected[^{]*\\{[^}]*box-shadow: none`).test(css),
+      false,
+      `${row} keeps the inset bar — it was not re-skinned by the essence change`
+    );
+  }
 });
 
 // The collapse ladder (issue 643 §8). Drop order is fixed and monotonic, and the
@@ -1859,21 +1876,36 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
   );
 });
 
-// The two multi-select browsers state the ticked-row treatment ONCE. A per-studio copy is
-// the variant the shared-primitive rule refuses, and it would drift the moment either
+// The three multi-select browsers state the ticked-row treatment ONCE. A per-studio copy is
+// the variant the shared-primitive rule refuses, and it would drift the moment any one
 // surface is re-toned.
-test('the bulk-selected row state is one joined selector across both studios', () => {
+//
+// The ESSENCE row joined for issue 1036. Its absence was a live defect, not a missing
+// nicety: `EssenceRow.svelte` already wrote `class:is-bulk-selected` and NOTHING matched it
+// in either the sheet or the component's own scoped block, so a ticked essence read exactly
+// like an unticked one — in the one studio whose bulk panel can also DELETE what is ticked.
+test('the bulk-selected row state is one joined selector across every multi-select studio', () => {
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-component-row.is-bulk-selected,\n.fabricate-manager .manager-recipe-row.is-bulk-selected {'
+      '.fabricate-manager .manager-component-row.is-bulk-selected,\n.fabricate-manager .manager-recipe-row.is-bulk-selected,\n.fabricate-manager .manager-essence-row.is-bulk-selected {'
     ),
-    'the recipe row JOINS the component row rule rather than authoring a second block'
+    'the recipe and essence rows JOIN the component row rule rather than authoring a second block'
   );
-  for (const row of ['manager-component-row', 'manager-recipe-row']) {
+  for (const row of ['manager-component-row', 'manager-recipe-row', 'manager-essence-row']) {
     assert.equal(
       (css.match(new RegExp(`\\.${row}\\.is-bulk-selected`, 'g')) || []).length,
       1,
       `${row}.is-bulk-selected must be written exactly once`
+    );
+  }
+  // The negative control on the widening: the environments and gathering-task browsers have
+  // no bulk selection at all, so adding the essence row must not have turned the join into
+  // "every browser row". A ticked treatment on a row nothing can tick is a dead rule.
+  for (const row of ['manager-environment-row', 'manager-gathering-task-row']) {
+    assert.equal(
+      css.includes(`.${row}.is-bulk-selected`),
+      false,
+      `${row} carries no bulk selection, so it must not join the ticked-row treatment`
     );
   }
 

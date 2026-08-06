@@ -5367,11 +5367,21 @@
 
 /* The component row joins the recipe row's opt-out (issue 676): it now leads with the
    same 40px Medallion, so the inset bar bit into it in exactly the way the recipe row
-   documents. The environment / gathering-task / essence rows keep the bar — they are
-   untouched by this change and re-skinning them here would re-type three surfaces it
-   never visited. */
+   documents.
+
+   The ESSENCE row joined for issue 1036, and the reason is the precondition this comment
+   already states rather than a new one: that redesign gave the row the same 40px
+   `Medallion` lead, so the bar started biting into it too — and the essence row is the
+   only one here that also renders as a GRID CARD, where an inset LEFT bar on a tile is
+   not even the right axis. It was left behind only because issue 676 predated the
+   medallion, so "untouched by this change" had been true of it until now.
+
+   The environment and gathering-task rows still keep the bar. They lead differently and
+   nothing about them moved, so re-skinning them here would re-type two surfaces this
+   change never visited — the same restraint issue 676 exercised toward the essence row. */
 .fabricate-manager .manager-recipe-row.is-selected,
-.fabricate-manager .manager-component-row.is-selected {
+.fabricate-manager .manager-component-row.is-selected,
+.fabricate-manager .manager-essence-row.is-selected {
   box-shadow: none;
 }
 
@@ -5381,15 +5391,23 @@
    accent ring over the ACTIVE surface, which sits one step forward of the selected row's
    soft surface. A row can be both.
 
-   The two multi-select browsers JOIN one selector here rather than authoring a block each:
-   the state means one thing and must look identical in both studios, and a second block
-   would be the per-studio variant the shared-primitive rule refuses.
+   The three multi-select browsers JOIN one selector here rather than authoring a block
+   each: the state means one thing and must look identical in every studio, and a second
+   block would be the per-studio variant the shared-primitive rule refuses.
+
+   The ESSENCE library joined for issue 1036, and its absence was a live defect rather
+   than a missing nicety. `EssenceRow.svelte` already wrote `class:is-bulk-selected`, so
+   the class was on the element and NOTHING matched it: a ticked essence row was
+   indistinguishable from an unticked one except for the checkbox itself, in the one
+   studio whose bulk panel can also delete what is ticked. A dead class is worse than an
+   absent one, because it reads as covered.
 
    It stays its OWN block, never folded into the `.is-selected` joins above: those are
    pinned by exact selector string in `tests/components/manager-layout.test.js`, and
-   appending to them would also give four other browser rows a state none of them has. */
+   appending to them would also give three other browser rows a state none of them has. */
 .fabricate-manager .manager-component-row.is-bulk-selected,
-.fabricate-manager .manager-recipe-row.is-bulk-selected {
+.fabricate-manager .manager-recipe-row.is-bulk-selected,
+.fabricate-manager .manager-essence-row.is-bulk-selected {
   border-color: var(--fab-accent-border);
   background: var(--fab-surface-active);
 }
