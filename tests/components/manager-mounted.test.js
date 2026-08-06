@@ -150,6 +150,11 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/essences/${essenceComponent}.svelte`);
   }
+  // The behaviour preview's "How it appears" card (issue 1036, round 3) mounts the REAL
+  // player InventoryItemCard for the essence tile AND the fake carrying component. It is a
+  // static import of EssenceBehaviorPreview, so it is in this root's module graph; omitting
+  // it HANGS every mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryItemCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
@@ -425,6 +430,10 @@ function compileManagerRoot() {
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
     'recipeItemPreviewRow.js',
+    // The essence editor's "How it appears" preview builds its two synthetic tiles with this
+    // pure helper (issue 1036, round 3); it imports only craftingImageDefaults (already
+    // listed). This suite has NO dependency validator, so an omission HANGS it (# cancelled).
+    'essencePreviewRow.js',
     // The manager's ONE colour vocabulary (issue 1036). `ManagerColorPopover` and
     // `ManagerColorPicker` both import it for the eight localized preset labels, and both
     // are compiled into this tree through `sharedComponentNames`. This suite hand-rolls its
@@ -8395,7 +8404,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(
-      target.querySelector('[data-essence-preview-identity] h3').textContent.trim(),
+      target
+        .querySelector('[data-essence-preview-tile] .inventory-card-name')
+        .textContent.trim(),
       'Rain',
       'the live preview follows the draft'
     );
@@ -8490,7 +8501,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(
-      target.querySelector('[data-essence-preview-identity] h3').textContent.trim(),
+      target
+        .querySelector('[data-essence-preview-tile] .inventory-card-name')
+        .textContent.trim(),
       'New essence draft'
     );
     assert.equal(
@@ -8503,7 +8516,9 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.equal(
-      target.querySelector('[data-essence-preview-identity] h3').textContent.trim(),
+      target
+        .querySelector('[data-essence-preview-tile] .inventory-card-name')
+        .textContent.trim(),
       'Air'
     );
 

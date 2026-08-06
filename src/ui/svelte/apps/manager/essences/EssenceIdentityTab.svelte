@@ -66,15 +66,15 @@
         <!-- The large tile. It carries the essence's own colour, so the GM sees the choice
              they just made rather than a preview in the theme accent.
 
-             `block` + `glyph` are what close the maintainer's round-2 note (issue 1036). The
-             tile was a 96px SQUARE inside a 156px column, with the picker and its reset
-             beneath at their natural ~154px — so the controls ran 58px past the tile's right
-             edge and the column read as a small tile with a ragged gap beside it. Now the
-             tile fills the column and the row beneath sits inside it, which is the
-             proportion `proto-04` draws. The glyph moves with it: at the shared 0.9rem
-             (~14px) default it was a speck in a 96px tile, and the prototype's flame fills
-             roughly a third of the tile's edge. -->
-        <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} block glyph={44} />
+             SQUARE, not block (issue 1036, maintainer round 3). The round-2 `block` filled
+             the column WIDTH and kept `size` only as its height, so a widened column
+             stretched the tile into a rectangle. The maintainer's note is that the icon must
+             read as a square: `size={124}` alone sets both dimensions, and the column below
+             is narrowed to that same 124px (`--fab-mv2-essence-icon-column`) so the picker +
+             reset row shrinks to fit beneath the tile rather than hanging past it. `glyph`
+             stays: at the shared 0.9rem (~14px) default the flame was a speck in a 124px
+             tile, and the prototype's flame fills roughly a third of the tile's edge. -->
+        <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
         <div class="manager-essence-icon-actions">
           <IconPicker
             value={icon}
@@ -209,11 +209,10 @@
      specificity, which makes which one wins a cascade coin-toss rather than a decision, so
      it was retired and its `min-width: 0` folded in here.
 
-     `align-items: stretch` replaces `flex-start` (issue 1036, maintainer round 2). With
-     `flex-start` every child sized itself: the tile to its own 96px and the actions row to
-     the picker's natural width, so the two disagreed about how wide the icon control is and
-     the wider one hung off the right of the narrower. Stretch makes the COLUMN the width and
-     both children fill it, so the tile and the controls beneath share one edge. */
+     `align-items: stretch` (issue 1036). The tile is now a fixed 124px SQUARE and the column
+     is narrowed to that same 124px, so stretch makes the actions row beneath fill the
+     column too — the picker + reset shrink to the tile's width and share its edges rather
+     than the picker's natural width hanging off the right of the narrower tile. */
   .manager-essence-icon-panel {
     display: flex;
     flex-direction: column;

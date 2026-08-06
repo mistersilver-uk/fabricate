@@ -259,29 +259,33 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     );
   });
 
-  it('gives the editor icon control a tile that fills its own column', () => {
-    // The rendered symptom: a 96px square tile in a 156px column with a ~154px picker row
-    // under it, so the controls overhung the tile by ~58px and left a ragged gap — and a
-    // 0.9rem (~14px) glyph inside a 96px tile, which reads as a speck.
-    assert.ok(
-      identityTabSource.includes('block'),
-      'the tile opts into the fill-width variant'
+  it('gives the editor icon control a SQUARE tile its column is sized to', () => {
+    // The rendered symptom (maintainer round 3): the round-2 `block` filled the column WIDTH
+    // and kept `size` only as the height, so a widened column stretched the icon tile into a
+    // rectangle. The icon must read as a square, with the column narrowed to that width so
+    // the picker + reset row shrinks to fit beneath it.
+    const medallionTag = identityTabSource.match(/<Medallion[^>]*\/>/)?.[0] ?? '';
+    assert.ok(medallionTag, 'the identity tab renders a Medallion tile');
+    assert.equal(
+      /\bblock\b/.test(medallionTag),
+      false,
+      'the tile is a square (size sets both dims), not the block fill-width variant'
     );
     assert.ok(
-      /<Medallion[^/]*block[^/]*glyph=\{\d+\}/s.test(identityTabSource),
-      'and sizes its glyph for the tile it now is'
+      /size=\{124\}/.test(medallionTag) && /glyph=\{\d+\}/.test(medallionTag),
+      'sized 124px square with a glyph scaled for the tile it now is'
     );
     assert.ok(
       /\.manager-essence-icon-panel \{[^}]*align-items: stretch;/s.test(
         styleBlock(identityTabSource)
       ),
-      'so the tile and the controls beneath it share one edge instead of sizing themselves'
+      'so the picker + reset row beneath fills the tile width instead of sizing itself'
     );
     assert.ok(
       globalCss.includes(
-        'grid-template-columns: var(--fab-mv2-essence-icon-column, 176px) minmax(0, 1fr);'
+        'grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);'
       ),
-      'in a column widened to hold the picker and its reset without crowding'
+      'in a column narrowed to the square tile width so the controls sit under it'
     );
     // Unset must stay byte-identical, or this re-types ~40 medallions across the manager.
     const medallion = readFileSync(

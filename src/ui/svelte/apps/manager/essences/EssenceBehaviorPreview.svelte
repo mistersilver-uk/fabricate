@@ -6,10 +6,19 @@
   ONE component for both, because they are one list. The delta is explicit that
   `EssenceBrowserInspector` renders this rather than re-authoring the same three facts a
   second time; the difference between the two sites is the surrounding CHROME (the "How it
-  appears" header, the two sample previews — on a component, and as a recipe input — and the
-  live-update note), which the inspector suppresses through `showIdentity` / `showLiveNote`.
-  There is no third `is-embedded` treatment: it declared the base rule's own `gap` and its
-  comment described removing padding this block never had, so it changed nothing.
+  appears" card and the live-update note), which the inspector suppresses through
+  `showIdentity` / `showLiveNote`. There is no third `is-embedded` treatment: it declared
+  the base rule's own `gap` and its comment described removing padding this block never had,
+  so it changed nothing.
+
+  ── "HOW IT APPEARS" MOUNTS THE REAL PLAYER TILE, NOT A CHIP (issue 1036, round 3) ──
+  The maintainer's note: the schematic swatch-chips ("On a component", "As a recipe input")
+  described the essence rather than showing it. This card now mounts the REAL player
+  `InventoryItemCard` twice — once for the essence's own inventory tile, and once for a fake
+  carrying component (a core Foundry icon item that carries the essence as a pip) — from
+  synthetic rows built by the pure `buildEssencePreviewRow`, the same "feed the real player
+  component a synthetic row so the preview can never drift" pattern `RecipeItemEditor` uses
+  for its "How players see it" rail.
 
   ── SUPPRESSION IS RENDERED, NOT REMOVED ──────────────────────────────────────────
   For a DISABLED essence each behaviour row still renders and states that it will not run.
@@ -23,11 +32,11 @@
   declines to stack — and claiming the outcomes are identical would be untrue.
 -->
 <script>
-  import Chip from '../Chip.svelte';
   import IconFactRow from '../IconFactRow.svelte';
-  import Medallion from '../../../components/Medallion.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
+  import InventoryItemCard from '../../inventory/InventoryItemCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  import { buildEssencePreviewRow } from '../../../util/essencePreviewRow.js';
   import { projectEssenceBehaviourFacts } from './essenceStudio.js';
 
   let {
@@ -71,6 +80,20 @@
       format
     )
   );
+
+  // The two synthetic rows the "How it appears" card mounts on the REAL player
+  // `InventoryItemCard`. The carrying component's display name is the essence's first real
+  // carrier when one exists (`sampleComponentName`), and the schematic fallback otherwise.
+  const previewRows = $derived(
+    buildEssencePreviewRow(
+      { id: essence?.id, name, icon: essence?.icon || 'fas fa-mortar-pestle' },
+      {
+        sampleComponentName:
+          sampleComponentName ||
+          text('FABRICATE.Admin.Manager.Essence.Preview.SampleComponent', 'a carrying component'),
+      }
+    )
+  );
 </script>
 
 <aside
@@ -79,23 +102,10 @@
   aria-label={text('FABRICATE.Admin.Manager.Essence.Preview.Label', 'Essence behaviour preview')}
 >
   {#if showIdentity}
-    <p class="manager-kicker">
-      {text('FABRICATE.Admin.Manager.Essence.Preview.Kicker', 'How it appears')}
-    </p>
-    <div class="manager-essence-preview-identity" data-essence-preview-identity>
-      <Medallion
-        icon={essence?.icon || 'fas fa-mortar-pestle'}
-        tint={essence?.colorToken || ''}
-        size={44}
-      />
-      <!-- NO colour-name sub-line (issue 1036, maintainer round 2). The medallion beside
-           it is already tinted with that colour, so the name restated the tile in words —
-           the same upkeep-for-nothing the row and inspector chips were removed for. The
-           EDITOR's palette caption keeps its name: there it labels the swatch the GM is
-           choosing, which is a different job. -->
-      <div class="manager-essence-preview-copy">
-        <h3 title={name}>{name}</h3>
-      </div>
+    <div class="manager-essence-preview-appears-head">
+      <p class="manager-kicker">
+        {text('FABRICATE.Admin.Manager.Essence.Preview.Kicker', 'How it appears')}
+      </p>
       {#if disabled}
         <StatusPill
           tone="neutral"
@@ -105,46 +115,29 @@
       {/if}
     </div>
 
-    <p class="manager-kicker">
-      {text('FABRICATE.Admin.Manager.Essence.Preview.OnAComponent', 'On a component')}
-    </p>
-    <!-- A sample of what the essence looks like where a GM meets it most: as a quantity
-         chip on a component. The chip carries the essence's own colour, which is the
-         change's whole visual point. -->
-    <div class="manager-essence-preview-sample" data-essence-preview-component>
-      <Chip tone="neutral" swatch={essence?.colorToken || ''} icon={essence?.icon || undefined}>
-        {format('FABRICATE.Admin.Manager.Essence.Preview.SampleQuantity', '{name} ×2', {
-          name,
-        })}
-      </Chip>
-      <span class="manager-muted"
-        >{sampleComponentName ||
-          text(
-            'FABRICATE.Admin.Manager.Essence.Preview.SampleComponent',
-            'a carrying component'
+    <!-- The REAL player tiles, fed synthetic rows — so the preview can never drift from
+         what a player actually sees. LEFT: the essence's own inventory tile. RIGHT: a fake
+         component (a core Foundry icon item) carrying the essence as a pip. -->
+    <div class="manager-essence-preview-appears" data-essence-preview-appears>
+      <div class="manager-essence-preview-appears-cell" data-essence-preview-tile>
+        <span class="manager-muted"
+          >{text(
+            'FABRICATE.Admin.Manager.Essence.Preview.InventoryTile',
+            'As an inventory tile'
           )}</span
-      >
-    </div>
-
-    <p class="manager-kicker">
-      {text('FABRICATE.Admin.Manager.Essence.Preview.AsARecipeInput', 'As a recipe input')}
-    </p>
-    <!-- The SECOND sample the prototype shows, and the other half of "where a GM meets
-         this essence": carried by a component, and required by a recipe. Those are the two
-         usage axes the inspector and the delete-impact statement both count separately, so
-         a preview showing only the component half under-describes the essence. -->
-    <div class="manager-essence-preview-sample" data-essence-preview-recipe>
-      <Chip tone="neutral" swatch={essence?.colorToken || ''} icon={essence?.icon || undefined}>
-        {format('FABRICATE.Admin.Manager.Essence.Preview.SampleQuantity', '{name} ×2', {
-          name,
-        })}
-      </Chip>
-      <span class="manager-muted"
-        >{text(
-          'FABRICATE.Admin.Manager.Essence.Preview.SampleRecipe',
-          'a recipe that requires it'
-        )}</span
-      >
+        >
+        <div class="manager-essence-preview-card">
+          <InventoryItemCard item={previewRows.essence} />
+        </div>
+      </div>
+      <div class="manager-essence-preview-appears-cell" data-essence-preview-component>
+        <span class="manager-muted"
+          >{text('FABRICATE.Admin.Manager.Essence.Preview.OnAComponent', 'On a component')}</span
+        >
+        <div class="manager-essence-preview-card">
+          <InventoryItemCard item={previewRows.component} />
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -182,47 +175,36 @@
     min-width: 0;
   }
 
-  .manager-essence-preview-identity {
+  /* The "How it appears" header carries the kicker and, for a disabled essence, the
+     Disabled pill that used to sit inside the retired identity well. */
+  .manager-essence-preview-appears-head {
     display: flex;
     align-items: center;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: 8px;
-    background: var(--fab-overlay-light-03);
-  }
-
-  .manager-essence-preview-copy {
-    min-width: 0;
-  }
-
-  .manager-essence-preview-copy h3 {
-    overflow: hidden;
-    margin: 0;
-    font-size: 0.9rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* `.manager-essence-preview-copy p` is RETIRED with the colour-name sub-line it sized
-     (issue 1036, maintainer round 2). The identity block is a tinted tile beside a name, and
-     the name of the tile's own colour is not a second fact about the essence. */
-
-  /* The two samples are WELLS, like the identity card above them (issue 1036 fidelity
-     pass). They shipped as bare runs of text on the rail background, so `How it appears`
-     read as one bordered card followed by two loose lines; the prototype draws all three as
-     the same card. Same border, radius and fill as `-identity`, one step tighter because a
-     sample is a single line rather than a 44px medallion row. */
-  .manager-essence-preview-sample {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    justify-content: space-between;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: 8px;
-    background: var(--fab-overlay-light-03);
+  }
+
+  /* Two real player tiles side by side — the essence's inventory tile and a fake carrying
+     component — each in a labelled cell. They wrap to one column when the rail is narrow. */
+  .manager-essence-preview-appears {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--fab-space-3);
+  }
+
+  .manager-essence-preview-appears-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+    min-width: 0;
     font-size: 0.7rem;
+  }
+
+  /* The mounted `InventoryItemCard` fills its player grid slot with `width: 100%`; the cap
+     keeps the ~98px player thumbnail from stretching to the full rail width in this
+     schematic context, so it reads as a sample tile rather than a hero image. */
+  .manager-essence-preview-card {
+    max-width: 132px;
   }
 
   .manager-essence-preview-rules {

@@ -35,6 +35,11 @@ const harness = createMountedComponentHarness({
     'src/utils/macroReference.js',
     'src/utils/essenceValidation.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
+    // The behaviour preview's "How it appears" card mounts the REAL player InventoryItemCard
+    // (issue 1036, round 3), fed synthetic rows by the pure essencePreviewRow helper — both
+    // import only craftingImageDefaults, so these three entries suffice.
+    'src/ui/svelte/util/essencePreviewRow.js',
+    'src/ui/svelte/util/craftingImageDefaults.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',
@@ -55,6 +60,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceValidationTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
+    // The REAL player essence/component tile the behaviour preview now mounts (issue 1036,
+    // round 3). A `.svelte` in the declared closure but absent HANGS the suite (# cancelled).
+    'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/manager/EssenceEditView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/EssenceEditView.svelte',

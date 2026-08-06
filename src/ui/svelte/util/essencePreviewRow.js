@@ -1,0 +1,100 @@
+// Pure helper that synthesizes the TWO inventory "rows" the essence editor's "How it
+// appears" preview mounts on the REAL player `InventoryItemCard.svelte`:
+//
+//   1. an ESSENCE-SOURCE row, shaped exactly like `InventoryListingBuilder._buildEssenceRows`
+//      emits (the synthetic per-essence aggregate), so the card renders the real player
+//      essence glyph tile (`.inventory-card-essence`); and
+//   2. a fake CARRYING-COMPONENT row — an ordinary inventory item drawing a CORE Foundry
+//      icon that exists in every install (`icons/svg/item-bag.svg`) and carrying THIS
+//      essence as a pip, shaped like the component rows `InventoryListingBuilder` folds an
+//      essence's `essences[]` entry onto.
+//
+// Mirrors `recipeItemPreviewRow.js`: the editor feeds the REAL player component a synthetic
+// row so the preview can never drift from what players actually see. It imports ONLY the
+// sibling pure `craftingImageDefaults` leaf (already a harness rawModule) so the
+// mounted-test allowlist stays small.
+
+import { GENERIC_ITEM_IMAGE } from './craftingImageDefaults.js';
+
+function str(value) {
+  return value == null ? '' : String(value);
+}
+
+/**
+ * Build the essence-tile + carrying-component preview rows for the "How it appears" card.
+ *
+ * @param {object} [essence] the live essence draft — `{ id, name, icon }`.
+ * @param {object} [options]
+ * @param {string} [options.sampleComponentName] display name for the fake carrying
+ *   component (the caller resolves the fallback copy, so this may be empty).
+ * @param {number} [options.totalQuantity=1] owned quantity both sample tiles report; the
+ *   preview owns one copy, exactly as `recipeItemPreviewRow` does — no count the store
+ *   cannot produce is invented.
+ * @returns {{ essence: object, component: object }} two rows shaped like
+ *   `InventoryListingBuilder` output, ready to mount on `InventoryItemCard`.
+ */
+export function buildEssencePreviewRow(
+  essence,
+  { sampleComponentName = '', totalQuantity = 1 } = {}
+) {
+  const id = str(essence?.id) || null;
+  const name = str(essence?.name);
+  const icon = str(essence?.icon) || null;
+
+  // The essence pip the carrying component's card reads: the essence's own id, name and
+  // authored icon, shaped exactly like the `essences[]` entries the builder folds onto a
+  // component row (the card keys pips on `id`).
+  const pip = { id: str(id), name, icon: icon || 'fas fa-mortar-pestle' };
+
+  // (1) The synthetic per-essence aggregate — `img: null`, `icon: <essence glyph>`,
+  // `isEssenceSource: true` — so `InventoryItemCard` renders its essence-glyph tile branch.
+  const essenceRow = {
+    key: `essence:preview:${id ?? 'draft'}`,
+    componentId: id,
+    systemId: null,
+    systemName: '',
+    name,
+    img: null,
+    icon,
+    tags: [],
+    tier: null,
+    isEssenceSource: true,
+    isTool: false,
+    broken: false,
+    salvage: null,
+    totalQuantity,
+    sources: [],
+    essences: [],
+    usedBy: [],
+    requiredFor: [],
+    producedBy: [],
+    contributors: [],
+  };
+
+  // (2) The fake carrying component — an ordinary item on a CORE Foundry icon, carrying the
+  // one essence pip. `isEssenceSource: false` routes the card to its artwork branch.
+  const componentRow = {
+    key: `essence:preview:component:${id ?? 'draft'}`,
+    componentId: null,
+    systemId: null,
+    systemName: '',
+    name: str(sampleComponentName),
+    img: GENERIC_ITEM_IMAGE,
+    icon: null,
+    tags: [],
+    tier: null,
+    isEssenceSource: false,
+    isTool: false,
+    broken: false,
+    salvage: null,
+    totalQuantity,
+    sources: [],
+    essences: [pip],
+    usedBy: [],
+    requiredFor: [],
+    producedBy: [],
+    contributors: [],
+  };
+
+  return { essence: essenceRow, component: componentRow };
+}

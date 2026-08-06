@@ -6315,12 +6315,13 @@
 /* The icon column WIDENED from 156px to 176px (issue 1036, maintainer round 2). 156px was
    sized for the picker trigger alone and left the trigger plus its icon-only reset at ~154px
    — technically inside the track, but flush against it, and beside a 96px tile it read as a
-   small tile with a gap. The tile now fills this track (`Medallion block`), so the track IS
-   the icon control's width and 176px gives the trigger room for a two-word icon name without
-   crowding its reset. */
+   small tile with a gap. The tile is a fixed 124px SQUARE (issue 1036, maintainer round 3),
+   so the track is narrowed to that same 124px: the icon column IS the tile's width and the
+   picker + reset row beneath shrinks to fit under it rather than the old 176px track leaving
+   the square tile with a ragged gap to its right. */
 .fabricate-manager .manager-essence-edit-grid {
   display: grid;
-  grid-template-columns: var(--fab-mv2-essence-icon-column, 176px) minmax(0, 1fr);
+  grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);
   gap: var(--fab-space-3);
   min-width: 0;
 }
@@ -6345,9 +6346,12 @@
    FULL-WIDTH controls — a picker trigger that reads as a bare dropdown, and a second
    full-width `Clear icon` button under it — which is three stacked elements where the
    design composes one. The picker keeps the flexible track and the reset shrinks to the
-   34px icon-button rhythm, so the whole control is one control-height row. */
+   34px icon-button rhythm, so the whole control is one control-height row. It may WRAP
+   (issue 1036, maintainer round 3): under the square tile's narrowed 124px column the
+   picker + reset can drop the reset onto a second line rather than overflow the tile. */
 .fabricate-manager .manager-essence-icon-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--fab-space-chip);
   align-items: center;
   min-width: 0;

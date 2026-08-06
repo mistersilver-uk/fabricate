@@ -2918,6 +2918,7 @@
           "Preview": {
             "Label": "Essence behaviour preview",
             "Kicker": "How it appears",
+            "InventoryTile": "As an inventory tile",
             "OnAComponent": "On a component",
             "Effective": "Effective behaviour",
             "LiveUpdate": "This preview updates live as you edit.",
@@ -2928,10 +2929,7 @@
             "TransfersFrom": "From {name}",
             "RunsMacro": "Runs {name}",
             "RunsMacroHint": "Runs once per craft against the item data, before the item is created.",
-            "SampleQuantity": "{name} ×2",
-            "SampleComponent": "a carrying component",
-            "AsARecipeInput": "As a recipe input",
-            "SampleRecipe": "a recipe that requires it"
+            "SampleComponent": "a carrying component"
           },
           "Macro": {
             "Heading": "Property macro",
