@@ -162,8 +162,9 @@ From there you can:
 Names, descriptions, linked source items, and property macros are never touched by a bulk edit.
 Edit those on the essence itself.
 
-**Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry them, and how many recipes will be rewritten to drop them.
-An essence still carried by a component is excluded from the delete and named in the panel, exactly as deleting a single in-use essence is blocked.
+**Delete selected essences** states its impact before you can confirm it, how many essence definitions will be deleted, how many components carry one or more of them, and how many recipes will be rewritten to drop them.
+An essence in use is never excluded: deleting it removes it from every component that carries it and rewrites every recipe that requires it.
+Deleting a single essence from its inspector warns you the same way, stating how many components it is removed from and how many recipes are rewritten before you confirm.
 
 Deleting is a two-step action.
 The first click arms the **Delete** button, and a second click confirms it.
