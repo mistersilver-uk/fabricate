@@ -18,7 +18,10 @@
   carrying component (a core Foundry icon item that carries the essence as a pip) — from
   synthetic rows built by the pure `buildEssencePreviewRow`, the same "feed the real player
   component a synthetic row so the preview can never drift" pattern `RecipeItemEditor` uses
-  for its "How players see it" rail.
+  for its "How players see it" rail. Both mounts pass `interactive={false}` (issue 1036,
+  round 4): `onSelect`/`onBulkToggle` are never wired here, and the card's real button is
+  focusable and keyboard-operable, so left interactive it would drop two no-op traps into
+  the editor's tab order.
 
   ── SUPPRESSION IS RENDERED, NOT REMOVED ──────────────────────────────────────────
   For a DISABLED essence each behaviour row still renders and states that it will not run.
@@ -127,7 +130,7 @@
           )}</span
         >
         <div class="manager-essence-preview-card">
-          <InventoryItemCard item={previewRows.essence} />
+          <InventoryItemCard item={previewRows.essence} interactive={false} />
         </div>
       </div>
       <div class="manager-essence-preview-appears-cell" data-essence-preview-component>
@@ -135,7 +138,7 @@
           >{text('FABRICATE.Admin.Manager.Essence.Preview.OnAComponent', 'On a component')}</span
         >
         <div class="manager-essence-preview-card">
-          <InventoryItemCard item={previewRows.component} />
+          <InventoryItemCard item={previewRows.component} interactive={false} />
         </div>
       </div>
     </div>

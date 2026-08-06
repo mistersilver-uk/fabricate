@@ -85,6 +85,29 @@ describe('EssenceBehaviorPreview — "How it appears" mounts the real player til
       'the effective-behaviour rules render'
     );
     assert.ok(root.querySelector('[data-essence-preview-live]'), 'and the live-update note');
+
+    // Issue 1036 round 4: both real tiles are mounted `interactive={false}` — a preview, not
+    // a control. Neither `onSelect` nor `onBulkToggle` is wired here, so a focusable,
+    // keyboard-operable, aria-pressed button would be a no-op trap in the editor's tab order.
+    const appears = root.querySelector('[data-essence-preview-appears]');
+    assert.equal(
+      appears.querySelector('button'),
+      null,
+      'the preview subtree mounts no <button> at all'
+    );
+    assert.equal(
+      appears.querySelector('[aria-pressed]'),
+      null,
+      'and nothing in it carries aria-pressed'
+    );
+    assert.ok(
+      tile.querySelector('.inventory-card-button.is-static'),
+      'the essence tile card body renders as a non-interactive static wrapper'
+    );
+    assert.ok(
+      component.querySelector('.inventory-card-button.is-static'),
+      'as does the fake carrying component'
+    );
     harness.remount();
   });
 
