@@ -227,13 +227,9 @@ test('1036/17: the card carries the recipe IDENTITIES the delete-impact union ne
 });
 
 test('1036/17: the delete-impact statement reports a NON-ZERO carrier count on STORE-BUILT rows', async () => {
-  // Why this pin is in the STORE suite and not only in the model suite: `deleteBlocked` is
-  // `componentUsageCount > 0` at this producer and nowhere else, so a carried essence is
-  // always blocked. A component count taken over the DELETABLE rows is therefore `0` for
-  // every selection the running app can produce — and a model-level fixture combining
-  // `deleteBlocked: false` with a non-empty `componentUsageItems` proved it non-zero anyway,
-  // because that fixture is a shape this function cannot emit. Only rows built HERE can
-  // fail when the union is taken over the wrong set.
+  // Store-built rows carry the `componentUsageItems` and `recipeUsageIds` the impact union
+  // reads. The delete is WARNED, not BLOCKED (maintainer round), so every selected essence is
+  // deletable and the carriers are counted once each over the WHOLE selection.
   const harness = makeEssenceStoreHarness({
     essences: [
       makeEssence({ id: 'fire' }),
@@ -249,24 +245,22 @@ test('1036/17: the delete-impact statement reports a NON-ZERO carrier count on S
   const store = await openStore(harness);
 
   const selection = cardsOf(store);
-  assert.deepEqual(
-    selection.map((card) => card.deleteBlocked),
-    [true, true, false],
-    'the invariant this pin rests on: a carried essence is blocked, an uncarried one is not'
+  assert.ok(
+    selection.every((card) => !Object.hasOwn(card, 'deleteBlocked')),
+    'no store-built row carries a delete-block flag any more'
   );
 
   const impact = describeEssenceDeleteImpact(selection);
-  assert.equal(impact.deletable, 1, 'only `air` is deletable');
+  assert.equal(impact.deletable, 3, 'every selected essence is deletable, carried or not');
   assert.equal(
     impact.componentsAffected,
     2,
-    'Ember and Cinder — a union over the DELETABLE rows could only ever be 0 here'
+    'Ember and Cinder, unioned once each over the whole selection'
   );
-  assert.equal(impact.recipeRewrites, 1, 'and the recipe number stays scoped to what is deleted');
-  assert.equal(impact.blocked, 2);
+  assert.equal(impact.recipeRewrites, 1, 'the air recipe is rewritten');
 });
 
-test('1036: recipe usage does NOT become a delete block', async () => {
+test('1036: a recipe reference is reported through its OWN key, never as a block', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [makeEssence({ id: 'fire' })],
     components: [{ id: 'c1', name: 'Ember', essences: {} }],
@@ -275,11 +269,13 @@ test('1036: recipe usage does NOT become a delete block', async () => {
   const store = await openStore(harness);
 
   const card = cardFor(store, 'fire');
-  // `deleteBlocked` keeps its COMPONENT-only meaning: deleting an essence a recipe requires
-  // is allowed and rewrites the recipe, while deleting one a component carries is refused.
-  assert.equal(card.deleteBlocked, false, 'a recipe reference alone never blocks the delete');
-  assert.equal(card.deleteRewritesRecipes, true, 'it is reported through its own key');
+  assert.equal(card.deleteRewritesRecipes, true, 'a recipe reference is reported through its own key');
   assert.equal(card.componentUsageCount, 0);
+  assert.equal(
+    Object.hasOwn(card, 'deleteBlocked'),
+    false,
+    'and there is no delete-block flag: deletion is warned, not blocked'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -362,7 +358,7 @@ test('1036/23: deleteEssence returns FALSE for a declined confirm, and writes no
   assert.equal(harness.system.essenceDefinitions.length, 1);
 });
 
-test('1036/23: deleteEssence returns FALSE for an unknown id and for an IN-USE essence', async () => {
+test('1036/23: deleteEssence returns FALSE for an unknown id but DELETES an in-use essence', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [makeEssence({ id: 'fire' })],
     components: [{ id: 'c1', name: 'Ember', essences: { fire: 2 } }],
@@ -370,21 +366,43 @@ test('1036/23: deleteEssence returns FALSE for an unknown id and for an IN-USE e
   const store = await openStore(harness);
 
   assert.equal(await store.deleteEssence('nope'), false, 'an unknown id is not a success');
-  // The in-use refusal is enforced in the STORE, not by a disabled control: the manager
-  // primitive deliberately strips the essence from carrying components regardless.
-  assert.equal(await store.deleteEssence('fire'), false);
-  assert.equal(harness.system.essenceDefinitions.length, 1, 'the definition is untouched');
-  assert.ok(
-    harness.notifications.warn.some((message) => message.includes('DeleteBlocked')),
-    'and the refusal is LOCALIZED — the fixture returns keys, so an English sentence would fail'
+  // The delete is WARNED, not BLOCKED (maintainer round): component usage no longer refuses
+  // it. The manager primitive strips the essence from every carrier, so the store lets it
+  // through and states the impact in the confirm dialog instead.
+  assert.equal(await store.deleteEssence('fire'), true, 'a carried essence deletes');
+  assert.equal(harness.system.essenceDefinitions.length, 0, 'the definition is gone');
+});
+
+test('1036: deleteEssence hands the cascade impact counts to the confirm dialog', async () => {
+  const harness = makeEssenceStoreHarness({
+    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+    components: [
+      { id: 'c1', name: 'Ember', essences: { fire: 2 } },
+      { id: 'c2', name: 'Cinder', essences: { fire: 1 } },
+    ],
+    recipes: [recipeWithSetEssence('r1', 'fire')],
+  });
+  const store = await openStore(harness);
+
+  await store.deleteEssence('fire');
+
+  const content = harness.localizations.find(
+    (call) => call.key === 'FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content'
   );
+  assert.ok(content, 'the confirm content is localized, not hardcoded');
+  assert.deepEqual(
+    content.data,
+    { name: 'Fire', components: 2, recipes: 1 },
+    'the GM is told, before confirming, how far the cascade reaches: two carriers, one recipe'
+  );
+  assert.equal(harness.confirmations.length, 1, 'exactly one confirm is asked, not one per carrier');
 });
 
 // ---------------------------------------------------------------------------
-// deleteEssences — the set delete partitions blocked members in the store
+// deleteEssences — the set delete deletes every member; usage never blocks it
 // ---------------------------------------------------------------------------
 
-test('1036: deleteEssences deletes the deletable and NAMES the blocked', async () => {
+test('1036: deleteEssences deletes EVERY selected essence, carried or not', async () => {
   const harness = makeEssenceStoreHarness({
     essences: [
       makeEssence({ id: 'fire', name: 'Fire' }),
@@ -396,28 +414,31 @@ test('1036: deleteEssences deletes the deletable and NAMES the blocked', async (
 
   const result = await store.deleteEssences(['fire', 'water']);
 
-  assert.equal(result.deleted, 1);
-  assert.deepEqual(result.blocked, ['Fire'], 'blocked members are named, not silently skipped');
+  assert.equal(result.deleted, 2, 'both delete despite Fire being carried by a component');
   assert.deepEqual(
     harness.system.essenceDefinitions.map((def) => def.id),
-    ['fire'],
-    'the carried essence survives; only the unblocked one is gone'
+    [],
+    'nothing is skipped — the cascade strips the carrier for the carried one'
   );
 });
 
-test('1036: deleteEssences is INERT when every member is blocked', async () => {
+test('1036: deleteEssences issues ONE batched manager write for the whole set', async () => {
   const harness = makeEssenceStoreHarness({
-    essences: [makeEssence({ id: 'fire', name: 'Fire' })],
+    essences: [
+      makeEssence({ id: 'fire', name: 'Fire' }),
+      makeEssence({ id: 'water', name: 'Water' }),
+    ],
     components: [{ id: 'c1', name: 'Ember', essences: { fire: 1 } }],
   });
   const store = await openStore(harness);
   harness.writes.length = 0;
 
-  const result = await store.deleteEssences(['fire']);
+  const result = await store.deleteEssences(['fire', 'water']);
 
-  assert.equal(result.deleted, 0);
-  assert.deepEqual(result.blocked, ['Fire']);
-  assert.deepEqual(harness.writes, [], 'no write is issued at all');
+  assert.equal(result.deleted, 2);
+  const deleteWrites = harness.writes.filter((write) => write.kind === 'deleteEssences');
+  assert.equal(deleteWrites.length, 1, 'one batched delete, not one per essence');
+  assert.deepEqual(deleteWrites[0].essenceIds, ['fire', 'water']);
 });
 
 // ---------------------------------------------------------------------------

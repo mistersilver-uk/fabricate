@@ -17,8 +17,9 @@
      gated on `features.effectTransfer` and moved here verbatim. `EssenceSourceSelector` is
      deliberately NOT `ItemDropZone`: an essence source is an in-system managed COMPONENT,
      not a document uuid.
-   - the deletion-blocked note, which is the only explanation a GM gets for a refused
-     delete.
+   - the delete-impact note, which tells the GM in advance how far a delete's cascade
+     reaches — how many components it strips the essence from and how many recipes it
+     rewrites — because the delete is warned, not blocked.
 
   ── ON CRAFT IS `EssenceBehaviorPreview`, NOT A SECOND LIST ───────────────────────
   The editor's preview panel and this section answer the same question with the same three
@@ -26,7 +27,6 @@
   renders the same component with its identity header and live-update note suppressed.
 -->
 <script>
-  import Chip from '../Chip.svelte';
   import EssenceBehaviorPreview from './EssenceBehaviorPreview.svelte';
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
@@ -122,11 +122,6 @@
             ? text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')
             : text('FABRICATE.Admin.Manager.Essence.Status.Enabled', 'Enabled')}
         />
-        {#if essence.deleteBlocked}
-          <Chip tone="warning"
-            >{text('FABRICATE.Admin.Manager.Essence.DeleteBlockedShort', 'In use')}</Chip
-          >
-        {/if}
       </div>
     </div>
   </div>
@@ -162,9 +157,11 @@
 </section>
 
 <section class="manager-inspector-card" data-essence-section="oncraft">
-  <h3 class="manager-card-title">
-    {text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')}
-  </h3>
+  <div class="manager-edit-card-heading">
+    <h3 class="manager-card-title">
+      {text('FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', 'On craft')}
+    </h3>
+  </div>
   <EssenceBehaviorPreview
     {essence}
     effectTransferEnabled={showSourceUi}
@@ -208,14 +205,14 @@
     <!-- The SINGLE delete keeps the `confirmDialog` the store already owns. The two-step
          ARM is the BULK panel's, per the maintainer's decision for that action alone;
          wearing both idioms on one screen for one verb would teach the GM neither. The
-         control is `disabled` only as a courtesy — `store.deleteEssence` re-checks the
-         in-use refusal against the system, because `deleteBlocked` is a UI-only card
-         field and the guard it stands for is a data-loss guard. -->
+         delete is WARNED, not BLOCKED (maintainer round): the control is never disabled by
+         component usage, and `store.deleteEssence` states the cascade's impact counts in
+         its confirm dialog rather than refusing. The impact note below previews the same
+         counts on the panel. -->
     <InspectorActionButton
       tone="danger"
       icon="fas fa-trash"
       label={text('FABRICATE.Admin.Manager.Essence.Delete', 'Delete essence')}
-      disabled={essence.deleteBlocked === true}
       ariaLabel={format('FABRICATE.Admin.Manager.Essence.DeleteNamed', 'Delete {name}', {
         name: essence.name,
       })}
@@ -223,13 +220,16 @@
       onClick={() => onDelete(essence.id)}
     />
   </div>
-  {#if essence.deleteBlocked}
-    <p class="manager-muted manager-essence-delete-note" data-essence-delete-blocked>
-      <i class="fas fa-lock" aria-hidden="true"></i>
+  {#if essence.componentUsageCount > 0}
+    <p class="manager-muted manager-essence-delete-note" data-essence-delete-impact>
+      <i class="fas fa-circle-info" aria-hidden="true"></i>
       {format(
-        'FABRICATE.Admin.Manager.Essence.UsageBlockedNamed',
-        'In use by {count} components. Remove it from those components before deleting the definition.',
-        { count: essence.componentUsageCount || 0 }
+        'FABRICATE.Admin.Manager.Essence.DeleteImpact',
+        'Deleting removes this essence from {components} components and rewrites {recipes} recipes.',
+        {
+          components: essence.componentUsageCount || 0,
+          recipes: essence.recipeUsageCount || 0,
+        }
       )}
     </p>
   {:else if essence.deleteRewritesRecipes}
@@ -303,9 +303,11 @@
 {/if}
 
 <section class="manager-inspector-card" data-essence-section="usage">
-  <h3 class="manager-card-title">
-    {text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}
-  </h3>
+  <div class="manager-edit-card-heading">
+    <h3 class="manager-card-title">
+      {text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}
+    </h3>
+  </div>
   <div class="manager-requirements-list">
     <div class="manager-requirement-row">
       <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>

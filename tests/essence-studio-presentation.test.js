@@ -69,7 +69,14 @@ test('1036: the Effects pill reports a BROKEN source, not merely a configured on
   // and the needs-attention filter is a search, not a signal.
   const healthy = essenceCapabilityPills({ ...CONFIGURED, enabled: true }, BOTH_GATES, text)[0];
   assert.equal(healthy.tone, 'info');
-  assert.equal(healthy.title, '', 'a working link explains nothing, because there is nothing to fix');
+  // Point 4 (maintainer round): the single Effects pill's two states each carry a DISTINCT
+  // title, so "linked and working" versus "source no longer resolves" is legible without a
+  // colour or glyph the reader must already know how to decode.
+  assert.match(
+    healthy.title,
+    /currently resolves/,
+    'a working link states that it resolves, rather than explaining nothing'
+  );
 
   for (const state of ['stale', 'missing']) {
     const broken = essenceCapabilityPills(
@@ -81,6 +88,7 @@ test('1036: the Effects pill reports a BROKEN source, not merely a configured on
     assert.equal(broken.tone, 'warning', `${state}: colour`);
     assert.notEqual(broken.icon, healthy.icon, `${state}: glyph, so it survives greyscale`);
     assert.match(broken.title, /no longer resolves/, `${state}: and words`);
+    assert.notEqual(broken.title, healthy.title, `${state}: the two states read differently`);
   }
 
   // The breakage OUTRANKS the suppression: a disabled essence with a dead link still has a

@@ -225,6 +225,8 @@ export function makeOwnedStack(name, quantity = 1) {
  */
 export function makeEssenceStoreHarness(options = {}) {
   const writes = [];
+  const confirmations = [];
+  const localizations = [];
   const notifications = { info: [], warn: [], error: [] };
   const recipes = options.recipes ? [...options.recipes] : [];
   const system = {
@@ -303,8 +305,20 @@ export function makeEssenceStoreHarness(options = {}) {
     getWorldUsers: () => [],
     // Keys are returned verbatim, which is what makes "is this string localized?" visible
     // in an assertion: a hardcoded English sentence cannot be mistaken for a key.
-    localize: (key) => key,
-    confirmDialog: async () => options.confirm !== false,
+    // Keys are returned verbatim, which is what makes "is this string localized?" visible in
+    // an assertion. The (key, data) pair is also RECORDED, so a suite can assert the store
+    // handed the delete-impact counts to the localizer without the harness having to invent a
+    // translation table.
+    localize: (key, data) => {
+      localizations.push({ key, data });
+      return key;
+    },
+    // Captures each call so a suite can assert a confirm was asked for, while keeping the
+    // boolean return the confirm/decline suites rely on.
+    confirmDialog: async (config) => {
+      confirmations.push(config);
+      return options.confirm !== false;
+    },
     notify: {
       info: (message) => notifications.info.push(String(message)),
       warn: (message) => notifications.warn.push(String(message)),
@@ -312,5 +326,14 @@ export function makeEssenceStoreHarness(options = {}) {
     },
   };
 
-  return { services, systemManager, system, recipes, writes, notifications };
+  return {
+    services,
+    systemManager,
+    system,
+    recipes,
+    writes,
+    confirmations,
+    localizations,
+    notifications,
+  };
 }

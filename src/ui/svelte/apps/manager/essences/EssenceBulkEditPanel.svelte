@@ -35,9 +35,10 @@
   promise "4 recipes" before an operation that rewrites 2. `describeEssenceDeleteImpact`
   owns that arithmetic; this component only renders it.
 
-  BLOCKED members are excluded and NAMED, and the action is inert when every member is
-  blocked. The single-delete guard is a data-loss guard and removing it was not what was
-  directed.
+  The delete is WARNED, not BLOCKED (maintainer round): every selected essence is deleted
+  regardless of component usage, because the cascade strips it from every carrying component
+  and rewrites every referencing recipe. There is no blocked partition and nothing is
+  skipped — the impact statement is the whole warning.
 -->
 <script>
   import ArmedDangerButton from '../ArmedDangerButton.svelte';
@@ -151,19 +152,6 @@
     return managerColorTokenLabel(value, localize);
   }
 
-  // `blockedNames` is CAPPED by the model. `Select all matching` can select every essence
-  // in the system, so the tail is SUMMARISED rather than comma-joined into one callout —
-  // and it is summarised rather than dropped, so the count and the names never disagree.
-  const blockedNamesLabel = $derived(
-    impact.blockedOverflow > 0
-      ? format(
-          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlockedMore',
-          '{names} and {count} more',
-          { names: impact.blockedNames.join(', '), count: impact.blockedOverflow }
-        )
-      : impact.blockedNames.join(', ')
-  );
-
   const deleteLabel = $derived(
     impact.deletable === 1
       ? text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteOne', 'Delete 1 essence')
@@ -209,19 +197,6 @@
           'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactRecipes',
           '{count} recipes will be rewritten.',
           { count: impact.recipeRewrites }
-        )
-  );
-  const impactBlockedLabel = $derived(
-    impact.blocked === 1
-      ? format(
-          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlockedOne',
-          '1 selected essence is still carried by components and will be skipped: {names}',
-          { names: blockedNamesLabel }
-        )
-      : format(
-          'FABRICATE.Admin.Manager.Essence.BulkEdit.ImpactBlocked',
-          '{count} selected essences are still carried by components and will be skipped: {names}',
-          { count: impact.blocked, names: blockedNamesLabel }
         )
   );
   const deleteAriaLabel = $derived(
@@ -362,9 +337,11 @@
   second way of applying the staged edit.
 -->
 <section class="manager-inspector-card manager-essence-bulk-delete" data-essence-bulk-delete-card>
-  <h3 class="manager-card-title">
-    {text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteHeading', 'Delete selected essences')}
-  </h3>
+  <div class="manager-edit-card-heading">
+    <h3 class="manager-card-title">
+      {text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteHeading', 'Delete selected essences')}
+    </h3>
+  </div>
 
   <!-- Stated BEFORE the action is armed, and recomputed from the selection. -->
   <ul class="manager-essence-bulk-impact" data-essence-bulk-impact>
@@ -372,11 +349,10 @@
       {impactEssencesLabel}
     </li>
     <!--
-      Counted over the WHOLE SELECTION, not over the deletable members, and worded to say
-      so. A component carrying an essence is exactly what BLOCKS that essence's delete, so
-      counted over the deletable rows this number is zero by construction — which is what
-      it read before, directly above a callout naming the essences those components keep.
-      See `describeEssenceDeleteImpact`.
+      A DISTINCT-carrier union over the selection: a component carrying two selected essences
+      is one carrier, not two, because the cascade strips it in one pass. The copy says "one
+      or more of the selected essences" for exactly that reason. See
+      `describeEssenceDeleteImpact`.
     -->
     <li data-essence-bulk-impact-row="components">
       {impactComponentsLabel}
@@ -386,19 +362,10 @@
     </li>
   </ul>
 
-  {#if impact.blocked > 0}
-    <Callout
-      tone="warning"
-      text={impactBlockedLabel}
-      dataAttr="data-essence-bulk-blocked"
-      dataValue={String(impact.blocked)}
-    />
-  {/if}
-
   <ArmedDangerButton
     token="delete-essences"
     armed={deleteArmed === true}
-    disabled={!impact.canDelete || inert}
+    disabled={impact.deletable === 0 || inert}
     idleLabel={deleteLabel}
     armedLabel={text('FABRICATE.Admin.Manager.Essence.BulkEdit.DeleteConfirm', 'Confirm delete')}
     idleAriaLabel={deleteAriaLabel}

@@ -217,35 +217,20 @@ function unionOfIds(rows, fields) {
 }
 
 /**
- * How many blocked essences the callout names before it summarises the rest.
+ * What a delete of the current selection would actually do — the impact statement the
+ * maintainer required, stated BEFORE the action is armed.
  *
- * Three is what fits on one line beside the count in every localization tested; the
- * remainder is reported as a number rather than dropped, so the GM is never told about
- * fewer skipped essences than there are.
- */
-export const BLOCKED_NAME_CAP = 3;
-
-/**
- * What a bulk delete of the current selection would actually do — the impact statement the
- * maintainer required in the bulk-edit sidebar, stated BEFORE the action is armed.
+ * Deletion is WARNED, never BLOCKED. `CraftingSystemManager.deleteEssence(s)` strips the
+ * essence from every carrying component and rewrites every referencing recipe, so a carried
+ * essence deletes exactly like an uncarried one — the old component-usage refusal is gone.
+ * Every selected row is therefore deletable, and this statement no longer partitions a
+ * blocked set: its whole job is to say, in advance, how far the cascade reaches.
  *
  * Three numbers that are genuinely different questions and must not be derived from each
  * other: how many essences will be deleted, how many COMPONENTS carry any of the SELECTED
  * essences, and how many RECIPES will be rewritten. One essence carried by twelve
  * components is 1 deletion and 12 carriers; two essences in one recipe is 2 deletions and
  * 1 rewrite.
- *
- * ## Why the two carrier numbers are counted over DIFFERENT sets
- *
- * `recipeRewrites` is counted over the DELETABLE rows, because only a deleted essence
- * causes a rewrite. `componentsAffected` is counted over the WHOLE SELECTION, because
- * `deleteBlocked` is `componentUsageCount > 0` at the only producer of these rows
- * (`adminStore._buildEssenceCards`): a row carrying a component is blocked, and a row
- * carrying none contributes no carrier. Counted over `deletable` the number is therefore
- * ZERO by construction — a fixed `0` rendered directly above a callout naming the
- * essences components are keeping alive. Counted over the selection it is the number that
- * EXPLAINS that callout, so the copy it feeds says "carry one or more of the selected
- * essences" rather than "carry them".
  *
  * **Both carrier numbers are UNIONS over identities, never sums of per-essence counts.**
  * The operation they describe performs unions: `CraftingSystemManager.deleteEssences`
@@ -258,39 +243,21 @@ export const BLOCKED_NAME_CAP = 3;
  * the rows supply IDS: `componentUsageIds` / `componentUsageItems` and `recipeUsageIds`.
  * A row supplying neither contributes nothing on that axis rather than an over-count.
  *
- * BLOCKED members are excluded and named. The single-delete guard is a data-loss guard and
- * removing it was not what was directed, so the panel says how many it will skip and why,
- * and `canDelete` is false when every selection member is blocked — an inert action rather
- * than one that silently does less than it says. The NAMES are capped: `Select all matching`
- * can select every essence in the system, and an uncapped list puts every one of them,
- * comma-joined, inside a single callout.
- *
- * @param {{id?: string, name?: string, deleteBlocked?: boolean,
+ * @param {{id?: string, name?: string,
  *   componentUsageIds?: string[], componentUsageItems?: {id?: string}[],
  *   recipeUsageIds?: string[]}[]} rows the SELECTED projected essence rows.
- * @returns {{deletable: number, deletableIds: string[], blocked: number,
- *   blockedNames: string[], blockedOverflow: number, componentsAffected: number,
- *   recipeRewrites: number, canDelete: boolean}} `componentsAffected` and `recipeRewrites`
- *   are DISTINCT-carrier counts, so each equals what the cascade will touch rather than
- *   exceeding it. `blockedNames` is capped at {@link BLOCKED_NAME_CAP} with the remainder
- *   in `blockedOverflow`, so "Select all 22 matching" cannot put 22 comma-joined names in
- *   one callout.
+ * @returns {{deletable: number, deletableIds: string[], componentsAffected: number,
+ *   recipeRewrites: number}} `componentsAffected` and `recipeRewrites` are DISTINCT-carrier
+ *   counts, so each equals what the cascade will touch rather than exceeding it. Every
+ *   selected row is deletable, so `deletableIds` names them all.
  */
 export function describeEssenceDeleteImpact(rows) {
   const selected = Array.isArray(rows) ? rows : [];
-  const deletable = selected.filter((row) => row?.deleteBlocked !== true);
-  const blocked = selected.filter((row) => row?.deleteBlocked === true);
-  const allBlockedNames = blocked.map((row) => String(row?.name ?? '')).filter(Boolean);
-
   return {
-    deletable: deletable.length,
-    deletableIds: deletable.map((row) => String(row?.id ?? '')).filter(Boolean),
-    blocked: blocked.length,
-    blockedNames: allBlockedNames.slice(0, BLOCKED_NAME_CAP),
-    blockedOverflow: Math.max(0, allBlockedNames.length - BLOCKED_NAME_CAP),
+    deletable: selected.length,
+    deletableIds: selected.map((row) => String(row?.id ?? '')).filter(Boolean),
     componentsAffected: unionOfIds(selected, ['componentUsageIds', 'componentUsageItems']).size,
-    recipeRewrites: unionOfIds(deletable, ['recipeUsageIds']).size,
-    canDelete: deletable.length > 0,
+    recipeRewrites: unionOfIds(selected, ['recipeUsageIds']).size,
   };
 }
 

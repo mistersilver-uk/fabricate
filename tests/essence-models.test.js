@@ -505,11 +505,12 @@ describe('1036 — describeEssenceDeleteImpact', () => {
   // more than the truth. The identities are what make the two answers distinguishable at
   // all; a counts-only fixture cannot fail this.
   //
-  // It is built through `makeEssenceRow` so it OBEYS the store's invariant: `deleteBlocked`
-  // is `componentUsageCount > 0` at the only producer of these rows, so a carried essence is
-  // blocked and a deletable essence carries nothing. The two carrier numbers are therefore
-  // counted over different sets, and this fixture separates them: `fire`/`water` are the
-  // carried, blocked pair and `earth`/`air` are the deletable pair.
+  // It is built through `makeEssenceRow`, whose rows carry no `deleteBlocked` flag because
+  // the delete is WARNED, not BLOCKED (maintainer round): every selected essence is
+  // deletable regardless of component usage. The fixture still mixes carried rows
+  // (`fire`/`water` carry components) with uncarried ones (`earth`/`air`) so the component
+  // union is exercised over a genuinely mixed selection, and its recipe ids are shared so a
+  // union and a sum differ.
   const SELECTION = [
     makeEssenceRow({
       id: 'fire',
@@ -531,11 +532,11 @@ describe('1036 — describeEssenceDeleteImpact', () => {
 
   it('reports the UNION of affected recipes, not the sum of per-essence counts', () => {
     const impact = describeEssenceDeleteImpact(SELECTION);
-    assert.equal(impact.deletable, 2, 'selection size 4, deletable 2');
+    assert.equal(impact.deletable, 4, 'every selected essence is deletable');
     assert.equal(
       impact.recipeRewrites,
       2,
-      'r1 and r2 — the sum over the two deletable rows would be 3, and 2 is what the cascade rewrites'
+      'r1 and r2 — the sum over the four rows would be 6, and 2 is what the cascade rewrites'
     );
   });
 
@@ -548,21 +549,15 @@ describe('1036 — describeEssenceDeleteImpact', () => {
     );
   });
 
-  it('counts the carrying components over the SELECTION, never over the deletable members', () => {
-    // THE structural defect this axis shipped with. `deleteBlocked` is
-    // `componentUsageCount > 0`, so a row that could contribute a carrier is excluded from
-    // `deletable` by construction: counted there the number is `0` for EVERY selection a
-    // real store can produce, rendered directly above the callout naming the essences those
-    // same components are keeping. Counted over the selection it explains that callout.
-    const allBlocked = describeEssenceDeleteImpact([SELECTION[0], SELECTION[1]]);
-    assert.equal(allBlocked.deletable, 0, 'a carried essence is never deletable');
-    assert.equal(
-      allBlocked.componentsAffected,
-      2,
-      'and the carriers are still reported — over `deletable` this could only be 0'
-    );
+  it('makes EVERY selected essence deletable, carried or not', () => {
+    // The maintainer's change: a component-carried essence deletes exactly like an
+    // uncarried one, because the cascade strips it from every carrier. No selection is
+    // ever inert on account of component usage.
+    const impact = describeEssenceDeleteImpact(SELECTION);
+    assert.equal(impact.deletable, 4, 'all four, including the component-carried Fire and Water');
+    assert.deepEqual(impact.deletableIds, ['fire', 'water', 'earth', 'air']);
 
-    // Negative control: a selection carried by nothing reports nothing, so the assertion
+    // Negative control: a selection carried by nothing reports zero carriers, so the union
     // above cannot pass on a number that is merely always non-zero.
     const noneCarried = describeEssenceDeleteImpact([SELECTION[2], SELECTION[3]]);
     assert.equal(noneCarried.deletable, 2);
@@ -578,46 +573,31 @@ describe('1036 — describeEssenceDeleteImpact', () => {
     assert.equal(impact.recipeRewrites, 1);
   });
 
-  it('excludes and NAMES the blocked members, and excludes their RECIPES from the rewrite', () => {
+  it('unions carriers over the WHOLE selection, so the carried rows contribute their carriers', () => {
     const impact = describeEssenceDeleteImpact(SELECTION);
-    assert.equal(impact.blocked, 2);
-    assert.deepEqual(impact.blockedNames, ['Fire', 'Water']);
-    assert.deepEqual(impact.deletableIds, ['earth', 'air']);
-    assert.equal(
-      impact.recipeRewrites,
-      describeEssenceDeleteImpact(SELECTION.slice(2)).recipeRewrites,
-      'dropping the blocked rows changes the REWRITE count not at all — nothing they alone require is rewritten'
-    );
+    // Dropping the carried Fire/Water drops their component carriers — proof the carriers
+    // are theirs — while the recipe union is unchanged, because r1/r2 are also required by
+    // the uncarried Earth/Air.
+    const withoutCarried = describeEssenceDeleteImpact(SELECTION.slice(2));
+    assert.equal(withoutCarried.componentsAffected, 0, 'the carriers were the carried rows alone');
     assert.notEqual(
       impact.componentsAffected,
-      describeEssenceDeleteImpact(SELECTION.slice(2)).componentsAffected,
-      'while the CARRIER count is theirs alone, which is why the two axes read different sets'
+      withoutCarried.componentsAffected,
+      'so the component union genuinely reads the whole selection'
+    );
+    assert.equal(
+      impact.recipeRewrites,
+      withoutCarried.recipeRewrites,
+      'r1/r2 are shared, so the rewrite union is the same either way'
     );
   });
 
-  it('is INERT when every selection member is blocked', () => {
+  it('reports a single carried essence as deletable, with its carriers stated as impact', () => {
     const impact = describeEssenceDeleteImpact([SELECTION[0]]);
-    assert.equal(impact.canDelete, false);
-    assert.equal(impact.deletable, 0);
-    assert.deepEqual(impact.blockedNames, ['Fire']);
-    assert.equal(impact.componentsAffected, 2, 'the carriers are the REASON, so they are stated');
-    assert.equal(impact.recipeRewrites, 0, 'while nothing is deleted, so nothing is rewritten');
-  });
-
-  it('CAPS the named blocked members and reports the remainder as a count', () => {
-    // `Select all matching` can select every essence in the system, and an uncapped list
-    // comma-joins all of them into one callout.
-    const rows = ['A', 'B', 'C', 'D', 'E'].map((name, index) =>
-      makeEssenceRow({ id: `e${index}`, name, componentUsageCount: 1 })
-    );
-    const impact = describeEssenceDeleteImpact(rows);
-    assert.equal(impact.blocked, 5, 'the count is all of them, so nothing is understated');
-    assert.deepEqual(impact.blockedNames, ['A', 'B', 'C']);
-    assert.equal(impact.blockedOverflow, 2);
-
-    const under = describeEssenceDeleteImpact(rows.slice(0, 2));
-    assert.deepEqual(under.blockedNames, ['A', 'B']);
-    assert.equal(under.blockedOverflow, 0, 'and a short list is never truncated or summarised');
+    assert.equal(impact.deletable, 1, 'Fire deletes despite its component usage');
+    assert.deepEqual(impact.deletableIds, ['fire']);
+    assert.equal(impact.componentsAffected, 2, 'comp-a and comp-b, stated as the delete impact');
+    assert.equal(impact.recipeRewrites, 2, 'r1 and r2 are rewritten');
   });
 
   it('recomputes from the selection it is given rather than caching', () => {

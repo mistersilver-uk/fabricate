@@ -81,7 +81,6 @@
 
   const isCard = $derived(variant === 'grid');
   const disabled = $derived(essence?.enabled === false);
-  const blocked = $derived(essence?.deleteBlocked === true);
   const capabilities = $derived(
     essenceCapabilityPills(essence, { effectTransferEnabled, propertyMacrosEnabled }, text)
   );
@@ -100,6 +99,74 @@
   );
 </script>
 
+<!-- The tile carries the essence's own colour. `Medallion.tint` recolours the glyph and
+     washes the surface; unset resolves to the accent, which is the shipped render. -->
+{#snippet medallionTile()}
+  <Medallion
+    icon={essence.icon || 'fas fa-mortar-pestle'}
+    tint={essence.colorToken || ''}
+    size={40}
+  />
+{/snippet}
+
+<!-- NO colour-name chip (issue 1036, maintainer round 2). The medallion already carries the
+     essence's colour, and a maintained display name for every theme colour is upkeep with no
+     reader. Removing it also un-wraps the DISABLED pill. -->
+{#snippet nameRow()}
+  <span class="manager-essence-name-row">
+    <span class="manager-system-name" title={essence.name}>{essence.name}</span>
+    {#if disabled}
+      <StatusPill
+        tone="neutral"
+        icon="fas fa-circle-pause"
+        label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
+      />
+    {/if}
+  </span>
+{/snippet}
+
+<!-- NEVER hidden for a disabled essence: hiding a pill removes state. They render in the
+     muted tone beside the Disabled badge instead. In the GRID card they sit in the header
+     row beside the medallion; in the LIST row they stay in the trailing cluster. -->
+{#snippet capabilityPills()}
+  <span class="manager-essence-capabilities" data-essence-capabilities>
+    {#each capabilities as pill (pill.id)}
+      <Chip
+        tone={pill.tone}
+        icon={pill.icon}
+        title={pill.title || undefined}
+        data-essence-capability={pill.id}
+        data-essence-capability-state={pill.tone === 'warning' ? 'broken' : 'ok'}>{pill.label}</Chip
+      >
+    {/each}
+  </span>
+{/snippet}
+
+<!-- The two usage counts. Deleting an essence is warned, not blocked (issue 1036, maintainer
+     round), so the component count renders plainly — the impact of a delete is stated in the
+     confirm dialog and the bulk panel rather than as a padlock here. -->
+{#snippet usageReadout()}
+  <span class="manager-essence-usage-readout" data-essence-usage>
+    <span class="manager-essence-usage-components" data-essence-usage-components
+      >{componentUsage}</span
+    >
+    <span data-essence-usage-recipes>{recipeUsage}</span>
+  </span>
+{/snippet}
+
+{#snippet selectionBox()}
+  <SelectionCheckbox
+    size="lg"
+    wrapper="label"
+    checked={bulkSelected}
+    ariaLabel={format('FABRICATE.Admin.Manager.BulkEdit.SelectRow', 'Select {name} for bulk edit', {
+      name: essence.name,
+    })}
+    data-essence-select={essence.id}
+    onChange={() => onToggleBulkSelected(essence.id)}
+  />
+{/snippet}
+
 <li
   class={`manager-essence-row ${isCard ? 'is-card' : ''} ${selected ? 'is-selected' : ''} ${disabled ? 'is-off' : ''}`}
   class:is-bulk-selected={bulkSelected}
@@ -109,78 +176,45 @@
   data-essence-bulk-selected={bulkSelected}
   aria-current={selected ? 'true' : undefined}
 >
-  <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
-    <!-- The tile carries the essence's own colour. `Medallion.tint` recolours the glyph and
-         washes the surface; unset resolves to the accent, which is the shipped render. -->
-    <Medallion
-      icon={essence.icon || 'fas fa-mortar-pestle'}
-      tint={essence.colorToken || ''}
-      size={40}
-    />
-    <span class="manager-system-copy">
-      <!-- NO colour-name chip (issue 1036, maintainer round 2). The medallion beside this
-           row already carries the essence's colour, and a maintained display name for every
-           theme colour is upkeep with no reader. Removing it also un-wraps the DISABLED
-           pill, which had been pushed to a second line beside the chip. -->
-      <span class="manager-essence-name-row">
-        <span class="manager-system-name" title={essence.name}>{essence.name}</span>
-        {#if disabled}
-          <StatusPill
-            tone="neutral"
-            icon="fas fa-circle-pause"
-            label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-          />
-        {/if}
+  {#if isCard}
+    <!-- GRID CARD. A fixed stack so every element lands at the same offset in every card
+         (issue 1036, maintainer round): a header row pairing the medallion with the capability
+         chips, then the name, then a description box with a FIXED 3-line height, then the usage
+         counts in the slot directly beneath it. The identity `<button>` wraps the whole stack
+         because clicking the card body selects it; the selection box is its only sibling. -->
+    <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
+      <span class="manager-essence-card-header">
+        {@render medallionTile()}
+        {@render capabilityPills()}
       </span>
+      {@render nameRow()}
       <span
         class="manager-system-description manager-essence-description"
         title={essence.description}
       >
         {description}
       </span>
-    </span>
-  </button>
-
-  <div class="manager-essence-cluster">
-    <!-- NEVER hidden for a disabled essence: hiding a pill removes state. They render in
-         the muted tone beside the Disabled badge instead. -->
-    <span class="manager-essence-capabilities" data-essence-capabilities>
-      {#each capabilities as pill (pill.id)}
-        <Chip
-          tone={pill.tone}
-          icon={pill.icon}
-          title={pill.title || undefined}
-          data-essence-capability={pill.id}
-          data-essence-capability-state={pill.tone === 'warning' ? 'broken' : 'ok'}
-          >{pill.label}</Chip
+      {@render usageReadout()}
+    </button>
+    {@render selectionBox()}
+  {:else}
+    <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
+      {@render medallionTile()}
+      <span class="manager-system-copy">
+        {@render nameRow()}
+        <span
+          class="manager-system-description manager-essence-description"
+          title={essence.description}
         >
-      {/each}
-    </span>
-
-    <!-- The component readout carries the BLOCKED-FROM-DELETE state, in the tone the
-         shipped row used and with a lock glyph and a title beside it. Component usage is
-         exactly what blocks the delete, so the state belongs on the number that causes it
-         rather than on a fourth pill; and stating it here is what puts the marker on BOTH
-         presentations, since the inspector only ever shows one essence at a time. -->
-    <span class="manager-essence-usage-readout" data-essence-usage>
-      <span
-        class="manager-essence-usage-components"
-        class:is-delete-blocked={blocked}
-        data-essence-usage-components
-        data-essence-delete-blocked={blocked ? 'true' : 'false'}
-        title={blocked
-          ? text(
-              'FABRICATE.Admin.Manager.Essence.DeleteBlocked',
-              'Remove component usage before deleting this essence.'
-            )
-          : undefined}
-      >
-        {#if blocked}<i class="fas fa-lock" aria-hidden="true"></i>{/if}{componentUsage}
+          {description}
+        </span>
       </span>
-      <span data-essence-usage-recipes>{recipeUsage}</span>
-    </span>
+    </button>
 
-    {#if !isCard}
+    <div class="manager-essence-cluster">
+      {@render capabilityPills()}
+      {@render usageReadout()}
+
       <button
         type="button"
         class={`manager-status-toggle ${disabled ? 'is-off' : 'is-on'}`}
@@ -219,23 +253,10 @@
       >
         <i class="fas fa-pen" aria-hidden="true"></i>
       </button>
-    {/if}
 
-    <SelectionCheckbox
-      size="lg"
-      wrapper="label"
-      checked={bulkSelected}
-      ariaLabel={format(
-        'FABRICATE.Admin.Manager.BulkEdit.SelectRow',
-        'Select {name} for bulk edit',
-        {
-          name: essence.name,
-        }
-      )}
-      data-essence-select={essence.id}
-      onChange={() => onToggleBulkSelected(essence.id)}
-    />
-  </div>
+      {@render selectionBox()}
+    </div>
+  {/if}
 </li>
 
 <style>
@@ -309,16 +330,6 @@
     white-space: nowrap;
   }
 
-  /* BLOCKED FROM DELETE. The shipped row toned its usage chip for this state and the
-     redesign must not lose it: the tone is the colour channel, the lock is the glyph
-     channel and the `title` is the words, so the marker survives greyscale. */
-  .manager-essence-usage-components.is-delete-blocked {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2xs);
-    color: var(--fab-warning-text);
-  }
-
   /* A disabled essence is DIMMED as well as pilled — the pill is what carries the state,
      the dimming only reinforces it. */
   .manager-essence-row.is-off .manager-essence-identity,
@@ -337,25 +348,44 @@
     padding: var(--fab-space-4);
   }
 
-  /* The card's identity stacks: tile above copy, rather than tile beside copy. The global
-     reset makes it a two-column grid, so the card overrides the template rather than the
-     display mode — a `flex-direction` here would not reach a grid. */
+  /* The card's identity is a FIXED VERTICAL STACK: header (medallion + chips), name,
+     description, usage. The global reset makes the identity a two-column grid for the list
+     row, so the card re-declares `display: flex` to override the mode rather than only the
+     template — the card's children are one column of siblings, not a tile-beside-copy pair. */
   .manager-essence-row.is-card .manager-essence-identity {
+    display: flex;
+    flex-direction: column;
     flex: 0 0 auto;
-    grid-template-columns: minmax(0, 1fr);
     gap: var(--fab-space-2);
   }
 
+  /* The header row: medallion on the left, capability chips pushed to the right, so every
+     card's chips sit in the same top-right slot regardless of how many it has. */
+  .manager-essence-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fab-space-2);
+  }
+
+  /* The description keeps its 3-line clamp AND reserves that height even when it is shorter,
+     so the usage counts beneath it land at the same offset in every card. This is the
+     "same place" half of the maintainer's ask; equal card height is the other half and is
+     structural (see the bounded-growth note below). */
   .manager-essence-row.is-card .manager-essence-description {
     -webkit-line-clamp: 3;
     line-clamp: 3;
+    line-height: 1.4;
+    min-height: calc(1.4em * 3);
   }
 
   /* ── EVERYTHING THAT CAN GROW IS BOUNDED (issue 1036, maintainer round 2) ────────
      Equal height inside a row is guaranteed by `align-items: stretch` plus the zeroed
-     Foundry `<li>` margin (see `styles/fabricate.css`). That makes the cards in ONE row
-     identical; it does not stop one long name making every card in that row half a screen
-     tall. So each growable part of the card states its own ceiling:
+     Foundry `<li>` margin (see `styles/fabricate.css`). With every growable part of the
+     card also bounded — the header is the fixed medallion height, the name is one line, the
+     description reserves a fixed 3-line box (above), and the usage row is one line — the
+     card's total height is the same for every card regardless of content, so the shelf is
+     level without any `margin-top: auto` footer trick. Each ceiling:
 
       - the NAME truncates to one line with an ellipsis. The maintainer named this
         mechanism. The `<span>` already carries `title={essence.name}`, so the full name is
@@ -364,10 +394,9 @@
         max-content width and `overflow: hidden` never engages.
       - the NAME ROW does not wrap. With the colour chip removed the only remaining sibling
         is the Disabled pill, and a wrap here would put the pill on its own line and add a
-        third variable to the card's height.
-      - the DESCRIPTION keeps its 3-line clamp (above).
-      - the CAPABILITY chips do not wrap: there are at most two and a wrap moves the whole
-        footer.
+        variable to the card's height.
+      - the DESCRIPTION keeps its 3-line clamp and reserves that height (above).
+      - the CAPABILITY chips do not wrap: there are at most two and a wrap moves the header.
 
      The LIST row is untouched — its name is beside a 76px-tall row that already clamps its
      description, and truncating there would hide names the list has room for. */
@@ -388,25 +417,13 @@
     flex: 0 0 auto;
   }
 
-  /* No `overflow: hidden` here on purpose. The cluster above already wraps, so a pair of
-     chips that does not fit moves to its own line instead of overflowing — and clipping
-     would silently delete a state marker, which is the one thing this card must never do. */
+  /* No `overflow: hidden` here on purpose. Clipping would silently delete a state marker,
+     which is the one thing this card must never do; the chips never wrap so at most two sit
+     in the header's right slot. */
   .manager-essence-row.is-card .manager-essence-capabilities {
     flex-wrap: nowrap;
     min-width: 0;
-  }
-
-  /* `margin-top: auto` is what turns the stretched grid row into a level shelf: the card
-     is a flex column, the list stretches every card to the tallest in its row, and this
-     pushes the pills-and-counts footer to the bottom of whatever height the card was given.
-     Without it the extra height falls BELOW the footer and the footers stay ragged, which
-     is the same defect one step further down. `--fab-space-3` survives as the minimum gap
-     for the shortest card in a row, which is the one `auto` resolves to zero for. */
-  .manager-essence-row.is-card .manager-essence-cluster {
-    flex-wrap: wrap;
-    margin-top: auto;
-    padding-top: var(--fab-space-3);
-    margin-left: 0;
+    flex: 0 0 auto;
   }
 
   .manager-essence-row.is-card .manager-essence-usage-readout {
@@ -414,7 +431,7 @@
   }
 
   /* The card's selection box is the only action it carries, so it is pinned to the corner
-     rather than left in the cluster where it would read as a fourth stat. */
+     over the header rather than stacked into the body where it would read as a fourth stat. */
   .manager-essence-row.is-card :global(.fab-selection-checkbox) {
     position: absolute;
     top: var(--fab-space-3);

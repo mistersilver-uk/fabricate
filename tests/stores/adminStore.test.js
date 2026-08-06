@@ -7511,11 +7511,10 @@ describe('createAdminStore', () => {
       assert.deepEqual(cards[0].componentUsageItems, [
         { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' },
       ]);
-      assert.equal(cards[0].deleteBlocked, true);
       assert.equal(cards[1].sourceState, 'none');
       assert.deepEqual(cards[1].componentUsageItems, []);
       assert.equal(cards[1].icon, DEFAULT_ESSENCE_ICON);
-      assert.equal(cards[1].deleteBlocked, false);
+      assert.equal(cards[1].componentUsageCount, 0, 'no component carries the second essence');
     });
 
     it('viewState.recipeSearchTerm and itemSearchTerm echo the current search values', async () => {

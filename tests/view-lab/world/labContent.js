@@ -723,9 +723,10 @@ const RUNEWORK_COMPONENTS = [
  * The shared essence vocabulary. Every one of the six lab systems declares THIS array, so
  * an edit here moves every essence surface in the corpus at once.
  *
- * SIX entries, and the sixth (`mote`) exists for one reason: it is the only essence NO
- * component carries, and `deleteBlocked` is `componentUsageCount > 0`, so it is the only
- * essence in the corpus that can be deleted at all. See its own note.
+ * SIX entries. Deletion is WARNED, not blocked (issue 1036, maintainer round), so every
+ * essence is deletable; the sixth (`mote`) is still special because it is the only essence
+ * NO component carries and the only one with no source, which gives the browser a clean
+ * zero-carrier subject for both. See its own note.
  *
  * COLOURS (issue 1036). Four of the five carry a distinct `--fab-tag-*` token and `air` is
  * deliberately left UNSET: an essence with no authored colour renders in the theme accent
@@ -791,15 +792,10 @@ const ESSENCES = [
     propertyMacroUuid: 'Macro.lab-aether-binding',
   },
   {
-    // The DELETABLE essence, and the only one in the corpus (issue 1036). NO component
-    // anywhere carries it, so `componentUsageCount` is 0, `deleteBlocked` is false, and it
-    // is the sole route to a bulk-delete impact statement with non-zero numbers and a LIVE
-    // Delete button.
-    //
-    // Without it the commissioned `manager-essences-bulk-edit` frame could only ever show
-    // the inert all-blocked state — every other lab essence is carried, and an essence is
-    // deletable exactly when no component carries it — so the maintainer's binding decision
-    // (state the impact, then Arm/Confirm) had no qualifying visual evidence at all.
+    // The ZERO-CARRIER essence (issue 1036). NO component anywhere carries it, so
+    // `componentUsageCount` is 0. Deletion is warned rather than blocked, so every lab
+    // essence is deletable; `mote` is the one whose bulk-delete impact statement reports
+    // zero carrying components, which is the clean subject the impact copy is written for.
     //
     // It is required by `sm-r-runeplate-draft`, so `recipeRewrites` is 1 rather than 0 and
     // the third impact number is not trivially satisfied. That recipe SPECIFICALLY, for the

@@ -2834,11 +2834,9 @@
           "Edit": "Edit essence",
           "DeleteNamed": "Delete {name}",
           "Delete": "Delete essence",
-          "DeleteBlocked": "Remove component usage before deleting this essence.",
-          "DeleteBlockedShort": "In use",
           "DeleteConfirm": {
             "Title": "Delete {name}?",
-            "Content": "Delete essence {name} and remove it from recipes in this system?"
+            "Content": "Delete essence {name}? This removes it from {components} component(s) and rewrites {recipes} recipe(s) that require it."
           },
           "DuplicateName": "{name} (copy)",
           "DuplicateNameIndexed": "{name} (copy {index})",
@@ -2876,7 +2874,7 @@
           "DisableThis": "Disable this essence",
           "Enabled": "Enabled",
           "EnabledHint": "A disabled essence still counts and is consumed, but carries no effects or macro onto a crafted result.",
-          "UsageBlockedNamed": "In use by {count} components. Remove it from those components before deleting the definition.",
+          "DeleteImpact": "Deleting removes this essence from {components} components and rewrites {recipes} recipes.",
           "DeleteRewritesRecipes": "Deleting this essence rewrites {count} recipes that require it.",
           "ViewList": "List",
           "ViewGrid": "Grid",
@@ -2907,6 +2905,7 @@
           },
           "Capability": {
             "Effects": "Effects",
+            "EffectsLinked": "Transfers active effects from a linked source that currently resolves.",
             "EffectsBroken": "The linked effect source no longer resolves, so no effect can transfer.",
             "Macro": "Macro"
           },
@@ -3002,9 +3001,6 @@
             "ImpactComponentsOne": "1 component carries one or more of the selected essences.",
             "ImpactRecipes": "{count} recipes will be rewritten.",
             "ImpactRecipesOne": "1 recipe will be rewritten.",
-            "ImpactBlocked": "{count} selected essences are still carried by components and will be skipped: {names}",
-            "ImpactBlockedOne": "1 selected essence is still carried by components and will be skipped: {names}",
-            "ImpactBlockedMore": "{names} and {count} more",
             "Delete": "Delete {count} essences",
             "DeleteOne": "Delete 1 essence",
             "DeleteConfirm": "Confirm delete",
@@ -3013,8 +3009,7 @@
             "DeleteConfirmAria": "Confirm deleting {count} essence definition(s) and rewriting {recipes} recipe(s)",
             "Applied": "Updated {count} essences.",
             "AppliedOne": "Updated 1 essence.",
-            "Deleted": "Deleted {count} essence(s) and rewrote {recipes} recipe(s).",
-            "DeletedSkipped": "Skipped {count}, still carried by components: {names}"
+            "Deleted": "Deleted {count} essence(s) and rewrote {recipes} recipe(s)."
           }
         },
         "Environment": {

@@ -37,6 +37,7 @@ import {
   makeExportFilename,
 } from '../../../systems/CraftingSystemExporter.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
+import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
 import {
   isGeneralRecipeCategory,
   normalizeCustomRecipeCategories,
@@ -2432,12 +2433,12 @@ function _buildEssenceCards(essenceDefinitions, managedItems, managedItemOptions
       // about to rewrite. `componentUsageItems` is the component-side twin (the union reads
       // `{id}` off it), so neither axis is a sum.
       recipeUsageIds: recipeUsage.ids,
-      // `deleteBlocked` keeps its COMPONENT-ONLY meaning. Recipe usage is an explanatory
-      // consequence with its own key, deliberately worded so it cannot read as a block:
-      // deleting an essence a recipe requires is allowed and rewrites that recipe, while
-      // deleting one a component carries is refused.
+      // Deleting an essence is WARNED, never BLOCKED (issue 1036, maintainer round). The
+      // cascade strips it from every carrying component and rewrites every referencing
+      // recipe, so there is no `deleteBlocked` state left to carry: `deleteRewritesRecipes`
+      // is the recipe-side explanatory flag, and `componentUsageCount` above is what the
+      // component-side impact note reads.
       deleteRewritesRecipes: recipeUsageCount > 0,
-      deleteBlocked: componentUsageCount > 0,
     };
   });
 }
@@ -7179,27 +7180,17 @@ export function createAdminStore(services) {
   }
 
   /**
-   * Whether deleting this essence is refused because a COMPONENT still carries it.
-   *
-   * Recomputed from the system rather than read off a card, because the refusal is a
-   * data-loss guard and must not depend on a projection the caller happens to hold.
-   */
-  function _essenceDeleteBlocked(system, essenceId) {
-    return _essenceUsageCount(essenceId, _getManagedItems(system)) > 0;
-  }
-
-  /**
    * Delete ONE essence definition, after asking (issue 1036).
    *
    * Renamed from `removeEssence` so the singular and the plural share one verb, localized,
-   * and it now RETURNS a boolean: the old `undefined` could not tell a caller whether the
-   * GM had cancelled, whether the essence existed, or whether the write happened.
+   * and it RETURNS a boolean: the old `undefined` could not tell a caller whether the GM
+   * had cancelled, whether the essence existed, or whether the write happened.
    *
-   * The in-use refusal is enforced HERE rather than by a disabled control.
-   * `CraftingSystemManager.deleteEssence` deliberately strips the essence from carrying
-   * components regardless of `deleteBlocked`, which is a UI-only card field, so a caller
-   * that reached this function with a carried essence would silently destroy authored
-   * component data.
+   * The delete is WARNED, not BLOCKED (maintainer round). `CraftingSystemManager.deleteEssence`
+   * strips the essence from every carrying component and rewrites every referencing recipe,
+   * so component usage no longer refuses the delete — it is stated in the confirm dialog as
+   * impact the GM is agreeing to. The counts come from `describeEssenceDeleteImpact` so the
+   * dialog and the bulk panel report the same distinct-carrier arithmetic.
    *
    * @param {string} essenceId
    * @returns {Promise<boolean>} whether the definition was deleted.
@@ -7211,22 +7202,26 @@ export function createAdminStore(services) {
 
     const essence = existing.find((def) => def.id === essenceId);
     if (!essence) return false;
-    if (_essenceDeleteBlocked(system, essenceId)) {
-      services.notify?.warn?.(
-        services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteBlocked') ||
-          'Remove component usage before deleting this essence.'
-      );
-      return false;
-    }
+
+    const managedItems = _getManagedItems(system);
+    const recipes = services.getRecipeManager?.()?.getRecipes?.({ craftingSystemId: sysId }) || [];
+    const impact = describeEssenceDeleteImpact([
+      {
+        id: essenceId,
+        componentUsageItems: _essenceUsageItems(essenceId, managedItems),
+        recipeUsageIds: _essenceRecipeUsage(essenceId, recipes).ids,
+      },
+    ]);
 
     const name = String(essence.name || '');
+    const data = { name, components: impact.componentsAffected, recipes: impact.recipeRewrites };
     const confirmed = await services.confirmDialog({
       title:
         services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Title', { name }) ||
         `Delete ${name}?`,
       content: `<p>${
-        services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content', { name }) ||
-        `Delete essence ${name} and remove it from recipes in this system?`
+        services.localize?.('FABRICATE.Admin.Manager.Essence.DeleteConfirm.Content', data) ||
+        `Delete essence ${name}? This removes it from ${impact.componentsAffected} component(s) and rewrites ${impact.recipeRewrites} recipe(s) that require it.`
       }</p>`,
       yes: () => true,
       no: () => false,
@@ -7242,49 +7237,44 @@ export function createAdminStore(services) {
    * Delete a SET of essence definitions (issue 1036) through the manager's batched
    * primitive: ONE `craftingSystems` write and ONE `recipes` write for the whole set.
    *
-   * The blocked-in-use PARTITION is the store's job, not a disabled control's: the manager
-   * primitive deliberately does not consult `deleteBlocked`, so a blocked id handed to it
-   * would have its essence stripped from every carrying component. Blocked members are
-   * therefore excluded here and returned by name, and the whole call is a no-op when every
-   * selected essence is blocked.
+   * The delete is WARNED, not BLOCKED (maintainer round): every requested essence is deleted
+   * regardless of component usage, because the manager primitive strips it from every
+   * carrying component and rewrites every referencing recipe. There is no blocked partition
+   * to compute or report.
    *
    * Confirmation is the CALLER's, not this function's: the bulk delete is armed in the
    * panel (`ArmedDangerButton`) beside an impact statement naming the counts, which is
    * strictly more information than a modal can carry.
    *
    * @param {Iterable<string>} essenceIds
-   * @returns {Promise<{deleted: number, blocked: string[], recipesUpdated: number}>}
+   * @returns {Promise<{deleted: number, recipesUpdated: number}>}
    */
   async function deleteEssences(essenceIds) {
-    const empty = { deleted: 0, blocked: [], recipesUpdated: 0 };
+    const empty = { deleted: 0, recipesUpdated: 0 };
     const context = _selectedSystemEssences();
     if (!context) return empty;
-    const { systemManager, sysId, system, existing } = context;
+    const { systemManager, sysId, existing } = context;
 
     const requested = new Set(Array.from(essenceIds || [], String).filter(Boolean));
     if (requested.size === 0) return empty;
 
     const resolved = existing.filter((def) => requested.has(String(def?.id ?? '')));
-    const blocked = resolved.filter((def) => _essenceDeleteBlocked(system, def.id));
-    const deletable = resolved.filter((def) => !_essenceDeleteBlocked(system, def.id));
-    const blockedNames = blocked.map((def) => String(def.name || def.id));
-    if (deletable.length === 0) return { ...empty, blocked: blockedNames };
+    if (resolved.length === 0) return empty;
 
     try {
       const result = await systemManager.deleteEssences(
         sysId,
-        deletable.map((def) => String(def.id))
+        resolved.map((def) => String(def.id))
       );
       await refresh();
       return {
         deleted: Number(result?.deleted) || 0,
-        blocked: blockedNames,
         recipesUpdated: Number(result?.recipesUpdated) || 0,
       };
     } catch (err) {
       console.error('Fabricate | Failed to delete essences:', err);
       services.notify?.error?.(err?.message || 'Failed to delete essences');
-      return { ...empty, blocked: blockedNames };
+      return empty;
     }
   }
 

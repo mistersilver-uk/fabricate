@@ -4148,12 +4148,10 @@
 
   function removeEssence(essenceId = selectedEssence?.id) {
     if (!essenceId) return;
-    const essence = essenceCards.find((card) => card.id === essenceId);
-    if (essence?.deleteBlocked) return;
     // `deleteEssence` (issue 1036) — the store's singular delete, renamed from
-    // `removeEssence` so it pairs with the new `deleteEssences` set delete. It now returns
-    // a boolean and re-checks the in-use refusal itself, because `deleteBlocked` is a
-    // UI-only card field and the manager primitive deliberately ignores it.
+    // `removeEssence` so it pairs with the new `deleteEssences` set delete. It returns a
+    // boolean and owns the impact-aware confirm dialog: the delete is warned, not blocked,
+    // so there is no component-usage guard to gate this call on.
     store.deleteEssence?.(essenceId);
   }
 
@@ -4243,8 +4241,8 @@
   }
 
   // The ARMED bulk delete's confirm step. The impact statement is rendered by the panel
-  // from the same rows; this only performs the write and reports what happened, including
-  // the blocked members the store excluded.
+  // from the same rows; this only performs the write and reports what happened. The delete
+  // is warned, not blocked, so every selected essence is deleted and nothing is skipped.
   async function deleteSelectedEssences(ids) {
     if (essenceBulkDeleting) return false;
     const targets = Array.isArray(ids) ? ids : [];
@@ -4263,26 +4261,12 @@
   }
 
   function essenceBulkDeletedMessage(result) {
-    const sentences = [
-      text(
-        'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
-        'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
-      )
-        .replace('{count}', Number(result?.deleted) || 0)
-        .replace('{recipes}', Number(result?.recipesUpdated) || 0),
-    ];
-    const blocked = Array.isArray(result?.blocked) ? result.blocked : [];
-    if (blocked.length > 0) {
-      sentences.push(
-        text(
-          'FABRICATE.Admin.Manager.Essence.BulkEdit.DeletedSkipped',
-          'Skipped {count}, still carried by components: {names}'
-        )
-          .replace('{count}', blocked.length)
-          .replace('{names}', blocked.join(', '))
-      );
-    }
-    return sentences.join(' ');
+    return text(
+      'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
+      'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
+    )
+      .replace('{count}', Number(result?.deleted) || 0)
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0);
   }
 
   function selectEnvironment(environmentId = selectedEnvironment?.id) {

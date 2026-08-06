@@ -54,26 +54,20 @@ const harness = createMountedComponentHarness({
 /**
  * Four essences, and every number the statement reports is a different one.
  *
- * ## The fixture obeys the store's OWN invariant, which the first version of it did not
+ * ## Every selected essence is DELETABLE — the delete is warned, not blocked
  *
- * `adminStore._buildEssenceCards` sets `deleteBlocked: componentUsageCount > 0` and nothing
- * else, so a row carrying a component IS blocked and a deletable row carries NONE. The
- * earlier fixture combined `deleteBlocked: false` with a non-empty `componentUsageItems`,
- * which the store cannot emit, and that shape is what made a component count taken over the
- * DELETABLE rows look non-trivial when in the running app it was always `0`.
- * `makeEssenceRow` now derives the flag, so this fixture cannot drift back.
+ * The maintainer's change: component usage no longer refuses a delete, so all four rows
+ * delete and there is no blocked partition. The two carrier numbers are still UNIONS over
+ * distinct identities, never sums, and the fixture is shaped so a union and a sum differ:
  *
- * Consequently the two carrier numbers are counted over different sets, and the fixture
- * separates them:
+ * - SELECTION SIZE 4, ALL deletable;
+ * - CARRYING COMPONENTS over the whole selection: `comp-a`…`comp-d`, with `comp-b` carried by
+ *   both `fire` and `water` — so the UNION is 4 where the SUM would be 5;
+ * - REWRITTEN RECIPES over the whole selection: `r1`, `r2`, `r3`, with `r2` required by
+ *   several — so the UNION is 3 where the SUM would be 6.
  *
- * - SELECTION SIZE 4, of which 2 are deletable — `fire` and `water` are carried;
- * - CARRYING COMPONENTS over the WHOLE selection: `comp-a`…`comp-d`, with `comp-b` carrying
- *   both blocked essences — so the UNION is 4 where the SUM would be 5;
- * - REWRITTEN RECIPES over the DELETABLE pair: `r1`, `r2`, `r3`, with `r2` required by both
- *   — so the UNION is 3 where the SUM would be 4.
- *
- * 2, 4 and 3: a statement deriving any number from another passes against equal numbers and
- * fails here.
+ * 4, 4 and 3: the two carrier numbers are still distinct-carrier counts, and a statement
+ * deriving either from a per-essence sum fails here.
  */
 const SELECTION = [
   makeEssenceRow({
@@ -133,7 +127,7 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
   it('reports three numbers that are three different questions', async () => {
     const root = await harness.mount(props(SELECTION));
 
-    assert.match(impactRow(root, 'essences'), /^2\b/, '2 of the 4 selected are deletable');
+    assert.match(impactRow(root, 'essences'), /^4\b/, 'all 4 selected are deletable');
     assert.match(
       impactRow(root, 'components'),
       /^4\b/,
@@ -142,29 +136,24 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
     assert.match(
       impactRow(root, 'recipes'),
       /^3\b/,
-      'r1, r2 and r3 — a SUM would say 4 before an operation that rewrites 3'
+      'r1, r2 and r3 — a SUM would say 6 before an operation that rewrites 3'
     );
     harness.remount();
   });
 
-  it('counts carrying components over the WHOLE selection, so the line explains the skip', async () => {
-    // The regression this pins: counted over the DELETABLE rows the number is zero for
-    // every selection a real store can produce, because carrying a component is exactly
-    // what blocks the delete. It rendered as a fixed "0 components carry them." directly
-    // above a callout naming the essences those components were keeping.
+  it('counts carrying components over the WHOLE selection as a distinct-carrier union', async () => {
+    // A component carrying two selected essences counts ONCE, because the cascade strips it
+    // in one pass. Over `[fire, water]` that is comp-a…comp-d with comp-b shared: four, not
+    // the five a per-essence sum would report.
     const root = await harness.mount(props([SELECTION[0], SELECTION[1]]));
-    assert.match(impactRow(root, 'essences'), /^0\b/, 'nothing in this selection is deletable');
+    assert.match(impactRow(root, 'essences'), /^2\b/, 'both are deletable');
     assert.match(
       impactRow(root, 'components'),
       /^4\b/,
-      'and the component line still names the four carriers that are why'
-    );
-    assert.ok(
-      root.querySelector('[data-essence-bulk-blocked]'),
-      'the callout it explains is on screen at the same time'
+      'comp-a…comp-d, comp-b unioned once — a SUM would say 5'
     );
 
-    // Negative control: a selection carried by nothing reports nothing, so the assertion
+    // Negative control: a selection carried by nothing reports zero carriers, so the union
     // above cannot be satisfied by a number that is simply always non-zero.
     await harness.setProps(props([SELECTION[2], SELECTION[3]]));
     assert.match(impactRow(root, 'components'), /^0\b/);
@@ -179,7 +168,7 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
     );
     assert.match(
       deleteButton(root).textContent,
-      /Delete 2 essences/,
+      /Delete 4 essences/,
       'and the idle button already names the count it will act on'
     );
     harness.remount();
@@ -189,10 +178,10 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
     const root = await harness.mount(props(SELECTION));
     assert.match(impactRow(root, 'recipes'), /^3\b/);
 
-    // Drop `fire` and `earth`: `water` alone is carried by comp-b/c/d, and `air` alone
-    // names only r2. All three numbers move.
+    // Drop `fire` and `earth`: `water` is carried by comp-b/c/d, and `air` names only r2.
+    // All three numbers move.
     await harness.setProps(props([SELECTION[1], SELECTION[3]]));
-    assert.match(impactRow(root, 'essences'), /^1\b/);
+    assert.match(impactRow(root, 'essences'), /^2\b/);
     assert.match(impactRow(root, 'components'), /^3\b/);
     assert.match(
       impactRow(root, 'recipes'),
@@ -202,55 +191,27 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
     harness.remount();
   });
 
-  it('EXCLUDES the blocked members and NAMES them', async () => {
-    const root = await harness.mount(props(SELECTION));
-    const blocked = root.querySelector('[data-essence-bulk-blocked]');
-    assert.ok(blocked, 'a blocked member is called out, not silently dropped');
-    assert.match(blocked.textContent, /Fire/, 'by name, so the GM knows which one');
-    assert.match(blocked.textContent, /Water/);
-    assert.equal(blocked.dataset.essenceBulkBlocked, '2');
-
-    // Negative control: with nothing blocked there is no notice at all, so the assertion
-    // above is not satisfied by a strip that is always present.
-    await harness.setProps(props([SELECTION[2], SELECTION[3]]));
+  it('has NO blocked callout — every selected essence is deletable', async () => {
+    // The delete is warned, not blocked: a carried essence deletes like any other, so the
+    // panel never renders a skipped-members callout.
+    const carried = await harness.mount(props(SELECTION));
     assert.ok(
-      !root.querySelector('[data-essence-bulk-blocked]'),
-      'and nothing blocked says nothing'
+      !carried.querySelector('[data-essence-bulk-blocked]'),
+      'no member is skipped, so nothing is called out'
     );
+    assert.match(impactRow(carried, 'essences'), /^4\b/, 'all four delete, including the carried pair');
     harness.remount();
   });
 
-  it('SUMMARISES the blocked tail rather than comma-joining a whole library', async () => {
-    // `Select all matching` can select every essence in the system. Four blocked members
-    // is one past the cap, which is the smallest selection that can tell a capped list
-    // from an uncapped one.
-    const many = ['Fire', 'Water', 'Earth', 'Aether'].map((name, index) =>
-      makeEssenceRow({
-        id: `blocked-${index}`,
-        name,
-        componentUsageItems: [{ id: `comp-${index}` }],
-        componentUsageCount: 1,
-      })
-    );
-    const root = await harness.mount(props(many));
-    const blocked = root.querySelector('[data-essence-bulk-blocked]');
-    assert.equal(blocked.dataset.essenceBulkBlocked, '4', 'the COUNT is still all of them');
-    assert.match(blocked.textContent, /and 1 more/, 'and the tail is summarised, not dropped');
-    assert.ok(
-      !blocked.textContent.includes('Aether'),
-      'the fourth name is behind the summary rather than in the list'
-    );
-    harness.remount();
-  });
-
-  it('is INERT when every selection member is blocked', async () => {
+  it('stays ENABLED for a single carried essence, with its carriers stated as impact', async () => {
     const root = await harness.mount(props([SELECTION[0]]));
     assert.equal(
       deleteButton(root).disabled,
-      true,
-      'an action that would do nothing must not look like one that will do something'
+      false,
+      'a carried essence is deletable, so the button is live'
     );
-    assert.match(impactRow(root, 'essences'), /^0\b/);
+    assert.match(impactRow(root, 'essences'), /^1\b/);
+    assert.match(impactRow(root, 'components'), /^2\b/, 'comp-a and comp-b, stated as impact');
     harness.remount();
   });
 });
@@ -258,20 +219,18 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
 describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at count 1', () => {
   // The shipped defect (View Lab frame `manager-essences-bulk-delete-armed`): every number
   // in the impact statement read a bare plural noun against `{count}` — "1 essence
-  // definitions", "1 components carry", "1 recipes", "1 selected essences" — because the
-  // panel had no `…One` sibling for these four keys, unlike its own `Heading`/`Apply`/
-  // `Delete` labels a few lines above, which already do. This fixture puts all four
-  // numbers at exactly 1 simultaneously, so a single mount proves every string.
+  // definitions", "1 components carry", "1 recipes" — because the panel had no `…One` sibling
+  // for these keys, unlike its own `Heading`/`Apply`/`Delete` labels a few lines above, which
+  // already do. This fixture is a SINGLE carried essence, so all three numbers are exactly 1
+  // at once and one mount proves every string.
   const ONE_OF_EACH = [
-    // Deletable: carries no component, so it is NOT blocked.
-    makeEssenceRow({ id: 'earth', name: 'Earth', recipeUsageIds: ['r1'] }),
-    // Blocked: the one carrying component in the WHOLE selection, so `componentsAffected`
-    // (unioned over every selected row) and `blocked` are both exactly 1 too.
     makeEssenceRow({
       id: 'fire',
       name: 'Fire',
       componentUsageItems: [{ id: 'comp-a' }],
       componentUsageCount: 1,
+      recipeUsageIds: ['r1'],
+      recipeUsageCount: 1,
     }),
   ];
 
@@ -294,14 +253,6 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
       'not "1 recipes"'
     );
 
-    const blocked = root.querySelector('[data-essence-bulk-blocked]');
-    assert.equal(blocked.dataset.essenceBulkBlocked, '1');
-    assert.equal(
-      blocked.textContent.trim(),
-      '1 selected essence is still carried by components and will be skipped: Fire',
-      'not "1 selected essences"'
-    );
-
     assert.match(
       deleteButton(root).getAttribute('aria-label'),
       /^Delete 1 essence definition$/,
@@ -311,11 +262,11 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
   });
 
   it('still uses the plural form when a number is not 1', async () => {
-    // Negative control: the fixture already exercised by the earlier suite (2, 4, 3) must
+    // Negative control: the fixture already exercised by the earlier suite (4, 4, 3) must
     // still read as the ordinary plural, so the fix above is a real branch, not a rename.
     const root = await harness.mount(props(SELECTION));
 
-    assert.equal(impactRow(root, 'essences'), '2 essence definitions will be deleted.');
+    assert.equal(impactRow(root, 'essences'), '4 essence definitions will be deleted.');
     assert.equal(
       impactRow(root, 'components'),
       '4 components carry one or more of the selected essences.'
@@ -323,7 +274,7 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
     assert.equal(impactRow(root, 'recipes'), '3 recipes will be rewritten.');
     assert.match(
       deleteButton(root).getAttribute('aria-label'),
-      /^Delete 2 essence definitions$/
+      /^Delete 4 essence definitions$/
     );
     harness.remount();
   });
@@ -346,7 +297,7 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
     const root = await harness.mount(props(SELECTION, { deleteArmed: true }));
     assert.equal(
       deleteButton(root).getAttribute('aria-label'),
-      'Confirm deleting 2 essence definition(s) and rewriting 3 recipe(s)'
+      'Confirm deleting 4 essence definition(s) and rewriting 3 recipe(s)'
     );
     harness.remount();
   });
@@ -387,8 +338,8 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     flushSync();
     assert.deepEqual(
       deleted,
-      [['earth', 'air']],
-      'the second click deletes exactly the unblocked members'
+      [['fire', 'water', 'earth', 'air']],
+      'the second click deletes exactly the selected members, carried or not'
     );
     harness.remount();
   });
@@ -403,7 +354,7 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     assert.equal(button.getAttribute('type'), 'button', 'and never submits a host form');
     assert.match(
       button.getAttribute('aria-label'),
-      /2 essence definitions/,
+      /4 essence definitions/,
       'the consequence sentence is on the control, not only in the panel body'
     );
     harness.remount();

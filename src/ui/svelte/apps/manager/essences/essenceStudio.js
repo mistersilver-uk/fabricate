@@ -94,12 +94,19 @@ export function essenceCapabilityPills(essence, features = {}, text = (_key, fal
       // The breakage outranks the suppression: a disabled essence with a working source is
       // a state the GM chose, and a broken link is one they have to repair either way.
       tone: sourceBroken ? 'warning' : tone,
+      // BOTH states carry a title, so the single Effects pill's two meanings — a source that
+      // resolves versus one that no longer does — are legible without a colour or glyph the
+      // reader has to already know how to decode (maintainer round). There is no separate
+      // linked/unlinked chip; this pill IS the distinction.
       title: sourceBroken
         ? text(
             'FABRICATE.Admin.Manager.Essence.Capability.EffectsBroken',
             'The linked effect source no longer resolves, so no effect can transfer.'
           )
-        : '',
+        : text(
+            'FABRICATE.Admin.Manager.Essence.Capability.EffectsLinked',
+            'Transfers active effects from a linked source that currently resolves.'
+          ),
     });
   }
   if (features.propertyMacrosEnabled === true && essence?.hasPropertyMacro === true) {

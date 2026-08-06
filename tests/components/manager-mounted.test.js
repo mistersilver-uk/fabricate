@@ -1150,7 +1150,6 @@ function createStore(calls = [], options = {}) {
         componentUsageItems: [
           { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp' },
         ],
-        deleteBlocked: true,
       },
       {
         id: 'water',
@@ -1164,9 +1163,9 @@ function createStore(calls = [], options = {}) {
         associatedItemName: null,
         sourceName: '',
         sourceState: 'none',
-        // The DISABLED, unconfigured counterpart — no colour, no source, no macro, and
-        // deletable. It carries one recipe, which `earth` also carries, so the bulk
-        // impact's recipe UNION (2) is smaller than the per-essence SUM (3).
+        // The DISABLED, unconfigured counterpart — no colour, no source, no macro. It carries
+        // one recipe, which `earth` also carries, so the bulk impact's recipe UNION (2) is
+        // smaller than the per-essence SUM (3).
         enabled: false,
         colorToken: null,
         propertyMacroUuid: null,
@@ -1177,7 +1176,6 @@ function createStore(calls = [], options = {}) {
         deleteRewritesRecipes: true,
         componentUsageCount: 0,
         componentUsageItems: [],
-        deleteBlocked: false,
       },
     ],
     smithing: [],
@@ -8465,7 +8463,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
 
-    // The DELETE lives in the inspector now, and is refused for an in-use essence.
+    // The DELETE lives in the inspector now, and is WARNED, not blocked (maintainer round):
+    // it fires for a carried essence too, with an impact note stating the cascade's reach.
     target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
     flushSync();
@@ -8476,10 +8475,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-essence-id="earth"] .manager-essence-identity').click();
     await tick();
     flushSync();
-    assert.equal(target.querySelector('[data-essence-action="delete"]').disabled, true);
+    assert.equal(
+      target.querySelector('[data-essence-action="delete"]').disabled,
+      false,
+      'a carried essence is still deletable — the delete is warned, not blocked'
+    );
     assert.ok(
-      target.querySelector('[data-essence-delete-blocked]'),
-      'a blocked delete says why, naming the carrying components'
+      target.querySelector('[data-essence-delete-impact]'),
+      'and an impact note states how far the cascade reaches'
     );
 
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
@@ -8619,7 +8622,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('states the bulk delete impact before arming, excludes blocked members, and needs two clicks', async () => {
+  it('states the bulk delete impact before arming, deletes every member, and needs two clicks', async () => {
     const calls = [];
     target = document.createElement('div');
     document.body.appendChild(target);
@@ -8655,24 +8658,24 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(
       !target.querySelector('[data-essence-bulk-blocked]'),
-      'nothing is blocked yet, so nothing is named'
+      'no member is ever blocked — deletion is warned, not blocked'
     );
 
-    // Adding the BLOCKED essence changes all three numbers, and the recipe number is a
-    // UNION rather than a sum: `earth` names r1+r2 and `water` names r2, so 2, not 3.
+    // Adding the COMPONENT-CARRIED essence changes all three numbers, and the recipe number
+    // is a UNION rather than a sum: `earth` names r1+r2 and `water` names r2, so 2, not 3.
     target.querySelector('[data-essence-select="earth"]').click();
     await tick();
     flushSync();
-    assert.ok(impactText('essences').startsWith('1'), 'the blocked member is excluded');
-    assert.ok(impactText('recipes').startsWith('1'), 'and so are the recipes only it names');
+    assert.ok(impactText('essences').startsWith('2'), 'the carried member is deletable too');
+    assert.ok(impactText('recipes').startsWith('2'), 'r1 and r2, unioned rather than summed');
     assert.ok(
       impactText('components').startsWith('1'),
-      'while its CARRIER is now reported — that carrier is the reason it is skipped, and ' +
-        'counting this axis over the deletable members alone pinned it at 0 forever'
+      'and its CARRIER is reported as impact, unioned over the whole selection'
     );
-    const blocked = target.querySelector('[data-essence-bulk-blocked]');
-    assert.ok(blocked, 'the blocked member is named');
-    assert.ok(blocked.textContent.includes('Earth'), 'by name, not merely counted');
+    assert.ok(
+      !target.querySelector('[data-essence-bulk-blocked]'),
+      'still nothing is blocked — the carried essence deletes like any other'
+    );
 
     const deleteButton = target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
     assert.ok(deleteButton, 'the bulk delete is a real button, armed rather than dialogged');
@@ -8692,7 +8695,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const deleteCall = calls.find((call) => call[0] === 'deleteEssences');
     assert.ok(deleteCall, 'the SECOND click performs the delete');
-    assert.deepEqual(deleteCall[1], ['water'], 'and it deletes only the unblocked members');
+    assert.deepEqual(
+      [...deleteCall[1]].sort(),
+      ['earth', 'water'],
+      'and it deletes EVERY selected member, carried or not'
+    );
   });
 
   it('applies a staged essence bulk edit with falsy-but-real axes', async () => {

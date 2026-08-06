@@ -29,7 +29,7 @@
  * Two adversarial rows, chosen so that content variance is the ONLY thing left that could
  * move a height:
  *
- *  - row one mixes a 3-line description, a 1-line description and a wrapped two-chip footer;
+ *  - row one mixes a 3-line description, a 1-line description and a two-chip header;
  *  - row two ends with a card carrying a 90-character name, which is the growth vector the
  *    maintainer named ("name should be truncated") and which, unclamped, wraps to three
  *    lines and re-sizes its whole row.
@@ -106,28 +106,28 @@ function card(essence) {
   const disabledPill = essence.off
     ? '<span class="fab-status-pill is-neutral"><i class="fas fa-circle-pause"></i><span class="fab-status-pill-label">Disabled</span></span>'
     : '';
-  const lock = essence.components > 0 ? '<i class="fas fa-lock"></i>' : '';
-  const blocked = essence.components > 0 ? ' is-delete-blocked' : '';
+  // The card branch is a FIXED vertical stack (issue 1036, maintainer round): a header
+  // pairing the medallion with the capability chips, the name row, the fixed-height
+  // description box, then the usage counts — and the selection box as the identity's sibling.
+  // Deletion is warned not blocked, so the component count renders plainly with no padlock.
   return `
 <li class="manager-essence-row is-card${essence.off ? ' is-off' : ''}" data-essence-id="${essence.id}" data-essence-variant="grid">
   <button type="button" class="manager-essence-identity">
-    <span class="fab-medallion has-tint" style="width:40px;height:40px;--fab-medallion-tint:var(--fab-tag-sage)"><i class="fas fa-mortar-pestle"></i></span>
-    <span class="manager-system-copy">
-      <span class="manager-essence-name-row">
-        <span class="manager-system-name" title="${essence.name}">${essence.name}</span>
-        ${disabledPill}
-      </span>
-      <span class="manager-system-description manager-essence-description">${essence.description}</span>
+    <span class="manager-essence-card-header">
+      <span class="fab-medallion has-tint" style="width:40px;height:40px;--fab-medallion-tint:var(--fab-tag-sage)"><i class="fas fa-mortar-pestle"></i></span>
+      <span class="manager-essence-capabilities">${pills}</span>
     </span>
-  </button>
-  <div class="manager-essence-cluster">
-    <span class="manager-essence-capabilities">${pills}</span>
+    <span class="manager-essence-name-row">
+      <span class="manager-system-name" title="${essence.name}">${essence.name}</span>
+      ${disabledPill}
+    </span>
+    <span class="manager-system-description manager-essence-description">${essence.description}</span>
     <span class="manager-essence-usage-readout">
-      <span class="manager-essence-usage-components${blocked}">${lock}${essence.components} components</span>
+      <span class="manager-essence-usage-components">${essence.components} components</span>
       <span>${essence.recipes} recipes</span>
     </span>
-    <label class="fab-selection-checkbox"><input type="checkbox" class="fab-selection-input"><span class="fab-selection-check is-lg"><i class="fas fa-check"></i></span></label>
-  </div>
+  </button>
+  <label class="fab-selection-checkbox"><input type="checkbox" class="fab-selection-input"><span class="fab-selection-check is-lg"><i class="fas fa-check"></i></span></label>
 </li>`;
 }
 

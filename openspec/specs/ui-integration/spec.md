@@ -675,7 +675,7 @@ Capabilities:
   The drop is refused when the macro's own type is not `script`, and the refusal is reported on the editing surface.
 - In Manager, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
 - Manager shows component usage evidence for essence definitions and shows source-link state only when `features.effectTransfer === true`.
-- Manager states component usage and recipe usage as two SEPARATE counts, because they answer different questions: components CARRY an essence and block its deletion, while recipes REQUIRE it and are rewritten by a deletion.
+- Manager states component usage and recipe usage as two SEPARATE counts, because they answer different questions: components CARRY an essence and recipes REQUIRE it, and deleting the essence strips it from every carrier and rewrites every referencing recipe.
 - Manager does not allow inline editing on the browse essences page, with one exception.
   The row's enable/disable toggle is a distinct localized named hit target, mirroring the Tools Tab's row switch; activating it neither selects the row nor opens the editor.
   Every other row edit still opens the dedicated edit essence view.
@@ -684,12 +684,12 @@ Capabilities:
   The editor's palette caption is the one exception and keeps its name: there the name labels the swatch the GM is choosing, and the No-colour cell has no tile to speak for it.
 - The essence library offers a list and a grid presentation of the same rows.
   The grid card carries the same state vocabulary as the list row — the Disabled marker, the capability markers and the usage counts — because a presentation toggle must not silently remove state.
+  In the grid card the capability markers sit in a header row beside the medallion rather than beside the usage counts, so the icon and what it can do read together; in the list row they stay in the trailing cluster and are NOT moved.
   Row actions are list-only; grid selection routes through the inspector.
-- Every grid card in a row is the same height regardless of its content or its position in the list, and that equality is structural rather than incidental.
-  Two things are required and neither is sufficient alone.
-  The grid stretches its cards and the card pushes its footer to the bottom of the height it is given, which levels the shelf; and the card carries NO margin, because Foundry core gives every `<li>` a bottom margin and exempts the last child, and a stretched grid sizes an item's margin box to its row — so the last card in the list silently takes its siblings' margin as extra height.
-  Each growable part of the card also states its own ceiling: the name truncates to one line with an ellipsis and keeps its full text as a title, the description keeps a fixed line clamp, and neither the name row nor the capability run wraps.
-  Equal height within a row does not cover a name that wraps, because every card in that row grows with it.
+- The grid card lays out as a FIXED vertical stack — a header pairing the medallion with the capability markers, then the name, then the description, then the usage counts — and every growable part states its own ceiling so the same element lands at the same vertical offset in every card and every card in a row is the same height.
+  The name truncates to one line with an ellipsis and keeps its full text as a title; the description keeps a fixed line clamp AND reserves that height even when it is shorter, so the usage counts beneath it are always at the same offset; and neither the name row nor the capability run wraps.
+  That equality is also structural rather than incidental: the grid stretches its cards, and the card carries NO margin, because Foundry core gives every `<li>` a bottom margin and exempts the last child, and a stretched grid sizes an item's margin box to its row — so the last card in the list would otherwise silently take its siblings' margin as extra height.
+  Equal height within a row does not cover a name that wraps, because every card in that row grows with it, which is why the name and description are bounded above.
 - An essence's linked active-effect source and linked property macro are presented exactly as the Tool Studio presents a linked Item: ONE card, carrying the linked document's image, its name, an instructional sub-line, and its actions as a grouped icon pair.
   The card is itself the drop target, so no second drop prompt renders beneath it — a card and a zone side by side state the same affordance twice.
   A sub-line states what the GM can do with the card; it never restates the card's own title or the raw uuid, which is what a copy-uuid action is for.
@@ -707,14 +707,12 @@ Capabilities:
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
 - A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
   Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
-- Manager prevents essence deletion while one or more managed components reference that essence with a positive quantity.
-  The same refusal applies to a SET delete: blocked members are excluded from the write and named in the panel, the action is inert when every selected member is blocked, and the refusal is enforced by the store rather than by a disabled control.
+- Manager allows essence deletion regardless of component usage: deletion is WARNED, not BLOCKED, because the cascade strips the essence from every carrying component and rewrites every referencing recipe. No delete is refused, and no set member is skipped, on account of the components carrying the essence, and the browser row shows the component count plainly with no delete-blocked marker.
+  Both delete forms state their impact before the GM commits. The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten.
 - A set delete states its impact before it is armed, and recomputes it when the selection changes.
   The statement reports how many essence definitions will be deleted, how many components carry one or more of the SELECTED essences, and how many recipes will be rewritten.
-  The component number is counted over the whole selection rather than over the deletable members, because a component carrying an essence is what blocks that essence's delete: counted over the deletable members it would be zero for every possible selection, stated directly above the callout naming the essences those same components keep.
-  It therefore explains the skip rather than contradicting it, and the copy says which set it counts.
+  The component number is counted over the whole selection as a DISTINCT-carrier union: a component carrying two selected essences counts once, because the cascade strips it in one pass, so the copy says "one or more of the selected essences" rather than a per-essence sum.
   The two carrier numbers are counts of DISTINCT carriers, so neither exceeds what the cascade will touch.
-  The named blocked members are capped, with the remainder reported as a count, so selecting every essence in the system cannot put every name in one callout.
 - The set delete uses the two-step armed confirmation rather than a modal dialog.
   This is a deliberate exception to the reserved-for-bulk-actions dialog rule, taken on an explicit maintainer decision, and it is paired with the impact statement above.
 - Manager source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.

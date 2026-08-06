@@ -65,7 +65,6 @@ const CONFIGURED_DISABLED = makeEssenceRow({
   recipeUsageCount: 1,
   recipeUsageIds: ['r1'],
   deleteRewritesRecipes: true,
-  deleteBlocked: true,
 });
 const PLAIN_ENABLED = makeEssenceRow({ id: 'water', name: 'Water' });
 
@@ -103,10 +102,9 @@ function vocabularyOf(root, id) {
     // deliberately REMOVED, so a re-added one has to fail rather than pass as "more state".
     colourChip: Boolean(row.querySelector('[data-essence-colour]')),
     disabledWord: row.textContent.includes('Disabled'),
+    // The component count renders PLAINLY now (issue 1036, maintainer round): deletion is
+    // warned, not blocked, so there is no padlock on this number and the grid must match.
     components: row.querySelector('[data-essence-usage-components]').textContent.trim(),
-    // The BLOCKED-FROM-DELETE marker, which is part of the vocabulary the grid must carry
-    // too — the inspector shows one essence at a time and cannot stand in for it.
-    blocked: row.querySelector('[data-essence-usage-components]').dataset.essenceDeleteBlocked,
     recipes: row.querySelector('[data-essence-usage-recipes]').textContent.trim(),
   };
 }
@@ -132,7 +130,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     assert.deepEqual(asList.capabilityStates, ['ok', 'ok'], 'a resolving source is not warned about');
     assert.equal(asList.colour, 'lavender', 'the tinted tile carries the colour');
     assert.equal(asList.colourChip, false, 'and no chip restates it as a word');
-    assert.equal(asList.blocked, 'true', 'a carried essence says it cannot be deleted');
+    assert.match(asList.components, /2/, 'the component count renders plainly, no padlock');
     assert.match(asList.recipes, /1/);
 
     root.querySelector('[data-essence-view-option="grid"] input').click();
@@ -175,19 +173,16 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
     harness.remount();
   });
 
-  it('marks BLOCKED-from-delete and a BROKEN source on the row, in BOTH presentations', async () => {
-    // Two states the shipped surfaces reported and the redesign must not lose. Both live
-    // on the row rather than in the inspector, because the inspector shows one essence at a
-    // time — and the grid card is the same component, so it carries them by construction.
+  it('marks a BROKEN source on the row in BOTH presentations, and NEVER a delete padlock', async () => {
+    // The broken-source pill is a state the shipped surfaces reported and the redesign must
+    // not lose; the delete padlock is one the maintainer removed, because deletion is warned
+    // rather than blocked. Both facts must hold on the grid card too, since it is the same
+    // component and the inspector shows one essence at a time.
     const brokenSource = makeEssenceRow({ id: 'ember', name: 'Ember', sourceState: 'stale' });
     const root = await harness.mount(props([CONFIGURED_DISABLED, PLAIN_ENABLED, brokenSource]));
 
-    assert.equal(vocabularyOf(root, 'aether').blocked, 'true');
-    assert.equal(
-      vocabularyOf(root, 'water').blocked,
-      'false',
-      'negative control: a deletable row carries no lock, so the marker is not always on'
-    );
+    const padlocks = () => root.querySelectorAll('[data-essence-usage-components] .fa-lock');
+    assert.equal(padlocks().length, 0, 'a carried essence renders no delete padlock any more');
     assert.deepEqual(
       vocabularyOf(root, 'ember').capabilityStates,
       ['broken'],
@@ -201,7 +196,7 @@ describe('1036 EssenceBrowserView — rows, cards and presentation', () => {
 
     root.querySelector('[data-essence-view-option="grid"] input').click();
     flushSync();
-    assert.equal(vocabularyOf(root, 'aether').blocked, 'true', 'the card keeps the lock');
+    assert.equal(padlocks().length, 0, 'and the card carries no padlock either');
     assert.deepEqual(vocabularyOf(root, 'ember').capabilityStates, ['broken']);
     harness.remount();
   });
