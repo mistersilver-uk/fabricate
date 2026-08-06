@@ -122,10 +122,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
       'the grid stretches every card to its row'
     );
     assert.ok(
-      /\.manager-essence-row\.is-card \.manager-essence-cluster \{[^}]*margin-top: auto;/s.test(
+      /\.manager-essence-row\.is-card \.manager-essence-description \{[^}]*min-height: calc\(1\.4em \* 3\);/s.test(
         styleBlock(rowSource)
       ),
-      'and the card pushes its footer to the bottom of the height it was given'
+      'and the card reserves a fixed 3-line description box so every card is the same height regardless of content'
     );
     // Neither of the two above is SUFFICIENT, which is the whole lesson of the maintainer's
     // second round: both declarations were already in place while the published frame showed

@@ -3680,9 +3680,9 @@ test('manager essence edit route defines a tabbed two-row shell', () => {
   );
   assert.ok(
     editGridBlock.includes(
-      'grid-template-columns: var(--fab-mv2-essence-icon-column, 176px) minmax(0, 1fr);'
+      'grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);'
     ),
-    'essence edit identity fields should reserve stable icon picker space'
+    'essence edit identity fields should reserve stable square-icon picker space'
   );
   // TWO tracks. The third reserved an inline clear button that no surface renders any more
   // (issue 1036, maintainer round 2): the editor's linked source is the shared `ItemDropZone`

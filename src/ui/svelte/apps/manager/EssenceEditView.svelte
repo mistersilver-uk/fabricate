@@ -258,7 +258,6 @@
       componentUsageCount: essence?.componentUsageCount || 0,
       componentUsageItems: essence?.componentUsageItems || [],
       recipeUsageCount: essence?.recipeUsageCount || 0,
-      deleteBlocked: essence?.deleteBlocked === true,
       dirty,
       validName,
     };
