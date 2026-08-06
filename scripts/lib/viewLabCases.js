@@ -1743,6 +1743,20 @@ export const VIEW_LAB_CASES = Object.freeze([
   // essences carry a distinct colour with `air` deliberately unset, and `aether` is DISABLED while
   // two components carry it and one recipe requires it — the feature's headline state, which no
   // existing fixture could reach.
+  //
+  // One more pattern joined the set for `InspectorActionButton.svelte` (issue 1036's Duplicate /
+  // Edit / Delete / Copy source UUID / Unlink extraction). It sits directly under `apps/manager/`,
+  // not `apps/manager/essences/`, so the directory glob above does not reach it on its own — and it
+  // is deliberately NOT in `MANAGER_PRIMITIVES` below. `MANAGER_PRIMITIVES` membership is for a
+  // primitive several studios render (see the comment above that list); today this one has exactly
+  // one consumer, `EssenceBrowserInspector.svelte`, which makes it a narrow signal rather than a
+  // broad one. The recipe, component and gathering inspectors are its planned remaining consumers —
+  // a follow-up, not yet built — and the pattern moves to `MANAGER_PRIMITIVES` when they adopt it,
+  // rather than being copied onto three more case arrays now for consumers that do not exist yet.
+  // It is added only to the four cases below that actually put an essence in the inspector —
+  // `manager-essences-normal`, `-stacked`, `-disabled-in-use` and `-grid` — not to the bulk-edit
+  // pair, whose rail shows `EssenceBulkEditPanel` instead, and not to the `essence-edit` cases,
+  // whose rail shows `EssenceBehaviorPreview` instead: neither renders this component.
   managerCase({
     id: 'manager-essences-normal',
     label: 'Manager — Essences normal',
@@ -1755,6 +1769,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
@@ -1777,6 +1792,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
@@ -1802,6 +1818,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
@@ -1835,6 +1852,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
