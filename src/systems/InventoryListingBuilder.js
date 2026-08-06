@@ -883,6 +883,10 @@ export class InventoryListingBuilder {
         name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
         img: null,
         icon: stringOrNull(def?.icon),
+        // The essence's chosen palette token (a bare `--fab-tag-*` key, or null when unset)
+        // so the player tile can tint its glyph to the essence colour, mirroring the
+        // manager Medallion. Unset stays null → the card falls back to the accent.
+        colorToken: stringOrNull(def?.colorToken),
         tags: [],
         tier: null,
         isEssenceSource: true,

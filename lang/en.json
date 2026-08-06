@@ -2917,7 +2917,7 @@
           },
           "Preview": {
             "Label": "Essence behaviour preview",
-            "Kicker": "How it appears",
+            "Kicker": "How players see it",
             "InventoryTile": "As an inventory tile",
             "OnAComponent": "On a component",
             "Effective": "Effective behaviour",

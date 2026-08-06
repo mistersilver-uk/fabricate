@@ -338,6 +338,42 @@ describe('InventoryView (mounted)', () => {
     assert.ok(card.querySelector('[data-inventory-pip="tool"]'), 'renders a tool pip');
   });
 
+  // Issue 1036: an essence tile renders its glyph in the essence's CHOSEN colour when the
+  // definition carries one, by emitting the `--fab-essence-tint` inline custom property the
+  // tile's `color: var(--fab-essence-tint, var(--fab-accent))` reads — theme-aware because it
+  // resolves through a `--fab-tag-*` token.
+  it('tints the essence glyph tile to the essence colour when colorToken is set', async () => {
+    const item = makeEssenceItem();
+    item.colorToken = '--fab-tag-mauve';
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const tile = target.querySelector('[data-inventory-card="sys:fire"] .inventory-card-essence');
+    assert.ok(tile, 'renders the essence glyph tile');
+    assert.equal(tile.getAttribute('data-inventory-essence-tint'), 'mauve');
+    assert.match(
+      tile.getAttribute('style') || '',
+      /--fab-essence-tint:\s*var\(--fab-tag-mauve\)/,
+      'emits the tint custom property so the glyph paints the essence colour'
+    );
+    assert.ok(tile.classList.contains('has-tint'), 'gates the surface wash on a real tint');
+  });
+
+  // The accent fallback path: an essence with no chosen colour emits NO inline var, so the
+  // tile's `var()` fallback paints `--fab-accent` exactly as it did before issue 1036.
+  it('emits no tint var on an essence with no chosen colour (accent fallback)', async () => {
+    const { services } = makeServices(makeEssenceItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const tile = target.querySelector('[data-inventory-card="sys:fire"] .inventory-card-essence');
+    assert.ok(tile, 'renders the essence glyph tile');
+    assert.equal(tile.hasAttribute('data-inventory-essence-tint'), false);
+    assert.doesNotMatch(tile.getAttribute('style') || '', /--fab-essence-tint/);
+    assert.equal(tile.classList.contains('has-tint'), false);
+  });
+
   // D14: the prototype puts the salvageable and tool badges at ONE slot, which is only
   // safe there because no prototype fixture item is both. Fabricate's flags are
   // orthogonal and a broken salvageable tool is the headline case, so both-true must

@@ -89,7 +89,12 @@
   // carrier when one exists (`sampleComponentName`), and the schematic fallback otherwise.
   const previewRows = $derived(
     buildEssencePreviewRow(
-      { id: essence?.id, name, icon: essence?.icon || 'fas fa-mortar-pestle' },
+      {
+        id: essence?.id,
+        name,
+        icon: essence?.icon || 'fas fa-mortar-pestle',
+        colorToken: essence?.colorToken || null,
+      },
       {
         sampleComponentName:
           sampleComponentName ||
@@ -107,7 +112,7 @@
   {#if showIdentity}
     <div class="manager-essence-preview-appears-head">
       <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.Essence.Preview.Kicker', 'How it appears')}
+        {text('FABRICATE.Admin.Manager.Essence.Preview.Kicker', 'How players see it')}
       </p>
       {#if disabled}
         <StatusPill

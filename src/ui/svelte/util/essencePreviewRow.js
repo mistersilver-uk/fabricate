@@ -23,7 +23,7 @@ function str(value) {
 /**
  * Build the essence-tile + carrying-component preview rows for the "How it appears" card.
  *
- * @param {object} [essence] the live essence draft — `{ id, name, icon }`.
+ * @param {object} [essence] the live essence draft — `{ id, name, icon, colorToken }`.
  * @param {object} [options]
  * @param {string} [options.sampleComponentName] display name for the fake carrying
  *   component (the caller resolves the fallback copy, so this may be empty).
@@ -40,6 +40,10 @@ export function buildEssencePreviewRow(
   const id = str(essence?.id) || null;
   const name = str(essence?.name);
   const icon = str(essence?.icon) || null;
+  // The essence's chosen palette token (a bare `--fab-tag-*` key, or null when unset), shaped
+  // exactly like `InventoryListingBuilder._buildEssenceRows` emits, so the mounted essence tile
+  // tints its glyph to the essence colour identically to the real player inventory.
+  const colorToken = str(essence?.colorToken) || null;
 
   // The essence pip the carrying component's card reads: the essence's own id, name and
   // authored icon, shaped exactly like the `essences[]` entries the builder folds onto a
@@ -56,6 +60,7 @@ export function buildEssencePreviewRow(
     name,
     img: null,
     icon,
+    colorToken,
     tags: [],
     tier: null,
     isEssenceSource: true,
@@ -81,6 +86,10 @@ export function buildEssencePreviewRow(
     name: str(sampleComponentName),
     img: GENERIC_ITEM_IMAGE,
     icon: null,
+    // A carrying component has no essence colour of its own (its face is artwork, and the
+    // card ignores `colorToken` on a non-essence row); carried null purely to keep both
+    // preview rows the single builder-row shape the card contract reads.
+    colorToken: null,
     tags: [],
     tier: null,
     isEssenceSource: false,

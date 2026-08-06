@@ -111,6 +111,35 @@ describe('EssenceBehaviorPreview — "How it appears" mounts the real player til
     harness.remount();
   });
 
+  it('tints the preview essence tile to the essence colour when one is chosen', async () => {
+    // Issue 1036: the preview mounts the REAL player tile, so a coloured essence's tile paints
+    // its glyph in the chosen colour here exactly as it does in the player app — the
+    // `colorToken` reaches `buildEssencePreviewRow`, which shapes it onto the mounted row.
+    const root = await harness.mount({
+      essence: makeEssenceRow({ id: 'fire', name: 'Fire', colorToken: '--fab-tag-mauve' }),
+    });
+    const tile = root.querySelector('[data-essence-preview-tile] .inventory-card-essence');
+    assert.ok(tile, 'the essence tile renders');
+    assert.equal(tile.getAttribute('data-inventory-essence-tint'), 'mauve');
+    assert.match(
+      tile.getAttribute('style') || '',
+      /--fab-essence-tint:\s*var\(--fab-tag-mauve\)/,
+      'the real tile carries the tint var, so the preview matches the player app'
+    );
+    harness.remount();
+  });
+
+  it('leaves the preview essence tile untinted (accent) when the essence has no colour', async () => {
+    const root = await harness.mount({
+      essence: makeEssenceRow({ id: 'fire', name: 'Fire' }),
+    });
+    const tile = root.querySelector('[data-essence-preview-tile] .inventory-card-essence');
+    assert.ok(tile, 'the essence tile renders');
+    assert.equal(tile.hasAttribute('data-inventory-essence-tint'), false);
+    assert.doesNotMatch(tile.getAttribute('style') || '', /--fab-essence-tint/);
+    harness.remount();
+  });
+
   it('flags a disabled essence with the Disabled pill in the card header', async () => {
     const root = await harness.mount({
       essence: makeEssenceRow({ id: 'aether', name: 'Aether', enabled: false }),

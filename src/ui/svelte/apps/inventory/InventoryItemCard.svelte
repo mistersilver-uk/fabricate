@@ -61,6 +61,21 @@
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
   );
+  // Issue 1036: the essence glyph tile renders in the essence's CHOSEN colour when one is set,
+  // and stays the theme accent when it is not — mirroring the manager `Medallion` tint. The
+  // token arrives as a bare `--fab-tag-*` palette key (the leading prefix is tolerated exactly
+  // as Medallion does, since the builder and the picker both accept either spelling) and is
+  // interpolated into a `style` custom property, so it is constrained to the shape a key can
+  // have. Anything else DROPS to '' → no inline var is emitted → the CSS `var()` fallback paints
+  // the accent, byte-identical to the pre-1036 render.
+  const essenceTint = $derived(
+    /^[a-z0-9-]+$/.test(String(item?.colorToken || '').replace(/^--fab-tag-/, ''))
+      ? String(item.colorToken).replace(/^--fab-tag-/, '')
+      : ''
+  );
+  const essenceTintStyle = $derived(
+    essenceTint ? `--fab-essence-tint:var(--fab-tag-${essenceTint})` : undefined
+  );
   const quantityLabel = $derived(`×${quantity}`);
   // At-a-glance badges (component rows only): salvageable, tool. Essence rows carry
   // neither. `broken` is a read-only verdict decided builder-side — it does NOT gate
@@ -120,7 +135,13 @@
     <span class="inventory-card-thumb">
       <span class="inventory-card-art" class:is-dimmed={broken}>
         {#if isEssence}
-          <span class="inventory-card-essence" aria-hidden="true">
+          <span
+            class="inventory-card-essence"
+            class:has-tint={Boolean(essenceTint)}
+            data-inventory-essence-tint={essenceTint || undefined}
+            style={essenceTintStyle}
+            aria-hidden="true"
+          >
             <i class={icon}></i>
           </span>
         {:else}
@@ -335,15 +356,26 @@
     opacity: 0.55;
   }
 
-  /* Essence tile / image fallback: the item's own glyph on the thumb fill. */
+  /* Essence tile / image fallback: the item's own glyph on the thumb fill. Issue 1036: the
+     glyph reads its colour through a `var()` FALLBACK, so an essence with no chosen colour
+     resolves to exactly the `var(--fab-accent)` it painted before — while a coloured essence
+     tints to its `--fab-tag-*` token (theme-aware, since the tokens are redefined per theme). */
   .inventory-card-essence {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 100%;
     height: 100%;
-    color: var(--fab-accent);
+    color: var(--fab-essence-tint, var(--fab-accent));
     font-size: 18px;
+  }
+
+  /* The subtle surface wash, CLASS-GATED rather than folded into the base rule so it is a
+     genuine no-op when unset (a `color-mix` against an unset property would tint every essence
+     tile). Mirrors the manager `Medallion` wash so the player tile and the manager tile read
+     the same side by side. */
+  .inventory-card-essence.has-tint {
+    background: color-mix(in srgb, var(--fab-essence-tint) 14%, var(--fab-bg-3));
   }
 
   .inventory-card-broken-wash {

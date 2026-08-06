@@ -16,6 +16,7 @@ const EXPECTED_KEYS = [
   'name',
   'img',
   'icon',
+  'colorToken',
   'tags',
   'tier',
   'isEssenceSource',
@@ -31,7 +32,7 @@ const EXPECTED_KEYS = [
   'contributors',
 ];
 
-const FIRE = { id: 'fire', name: 'Fire', icon: 'fas fa-fire' };
+const FIRE = { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: '--fab-tag-mauve' };
 
 test('both rows carry exactly the builder essence-row keys', () => {
   const { essence, component } = buildEssencePreviewRow(FIRE, { sampleComponentName: 'Ember Ash' });
@@ -54,9 +55,19 @@ test('the essence-tile row is an essence SOURCE with a null image so the card re
   assert.equal(essence.icon, 'fas fa-fire', "the essence's own authored glyph");
   assert.equal(essence.name, 'Fire');
   assert.equal(essence.componentId, 'fire');
+  assert.equal(
+    essence.colorToken,
+    '--fab-tag-mauve',
+    "the essence's chosen colour so the mounted tile tints its glyph identically to the player app"
+  );
   // The preview owns one copy — no count the store cannot produce is invented.
   assert.equal(essence.totalQuantity, 1);
   assert.deepEqual(essence.essences, [], 'an essence source carries no pips of its own');
+});
+
+test('an essence with no chosen colour yields a null colorToken (the tile keeps the accent)', () => {
+  const { essence } = buildEssencePreviewRow({ id: 'fire', name: 'Fire', icon: 'fas fa-fire' });
+  assert.equal(essence.colorToken, null);
 });
 
 test('the carrying-component row is a normal item on a CORE Foundry icon, carrying the essence pip', () => {

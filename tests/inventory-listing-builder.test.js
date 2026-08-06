@@ -331,6 +331,34 @@ describe('InventoryListingBuilder — used-by index', () => {
     assert.equal(fire.usedBy[0].recipeId, 'r1');
   });
 
+  it('carries the essence definition colorToken on the essence row (null when unset)', () => {
+    // Issue 1036: the player essence tile tints its glyph to the essence's chosen colour, so
+    // the synthetic per-essence row now carries the definition's `colorToken` (a bare
+    // `--fab-tag-*` key), normalized to null when the essence has no chosen colour.
+    const { builder } = makeBuilder({
+      systems: [
+        makeSystem({
+          essenceDefinitions: [
+            { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: '--fab-tag-mauve' },
+            { id: 'earth', name: 'Earth', icon: 'fas fa-mountain' },
+          ],
+          components: [
+            { id: 'c1', name: 'Iron', img: 'icons/iron.webp', essences: { fire: 2 } },
+            { id: 'c2', name: 'Loam', img: 'icons/loam.webp', essences: { earth: 1 } },
+          ],
+          tools: [],
+        }),
+      ],
+    });
+    const listing = builder.buildListing({
+      craftingActor: actor('a1', 'Akra', [item('Iron', 1), item('Loam', 1)]),
+    });
+    const fire = listing.rows.find((r) => r.isEssenceSource && r.componentId === 'fire');
+    const earth = listing.rows.find((r) => r.isEssenceSource && r.componentId === 'earth');
+    assert.equal(fire.colorToken, '--fab-tag-mauve');
+    assert.equal(earth.colorToken, null);
+  });
+
   it('marks a component as used by a recipe that requires an essence it carries', () => {
     // A recipe that requires fire essence but never names Iron as an ingredient.
     const recipe = {
