@@ -707,8 +707,10 @@ Capabilities:
   With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
 - A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
   Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
-- Manager allows essence deletion regardless of component usage: deletion is WARNED, not BLOCKED, because the cascade strips the essence from every carrying component and rewrites every referencing recipe. No delete is refused, and no set member is skipped, on account of the components carrying the essence, and the browser row shows the component count plainly with no delete-blocked marker.
-  Both delete forms state their impact before the GM commits. The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten.
+- Manager allows essence deletion regardless of component usage: deletion is WARNED, not BLOCKED, because the cascade strips the essence from every carrying component and rewrites every referencing recipe.
+  No delete is refused, and no set member is skipped, on account of the components carrying the essence, and the browser row shows the component count plainly with no delete-blocked marker.
+  Both delete forms state their impact before the GM commits.
+  The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten.
 - A set delete states its impact before it is armed, and recomputes it when the selection changes.
   The statement reports how many essence definitions will be deleted, how many components carry one or more of the SELECTED essences, and how many recipes will be rewritten.
   The component number is counted over the whole selection as a DISTINCT-carrier union: a component carrying two selected essences counts once, because the cascade strips it in one pass, so the copy says "one or more of the selected essences" rather than a per-essence sum.
