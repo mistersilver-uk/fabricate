@@ -5356,8 +5356,8 @@ export class CraftingSystemManager {
     system.essenceDefinitions = definitions.filter((def) => def.id !== essenceId);
     system.essences = system.essenceDefinitions.map((def) => def.id);
 
-    // Defensively strip the essence from any component that still carries it. The UI blocks
-    // deleting an in-use essence, but the manager must not leave dangling component references.
+    // Strip the essence from any component that still carries it. Deletion is warned, not
+    // blocked, so this cascade is what keeps component references from dangling after a delete.
     for (const component of system.components || []) {
       if (component.essences && essenceId in component.essences) {
         delete component.essences[essenceId];
@@ -5495,9 +5495,9 @@ export class CraftingSystemManager {
    * this loop with `essenceDefinitions` and the component essence maps already mutated in
    * memory, some recipes written, and nothing persisted.
    *
-   * Blocked-in-use refusal is NOT enforced here. `deleteBlocked` is a UI-only card field and
-   * {@link CraftingSystemManager#deleteEssence} deliberately strips the essence from carrying
-   * components regardless of it; the caller partitions the selection before calling.
+   * In-use essences are NOT refused. Deletion is warned, not blocked:
+   * {@link CraftingSystemManager#deleteEssence} strips the essence from every carrying component
+   * and the caller deletes every selected id, stating the component and recipe impact first.
    *
    * @param {string} systemId
    * @param {Iterable<string>} essenceIds
