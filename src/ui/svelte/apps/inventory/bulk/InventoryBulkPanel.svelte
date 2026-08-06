@@ -635,9 +635,11 @@
   }
 
   .bulk-footer-note {
-    /* Takes any room left over beside the actions, but is never sized below its basis:
-       that is what makes the row wrap instead of crushing the note. */
-    flex: 1 1 22em;
+    /* MUST stay `auto`-basis. The footer is a COLUMN, so flex-basis is a HEIGHT here —
+       a row-style `flex: 1 1 22em` inflates the note to a ~22em-tall box, and because
+       the footer is `position: sticky` it then paints over the yield rows behind it,
+       hiding every row but the first (issue 859). Sized by its own text, nothing more. */
+    flex: 0 0 auto;
     margin: 0;
     min-width: 0;
     font-size: 10.5px;

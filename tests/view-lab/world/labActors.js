@@ -183,6 +183,16 @@ const INVENTORIES = {
     'jw-wire': 2,
     'rw-bar': 2,
     'rw-chalk': 4,
+    // The world's only WORKING routed salvage (`rw-slag` — Jewelry's routed config is the
+    // misconfigured fixture). It was deliberately unstocked because a salvage config grows
+    // a salvage panel in the inventory detail; it is stocked now because the bulk panel's
+    // routed mode is otherwise unreachable and therefore unphotographable (issue 859).
+    // Kept at ×2 so it reads as a real holding without disturbing any quantity assertion.
+    'rw-slag': 2,
+    // Its required tool. Without this the row is BLOCKED on `toolsUnavailable` rather than
+    // queued, which is a different frame entirely — the tools-blocked case already owns that
+    // one, and routed mode would have stayed unphotographable.
+    'rw-tool-mallet': 1,
     // ONE stack, registered as a component in TWO systems (see SHARED_AIR_SHARD_UUID). ×1 on
     // purpose: the collapse contract is a single card whose quantity is counted ONCE, and a ×2
     // stack would hide a double-count rather than disprove it.

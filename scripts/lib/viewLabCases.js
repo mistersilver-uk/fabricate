@@ -2801,6 +2801,83 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has([data-inventory-bulk-salvage][disabled])' +
       ':has([data-inventory-bulk-destroy]:not([disabled]))',
   }),
+  // ONE FRAME PER SALVAGE RESOLUTION MODE, plus one carrying all three at once.
+  //
+  // The mode is a property of the SYSTEM, not the component, so each of these selects from a
+  // different crafting system: Karrun Forgecraft is `simple` (and authors no salvage check at
+  // all, so it is the no-roll case), Ashfall Runework is `routed`, Sablewright Herbalism is
+  // `progressive`. Sablewright Jewellers is also routed but authors no check — that is the
+  // MISCONFIGURED fixture, covered by `player-salvage-misconfigured`, and it is deliberately
+  // not one of these.
+  //
+  // A single shift-click is a legal one-row bulk selection (the promotion only fires when a
+  // DIFFERENT card is already inspected), which is what lets each mode be shown alone rather
+  // than competing with two others in the same queue.
+  //
+  // Each raises the page size first: the grid is 25 per page and these cards are spread across
+  // the alphabet, so page-one membership is not something to assume.
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-mode-simple',
+    label: 'Player app — Inventory bulk salvage, simple mode',
+    steps: [
+      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      SHIFT_CLICK('lab-smithing:sm-longsword'),
+    ],
+    // Guaranteed, because simple with no authored roll formula awards its whole result set
+    // outright — the certainty chip is the visible difference from the other two modes.
+    expectSelector:
+      '[data-inventory-bulk-panel="preview"]' +
+      ':has([data-inventory-bulk-queue-row="lab-smithing:sm-longsword"])' +
+      ':has([data-inventory-bulk-yield] [data-status-pill="success"])',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-mode-routed',
+    label: 'Player app — Inventory bulk salvage, routed mode',
+    steps: [
+      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      SHIFT_CLICK('lab-runework:rw-slag'),
+    ],
+    expectSelector:
+      '[data-inventory-bulk-panel="preview"]' +
+      ':has([data-inventory-bulk-queue-row="lab-runework:rw-slag"])',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-mode-progressive',
+    label: 'Player app — Inventory bulk salvage, progressive mode',
+    steps: [
+      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
+    ],
+    // Progressive is the one mode that honours a player's saved stage order, so this is also
+    // the frame that carries the footer's reorder note.
+    expectSelector:
+      '[data-inventory-bulk-panel="preview"]' +
+      ':has([data-inventory-bulk-queue-row="lab-herbalism:hb-cracked-alembic"])' +
+      ':has([data-inventory-bulk-reorder-note])',
+  }),
+  playerCase({
+    ...BULK_DEFAULTS,
+    id: 'player-inventory-bulk-all-modes',
+    label: 'Player app — Inventory bulk salvage across all three resolution modes',
+    // One of each, in one queue, across three systems — the case the other three exist to be
+    // read against. It is also the only frame where the aggregate yield sums contributions
+    // from three differently-resolved ladders, which is where same-named components from
+    // different systems would collapse if the preview keyed on name rather than id.
+    steps: [
+      { selector: '.inventory-grid-pagination [data-pagination-size]', select: '75' },
+      SHIFT_CLICK('lab-smithing:sm-longsword'),
+      SHIFT_CLICK('lab-runework:rw-slag'),
+      SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
+    ],
+    expectSelector:
+      '[data-inventory-bulk-panel="preview"]' +
+      ':has([data-inventory-bulk-queue-row="lab-smithing:sm-longsword"])' +
+      ':has([data-inventory-bulk-queue-row="lab-runework:rw-slag"])' +
+      ':has([data-inventory-bulk-queue-row="lab-herbalism:hb-cracked-alembic"])',
+  }),
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-tools-blocked',
