@@ -186,6 +186,20 @@ function actorQuantityOf(row, actorId) {
   return Number(row?.totalQuantity ?? 0);
 }
 
+/**
+ * The identity a yield row aggregates under. Component IDENTITY, never its display
+ * name: two distinct components can legitimately share a name (and do — a ladder
+ * yielding same-named results collapsed them into one row, hiding real components
+ * from the preview). Falls back to a name-derived key ONLY when a projection carries
+ * no id at all, which keeps such a row visible instead of merging it into the first
+ * nameless one.
+ */
+function yieldKeyOf(entry) {
+  const componentId = entry?.componentId;
+  if (typeof componentId === 'string' && componentId !== '') return componentId;
+  return `name:${String(entry?.name ?? '')}`;
+}
+
 /** Best-case one-unit-per-row yield contribution of a SIMPLE salvage config. */
 function simpleYieldRows(salvage) {
   const results = Array.isArray(salvage?.results) ? salvage.results : [];
@@ -193,6 +207,7 @@ function simpleYieldRows(salvage) {
   return results.map((result) => {
     const quantity = Number(result?.quantity) || 0;
     return {
+      componentId: result?.componentId ?? null,
       name: String(result?.name ?? ''),
       img: result?.img ?? null,
       quantity,
@@ -217,29 +232,35 @@ function routedYieldRows(salvage) {
   const guaranteedEligible =
     outcomes.length > 0 && !hasFailureTier && salvage?.routedType !== 'fixed';
 
-  const quantityFor = (outcome, name) =>
+  const quantityFor = (outcome, key) =>
     (outcome?.results || [])
-      .filter((result) => result?.name === name)
+      .filter((result) => yieldKeyOf(result) === key)
       .reduce((sum, result) => sum + (Number(result?.quantity) || 0), 0);
 
-  const byName = new Map();
+  const byKey = new Map();
   for (const outcome of successOutcomes) {
     for (const result of outcome.results || []) {
-      const name = String(result?.name ?? '');
-      if (!byName.has(name)) {
-        byName.set(name, { name, img: result?.img ?? null, quantity: 0, guaranteedQuantity: 0 });
+      const key = yieldKeyOf(result);
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          componentId: result?.componentId ?? null,
+          name: String(result?.name ?? ''),
+          img: result?.img ?? null,
+          quantity: 0,
+          guaranteedQuantity: 0,
+        });
       }
     }
   }
-  for (const [name, row] of byName) {
-    row.quantity = Math.max(0, ...successOutcomes.map((outcome) => quantityFor(outcome, name)));
+  for (const [key, row] of byKey) {
+    row.quantity = Math.max(0, ...successOutcomes.map((outcome) => quantityFor(outcome, key)));
     if (guaranteedEligible) {
       row.guaranteedQuantity = Math.min(
-        ...successOutcomes.map((outcome) => quantityFor(outcome, name))
+        ...successOutcomes.map((outcome) => quantityFor(outcome, key))
       );
     }
   }
-  return [...byName.values()];
+  return [...byKey.values()];
 }
 
 /**
@@ -249,20 +270,21 @@ function routedYieldRows(salvage) {
  */
 function progressiveYieldRows(salvage) {
   const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
-  const byName = new Map();
+  const byKey = new Map();
   for (const stage of stages) {
     if (stage?.threshold === null) continue;
-    const name = String(stage?.name ?? '');
-    const row = byName.get(name) ?? {
-      name,
+    const key = yieldKeyOf(stage);
+    const row = byKey.get(key) ?? {
+      componentId: stage?.componentId ?? null,
+      name: String(stage?.name ?? ''),
       img: stage?.img ?? null,
       quantity: 0,
       guaranteedQuantity: 0,
     };
     row.quantity += 1;
-    byName.set(name, row);
+    byKey.set(key, row);
   }
-  return [...byName.values()];
+  return [...byKey.values()];
 }
 
 /**
@@ -563,6 +585,13 @@ export function createInventoryStore({ services } = {}) {
         blocked: blockedReason !== null,
         blockedReason,
         missingTools: blockedReason === 'toolsUnavailable' ? missingToolNames(salvage) : [],
+        // The row's resolution mode, and whether THIS component honours the player's
+        // stored stage order. The engine captures that order per `(systemId, componentId)`
+        // at run start inside `salvage()`, which the bulk service calls once per queued
+        // row — so a bulk run already respects each row's own order. The panel surfaces
+        // it because nothing else on this screen tells the player that (issue 859).
+        mode: salvage?.mode ?? null,
+        allowsReorder: salvage?.mode === 'progressive' && salvage?.allowPlayerResultReorder !== false,
         yieldRows: blockedReason === null ? yieldRowsFor(salvage) : [],
       };
     })
@@ -594,10 +623,12 @@ export function createInventoryStore({ services } = {}) {
   // summed INDEPENDENTLY per component name (two rows can yield the same component
   // at different certainties). Sorted by name.
   const bulkYieldPreview = $derived.by(() => {
-    const byName = new Map();
+    const byKey = new Map();
     for (const entry of bulkSalvageable) {
       for (const row of entry.yieldRows) {
-        const existing = byName.get(row.name) ?? {
+        const key = yieldKeyOf(row);
+        const existing = byKey.get(key) ?? {
+          componentId: row.componentId ?? null,
           name: row.name,
           img: row.img,
           quantity: 0,
@@ -606,10 +637,10 @@ export function createInventoryStore({ services } = {}) {
         existing.quantity += row.quantity;
         existing.guaranteedQuantity += row.guaranteedQuantity;
         if (!existing.img && row.img) existing.img = row.img;
-        byName.set(row.name, existing);
+        byKey.set(key, existing);
       }
     }
-    return [...byName.values()].sort((left, right) => left.name.localeCompare(right.name));
+    return [...byKey.values()].sort((left, right) => left.name.localeCompare(right.name));
   });
 
   const bulkActive = $derived(bulkSelectedKeys.length > 0);

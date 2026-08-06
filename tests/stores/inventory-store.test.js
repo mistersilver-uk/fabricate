@@ -1573,7 +1573,7 @@ describe('inventoryStore', () => {
       // Row shape 1 — `guaranteed === quantity > 0`, the commonest configuration by far,
       // which the panel renders with a Guaranteed pill and NO "up to" affix.
       assert.deepEqual(preview, [
-        { name: 'Shard', img: 'icons/shard.webp', quantity: 2, guaranteedQuantity: 2 },
+        { componentId: null, name: 'Shard', img: 'icons/shard.webp', quantity: 2, guaranteedQuantity: 2 },
       ]);
     });
 
@@ -1587,7 +1587,7 @@ describe('inventoryStore', () => {
       );
       // Row shape 3 — `guaranteed === 0`, which the panel renders as Possible.
       assert.deepEqual(preview, [
-        { name: 'Shard', img: 'icons/shard.webp', quantity: 2, guaranteedQuantity: 0 },
+        { componentId: null, name: 'Shard', img: 'icons/shard.webp', quantity: 2, guaranteedQuantity: 0 },
       ]);
     });
 
@@ -1609,7 +1609,7 @@ describe('inventoryStore', () => {
           ],
         })
       );
-      assert.deepEqual(preview, [{ name: 'Shard', img: null, quantity: 4, guaranteedQuantity: 0 }]);
+      assert.deepEqual(preview, [{ componentId: null, name: 'Shard', img: null, quantity: 4, guaranteedQuantity: 0 }]);
     });
 
     it('routed with ONLY success tiers: a guaranteed floor below the best case', async () => {
@@ -1627,7 +1627,7 @@ describe('inventoryStore', () => {
           ],
         })
       );
-      assert.deepEqual(preview, [{ name: 'Shard', img: null, quantity: 5, guaranteedQuantity: 2 }]);
+      assert.deepEqual(preview, [{ componentId: null, name: 'Shard', img: null, quantity: 5, guaranteedQuantity: 2 }]);
     });
 
     it('routed FIXED guarantees nothing even with only success tiers', async () => {
@@ -1644,7 +1644,7 @@ describe('inventoryStore', () => {
           ],
         })
       );
-      assert.deepEqual(preview, [{ name: 'Shard', img: null, quantity: 5, guaranteedQuantity: 0 }]);
+      assert.deepEqual(preview, [{ componentId: null, name: 'Shard', img: null, quantity: 5, guaranteedQuantity: 0 }]);
     });
 
     it('a success tier with NO results contributes 0 to its component', async () => {
@@ -1659,7 +1659,7 @@ describe('inventoryStore', () => {
           ],
         })
       );
-      assert.deepEqual(preview, [{ name: 'Shard', img: null, quantity: 3, guaranteedQuantity: 0 }]);
+      assert.deepEqual(preview, [{ componentId: null, name: 'Shard', img: null, quantity: 3, guaranteedQuantity: 0 }]);
     });
 
     it('progressive: one per stage, always possible, null-threshold stages OMITTED', async () => {
@@ -1679,8 +1679,38 @@ describe('inventoryStore', () => {
         })
       );
       assert.deepEqual(preview, [
-        { name: 'Shard', img: 'icons/shard.webp', quantity: 2, guaranteedQuantity: 0 },
+        { componentId: null, name: 'Shard', img: 'icons/shard.webp', quantity: 2, guaranteedQuantity: 0 },
       ]);
+    });
+
+    it('keeps SAME-NAMED components apart, aggregating on id rather than display name', async () => {
+      // The defect this closes: the preview aggregated on `name`, so two genuinely
+      // different components that share a display name collapsed into ONE row and the
+      // player was shown a subset of what a best-case roll actually yields. Names are
+      // GM-authored and not unique — across systems or within one ladder — so identity
+      // is the only safe key. Reported against Mythwright's Slain Balehound Pup and
+      // Denmother (issue 859).
+      const preview = await previewFor(
+        salvageProjection({
+          mode: 'progressive',
+          checkUsable: true,
+          stages: [
+            { id: 's1', componentId: 'pup-fang', name: 'Fang', img: 'icons/fang.webp', threshold: 5 },
+            { id: 's2', componentId: 'den-fang', name: 'Fang', img: 'icons/fang2.webp', threshold: 9 },
+          ],
+        })
+      );
+      // Two rows, NOT one row of quantity 2 — that collapse is the bug.
+      assert.equal(preview.length, 2);
+      // Insertion order, not alphabetical: the preview sorts by NAME and both names
+      // are identical, so the sort is a stable no-op between these two.
+      assert.deepEqual(
+        preview.map((row) => [row.componentId, row.quantity]),
+        [
+          ['pup-fang', 1],
+          ['den-fang', 1],
+        ]
+      );
     });
 
     it('a progressive row with EVERY stage unreachable previews nothing but stays queued', async () => {
@@ -1727,7 +1757,7 @@ describe('inventoryStore', () => {
       flushSync();
 
       assert.deepEqual(store.bulkYieldPreview, [
-        { name: 'Shard', img: 'icons/shard.webp', quantity: 7, guaranteedQuantity: 2 },
+        { componentId: null, name: 'Shard', img: 'icons/shard.webp', quantity: 7, guaranteedQuantity: 2 },
       ]);
     });
 

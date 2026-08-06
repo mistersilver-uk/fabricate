@@ -117,6 +117,10 @@
 
   const busy = $derived(running === true || destroying === true);
   const hasReport = $derived(report != null);
+  // How many QUEUED rows honour the player's own stage order. Only progressive rows
+  // whose component permits player reorder qualify; a GM who pinned the authored order
+  // sets `allowPlayerResultReorder: false` and must not be told otherwise.
+  const reorderedCount = $derived(salvageable.filter((entry) => entry.allowsReorder).length);
 
   const state = $derived.by(() => {
     if (hasReport) return 'report';
@@ -372,7 +376,10 @@
             title={localize('FABRICATE.App.Inventory.Bulk.YieldTitle')}
             attrs={{ 'data-inventory-bulk-yield': '' }}
           >
-            {#each yieldRows as row (row.name)}
+            <!-- Keyed on component IDENTITY, not display name: two distinct components
+                 can share a name, and a name key both collides here and merged them
+                 upstream, hiding real components from the preview (issue 859). -->
+            {#each yieldRows as row (row.componentId ?? `name:${row.name}`)}
               {@const shape = yieldShape(row)}
               <InventoryBulkRow
                 img={row.img}
@@ -446,6 +453,16 @@
       {:else}
         <p class="bulk-footer-note" data-inventory-bulk-footer-note>
           {localize('FABRICATE.App.Inventory.Bulk.FooterNote')}
+          <!-- Progressive rows spend the roll down a stage list the player may have
+               reordered on the single-item panel. That order is stored per player and
+               per component, and the engine re-reads it for EACH queued row at run
+               start — so a bulk run already honours it. Nothing else on this screen
+               says so, which is the only reason this sentence exists (issue 859). -->
+          {#if reorderedCount > 0}
+            <span data-inventory-bulk-reorder-note>
+              {localize('FABRICATE.App.Inventory.Bulk.ReorderNote')}
+            </span>
+          {/if}
         </p>
         <div class="bulk-footer-actions">
           <button
@@ -598,14 +615,23 @@
     position: sticky;
     bottom: 0;
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
+    /* Stacked, not a row: the actions are full-width so the commit control is the
+       widest thing on the panel, matching the reference prototype. */
+    flex-direction: column;
+    align-items: stretch;
     gap: var(--fab-space-3);
+    /* A section DIVIDER, not a card. The footer must read as a continuation of the
+       panel with a rule above it — never as a boxed tray. */
     border-top: 1px solid var(--fab-border);
     padding-top: var(--fab-space-3);
     padding-bottom: var(--fab-space-2);
-    background: var(--fab-surface);
+    /* Sticky needs an opaque fill or scrolled rows show through (issue 859). The fill
+       must reproduce the panel's own composite EXACTLY, or the 5% difference reads as
+       a box: the column paints `--fab-surface-soft` over the grid's `--fab-surface`,
+       so both layers are restated here. The inset shadow is that second layer — a
+       gradient would be the obvious way and `flat-ui-style-contract` bans them. */
+    background-color: var(--fab-surface);
+    box-shadow: inset 0 0 0 100vmax var(--fab-surface-soft);
   }
 
   .bulk-footer-note {
@@ -626,14 +652,18 @@
      button loses its right edge with nothing on screen to say so. Shrinkable, the group
      takes the line's width and the buttons stack, still right-aligned. */
   .bulk-footer-actions {
-    flex: 0 1 auto;
-    min-width: 0;
-    margin-left: auto;
+    /* Full-width stacked actions, matching the reference prototype: the commit control
+       is the widest thing on the panel rather than a right-aligned pair. This also
+       removes the 1024 wrap case entirely — there is nothing left to wrap. */
     display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: var(--fab-space-2);
+  }
+
+  .bulk-footer-actions > :global(button) {
+    width: 100%;
+    justify-content: center;
   }
 
   /* Foundry's global `.app button` pins a fixed height and centres content, so a
