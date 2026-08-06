@@ -17,11 +17,43 @@
  * `DialogV2.wait` button-callback style used elsewhere in the repo — see
  * `src/config/repairItemData.js`). When DialogV2 is unavailable
  * (headless/tests) it resolves `{ confirmed: true }` so nothing blocks.
+ *
+ * ## Two dialogs, one set of shared leaves
+ *
+ * {@link promptCheckRoll} answers for ONE subject; {@link promptBulkCheckRoll} answers
+ * once for a whole batch (issue 859). They are deliberately separate exports rather
+ * than one function behind a `bulk` flag: `promptCheckRoll`'s body is already a dense
+ * conditional matrix (formula / DC / `playerPicks` / advantage), and a batch has NO
+ * single formula and NO single DC to render, so a flag would add a fourth axis whose
+ * every branch turns other branches off. What they genuinely share — the die row, the
+ * situational-bonus input, the roll-mode picker, the form reader and the footer buttons
+ * — is extracted into the leaves below, so the two dialogs cannot drift on the fields
+ * `evaluateCheckRoll` reads.
+ *
+ * ## Everything emitted here passes through Foundry's `cleanHTML`
+ *
+ * `cleanHTML` is a TAG AND ATTRIBUTE ALLOWLIST, not an escaper: an attribute outside
+ * the list is stripped silently, and so is every inline `on*` handler. So these builders
+ * emit only allowlisted tags/attributes, and all state is read in the button callback
+ * through `button.form.elements` rather than from a handler that would never survive.
  */
 
 /**
  * Fabricate's roll modes with i18n keys + English fallbacks, in the order the
  * Roll Mode picker lists them (mirrors Foundry core's `CONFIG.Dice.rollModes`).
+ *
+ * ## The vocabulary here is deliberately the LEGACY one
+ *
+ * `publicroll | gmroll | blindroll | selfroll`. Foundry V14 introduces a disjoint
+ * message-mode vocabulary (`public | gm | blind | self | ic`), and migrating this picker
+ * is its own change with its own V13 verification burden (issue 1043). Keeping the
+ * legacy token here is what lets the aggregate bulk card and the N dice messages carry
+ * the SAME token on both Foundry versions — the dice through `Roll#toMessage`'s own
+ * `_mapLegacyRollMode`, the card through the poster's version edge using the identical
+ * map — so card visibility and dice visibility cannot diverge.
+ *
+ * Do NOT read `core.messageMode` as a fallback: `ClientSettings#assertSetting` THROWS
+ * for an unregistered key on V13, and `??` does not catch a throw.
  */
 const ROLL_MODE_CHOICES = Object.freeze([
   ['publicroll', 'CHAT.RollPublic', 'Public Roll'],
@@ -49,6 +81,147 @@ const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
 function localize(key, fallback) {
   const resolved = globalThis.game?.i18n?.localize?.(key);
   return typeof resolved === 'string' && resolved && resolved !== key ? resolved : fallback;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared leaves — used by BOTH dialogs and by `buildInteractiveRollOptions`.  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The client's configured default roll mode, as a STRING.
+ *
+ * `?? ''` so this types as a string rather than possibly-undefined: SonarCloud's
+ * inference otherwise reads the `value === defaultRollMode` comparison in the picker as
+ * always-false (S3403), because the value is reached through optional chaining on an
+ * untyped Foundry global.
+ *
+ * That normalization is now shared with `buildInteractiveRollOptions`, which previously
+ * read the same setting WITHOUT the coalesce and could therefore emit `undefined` where
+ * this emits `''`. Unifying has to pick one, and `''` is the safe pick because the two
+ * are equivalent everywhere downstream: `evaluateCheckRoll` gates on
+ * `if (choice.rollMode)` and `Roll#toMessage` gates on `if (rollMode)`, so an empty
+ * string and an absent value both mean "use the client default". Recorded here so
+ * neither a later editor "restores" the difference nor a reviewer reads it as drift.
+ *
+ * Never falls back to `core.messageMode` — see {@link ROLL_MODE_CHOICES}.
+ *
+ * @returns {string}
+ */
+function readDefaultRollMode() {
+  return globalThis.game?.settings?.get?.('core', 'rollMode') ?? '';
+}
+
+/**
+ * The die glyph row: a d20 for an advantage-eligible check, else a generic die.
+ * Decorative — hidden from assistive tech (the formula/DC, or the batch heading, carry
+ * the meaning).
+ *
+ * @param {boolean} allowAdvantage
+ * @returns {string}
+ */
+function renderDieRow(allowAdvantage) {
+  const dieIcon = allowAdvantage === true ? 'fa-dice-d20' : 'fa-dice';
+  return `<div class="fabricate-roll-prompt__die"><i class="fa-solid ${dieIcon}" aria-hidden="true"></i></div>`;
+}
+
+/**
+ * The free-form situational-bonus input.
+ *
+ * No `inputmode` attribute: `cleanHTML`'s `input` allowlist does not carry one, so the
+ * `inputmode="text"` this markup used to emit was stripped before it ever reached the
+ * DOM. It is dropped rather than kept as decoration.
+ *
+ * @returns {string}
+ */
+function renderBonusInput() {
+  return (
+    `<input class="fabricate-roll-prompt__bonus" type="text" name="situationalBonus" ` +
+    `aria-label="Situational Bonus" placeholder="Situational Bonus?" autofocus />`
+  );
+}
+
+/**
+ * The Configuration section with the Roll Mode picker.
+ *
+ * @param {string} defaultRollMode The client default, pre-selected.
+ * @returns {string}
+ */
+function renderRollModePicker(defaultRollMode) {
+  const rollModeOptions = ROLL_MODE_CHOICES.map(([value, key, fallback]) => {
+    const selected = value === defaultRollMode ? ' selected' : '';
+    return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(localize(key, fallback))}</option>`;
+  }).join('');
+  return (
+    `<div class="fabricate-roll-prompt__config">` +
+    `<p class="fabricate-roll-prompt__config-heading">Configuration</p>` +
+    `<label>Roll Mode <select name="rollMode">${rollModeOptions}</select></label>` +
+    `</div>`
+  );
+}
+
+/**
+ * Read the fields both dialogs share off a clicked button's form: normalize the
+ * situational bonus (strip one leading `+`, trim, empty → null), read the chosen roll
+ * mode, and tag the advantage disposition the button represents.
+ *
+ * @param {object} button The DialogV2 button the player clicked.
+ * @param {string} defaultRollMode The client default, used when the field is absent.
+ * @param {'advantage'|'normal'|'disadvantage'} advantage
+ * @returns {{confirmed: true, bonus: string|null, rollMode: string|undefined,
+ *   advantage: 'advantage'|'normal'|'disadvantage'}}
+ */
+function readSharedRollChoice(button, defaultRollMode, advantage) {
+  const rawBonus = button?.form?.elements?.situationalBonus?.value ?? '';
+  const bonus = String(rawBonus)
+    .replace(/^\s*\+/, '')
+    .trim();
+  const rollModeValue = button?.form?.elements?.rollMode?.value;
+  return {
+    confirmed: true,
+    bonus: bonus === '' ? null : bonus,
+    rollMode: rollModeValue || defaultRollMode || undefined,
+    advantage,
+  };
+}
+
+/**
+ * The footer: three Advantage / Normal / Disadvantage buttons when the check can honour
+ * them, else a single Roll. `readChoice` is the caller's reader so each dialog can
+ * decorate the shared choice with its own extra fields.
+ *
+ * @param {boolean} allowAdvantage
+ * @param {(button: object, advantage: string) => object} readChoice
+ * @returns {object[]} DialogV2 button descriptors.
+ */
+function buildRollButtons(allowAdvantage, readChoice) {
+  if (allowAdvantage === true) {
+    return [
+      {
+        action: 'advantage',
+        label: 'Advantage',
+        callback: (_event, button) => readChoice(button, 'advantage'),
+      },
+      {
+        action: 'normal',
+        default: true,
+        label: 'Normal',
+        callback: (_event, button) => readChoice(button, 'normal'),
+      },
+      {
+        action: 'disadvantage',
+        label: 'Disadvantage',
+        callback: (_event, button) => readChoice(button, 'disadvantage'),
+      },
+    ];
+  }
+  return [
+    {
+      action: 'roll',
+      default: true,
+      label: 'Roll',
+      callback: (_event, button) => readChoice(button, 'normal'),
+    },
+  ];
 }
 
 /**
@@ -97,12 +270,7 @@ export async function promptCheckRoll({
       : { confirmed: true };
   }
 
-  // `?? ''` so this types as a string rather than possibly-undefined: SonarCloud's
-  // inference otherwise reads the `value === defaultRollMode` comparison below as
-  // always-false (S3403) because the value is reached through optional chaining on an
-  // untyped Foundry global. Behaviour is unchanged — the one consumer is
-  // `rollModeValue || defaultRollMode || undefined`, where '' and undefined are equivalent.
-  const defaultRollMode = globalThis.game?.settings?.get?.('core', 'rollMode') ?? '';
+  const defaultRollMode = readDefaultRollMode();
   const displayFormula = resolvedFormula || formula || '';
   const activityLabel = activity || 'Roll';
 
@@ -119,10 +287,7 @@ export async function promptCheckRoll({
     `<h2 class="fabricate-roll-prompt__title">${titleText}</h2>` +
     `</div></div>`;
 
-  // Die glyph: a d20 for an advantage-eligible check, else a generic die.
-  // Decorative — hidden from assistive tech (the formula/DC carry the meaning).
-  const dieIcon = allowAdvantage ? 'fa-dice-d20' : 'fa-dice';
-  const dieHtml = `<div class="fabricate-roll-prompt__die"><i class="fa-solid ${dieIcon}" aria-hidden="true"></i></div>`;
+  const dieHtml = renderDieRow(allowAdvantage);
 
   // The DC chip sits with the formula (right side) rather than floating alone.
   const dcChip = Number.isFinite(dc)
@@ -180,19 +345,8 @@ export async function promptCheckRoll({
       `${optionsHtml}</fieldset>`;
   }
 
-  const bonusHtml =
-    `<input class="fabricate-roll-prompt__bonus" type="text" name="situationalBonus" ` +
-    `inputmode="text" aria-label="Situational Bonus" placeholder="Situational Bonus?" autofocus />`;
-
-  const rollModeOptions = ROLL_MODE_CHOICES.map(([value, key, fallback]) => {
-    const selected = value === defaultRollMode ? ' selected' : '';
-    return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(localize(key, fallback))}</option>`;
-  }).join('');
-  const configHtml =
-    `<div class="fabricate-roll-prompt__config">` +
-    `<p class="fabricate-roll-prompt__config-heading">Configuration</p>` +
-    `<label>Roll Mode <select name="rollMode">${rollModeOptions}</select></label>` +
-    `</div>`;
+  const bonusHtml = renderBonusInput();
+  const configHtml = renderRollModePicker(defaultRollMode);
 
   // Die glyph on its own row ABOVE the icon + name row, then the formula/DC,
   // situational bonus, and configuration.
@@ -200,21 +354,10 @@ export async function promptCheckRoll({
     `<div class="fabricate-roll-prompt">` +
     `${dieHtml}${headerHtml}${formulaHtml}${modifierChoiceHtml}${bonusHtml}${configHtml}</div>`;
 
-  // Read the form on a button click: normalize the situational bonus (strip one
-  // leading `+`, trim, empty → null), read the chosen roll mode, and tag the
-  // advantage disposition the button represents.
+  // The shared reader owns bonus/roll-mode/advantage; this path adds the one field
+  // that is unique to it.
   const readChoice = (button, advantage) => {
-    const rawBonus = button?.form?.elements?.situationalBonus?.value ?? '';
-    const bonus = String(rawBonus)
-      .replace(/^\s*\+/, '')
-      .trim();
-    const rollModeValue = button?.form?.elements?.rollMode?.value;
-    const choice = {
-      confirmed: true,
-      bonus: bonus === '' ? null : bonus,
-      rollMode: rollModeValue || defaultRollMode || undefined,
-      advantage,
-    };
+    const choice = readSharedRollChoice(button, defaultRollMode, advantage);
     // Interactive `playerPicks`: the checked radio's value is the chosen modifier id;
     // fall back to the pre-selected default when the field is absent (headless). Only
     // added when a modifier choice was offered, so the non-`playerPicks` choice object
@@ -226,34 +369,7 @@ export async function promptCheckRoll({
     return choice;
   };
 
-  const buttons =
-    allowAdvantage === true
-      ? [
-          {
-            action: 'advantage',
-            label: 'Advantage',
-            callback: (_event, button) => readChoice(button, 'advantage'),
-          },
-          {
-            action: 'normal',
-            default: true,
-            label: 'Normal',
-            callback: (_event, button) => readChoice(button, 'normal'),
-          },
-          {
-            action: 'disadvantage',
-            label: 'Disadvantage',
-            callback: (_event, button) => readChoice(button, 'disadvantage'),
-          },
-        ]
-      : [
-          {
-            action: 'roll',
-            default: true,
-            label: 'Roll',
-            callback: (_event, button) => readChoice(button, 'normal'),
-          },
-        ];
+  const buttons = buildRollButtons(allowAdvantage, readChoice);
 
   const result = await DialogV2.wait({
     window: { title: `${activityLabel} check` },
@@ -264,6 +380,143 @@ export async function promptCheckRoll({
   }).catch(() => ({ confirmed: false }));
 
   // A dismissed dialog (rejectClose:false) resolves to null → treat as cancel.
+  if (!result || result.confirmed !== true) return { confirmed: false };
+  return result;
+}
+
+/**
+ * How many subject thumbnails the strip shows before it collapses the rest into a
+ * "+K more" chip. Eight is what fits one row at the dialog's shipped width without
+ * wrapping; the cap exists so a 25-item batch does not push the bonus input and the
+ * roll-mode picker below the fold, where the player would answer a prompt they cannot
+ * see the controls for.
+ */
+const BULK_SUBJECT_STRIP_LIMIT = 8;
+
+/**
+ * The thumbnail a subject with no authored image falls back to.
+ *
+ * Spelled locally rather than imported, matching `BulkSalvageChatCard.js`: this module
+ * is a string builder handed to `DialogV2` and deliberately imports nothing, so it does
+ * not drag a UI utility graph into every consumer that only wanted a roll prompt.
+ */
+const BULK_SUBJECT_FALLBACK_IMG = 'icons/svg/item-bag.svg';
+
+/**
+ * Prompt the player ONCE for a whole batch of checks (issue 859).
+ *
+ * ## What it deliberately does NOT show
+ *
+ * **No formula and no DC.** A batch has no single subject: each item rolls its OWN
+ * system's formula against its own DC / tiers / stages, and nothing about a bulk answer
+ * is shared across those rolls except the three fields below. Rendering one item's
+ * formula would be a claim about the other twenty-four, and rendering all of them would
+ * be a wall of text the player cannot act on. The subject strip is what tells them what
+ * they are about to roll for.
+ *
+ * ## What the answer applies to
+ *
+ * The situational bonus, the roll mode AND the advantage disposition apply to EVERY
+ * roll in the batch — an accepted consequence of the one-prompt design, so the note in
+ * the body says it in words rather than leaving the player to infer it from a `+2` that
+ * lands twenty-five times.
+ *
+ * `allowAdvantage` is computed by the caller (`BulkSalvageService`) over the AUTHORED
+ * formulas, all-or-nothing: offering Advantage that only some rolls could honour would
+ * be a lie about half the batch.
+ *
+ * @param {object} args
+ * @param {boolean} [args.allowAdvantage] When true, offer Advantage / Normal /
+ *   Disadvantage; else a single Roll.
+ * @param {number} [args.count] How many items the batch will roll for. Defaults to the
+ *   number of subjects, so a caller that passes only `subjects` still reads correctly.
+ * @param {Array<{name?: string, img?: string}>} [args.subjects] The batch's subjects, in
+ *   the order the player queued them.
+ * @returns {Promise<{confirmed: true, bonus: string|null, rollMode: string|undefined,
+ *   advantage: 'advantage'|'normal'|'disadvantage'} | {confirmed: false}>}
+ *   `{ confirmed: false }` on dismissal, matching {@link promptCheckRoll}, because
+ *   `DialogV2.wait` with the default `rejectClose = false` resolves `result ?? null` on
+ *   BOTH Escape and the window X — neither rejects, so a `catch` alone cannot see them.
+ */
+export async function promptBulkCheckRoll({ allowAdvantage, count, subjects } = {}) {
+  const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
+  // Headless / no dialog API (tests): do not block the run. `advantage: 'normal'` is
+  // supplied so a headless caller threads the same shape a confirmed click produces.
+  if (!DialogV2?.wait) {
+    return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
+  }
+
+  const defaultRollMode = readDefaultRollMode();
+  const rows = Array.isArray(subjects) ? subjects : [];
+  const total = Number.isFinite(count) ? count : rows.length;
+
+  // The frame title carries no count — the body heading does, and repeating it in the
+  // window chrome buys nothing on a dialog this small.
+  const title = localize('FABRICATE.App.RollPrompt.BulkTitle', 'Bulk check');
+  const heading = escapeHtml(
+    localize('FABRICATE.App.RollPrompt.BulkHeading', 'One roll setting for {count} items').replace(
+      '{count}',
+      String(total)
+    )
+  );
+  const headerHtml =
+    `<div class="fabricate-roll-prompt__header">` +
+    `<div class="fabricate-roll-prompt__titles">` +
+    `<h2 class="fabricate-roll-prompt__title">${heading}</h2>` +
+    `</div></div>`;
+
+  // The strip, then the overflow chip. Both branches are single expressions on purpose:
+  // a combined `shown.length < rows.length ? … : ''` nested inside the thumb map would
+  // be the nested ternary SonarCloud flags in this file, which ESLint does not reach.
+  const shown = rows.slice(0, BULK_SUBJECT_STRIP_LIMIT);
+  const hidden = rows.length - shown.length;
+  const thumbsHtml = shown
+    .map((subject) => {
+      const src = escapeHtml(subject?.img || BULK_SUBJECT_FALLBACK_IMG);
+      // The name is the thumbnail's ALT text rather than a caption: eight captions do
+      // not fit the row, but a screen-reader user still needs to know what is queued.
+      return `<img class="fabricate-roll-prompt__subject" src="${src}" alt="${escapeHtml(subject?.name || '')}" />`;
+    })
+    .join('');
+  const moreLabel = escapeHtml(
+    localize('FABRICATE.App.RollPrompt.BulkMore', '+{count} more').replace(
+      '{count}',
+      String(hidden)
+    )
+  );
+  const moreHtml =
+    hidden > 0 ? `<span class="fabricate-roll-prompt__subjects-more">${moreLabel}</span>` : '';
+  const subjectsHtml =
+    rows.length > 0
+      ? `<div class="fabricate-roll-prompt__subjects">${thumbsHtml}${moreHtml}</div>`
+      : '';
+
+  const noteHtml =
+    `<p class="fabricate-roll-prompt__bulk-note">` +
+    `${escapeHtml(
+      localize(
+        'FABRICATE.App.RollPrompt.BulkNote',
+        'The situational bonus, roll mode and advantage apply to every roll in this batch.'
+      )
+    )}</p>`;
+
+  const content =
+    `<div class="fabricate-roll-prompt">` +
+    `${renderDieRow(allowAdvantage)}${headerHtml}${subjectsHtml}` +
+    `${renderBonusInput()}${renderRollModePicker(defaultRollMode)}${noteHtml}</div>`;
+
+  const buttons = buildRollButtons(allowAdvantage, (button, advantage) =>
+    readSharedRollChoice(button, defaultRollMode, advantage)
+  );
+
+  const result = await DialogV2.wait({
+    window: { title },
+    classes: ['fabricate', 'fabricate-dialog', 'fabricate-roll-prompt-dialog'],
+    content,
+    rejectClose: false,
+    buttons,
+  }).catch(() => ({ confirmed: false }));
+
   if (!result || result.confirmed !== true) return { confirmed: false };
   return result;
 }
@@ -305,7 +558,9 @@ export function buildInteractiveRollOptions({
   const rollOptions = {
     interactive: interactive === true,
     prompt: promptCheckRoll,
-    rollMode: globalThis.game?.settings?.get?.('core', 'rollMode'),
+    // Shared with the dialog since issue 859 — see `readDefaultRollMode` for why this
+    // read now normalizes an absent setting to `''` rather than leaving it `undefined`.
+    rollMode: readDefaultRollMode(),
     flavor,
     speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
     dc,

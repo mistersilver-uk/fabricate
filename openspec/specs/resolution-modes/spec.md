@@ -86,6 +86,21 @@ The **pre-roll dialog** is the exception: it renders the `@craftingmod` slot as 
 Showing the pre-selected default's number there would misrepresent every non-default pick, so the slot stays neutral; every OTHER `@` placeholder in the dialog formula still resolves to a number, and each radio option carries its own signed value chip.
 - The posted roll's chat flavor is suffixed with the chosen modifier's label (`<flavor> · <label>`) so the chat log records which modifier was picked; a label-less modifier leaves the flavor unchanged, and an empty base flavor yields the bare label with no orphan separator.
 - A cancelled prompt aborts with zero mutation and no substitution.
+- A **pre-resolved roll decision** is a **transport** for the player's confirm / bonus / roll-mode / advantage answer and changes nothing about how any mode resolves.
+Each item in a batch still evaluates its **own** formula, its own DC or tiers or stages, and its own triggers, in its own crafting system, so a bulk decision never shares a rolled **total** across items.
+That is also why a batch spanning crafting systems needs no single check: nothing is shared but the answer to the prompt.
+`@craftingmod` / `playerPicks` remains crafting-only, so a salvage batch never carries a modifier choice.
+- **For salvage**, a check is usable IFF its mode's roll formula is authored **and non-blank**.
+A whitespace-only formula is not a check: handing it to `Roll` throws inside the runner and surfaces as a rolled — and therefore consuming — failure, which is the opposite of the "no formula, no check" answer every reader intends.
+Trimming brings salvage **into line with** the alchemy check-mode guards and the player salvage projection, which already test the formula trimmed; it is not a new global constraint.
+One resolved mode governs salvage check dispatch, breakage-block selection and award-group resolution alike, replacing the independent derivations those readers each carried.
+A salvage mode outside the supported set (`simple` / `routed` / `progressive`) is a **misconfiguration with zero mutation**, matching what salvage validation already reports for the same configuration.
+Coercing it to `simple` instead would award the first result group for a configuration validation calls invalid — a silent *wrong award*.
+This is a defensive guard rather than a fix: legacy salvage tokens are normalized long before they reach these readers, and salvage validation guards the case anyway, which is the precedent being followed.
+
+  *Stated residual:* the three mainline crafting readers (`useSimpleCheck`, `useProgressiveCheck`, `useRoutedCheck`) still test their roll formula with raw truthiness, so the non-blank rule is deliberately **not** asserted globally here.
+  Asserting it globally would make this spec claim behaviour the crafting path does not have — the exact divergence class the salvage unification is closing.
+  Unifying them is a follow-up.
 
 ## Player-Facing Mode Labels
 

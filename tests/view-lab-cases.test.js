@@ -110,6 +110,24 @@ function navDeclarationScope(sources, template) {
   return [...scope];
 }
 
+/**
+ * The step keys `runSteps` dispatches on. Hoisted out of the step test so the drift check below can
+ * compare them against the runner's own lists.
+ */
+const VERBS = ['select', 'fill', 'scroll', 'upload'];
+
+/**
+ * `modifiers` is a MODIFIER, not a verb: it does not choose which action runs, it changes how the
+ * default click runs. Keeping it out of `VERBS` is load-bearing twice over — the mutual-exclusion
+ * check counts the VERBS present, so admitting it there would reject the legal `{selector,
+ * modifiers}` step as naming two verbs; and the pairing rule below is precisely that `modifiers`
+ * may accompany none of them.
+ */
+const MODIFIERS_KEY = 'modifiers';
+
+/** The click modifiers Playwright accepts, mirroring `CLICK_MODIFIERS` in the capture driver. */
+const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
+
 /** Selector tokens are matched as regular expressions, so their own metacharacters must not be. */
 function escapeForRegExp(value) {
   return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
@@ -161,7 +179,6 @@ test('every interaction step names text that exists in the manager UI', () => {
   const haystack = [...sources.values()].join('\n');
 
   const missing = [];
-  const VERBS = ['select', 'fill', 'scroll', 'upload'];
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step === 'string') {
@@ -184,15 +201,48 @@ test('every interaction step names text that exists in the manager UI', () => {
       // The runner dispatches on which verb key is present, so a typo'd key (`selectOption`,
       // `value`, `text`) silently degrades the step to a plain click and the case captures the
       // screen it started on. Only the known verbs may appear alongside `selector`.
-      const extra = Object.keys(step).filter((key) => key !== 'selector' && !VERBS.includes(key));
+      const extra = Object.keys(step).filter(
+        (key) => key !== 'selector' && key !== MODIFIERS_KEY && !VERBS.includes(key)
+      );
       if (extra.length > 0) {
         missing.push(
           `${viewCase.id}: step for "${step.selector}" has unknown key(s) ${extra.join(', ')} — ` +
-            `the runner would silently click instead. Known verbs: ${VERBS.join(', ')}`
+            `the runner would silently click instead. Known verbs: ${VERBS.join(', ')}; ` +
+            `known modifier: ${MODIFIERS_KEY}`
         );
       }
       if (VERBS.filter((verb) => verb in step).length > 1) {
         missing.push(`${viewCase.id}: step for "${step.selector}" names more than one verb`);
+      }
+      // The runner rejects both of these too, but that throw only fires during a capture run, which
+      // is not an `npm test` gate — so a bad step would sit green in the registry until somebody
+      // spent twenty minutes discovering it. Both rules are therefore enforced HERE as well.
+      if (MODIFIERS_KEY in step) {
+        // A modifier can only ride on a click. Playwright's `selectOption`, `fill`, `setInputFiles`
+        // and `scrollIntoViewIfNeeded` accept no `modifiers` option, so the pairing is not a
+        // stricter step — it is an INERT one, capturing the unmodified state under the name of the
+        // modified one.
+        const paired = VERBS.filter((verb) => verb in step);
+        if (paired.length > 0) {
+          missing.push(
+            `${viewCase.id}: step for "${step.selector}" pairs \`${MODIFIERS_KEY}\` with ` +
+              `${paired.join(', ')} — a modifier applies only to a click, so it would be dropped ` +
+              `and the case would capture the unmodified state. Split it into two steps.`
+          );
+        }
+        const names = Array.isArray(step[MODIFIERS_KEY]) ? step[MODIFIERS_KEY] : [];
+        if (names.length === 0) {
+          missing.push(
+            `${viewCase.id}: step for "${step.selector}" must declare \`${MODIFIERS_KEY}\` as a ` +
+              `non-empty array of ${CLICK_MODIFIERS.join(', ')}`
+          );
+        }
+        for (const name of names.filter((entry) => !CLICK_MODIFIERS.includes(entry))) {
+          missing.push(
+            `${viewCase.id}: step for "${step.selector}" names unknown modifier ` +
+              `${JSON.stringify(name)} — Playwright accepts ${CLICK_MODIFIERS.join(', ')}`
+          );
+        }
       }
       // An editor tab strip renders `id={`<family>-tab-${tab.id}`}`, so neither half of the
       // selector appears literally. Both halves still have to be checked, and checking them
@@ -314,6 +364,33 @@ test('the hooks the capture driver hard-codes still exist in the UI', () => {
     'the capture driver hard-codes these hooks and no case references them, so nothing else would ' +
       'catch their removal. Update `scripts/view-lab-screenshots.mjs` alongside the rename:\n  ' +
       absent.join('\n  ')
+  );
+});
+
+test('the modifier vocabulary this file enforces is the one the capture driver enforces', () => {
+  // The pairing rule and the modifier names are checked twice: statically above, and in `runSteps`
+  // at capture time. Only the static half runs in `npm test`, and it is a hand-copied list — so a
+  // modifier added to the driver, or a verb that stops being incompatible with one, would leave the
+  // two halves disagreeing with nothing to say so. Read the driver's own arrays instead of trusting
+  // the copy. The verb list is the same comparison in the other direction: the driver refuses to
+  // pair `modifiers` with exactly the verbs this file knows about, so a sixth verb added there
+  // without being added here would go unchecked at the only point that gates a PR.
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  const declaredArray = (name) => {
+    const match = new RegExp(String.raw`const ${name} = \[([^\]]*)]`).exec(driver);
+    assert.ok(match, `\`scripts/view-lab-screenshots.mjs\` no longer declares \`${name}\``);
+    return [...match[1].matchAll(/'([^']+)'/g)].map(([, entry]) => entry).sort();
+  };
+
+  assert.deepEqual(
+    declaredArray('CLICK_MODIFIERS'),
+    [...CLICK_MODIFIERS].sort(),
+    'the driver accepts a different set of click modifiers than this file admits'
+  );
+  assert.deepEqual(
+    declaredArray('MODIFIER_INCOMPATIBLE_VERBS'),
+    [...VERBS].sort(),
+    'the driver refuses to pair `modifiers` with a different set of verbs than this file knows'
   );
 });
 

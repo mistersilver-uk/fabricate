@@ -29,6 +29,20 @@ import { progressiveStageThresholds } from '../../../utils/progressiveStageThres
 
 const DEFAULT_PAGE_SIZE = 25;
 
+// The bulk-selection bound (issue 859), applied here at SELECTION level so both
+// bulk salvage and bulk destroy inherit one limit (`toggleBulkSelection` refuses
+// the 26th). MUST equal `BulkSalvageService.BULK_MAX_ITEMS`
+// (`src/systems/BulkSalvageService.js`) — deliberately NOT imported from there:
+// that module's own graph (the bulk chat-card builder, `componentStacking.js`,
+// `itemStackQuantity.js`, …) is entirely unrelated to this store's presentational
+// concern, and pulling it in would drag several unrelated systems modules into
+// every store test harness's explicit copy/raw-module allowlist for the sake of
+// one integer. `salvage-check-usability.test.js`-style "pin as a pure move" is not
+// available here since these are two independent declarations by design; a
+// divergence would only ever show up as the UI accepting a 26th while the engine
+// (defensively) still refuses it, or vice versa — never a silent wrong-award.
+const BULK_MAX_ITEMS = 25;
+
 // Reorder writes are replicated `scope: 'user'` document writes, so they are coalesced
 // rather than issued per gesture. Mirrors the crafting store's window.
 const ORDER_COMMIT_DEBOUNCE_MS = 400;
@@ -102,6 +116,215 @@ function reconcileHeldRow(row, liveRow, systemId, componentId) {
   return { ...row, totalQuantity: 0, systems };
 }
 
+/**
+ * The acting participation for a BULK row (issue 859): the row's `systems[]` entry
+ * named by `selectedSystemId` when the row IS the currently-inspected card
+ * (mirroring `selectedParticipation`'s own resolution), else the PRIMARY — "a row
+ * acts on the selected participation when its card is the inspected one, otherwise
+ * the primary". For a legacy/single-system card (no `systems[]`) the card's own
+ * top-level identity IS the participation, exactly as `selectedParticipation`
+ * treats it.
+ */
+function actingParticipationOf(row, { inspected = false, selectedSystemId = null } = {}) {
+  const systems = Array.isArray(row?.systems) ? row.systems : [];
+  if (systems.length === 0) {
+    return {
+      systemId: row?.systemId ?? null,
+      systemName: null,
+      componentId: row?.componentId ?? null,
+      salvage: row?.salvage ?? null,
+      ownedQuantity: Number(row?.totalQuantity ?? 0),
+    };
+  }
+  if (inspected) {
+    return (
+      systems.find((entry) => entry?.systemId === selectedSystemId) ?? primaryParticipation(row)
+    );
+  }
+  return primaryParticipation(row);
+}
+
+/**
+ * First-match blocked-reason classification for one bulk row (issue 859), reusing
+ * already-normative ids: `essence`/`recipeItem` are card KINDS that were never
+ * salvageable; `salvageDisabled` covers a real component whose salvage config is
+ * off entirely; the three `misconfiguredReason` values are the salvage
+ * projection's own; `toolsUnavailable` and `depleted` come last because they
+ * describe an otherwise-configured, otherwise-stocked row.
+ *
+ * `broken` is DELIBERATELY absent — brokenness does not gate salvageability
+ * (`InventoryItemCard`, `InventoryComponentDetail`,
+ * `InventoryListingBuilder._isBrokenTool`); a broken row stays in the queue.
+ *
+ * @returns {string|null} A blocked-reason id, or null when the row is queueable.
+ */
+function bulkBlockedReasonFor(row, participation) {
+  if (row?.isEssenceSource === true) return 'essence';
+  if (row?.isRecipeItem === true) return 'recipeItem';
+  const salvage = participation?.salvage ?? null;
+  if (!salvage || salvage.enabled !== true) return 'salvageDisabled';
+  if (salvage.misconfiguredReason) return salvage.misconfiguredReason;
+  if (salvage.toolsAvailable !== true) return 'toolsUnavailable';
+  if (Number(participation?.ownedQuantity ?? 0) <= 0) return 'depleted';
+  return null;
+}
+
+/** The missing tool NAMES behind a `toolsUnavailable` blocked reason (issue 859). */
+function missingToolNames(salvage) {
+  const states = Array.isArray(salvage?.toolStates) ? salvage.toolStates : [];
+  return states
+    .filter((tool) => tool?.available !== true)
+    .map((tool) => tool?.name)
+    .filter(Boolean);
+}
+
+/** The quantity the TARGET actor owns of one row (issue 859) — destroy's basis. */
+function actorQuantityOf(row, actorId) {
+  const sources = Array.isArray(row?.sources) ? row.sources : [];
+  const match = sources.find((source) => source?.actorId === actorId);
+  if (match) return Number(match.quantity) || 0;
+  return Number(row?.totalQuantity ?? 0);
+}
+
+/**
+ * The identity a yield row aggregates under. Component IDENTITY, never its display
+ * name: two distinct components can legitimately share a name (and do — a ladder
+ * yielding same-named results collapsed them into one row, hiding real components
+ * from the preview). Falls back to a name-derived key ONLY when a projection carries
+ * no id at all, which keeps such a row visible instead of merging it into the first
+ * nameless one.
+ */
+function yieldKeyOf(entry) {
+  const componentId = entry?.componentId;
+  if (typeof componentId === 'string' && componentId !== '') return componentId;
+  return `name:${String(entry?.name ?? '')}`;
+}
+
+/** Best-case one-unit-per-row yield contribution of a SIMPLE salvage config. */
+function simpleYieldRows(salvage) {
+  const results = Array.isArray(salvage?.results) ? salvage.results : [];
+  const guaranteed = salvage?.checkUsable !== true;
+  return results.map((result) => {
+    const quantity = Number(result?.quantity) || 0;
+    return {
+      componentId: result?.componentId ?? null,
+      name: String(result?.name ?? ''),
+      img: result?.img ?? null,
+      quantity,
+      guaranteedQuantity: guaranteed ? quantity : 0,
+    };
+  });
+}
+
+/**
+ * Best-case one-unit-per-row yield contribution of a ROUTED salvage config
+ * (Divergence 2). `quantity` is the MAX over SUCCESS outcomes only — a
+ * `success: false` tier, or a success tier with no `outcomeRouting` entry,
+ * contributes 0. `guaranteedQuantity` is the MIN across every (success) outcome,
+ * but ONLY when none of the authored outcomes is a failure tier and the mode is
+ * not `fixed`; otherwise it is 0 for every component, because the roll can always
+ * land on the failure tier (relative) or miss every authored range (fixed).
+ */
+function routedYieldRows(salvage) {
+  const outcomes = Array.isArray(salvage?.routedOutcomes) ? salvage.routedOutcomes : [];
+  const successOutcomes = outcomes.filter((outcome) => outcome?.success === true);
+  const hasFailureTier = outcomes.some((outcome) => outcome?.success !== true);
+  const guaranteedEligible =
+    outcomes.length > 0 && !hasFailureTier && salvage?.routedType !== 'fixed';
+
+  const quantityFor = (outcome, key) =>
+    (outcome?.results || [])
+      .filter((result) => yieldKeyOf(result) === key)
+      .reduce((sum, result) => sum + (Number(result?.quantity) || 0), 0);
+
+  const byKey = new Map();
+  for (const outcome of successOutcomes) {
+    for (const result of outcome.results || []) {
+      const key = yieldKeyOf(result);
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          componentId: result?.componentId ?? null,
+          name: String(result?.name ?? ''),
+          img: result?.img ?? null,
+          quantity: 0,
+          guaranteedQuantity: 0,
+        });
+      }
+    }
+  }
+  for (const [key, row] of byKey) {
+    row.quantity = Math.max(0, ...successOutcomes.map((outcome) => quantityFor(outcome, key)));
+    if (guaranteedEligible) {
+      row.guaranteedQuantity = Math.min(
+        ...successOutcomes.map((outcome) => quantityFor(outcome, key))
+      );
+    }
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Best-case one-unit-per-row yield contribution of a PROGRESSIVE salvage config
+ * (Divergence 3): 1 per stage, always POSSIBLE (never guaranteed), and a stage
+ * whose `threshold === null` is OMITTED entirely — unreachable at any budget.
+ */
+function progressiveYieldRows(salvage) {
+  const stages = Array.isArray(salvage?.stages) ? salvage.stages : [];
+  const byKey = new Map();
+  for (const stage of stages) {
+    if (stage?.threshold === null) continue;
+    const key = yieldKeyOf(stage);
+    const row = byKey.get(key) ?? {
+      componentId: stage?.componentId ?? null,
+      name: String(stage?.name ?? ''),
+      img: stage?.img ?? null,
+      quantity: 0,
+      guaranteedQuantity: 0,
+    };
+    row.quantity += 1;
+    byKey.set(key, row);
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * One row's best-case yield contribution, dispatched by mode, from the row's OWN
+ * `salvage.results` / `routedOutcomes` / `stages` — NEVER `store.orderedSalvageStages`,
+ * which is scoped to the inspected card only.
+ */
+function yieldRowsFor(salvage) {
+  if (salvage?.mode === 'simple') return simpleYieldRows(salvage);
+  if (salvage?.mode === 'routed') return routedYieldRows(salvage);
+  if (salvage?.mode === 'progressive') return progressiveYieldRows(salvage);
+  return [];
+}
+
+/**
+ * Assemble the in-panel report from one bulk run's snapshot + facade result
+ * (issue 859). Positional matching against `items[index]` is safe because both
+ * `BulkSalvageService.run` and `BulkDestroyService.run` preserve `targets` order
+ * end to end, and `targets` was built from `snapshot` in that exact order.
+ */
+function buildBulkReport(mode, snapshot, result) {
+  const items = Array.isArray(result?.items) ? result.items : [];
+  const rows = snapshot.map((entry, index) => ({
+    key: entry.key,
+    name: entry.name,
+    img: entry.img,
+    ...(items[index] ?? {}),
+  }));
+  return {
+    mode,
+    cancelled: result?.cancelled === true,
+    counts: result?.counts ?? null,
+    unitsDeleted: Number.isFinite(result?.unitsDeleted) ? result.unitsDeleted : null,
+    documentsDeleted: Number.isFinite(result?.documentsDeleted) ? result.documentsDeleted : null,
+    posted: result?.posted === true,
+    error: result?.error ?? null,
+    items: rows,
+  };
+}
+
 function matchesFilter(row, filter) {
   switch (filter) {
     case 'components':
@@ -157,7 +380,25 @@ export function createInventoryStore({ services } = {}) {
   let progressiveOrders = $state({});
   let persistedOrders = {};
   let orderCommitTimer = null;
+  // The order key captured when `orderCommitTimer` was ARMED (issue 859 latent-bug
+  // fix). `flushSalvageOrder` reads (and clears) THIS rather than re-deriving the
+  // key from the CURRENT selection — a selection change between the reorder
+  // gesture and the debounced commit must not silently write the pending order
+  // under a different participation's key.
+  let pendingOrderKey = null;
   let salvageOrderAnnouncement = $state('');
+
+  // Bulk salvage/destroy (issue 859). `bulkSelectedKeys` is CARD keys in click
+  // order — see `toggleBulkSelection`.
+  let bulkSelectedKeys = $state([]);
+  let bulkRunning = $state(false);
+  let bulkDestroying = $state(false);
+  // `{ current, total }` while a bulk run is in flight, else null.
+  let bulkProgress = $state(null);
+  // The last bulk run's report, or null. Invalidated by any selection mutation
+  // (`toggleBulkSelection` / `removeFromBulkSelection` / `clearBulkSelection`) so a
+  // report never stands for a selection it no longer describes.
+  let bulkReport = $state(null);
 
   /** Resolve the current component-source actor ids, preferring the sibling store. */
   function currentSourceIds() {
@@ -300,6 +541,110 @@ export function createInventoryStore({ services } = {}) {
     return ordered.map((stage, index) => ({ ...stage, threshold: thresholds[index] }));
   });
 
+  // The selected cards, in CLICK order (issue 859). Stale keys (a card the reload
+  // dropped) are silently filtered rather than surfaced — the panel has nothing
+  // useful to show for a card that no longer exists.
+  const bulkSelectedRows = $derived.by(() =>
+    bulkSelectedKeys.map((key) => rows.find((row) => row?.key === key) ?? null).filter(Boolean)
+  );
+
+  /**
+   * The bulk selection partitioned into salvageable/blocked, computed ONCE (issue
+   * 859) — `bulkSalvageable`/`bulkBlocked`/`bulkCounts`/`bulkYieldPreview` are all
+   * cheap filters/aggregates over this. Entries are PURE DATA carrying no i18n; the
+   * view localizes `blockedReason` and renders `yieldRows`.
+   */
+  const bulkEntries = $derived.by(() =>
+    bulkSelectedRows.map((row) => {
+      const inspected = row.key === selectedKey;
+      const participation = actingParticipationOf(row, { inspected, selectedSystemId });
+      const salvage = participation?.salvage ?? null;
+      const blockedReason = bulkBlockedReasonFor(row, participation);
+      // Decision 8 parity: the first owned actor holding the acting participation's
+      // documents, falling back to the card's own first source for a row with no
+      // salvage config at all (essence/recipeItem/salvageDisabled) — destroy still
+      // needs a target actor for those.
+      const actorId = salvage?.targetActorId ?? row?.sources?.[0]?.actorId ?? null;
+      const actorSource = (Array.isArray(row?.sources) ? row.sources : []).find(
+        (source) => source?.actorId === actorId
+      );
+      return {
+        key: row.key,
+        name: row.name,
+        img: row.img,
+        broken: row.broken === true,
+        systemId: participation?.systemId ?? null,
+        systemName: participation?.systemName ?? null,
+        componentId: participation?.componentId ?? null,
+        // > 1 means the card carries several system participations; the queue row
+        // names the acting system in that case.
+        systemsCount: Array.isArray(row.systems) ? row.systems.length : 0,
+        actorId,
+        actorName: actorSource?.actorName ?? '',
+        actorQuantity: actorQuantityOf(row, actorId),
+        blocked: blockedReason !== null,
+        blockedReason,
+        missingTools: blockedReason === 'toolsUnavailable' ? missingToolNames(salvage) : [],
+        // The row's resolution mode, and whether THIS component honours the player's
+        // stored stage order. The engine captures that order per `(systemId, componentId)`
+        // at run start inside `salvage()`, which the bulk service calls once per queued
+        // row — so a bulk run already respects each row's own order. The panel surfaces
+        // it because nothing else on this screen tells the player that (issue 859).
+        mode: salvage?.mode ?? null,
+        allowsReorder: salvage?.mode === 'progressive' && salvage?.allowPlayerResultReorder !== false,
+        yieldRows: blockedReason === null ? yieldRowsFor(salvage) : [],
+      };
+    })
+  );
+
+  // Queue rows follow the NAME-sorted order (issue 859) — also `bulkSalvage()`'s
+  // and the report's iteration order.
+  const bulkSalvageable = $derived.by(() =>
+    bulkEntries
+      .filter((entry) => !entry.blocked)
+      .sort((left, right) => left.name.localeCompare(right.name))
+  );
+  const bulkBlocked = $derived.by(() =>
+    bulkEntries
+      .filter((entry) => entry.blocked)
+      .sort((left, right) => left.name.localeCompare(right.name))
+  );
+  const bulkCounts = $derived.by(() => ({
+    selected: bulkSelectedKeys.length,
+    salvageable: bulkSalvageable.length,
+    blocked: bulkBlocked.length,
+    // Flips true on the CLICK that REACHES the cap (not the refused one after it),
+    // so the panel's `aria-live` count line already states the limit before a
+    // screen-reader user hits the wall — see `toggleBulkSelection`.
+    atMax: bulkSelectedKeys.length >= BULK_MAX_ITEMS,
+  }));
+
+  // Best-case aggregate yield across the QUEUE only, `quantity`/`guaranteedQuantity`
+  // summed INDEPENDENTLY per component name (two rows can yield the same component
+  // at different certainties). Sorted by name.
+  const bulkYieldPreview = $derived.by(() => {
+    const byKey = new Map();
+    for (const entry of bulkSalvageable) {
+      for (const row of entry.yieldRows) {
+        const key = yieldKeyOf(row);
+        const existing = byKey.get(key) ?? {
+          componentId: row.componentId ?? null,
+          name: row.name,
+          img: row.img,
+          quantity: 0,
+          guaranteedQuantity: 0,
+        };
+        existing.quantity += row.quantity;
+        existing.guaranteedQuantity += row.guaranteedQuantity;
+        if (!existing.img && row.img) existing.img = row.img;
+        byKey.set(key, existing);
+      }
+    }
+    return [...byKey.values()].sort((left, right) => left.name.localeCompare(right.name));
+  });
+
+  const bulkActive = $derived(bulkSelectedKeys.length > 0);
+
   /**
    * Persist the pending order for `key`, reverting and announcing on failure.
    *
@@ -364,8 +709,11 @@ export function createInventoryStore({ services } = {}) {
     salvageOrderAnnouncement = announcement;
 
     if (orderCommitTimer) clearTimeout(orderCommitTimer);
+    // Captured HERE, at schedule time — see `pendingOrderKey`'s own comment.
+    pendingOrderKey = key;
     orderCommitTimer = setTimeout(() => {
       orderCommitTimer = null;
+      pendingOrderKey = null;
       void commitProgressiveOrder(key);
     }, ORDER_COMMIT_DEBOUNCE_MS);
   }
@@ -410,8 +758,11 @@ export function createInventoryStore({ services } = {}) {
     salvageOrderAnnouncement = announcement;
 
     if (orderCommitTimer) clearTimeout(orderCommitTimer);
+    // Captured HERE, at schedule time — see `pendingOrderKey`'s own comment.
+    pendingOrderKey = key;
     orderCommitTimer = setTimeout(() => {
       orderCommitTimer = null;
+      pendingOrderKey = null;
       void commitProgressiveOrder(key);
     }, ORDER_COMMIT_DEBOUNCE_MS);
   }
@@ -433,7 +784,13 @@ export function createInventoryStore({ services } = {}) {
     if (!orderCommitTimer) return Promise.resolve({ ok: true });
     clearTimeout(orderCommitTimer);
     orderCommitTimer = null;
-    const key = progressiveOrderKey({ scope: 'salvage', id: salvageOrderId(selectedParticipation) });
+    // READ (and clear) the key captured when the debounce was ARMED — never
+    // re-derive it from `selectedParticipation`, which may have changed since
+    // (issue 859 latent-bug fix). Re-deriving here was the bug: a selection change
+    // between the reorder gesture and this flush silently committed the reordered
+    // array under a DIFFERENT participation's key.
+    const key = pendingOrderKey;
+    pendingOrderKey = null;
     return key ? commitProgressiveOrder(key) : Promise.resolve({ ok: true });
   }
 
@@ -543,12 +900,13 @@ export function createInventoryStore({ services } = {}) {
    * salvage path has, and a uuid would bypass it and reach the engine (which mutates
    * Items directly and THROWS on a bad uuid rather than returning a message).
    *
-   * `salvage()` has FOUR outcomes, not two — a `success` with null results is a
-   * time-gated run that has STARTED and awarded nothing:
+   * `salvage()` has FOUR outcomes, not two — `waiting: true` (issue 859; alongside
+   * `success: true` and null results) marks a time-gated run that has STARTED and
+   * awarded nothing:
    *
    *   cancelled            → silently back to pre-roll. NO notify: the player chose to
    *                          dismiss the prompt; an error toast would be a lie.
-   *   success, no results  → waiting state carrying the engine's message. No ribbon,
+   *   waiting              → waiting state carrying the engine's message. No ribbon,
    *                          no "Salvage again" (that would re-enter the time gate).
    *   success + results    → success ribbon, quiet reload, selection HELD.
    *   !success             → surface the message (this is also the misconfigured shape).
@@ -600,7 +958,10 @@ export function createInventoryStore({ services } = {}) {
         salvageResult = null;
         return result;
       }
-      if (result?.success === true && result?.results == null) {
+      // Issue 859: read the engine's explicit `waiting: true` flag rather than
+      // inferring the time-gated state from `results == null` — one derivation of
+      // one fact, matching `classifySalvageOutcome` (`BulkSalvageService.js`).
+      if (result?.waiting === true) {
         salvageResult = { systemId, componentId, state: 'waiting', message: result?.message ?? '' };
         await load(true);
         return result;
@@ -725,10 +1086,256 @@ export function createInventoryStore({ services } = {}) {
    * system (issue 766).
    */
   function select(key) {
+    // Cleared FIRST (issue 859) so every plain-click exit from bulk gets it for
+    // free — a normal card click always means "leave bulk, inspect this one".
+    bulkSelectedKeys = [];
+    bulkReport = null;
     selectedKey = key ?? null;
     selectedSystemId = null;
     heldItem = null;
     salvageResult = null;
+  }
+
+  /**
+   * Toggle one card into or out of the bulk selection, in CLICK ORDER (issue 859).
+   *
+   * PROMOTION: the FIRST shift-click also promotes the currently-inspected card —
+   * but ONLY when the selection is empty AND the newly-toggled key differs from
+   * it. Shift-clicking the ALREADY-inspected card first therefore selects exactly
+   * ONE (itself), not two — the guard a naive implementation gets wrong.
+   *
+   * REFUSAL: the store holds no i18n (the `onResetSalvageOrder` precedent — a
+   * caller supplies/consumes localized text, the store never authors it), so a
+   * refusal at `BULK_MAX_ITEMS` is reported back as a plain signal for
+   * `InventoryView` to localize and hand to `services.notify`.
+   * `bulkCounts.atMax` flips true on the click that REACHES the cap (this one,
+   * when it succeeds), so the panel's `aria-live` count line already states the
+   * limit before a screen-reader user hits the wall on the NEXT (refused) click —
+   * a toast on the refused click alone would be invisible to them.
+   *
+   * Clears `bulkReport`: adding a card while a report stands would otherwise show
+   * a report for a set it no longer describes. Entering (or extending) bulk
+   * releases the single-item inspector's `salvageResult`/`heldItem`; `selectedKey`
+   * is retained so Clear/Done return to the same card.
+   *
+   * @param {string} key
+   * @returns {{refused: boolean, reason?: string}}
+   */
+  function toggleBulkSelection(key) {
+    if (!key) return { refused: false };
+    bulkReport = null;
+    if (bulkSelectedKeys.includes(key)) {
+      bulkSelectedKeys = bulkSelectedKeys.filter((existing) => existing !== key);
+      return { refused: false };
+    }
+    let next = bulkSelectedKeys;
+    if (next.length === 0 && selectedKey && selectedKey !== key) {
+      next = [selectedKey];
+    }
+    if (next.length >= BULK_MAX_ITEMS) {
+      return { refused: true, reason: 'bulkLimit' };
+    }
+    bulkSelectedKeys = [...next, key];
+    salvageResult = null;
+    heldItem = null;
+    return { refused: false };
+  }
+
+  /** Remove one card from the bulk selection (the panel's per-row `×`). */
+  function removeFromBulkSelection(key) {
+    bulkReport = null;
+    bulkSelectedKeys = bulkSelectedKeys.filter((existing) => existing !== key);
+  }
+
+  /** Empty the bulk selection, returning to the single-item inspector. */
+  function clearBulkSelection() {
+    bulkReport = null;
+    bulkSelectedKeys = [];
+  }
+
+  /**
+   * Run the queued bulk salvage (issue 859) — the batch analogue of `salvage()`.
+   *
+   * FLUSHES the pending progressive-order write FIRST, for the same reason
+   * `salvage()` does: a queued row must not run against a stale order. A REJECTED
+   * flush ABORTS before anything starts — no run, no toast, no reload — exactly
+   * like the single-item path.
+   *
+   * SNAPSHOTS `bulkSalvageable` BEFORE awaiting the run — the bulk analogue of
+   * `heldItem`: the terminal `load(true)` this always performs drops every
+   * consumed row from the listing, and the report must survive that drop.
+   * Iteration/report order is the snapshot's own name-sorted order.
+   *
+   * ONE `finally` BLOCK discharges the whole exit-path obligation — this is the
+   * sharpest correctness risk in the feature. The busy flag reset, the progress
+   * toast's terminal removal, and the single terminal `load(true)` run together on
+   * EVERY exit: success, a per-item `error`, a `cancelled` prompt dismissal, AND a
+   * throw. Without this, a throw escaping with `bulkRunning` still `true` would
+   * leave the inventory PERMANENTLY deaf to document-change reloads for the rest
+   * of the session (`reloadOnDocumentChange` reads the flag at fire time, forever)
+   * — silently, with no error surfaced anywhere.
+   *
+   * @returns {Promise<object>} The facade's own result shape, or `{cancelled:
+   *   true}` on a pre-flight abort (already running, nothing queued, or a
+   *   rejected order flush).
+   */
+  async function bulkSalvage() {
+    if (bulkRunning || bulkDestroying) return { cancelled: true };
+    const flush = await flushSalvageOrder();
+    if (flush?.ok === false) {
+      return { cancelled: true, message: salvageOrderAnnouncement };
+    }
+    const snapshot = bulkSalvageable;
+    if (snapshot.length === 0) return { cancelled: true, items: [] };
+
+    bulkRunning = true;
+    const total = snapshot.length;
+    bulkProgress = { current: 0, total };
+    const reporter = services?.createProgressReporter?.() ?? null;
+    // Whether the run ever produced a progress tick — the toast's open/close gate; see
+    // the `finally` below.
+    let ticked = false;
+    try {
+      const targets = snapshot.map((entry) => ({
+        actorId: entry.actorId,
+        actorName: entry.actorName,
+        systemId: entry.systemId,
+        componentId: entry.componentId,
+      }));
+      const result = await services?.salvageComponents?.({
+        targets,
+        interactive: true,
+        // Optional: a facade that does not thread this through simply never calls
+        // it, and the toast/panel jump straight from 0 to the terminal state below
+        // — a graceful degrade, not a throw (a missing facade is `null`, and `?.`
+        // on the awaited result already covers that).
+        onProgress: (current) => {
+          ticked = true;
+          bulkProgress = { current, total };
+          reporter?.({ pct: total > 0 ? current / total : 1 });
+        },
+      });
+      bulkProgress = { current: total, total };
+      bulkReport = buildBulkReport('salvage', snapshot, result);
+      return result ?? { cancelled: true, items: [] };
+    } catch (error) {
+      const message = error?.message ?? String(error);
+      bulkReport = buildBulkReport('salvage', snapshot, { items: [], error: message });
+      return { cancelled: false, items: [], error: message };
+    } finally {
+      // The terminal `pct: 1` is CONDITIONAL on a tick having happened. The reporter
+      // opens its toast lazily, on its first call (`createDefaultProgressReporter`), so
+      // an unconditional terminal emit on a ZERO-TICK exit — a dismissed batch prompt
+      // returns `{cancelled: true}` before the first target, and a throw can precede
+      // the first target too — OPENS the toast for the first time and immediately
+      // drives it to 100%: a completion notification for a run that never ran.
+      // `dismiss()` stays unconditional: it is documented as a no-op when the reporter
+      // never started, so it still discharges the abnormal-exit obligation.
+      if (ticked) reporter?.({ pct: 1 });
+      reporter?.dismiss?.();
+      bulkRunning = false;
+      bulkProgress = null;
+      await load(true);
+    }
+  }
+
+  /**
+   * Confirm, then permanently destroy every SELECTED row's whole stack on its
+   * target actor (issue 859) — salvageable AND blocked rows alike (acceptance 10):
+   * destroy is not gated on salvageability at all, so the snapshot is `bulkEntries`
+   * (the whole partition), never `bulkSalvageable`.
+   *
+   * `prompt` is handed to `services.confirmDialog` VERBATIM — the store holds no
+   * i18n, and the caller composes the full dialog copy (the row count AND the unit
+   * count). A FALSY result is treated as not-confirmed: covers both `null` (the
+   * dialog dismissed) and `false` (No, `DialogV2.confirm`'s own default button).
+   *
+   * THE TARGET SET IS SNAPSHOTTED BEFORE THE DIALOG OPENS, which is what the spec
+   * states (§Bulk Destroy) and what the panel's own docblock claims. The listing
+   * reloads on world-time, scene and source changes, any of which can fire while the
+   * modal stands, so the set the caller counted for the confirmation copy has to be
+   * the set that is destroyed — a re-read afterwards would let the row count and the
+   * unit count the player agreed to drift from what is deleted.
+   *
+   * Same single-`finally` exit-path obligation as `bulkSalvage()`.
+   *
+   * @param {object} prompt Already-localized `DialogV2.confirm` options.
+   * @returns {Promise<object>} `{ confirmed: false }` when not confirmed, else the
+   *   facade's own result shape merged with `confirmed: true`.
+   */
+  async function bulkDestroy(prompt) {
+    if (bulkRunning || bulkDestroying) return { confirmed: false };
+    // BEFORE the modal, never after — see the docblock. `bulkEntries` recomputes into a
+    // NEW array whenever the listing changes, so holding this reference is a real
+    // snapshot rather than a live view.
+    const snapshot = bulkEntries;
+    const confirmed = await services?.confirmDialog?.(prompt);
+    if (!confirmed) return { confirmed: false };
+    if (snapshot.length === 0) return { confirmed: true, items: [] };
+
+    bulkDestroying = true;
+    const total = snapshot.length;
+    bulkProgress = { current: 0, total };
+    const reporter = services?.createProgressReporter?.() ?? null;
+    let ticked = false;
+    try {
+      const targets = snapshot.map((entry) => ({
+        actorId: entry.actorId,
+        actorName: entry.actorName,
+        systemId: entry.systemId,
+        componentId: entry.componentId,
+      }));
+      const result = await services?.destroyComponents?.({
+        targets,
+        onProgress: (current) => {
+          ticked = true;
+          bulkProgress = { current, total };
+          reporter?.({ pct: total > 0 ? current / total : 1 });
+        },
+      });
+      bulkProgress = { current: total, total };
+      bulkReport = buildBulkReport('destroy', snapshot, result);
+      return { confirmed: true, ...(result ?? { items: [] }) };
+    } catch (error) {
+      const message = error?.message ?? String(error);
+      bulkReport = buildBulkReport('destroy', snapshot, { items: [], error: message });
+      return { confirmed: true, items: [], error: message };
+    } finally {
+      // Conditional for the same reason `bulkSalvage`'s is: a zero-tick exit (a throw
+      // before the first target) must not OPEN the progress toast just to complete it.
+      if (ticked) reporter?.({ pct: 1 });
+      reporter?.dismiss?.();
+      bulkDestroying = false;
+      bulkProgress = null;
+      await load(true);
+    }
+  }
+
+  /**
+   * Handle a hook-driven listing refresh, quietly reloading UNLESS a bulk run is in
+   * flight (issue 859).
+   *
+   * THIS IS THE ONLY WAY THE SHELL MAY REFRESH THE LISTING. `FabricateAppRoot`
+   * routes BOTH of its subscriptions here — `subscribeInventoryChange` and
+   * `subscribeCraftingDataChange` (`src/ui/svelte/util/foundryBridge.js`) — and
+   * `fabricate-app-shell.test.js` pins the absence of a direct `load(true)` call
+   * there, because a bypassed guard is indistinguishable from a missing one and
+   * this store's own tests cannot see the bypass (they call the guard directly).
+   * The item-change hook is the sharp case: item mutations arrive one hook fire per
+   * document, so a bulk run's burst would otherwise reload roughly once per queued
+   * item.
+   *
+   * This is a DROP, not a defer, and that is safe ONLY because it is paired with
+   * `bulkSalvage()`/`bulkDestroy()` always performing their own terminal
+   * `load(true)` once the run ends — a dropped reload here is never lost, only
+   * deferred to that terminal reload.
+   *
+   * The flag is read HERE, AT FIRE TIME — never by unsubscribing/re-subscribing
+   * the hook, which is registered ONCE for the whole window's lifetime.
+   */
+  function reloadOnDocumentChange() {
+    if (bulkRunning || bulkDestroying) return;
+    void load(true);
   }
 
   /**
@@ -854,6 +1461,42 @@ export function createInventoryStore({ services } = {}) {
     get selectedParticipation() {
       return selectedParticipation;
     },
+    get bulkSelectedKeys() {
+      return bulkSelectedKeys;
+    },
+    get bulkRunning() {
+      return bulkRunning;
+    },
+    get bulkDestroying() {
+      return bulkDestroying;
+    },
+    get bulkProgress() {
+      return bulkProgress;
+    },
+    get bulkReport() {
+      return bulkReport;
+    },
+    get bulkSelectedRows() {
+      return bulkSelectedRows;
+    },
+    get bulkEntries() {
+      return bulkEntries;
+    },
+    get bulkSalvageable() {
+      return bulkSalvageable;
+    },
+    get bulkBlocked() {
+      return bulkBlocked;
+    },
+    get bulkCounts() {
+      return bulkCounts;
+    },
+    get bulkYieldPreview() {
+      return bulkYieldPreview;
+    },
+    get bulkActive() {
+      return bulkActive;
+    },
     load,
     learn,
     learnAll,
@@ -870,5 +1513,11 @@ export function createInventoryStore({ services } = {}) {
     setPage,
     setPageSize,
     tickWorldTime,
+    toggleBulkSelection,
+    removeFromBulkSelection,
+    clearBulkSelection,
+    bulkSalvage,
+    bulkDestroy,
+    reloadOnDocumentChange,
   };
 }

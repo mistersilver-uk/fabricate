@@ -107,6 +107,22 @@ async function startLabServer() {
 }
 
 /**
+ * The click modifiers Playwright accepts. Checked here rather than left to Playwright because its
+ * own error names neither the case nor the selector, and locating one bad step part-way through a
+ * 155-frame capture costs a whole run.
+ */
+const CLICK_MODIFIERS = ['Alt', 'Control', 'ControlOrMeta', 'Meta', 'Shift'];
+
+/**
+ * The verbs a `modifiers` step may NOT carry. `selectOption`, `fill`, `setInputFiles` and
+ * `scrollIntoViewIfNeeded` take no `modifiers` option, so the pairing would be silently INERT: the
+ * step would run unmodified and the case would publish a frame of the WRONG state under the right
+ * name. That is the failure class every other guard in this runner exists to prevent, so the
+ * pairing is rejected rather than dropped.
+ */
+const MODIFIER_INCOMPATIBLE_VERBS = ['select', 'fill', 'upload', 'scroll'];
+
+/**
  * Drive a case to its named view state.
  *
  * The manager's route (`activeView`) is component-local `$state` — not a prop, and not in
@@ -118,11 +134,14 @@ async function startLabServer() {
  * A step is either a rail label (matched by text against `.manager-nav-button`) or an object naming
  * a stable selector plus the verb to apply to it:
  *
- *   { selector }                  click it (the default)
- *   { selector, select: 'macro' } choose that option on a `<select>`
- *   { selector, fill: 'text' }    type into it, which is the only way to reach a dirty form
- *   { selector, scroll: true }    scroll it into view inside its own overflow container
- *   { selector, upload: json }     choose a file on a native file input
+ *   { selector }                       click it (the default)
+ *   { selector, modifiers: ['Shift'] } click it with those keys held — a VARIANT of the click
+ *                                      above, not a peer of the verbs below, so it composes with
+ *                                      the default and with nothing else
+ *   { selector, select: 'macro' }      choose that option on a `<select>`
+ *   { selector, fill: 'text' }         type into it, which is the only way to reach a dirty form
+ *   { selector, scroll: true }         scroll it into view inside its own overflow container
+ *   { selector, upload: json }         choose a file on a native file input
  *
  * @param {import('playwright').Page} page The lab page.
  * @param {Array<string|object>} steps Ordered steps.
@@ -141,6 +160,34 @@ async function runSteps(page, steps, label, scratch) {
         );
       }
       const target = element.first();
+
+      // `modifiers` is a MODIFIER ON THE CLICK, not a sixth verb: it does not choose which action
+      // runs, it changes how the default one runs. Bulk selection is shift-click, so without it
+      // every multi-selected state in the player inventory is unphotographable.
+      //
+      // Both guards run BEFORE the dispatch below, because both failures are silent otherwise.
+      const modifiers = 'modifiers' in step ? [step.modifiers].flat() : null;
+      if (modifiers) {
+        // A modifier paired with a non-click verb would be dropped without a word, and the case
+        // would capture the UNMODIFIED state under its own name — a frame of the wrong state,
+        // published as evidence of the right one. Split such a step into two instead.
+        const paired = MODIFIER_INCOMPATIBLE_VERBS.filter((verb) => verb in step);
+        if (paired.length > 0) {
+          throw new Error(
+            `${label}: step for "${step.selector}" pairs \`modifiers\` with \`${paired.join('`, `')}\` — ` +
+              `a modifier only applies to a click, so it would be silently dropped and the case ` +
+              `would publish a frame of the unmodified state. Split it into two steps.`
+          );
+        }
+        const unknown = modifiers.filter((name) => !CLICK_MODIFIERS.includes(name));
+        if (unknown.length > 0) {
+          throw new Error(
+            `${label}: step for "${step.selector}" names unknown modifier(s) ` +
+              `${unknown.map((name) => JSON.stringify(name)).join(', ')} — ` +
+              `Playwright accepts ${CLICK_MODIFIERS.join(', ')}`
+          );
+        }
+      }
 
       // Five verbs, because a click alone cannot reach every state the smoke photographs. The smoke
       // itself drives these surfaces with `selectOption` and `fill`; a click-only runner leaves those
@@ -176,7 +223,7 @@ async function runSteps(page, steps, label, scratch) {
         // into view is simply absent from the frame while every assertion still passes.
         await target.scrollIntoViewIfNeeded();
       } else {
-        await target.click();
+        await target.click(modifiers ? { modifiers } : {});
       }
 
       await page.evaluate(() => globalThis.__FABRICATE_VIEW__.settle());

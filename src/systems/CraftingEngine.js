@@ -49,6 +49,7 @@ import {
   updateStackQuantity,
 } from './itemStackQuantity.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
+import { hasCheckFormula, resolveSalvageCheck } from './salvageCheckUsability.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
 import { buildStepRecipeView } from './stepRecipeView.js';
 import {
@@ -3381,7 +3382,7 @@ export class CraftingEngine {
       craftingActor?.items != null && typeof craftingActor.items[Symbol.iterator] === 'function';
     let matchingItems = [];
     if (managedItem && system && itemsIterable && !hasPropertyUpdates && !transfersEffects) {
-      matchingItems = this._findComponentItems(craftingActor, managedItem, system) || [];
+      matchingItems = this.findComponentItems(craftingActor, managedItem, system) || [];
     }
 
     const resultItem = await createOrStackComponentItem({
@@ -3628,7 +3629,7 @@ export class CraftingEngine {
         return { success: true, outcome: null, value: null, data: {} };
       }
       if (alchemyCheckMode === 'simple') {
-        if (!this._hasCheckFormula(system?.craftingCheck?.simple)) {
+        if (!hasCheckFormula(system?.craftingCheck?.simple)) {
           return {
             success: false,
             misconfigured: true,
@@ -3644,7 +3645,7 @@ export class CraftingEngine {
         });
       }
       // tiered
-      if (!this._hasCheckFormula(system?.craftingCheck?.routed)) {
+      if (!hasCheckFormula(system?.craftingCheck?.routed)) {
         return {
           success: false,
           misconfigured: true,
@@ -4070,15 +4071,20 @@ export class CraftingEngine {
 
   /**
    * Resolve the active salvage check's `checkBreakage` block for the system's
-   * salvage resolution mode (issue 419).
+   * salvage resolution mode (issue 419), via the shared {@link resolveSalvageCheck}
+   * derivation (issue 859).
+   *
+   * An UNSUPPORTED mode breaks nothing. That deliberately removes the old fall-through
+   * to `check.simple.checkBreakage`: an invalid salvage config now aborts
+   * `misconfigured` with zero mutation inside `_runSalvageCraftingCheck`, so the run
+   * never reaches breakage at all and reading a foreign mode's triggers here could only
+   * ever be wrong.
    * @private
    */
   _resolveSalvageCheckBreakage(system) {
-    const mode = system?.salvageResolutionMode || 'simple';
-    const check = system?.salvageCraftingCheck || {};
-    if (mode === 'routed') return check.routed?.checkBreakage ?? null;
-    if (mode === 'progressive') return check.progressive?.checkBreakage ?? null;
-    return check.simple?.checkBreakage ?? null;
+    const { config, unsupportedMode } = resolveSalvageCheck(system);
+    if (unsupportedMode) return null;
+    return config?.checkBreakage ?? null;
   }
 
   /**
@@ -4237,15 +4243,6 @@ export class CraftingEngine {
     }
     const resumed = await runManager.markStepInProgress(craftingActor, run, 0);
     return { waiting: false, run: resumed };
-  }
-
-  /**
-   * True when a check sub-config carries an authored, non-empty roll formula — the
-   * single notion of a "usable" check (matches `ResolutionModeService._hasRollFormula`).
-   * @private
-   */
-  _hasCheckFormula(config) {
-    return typeof config?.rollFormula === 'string' && config.rollFormula.trim().length > 0;
   }
 
   /**
@@ -4458,6 +4455,10 @@ export class CraftingEngine {
    *   or null when no check ran; the card renders it only when finite.
    * @param {object|null} [params.tierStep]    - Realized routed tier-step evidence
    *   (`data.tierStepApplied`), or null when the rolled tier was never moved.
+   * @param {boolean} [params.suppressed] - When true, post nothing (issue 859). The
+   *   caller owns the chat output for this run — a bulk salvage posts ONE aggregated
+   *   card and suppresses the per-item ones. Gated in the SAME place as
+   *   `features.chatOutput` so there is one early return, not two.
    * @private
    */
   async _postSalvageChatMessage({
@@ -4471,8 +4472,9 @@ export class CraftingEngine {
     failureReason,
     rollValue = null,
     tierStep = null,
+    suppressed = false,
   }) {
-    if (!system || system.features?.chatOutput !== true) return;
+    if (suppressed || !system || system.features?.chatOutput !== true) return;
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
     const consumed =
@@ -4764,7 +4766,19 @@ export class CraftingEngine {
    *   `{ success: false, cancelled: true, results: null }` with zero mutation (no
    *   component consumed, no tool breakage) and discards a run created by this call.
    *   The player Inventory tab's Salvage panel passes true (issue 675).
-   * @returns {Promise<{success: boolean, results: Item[]|null, message: string, salvageRun: object|null, cancelled?: boolean}>}
+   * @param {object|null} [options.rollDecision] A PRE-RESOLVED roll decision
+   *   (`{ bonus, rollMode, advantage }` — `promptCheckRoll`'s shape minus `confirmed`),
+   *   threaded to the salvage check so ONE prompt answer drives every roll of a bulk
+   *   run (issue 859). When set on an interactive salvage no dialog is shown. Absent on
+   *   every single-item path.
+   * @param {boolean} [options.suppressChat] When true, suppress this call's per-item
+   *   salvage chat card (issue 859). A bulk run posts ONE aggregated card instead, so
+   *   without this an N-item run would post the aggregate plus N strays. It does NOT
+   *   suppress the interactive roll's own `Roll#toMessage` post — that is the Dice So
+   *   Nice trigger and every roll keeps animating. Defaults to false.
+   * @returns {Promise<{success: boolean, results: Item[]|null, message: string,
+   *   salvageRun: object|null, cancelled?: boolean, misconfigured?: boolean,
+   *   waiting?: boolean}>}
    */
   async salvage(actorUuid, craftingSystemId, componentId, options = {}) {
     const actor = await fromUuid(actorUuid);
@@ -4819,6 +4833,15 @@ export class CraftingEngine {
       if (!validation.valid) {
         return {
           success: false,
+          // The SAME additive discriminator the misconfigured-check abort carries
+          // (issue 859), and the branch that actually fires in a wired world: this gate
+          // runs BEFORE `_runSalvageCraftingCheck`, so a GM-side config error
+          // (unsupported mode, a routed success tier routing nowhere, a simple mode with
+          // two success groups) never reaches the check's own misconfigured return.
+          // Without the flag here a caller reads a broken config as a rolled failure and
+          // tells the player "nothing recovered" — so they retry a config only their GM
+          // can fix. `success` is unchanged, so nothing existing regresses.
+          misconfigured: true,
           results: null,
           message: `Invalid salvage configuration: ${validation.errors.join(', ')}`,
           salvageRun: null,
@@ -4848,7 +4871,7 @@ export class CraftingEngine {
     }
 
     const ingredientQuantity = Number(component.salvage.ingredientQuantity) || 1;
-    const componentItems = this._findComponentItems(actor, component, system);
+    const componentItems = this.findComponentItems(actor, component, system);
     const totalAvailable = componentItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
     if (totalAvailable < ingredientQuantity) {
       if (salvageRunManager && salvageRun) {
@@ -4934,6 +4957,12 @@ export class CraftingEngine {
         );
         return {
           success: true,
+          // The run STARTED and is waiting on world time; nothing has been awarded yet
+          // (issue 859). Additive and purely descriptive — `success` is unchanged — so
+          // a caller can tell "started, come back later" from "succeeded and awarded"
+          // without re-deriving it from `results == null`, which is also what a
+          // no-result success looks like.
+          waiting: true,
           results: null,
           message: `Salvage started for ${component.name || componentId} (${remaining}s remaining)`,
           salvageRun,
@@ -4948,6 +4977,7 @@ export class CraftingEngine {
     const checkResult = await this._runSalvageCraftingCheck(component, system, actor, {
       interactive: options?.interactive === true,
       toolItems: toolValidation.tools,
+      rollDecision: options?.rollDecision ?? null,
     });
     const failurePolicy = this._getSalvageFailureConsumptionPolicy(system);
 
@@ -4964,6 +4994,11 @@ export class CraftingEngine {
       }
       return {
         success: false,
+        // Additive discriminator (issue 859): a GM-side config gap, NOT a rolled
+        // failure. `success` is unchanged, so no existing consumer regresses; a caller
+        // that cares can now say "not configured — tell your GM" instead of reporting a
+        // failed roll that never happened.
+        misconfigured: true,
         results: null,
         message: checkResult.message,
         salvageRun: salvageRunCreatedThisCall ? null : salvageRun,
@@ -5050,6 +5085,7 @@ export class CraftingEngine {
         failureReason: checkResult.message || 'Salvage check failed',
         rollValue: rollTotalForCard(checkResult),
         tierStep: tierStepForCard(checkResult),
+        suppressed: options?.suppressChat === true,
       });
 
       return {
@@ -5155,6 +5191,7 @@ export class CraftingEngine {
       failureReason: '',
       rollValue: rollTotalForCard(checkResult),
       tierStep: tierStepForCard(checkResult),
+      suppressed: options?.suppressChat === true,
     });
 
     return {
@@ -5176,9 +5213,26 @@ export class CraftingEngine {
    * legacy scalar / raw source-reference chain), keeping those that resolve to the
    * target component. When none resolve, falls back to a case-SENSITIVE exact-name
    * match — a compatibility path whose closure is deferred to issue 557.
-   * @private
+   *
+   * ## Public because DESTROY must match exactly what SALVAGE matches
+   *
+   * Bulk destroy (issue 859) deletes the documents a player was shown as a component,
+   * so it has to resolve them through this matcher and no other. The three sibling
+   * matchers (`RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`,
+   * `essenceResolver.findMatchingComponent`) fall back case-INSENSITIVELY; matching more
+   * broadly than salvage would delete items belonging to a differently-cased component.
+   * Rather than let `BulkDestroyService` reach through the private spelling, the method
+   * is part of the engine's surface. {@link CraftingEngine#_findComponentItems} remains
+   * as a delegate for existing callers.
+   *
+   * @param {Actor} actor The owning actor whose items are searched.
+   * @param {object} component The managed component to resolve items against.
+   * @param {object} system The crafting system the component belongs to; its `id` scopes
+   *   durable-identity resolution and its `components` list makes resolution list-aware.
+   * @returns {Array<Item>} The matching items, in the actor's own item order. Empty when
+   *   nothing matches, and when the component carries neither source references nor a name.
    */
-  _findComponentItems(actor, component, system) {
+  findComponentItems(actor, component, system) {
     const items = [...actor.items];
     const components = Array.isArray(system?.components) ? system.components : [];
     if (
@@ -5200,6 +5254,24 @@ export class CraftingEngine {
       );
     }
     return [];
+  }
+
+  /**
+   * The private spelling {@link CraftingEngine#findComponentItems} was promoted from.
+   *
+   * Retained as a THIN DELEGATE, never a second copy: two bodies could drift, and a
+   * drifted destroy matcher deletes the wrong documents. Kept because callers still name
+   * it directly, and silent — no deprecation warning — because it is an internal spelling
+   * of a method whose behaviour did not change, not a deprecated feature.
+   *
+   * @param {Actor} actor
+   * @param {object} component
+   * @param {object} system
+   * @returns {Array<Item>}
+   * @private
+   */
+  _findComponentItems(actor, component, system) {
+    return this.findComponentItems(actor, component, system);
   }
 
   /**
@@ -5254,9 +5326,18 @@ export class CraftingEngine {
    * @private
    */
   _resolveSalvageResultGroups(component, system, checkResult, salvageRun = null) {
-    // Legacy salvage tokens are normalized to canonical values by the manager
-    // (salvage token normalizer) and the 1.4.0 migration before reaching here.
-    const mode = system?.salvageResolutionMode || 'simple';
+    // The mode comes from the shared derivation (issue 859), which also flags a token
+    // outside `simple|routed|progressive`. Legacy tokens are rewritten to canonical
+    // values by the manager (salvage token normalizer) and the 1.4.0 migration, so an
+    // unsupported token here is a CONFIG DEFECT rather than a legacy spelling — and
+    // awarding for it would award the WRONG thing, since the resolver's `mode` coerces
+    // to `simple` for display. `ResolutionModeService.validateSalvage` reports the same
+    // config invalid, so award nothing. (This is also why there is no trailing
+    // "unknown mode → every group" default: it awarded EVERY authored group, including
+    // failure groups, for a configuration nothing supports.)
+    const { mode, unsupportedMode } = resolveSalvageCheck(system);
+    if (unsupportedMode) return [];
+
     const allGroups = Array.isArray(component.salvage?.resultGroups)
       ? component.salvage.resultGroups
       : [];
@@ -5323,7 +5404,10 @@ export class CraftingEngine {
       return [{ ...group, results: awarded.map((result) => ({ ...result, quantity: 1 })) }];
     }
 
-    return allGroups;
+    // Unreachable: `mode` is one of `simple | routed | progressive` by construction and
+    // every one of the three returns above. Kept as an explicit exhaustiveness fallback
+    // that awards NOTHING, never `allGroups`.
+    return [];
   }
 
   /**
@@ -5351,47 +5435,64 @@ export class CraftingEngine {
   }
 
   /**
-   * Run the salvage crafting check for the active salvage resolution mode.
+   * Run the salvage crafting check for the active salvage resolution mode, dispatching
+   * on the `(mode, checkUsable)` PAIR from the shared {@link resolveSalvageCheck}
+   * derivation (issue 859).
    *
-   * A salvage check is usable only when its mode has an authored roll formula
-   * (simple/routed/progressive). Routed maps the rolled total onto a named outcome
-   * tier that `_resolveSalvageResultGroups` routes through
-   * `component.salvage.outcomeRouting`. When the routed mode needs a check outcome
-   * to route but no roll formula is configured, the attempt fails loudly; every
-   * other mode with no usable formula is a no-op success.
+   * A salvage check is usable only when its mode has an authored, NON-EMPTY roll
+   * formula (simple/routed/progressive) — the trimmed test the builder and the whole
+   * crafting path already used, adopted here so a whitespace-only formula reads as "no
+   * check" everywhere instead of rolling `"   "` and surfacing as a consuming failure.
+   * Routed maps the rolled total onto a named outcome tier that
+   * `_resolveSalvageResultGroups` routes through `component.salvage.outcomeRouting`.
+   * When routed/progressive need a check outcome but no roll formula is configured, the
+   * attempt fails loudly; every other mode with no usable formula is a no-op success.
+   *
+   * @param {object} [options]
+   * @param {object|null} [options.rollDecision] A pre-resolved roll decision (issue 859
+   *   bulk salvage) threaded to the runners' `rollOptions`; see `evaluateCheckRoll`.
    * @private
    */
   async _runSalvageCraftingCheck(
     component,
     system,
     actor,
-    { interactive = false, toolItems = [] } = {}
+    { interactive = false, toolItems = [], rollDecision = null } = {}
   ) {
-    const check = system?.salvageCraftingCheck || {};
-    const mode = system?.salvageResolutionMode || 'simple';
+    const { mode, config, checkUsable, requiresCheck, unsupportedMode } =
+      resolveSalvageCheck(system);
+    const runOptions = { interactive, toolItems, rollDecision };
 
-    if (mode === 'progressive' && check.progressive?.rollFormula) {
-      return this._runSalvageProgressiveCheck(check.progressive, component, actor, {
-        interactive,
-        toolItems,
-      });
+    // A mode outside `simple|routed|progressive` is a GM-side config defect, not a
+    // rolled failure: report it exactly as a missing required formula is reported, so
+    // `salvage()` aborts with ZERO mutation. This matches the answer
+    // `ResolutionModeService.validateSalvage` already gives; coercing to `simple`
+    // instead would award `resultGroups[0]` for a config validation calls invalid.
+    // The authored token is read HERE for the MESSAGE only — never to dispatch on.
+    if (unsupportedMode) {
+      return {
+        success: false,
+        misconfigured: true,
+        outcome: null,
+        value: null,
+        data: {},
+        message: `Unsupported salvage resolution mode: ${system?.salvageResolutionMode}`,
+      };
     }
-    if (mode === 'simple' && check.simple?.rollFormula) {
-      return this._runSalvageSimpleCheck(check.simple, component, actor, {
-        interactive,
-        toolItems,
-      });
-    }
-    if (mode === 'routed' && check.routed?.rollFormula) {
-      return this._runSalvageRoutedCheck(check.routed, component, actor, {
-        interactive,
-        toolItems,
-      });
+
+    if (checkUsable) {
+      if (mode === 'progressive') {
+        return this._runSalvageProgressiveCheck(config, component, actor, runOptions);
+      }
+      if (mode === 'routed') {
+        return this._runSalvageRoutedCheck(config, component, actor, runOptions);
+      }
+      return this._runSalvageSimpleCheck(config, component, actor, runOptions);
     }
 
     // A salvage check is REQUIRED to produce an outcome in progressive mode and in
     // routed mode (the routed result-group routing keys off the outcome tier name).
-    if (mode === 'progressive' || mode === 'routed') {
+    if (requiresCheck) {
       return {
         success: false,
         misconfigured: true,
@@ -5417,6 +5518,33 @@ export class CraftingEngine {
   }
 
   /**
+   * The interactive roll-options bag every salvage check runner passes to its shared
+   * formula runner: {@link buildInteractiveRollOptions} plus the optional PRE-RESOLVED
+   * `rollDecision` (issue 859 bulk salvage).
+   *
+   * The decision is attached ONLY when truthy — the same conditional-attach idiom
+   * `buildInteractiveRollOptions` itself uses for `modifierChoice` — so a single-item
+   * salvage's bag stays byte-identical to what it was before bulk existed, and
+   * `evaluateCheckRoll` keeps taking the prompt path.
+   *
+   * One helper rather than three inline spreads: the attach is a single gate, so a
+   * fourth runner cannot silently ship without it.
+   * @private
+   */
+  _salvageRollOptions({ interactive, actor, component, dc, rollDecision = null }) {
+    const rollOptions = buildInteractiveRollOptions({
+      interactive,
+      actor,
+      name: component?.name,
+      activity: 'Salvage',
+      img: component?.img,
+      dc,
+    });
+    if (rollDecision) rollOptions.rollDecision = rollDecision;
+    return rollOptions;
+  }
+
+  /**
    * Salvage simple pass/fail check: compare the rolled total against the resolved DC
    * (per-component override ?? default), honouring per-die crits. Delegates the roll
    * to the shared {@link runFormulaPassFail}.
@@ -5425,7 +5553,7 @@ export class CraftingEngine {
     simple,
     component,
     actor,
-    { interactive = false, toolItems = [] } = {}
+    { interactive = false, toolItems = [], rollDecision = null } = {}
   ) {
     const dc = this._resolveSalvageDc(simple, component);
     const formula = await this._appendToolCheckBonuses(simple.rollFormula, toolItems);
@@ -5436,14 +5564,7 @@ export class CraftingEngine {
       triggers: simple.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor,
-        name: component?.name,
-        activity: 'Salvage',
-        img: component?.img,
-        dc,
-      }),
+      rollOptions: this._salvageRollOptions({ interactive, actor, component, dc, rollDecision }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -5457,7 +5578,7 @@ export class CraftingEngine {
     progressive,
     component,
     actor,
-    { interactive = false, toolItems = [] } = {}
+    { interactive = false, toolItems = [], rollDecision = null } = {}
   ) {
     const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
     const result = await runFormulaProgressive({
@@ -5465,13 +5586,8 @@ export class CraftingEngine {
       triggers: progressive.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor,
-        name: component?.name,
-        activity: 'Salvage',
-        img: component?.img,
-      }),
+      // No `dc`: progressive has none, and the prompt must show no DC chip.
+      rollOptions: this._salvageRollOptions({ interactive, actor, component, rollDecision }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -5489,7 +5605,7 @@ export class CraftingEngine {
     routed,
     component,
     actor,
-    { interactive = false, toolItems = [] } = {}
+    { interactive = false, toolItems = [], rollDecision = null } = {}
   ) {
     const dc = this._resolveSalvageDc(routed, component);
     const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems);
@@ -5506,14 +5622,7 @@ export class CraftingEngine {
       // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-
       // component dcOverride never opens a null-outcome dead zone.
       clampToNearest: true,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor,
-        name: component?.name,
-        activity: 'Salvage',
-        img: component?.img,
-        dc,
-      }),
+      rollOptions: this._salvageRollOptions({ interactive, actor, component, dc, rollDecision }),
     });
     return this._markEngineEvaluated(result);
   }

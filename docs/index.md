@@ -72,6 +72,7 @@ See [Recipes]({% link recipes/index.md %}).
 
 Players can break a managed item back down into component parts from the **Salvage** flow.
 Salvage can be a straight breakdown or gated behind a crafting check, and it supports progressive results that a roll spends down.
+Players can also select several items at once to salvage or permanently destroy them together in a single gesture.
 See [Salvage]({% link salvage.md %}).
 
 ## Tools

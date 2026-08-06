@@ -67,6 +67,10 @@ import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { readStackQuantity } from './itemStackQuantity.js';
+// The ONE salvage `(mode, checkUsable)` derivation, shared with `CraftingEngine` so the
+// player's panel and the engine that rolls for it cannot disagree. A pure, Foundry-free
+// leaf, so it adds no transitive edge.
+import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
@@ -1174,18 +1178,19 @@ export class InventoryListingBuilder {
     // untouched — this is a viewer projection, not a config mutation.
     if (hiddenEntityIds.has(component?.id)) return null;
 
-    const check = system?.salvageCraftingCheck ?? {};
-    // The mode the ENGINE dispatches on. `_runSalvageCraftingCheck` reads this and the
-    // authored formula; `check.enabled` is never consulted anywhere on the salvage path.
-    const mode = ['simple', 'routed', 'progressive'].includes(system?.salvageResolutionMode)
-      ? system.salvageResolutionMode
-      : 'simple';
-    const config = check[mode] ?? null;
-    // A check is USABLE iff its mode's roll formula is authored. That is the only gate —
-    // so "no check" and "pass/fail" are not two modes, they are one `simple` mode read at
-    // two usability states, and the body dispatches on the PAIR (mode, checkUsable).
-    const rollFormula = typeof config?.rollFormula === 'string' ? config.rollFormula.trim() : '';
-    const checkUsable = rollFormula.length > 0;
+    // The mode the ENGINE dispatches on, and whether its check is usable, from the ONE
+    // shared derivation both sides now read (issue 859). `_runSalvageCraftingCheck`
+    // resolves the same pair from the same helper, so the panel can no longer disagree
+    // with the engine about whether a check will roll. `salvageCraftingCheck.enabled` is
+    // never consulted anywhere on the salvage path.
+    //
+    // A check is USABLE iff its mode's roll formula is authored and non-empty. That is
+    // the only gate — so "no check" and "pass/fail" are not two modes, they are one
+    // `simple` mode read at two usability states, and the body dispatches on the PAIR
+    // (mode, checkUsable). An unsupported mode token still reads as `simple` here (a
+    // projection has nothing better to render); only the MUTATING engine path treats it
+    // as misconfigured.
+    const { mode, config, checkUsable } = resolveSalvageCheck(system);
     // Simple mode admits exactly one SUCCESS group (issue 764). A stored-but-not-yet-
     // re-normalized legacy config with more than one success group is misconfigured: the
     // engine awards `slice(0, 1)`, so the surplus is silently ignored. The GM sees this

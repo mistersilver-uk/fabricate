@@ -30,12 +30,16 @@ import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGa
 import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
 import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
+import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
 import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
+import { BulkSalvageService } from './systems/BulkSalvageService.js';
+import { BulkDestroyService } from './systems/BulkDestroyService.js';
+import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
 import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
@@ -522,6 +526,12 @@ class Fabricate {
     // Lazily-built player-facing inventory listing projector (player Inventory
     // tab). Constructed on first read once the managers exist.
     this._inventoryListingBuilder = null;
+    // Lazily-built bulk salvage / bulk destroy collaborators (issue 859), cached
+    // exactly like the listing builders above. Deliberately NOT exported onto
+    // `game.fabricate`: `salvageComponents` and `destroyComponents` are the only
+    // supported entry points, because they are where the per-target ownership gate is.
+    this._bulkSalvageService = null;
+    this._bulkDestroyService = null;
     this.itemPilesIntegration = null;
     this.actorInventoryCoinSpender = null;
     this.actorPropertyCoinSpender = null;
@@ -1724,6 +1734,332 @@ class Fabricate {
     return await this.craftingEngine.salvage(craftingActor.uuid, systemId, componentId, {
       interactive
     });
+  }
+
+  /**
+   * Lazily build (and cache) the {@link BulkSalvageService} behind
+   * {@link Fabricate#salvageComponents} (issue 859). Mirrors
+   * {@link Fabricate#_getCraftingListingBuilder}: every collaborator the service needs
+   * is injected here, so the service itself reaches no Foundry global and stays
+   * unit-testable against plain objects.
+   *
+   * Safe to cache because every collaborator below is read off `this` at CALL time and
+   * none is captured at construction time. That — not immutability — is what makes the
+   * cache sound: `this.craftingEngine` is assigned twice (`null` in the constructor, then
+   * the real engine in `initialize()`), so a service that had captured the field's value
+   * instead of the receiver could hold `null` forever.
+   * {@link Fabricate#_getBulkDestroyService} states the same rule for the same reason.
+   *
+   * @returns {BulkSalvageService}
+   * @private
+   */
+  _getBulkSalvageService() {
+    if (this._bulkSalvageService) return this._bulkSalvageService;
+    this._bulkSalvageService = new BulkSalvageService({
+      salvage: (actorUuid, systemId, componentId, options) =>
+        this.craftingEngine.salvage(actorUuid, systemId, componentId, options),
+      getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
+      promptRollDecision: promptBulkCheckRoll,
+      postChatMessage: (message) => this._postBulkSalvageChatMessage(message),
+      // Key-only, matching every card module's `localize` contract; the aggregate card
+      // substitutes its own counts.
+      localize: (key) => game.i18n?.localize?.(key) ?? key
+    });
+    return this._bulkSalvageService;
+  }
+
+  /**
+   * Lazily build (and cache) the {@link BulkDestroyService} behind
+   * {@link Fabricate#destroyComponents} (issue 859).
+   *
+   * @returns {BulkDestroyService}
+   * @private
+   */
+  _getBulkDestroyService() {
+    if (this._bulkDestroyService) return this._bulkDestroyService;
+    this._bulkDestroyService = new BulkDestroyService({
+      getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
+      // Destroy MUST resolve documents through the identical matcher salvage uses,
+      // including its case-SENSITIVE name fallback: a destroy that matched more broadly
+      // than salvage would delete things the player was shown as a different component.
+      // Read off `this.craftingEngine` at CALL time, not at construction time, because
+      // this service is cached and the engine is assigned during `initialize()` — the
+      // constructor leaves the field `null`.
+      findComponentItems: (actor, component, system) =>
+        this.craftingEngine.findComponentItems(actor, component, system),
+      // Must RETURN the deleted documents: the service derives `unitsDeleted` from what
+      // came back, never from what it asked for, because a `preDeleteItem` hook can veto
+      // individual ids silently while the rest of the batch deletes.
+      deleteItems: (actor, itemIds) => actor.deleteEmbeddedDocuments('Item', itemIds)
+    });
+    return this._bulkDestroyService;
+  }
+
+  /**
+   * Post the ONE aggregated bulk-salvage chat card: speaker → visibility → create.
+   *
+   * ## The order of the three steps is load-bearing
+   *
+   * 1. **Speaker first**, because `ChatMessage.applyMode`'s `ic` branch reads
+   *    `chatData.speaker.actor` unguarded — a visibility pass over speaker-less data
+   *    throws for a player whose client default is In-Character.
+   * 2. **Visibility before `create`**, because the legacy `rollMode` CREATE OPTION is
+   *    honoured only for a message carrying rolls and this card carries none. See
+   *    {@link module:src/systems/bulkChatVisibility.applyBulkChatVisibility}, which owns
+   *    the V13/V14 probe and vocabulary.
+   * 3. **`create` last**, with `author` — the V14 schema defines `author` and has no
+   *    `user` field and no shim, so the `user` key the single-salvage poster still
+   *    passes is silently discarded there and works only by defaulting.
+   *
+   * ## Why the speaker is built rather than inferred
+   *
+   * `ChatMessage.getSpeaker()` with no actor falls through to the CONTROLLED TOKENS on
+   * the canvas, so a GM running a bulk salvage with an unrelated NPC selected would have
+   * the card attributed to that NPC. A one-actor run therefore names its actor
+   * explicitly, and a multi-actor run — which has no single speaker to name — builds the
+   * same shape `_getSpeakerFromUser` produces, with an explicit alias, so the card speaks
+   * as the acting user rather than as whatever happened to be selected.
+   *
+   * @param {object} message
+   * @param {string} message.content The card markup (already built and escaped).
+   * @param {string|null} message.rollMode The LEGACY token the player chose, or null when
+   *   nothing prompted — in which case the client's own `core.rollMode` decides. Never
+   *   reads `core.messageMode`: `ClientSettings#assertSetting` throws for an unregistered
+   *   key on V13, and `??` does not catch a throw.
+   * @param {string|null} message.actorUuid Set only for a single-actor run.
+   * @param {string[]} [message.actorNames] The acting actors, used for the alias.
+   * @returns {Promise<object|undefined>} The created message.
+   * @private
+   */
+  async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {
+    // `globalThis.` rather than the bare global `fromUuid` this file uses elsewhere:
+    // optional chaining does not rescue an UNDECLARED identifier, so a bare
+    // `fromUuidSync?.()` would still throw a ReferenceError under a harness that has not
+    // installed it, and this poster must never be the thing that costs a completed run
+    // its report.
+    const actor = actorUuid ? (globalThis.fromUuidSync?.(actorUuid) ?? null) : null;
+    const alias = actorNames.filter(Boolean).join(', ') || game.user?.name || '';
+    const speaker = actor
+      ? ChatMessage.getSpeaker({ actor })
+      : { scene: game.scenes?.current?.id ?? null, actor: null, token: null, alias };
+
+    const chatData = { author: game.user?.id, speaker, content };
+    applyBulkChatVisibility(chatData, rollMode || game.settings?.get?.('core', 'rollMode'));
+    return await ChatMessage.create(chatData);
+  }
+
+  /**
+   * Gate a bulk target list, resolving ONE actor per row.
+   *
+   * ## `target.actorId ?? actorId`, and nothing else
+   *
+   * There is deliberately no `?? this.getSelectedCraftingActorId()` tail here, unlike
+   * {@link Fabricate#_resolveCraftingSources}. A bulk run may span actors, so a
+   * persisted-selection fallback would silently RETARGET a row whose own actor did not
+   * resolve onto whichever actor the player last selected — salvaging or destroying the
+   * wrong character's items with no error anywhere. A row that names no resolvable actor
+   * is refused, never redirected.
+   *
+   * @param {Array<object>} targets
+   * @param {string|null} actorId The run-level default for rows that name no actor.
+   * @returns {Array<{target: object, actor: Actor|null}>} Input order, preserved.
+   * @private
+   */
+  _gateBulkTargets(targets, actorId) {
+    return (targets || []).filter(Boolean).map((target) => ({
+      target,
+      actor: this._resolveCraftingActor(target.actorId ?? actorId)
+    }));
+  }
+
+  /**
+   * Weave a service's result rows back into the caller's ORIGINAL target order,
+   * substituting a refusal row wherever the gate resolved no actor.
+   *
+   * Order is preserved end to end because the in-panel report and the chat card line up
+   * with the queue the player committed; a run that reordered its own rows would make
+   * "the third one failed" unreadable.
+   *
+   * @param {Array<{target: object, actor: Actor|null}>} gated
+   * @param {Array<object>} ranItems The service's rows, in gated-and-runnable order.
+   * @param {(target: object) => object} buildRefusedRow
+   * @returns {Array<object>}
+   * @private
+   */
+  _mergeBulkRows(gated, ranItems, buildRefusedRow) {
+    const rows = [];
+    let next = 0;
+    for (const entry of gated) {
+      if (entry.actor && next < ranItems.length) {
+        rows.push(ranItems[next]);
+        next += 1;
+      } else {
+        rows.push(buildRefusedRow(entry.target));
+      }
+    }
+    return rows;
+  }
+
+  /**
+   * The identity fields every refusal row carries. The component's name and image are
+   * resolved from the crafting system so a refused row still READS as the thing the
+   * player selected, rather than as a blank line they cannot connect to anything.
+   *
+   * @param {object} target
+   * @returns {object}
+   * @private
+   */
+  _buildNotPermittedRow(target) {
+    const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
+    const component =
+      (system?.components || []).find((entry) => entry?.id === target?.componentId) ?? null;
+    return {
+      actorId: target?.actorId ?? null,
+      actorName: '',
+      systemId: target?.systemId ?? null,
+      componentId: target?.componentId ?? null,
+      name: component?.name || '',
+      img: component?.img || '',
+      // The facade's own outcome, added to the service vocabulary rather than folded
+      // into `skipped`: "you may not act on this actor" and "this row was not runnable"
+      // are different answers and the panel gives them different chips.
+      outcome: 'notPermitted',
+      skipReason: null
+    };
+  }
+
+  /**
+   * Salvage MANY owned components in one gesture (issue 859) — the seam behind the
+   * player Inventory tab's bulk panel.
+   *
+   * TAKES AN `actorId` PER TARGET, NEVER AN `actorUuid`, AT ANY NESTING LEVEL.
+   * `CraftingEngine.salvage` performs no ownership check of its own and
+   * `BulkSalvageService` performs none either — it receives a facade-derived uuid — so
+   * the per-target `_resolveCraftingActor` below is the ONLY gate on this path. It
+   * resolves through `game.actors` (world actors only), which closes two Foundry paths
+   * for free and is stated so a future "just accept a uuid" change knows what it would
+   * open: a compendium-backed actor can never be a target, and an unlinked token actor
+   * is not in `game.actors` either.
+   *
+   * An unresolvable actor becomes an `outcome: 'notPermitted'` ROW. It never throws and
+   * never retargets, so one refused row costs the player none of the others.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The run-level actor id, used for any target
+   *   that names none of its own.
+   * @param {Array<{actorId?: string, systemId: string, componentId: string}>}
+   *   [options.targets] The queue, in the order the player committed it.
+   * @param {boolean} [options.interactive] When true the run opens ONE roll prompt and
+   *   applies the player's answer to every roll. Defaults true — this facade exists for
+   *   a player gesture, unlike the automation-facing {@link Fabricate#salvageComponent}.
+   * @param {Function} [options.onProgress] Called `(completed, total)` after each target
+   *   resolves, so a caller can render determinate progress for a run that is knowable
+   *   precisely because it is sequential. OPTIONAL, and a listener that throws never
+   *   costs the run — see the service's own `reportBulkProgress`.
+   *
+   *   STATED LIMIT: `total` counts the rows the SERVICE was given, which is this call's
+   *   targets MINUS any the gate refused. A run containing a `notPermitted` row
+   *   therefore finishes below the caller's own denominator rather than reporting a
+   *   refusal as work; the caller owns its terminal state either way.
+   * @returns {Promise<{cancelled: boolean, items: object[], counts: object,
+   *   posted: boolean}>} Plain models only, in the caller's target order.
+   */
+  async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {
+    this._requireReady();
+    const gated = this._gateBulkTargets(targets, actorId);
+    const runnable = gated.filter((entry) => entry.actor);
+
+    const result = await this._getBulkSalvageService().run({
+      targets: runnable.map(({ target, actor }) => ({
+        actorUuid: actor.uuid,
+        actorId: actor.id,
+        actorName: actor.name,
+        systemId: target.systemId,
+        componentId: target.componentId
+      })),
+      interactive,
+      onProgress
+    });
+    // A dismissed prompt returns before the first engine call, so nothing ran and there
+    // is no per-row story to tell — pass the service's zero-mutation shape straight
+    // through rather than reporting refusals for a run the player cancelled.
+    if (result.cancelled) return result;
+
+    const items = this._mergeBulkRows(gated, result.items, (target) => ({
+      ...this._buildNotPermittedRow(target),
+      rollValue: null,
+      tierStep: null,
+      message: '',
+      results: [],
+      consumed: [],
+      tools: []
+    }));
+    return {
+      cancelled: false,
+      items,
+      counts: {
+        ...result.counts,
+        total: items.length,
+        notPermitted: items.length - result.items.length
+      },
+      posted: result.posted
+    };
+  }
+
+  /**
+   * Permanently destroy MANY owned components in one gesture (issue 859).
+   *
+   * Same gate as {@link Fabricate#salvageComponents} — an `actorId` per target, never a
+   * uuid, no persisted-selection fallback, an unresolvable actor refused as
+   * `notPermitted` rather than retargeted — and the same order-preserving merge.
+   *
+   * Destroy deletes WHOLE STACKS on the target actor and is deliberately NOT gated on
+   * `features.salvage` or a component's `salvage.enabled`: a player can already delete
+   * their own owned Items from the Foundry sheet, so this adds ergonomics, not
+   * capability, and a blocked-for-salvage row is often exactly the row they want gone.
+   * There is no chat card — a result card reports what an activity produced.
+   *
+   * The caller owns the confirmation. This facade executes against the snapshot the
+   * confirmation named and does not re-prompt.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The run-level actor id.
+   * @param {Array<{actorId?: string, systemId: string, componentId: string}>}
+   *   [options.targets]
+   * @param {Function} [options.onProgress] Called `(completed, total)` after each target
+   *   is destroyed, under the same optional-and-cannot-break-the-run contract — and the
+   *   same stated limit about refused rows — as {@link Fabricate#salvageComponents}.
+   * @returns {Promise<{items: object[], unitsDeleted: number, documentsDeleted: number}>}
+   */
+  async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
+    this._requireReady();
+    const gated = this._gateBulkTargets(targets, actorId);
+    const runnable = gated.filter((entry) => entry.actor);
+
+    const result = await this._getBulkDestroyService().run({
+      targets: runnable.map(({ target, actor }) => ({
+        // The RESOLVED document, not an id: the service's matcher and delete both need
+        // the actor itself, and re-resolving it there would be a second gate to keep
+        // honest. Resolution and the ownership decision stay in one place.
+        actor,
+        actorId: actor.id,
+        actorName: actor.name,
+        systemId: target.systemId,
+        componentId: target.componentId
+      })),
+      onProgress
+    });
+
+    const items = this._mergeBulkRows(gated, result.items, (target) => ({
+      ...this._buildNotPermittedRow(target),
+      requested: 0,
+      unitsDeleted: 0,
+      documentsDeleted: 0,
+      staleIds: 0,
+      items: [],
+      vetoed: []
+    }));
+    return { items, unitsDeleted: result.unitsDeleted, documentsDeleted: result.documentsDeleted };
   }
 
   /**

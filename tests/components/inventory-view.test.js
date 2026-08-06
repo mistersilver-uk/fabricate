@@ -62,6 +62,13 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
+    // The bulk tree (issue 859). `InventoryView` renders the panel as a SIBLING of
+    // `InventoryDetail`, so these are static imports of the view itself; an omission
+    // HANGS this suite (# cancelled), and a speculative entry throws outright.
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkSection.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/inventory/InventoryView.svelte',
@@ -120,8 +127,16 @@ function makeEssenceItem() {
 // A plain (non-reactive) store stand-in: this is a render + interaction smoke
 // test, so a POJO exposing the getters InventoryView reads is sufficient. The
 // real store's derivations are unit-tested separately.
-function makeServices(item) {
-  const calls = { navigate: [] };
+function makeServices(item, bulk = {}) {
+  const calls = {
+    navigate: [],
+    notify: [],
+    bulkToggle: [],
+    bulkClear: [],
+    bulkRemove: [],
+    bulkSalvage: [],
+    bulkDestroy: [],
+  };
   const store = {
     rows: [item],
     loading: false,
@@ -165,6 +180,39 @@ function makeServices(item) {
     setPageSize() {},
     load() {},
     tickWorldTime() {},
+    // Bulk salvage / destroy (issue 859). The POJO is not reactive, so every bulk state
+    // below is supplied AT MOUNT and the action seams merely RECORD — which is the only
+    // way to pin the `running` markup at all, since the View Lab cannot photograph it
+    // (its `Roll` is seeded and synchronous, so a lab run completes before the shot).
+    bulkSelectedKeys: bulk.selectedKeys ?? [],
+    get bulkActive() {
+      return (this.bulkSelectedKeys?.length ?? 0) > 0;
+    },
+    bulkEntries: bulk.entries ?? [],
+    bulkSalvageable: bulk.salvageable ?? [],
+    bulkBlocked: bulk.blocked ?? [],
+    bulkYieldPreview: bulk.yieldRows ?? [],
+    bulkCounts: bulk.counts ?? null,
+    bulkRunning: bulk.running ?? false,
+    bulkDestroying: bulk.destroying ?? false,
+    bulkProgress: bulk.progress ?? null,
+    bulkReport: bulk.report ?? null,
+    toggleBulkSelection(key) {
+      calls.bulkToggle.push(key);
+      return bulk.toggleResult ?? { refused: false };
+    },
+    clearBulkSelection() {
+      calls.bulkClear.push(true);
+    },
+    removeFromBulkSelection(key) {
+      calls.bulkRemove.push(key);
+    },
+    bulkSalvage() {
+      calls.bulkSalvage.push(true);
+    },
+    bulkDestroy(prompt) {
+      calls.bulkDestroy.push(prompt);
+    },
   };
   const services = {
     inventory: store,
@@ -172,8 +220,31 @@ function makeServices(item) {
     actorBar: { selectedActorId: 'a1' },
     setSelectedCraftingActorId() {},
     navigateToCraftingRecipe: (id) => calls.navigate.push(id),
+    notify: (message) => calls.notify.push(message),
   };
   return { services, calls, store };
+}
+
+/** A bulk queue/report entry in the shape the store's `bulkEntries` produces. */
+function bulkEntry(overrides = {}) {
+  return {
+    key: 'sys:c1',
+    name: 'Mordant Gland',
+    img: 'icons/gland.webp',
+    broken: false,
+    systemId: 'sys',
+    systemName: 'Alchemy',
+    componentId: 'c1',
+    systemsCount: 1,
+    actorId: 'a1',
+    actorName: 'Akra',
+    actorQuantity: 7,
+    blocked: false,
+    blockedReason: null,
+    missingTools: [],
+    yieldRows: [{ name: 'Shard', img: 'icons/shard.webp', quantity: 2, guaranteedQuantity: 2 }],
+    ...overrides,
+  };
 }
 
 async function settle() {
@@ -2146,5 +2217,480 @@ describe('InventoryDetailHeader (source contract)', () => {
         `${leaf} must be published globally, ancestor-guarded and :where()-zeroed`
       );
     }
+  });
+});
+
+// ===========================================================================
+// Bulk salvage / destroy (issue 859).
+// ===========================================================================
+describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  /** Dispatch a real bubbling event on `node` with the modifier keys set. */
+  function fire(node, type, init = {}) {
+    const EventClass = type.startsWith('key')
+      ? node.ownerDocument.defaultView.KeyboardEvent
+      : node.ownerDocument.defaultView.MouseEvent;
+    node.dispatchEvent(new EventClass(type, { bubbles: true, cancelable: true, ...init }));
+  }
+
+  it('a SHIFT-click on a card reaches toggleBulkSelection, not select', async () => {
+    // One `activate(event)` handler serves click and keydown — both event types carry
+    // `shiftKey` — so the mouse and keyboard gestures cannot drift apart.
+    const { services, calls, store } = makeServices(makeItem());
+    let selected = null;
+    store.select = (key) => {
+      selected = key;
+    };
+    const target = await harness.mount({ services });
+    await settle();
+
+    const card = target.querySelector('[data-inventory-card="sys:c1"] button');
+    fire(card, 'click', { shiftKey: true });
+    await settle();
+
+    assert.deepEqual(calls.bulkToggle, ['sys:c1']);
+    assert.ok(!selected, 'a shift-click never also inspects the card');
+  });
+
+  it('a PLAIN click still inspects, and toggles nothing', async () => {
+    const { services, calls, store } = makeServices(makeItem());
+    let selected = null;
+    store.select = (key) => {
+      selected = key;
+    };
+    const target = await harness.mount({ services });
+    await settle();
+
+    fire(target.querySelector('[data-inventory-card="sys:c1"] button'), 'click');
+    await settle();
+
+    assert.equal(selected, 'sys:c1');
+    assert.deepEqual(calls.bulkToggle, []);
+  });
+
+  it('Shift+Enter reaches the SAME action as the shift-click', async () => {
+    const { services, calls } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const card = target.querySelector('[data-inventory-card="sys:c1"] button');
+    fire(card, 'keydown', { key: 'Enter', shiftKey: true });
+    await settle();
+
+    assert.deepEqual(calls.bulkToggle, ['sys:c1'], 'the keyboard gesture is not a second path');
+    assert.equal(
+      card.getAttribute('aria-keyshortcuts'),
+      'Shift+Enter Shift+Space',
+      'and the gesture is advertised to assistive tech'
+    );
+  });
+
+  it('renders the bulk PANEL in the right column, and not the detail body', async () => {
+    // The panel is a SIBLING of `InventoryDetail` under `{#if bulkActive}`, so entering
+    // bulk replaces the inspector rather than routing through it — which is what keeps
+    // the bulk tree out of `InventoryDetail`'s static graph.
+    const { services } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1', 'sys:c2'],
+      entries: [bulkEntry(), bulkEntry({ key: 'sys:c2', name: 'Bronze Ingot' })],
+      salvageable: [bulkEntry(), bulkEntry({ key: 'sys:c2', name: 'Bronze Ingot' })],
+      counts: { selected: 2, salvageable: 2, blocked: 0, atMax: false },
+      yieldRows: [{ name: 'Shard', img: 'icons/shard.webp', quantity: 4, guaranteedQuantity: 4 }],
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    const panel = target.querySelector('[data-inventory-bulk-panel]');
+    assert.ok(panel, 'the panel renders');
+    assert.equal(panel.getAttribute('data-inventory-bulk-panel'), 'preview');
+    assert.ok(
+      !target.querySelector('[data-inventory-detail="sys:c1"]'),
+      'the single-item detail body is NOT rendered beside it'
+    );
+    assert.ok(target.querySelector('[data-inventory-bulk-queue="preview"]'), 'the queue renders');
+    assert.ok(target.querySelector('[data-inventory-bulk-yield-row="Shard"]'), 'and the preview');
+  });
+
+  it('labels the panel as a region and makes the count line a live region', async () => {
+    // `role="region"` + `aria-label` go on the SHELL ROOT, not the inner panel div —
+    // otherwise the title, count line and Clear sit OUTSIDE the labelled region and a
+    // screen-reader user skips exactly the material the live region added.
+    const { services } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    const panel = target.querySelector('[data-inventory-bulk-panel]');
+    assert.equal(panel.getAttribute('role'), 'region');
+    assert.ok(panel.getAttribute('aria-label'), 'the region is named');
+    const total = panel.querySelector('.inventory-detail-total');
+    assert.equal(total.getAttribute('aria-live'), 'polite');
+    assert.equal(total.getAttribute('aria-atomic'), 'true');
+    assert.equal(
+      panel.contains(total),
+      true,
+      'and the live region is INSIDE the labelled region, not beside it'
+    );
+  });
+
+  it('renders every blocked row with its own reason', async () => {
+    const blocked = [
+      bulkEntry({ key: 'sys:e1', name: 'Fire', blocked: true, blockedReason: 'essence' }),
+      bulkEntry({
+        key: 'sys:t1',
+        name: 'Hammer',
+        blocked: true,
+        blockedReason: 'toolsUnavailable',
+        missingTools: ['Anvil', 'Tongs'],
+      }),
+      bulkEntry({ key: 'sys:d1', name: 'Dust', blocked: true, blockedReason: 'depleted' }),
+    ];
+    const { services } = makeServices(makeItem(), {
+      selectedKeys: ['sys:e1', 'sys:t1', 'sys:d1'],
+      entries: blocked,
+      blocked,
+      counts: { selected: 3, salvageable: 0, blocked: 3, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.ok(target.querySelector('[data-inventory-bulk-blocked]'), 'the blocked section renders');
+    for (const reason of ['essence', 'toolsUnavailable', 'depleted']) {
+      assert.ok(
+        target.querySelector(`[data-inventory-bulk-blocked-row="${reason}"]`),
+        `${reason} names itself on its own row`
+      );
+    }
+    assert.equal(
+      target.querySelector('[data-inventory-bulk-panel]').getAttribute('data-inventory-bulk-panel'),
+      'empty',
+      'nothing is queueable, so the panel is in its empty state'
+    );
+    assert.ok(target.querySelector('[data-inventory-bulk-empty]'), 'with the shared empty note');
+  });
+
+  it('renders the RUNNING state from its props — the state the lab cannot photograph', async () => {
+    // The View Lab's `Roll` is seeded and synchronous, so a lab run completes before the
+    // shot; reaching this state would need a harness hook that stalls the
+    // `salvageComponents` seam mid-run. This mounted pin is therefore the ONLY evidence
+    // the running markup has, and it drives the busy props directly.
+    const rows = [
+      bulkEntry({ key: 'sys:a', name: 'Alpha' }),
+      bulkEntry({ key: 'sys:b', name: 'Beta' }),
+      bulkEntry({ key: 'sys:c', name: 'Gamma' }),
+    ];
+    const { services } = makeServices(makeItem(), {
+      selectedKeys: rows.map((entry) => entry.key),
+      entries: rows,
+      salvageable: rows,
+      counts: { selected: 3, salvageable: 3, blocked: 0, atMax: false },
+      running: true,
+      progress: { current: 1, total: 3 },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    const panel = target.querySelector('[data-inventory-bulk-panel]');
+    assert.equal(panel.getAttribute('data-inventory-bulk-panel'), 'running');
+
+    const progress = target.querySelector('[data-inventory-bulk-progress]');
+    assert.ok(progress, 'a determinate progress region, not a spinner');
+    assert.equal(progress.getAttribute('role'), 'status', 'announced politely as it advances');
+    assert.equal(progress.getAttribute('data-inventory-bulk-progress'), '33');
+
+    assert.ok(
+      target.querySelector('[data-inventory-bulk-queue="running"]'),
+      'the queue is marked up'
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-inventory-bulk-run-row]')].map((node) =>
+        node.getAttribute('data-inventory-bulk-run-row')
+      ),
+      ['sys:a', 'sys:b', 'sys:c'],
+      'one row per queued item, in run order'
+    );
+    // The footer stays put and goes BUSY rather than disappearing: a control that
+    // vanishes mid-run reflows the footer under the player's cursor, and `aria-busy` is
+    // what tells assistive tech the same thing the spinner tells everyone else.
+    const commit = target.querySelector('[data-inventory-bulk-salvage]');
+    assert.equal(commit.disabled, true, 'the commit button cannot be pressed twice');
+    assert.equal(commit.getAttribute('aria-busy'), 'true');
+    assert.equal(
+      target.querySelector('[data-inventory-bulk-destroy]').disabled,
+      true,
+      'and destroy cannot start on top of a salvage'
+    );
+    assert.equal(
+      target.querySelector('[data-inventory-bulk-clear]').disabled,
+      true,
+      'nor can Clear pull the rug from under a run in flight'
+    );
+  });
+
+  /**
+   * Each run row paired with the TONE of its trailing status chip — `subtle` waiting,
+   * `accent` in progress, `success` done. The row keys alone say nothing about which row
+   * the panel claims is being worked on, which is the whole subject below.
+   */
+  function runRowTones(target) {
+    return [...target.querySelectorAll('[data-inventory-bulk-run-row]')].map((node) => [
+      node.getAttribute('data-inventory-bulk-run-row'),
+      node.querySelector('[data-status-pill]')?.getAttribute('data-status-pill') ?? null,
+    ]);
+  }
+
+  /** The three-row busy panel every run-state case below drives, at one progress value. */
+  function busyServices(bulk) {
+    const rows = [
+      bulkEntry({ key: 'sys:a', name: 'Alpha' }),
+      bulkEntry({ key: 'sys:b', name: 'Beta' }),
+      bulkEntry({ key: 'sys:c', name: 'Gamma' }),
+    ];
+    return makeServices(makeItem(), {
+      selectedKeys: rows.map((entry) => entry.key),
+      entries: rows,
+      salvageable: rows,
+      counts: { selected: 3, salvageable: 3, blocked: 0, atMax: false },
+      ...bulk,
+    });
+  }
+
+  it('claims NO row in progress before a salvage run has ticked once', async () => {
+    // `salvageComponents` opens the ONE batch roll prompt BEFORE it touches the first
+    // target, so `current: 0` means "waiting on the player", not "row 1 running". A
+    // dismissed prompt ends the run having called the engine zero times, and a row left
+    // wearing "In progress" would be claiming work that never started.
+    const { services } = busyServices({ running: true, progress: { current: 0, total: 3 } });
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(runRowTones(target), [
+      ['sys:a', 'subtle'],
+      ['sys:b', 'subtle'],
+      ['sys:c', 'subtle'],
+    ]);
+    const progress = target.querySelector('[data-inventory-bulk-progress]');
+    assert.equal(
+      progress.getAttribute('data-inventory-bulk-progress'),
+      '0',
+      'and the bar is empty, not a third full'
+    );
+  });
+
+  it('marks done / in progress / waiting once the first tick has landed', async () => {
+    // `current` counts COMPLETED rows, so one tick means row 1 is done and row 2 is the
+    // one being worked on. This is the value at which the guarded expression and the
+    // unguarded one agree — which is exactly why the case above exists.
+    const { services } = busyServices({ running: true, progress: { current: 1, total: 3 } });
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(runRowTones(target), [
+      ['sys:a', 'success'],
+      ['sys:b', 'accent'],
+      ['sys:c', 'subtle'],
+    ]);
+  });
+
+  it('a DESTROY run marks its first row active from tick zero — the asymmetry', async () => {
+    // Destroy has no pre-first-target gap: its confirmation is answered BEFORE the store
+    // raises the busy flag at all, so `current: 0` there really does mean row 1 is being
+    // deleted. Holding destroy to salvage's rule would show a three-row queue with
+    // nothing happening for the whole run.
+    const { services } = busyServices({ destroying: true, progress: { current: 0, total: 3 } });
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(runRowTones(target), [
+      ['sys:a', 'accent'],
+      ['sys:b', 'subtle'],
+      ['sys:c', 'subtle'],
+    ]);
+  });
+
+  it('shows only Done in the REPORT state, and no footer actions', async () => {
+    const { services, calls } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+      report: {
+        mode: 'salvage',
+        cancelled: false,
+        counts: { total: 1, succeeded: 1 },
+        posted: true,
+        error: null,
+        items: [
+          { key: 'sys:c1', name: 'Mordant Gland', img: null, outcome: 'succeeded', results: [] },
+        ],
+      },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    const panel = target.querySelector('[data-inventory-bulk-panel]');
+    assert.equal(panel.getAttribute('data-inventory-bulk-panel'), 'report');
+    assert.ok(!target.querySelector('[data-inventory-bulk-salvage]'), 'no Salvage');
+    assert.ok(!target.querySelector('[data-inventory-bulk-destroy]'), 'no Destroy');
+    const done = target.querySelector('[data-inventory-bulk-done]');
+    assert.ok(done, 'only Done');
+
+    fire(done, 'click');
+    await settle();
+    assert.deepEqual(calls.bulkClear, [true], 'Done returns to the single-item inspector');
+  });
+
+  it('WITHHOLDS the count line, and its live region, in the REPORT state', async () => {
+    // The run consumed its rows, so they no longer resolve in the listing and every count
+    // collapses to zero. Left in place, the polite live region announces
+    // "1 selected · 0 salvageable · 0 skipped" directly above "Batch complete" at the
+    // moment the run SUCCEEDED — both true, together a contradiction, and the one a
+    // screen-reader user hears is the wrong one. The report's own banner is the summary
+    // in that state, so the header line stands down rather than competing with it.
+    const { services } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      // What the store really holds once the terminal reload has dropped the consumed
+      // row: a selection that still names a card, and zeroes for everything else.
+      counts: { selected: 1, salvageable: 0, blocked: 0, atMax: false },
+      report: {
+        mode: 'salvage',
+        cancelled: false,
+        counts: { total: 1, succeeded: 1 },
+        posted: true,
+        error: null,
+        items: [
+          { key: 'sys:c1', name: 'Mordant Gland', img: null, outcome: 'succeeded', results: [] },
+        ],
+      },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    const panel = target.querySelector('[data-inventory-bulk-panel]');
+    assert.equal(panel.getAttribute('data-inventory-bulk-panel'), 'report');
+    const total = panel.querySelector('.inventory-detail-total');
+    assert.equal(total.textContent.trim(), '', 'no count line is rendered at all');
+    assert.equal(total.getAttribute('aria-live'), null, 'and the node is not a live region');
+    assert.equal(total.getAttribute('aria-atomic'), null);
+  });
+
+  it('wires the footer actions and the per-row remove', async () => {
+    const { services, calls } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    fire(target.querySelector('[data-inventory-bulk-salvage]'), 'click');
+    fire(target.querySelector('[data-inventory-bulk-remove="sys:c1"]'), 'click');
+    fire(target.querySelector('[data-inventory-bulk-clear]'), 'click');
+    await settle();
+
+    assert.deepEqual(calls.bulkSalvage, [true]);
+    assert.deepEqual(calls.bulkRemove, ['sys:c1']);
+    assert.deepEqual(calls.bulkClear, [true]);
+  });
+
+  it('names BOTH the row count and the unit count on the destroy prompt', async () => {
+    // The trigger and the dialog both name them, so the whole-stack rule is legible
+    // before the fact and the row count is not discarded.
+    const { services, calls } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1', 'sys:c2'],
+      entries: [bulkEntry({ actorQuantity: 7 }), bulkEntry({ key: 'sys:c2', actorQuantity: 40 })],
+      salvageable: [bulkEntry()],
+      counts: { selected: 2, salvageable: 1, blocked: 1, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    fire(target.querySelector('[data-inventory-bulk-destroy]'), 'click');
+    await settle();
+
+    assert.equal(calls.bulkDestroy.length, 1, 'the store owns the confirmation');
+    const prompt = calls.bulkDestroy[0];
+    // `window.title`, NOT a top-level `title`: `confirmDialog` forwards this bag to
+    // `DialogV2.confirm` untouched and DialogV2 reads the frame title off `window.title`,
+    // so a top-level one renders a BLANK title bar. Asserting the nesting is the only
+    // way this pin can tell the difference — `assert.ok(prompt.title)` passed against
+    // the untitled dialog.
+    assert.ok(prompt.window?.title, 'the dialog is titled through DialogV2 window options');
+    assert.equal(prompt.title, undefined, 'and not through a top-level title DialogV2 ignores');
+    assert.ok(prompt.content, 'and carries the consequence a button label cannot');
+    assert.ok(prompt.yes?.label, 'with an explicit affirmative label');
+    assert.ok(prompt.yes?.icon, 'and its own destructive icon rather than the default checkmark');
+  });
+
+  it('Escape clears the bulk selection from anywhere in the app', async () => {
+    // A document-level CAPTURING listener, so it fires whichever control has focus — the
+    // grid, the pagination or the search field — rather than requiring focus inside one
+    // element. Armed only while bulk is active.
+    const { services, calls } = makeServices(makeItem(), {
+      selectedKeys: ['sys:c1'],
+      entries: [bulkEntry()],
+      salvageable: [bulkEntry()],
+      counts: { selected: 1, salvageable: 1, blocked: 0, atMax: false },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    fire(target.querySelector('[data-inventory-grid]'), 'keydown', { key: 'Escape' });
+    await settle();
+
+    assert.deepEqual(calls.bulkClear, [true]);
+  });
+
+  it('does NOT arm Escape when the selection is empty', async () => {
+    // A permanently-armed capturing listener would swallow Escape for every other
+    // surface in the app.
+    const { services, calls } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    fire(target.querySelector('[data-inventory-grid]'), 'keydown', { key: 'Escape' });
+    await settle();
+
+    assert.deepEqual(calls.bulkClear, []);
+  });
+
+  it('notifies the player when the selection bound refuses a card', async () => {
+    // The store holds no i18n, so it returns a plain refusal signal and the VIEW
+    // localizes it — the `onResetSalvageOrder` precedent, not a fourth pattern.
+    const { services, calls } = makeServices(makeItem(), {
+      toggleResult: { refused: true, reason: 'bulkLimit' },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+
+    fire(target.querySelector('[data-inventory-card="sys:c1"] button'), 'click', {
+      shiftKey: true,
+    });
+    await settle();
+
+    assert.equal(calls.notify.length, 1, 'the refusal is reported, never silent');
+  });
+
+  it('InventoryDetail imports NOTHING from the bulk tree — the router bypass', () => {
+    // `InventoryDetail` is a documented public entry point (`RecipeItemEditor`'s GM
+    // preview), so routing bulk through it would buy a permanent forwarding-trap surface
+    // for a feature preview can never use. It would also pull the whole bulk tree into
+    // `recipe-item-editor-mounted` and `manager-mounted`'s STATIC graphs — a `{#if}` in a
+    // router does not keep a branch out of the compiled module's imports.
+    const detail = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/inventory/InventoryDetail.svelte'),
+      'utf8'
+    );
+    assert.equal(detail.includes('/bulk/'), false, 'no bulk import of any kind');
+    assert.equal(detail.includes('InventoryBulk'), false, 'nor a bulk component by name');
   });
 });

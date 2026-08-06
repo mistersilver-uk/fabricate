@@ -7,13 +7,23 @@
    - `accent`  — Locked (visible to players, GM-only to craft).
    - `danger`  — Can't enable (an activation blocker: enabling would be refused).
    - `warning` — Incomplete (a persistable authoring shell, not yet craftable).
+   - `info`    — In progress / not yet resolved: an outcome that is neither a
+                 success nor a failure and needs no action from the player (the
+                 bulk salvage report's time-gated "Started — finishes when time
+                 passes" row, issue 859). ADDED, not repurposed: every existing
+                 consumer computes its tone from a closed set that excludes
+                 `info`, so no shipped pixel changes.
+
+  These five — now six — are the WHOLE ramp. A new state belongs on one of them;
+  adding a seventh means the state genuinely is not any of the six, which has not
+  happened yet.
 
   Import-free leaf (design-system §7): props only — no foundryBridge, no model or
   util imports. The caller resolves the localized `label` and the Font Awesome
   `icon` class, so nothing here reaches for `game.i18n`.
 
   Props:
-   - tone: 'subtle' | 'success' | 'accent' | 'danger' | 'warning'.
+   - tone: 'subtle' | 'success' | 'accent' | 'danger' | 'warning' | 'info'.
    - icon: a Font Awesome class string (e.g. 'fas fa-lock'); omitted renders none.
    - label: the already-localized pill text.
    - title: optional hover text.
@@ -77,5 +87,11 @@
     color: var(--fab-warning-text);
     border-color: var(--fab-warning-border);
     background: var(--fab-warning-soft);
+  }
+
+  .fab-status-pill.is-info {
+    color: var(--fab-info-text);
+    border-color: var(--fab-info-border);
+    background: var(--fab-info-soft);
   }
 </style>

@@ -6,33 +6,12 @@ import {
   promptCheckRoll,
 } from '../src/ui/svelte/apps/crafting/rollPrompt.js';
 
-// Stub DialogV2.wait: capture the rendered content + buttons, then invoke the default
-// button's callback with a fake form so `readChoice` runs against known field values.
-function stubDialogCapture(formElements) {
-  const original = globalThis.foundry;
-  const captured = {};
-  globalThis.foundry = {
-    applications: {
-      api: {
-        DialogV2: {
-          wait: async (config) => {
-            captured.content = config.content;
-            captured.buttons = config.buttons;
-            const button = { form: { elements: formElements } };
-            const chosenButton = config.buttons.find((b) => b.default) || config.buttons[0];
-            captured.result = chosenButton.callback({}, button);
-            return captured.result;
-          },
-        },
-      },
-    },
-  };
-  captured.restore = () => {
-    if (original === undefined) delete globalThis.foundry;
-    else globalThis.foundry = original;
-  };
-  return captured;
-}
+// The DialogV2 / i18n stubs are SHARED with `tests/roll-prompt-bulk.test.js` (issue
+// 859): the two prompts share `renderDieRow`, `renderBonusInput`,
+// `renderRollModePicker`, `readSharedRollChoice` and `buildRollButtons`, so a second
+// copy of the harness would be new test code duplicating new test code against
+// SonarCloud's new-code duplication gate.
+import { stubDialogCapture, stubI18n } from './helpers/rollPromptDialogStub.js';
 
 const PICK_DESCRIPTOR = {
   modifiers: [
@@ -52,16 +31,6 @@ const BARE_DESCRIPTOR = {
   ],
   defaultSelectedId: 'herb',
 };
-
-/** Install a `game.i18n.localize` backed by `table`, returning a restore function. */
-function stubI18n(table) {
-  const original = globalThis.game;
-  globalThis.game = { i18n: { localize: (key) => table[key] ?? key } };
-  return () => {
-    if (original === undefined) delete globalThis.game;
-    else globalThis.game = original;
-  };
-}
 
 /**
  * `buildInteractiveRollOptions` threads the subject `name`/`activity`/`img` into
@@ -136,6 +105,29 @@ describe('buildInteractiveRollOptions', () => {
       false,
       'a null descriptor (the engine default) must not add the key'
     );
+  });
+
+  // Acceptance 11 — "the single-item salvage path is unchanged: no `rollOptions` key
+  // added (asserted)". `rollDecision` is attached by `CraftingEngine._salvageRollOptions`
+  // and NOT here, deliberately: this builder is shared with the crafting and gathering
+  // paths, which wire no pre-resolved-roll support at all, so a key added here would
+  // advertise a capability two of its three consumers do not have. These three cases
+  // are every non-bulk shape a caller passes.
+  it('adds no rollDecision key on any non-bulk path', () => {
+    for (const args of [
+      { interactive: true, actor: { id: 'a1' }, name: 'Iron Rivets', activity: 'Crafting', dc: 12 },
+      { interactive: false, actor: null, name: 'Extract Iron Ore', activity: 'Gathering' },
+      {
+        interactive: true,
+        actor: null,
+        name: 'Iron Ore',
+        activity: 'Salvage',
+        modifierChoice: PICK_DESCRIPTOR,
+      },
+    ]) {
+      const options = buildInteractiveRollOptions(args);
+      assert.equal('rollDecision' in options, false, `${args.activity}: byte-identical bag`);
+    }
   });
 });
 
