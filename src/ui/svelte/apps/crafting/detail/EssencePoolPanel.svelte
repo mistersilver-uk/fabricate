@@ -20,6 +20,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
+  import { essenceTintToken } from '../../../util/essenceTint.js';
   import CraftingThumb from '../CraftingThumb.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
@@ -48,10 +49,16 @@
     new Map(requirements.map((requirement) => [requirement.essenceId, requirement]))
   );
 
+  // The essence's own colour, folded through the shared sanitiser rather than interpolated
+  // raw: `colorToken` reaches here from world data, and it is being spliced into a `style`
+  // string. Everything else in the player app already spends the colour through this fold.
+  function tintTokenOf(requirement) {
+    return essenceTintToken(requirement?.colorToken);
+  }
+
   function tintOf(requirement) {
-    return requirement?.colorToken
-      ? `--fab-chip-color: var(--fab-tag-${requirement.colorToken})`
-      : '';
+    const token = tintTokenOf(requirement);
+    return token ? `--fab-chip-color: var(--fab-tag-${token})` : '';
   }
 
   function meterState(requirement) {
@@ -101,9 +108,11 @@
         {@const state = meterState(requirement)}
         <div
           class={`essence-pool-meter is-${state}`}
+          class:has-tint={Boolean(tintTokenOf(requirement))}
           style={tintOf(requirement)}
           data-essence-meter={requirement.essenceId}
           data-essence-meter-state={state}
+          data-essence-meter-tint={tintTokenOf(requirement) || undefined}
         >
           <div class="essence-pool-meter-head">
             <span class="essence-pool-meter-badge">
@@ -323,6 +332,25 @@
 
   .essence-pool-meter.is-short .essence-pool-bar-fill {
     background: var(--fab-danger);
+  }
+
+  /* A COLOURED essence keeps its own colour in every state, so the bar you fill reads as the
+     same essence as the pip you filled it from. Without this the bar tracked the essence
+     while `partial` and then flipped to green the moment it was satisfied — the one moment
+     the player is looking at it — so the colour that identified it was dropped exactly when
+     it mattered.
+
+     Losing the green does not lose the STATE: the ratio beside the name reads `5/5`, the
+     fill reaches full width, and `data-essence-meter-state` still says `met`. The state was
+     always carried by those three; the fill colour only reinforced it. (`is-short` is
+     `delivered === 0`, so its danger fill renders at 0% width and was never visible.)
+
+     An essence with NO colour is untouched and keeps the success/danger palette it has
+     today — which the lab world exercises, since its `air` essence declares no colour. */
+  .essence-pool-meter.has-tint.is-met .essence-pool-bar-fill,
+  .essence-pool-meter.has-tint.is-partial .essence-pool-bar-fill,
+  .essence-pool-meter.has-tint.is-short .essence-pool-bar-fill {
+    background: var(--fab-chip-color);
   }
 
   @media (prefers-reduced-motion: reduce) {
