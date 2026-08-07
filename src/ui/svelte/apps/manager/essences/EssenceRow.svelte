@@ -99,15 +99,20 @@
     })
   );
 
-  // The GRID card's recessed well. The component count leads and carries the emphasis
-  // (`strong`), the recipe count follows subtly — the shared card draws the hairline
-  // between them. The classes and data hooks are this studio's, not the primitive's:
-  // the mounted tests and the bulk panel read the counts through them.
+  // The GRID card's recessed well. BOTH counts read the same (maintainer round): they are two
+  // readings of the same kind — how much of the library uses this essence — and emphasising
+  // the first implied a precedence between them that does not exist. The prototype's leading
+  // stat is emphasised because "2 in · 1 out" is a headline over "2 steps"; "N components"
+  // beside "N recipes" is a pair. The `strong` tone stays in the shared card for the studios
+  // whose well DOES have a headline. The shared card draws the hairline between them.
+  //
+  // The classes and data hooks are this studio's, not the primitive's: the mounted tests and
+  // the bulk panel read the counts through them.
   const cardFacts = $derived([
     {
       id: 'components',
       label: componentUsage,
-      tone: 'strong',
+      tone: 'muted',
       class: 'manager-essence-usage-components',
       attrs: { 'data-essence-usage-components': '' },
     },

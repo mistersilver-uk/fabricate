@@ -130,7 +130,7 @@ function card(essence) {
     <span class="fab-library-card-badges">${disabledPill}<span class="manager-essence-capabilities is-card-badges">${pills}</span></span>
     <span class="fab-library-card-description manager-system-description">${essence.description}</span>
     <span class="fab-library-card-facts" data-essence-usage>
-      <span class="fab-library-card-fact is-strong manager-essence-usage-components" data-essence-usage-components>${essence.components} components</span>
+      <span class="fab-library-card-fact is-muted manager-essence-usage-components" data-essence-usage-components>${essence.components} components</span>
       <span class="fab-library-card-facts-sep"></span>
       <span class="fab-library-card-fact is-muted" data-essence-usage-recipes>${essence.recipes} recipes</span>
     </span>
