@@ -234,35 +234,32 @@
     gap: var(--fab-space-2);
   }
 
-  /* The one shipped tinted-surface idiom (EnvironmentCard / GatheringDetail /
-     GatheringEventDetail / Chip): 16% fill over the surface the card sits on, 50%
-     border, tint on the GLYPH only. The rail renders inside .fabricate-app cards, so
-     it mixes against --fab-surface-raised rather than theme root. */
+  /* The meter box is NEUTRAL by default and carries the ESSENCE's colour when it has one.
+     It never carries state.
+
+     It used to: `met` painted the box in the success family and `short` in the danger
+     family. That made the box a second, louder answer to a question the head already
+     answers precisely — the `6/6` ratio beside the name, and the colour-coded requirement
+     tiles above the panel, both state exactly where each requirement stands. A green box
+     only restated it, and it cost the box the one thing it alone could say: WHICH essence
+     this meter is. With two requirements in a shared pool, both boxes went green together
+     and became indistinguishable at a glance. */
   .essence-pool-meter {
     flex: 1 1 180px;
     min-width: 0;
     padding: 9px 11px;
-    border: 1px solid color-mix(in srgb, var(--fab-chip-color, var(--fab-accent)) 50%, transparent);
+    border: 1px solid var(--fab-border);
     border-radius: 9px;
-    background: color-mix(
-      in srgb,
-      var(--fab-chip-color, var(--fab-accent)) 16%,
-      var(--fab-surface-raised)
-    );
+    background: var(--fab-surface-raised);
   }
 
-  /* All three states of the published slot-state matrix are declared, so none of them
-     is an implicit default a later edit can silently retune. `partial` is the authored
-     tint of the base rule above; `met` and `short` replace it with the success and
-     danger families, so zero-delivered reads as an error rather than as a short bar. */
-  .essence-pool-meter.is-met {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-  }
-
-  .essence-pool-meter.is-short {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
+  /* The shipped tinted-surface idiom (EnvironmentCard / GatheringDetail /
+     GatheringEventDetail / Chip): 16% fill over the surface the card sits on, 50%
+     border, tint on the GLYPH only. The rail renders inside .fabricate-app cards, so
+     it mixes against --fab-surface-raised rather than theme root. */
+  .essence-pool-meter.has-tint {
+    border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
+    background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-surface-raised));
   }
 
   .essence-pool-meter-head {
