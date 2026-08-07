@@ -449,18 +449,39 @@
     font-size: 0.72rem;
   }
 
-  /* FACTS box: the component and recipe counts in a bordered well, split by a hairline —
-     the prototype's "in · out / steps" box, carrying the essence's two usage counts. */
+  /* FACTS box: the component and recipe counts in a RECESSED well, split by a hairline —
+     the prototype's "in · out / steps" box, carrying the essence's two usage counts.
+
+     The surface is `--fab-bg-1` rather than transparent, and that is not a guess: the
+     maintainer's prototype was measured in Chromium, and its facts-box background computes
+     to the SAME value `--fab-bg-1` resolves to in the default theme, with its muted half
+     landing on `--fab-text-subtle` exactly. The mock was drawn from this palette, so the
+     faithful render and the tokenised one are the same render. The inspector's stat tiles
+     (`.manager-essence-stat`, `styles/fabricate.css`) already state this idiom in-house —
+     recessed `--fab-bg-1` well, bordered, with a full-strength value over a subtle label —
+     so this box now agrees with BOTH the prototype and the surface one click away, instead
+     of being a flat outline that matched neither. */
   .manager-essence-card-facts {
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
-    padding: var(--fab-space-2xs) var(--fab-space-2);
+    padding: var(--fab-space-chip) var(--fab-space-2);
     border: 1px solid var(--fab-mv2-border);
     border-radius: 8px;
-    color: var(--fab-text-muted);
-    font-size: 0.7rem;
+    background: var(--fab-bg-1);
+    color: var(--fab-text-subtle);
+    font-size: 0.62rem;
     white-space: nowrap;
+  }
+
+  /* The component count is the PRIMARY fact and carries the emphasis, exactly as the
+     prototype's leading "2 in · 1 out" does against its trailing "2 steps": full-strength
+     text at 600 over the subtle recipe count. A well in which both halves read identically
+     is a box with no hierarchy, which is what this was. */
+  .manager-essence-card-facts .manager-essence-usage-components {
+    color: var(--fab-mv2-text);
+    font-size: 0.66rem;
+    font-weight: 600;
   }
 
   .manager-essence-card-facts-sep {
