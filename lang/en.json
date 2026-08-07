@@ -2,7 +2,11 @@
   "FABRICATE": {
     "ModuleName": "Fabricate - Universal Crafting",
     "Common": {
-      "General": "General"
+      "General": "General",
+      "Stepper": {
+        "Decrease": "Decrease {label}",
+        "Increase": "Increase {label}"
+      }
     },
     "Migration": {
       "CatalystsToTools": {
