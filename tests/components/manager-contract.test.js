@@ -104,6 +104,12 @@ const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
 const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
+// The paginated rows/columns are the shared studio-library shelf now, so the `<ul>` and its
+// `role="list"` are rendered there rather than in each browser view.
+const libraryShelfSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte'),
+  'utf8'
+);
 const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
 const essenceStudioSources = readdirSync(essenceStudioDir)
   .filter((entry) => entry.endsWith('.svelte') || entry.endsWith('.js'))
@@ -1910,7 +1916,7 @@ describe('CraftingSystemManager source contract', () => {
     // RENDERED attribute (`role="list"`) rather than on the absence of `role="table"`,
     // which both files' own comments legitimately mention in prose.
     assert.ok(
-      essenceBrowserSource.includes('role="list"'),
+      libraryShelfSource.includes('role="list"'),
       'the row list is a real list, not a table with no columns'
     );
     assert.ok(

@@ -1769,6 +1769,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // The shared studio-library SHELF — the scroll section, the empty states, the
+      // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
+      /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
@@ -1792,6 +1795,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // The shared studio-library SHELF — the scroll section, the empty states, the
+      // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
+      /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
@@ -1818,6 +1824,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // The shared studio-library SHELF — the scroll section, the empty states, the
+      // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
+      /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
@@ -1852,6 +1861,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      // The shared studio-library SHELF — the scroll section, the empty states, the
+      // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
+      /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
+      // The CARD is claimed HERE and only here: this is the one frame that renders a grid of
+      // them, so a change to `LibraryCard` picks a card as its evidence rather than a list
+      // that never shows one.
+      /^src\/ui\/svelte\/apps\/manager\/library\/LibraryCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
       /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,

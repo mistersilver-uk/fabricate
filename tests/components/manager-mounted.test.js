@@ -150,6 +150,13 @@ function compileManagerRoot() {
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/essences/${essenceComponent}.svelte`);
   }
+  // The shared studio-library primitives (`library/`). `EssenceBrowserView` imports the shelf
+  // and `EssenceRow` imports the card, both statically, so they are in this root's module
+  // graph; omitting either HANGS every mounted manager test as `# cancelled`. Every studio
+  // that gains a grid will reach the same two files.
+  for (const libraryComponent of ['LibraryCard', 'LibraryShelf']) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/library/${libraryComponent}.svelte`);
+  }
   // The behaviour preview's "How players see it" card (issue 1036, round 3) mounts the REAL
   // player InventoryItemCard for the essence tile AND the fake carrying component. It is a
   // static import of EssenceBehaviorPreview, so it is in this root's module graph; omitting

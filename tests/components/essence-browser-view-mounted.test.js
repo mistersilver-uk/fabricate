@@ -42,6 +42,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/components/StatusPill.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/apps/manager/library/LibraryCard.svelte',
+    'src/ui/svelte/apps/manager/library/LibraryShelf.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceRow.svelte',
     'src/ui/svelte/apps/manager/EssenceBrowserView.svelte',
   ],

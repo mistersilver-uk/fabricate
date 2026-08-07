@@ -59,6 +59,7 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
+  import LibraryCard from '../library/LibraryCard.svelte';
   import Medallion from '../../../components/Medallion.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusPill from '../../../components/StatusPill.svelte';
@@ -97,6 +98,37 @@
       count: essence?.recipeUsageCount || 0,
     })
   );
+
+  // The GRID card's recessed well. The component count leads and carries the emphasis
+  // (`strong`), the recipe count follows subtly — the shared card draws the hairline
+  // between them. The classes and data hooks are this studio's, not the primitive's:
+  // the mounted tests and the bulk panel read the counts through them.
+  const cardFacts = $derived([
+    {
+      id: 'components',
+      label: componentUsage,
+      tone: 'strong',
+      class: 'manager-essence-usage-components',
+      attrs: { 'data-essence-usage-components': '' },
+    },
+    {
+      id: 'recipes',
+      label: recipeUsage,
+      tone: 'muted',
+      attrs: { 'data-essence-usage-recipes': '' },
+    },
+  ]);
+
+  // Stringified for the READER, not for the renderer: Svelte drops an attribute only for
+  // `null`/`undefined`, so a raw `false` would reach `setAttribute` and coerce to "false"
+  // by itself. Saying it here means the rendered `data-essence-bulk-selected="false"` is
+  // legible at the call site instead of resting on that coercion.
+  const cardRootAttrs = $derived({
+    'data-essence-id': essence?.id,
+    'data-essence-variant': 'grid',
+    'data-essence-enabled': disabled ? 'false' : 'true',
+    'data-essence-bulk-selected': String(bulkSelected),
+  });
 </script>
 
 <!-- The tile carries the essence's own colour. `Medallion.tint` recolours the glyph and
@@ -128,8 +160,8 @@
 <!-- NEVER hidden for a disabled essence: hiding a pill removes state. They render in the
      muted tone beside the Disabled badge instead. In the GRID card they sit in the header
      row beside the medallion; in the LIST row they stay in the trailing cluster. -->
-{#snippet capabilityPills()}
-  <span class="manager-essence-capabilities" data-essence-capabilities>
+{#snippet capabilityPills(extraClass = '')}
+  <span class={`manager-essence-capabilities ${extraClass}`} data-essence-capabilities>
     {#each capabilities as pill (pill.id)}
       <Chip
         tone={pill.tone}
@@ -212,60 +244,52 @@
   </button>
 {/snippet}
 
-<li
-  class={`manager-essence-row ${isCard ? 'is-card' : ''} ${selected ? 'is-selected' : ''} ${disabled ? 'is-off' : ''}`}
-  class:is-bulk-selected={bulkSelected}
-  data-essence-id={essence.id}
-  data-essence-variant={isCard ? 'grid' : 'row'}
-  data-essence-enabled={disabled ? 'false' : 'true'}
-  data-essence-bulk-selected={bulkSelected}
-  aria-current={selected ? 'true' : undefined}
->
-  {#if isCard}
-    <!-- GRID CARD (issue 1036, maintainer round) — the prototype's left-aligned stack, in order:
-         a HEADER pairing the medallion with the name to its right; a BADGES row (Disabled pill +
-         capability chips); the DESCRIPTION; a bordered FACTS box carrying the component and recipe
-         counts; then a divided FOOTER with the enable toggle and the edit pencil. Every row has a
-         fixed height so the cards in a shelf stay level. The identity `<button>` wraps only the
-         non-interactive body (header → facts); the checkbox (absolute, top-right) and the footer
-         controls are its siblings so no interactive element nests inside the button. -->
-    <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
-      <span class="manager-essence-card-header">
-        {@render medallionTile()}
-        <span class="manager-essence-card-heading">
-          <span class="manager-system-name" title={essence.name}>{essence.name}</span>
-        </span>
-      </span>
-      <span class="manager-essence-card-badges">
-        {#if disabled}
-          <StatusPill
-            tone="neutral"
-            icon="fas fa-circle-pause"
-            label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
-          />
-        {/if}
-        {@render capabilityPills()}
-      </span>
-      <span
-        class="manager-system-description manager-essence-description"
-        title={essence.description}
-      >
-        {description}
-      </span>
-      <span class="manager-essence-card-facts" data-essence-usage>
-        <span class="manager-essence-usage-components" data-essence-usage-components
-          >{componentUsage}</span
-        >
-        <span class="manager-essence-card-facts-sep" aria-hidden="true"></span>
-        <span data-essence-usage-recipes>{recipeUsage}</span>
-      </span>
-    </button>
-    {@render selectionBox()}
-    <div class="manager-essence-card-footer">
-      {@render statusToggle()}
-      {@render editButton()}
-    </div>
-  {:else}
+{#if isCard}
+  <!-- GRID CARD — the shared `LibraryCard` primitive supplies the anatomy (header, badges,
+       description, recessed facts well, divider, footer) and this studio supplies the
+       vocabulary. The essence hooks the smoke walk, the View Lab and the mounted tests
+       navigate by (`.manager-essence-row`, `.manager-essence-identity`, `data-essence-*`)
+       are passed through, so the rendered card is the one those surfaces already know. -->
+  <LibraryCard
+    rootClass="manager-essence-row is-card"
+    identityClass="manager-essence-identity"
+    rootAttrs={cardRootAttrs}
+    {selected}
+    {disabled}
+    {bulkSelected}
+    name={essence.name}
+    nameTitle={essence.name}
+    {description}
+    descriptionTitle={essence.description}
+    facts={cardFacts}
+    factsAttrs={{ 'data-essence-usage': '' }}
+    onSelect={() => onSelect(essence.id)}
+  >
+    {#snippet media()}{@render medallionTile()}{/snippet}
+    {#snippet badges()}
+      {#if disabled}
+        <StatusPill
+          tone="neutral"
+          icon="fas fa-circle-pause"
+          label={text('FABRICATE.Admin.Manager.Essence.Status.Disabled', 'Disabled')}
+        />
+      {/if}
+      {@render capabilityPills('is-card-badges')}
+    {/snippet}
+    {#snippet selection()}{@render selectionBox()}{/snippet}
+    {#snippet footerStart()}{@render statusToggle()}{/snippet}
+    {#snippet footerEnd()}{@render editButton()}{/snippet}
+  </LibraryCard>
+{:else}
+  <li
+    class={`manager-essence-row ${selected ? 'is-selected' : ''} ${disabled ? 'is-off' : ''}`}
+    class:is-bulk-selected={bulkSelected}
+    data-essence-id={essence.id}
+    data-essence-variant="row"
+    data-essence-enabled={disabled ? 'false' : 'true'}
+    data-essence-bulk-selected={bulkSelected}
+    aria-current={selected ? 'true' : undefined}
+  >
     <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
       {@render medallionTile()}
       <span class="manager-system-copy">
@@ -287,8 +311,8 @@
       {@render editButton()}
       {@render selectionBox()}
     </div>
-  {/if}
-</li>
+  </li>
+{/if}
 
 <style>
   /* The row's INTERIOR only. `.manager-essence-row` itself stays in the four shared
@@ -351,6 +375,18 @@
     gap: var(--fab-space-2);
   }
 
+  /* The chips in the GRID card wrap and sit on the card's tighter badge rhythm. This is a
+     MODIFIER on the span rather than a descendant of `.manager-essence-row.is-card`, because
+     the card's `<li>` is rendered by `LibraryCard` now: a selector reaching through it would
+     never match (Svelte scopes both halves to THIS component) and would be reported as an
+     unused selector, which `lint:svelte:warnings` fails on. The span itself is still ours —
+     snippet bodies compile in the parent — so a single-element modifier still applies. */
+  .manager-essence-capabilities.is-card-badges {
+    flex-wrap: wrap;
+    gap: var(--fab-space-1);
+    min-width: 0;
+  }
+
   .manager-essence-usage-readout {
     display: flex;
     flex-direction: column;
@@ -362,164 +398,30 @@
   }
 
   /* A disabled essence is DIMMED as well as pilled — the pill is what carries the state,
-     the dimming only reinforces it. */
+     the dimming only reinforces it. The card's own dimming lives in `LibraryCard`, which
+     owns the card body; this is the LIST row's. */
   .manager-essence-row.is-off .manager-essence-identity,
   .manager-essence-row.is-off .manager-essence-usage-readout {
     opacity: 0.72;
   }
 
-  /* The GRID card. A column rather than a row, with the selection box floated into the
-     top-right corner over the tile — which is what the prototype shows and what keeps the
-     card's body a single readable stack. */
-  /* GRID CARD (issue 1036, maintainer round) — the prototype's left-aligned vertical stack.
-     `align-items: stretch` overrides the shared identity reset's `center`. Every row has a
-     bounded height (fixed medallion header, reserved badge row, fixed 2-line description,
-     one-line facts box, footer) so the cards in a shelf stay level regardless of content. */
-  .manager-essence-row.is-card {
-    position: relative;
-    flex-direction: column;
-    align-items: stretch;
-    min-height: 0;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-3);
-  }
+  /* The GRID card's interior — header, badges, description, recessed facts well, divider and
+     footer — now lives in `../library/LibraryCard.svelte`, which every studio's grid will
+     render. It moved wholesale rather than being duplicated: a card whose look is authored
+     twice is two cards. The `.is-card` hooks the global sheet still needs
+     (`.manager-essence-row.is-card { margin: 0 }`) stay in `styles/fabricate.css`.
 
-  /* The identity `<button>` is the card BODY (header → facts). The global reset makes it a
-     two-column grid for the list row, so the card re-declares flex-column to stack its rows. */
-  .manager-essence-row.is-card .manager-essence-identity {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    flex: 0 0 auto;
-    gap: var(--fab-space-2);
-  }
-
-  /* HEADER: medallion on the left, the name to its right. `padding-right` reserves room for the
-     absolute selection checkbox pinned in the top-right corner, so the name never runs under it. */
-  .manager-essence-card-header {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--fab-space-2);
-    padding-right: 2.25rem;
-  }
-
-  .manager-essence-card-heading {
-    display: flex;
-    flex: 1 1 0;
-    min-width: 0;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 40px;
-  }
-
-  .manager-essence-row.is-card .manager-system-name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--fab-font-serif);
-    font-size: 0.85rem;
-    font-weight: 600;
-    line-height: 1.2;
-  }
-
-  /* BADGES row: the Disabled pill and the capability chips, left-aligned. A reserved min-height
-     keeps a card with no badges the same height as one that has them. */
-  .manager-essence-card-badges {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-1);
-    min-height: 1.35rem;
-  }
-
-  .manager-essence-row.is-card .manager-essence-capabilities {
-    flex-wrap: wrap;
-    gap: var(--fab-space-1);
-    min-width: 0;
-  }
-
-  /* DESCRIPTION: a fixed 2-line box so the facts box and footer beneath land at the same
-     offset in every card. `title` on the span keeps the full text reachable. */
-  .manager-essence-row.is-card .manager-essence-description {
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    line-height: 1.4;
-    min-height: calc(1.4em * 2);
-    font-size: 0.72rem;
-  }
-
-  /* FACTS box: the component and recipe counts in a RECESSED well, split by a hairline —
-     the prototype's "in · out / steps" box, carrying the essence's two usage counts.
-
-     The surface is `--fab-bg-1` rather than transparent, and that is not a guess: the
-     maintainer's prototype was measured in Chromium, and its facts-box background computes
-     to the SAME value `--fab-bg-1` resolves to in the default theme, with its muted half
-     landing on `--fab-text-subtle` exactly. The mock was drawn from this palette, so the
-     faithful render and the tokenised one are the same render. The inspector's stat tiles
-     (`.manager-essence-stat`, `styles/fabricate.css`) already state this idiom in-house —
-     recessed `--fab-bg-1` well, bordered, with a full-strength value over a subtle label —
-     so this box now agrees with BOTH the prototype and the surface one click away, instead
-     of being a flat outline that matched neither. */
-  .manager-essence-card-facts {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-chip) var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: 8px;
-    background: var(--fab-bg-1);
-    color: var(--fab-text-subtle);
-    font-size: 0.62rem;
-    white-space: nowrap;
-  }
-
-  /* The component count is the PRIMARY fact and carries the emphasis, exactly as the
-     prototype's leading "2 in · 1 out" does against its trailing "2 steps": full-strength
-     text at 600 over the subtle recipe count. A well in which both halves read identically
-     is a box with no hierarchy, which is what this was. */
-  .manager-essence-card-facts .manager-essence-usage-components {
-    color: var(--fab-mv2-text);
-    font-size: 0.66rem;
-    font-weight: 600;
-  }
-
-  .manager-essence-card-facts-sep {
-    flex: 0 0 auto;
-    width: 1px;
-    height: 0.9em;
-    background: var(--fab-mv2-border);
-  }
-
-  /* FOOTER: a divider, then the enable toggle on the left and the edit pencil on the right —
-     the prototype's card actions, which the essence grid previously routed only to the inspector. */
-  .manager-essence-card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fab-space-2);
-    margin-top: var(--fab-space-1);
-    padding-top: var(--fab-space-2);
-    border-top: 1px solid var(--fab-mv2-border);
-  }
-
-  /* The card's selection box is pinned to the top-right corner over the header. */
-  .manager-essence-row.is-card :global(.fab-selection-checkbox) {
-    position: absolute;
-    top: var(--fab-space-3);
-    right: var(--fab-space-3);
-  }
-
-  /* NARROW (issue 1036). The row keeps `display: flex` and simply wraps: the identity
+     NARROW (issue 1036). The LIST row keeps `display: flex` and simply wraps: the identity
      block takes the first line and the cluster wraps onto a second, aligned right.
      `.manager-labeled-cell` and its `::before` data-label reveal are not used at all —
-     there are no columns left to label. */
+     there are no columns left to label. The `:not(.is-card)` guards are gone with the card
+     branch: this component only renders the list row now. */
   @container fabricate-manager (max-width: 1120px) {
-    .manager-essence-row:not(.is-card) .manager-essence-identity {
+    .manager-essence-identity {
       flex: 1 1 100%;
     }
 
-    .manager-essence-row:not(.is-card) .manager-essence-cluster {
+    .manager-essence-cluster {
       flex: 1 1 100%;
       justify-content: flex-end;
     }

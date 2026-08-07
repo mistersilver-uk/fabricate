@@ -62,6 +62,9 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/StatusPill.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // The card's own CSS lives in the shared primitive now; without it this fixture measures
+  // an unstyled stack and every gate below passes vacuously.
+  'src/ui/svelte/apps/manager/library/LibraryCard.svelte',
   'src/ui/svelte/apps/manager/essences/EssenceRow.svelte',
   'src/ui/svelte/apps/manager/EssenceBrowserView.svelte',
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
@@ -106,28 +109,37 @@ function card(essence) {
   const disabledPill = essence.off
     ? '<span class="fab-status-pill is-neutral"><i class="fas fa-circle-pause"></i><span class="fab-status-pill-label">Disabled</span></span>'
     : '';
-  // The card branch is a FIXED vertical stack (issue 1036, maintainer round): a header
-  // pairing the medallion with the capability chips, the name row, the fixed-height
-  // description box, then the usage counts — and the selection box as the identity's sibling.
-  // Deletion is warned not blocked, so the component count renders plainly with no padlock.
+  // The card is the shared `LibraryCard` anatomy: a header pairing the medallion with the
+  // name to its right, a badges row, the fixed 2-line description box, the recessed facts
+  // well, then a divided footer carrying the enable toggle and the edit pencil. The
+  // selection box is the body button's SIBLING, pinned into the top-right corner.
+  //
+  // Both class vocabularies are stamped, exactly as the app renders them: the primitive's
+  // own `fab-library-card-*` (which is where the LOOK lives) and the essence hooks the
+  // smoke walk and the View Lab navigate by. Dropping either half would measure an element
+  // the app does not ship.
   return `
-<li class="manager-essence-row is-card${essence.off ? ' is-off' : ''}" data-essence-id="${essence.id}" data-essence-variant="grid">
-  <button type="button" class="manager-essence-identity">
-    <span class="manager-essence-card-header">
+<li class="fab-library-card manager-essence-row is-card${essence.off ? ' is-off' : ''}" data-essence-id="${essence.id}" data-essence-variant="grid">
+  <button type="button" class="fab-library-card-body manager-essence-identity">
+    <span class="fab-library-card-header">
       <span class="fab-medallion has-tint" style="width:40px;height:40px;--fab-medallion-tint:var(--fab-tag-sage)"><i class="fas fa-mortar-pestle"></i></span>
-      <span class="manager-essence-capabilities">${pills}</span>
+      <span class="fab-library-card-heading">
+        <span class="fab-library-card-name manager-system-name" title="${essence.name}">${essence.name}</span>
+      </span>
     </span>
-    <span class="manager-essence-name-row">
-      <span class="manager-system-name" title="${essence.name}">${essence.name}</span>
-      ${disabledPill}
-    </span>
-    <span class="manager-system-description manager-essence-description">${essence.description}</span>
-    <span class="manager-essence-usage-readout">
-      <span class="manager-essence-usage-components">${essence.components} components</span>
-      <span>${essence.recipes} recipes</span>
+    <span class="fab-library-card-badges">${disabledPill}<span class="manager-essence-capabilities is-card-badges">${pills}</span></span>
+    <span class="fab-library-card-description manager-system-description">${essence.description}</span>
+    <span class="fab-library-card-facts" data-essence-usage>
+      <span class="fab-library-card-fact is-strong manager-essence-usage-components" data-essence-usage-components>${essence.components} components</span>
+      <span class="fab-library-card-facts-sep"></span>
+      <span class="fab-library-card-fact is-muted" data-essence-usage-recipes>${essence.recipes} recipes</span>
     </span>
   </button>
   <label class="fab-selection-checkbox"><input type="checkbox" class="fab-selection-input"><span class="fab-selection-check is-lg"><i class="fas fa-check"></i></span></label>
+  <div class="fab-library-card-footer">
+    <button type="button" class="manager-status-toggle ${essence.off ? 'is-off' : 'is-on'}"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>
+    <span class="fab-library-card-footer-end"><button type="button" class="manager-icon-button manager-essence-edit"><i class="fas fa-pen"></i></button></span>
+  </div>
 </li>`;
 }
 

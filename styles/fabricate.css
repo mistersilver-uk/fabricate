@@ -5652,6 +5652,30 @@
   cursor: pointer;
 }
 
+/* The shared GRID CARD body re-stacks that reset (`LibraryCard.svelte`). The reset above
+   makes every identity button a two-column grid, which is right for a LIST row and wrong
+   for a card, whose body is a vertical stack.
+
+   It lives HERE, immediately after the reset, because that ORDER is what makes it win.
+   Svelte appends a scope class to the first scoped selector in a rule, so the primitive's
+   own `.fab-library-card-body` compiles to a two-class compound — (0,2,0), the SAME
+   specificity as `.fabricate-manager .manager-<studio>-identity`, not lower. Equal
+   specificity means the tie breaks on source order, and the order of a component's
+   injected styles against this sheet is not something either file controls. Declaring the
+   override in this sheet, after the reset, is what removes that dependency: within one
+   stylesheet the later rule always wins.
+
+   The primitive keeps the same declarations in its own block so the card still stacks if
+   it is ever rendered outside `.fabricate-manager`. The two carry identical values, so
+   whichever wins between THEM is immaterial. */
+.fabricate-manager .fab-library-card-body {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--fab-space-2);
+}
+
 /* Inside the flex card row the identity is the ONLY shrinkable cell (the control
    cluster never shrinks), which is what keeps the row from overflowing. */
 .fabricate-manager .manager-recipe-row .manager-recipe-identity {

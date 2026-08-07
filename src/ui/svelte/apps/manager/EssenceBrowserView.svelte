@@ -28,7 +28,7 @@
 <script>
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
-  import Pagination from '../../components/Pagination.svelte';
+  import LibraryShelf from './library/LibraryShelf.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import EssenceRow from './essences/EssenceRow.svelte';
@@ -440,11 +440,28 @@
     />
   </section>
 
-  <section
-    class="manager-table-scroll"
-    aria-label={text('FABRICATE.Admin.Manager.Essence.TableShort', 'Essences')}
+  <!-- The paginated rows/columns are the shared `LibraryShelf`: the scroll section, the two
+       empty states, the list-or-grid `<ul>` and the pager, which all four studios re-derived.
+       This studio still supplies its own ENTRY, its own hook class and view attribute, and
+       its own grid template — the parts that are genuinely per-studio. -->
+  <LibraryShelf
+    items={model.essences}
+    viewMode={ui.viewMode}
+    listClass="manager-essences-table"
+    listAttrs={{ 'data-essence-view': ui.viewMode }}
+    scrollLabel={text('FABRICATE.Admin.Manager.Essence.TableShort', 'Essences')}
+    isEmpty={(essenceCards || []).length === 0}
+    totalCount={model.totalCount}
+    pageSize={ui.pageSize}
+    pageIndex={model.pageIndex}
+    pageSizeOptions={[10, 25, 50]}
+    onPageChange={(next) => (ui.pageIndex = next)}
+    onPageSizeChange={(next) => {
+      ui.pageSize = next;
+      ui.pageIndex = 0;
+    }}
   >
-    {#if (essenceCards || []).length === 0}
+    {#snippet empty()}
       <EmptyState
         icon="fas fa-mortar-pestle"
         title={text('FABRICATE.Admin.Manager.Essence.EmptyTitle', 'No essences yet')}
@@ -453,7 +470,8 @@
           'Create an essence definition to start assigning essence quantities to components.'
         )}
       />
-    {:else if model.totalCount === 0}
+    {/snippet}
+    {#snippet emptyFiltered()}
       <EmptyState
         filtered
         hint={text(
@@ -470,45 +488,24 @@
           >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
         >
       </EmptyState>
-    {:else}
-      <!-- A card row has no columns, so this is a list, not a table: the `role="table"` head
-           and the `role="row"` / `role="cell"` spans are gone with it. -->
-      <ul
-        class={`manager-essences-table ${ui.viewMode === 'grid' ? 'is-grid' : 'is-list'}`}
-        role="list"
-        data-essence-view={ui.viewMode}
-      >
-        {#each model.essences as essence (essence.id)}
-          <EssenceRow
-            {essence}
-            variant={ui.viewMode}
-            selected={selectedEssenceId === essence.id}
-            bulkSelected={bulkSelectedIds.has(essence.id)}
-            effectTransferEnabled={showSourceUi}
-            propertyMacrosEnabled={showPropertyMacroUi}
-            {text}
-            {format}
-            onSelect={(id) => onSelectEssence(id)}
-            onEdit={(id) => onEditEssence(id)}
-            onToggleEnabled={(id, enabled) => onToggleEssenceEnabled(id, enabled)}
-            onToggleBulkSelected={(id) => toggleBulkSelected(id)}
-          />
-        {/each}
-      </ul>
-    {/if}
-  </section>
-
-  <Pagination
-    totalCount={model.totalCount}
-    pageSize={ui.pageSize}
-    pageIndex={model.pageIndex}
-    pageSizeOptions={[10, 25, 50]}
-    onPageChange={(next) => (ui.pageIndex = next)}
-    onPageSizeChange={(next) => {
-      ui.pageSize = next;
-      ui.pageIndex = 0;
-    }}
-  />
+    {/snippet}
+    {#snippet entry(essence)}
+      <EssenceRow
+        {essence}
+        variant={ui.viewMode}
+        selected={selectedEssenceId === essence.id}
+        bulkSelected={bulkSelectedIds.has(essence.id)}
+        effectTransferEnabled={showSourceUi}
+        propertyMacrosEnabled={showPropertyMacroUi}
+        {text}
+        {format}
+        onSelect={(id) => onSelectEssence(id)}
+        onEdit={(id) => onEditEssence(id)}
+        onToggleEnabled={(id, enabled) => onToggleEssenceEnabled(id, enabled)}
+        onToggleBulkSelected={(id) => toggleBulkSelected(id)}
+      />
+    {/snippet}
+  </LibraryShelf>
 </main>
 
 <style>
@@ -541,7 +538,13 @@
     cursor: pointer;
   }
 
-  .manager-essences-table {
+  /* `:global` because the `<ul>` these style is rendered by `LibraryShelf` now, so a scoped
+     selector would be hashed to THIS component, match nothing, and be reported as unused —
+     which `lint:svelte:warnings` fails on. They stay HERE rather than moving into the shelf
+     because the grid template is a per-studio content judgement: essences read well at a
+     210px minimum, and a recipe card carrying a subtitle and a longer fact row will not.
+     `.manager-essences-table` is unique to this studio, so the global escape leaks nothing. */
+  :global(.manager-essences-table) {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
@@ -559,7 +562,7 @@
      shelf where the prototype shows a level one. The card's own control cluster takes
      `margin-top: auto` in `EssenceRow.svelte`, so the extra height lands between the
      description and the footer and the footers line up across the row. */
-  .manager-essences-table.is-grid {
+  :global(.manager-essences-table.is-grid) {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     align-items: stretch;

@@ -26,6 +26,10 @@ const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 const colourPopoverSource = read('src/ui/svelte/components/ManagerColorPopover.svelte');
 const browserSource = read('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
 const rowSource = read('src/ui/svelte/apps/manager/essences/EssenceRow.svelte');
+// The GRID card's anatomy and look now live in the shared studio-library primitive; the
+// essence row supplies the vocabulary and renders it. Assertions about the CARD read here,
+// assertions about the LIST row still read `rowSource`.
+const cardSource = read('src/ui/svelte/apps/manager/library/LibraryCard.svelte');
 const bulkPanelSource = read('src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte');
 const identityTabSource = read('src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte');
 const inspectorSource = read('src/ui/svelte/apps/manager/essences/EssenceBrowserInspector.svelte');
@@ -116,14 +120,16 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // The rendered symptom: `align-items: start` sized each card to its own copy, so a row
     // of four ran four different heights with four footers at four different baselines.
     assert.ok(
-      /\.manager-essences-table\.is-grid \{[^}]*align-items: stretch;/s.test(
+      // `:global(...)` because the `<ul>` is rendered by `LibraryShelf` now — a scoped
+      // selector would be hashed to the browser view, match nothing, and compile away.
+      /:global\(\.manager-essences-table\.is-grid\) \{[^}]*align-items: stretch;/s.test(
         styleBlock(browserSource)
       ),
       'the grid stretches every card to its row'
     );
     assert.ok(
-      /\.manager-essence-row\.is-card \.manager-essence-description \{[^}]*min-height: calc\(1\.4em \* 2\);/s.test(
-        styleBlock(rowSource)
+      /\.fab-library-card-description \{[^}]*min-height: calc\(1\.4em \* 2\);/s.test(
+        styleBlock(cardSource)
       ),
       'and the card reserves a fixed 2-line description box so every card is the same height regardless of content'
     );
@@ -212,29 +218,29 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // The rendered symptom the maintainer named as the mechanism: "name should be truncated".
     // Equal-height-within-a-row does not cover this — an unclamped name wraps and every card
     // in the row grows WITH it, which still satisfies "all the same height".
-    const styles = styleBlock(rowSource);
+    const styles = styleBlock(cardSource);
     assert.ok(
-      /\.manager-essence-row\.is-card \.manager-system-name \{[^}]*white-space: nowrap;/s.test(
-        styles
-      ),
+      /\.fab-library-card-name \{[^}]*white-space: nowrap;/s.test(styles),
       'the card name is one line'
     );
     assert.ok(
-      /\.manager-essence-row\.is-card \.manager-system-name \{[^}]*text-overflow: ellipsis;/s.test(
-        styles
-      ),
+      /\.fab-library-card-name \{[^}]*text-overflow: ellipsis;/s.test(styles),
       'with an ellipsis'
     );
     assert.ok(
-      /\.manager-essence-row\.is-card \.manager-system-name \{[^}]*min-width: 0;/s.test(styles),
+      /\.fab-library-card-name \{[^}]*min-width: 0;/s.test(styles),
       'and the min-width without which overflow never engages on a flex item'
     );
     // The full name stays reachable. Truncation that loses text is a defect, not a fix.
-    assert.ok(rowSource.includes('title={essence.name}'), 'the whole name survives as a title');
+    assert.ok(
+      rowSource.includes('nameTitle={essence.name}'),
+      'the whole name survives as a title'
+    );
     // LIST rows are untouched: a 76px row beside a clamped description has the width, and
-    // truncating there would hide names the list can show.
+    // truncating there would hide names the list can show. The card's clamp lives on the
+    // card's OWN class now, so it cannot reach the list row's `.manager-system-name` at all.
     assert.equal(
-      /\.manager-essence-row \.manager-system-name \{/.test(styles),
+      /\.manager-system-name \{/.test(styleBlock(rowSource)),
       false,
       'and the list row keeps its full name'
     );
@@ -621,16 +627,21 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // flex COLUMN without stating `align-items`, so the centred cross-axis value survives the
     // reflow and centres the name, description and usage counts. The prototype (and the
     // maintainer) want them flush left.
-    const styles = styleBlock(rowSource);
     assert.ok(
-      /\.manager-essence-row\.is-card \.manager-essence-identity \{[^}]*align-items: stretch;/s.test(
-        styles
-      ),
+      /\.fab-library-card-body \{[^}]*align-items: stretch;/s.test(styleBlock(cardSource)),
       'the card identity stretches its children to the card width so their left-aligned content is not centred'
+    );
+    // And it must WIN against the shared identity reset, which is `.fabricate-manager
+    // .manager-<studio>-identity` (0,2,0) and would otherwise keep the body a two-column
+    // grid. A component-scoped rule is (0,1,0), so the override is declared in the global
+    // sheet at matching specificity and later in source order.
+    assert.ok(
+      /\.fabricate-manager \.fab-library-card-body \{[^}]*flex-direction: column;/s.test(globalCss),
+      'the shared sheet re-stacks the card body over the identity reset'
     );
     // The LIST row must stay untouched — it keeps the shared grid's centred cross-axis.
     assert.equal(
-      /\.manager-essence-row \.manager-essence-identity \{[^}]*align-items:/s.test(styles),
+      /\.manager-essence-identity \{[^}]*align-items:/s.test(styleBlock(rowSource)),
       false,
       'the list row identity is not given its own align-items override'
     );
