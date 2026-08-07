@@ -420,26 +420,31 @@ function collectExternalDescriptors(payload) {
   collectMacroDescriptors(payload.recipes, 'recipe', descriptors);
   collectMacroDescriptors(slice.tasks, 'task', descriptors);
   collectMacroDescriptors(slice.events, 'event', descriptors);
+  // Essence property macros (issue 1036) live on a DIFFERENTLY NAMED field, so the
+  // collector takes the field name rather than being forked. The import report already
+  // carries the `essence` owner type (it is used for `componentLink`), so no new
+  // owner-type label is needed.
+  collectMacroDescriptors(system.essenceDefinitions, 'essence', descriptors, 'propertyMacroUuid');
 
   return descriptors;
 }
 
-function collectMacroDescriptors(records, ownerType, descriptors) {
+function collectMacroDescriptors(records, ownerType, descriptors, field = 'macroUuid') {
   for (const record of arrayOf(records)) {
     if (
       record &&
       typeof record === 'object' &&
-      typeof record.macroUuid === 'string' &&
-      record.macroUuid
+      typeof record[field] === 'string' &&
+      record[field]
     ) {
       descriptors.push({
         kind: REFERENCE_KINDS.MACRO,
         ownerType,
         ownerId: record.id ?? null,
         ownerName: record.name ?? '',
-        referenceValue: record.macroUuid,
+        referenceValue: record[field],
         set: (v) => {
-          record.macroUuid = v;
+          record[field] = v;
         },
       });
     }

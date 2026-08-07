@@ -128,10 +128,23 @@ export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
   // silent break the unit suite cannot see.
   'component edit normal': ['.manager-component-edit-view', '.manager-component-identity-strip'],
 
-  // Essences browser + editor.
-  'essences normal': ['.manager-essence-row'],
+  // Essences browser + editor (issue 1036). `.manager-essence-row` survives the redesign
+  // deliberately: it stays in the four shared selector lists in `styles/fabricate.css` (the
+  // row skin, the 76px geometry group, hover and the `.is-selected` accent ring), so only
+  // the row's INTERIOR moved into `EssenceRow.svelte`. `.manager-essences-table` pins the
+  // list container that replaced the `role="table"` grid, and `.manager-essence-identity`
+  // pins the selecting button — losing either is a silent break the unit suite cannot see,
+  // because both are what the capture steps click through.
+  'essences normal': ['.manager-essences-table', '.manager-essence-row'],
   'essences stacked': ['.manager-essence-row'],
+  'essences disabled in use': ['.manager-essence-row', '.manager-essence-identity'],
+  'essences grid': ['.manager-essences-table', '.manager-essence-row'],
+  // The bulk panel REPLACES the inspector while a selection exists, so the browser's own
+  // row is still the thing to measure.
+  'essences bulk edit': ['.manager-essence-row'],
   'essence-edit first state': ['.manager-essence-edit-view'],
+  'essence edit on craft': ['.manager-essence-edit-view'],
+  'essence edit validation': ['.manager-essence-edit-view'],
 
   // Environments browser (harness asserts `.manager-environment-row` count >= 1).
   'environments normal': ['.manager-environment-row'],

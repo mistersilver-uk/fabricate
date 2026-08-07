@@ -19,14 +19,54 @@
    - icon: Font Awesome class used when `src` is falsy.
    - size: edge length in px (default 40).
    - alt: image alt text (decorative by default).
+   - tint: a BARE `--fab-tag-*` palette key (`sage`, `mauve`, …), or '' for the accent
+     default. Issue 1036: the tile pinned `color: var(--fab-accent)` and forwards no rest
+     spread, so as shipped it renders every essence medallion accent-coloured and the
+     per-essence colour vocabulary could never appear on it. The tint recolours the GLYPH
+     and washes the SURFACE, because the prototype tile carries both and recolouring the
+     glyph alone does not reproduce it. Unset is byte-identical to the shipped render:
+     the glyph reads the token through a `var()` FALLBACK, and the wash is a separate
+     class-gated rule rather than a `color-mix` against `transparent`, which would leave
+     an untinted tile 14% translucent instead of unchanged.
+   - glyph: the glyph's font-size in px, for a tile large enough that the 0.9rem default
+     reads as a speck inside it. Unset resolves to `0.9rem` through a `var()` FALLBACK, so
+     no existing medallion moves. It is a prop rather than a `size`-derived calc precisely
+     because deriving it would re-type all ~40 medallions across the manager at once, which
+     is a change with its own frames rather than a side effect of this one.
 -->
 <script>
-  let { src = '', icon = 'fas fa-scroll', size = 40, alt = '' } = $props();
+  let { src = '', icon = 'fas fa-scroll', size = 40, alt = '', tint = '', glyph = 0 } = $props();
 
-  const boxStyle = $derived(`width:${size}px;height:${size}px`);
+  // Both numeric props are coerced and floored at zero before interpolation: they land in a
+  // `style` attribute, and a caller that passes a string is a caller that could otherwise
+  // compose a declaration.
+  const boxHeight = $derived(Math.max(0, Number(size) || 0));
+  const glyphPx = $derived(Math.max(0, Number(glyph) || 0));
+
+  // The token arrives as a bare palette key and is interpolated into a `style` attribute,
+  // so it is constrained to the shape a key can have. Anything else is DROPPED to '' — an
+  // unrecognised value renders the accent default rather than emitting a declaration the
+  // caller composed. The leading `--fab-tag-` is tolerated because `ManagerColorPicker`
+  // already accepts both spellings and a primitive should not be the one place that does not.
+  const safeTint = $derived(
+    /^[a-z0-9-]+$/.test(String(tint || '').replace(/^--fab-tag-/, ''))
+      ? String(tint).replace(/^--fab-tag-/, '')
+      : ''
+  );
+  const boxStyle = $derived(
+    `width:${boxHeight}px;height:${boxHeight}px` +
+      (glyphPx ? `;--fab-medallion-glyph:${glyphPx}px` : '') +
+      (safeTint ? `;--fab-medallion-tint:var(--fab-tag-${safeTint})` : '')
+  );
 </script>
 
-<span class="fab-medallion" data-medallion={src ? 'image' : 'glyph'} style={boxStyle}>
+<span
+  class="fab-medallion"
+  class:has-tint={Boolean(safeTint)}
+  data-medallion={src ? 'image' : 'glyph'}
+  data-medallion-tint={safeTint || undefined}
+  style={boxStyle}
+>
   {#if src}
     <img class="fab-medallion-img" {src} {alt} />
   {:else}
@@ -44,9 +84,24 @@
     overflow: hidden;
     border: 1px solid var(--fab-border);
     border-radius: 9px;
-    color: var(--fab-accent);
+    /* The tint recolours the glyph through a var() FALLBACK, so an untinted medallion
+       resolves to exactly the `var(--fab-accent)` it painted before issue 1036. */
+    color: var(--fab-medallion-tint, var(--fab-accent));
     background: var(--fab-bg-3);
-    font-size: 0.9rem;
+
+    /* Same `var()` FALLBACK discipline as the tint: with `--fab-medallion-glyph` unset this
+       resolves to exactly the 0.9rem every medallion painted before issue 1036. */
+    font-size: var(--fab-medallion-glyph, 0.9rem);
+  }
+
+  /* The surface wash, CLASS-GATED rather than folded into the base rule. Writing it as
+     `color-mix(in srgb, var(--fab-medallion-tint, transparent) 14%, var(--fab-bg-3))`
+     would look equivalent but is not: with the property unset that mixes 14% of
+     `transparent` into the surface, leaving every untinted medallion in the repo slightly
+     see-through. A separate rule is the only form that is genuinely a no-op when unset. */
+  .fab-medallion.has-tint {
+    border-color: color-mix(in srgb, var(--fab-medallion-tint) 45%, var(--fab-border));
+    background: color-mix(in srgb, var(--fab-medallion-tint) 14%, var(--fab-bg-3));
   }
 
   .fab-medallion-img {

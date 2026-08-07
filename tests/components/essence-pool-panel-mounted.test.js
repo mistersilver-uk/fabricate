@@ -24,6 +24,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/essenceIcons.js',
+    // The essence colour fold: the pool meters tint to the essence being filled.
+    'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   ],
   compiledModules: [
@@ -37,12 +39,46 @@ const harness = createMountedComponentHarness({
 
 const SHARED = essencePool({
   requirements: [
-    { groupId: 'g-radiant', essenceId: 'radiant', name: 'Radiant', icon: 'fas fa-sun', colorToken: 'butter', need: 2, delivered: 2, owned: 4, satisfied: true },
-    { groupId: 'g-shadow', essenceId: 'shadow', name: 'Shadow', icon: 'fas fa-moon', colorToken: 'lavender', need: 3, delivered: 1, owned: 2, satisfied: false },
+    {
+      groupId: 'g-radiant',
+      essenceId: 'radiant',
+      name: 'Radiant',
+      icon: 'fas fa-sun',
+      colorToken: 'butter',
+      need: 2,
+      delivered: 2,
+      owned: 4,
+      satisfied: true,
+    },
+    {
+      groupId: 'g-shadow',
+      essenceId: 'shadow',
+      name: 'Shadow',
+      icon: 'fas fa-moon',
+      colorToken: 'lavender',
+      need: 3,
+      delivered: 1,
+      owned: 2,
+      satisfied: false,
+    },
   ],
   carriers: [
-    { itemKey: 'Item.dusk', name: 'Duskcrystal', img: 'icons/gem.webp', ownedUnits: 3, allocatedUnits: 1, perUnit: { radiant: 2, shadow: 1 } },
-    { itemKey: 'Item.prism', name: 'Prism Ash', img: null, ownedUnits: 2, allocatedUnits: 0, perUnit: { radiant: 1, ember: 1 } },
+    {
+      itemKey: 'Item.dusk',
+      name: 'Duskcrystal',
+      img: 'icons/gem.webp',
+      ownedUnits: 3,
+      allocatedUnits: 1,
+      perUnit: { radiant: 2, shadow: 1 },
+    },
+    {
+      itemKey: 'Item.prism',
+      name: 'Prism Ash',
+      img: null,
+      ownedUnits: 2,
+      allocatedUnits: 0,
+      perUnit: { radiant: 1, ember: 1 },
+    },
   ],
   allocation: { 'Item.dusk': 1 },
 });
@@ -73,7 +109,11 @@ describe('EssencePoolPanel mounted behavior', () => {
     const target = await harness.mount({ pool: SHARED });
     const bars = [...target.querySelectorAll('[role="progressbar"]')];
     assert.deepEqual(
-      bars.map((bar) => [bar.getAttribute('aria-valuemin'), bar.getAttribute('aria-valuenow'), bar.getAttribute('aria-valuemax')]),
+      bars.map((bar) => [
+        bar.getAttribute('aria-valuemin'),
+        bar.getAttribute('aria-valuenow'),
+        bar.getAttribute('aria-valuemax'),
+      ]),
       [
         ['0', '2', '2'],
         ['0', '1', '3'],
@@ -127,8 +167,24 @@ describe('EssencePoolPanel mounted behavior', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte'),
       'utf8'
     );
-    assert.match(source, /\.essence-pool-meter\.is-short\s*\{[^}]*--fab-danger/);
+    // The state classes are styled on the BAR FILL, which is where an uncoloured essence
+    // still reads its state from.
+    assert.match(
+      source,
+      /\.essence-pool-meter\.is-short \.essence-pool-bar-fill\s*\{[^}]*--fab-danger/
+    );
     assert.match(source, /\.essence-pool-meter\.is-partial \.essence-pool-bar-fill\s*\{/);
+    // But NOT on the meter BOX (maintainer round). The box carries the essence's identity;
+    // the `x/y` ratio in its head and the colour-coded requirement tiles above the panel
+    // carry the state. A box in the success family said nothing the ratio had not already
+    // said, and cost the box the one thing only it could say — which essence this is —
+    // leaving two met requirements in a shared pool as two identical green boxes.
+    const boxStateRule = /\.essence-pool-meter\.is-(?:met|short)\s*\{/;
+    assert.equal(
+      boxStateRule.test(source),
+      false,
+      'the meter box carries no success/danger state rule'
+    );
   });
 
   it('prints delivered/need as the readout, never the whole held amount', async () => {
@@ -153,13 +209,20 @@ describe('EssencePoolPanel mounted behavior', () => {
     const target = await harness.mount({ pool: SHARED });
     const inputs = [...target.querySelectorAll('[data-essence-allocation]')];
     assert.deepEqual(
-      inputs.map((input) => [input.getAttribute('data-essence-allocation'), input.value, input.getAttribute('max')]),
+      inputs.map((input) => [
+        input.getAttribute('data-essence-allocation'),
+        input.value,
+        input.getAttribute('max'),
+      ]),
       [
         ['Item.dusk', '1', '3'],
         ['Item.prism', '0', '2'],
       ]
     );
-    assert.deepEqual(inputs.map((input) => input.getAttribute('min')), ['0', '0']);
+    assert.deepEqual(
+      inputs.map((input) => input.getAttribute('min')),
+      ['0', '0']
+    );
   });
 
   it('keeps every allocation control keyboard-operable and named', async () => {
@@ -184,9 +247,7 @@ describe('EssencePoolPanel mounted behavior', () => {
       pool: SHARED,
       onAllocate: (itemKey, units) => calls.push([itemKey, units]),
     });
-    target
-      .querySelector('[data-essence-carrier="Item.prism"] [data-stepper-increment]')
-      .click();
+    target.querySelector('[data-essence-carrier="Item.prism"] [data-stepper-increment]').click();
     assert.deepEqual(calls.at(-1), ['Item.prism', 1]);
   });
 
@@ -222,7 +283,10 @@ describe('EssencePoolPanel mounted behavior', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte'),
       'utf8'
     );
-    assert.match(source, /\.essence-contribution\.is-required i\s*\{\s*color: var\(--fab-chip-color/);
+    assert.match(
+      source,
+      /\.essence-contribution\.is-required i\s*\{\s*color: var\(--fab-chip-color/
+    );
     assert.ok(
       !/\.essence-contribution\.is-required\s*\{/.test(source),
       'the tinted rule must target the glyph, never the span wrapping the label text'

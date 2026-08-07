@@ -1739,12 +1739,29 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   // Selection is the accent BORDER. A ring plus an inset left bar is the same statement
   // made twice, and the bar bit into the row's medallion. The COMPONENT row joined the
   // opt-out in issue 676: it now leads with the same Medallion, so it had the same defect.
+  // The ESSENCE row joined in issue 1036 on the same precondition — its redesign gave it
+  // the 40px Medallion lead — and it is also the only one of the three that renders as a
+  // GRID CARD, where an inset left bar is not even the right axis. The environment and
+  // gathering-task rows are deliberately NOT here: they still lead differently.
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected'
+      '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected,\n.fabricate-manager .manager-essence-row.is-selected'
     ).includes('box-shadow: none;'),
-    'the selected recipe and component rows ring in the accent and add no left bar'
+    'the selected recipe, component and essence rows ring in the accent and add no left bar'
   );
+  for (const row of ['manager-environment-row', 'manager-gathering-task-row']) {
+    assert.equal(
+      css.includes(`.fabricate-manager .${row}.is-selected,\n`) ||
+        css.includes(`.fabricate-manager .${row}.is-selected {`),
+      true,
+      `${row} still declares the shared selected treatment`
+    );
+    assert.equal(
+      new RegExp(`\\.${row}\\.is-selected[^{]*\\{[^}]*box-shadow: none`).test(css),
+      false,
+      `${row} keeps the inset bar — it was not re-skinned by the essence change`
+    );
+  }
 });
 
 // The collapse ladder (issue 643 §8). Drop order is fixed and monotonic, and the
@@ -1859,31 +1876,51 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
   );
 });
 
-// The two multi-select browsers state the ticked-row treatment ONCE. A per-studio copy is
-// the variant the shared-primitive rule refuses, and it would drift the moment either
+// The three multi-select browsers state the ticked-row treatment ONCE. A per-studio copy is
+// the variant the shared-primitive rule refuses, and it would drift the moment any one
 // surface is re-toned.
-test('the bulk-selected row state is one joined selector across both studios', () => {
+//
+// The ESSENCE row joined for issue 1036. Its absence was a live defect, not a missing
+// nicety: `EssenceRow.svelte` already wrote `class:is-bulk-selected` and NOTHING matched it
+// in either the sheet or the component's own scoped block, so a ticked essence read exactly
+// like an unticked one — in the one studio whose bulk panel can also DELETE what is ticked.
+test('the bulk-selected row state is one joined selector across every multi-select studio', () => {
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-component-row.is-bulk-selected,\n.fabricate-manager .manager-recipe-row.is-bulk-selected {'
+      '.fabricate-manager .manager-component-row.is-bulk-selected,\n.fabricate-manager .manager-recipe-row.is-bulk-selected,\n.fabricate-manager .manager-essence-row.is-bulk-selected {'
     ),
-    'the recipe row JOINS the component row rule rather than authoring a second block'
+    'the recipe and essence rows JOIN the component row rule rather than authoring a second block'
   );
-  for (const row of ['manager-component-row', 'manager-recipe-row']) {
+  for (const row of ['manager-component-row', 'manager-recipe-row', 'manager-essence-row']) {
     assert.equal(
       (css.match(new RegExp(`\\.${row}\\.is-bulk-selected`, 'g')) || []).length,
       1,
       `${row}.is-bulk-selected must be written exactly once`
     );
   }
+  // The negative control on the widening: the environments and gathering-task browsers have
+  // no bulk selection at all, so adding the essence row must not have turned the join into
+  // "every browser row". A ticked treatment on a row nothing can tick is a dead rule.
+  for (const row of ['manager-environment-row', 'manager-gathering-task-row']) {
+    assert.equal(
+      css.includes(`.${row}.is-bulk-selected`),
+      false,
+      `${row} carries no bulk selection, so it must not join the ticked-row treatment`
+    );
+  }
 
   // The selection ROW joins the same way, for the same reason: one primitive renders it in
-  // both toolbars and its `rowClass` prop picks which half applies.
+  // all three toolbars and its `rowClass` prop picks which third applies.
+  //
+  // The essence library joined for issue 1036, and its absence was a live defect rather
+  // than a cosmetic one: it passed `rowClass="manager-essence-filter-row"` while authoring
+  // that class only in its own scoped `<style>`, which a child component's root element
+  // cannot see. The selection row therefore rendered with NO row metrics at all.
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-recipe-filter-row.is-selection,\n.fabricate-manager .manager-component-filter-row.is-selection {'
+      '.fabricate-manager .manager-recipe-filter-row.is-selection,\n.fabricate-manager .manager-component-filter-row.is-selection,\n.fabricate-manager .manager-essence-filter-row.is-selection {'
     ),
-    'the recipe toolbar joins the selection-row block rather than authoring a second one'
+    'every toolbar rendering the shared selection row joins one selection-row block'
   );
   assert.equal(
     css.includes('has no selection row at all'),
@@ -1915,7 +1952,7 @@ test('long-labelled switches escape the status cell geometry', () => {
   // The micro-label is what titles the control, and `white-space: nowrap` is the whole
   // reason "Sort by" no longer breaks onto two lines in the flagship frame.
   const filterLabelBlock = blockFor(
-    '.fabricate-manager .manager-recipe-filter-label,\n.fabricate-manager .manager-component-filter-label'
+    '.fabricate-manager .manager-recipe-filter-label,\n.fabricate-manager .manager-component-filter-label,\n.fabricate-manager .manager-essence-filter-label'
   );
   assert.ok(filterLabelBlock.includes('white-space: nowrap;'), 'a filter micro-label never wraps');
   assert.ok(
@@ -1958,7 +1995,7 @@ test('a selected browser row reads as an identity cue in the accent family, not 
   );
   const selectedSystemBlock = blockFor('.fabricate-manager .manager-system-row.is-selected');
   const identityFocusBlock = blockFor(
-    '.fabricate-manager .manager-system-identity:focus-visible,\n.fabricate-manager .manager-recipe-identity:focus-visible,\n.fabricate-manager .manager-component-identity:focus-visible,\n.fabricate-manager .manager-environment-identity:focus-visible,\n.fabricate-manager .manager-gathering-task-identity:focus-visible'
+    '.fabricate-manager .manager-system-identity:focus-visible,\n.fabricate-manager .manager-recipe-identity:focus-visible,\n.fabricate-manager .manager-component-identity:focus-visible,\n.fabricate-manager .manager-environment-identity:focus-visible,\n.fabricate-manager .manager-gathering-task-identity:focus-visible,\n.fabricate-manager .manager-essence-identity:focus-visible'
   );
 
   for (const [name, block] of [
@@ -2126,7 +2163,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-gathering-task-table-head,\n.fabricate-manager .manager-gathering-task-row'
   );
   const identityBlock = blockFor(
-    '.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity,\n.fabricate-manager .manager-gathering-task-identity'
+    '.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity,\n.fabricate-manager .manager-gathering-task-identity,\n.fabricate-manager .manager-essence-identity'
   );
   const toolsIdentityDropZoneBlock = blockFor(
     '.fabricate-manager .manager-tools-identity.is-component-drop-zone'
@@ -3487,17 +3524,28 @@ test('manager components browser defines drop target and compact responsive list
   // The component toolbar adopted the recipe bar's three-row shape (issue 676, ruling 1),
   // so it JOINS those rules rather than re-deriving a second, drifting filter bar. Its
   // own selects carried no font-size at all and were rendering at Foundry's 14px app base.
+  // The essence library joined both lists for issue 1036 — see the selection-row assertion
+  // above for why its scoped copy of them was not equivalent.
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row'
+      '.fabricate-manager .manager-recipe-filter-row,\n.fabricate-manager .manager-component-filter-row,\n.fabricate-manager .manager-essence-filter-row'
     ).includes('flex-wrap: wrap;'),
-    'the component filter rows share the recipe filter row rule'
+    'the component and essence filter rows share the recipe filter row rule'
   );
   assert.ok(
     blockFor(
-      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar select'
+      '.fabricate-manager .manager-recipe-toolbar .manager-search input,\n.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar .manager-search input,\n.fabricate-manager .manager-component-toolbar select,\n.fabricate-manager .manager-essence-toolbar .manager-search input,\n.fabricate-manager .manager-essence-toolbar select'
     ).includes('font-size: var(--fab-recipe-control-font);'),
-    'the component toolbar controls are typed by the shared control font, not the Foundry bleed'
+    'the component and essence toolbar controls are typed by the shared control font, not the Foundry bleed'
+  );
+  // The essence toolbar's selects also take the Fabricate select TREATMENT. Without it they
+  // rendered with Foundry core's own chrome — full-width, taller than the segmented controls
+  // beside them, and wrapping one filter row into three.
+  assert.ok(
+    blockFor(
+      '.fabricate-manager .manager-recipe-toolbar select,\n.fabricate-manager .manager-component-toolbar select,\n.fabricate-manager .manager-essence-toolbar select'
+    ).includes('height: 34px;'),
+    'every studio filter bar dresses its own selects rather than inheriting Foundry core chrome'
   );
   assert.ok(
     blockFor(
@@ -3521,12 +3569,21 @@ test('manager components browser defines drop target and compact responsive list
   // narrow surface reflows without a breakpoint re-templating its columns.
 });
 
-test('manager essence browser defines compact responsive table geometry', () => {
-  const tableBlock = blockFor('.fabricate-manager .manager-essences-table');
-  const noSourceBlock = blockFor('.fabricate-manager .manager-essences-table.has-no-source');
-  const identityBlock = blockFor('.fabricate-manager .manager-essence-identity');
-  const sourceImageBlock = blockFor('.fabricate-manager .manager-essence-source-cell-image');
-  const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
+// Issue 1036. The `--fab-mv2-essence-grid` column template, its `.has-no-source` variant,
+// the `.manager-essence-source-cell-image` block and the narrow-container `grid-template-
+// columns` stacking rule are all RETIRED here, and that is a deliberate edit rather than
+// incidental churn: the essence row is a FLEX card that wraps, so a column template on it
+// would place nothing, and the narrow join's `align-items: stretch` is a live flex property
+// that would stretch the medallion and the whole control cluster to full card height. The
+// replacement narrow behaviour is authored in `EssenceRow.svelte`'s own scoped block.
+//
+// What stays global is what a scoped child block cannot reach: the route-level `.manager-
+// main` row template, and the identity button's reset — which must beat Foundry's host
+// button geometry — joined to the three siblings that already carry it.
+test('manager essence browser defines a wrapping card row rather than a column template', () => {
+  const identityResetBlock = blockFor(
+    '.fabricate-manager .manager-recipe-identity,\n.fabricate-manager .manager-component-identity,\n.fabricate-manager .manager-environment-identity,\n.fabricate-manager .manager-gathering-task-identity,\n.fabricate-manager .manager-essence-identity'
+  );
 
   assert.ok(
     css.includes('.fabricate-manager[data-manager-view="essences"] .manager-main'),
@@ -3534,40 +3591,72 @@ test('manager essence browser defines compact responsive table geometry', () => 
   );
   assert.ok(
     blockFor('.fabricate-manager[data-manager-view="essences"] .manager-main').includes(
-      'grid-template-rows: auto auto minmax(0, 1fr);'
+      'grid-template-rows: auto minmax(0, 1fr) auto;'
     ),
-    'essences route should reserve rows for header, toolbar, and table'
+    'essences route should put the slack on the LIST, between the toolbar and the pager'
+  );
+
+  // The retirements, asserted as absences so a re-introduction is caught rather than
+  // silently coexisting with the flex row. Each needle carries the punctuation that only a
+  // DECLARATION or a RULE OPENER has — a bare class-name match would be satisfied by the
+  // retirement comments themselves, which name what they retired.
+  assert.equal(
+    css.includes('--fab-mv2-essence-grid:'),
+    false,
+    'the essence column template is retired with the table head it served'
+  );
+  assert.equal(
+    css.includes('.manager-essences-table.has-no-source {'),
+    false,
+    'and so is its no-source variant'
+  );
+  assert.equal(
+    css.includes('.manager-essence-source-cell-image {'),
+    false,
+    'and the source column cell, which reported one bit in a column of its own'
+  );
+  assert.equal(
+    css.includes('.manager-essence-table-head,') || css.includes('.manager-essence-table-head {'),
+    false,
+    'and the table head itself'
+  );
+
+  // The identity button JOINS the shared reset, so a `<button>` used as a row identity is
+  // not cropped by Foundry's fixed button height — a defect no mounted test can see.
+  assert.ok(
+    identityResetBlock.includes('appearance: none;'),
+    'the essence identity button joins the shared manager button reset'
   );
   assert.ok(
-    tableBlock.includes('--fab-mv2-essence-grid: minmax(0, 1.55fr)'),
-    'essences table should define shrinkable compact columns for normal Foundry manager widths'
+    identityResetBlock.includes('min-height: 46px;'),
+    'including the min-height that stops Foundry cropping it'
   );
+  // `min-height` ALONE does not stop the crop. Foundry pins a fixed `height` on every
+  // `button`, so used height is `max(height, min-height)` and a grow-tall variant still
+  // resolves to 46px — which is what the essence grid CARD is: the same button laid out as
+  // a ~150px stack. The four row-shaped siblings escape it only because their content never
+  // exceeds 46px, so the property was missing without being visible. CONTRIBUTING.md's
+  // "Instance 1 — button layout" states the pair; happy-dom computes no cascade, so this
+  // source assertion and the rendered `manager-essences-grid` frame are the only proofs.
   assert.ok(
-    noSourceBlock.includes('--fab-mv2-essence-grid: minmax(0, 1.7fr)'),
-    'essences table should have a no-source grid variant when effect transfer is disabled'
+    identityResetBlock.includes('height: auto;'),
+    'and the height:auto that lets the grid card grow past it'
   );
+
+  // The row still joins the four shared lists, so the one-consistent-selected-row-signal
+  // rule holds by construction rather than by convention.
   assert.ok(
-    identityBlock.includes('grid-template-columns: 44px minmax(0, 1fr);'),
-    'essence identity should reserve icon space'
-  );
-  assert.ok(
-    sourceImageBlock.includes('width: 36px;') && sourceImageBlock.includes('height: 36px;'),
-    'essence source cells should render stable image-only evidence'
-  );
-  assert.ok(
-    mediumQuery.includes('.fabricate-manager .manager-essence-row') &&
-      mediumQuery.includes('grid-template-columns: minmax(0, 1fr);'),
-    'medium manager layout should stack essence rows before columns become cramped'
+    blockFor(
+      '.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row'
+    ).includes('min-height: 76px;'),
+    'the essence row keeps the shared 76px row height'
   );
 });
 
-test('manager essence edit route defines picker-based responsive geometry', () => {
+test('manager essence edit route defines a tabbed two-row shell', () => {
   const mainBlock = blockFor('.fabricate-manager[data-manager-view="essence-edit"] .manager-main');
   const editGridBlock = blockFor('.fabricate-manager .manager-essence-edit-grid');
   const sourceSummaryBlock = blockFor('.fabricate-manager .manager-essence-source-summary');
-  const inspectorSourceSummaryBlock = blockFor(
-    '.fabricate-manager .manager-essence-inspector-source-summary'
-  );
   const inspectorSourceActionsBlock = blockFor(
     '.fabricate-manager .manager-essence-inspector-source-actions'
   );
@@ -3583,27 +3672,31 @@ test('manager essence edit route defines picker-based responsive geometry', () =
   const sourceTriggerBlock = blockFor('.fabricate-manager .essence-source-trigger');
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
+  // TWO tracks now, not one: the tab strip and the scrolling tab body. A single `1fr`
+  // would stretch the strip, which is what the shipped single-card editor did not have.
   assert.ok(
-    mainBlock.includes('grid-template-rows: minmax(0, 1fr);'),
-    'essence edit route should let the identity card be the first main content'
+    mainBlock.includes('grid-template-rows: auto minmax(0, 1fr);'),
+    'essence edit route reserves a row for the tab strip and gives the body the slack'
   );
   assert.ok(
     editGridBlock.includes(
-      'grid-template-columns: var(--fab-mv2-essence-icon-column, 156px) minmax(0, 1fr);'
+      'grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);'
     ),
-    'essence edit identity fields should reserve stable icon picker space'
+    'essence edit identity fields should reserve stable square-icon picker space'
   );
+  // TWO tracks. The third reserved an inline clear button that no surface renders any more
+  // (issue 1036, maintainer round 2): the editor's linked source is the shared `ItemDropZone`
+  // card, whose actions are the primitive's own, and the browser inspector always overrode
+  // the third track away. The per-inspector override is retired with it, so this asserts the
+  // ONE geometry rather than a base and the rule that cancelled it.
   assert.ok(
-    sourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) 34px;'),
-    'essence source summary should reserve source image, evidence, and clear action columns'
+    sourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr);'),
+    'essence source summary should be the linked item evidence card, image beside evidence'
   );
-  assert.ok(
-    !inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr) auto;'),
-    'inspector source summary should not crowd evidence and unlink into a three-column row'
-  );
-  assert.ok(
-    inspectorSourceSummaryBlock.includes('grid-template-columns: 54px minmax(0, 1fr);'),
-    'inspector source summary should be only the linked item evidence card'
+  assert.equal(
+    css.includes('.fabricate-manager .manager-essence-inspector-source-summary {'),
+    false,
+    'and no per-inspector override survives to re-declare it'
   );
   assert.ok(
     inspectorSourceActionsBlock.includes('margin-top: var(--fab-space-3);'),

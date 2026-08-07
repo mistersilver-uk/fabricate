@@ -1685,7 +1685,7 @@ describe('createAdminStore', () => {
       assert.ok(!updateCalled, 'updateSystem should not be called for empty name');
     });
 
-    it('removeEssence shows confirm before deleting', async () => {
+    it('deleteEssence shows confirm before deleting', async () => {
       let confirmCalled = false;
       const services = createMockServices({
         confirmDialog: async () => {
@@ -1701,12 +1701,12 @@ describe('createAdminStore', () => {
         ];
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.removeEssence('ess1');
+      await store.deleteEssence('ess1');
       assert.ok(confirmCalled, 'should call confirmDialog');
       assert.ok(!manager.getSystem('sys1').essenceDefinitions.some((e) => e.id === 'ess1'));
     });
 
-    it('removeEssence does nothing when confirm declined', async () => {
+    it('deleteEssence does nothing when confirm declined', async () => {
       const services = createMockServices({ confirmDialog: async () => false });
       const manager = services.getCraftingSystemManager();
       const sys = manager.getSystem('sys1');
@@ -1716,14 +1716,14 @@ describe('createAdminStore', () => {
         ];
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.removeEssence('ess1');
+      await store.deleteEssence('ess1');
       assert.ok(
         manager.getSystem('sys1').essenceDefinitions.some((e) => e.id === 'ess1'),
         'should not delete when declined'
       );
     });
 
-    it('removeEssence delegates to systemManager.deleteEssence', async () => {
+    it('deleteEssence delegates to systemManager.deleteEssence', async () => {
       const services = createMockServices();
       const manager = services.getCraftingSystemManager();
       const sys = manager.getSystem('sys1');
@@ -1735,7 +1735,7 @@ describe('createAdminStore', () => {
       }
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
-      await store.removeEssence('ess1');
+      await store.deleteEssence('ess1');
       const remaining = manager.getSystem('sys1').essenceDefinitions;
       assert.ok(!remaining.some((e) => e.id === 'ess1'));
       assert.ok(remaining.some((e) => e.id === 'ess2'));
@@ -2030,7 +2030,7 @@ describe('createAdminStore', () => {
       assert.equal(updateCalled, false, 'duplicate rename should not persist');
     });
 
-    it('addEssence followed by removeEssence round-trips correctly', async () => {
+    it('addEssence followed by deleteEssence round-trips correctly', async () => {
       let lastSavedEssences = null;
       const services = createMockServices();
       const origManager = services.getCraftingSystemManager();
@@ -2054,11 +2054,11 @@ describe('createAdminStore', () => {
       const addedEssence = lastSavedEssences.find((e) => e.name === 'Fire');
       assert.ok(addedEssence, 'essence should exist after add');
       assert.ok(addedEssence.id, 'essence should have an id');
-      await store.removeEssence(addedEssence.id);
+      await store.deleteEssence(addedEssence.id);
       const remaining = origManager.getSystem('sys1').essenceDefinitions;
       assert.ok(
         !remaining.some((e) => e.id === addedEssence.id),
-        'essence should be removed after removeEssence'
+        'essence should be removed after deleteEssence'
       );
     });
   });
@@ -3772,7 +3772,12 @@ describe('createAdminStore', () => {
         'addTag',
         'removeTag',
         'addEssence',
-        'removeEssence',
+        'duplicateEssence',
+        'setEssenceEnabled',
+        'applyEssenceBulkEdit',
+        'deleteEssence',
+        'deleteEssences',
+        'cancelEssenceDraft',
         'addCurrencyUnit',
         'updateCurrencyUnit',
         'deleteCurrencyUnit',
@@ -7506,11 +7511,10 @@ describe('createAdminStore', () => {
       assert.deepEqual(cards[0].componentUsageItems, [
         { id: 'comp-1', name: 'Blazing Herb', img: 'blazing-herb.png' },
       ]);
-      assert.equal(cards[0].deleteBlocked, true);
       assert.equal(cards[1].sourceState, 'none');
       assert.deepEqual(cards[1].componentUsageItems, []);
       assert.equal(cards[1].icon, DEFAULT_ESSENCE_ICON);
-      assert.equal(cards[1].deleteBlocked, false);
+      assert.equal(cards[1].componentUsageCount, 0, 'no component carries the second essence');
     });
 
     it('viewState.recipeSearchTerm and itemSearchTerm echo the current search values', async () => {

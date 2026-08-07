@@ -218,6 +218,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/ui/svelte/util/essenceIcons.js',
+  // The essence colour fold (issue 1036). `EssencePoolPanel` spends it on the pool meters
+  // so a bar reads as the same essence as the pip that filled it; the panel is already in
+  // the compiled graph, so omitting this HANGS every mounted crafting suite (# cancelled)
+  // rather than failing one. It imports nothing, so this single entry suffices.
+  'src/ui/svelte/util/essenceTint.js',
   'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',

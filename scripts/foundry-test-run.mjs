@@ -1862,7 +1862,13 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-components-list',
       '.manager-component-row',
       '.manager-component-identity',
+      // The essence library's list container and its selecting button (issue 1036). Both
+      // are what the View Lab essence steps click through, so both are pinned by
+      // `MANAGER_SURFACE_EXPECTED_SELECTORS` — and a pinned selector this list does not
+      // MEASURE is a guard that can never fire.
+      '.manager-essences-table',
       '.manager-essence-row',
+      '.manager-essence-identity',
       '.manager-vocabulary-row',
       '.manager-gathering-task-row',
       '.manager-gathering-event-row',

@@ -19,6 +19,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import { essenceTintToken } from '../../../util/essenceTint.js';
   import CraftingThumb from '../../crafting/CraftingThumb.svelte';
   import InventoryDetailHeader from './InventoryDetailHeader.svelte';
   import InventoryDetailPager from './InventoryDetailPager.svelte';
@@ -254,6 +255,7 @@
   detailKey={item.key}
   img={displayImg}
   icon={isEssence ? icon : ''}
+  colorToken={isEssence ? item?.colorToken : ''}
   name={displayName}
   total={totalLabel}
   chips={headerChips}
@@ -349,7 +351,13 @@
           </p>
           <div class="inventory-detail-essences">
             {#each essences as essence (essence.id)}
-              <span class="inventory-chip inventory-chip-essence">
+              {@const tint = essenceTintToken(essence.colorToken)}
+              <span
+                class="inventory-chip inventory-chip-essence"
+                class:has-tint={Boolean(tint)}
+                style={tint ? `--fab-essence-tint:var(--fab-tag-${tint})` : undefined}
+                data-essence-tint={tint || undefined}
+              >
                 {#if essence.icon}<i class={essence.icon} aria-hidden="true"></i>{/if}
                 <span>{essence.name}</span>
                 <span class="inventory-chip-qty">×{essence.quantity}</span>
@@ -740,5 +748,30 @@
 
   .inventory-chip-essence i {
     font-size: 10px;
+  }
+
+  /* Issue 1036: an essence chip on a carrying component wears THAT essence's colour, so the
+     inspector answers "which essences are in this" by colour as well as by name — the same
+     question the tinted tile answers one click away.
+
+     All three of the chip's surfaces vary around the one base colour, which is the shape the
+     `is-info` / `is-success` / `is-warning` tones above already take: a strong border, a
+     faint wash, and full-strength text. Deriving them with `color-mix` rather than adding
+     three tokens per palette colour is what keeps this to one declaration per surface for
+     all fourteen colours, in every theme — the mix resolves against whatever the theme's
+     `--fab-tag-*` currently is.
+
+     `has-tint` gates the whole thing: an essence with no colour keeps the neutral chip it
+     has today, byte for byte. */
+  .inventory-chip-essence.has-tint {
+    border-color: color-mix(in srgb, var(--fab-essence-tint) 45%, transparent);
+    background: color-mix(in srgb, var(--fab-essence-tint) 14%, var(--fab-surface-raised));
+    color: var(--fab-essence-tint);
+  }
+
+  /* The quantity keeps its quieter reading INSIDE a tinted chip: it is a number about the
+     essence, not the essence's name, and at full strength it competed with it. */
+  .inventory-chip-essence.has-tint .inventory-chip-qty {
+    color: color-mix(in srgb, var(--fab-essence-tint) 72%, var(--fab-text-muted));
   }
 </style>

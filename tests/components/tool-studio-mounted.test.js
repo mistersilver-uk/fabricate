@@ -7,6 +7,7 @@ import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
@@ -22,10 +23,15 @@ const harness = createMountedComponentHarness({
     'src/systems/characterModifierPrerequisiteCopy.js',
     'src/systems/characterPrerequisites.js',
     'src/utils/plainTextDescription.js',
+    // The add-new essence offer projection (issue 1036); the recipe ingredient components
+    // in this tree import it. Also the shared drop-data resolver, which `ItemDropZone`
+    // now uses to widen its guard onto the legacy compendium `{ pack, id }` shape.
+    'src/utils/essenceValidation.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/chanceColorScale.js',
     'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/util/recipeCurrency.js',
+    'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
     ...SEARCHABLE_POPOVER_RAW_MODULES,
@@ -313,13 +319,25 @@ describe('Tool Studio editor (mounted)', () => {
 
     root.querySelector('[data-tool-source-copy-uuid]').click();
     root.querySelector('[data-tool-source-unlink]').click();
-    const drop = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(drop, 'dataTransfer', {
-      value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.replacement' }) },
-    });
-    root.querySelector('[data-tool-source-card]').dispatchEvent(drop);
+    const sourceCard = root.querySelector('[data-tool-source-card]');
+    dispatchDrop(sourceCard, { type: 'Item', uuid: 'Item.replacement' });
 
     assert.deepEqual(calls, [['copy', 'Item.hammer'], ['unlink'], ['drop', 'Item.replacement']]);
+
+    // Issue 1036/7, at THIS call site: the widened `resolveDropUuid` guard resolves a uuid
+    // out of more drag shapes than the old `data.uuid` read did, so the document-type check
+    // is now the only thing keeping an Actor or a Macro out of a Tool's source link.
+    dispatchRejectedDrops(sourceCard);
+    assert.equal(
+      calls.filter(([kind]) => kind === 'drop').length,
+      1,
+      'the tool source zone still refuses every non-Item and document-less payload'
+    );
+
+    // And the legacy compendium pair IS now accepted here, exactly as its `onDrop` — which
+    // calls `resolveDropUuid` itself — always expected.
+    dispatchDrop(sourceCard, { type: 'Item', pack: 'fabricate.items', id: 'legacy' });
+    assert.equal(calls.filter(([kind]) => kind === 'drop').length, 2);
   });
 
   it('stages only Display label and routes Enabled through immediate persistence', async () => {

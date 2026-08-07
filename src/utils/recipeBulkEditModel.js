@@ -70,7 +70,10 @@
  * selection.
  */
 
-import { normalizeSelectionIds as normalizeBookIds } from './bulkSelectionModel.js';
+import {
+  normalizeBulkStatus,
+  normalizeSelectionIds as normalizeBookIds,
+} from './bulkSelectionModel.js';
 
 /**
  * @typedef {object} RecipeBulkDraft
@@ -83,8 +86,16 @@ import { normalizeSelectionIds as normalizeBookIds } from './bulkSelectionModel.
  * @property {string[]} bookRemove recipe-book ids staged for removal; disjoint from `bookAdd`.
  */
 
-/** The Status axis's three segments, in the panel's segmented-control order. */
-export const RECIPE_BULK_STATUS_VALUES = Object.freeze(['unchanged', 'enable', 'disable']);
+/**
+ * The Status axis's three segments, in the panel's segmented-control order.
+ *
+ * The shared `unchanged | enable | disable` axis, which now lives in
+ * `bulkSelectionModel.js` beside the selection helpers (issue 1036) because the Essence
+ * Studio stages the identical intention onto the identical `enabled` edit key. Re-exported
+ * under its recipe-flavoured name so `RecipeBulkEditPanel` keeps importing ONE model
+ * module, exactly as the four selection helpers at the foot of this file do.
+ */
+export { BULK_STATUS_VALUES as RECIPE_BULK_STATUS_VALUES } from './bulkSelectionModel.js';
 
 /** The Lock axis's three segments, in the panel's segmented-control order. */
 export const RECIPE_BULK_LOCK_VALUES = Object.freeze(['unchanged', 'lock', 'unlock']);
@@ -141,7 +152,7 @@ function readDraft(draft) {
   const tierId = typeof source.checkTierId === 'string' ? source.checkTierId.trim() : '';
   return {
     category: typeof source.category === 'string' ? source.category : '',
-    status: enumValue(source.status, RECIPE_BULK_STATUS_VALUES),
+    status: normalizeBulkStatus(source.status),
     lock: enumValue(source.lock, RECIPE_BULK_LOCK_VALUES),
     checkTierStaged: source.checkTierStaged === true,
     checkTierId: tierId || null,
@@ -197,7 +208,7 @@ export function setBulkRecipeCategory(draft, category) {
  * @returns {RecipeBulkDraft} a NEW draft; the input is not mutated.
  */
 export function setBulkRecipeStatus(draft, status) {
-  return { ...readDraft(draft), status: enumValue(status, RECIPE_BULK_STATUS_VALUES) };
+  return { ...readDraft(draft), status: normalizeBulkStatus(status) };
 }
 
 /**

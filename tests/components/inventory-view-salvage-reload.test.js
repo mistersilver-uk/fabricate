@@ -29,6 +29,8 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // The essence colour fold, shared by the card tile, its pips and the inspector.
+    'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The REAL store imports these two leaves (unlike the mocked-store suite); they
     // are import-free, so copying them verbatim resolves the compiled store's graph.

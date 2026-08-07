@@ -64,6 +64,28 @@ Deleting a vocabulary entry that records still reference is a confirmed destruct
    A placeholder emptied by the strip is persisted as an incomplete ingredient rather than left naming the deleted tag.
 5. Nothing is left dangling: no recipe or component retains a `category` or tag value that no longer exists in the system vocabulary.
 
+### Delete Essence Definition
+
+Deleting an essence is a confirmed destructive record rewrite across components and recipes, not a silent orphaning.
+It has both a single-essence and a SET form, and the two perform the same cascade.
+
+1. Require explicit GM confirmation.
+   Deletion is WARNED, not BLOCKED: component usage never refuses a delete, because the cascade strips the essence from every carrying component, so neither the single delete nor a set member is ever excluded or skipped on account of the components carrying it.
+   Both forms state their impact before the GM commits: the single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten, and the set delete states, before it is armed, how many essences will be deleted, how many components carry them, and how many recipes will be rewritten.
+   Both carrier numbers are counted over DISTINCT carriers, never summed per essence: the cascade rewrites each referencing recipe once for the whole selection and strips every deleted essence from a carrying component in one pass, so a component or recipe naming two selected essences is one carrier, not two.
+2. The essence is removed from `essenceDefinitions` and from the derived `essences` id array.
+3. Every component still carrying the essence has that quantity stripped, so no component is left naming a deleted essence.
+4. Every recipe referencing the essence — through either the legacy per-set essences map or a first-class essence ingredient option, at recipe level or step level — is rewritten to drop it.
+   A group left with no options is dropped, and a set left with no ingredient groups, ingredients or essences is dropped.
+5. A recipe left with no ingredient sets, or with no results, is clamped to disabled.
+6. Each rewritten recipe is re-saved as an INCOMPLETE authoring shell (`allowIncomplete`), because a recipe stripped of its only requirement is deliberately persisted rather than deleted.
+7. The rewrites run BEFORE the crafting-system write.
+   That ordering is only safe because the disabled-essence blocker is an ACTIVATION-only validation and never a persistence one: a persistence-level blocker would abort the cascade partway through, with the essence definitions and component essence maps already mutated in memory and nothing persisted.
+8. The set form issues exactly ONE crafting-systems write and ONE recipes write for the whole operation, computing each recipe's union rewrite once, so a recipe referencing two deleted essences is written once rather than twice.
+9. A single summary notification is emitted, never one per rewritten recipe.
+10. Alchemy signature uniqueness is reconciled once after the cascade, because stripping essences collapses signatures and can create collisions that did not exist before.
+11. No run clean-up applies: a crafting run records component ingredients and a resolved-essence snapshot, neither of which is invalidated by the definition's removal.
+
 ### Disable Multi-step Feature
 
 Disabling `features.multiStepRecipes` is a **non-destructive collapse**, not a destructive migration and not an information-hiding gate.

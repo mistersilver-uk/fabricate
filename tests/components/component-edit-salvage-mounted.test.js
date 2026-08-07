@@ -32,6 +32,10 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/componentEditor.js',
+    // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
+    // withhold a disabled essence from the quantity grid. A missing raw module HANGS the
+    // suite rather than failing it, so the shared harness validator throws for it up front.
+    'src/utils/essenceValidation.js',
     // The component category vocabulary (issue 676), imported by ComponentEditView.
     // A deliberately import-free leaf, so this single entry suffices — but omit it
     // and the mounted suite HANGS (# cancelled) rather than failing.
@@ -657,6 +661,79 @@ describe('ComponentEditView — the extracted essence quantity card (issue 772)'
     assert.equal(drafts.at(-1).updates.essences.earth, 4, 'a typed quantity commits');
     assert.equal(drafts.at(-1).essenceCount, 2, 'and both essences now count as contributed');
 
+    harness.remount();
+  });
+
+  // Issue 1036, criteria 2 and 18. The editor's grid is both the add-new offer and the
+  // editing surface for what is already carried, and `buildComponentEditorUpdates` rebuilds
+  // `updates.essences` SOLELY from these rows — so the offer narrows and the DRAFT does not.
+  const MIXED_ESSENCES = [
+    { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false, quantity: 0 },
+    { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true, quantity: 0 },
+  ];
+
+  it('1036/18: a DISABLED essence this component does not carry is withheld from the grid', async () => {
+    const target = await harness.mount(
+      props({ showEssences: true, essenceOptions: MIXED_ESSENCES })
+    );
+
+    assert.ok(
+      Boolean(cardFor(target, 'earth')),
+      'negative control: the ENABLED essence IS offered, so the grid is not simply empty'
+    );
+    assert.ok(!cardFor(target, 'fire'), 'the disabled, uncarried essence is withheld');
+    harness.remount();
+  });
+
+  it('1036/2: a DISABLED essence this component already carries stays editable and clearable', async () => {
+    const { drafts, props: mountProps } = trackDirty({
+      showEssences: true,
+      essenceOptions: [
+        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false, quantity: 3 },
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true, quantity: 0 },
+      ],
+    });
+    const target = await harness.mount(mountProps);
+
+    const fire = cardFor(target, 'fire');
+    assert.ok(Boolean(fire), 'the carried disabled essence is still rendered');
+    assert.equal(stepperInput(fire).value, '3', 'with its authored quantity intact');
+
+    // Clearable: the surface that authored the value must be able to remove it.
+    const input = stepperInput(fire);
+    input.value = '0';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushRender();
+    assert.equal(
+      drafts.at(-1).updates.essences.fire,
+      undefined,
+      'a cleared quantity leaves the map, exactly as it would for an enabled essence'
+    );
+    harness.remount();
+  });
+
+  it('1036/18: the essenceOptions PROP is not filtered — the SAVE payload keeps the disabled quantity', async () => {
+    const { drafts, props: mountProps } = trackDirty({
+      showEssences: true,
+      essenceOptions: [
+        { id: 'fire', name: 'Fire', icon: 'fas fa-fire', enabled: false, quantity: 3 },
+        { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', enabled: true, quantity: 0 },
+      ],
+    });
+    const target = await harness.mount(mountProps);
+
+    // Edit an UNRELATED essence. The save payload is rebuilt from the whole draft, so if the
+    // offer filter had narrowed the draft rather than the render, this ordinary edit would
+    // silently delete the disabled essence's authored 3.
+    cardFor(target, 'earth').querySelector('[data-stepper-increment]').click();
+    await flushRender();
+
+    assert.equal(drafts.at(-1).updates.essences.earth, 1);
+    assert.equal(
+      drafts.at(-1).updates.essences.fire,
+      3,
+      'the disabled essence keeps its authored quantity through an unrelated save'
+    );
     harness.remount();
   });
 

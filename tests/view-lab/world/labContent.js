@@ -142,6 +142,11 @@ const SMITHING_COMPONENTS = [
     categories: ['Raw Materials'],
     tags: ['hide'],
     difficulty: 2,
+    // Carriers of the DISABLED `aether` essence (issue 1036). Two of them, so the essence
+    // library's usage readout, the inspector's stat card and the bulk delete's blocked-
+    // member notice all have a non-zero, non-one number to report. A disabled essence still
+    // counts and is still consumed, which is exactly what these carriers demonstrate.
+    essences: { aether: 1 },
   }),
   component('sm-oak-haft', 'Oak Haft', 'commodities/wood/kindling-stick-brown.webp', {
     categories: ['Raw Materials'],
@@ -153,6 +158,7 @@ const SMITHING_COMPONENTS = [
     categories: ['Raw Materials'],
     tags: ['abrasive'],
     difficulty: 1,
+    essences: { aether: 2 },
   }),
   component('sm-ruby', 'Flawless Ruby', 'commodities/gems/gem-faceted-radiant-red.webp', {
     categories: ['Reagents'],
@@ -713,12 +719,40 @@ const RUNEWORK_COMPONENTS = [
   }),
 ];
 
+/**
+ * The shared essence vocabulary. Every one of the six lab systems declares THIS array, so
+ * an edit here moves every essence surface in the corpus at once.
+ *
+ * SIX entries. Deletion is WARNED, not blocked (issue 1036, maintainer round), so every
+ * essence is deletable; the sixth (`mote`) is still special because it is the only essence
+ * NO component carries and the only one with no source, which gives the browser a clean
+ * zero-carrier subject for both. See its own note.
+ *
+ * COLOURS (issue 1036). Four of the five carry a distinct `--fab-tag-*` token and `air` is
+ * deliberately left UNSET: an essence with no authored colour renders in the theme accent
+ * by design, and it is a first-class state the redesign has to photograph — the frame
+ * proves both that the colour vocabulary appears and that its absence is handled, which a
+ * fully-coloured fixture cannot.
+ *
+ * `aether` is NEW, and it is the feature's HEADLINE STATE: DISABLED while components carry
+ * it and a recipe requires it. Its quantities still match, accumulate and are consumed;
+ * only the behaviour it carries onto a crafted result is suppressed. A new essence rather
+ * than a flipped existing one, deliberately — flipping one would disable it in all six
+ * systems and, through the new recipe-activation blocker, could disable lab recipes and
+ * break unrelated cases.
+ *
+ * Its `propertyMacroUuid` does NOT resolve: the lab world declares no `Macro` documents at
+ * all, so the editor's macro card photographs in its MISSING state. That state has no
+ * shipped precedent and is worth having; the RESOLVED state routes to smoke or maintainer
+ * evidence rather than being implied here.
+ */
 const ESSENCES = [
   {
     id: 'earth',
     name: 'Earth',
     description: 'Stone, ore, and root.',
     icon: 'fas fa-mountain',
+    colorToken: 'sage',
     sourceComponentId: 'sm-iron-ore',
   },
   {
@@ -726,6 +760,7 @@ const ESSENCES = [
     name: 'Fire',
     description: 'Forge-heat and ember.',
     icon: 'fas fa-fire',
+    colorToken: 'peach',
     sourceComponentId: 'sm-coal',
   },
   {
@@ -733,14 +768,48 @@ const ESSENCES = [
     name: 'Water',
     description: 'Spring, tide, and frost.',
     icon: 'fas fa-droplet',
+    colorToken: 'aqua',
     sourceComponentId: 'hb-spring-water',
   },
   {
+    // No `colorToken`, on purpose. See the header: the unset-colour row is a state the
+    // design has to handle and a fully-coloured fixture would never show it.
     id: 'air',
     name: 'Air',
     description: 'Breath and vapour.',
     icon: 'fas fa-wind',
     sourceComponentId: 'al-saltpetre',
+  },
+  {
+    id: 'aether',
+    name: 'Aether',
+    // Deliberately long enough to exercise the row's one-line description clamp.
+    description: 'The binding between things, drawn thin. Rare, and quiet about what it does.',
+    icon: 'fas fa-atom',
+    colorToken: 'lavender',
+    enabled: false,
+    sourceComponentId: 'sm-ruby',
+    propertyMacroUuid: 'Macro.lab-aether-binding',
+  },
+  {
+    // The ZERO-CARRIER essence (issue 1036). NO component anywhere carries it, so
+    // `componentUsageCount` is 0. Deletion is warned rather than blocked, so every lab
+    // essence is deletable; `mote` is the one whose bulk-delete impact statement reports
+    // zero carrying components, which is the clean subject the impact copy is written for.
+    //
+    // It is required by `sm-r-runeplate-draft`, so `recipeRewrites` is 1 rather than 0 and
+    // the third impact number is not trivially satisfied. That recipe SPECIFICALLY, for the
+    // reason recorded there: it is already `enabled: false` and already un-enableable, so a
+    // new requirement on it moves no status pill on any recipe-library frame.
+    //
+    // NO `sourceComponentId` on purpose: it is the corpus's only essence with no source at
+    // all, so the browser's `Source: none` filter and the row's absent Effects pill both
+    // have a subject.
+    id: 'mote',
+    name: 'Mote',
+    description: 'Loose motive dust. Useful, and nobody has found a use.',
+    icon: 'fas fa-circle-dot',
+    colorToken: 'butter',
   },
 ];
 
@@ -1249,14 +1318,52 @@ const SMITHING_RECIPES = [
       // `enabled: false` overrides the builder's hardcoded `true` because `recipe()` spreads
       // `...config` AFTER it; that ordering is what makes this fixture expressible at all.
       //
-      // An INCOMPLETE SHELL, not a broken one: no ingredient sets and no result groups, which is
-      // the completeness contract failing while structural integrity holds. So
-      // `validateStructure()` passes, `validate()` fails, and the activation gate refuses it —
-      // `incomplete: true` AND `enableBlocked: true`, with the pill reading `blocked` because the
-      // recipe is off.
+      // An INCOMPLETE SHELL, not a broken one: no result groups, which is the completeness
+      // contract failing while structural integrity holds. So `validateStructure()` passes,
+      // `validate()` fails, and the activation gate refuses it — `incomplete: true` AND
+      // `enableBlocked: true`, with the pill reading `blocked` because the recipe is off.
       //
       // Safe on every player surface by construction: `InventoryListingBuilder` and the crafting
       // listing drop `enabled === false` outright, so this row exists only for the GM.
+      //
+      // It is ALSO the lab's one recipe that requires the DISABLED `aether` essence (issue
+      // 1036), which is what gives that essence a non-zero recipe-usage count for the
+      // library readout, the inspector stat card and the bulk-delete impact statement. This
+      // recipe specifically, because the new activation blocker refuses a recipe requiring a
+      // disabled essence, and this one is ALREADY off and already un-enableable — so the
+      // blocker changes nothing about it, where adding the requirement to a live recipe
+      // would have moved a row on the recipe library's status pills.
+      ingredientSets: [
+        {
+          id: 'sm-runeplate-s1',
+          ingredientGroups: [
+            {
+              id: 'sm-runeplate-s1-g1',
+              name: 'Aether binding',
+              // The FIRST-CLASS essence option shape — `match: { type: 'essence', … }` —
+              // which is what `recipeReferencesEssence` walks. A bare `{ essenceId }` is
+              // not a reference at all and would leave the count at zero.
+              options: [{ match: { type: 'essence', essenceId: 'aether', amount: 2 } }],
+            },
+            {
+              // `mote` rides along on this SAME recipe, for the reason `aether` is here: it
+              // is the corpus's only DELETABLE essence, and without a recipe requiring it
+              // the bulk-delete impact statement's "recipes will be rewritten" number would
+              // be 0 for every selection that can reach a live Delete button.
+              //
+              // A SECOND GROUP rather than a second option in the group above. Options
+              // inside one group are ALTERNATIVES, so adding `mote` there would have made
+              // the disabled `aether` merely one way to satisfy the group — which could
+              // lift the activation blocker and move this recipe's status pill, the exact
+              // outcome the note above chose this recipe to avoid. Groups are required
+              // independently, so the blocker still sees a required disabled essence.
+              id: 'sm-runeplate-s1-g2',
+              name: 'Mote dusting',
+              options: [{ match: { type: 'essence', essenceId: 'mote', amount: 1 } }],
+            },
+          ],
+        },
+      ],
       enabled: false,
     }
   ),
@@ -2917,8 +3024,16 @@ export function buildLabContent() {
       // keeps exactly the first success group; the `routed`/`progressive` modes keep every group.
       salvageResolutionMode: 'simple',
       craftingCheck: SMITHING_CHECK,
+      // BOTH essence-behaviour gates, ON, and only here (issue 1036). No lab system declared
+      // either, and both normalize to FALSE when absent — so every essence frame would
+      // otherwise have shown `showSourceUi` false, no source or capability pills, and the
+      // On-craft tab in its both-off empty state. Smithing is the system the essence cases
+      // navigate to (they carry no `query.system`, so they land on the default), which is
+      // why it is the one that declares them.
       features: {
         essences: true,
+        effectTransfer: true,
+        propertyMacros: true,
         recipeCategories: true,
         itemTags: true,
         gathering: true,

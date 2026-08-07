@@ -72,6 +72,17 @@ const IDENTITY_SOURCES = {
   // would otherwise surface only in a capture run.
   'data-recipe-select': new Set(content.recipes.map((entry) => entry.id)),
   'data-system-id': new Set(content.systems.map((entry) => entry.id)),
+  // The essence browser's bulk selection control (issue 1036) — the exact mirror of
+  // `data-component-select` and `data-recipe-select` above. The essence bulk-edit case pins
+  // fixture ids in its row ticks, so a rename would otherwise surface only in a capture run.
+  // Derived from the SYSTEM's declared vocabulary for the same reason `data-essence-id` is:
+  // deriving it from the essences components happen to carry would falsely reject a
+  // declared-but-uncarried essence.
+  'data-essence-select': new Set(
+    content.systems.flatMap((system) =>
+      (system.essenceDefinitions ?? []).map((essence) => essence.id)
+    )
+  ),
   // From the SYSTEM's declared vocabulary, which is what `adminStore` builds the browser's rows
   // from and therefore what `EssenceBrowserView` writes into the attribute. Deriving these from the
   // essences components happen to carry passes today only because the two coincide: it would

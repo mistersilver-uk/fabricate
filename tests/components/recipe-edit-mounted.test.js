@@ -17,6 +17,9 @@ const repoRoot = resolve(__dirname, '../..');
 
 const RAW_MODULES = [
   'src/ui/svelte/util/foundryBridge.js',
+  // The add-new essence offer projection (issue 1036). The three ingredient components
+  // below import it to withhold a DISABLED essence from their add controls.
+  'src/utils/essenceValidation.js',
   'src/ui/svelte/util/dropUtils.js',
   'src/ui/svelte/actions/dragDrop.js',
   // recipeImageIcons re-exports DEFAULT_RECIPE_IMAGE from the Recipe model
@@ -3503,6 +3506,149 @@ describe('RecipeEditView (mounted)', () => {
       options[0].match.componentId,
       'cmp-water',
       'the surviving alternative is the one not removed'
+    );
+    editHarness.remount();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Issue 1036, criteria 2 and 18 — the add-new offer withholds a DISABLED essence
+  // from the three recipe-side controls, while the `essenceOptions` PROP stays whole.
+  //
+  // Every assertion here carries its negative control, because a filter that filters
+  // nothing passes the positive half of all three.
+  // ---------------------------------------------------------------------------
+
+  // `ess-life` disabled, `ess-water` enabled. Declaration order matters: the disabled one
+  // is FIRST, which is what makes the `firstEssence` default selection provable.
+  const MIXED_ESSENCE_OPTIONS = Object.freeze([
+    Object.freeze({ id: 'ess-life', name: 'Life', icon: 'fas fa-heart', enabled: false }),
+    Object.freeze({ id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: true }),
+  ]);
+
+  it('1036/18: the alternative-essence default selection SKIPS a disabled essence', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      { props: { componentOptions: COMPONENT_OPTIONS, essenceOptions: MIXED_ESSENCE_OPTIONS } }
+    );
+
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]')
+      .click();
+    await flushRender();
+
+    const options = patches.at(-1).ingredientSets[0].ingredientGroups[0].options;
+    // Without the filter this would author a requirement on a DISABLED essence, which the
+    // activation validator then refuses — the recipe would be born unenableable.
+    assert.equal(options.at(-1).match.essenceId, 'ess-water');
+    editHarness.remount();
+  });
+
+  it('1036/18 negative control: with both enabled, the default is the FIRST essence', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      { props: { componentOptions: COMPONENT_OPTIONS, essenceOptions: ESSENCE_OPTIONS } }
+    );
+
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]')
+      .click();
+    await flushRender();
+
+    // `ess-life` is first in `ESSENCE_OPTIONS` too, so this proves the test above measured
+    // the FILTER rather than an unrelated change of ordering.
+    assert.equal(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options.at(-1).match.essenceId,
+      'ess-life'
+    );
+    editHarness.remount();
+  });
+
+  it('1036/18: the set-level essence picker withholds a disabled essence, and offers an enabled one', async () => {
+    const { target } = await mountIngredientGroups([], {
+      props: { essenceOptions: MIXED_ESSENCE_OPTIONS },
+    });
+    target.querySelector('[data-recipe-set-id="set-1"] .manager-recipe-essence-trigger').click();
+    await flushRender();
+
+    const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>
+      option.textContent.trim()
+    );
+    assert.ok(
+      offered.some((label) => /Water/.test(label)),
+      'negative control: the ENABLED essence IS offered, so the picker is not simply empty'
+    );
+    assert.ok(!offered.some((label) => /Life/.test(label)), 'the disabled essence is withheld');
+    editHarness.remount();
+  });
+
+  it('1036/2: an ALREADY-AUTHORED disabled essence stays resolved, editable and offered back to itself', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-life', amount: 2 } }],
+      { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
+    );
+
+    // The PROP boundary: `RecipeIngredientOption` resolves its display through the
+    // unfiltered `essenceOptions`, so an authored requirement on a disabled essence reads
+    // back by NAME. Filtering the prop would render it as an unresolved "Pick essence".
+    const trigger = target.querySelector(
+      '[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger'
+    );
+    assert.match(trigger.textContent, /Life/, 'the authored disabled essence still names itself');
+
+    // And it is still CLEARABLE: the option can be removed outright.
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-remove="alternative"]')
+      .click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'removing the authored requirement still works');
+    editHarness.remount();
+  });
+
+  it('1036/18: the per-option picker withholds a disabled essence unless it is the CURRENT choice', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-water', amount: 1 } }],
+      { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
+    );
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger')
+      .click();
+    await flushRender();
+
+    const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>
+      option.textContent.trim()
+    );
+    assert.ok(
+      offered.some((label) => /Water/.test(label)),
+      'negative control: the enabled essence IS offered'
+    );
+    assert.ok(
+      !offered.some((label) => /Life/.test(label)),
+      'a disabled essence that is NOT the current choice is withheld'
+    );
+    editHarness.remount();
+  });
+
+  it('1036/2: the essence match TYPE survives a system whose essences are all disabled', async () => {
+    const allDisabled = [
+      { id: 'ess-life', name: 'Life', icon: 'fas fa-heart', enabled: false },
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: false },
+    ];
+    const { target } = await mountIngredientGroups([], { props: { essenceOptions: allDisabled } });
+
+    // `hasEssences` reads the UNFILTERED prop deliberately. Gating it on the offer would
+    // remove essence requirements entirely from such a system — including the ability to
+    // see and clear the ones it already has.
+    assert.ok(
+      Boolean(
+        target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]')
+      ),
+      'the set-level essence add still renders'
     );
     editHarness.remount();
   });

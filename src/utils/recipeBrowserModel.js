@@ -20,6 +20,7 @@
  */
 
 import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
+import { paginateRows } from './browserPagination.js';
 
 /** @typedef {'name' | 'attention' | 'dc' | 'ingredients' | 'results'} RecipeSortKey */
 /** @typedef {'asc' | 'desc'} SortDirection */
@@ -293,21 +294,8 @@ export function groupRecipesByCategory(recipes, categoryTotals) {
  * @returns {{recipes: object[], pageIndex: number, pageCount: number, totalCount: number, rangeStart: number, rangeEnd: number}}
  */
 export function paginateRecipes(recipes, options = {}) {
-  const rows = Array.isArray(recipes) ? recipes : [];
-  const pageSize = Math.max(1, numeric(options.pageSize, RECIPE_DEFAULT_PAGE_SIZE));
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const pageIndex = Math.min(Math.max(0, numeric(options.pageIndex)), pageCount - 1);
-  const start = pageIndex * pageSize;
-  const page = rows.slice(start, start + pageSize);
-
-  return {
-    recipes: page,
-    pageIndex,
-    pageCount,
-    totalCount: rows.length,
-    rangeStart: page.length > 0 ? start + 1 : 0,
-    rangeEnd: page.length > 0 ? start + page.length : 0,
-  };
+  const { rows, ...window } = paginateRows(recipes, options, RECIPE_DEFAULT_PAGE_SIZE);
+  return { recipes: rows, ...window };
 }
 
 /**

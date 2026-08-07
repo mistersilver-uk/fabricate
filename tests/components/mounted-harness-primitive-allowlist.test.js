@@ -60,6 +60,13 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // THE right-inspector action button (issue 1036, maintainer round 2), extracted from the
+  // Tool Studio's editor-header treatment and declared the point of arrival for every
+  // studio's inspector actions. It is deliberately here BEFORE the sweep that converts the
+  // recipe, component and Tool Studio inspectors: each conversion drops it into another
+  // mounted tree, and this is the guard that turns the resulting omission into a failure
+  // instead of a hung suite.
+  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.

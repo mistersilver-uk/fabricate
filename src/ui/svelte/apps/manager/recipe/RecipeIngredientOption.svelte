@@ -31,6 +31,10 @@
   import Chip from '../Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
+  // The add-new offer projection (issue 1036). `selectedEssence` below deliberately
+  // resolves against the UNFILTERED prop, so an authored requirement on a disabled essence
+  // still reads back by name instead of collapsing to "Pick essence".
+  import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import {
     currencyUnitLabel,
     currencyUnitIcon,
@@ -57,8 +61,10 @@
     // while currency was on stays VISIBLE when it is later disabled, but renders read-only
     // (its unit + amount as static text, no pickers/stepper) so no authored data is hidden.
     currencyEnabled = true,
-    // The system's essences ({ id, name, icon }), for an essence OR alternative's
+    // The system's essences ({ id, name, icon, enabled }), for an essence OR alternative's
     // picker. Empty when the system has no essences (the essence arm never appears).
+    // UNFILTERED by contract (issue 1036): the picker narrows to enabled essences itself,
+    // but `selectedEssence` must resolve an already-authored disabled essence by name.
     essenceOptions = [],
     // Render the "REQUIRED" tag — set by the parent for a bare (single-alternative)
     // requirement; box alternatives (inside "ANY ONE OF") never carry it.
@@ -138,12 +144,17 @@
   const selectedEssence = $derived(
     essenceId ? (essenceOptions || []).find((essence) => essence.id === essenceId) || null : null
   );
+  // Every ENABLED essence, plus whichever one this option already names. Keeping the
+  // current choice in the list is what makes an authored requirement on a disabled essence
+  // editable and clearable rather than stranded (issue 1036).
   const essencePickerOptions = $derived(
-    (essenceOptions || []).map((essence) => ({
-      id: essence.id,
-      label: essence.name,
-      icon: essence.icon || 'fas fa-flask-vial',
-    }))
+    visibleEssenceOptions(essenceOptions, (essence) => essence?.id === essenceId).map(
+      (essence) => ({
+        id: essence.id,
+        label: essence.name,
+        icon: essence.icon || 'fas fa-flask-vial',
+      })
+    )
   );
 
   const selectedComponent = $derived(

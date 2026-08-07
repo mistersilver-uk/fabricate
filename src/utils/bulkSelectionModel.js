@@ -33,6 +33,37 @@
  */
 
 /**
+ * The Status axis's three segments, in every panel's segmented-control order.
+ *
+ * Here for the same duplication reason `cycleTriStateStaging` is (see the header): the
+ * Recipe Studio and the Essence Studio stage the identical `unchanged | enable | disable`
+ * intention onto the identical `enabled: boolean` edit key, and a third literal copy would
+ * count against the Sonar new-code duplication gate in `src/` and in `tests/` alike.
+ *
+ * `'unchanged'` is a REAL member of the enum rather than the absence of one, which is what
+ * lets a staged `enabled: false` (Disable) be distinguished from an unstaged axis by key
+ * PRESENCE alone. Every write primitive downstream therefore tests `Object.hasOwn`, never
+ * truthiness.
+ *
+ * @type {readonly ['unchanged', 'enable', 'disable']}
+ */
+export const BULK_STATUS_VALUES = Object.freeze(['unchanged', 'enable', 'disable']);
+
+/**
+ * Read arbitrary input as one of the three status segments.
+ *
+ * An unrecognised value falls back to `'unchanged'` rather than throwing, so a stray
+ * segment value can only ever UNSTAGE the axis — never stage an edit nobody asked for
+ * across a whole selection.
+ *
+ * @param {unknown} value
+ * @returns {'unchanged' | 'enable' | 'disable'}
+ */
+export function normalizeBulkStatus(value) {
+  return BULK_STATUS_VALUES.includes(value) ? value : 'unchanged';
+}
+
+/**
  * A de-duplicated list of non-empty ids from an array, `Set`, or any other iterable.
  *
  * A coercion rather than a getter, and the one every export below funnels its inputs

@@ -30,12 +30,12 @@ When all three are turned on, after a successful craft Fabricate:
 4. Collects all of the source item's active effects.
 5. Applies those effects to the newly created result item.
 
-Essences with no linked source item, or whose linked item no longer exists, are skipped without comment.
+A disabled essence, an essence with no linked source item, or an essence whose linked item no longer exists, is skipped without comment.
 
 **Enabling via the UI.**
 Open the Crafting Admin panel, select your system, and look for the **Essences** toggle and the **Effect transfer** toggle in the Features card.
 Both must be enabled.
-Then link each essence definition to a **Source item** in the Essences feature card.
+Then open the [Essence Studio]({% link essences.md %}#open-the-essence-studio) and set an **Active effect source** on each essence's **On craft** tab.
 
 **Enabling via the API.**
 You can also enable both required features programmatically.

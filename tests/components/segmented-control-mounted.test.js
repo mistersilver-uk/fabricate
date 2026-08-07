@@ -154,6 +154,95 @@ describe('SegmentedControl (mounted)', () => {
     );
   });
 
+  // ── The icon-only variant (issue 1036) ──────────────────────────────────────────
+  //
+  // Opt-in, and the opt-out side is the half worth pinning: the essence library's
+  // list/grid toggle is the only consumer that sets it, so the other four must render
+  // exactly what they rendered before the flag existed.
+  it('adds is-icon-only to the track only when iconOnly is set', async () => {
+    const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
+    assert.equal(
+      plain.querySelector('.manager-segmented').classList.contains('is-icon-only'),
+      false,
+      'the default track renders its labels (no is-icon-only)'
+    );
+    harness.remount();
+    const compact = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      iconOnly: true
+    });
+    assert.ok(
+      compact.querySelector('.manager-segmented.is-icon-only'),
+      'iconOnly=true compacts the track to glyph tiles'
+    );
+  });
+
+  // The variant is a pure CSS statement over the SAME DOM. The label span is CLIPPED,
+  // never dropped and never `display: none` — the `<label>` IS the radio's accessible
+  // name, so removing the text would leave every segment of an icon-only track anonymous
+  // to a screen reader. `title` is the pointer half of the same affordance, and it is
+  // added ONLY here: a labelled segment whose tooltip repeats its own visible words is
+  // noise, and the attribute would be a markup change for the four existing consumers.
+  it('keeps the label text as the accessible name and titles the tile, in icon-only only', async () => {
+    const compact = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      iconOnly: true
+    });
+    assert.deepEqual(
+      [...compact.querySelectorAll('.manager-segment-label')].map((n) => n.textContent),
+      ['Destroyed', 'Becomes inert'],
+      'an icon-only segment still carries its words — they are clipped by CSS, not dropped'
+    );
+    assert.deepEqual(
+      [...compact.querySelectorAll('.manager-segment')].map((n) => n.getAttribute('title')),
+      ['Destroyed', 'Becomes inert'],
+      'and names itself to the pointer'
+    );
+    harness.remount();
+
+    const plain = await harness.mount({ options: OPTIONS, value: 'destroyed', groupName: 'g' });
+    assert.deepEqual(
+      [...plain.querySelectorAll('.manager-segment')].map((n) => n.hasAttribute('title')),
+      [false, false],
+      'a labelled consumer gets no title attribute at all — its markup is untouched'
+    );
+  });
+
+  // The View Lab's `manager-essences-grid` case steps on `[data-essence-view-option="grid"]`,
+  // which is this hook. `view-lab-screenshots.mjs` calls `target.click()`, whose hit-target
+  // check requires the element under the click point to BE the target or a DESCENDANT of it —
+  // so the hook must stay on the enclosing `<label>` and never move to the radio. A selector
+  // that resolves to the 1x1 clipped radio times out for 30s, and one failing case fails the
+  // whole capture job and publishes NOTHING, which lets the screenshot gate pass on stale
+  // frames. The compaction must not have moved it.
+  it('keeps optionDataAttr on the clickable LABEL in the icon-only variant', async () => {
+    const root = await harness.mount({
+      options: OPTIONS,
+      value: 'destroyed',
+      groupName: 'g',
+      iconOnly: true,
+      optionDataAttr: 'data-seg'
+    });
+    const hook = root.querySelector('[data-seg="inert"]');
+    assert.ok(Boolean(hook), 'the option hook must resolve to an element');
+    assert.equal(hook.tagName, 'LABEL', 'the hook is the label, never the hidden radio');
+    assert.equal(
+      hook.querySelector('input[type="radio"]').getAttribute('data-seg'),
+      null,
+      'and the radio does not also carry it, which would make the selector ambiguous'
+    );
+    // The tile's visible content is the glyph, so a compacted segment that rendered no
+    // icon would be an empty click target.
+    assert.ok(
+      Boolean(root.querySelector('[data-seg="destroyed"] i.fa-trash')),
+      'the glyph is what the tile shows'
+    );
+  });
+
   it('stamps dataAttr and optionDataAttr hooks', async () => {
     const root = await harness.mount({
       options: OPTIONS,

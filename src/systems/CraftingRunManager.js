@@ -82,7 +82,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       // transfer essences and build results/chat/history without re-reading the
       // (now-deleted) source items. Undefined for non-timed / instant steps.
       // Its `currencySpends` holds the SETTLED deductions only (issue 902), because the
-      // cancel reversal refunds exactly what it finds there.
+      // cancel reversal refunds exactly what it finds there, and its `essenceEnabled`
+      // holds the START-phase behaviour-gate snapshot (issue 1036).
       preparedConsumption: undefined,
       selectedIngredientSetId: undefined,
       lastCheckResult: undefined,
@@ -175,12 +176,24 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * never paid. An empty array is the correct record for a step whose currency deduction
    * settled nothing, and the reversal's own `length > 0` guard then skips the refund.
    *
+   * `essenceEnabled` is the START-phase behaviour-gate snapshot (issue 1036): a COMPLETE
+   * `{ [essenceId]: boolean }` map over every key in `resolvedEssences`, so a mid-run
+   * enable/disable cannot change the outcome of a craft whose inputs are already
+   * consumed. It is `{}` — not absent — when nothing contributed, and the engine reads an
+   * ABSENT map (a run armed before this change) as all-enabled.
+   *
+   * **This literal is a whitelist REBUILD.** It emits exactly the keys named below and
+   * silently drops anything else the call site passes, so a new snapshot field must be
+   * added HERE as well as at the call site or the finish path falls back to live values
+   * and the defect ships green.
+   *
    * @param {Actor} actor
    * @param {object} run
    * @param {number} stepIndex
    * @param {{ selectedIngredientSetId?: string|null,
    *   currencySpends?: Array<{unit: string, amount: number}>,
-   *   resolvedEssences?: object, consumedSummary?: Array }} prepared
+   *   resolvedEssences?: object, essenceEnabled?: Record<string, boolean>,
+   *   consumedSummary?: Array }} prepared
    * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
    */
   async markStepPrepared(actor, run, stepIndex, prepared = {}) {
@@ -193,6 +206,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
       resolvedEssences:
         prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
           ? prepared.resolvedEssences
+          : {},
+      essenceEnabled:
+        prepared.essenceEnabled && typeof prepared.essenceEnabled === 'object'
+          ? prepared.essenceEnabled
           : {},
       consumedSummary: Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [],
     };

@@ -271,6 +271,26 @@
     font-size: 0.74rem;
     font-weight: 500;
     text-align: center;
+    /* Firefox and the standard property. See the spin-button rule below. */
+    appearance: textfield;
+  }
+
+  /* NO native spinner. This control already offers both ways to step — the −/+ adjuncts for
+     the pointer, and the browser's own Up/Down handling for the keyboard — so the arrows are
+     a third affordance that duplicates both. They also cost real room: the field is 48px and
+     the spinner takes ~13-17px of it, shunting the centred mono value off-centre.
+
+     The element STAYS `type="number"`. This component has no keydown handler of its own:
+     Up/Down work purely as native number-input behaviour, which fires `input` and lands in
+     `onInput` → `commit`. Suppressing the pseudo-elements removes only the drawn buttons and
+     leaves that intact, whereas switching to `type="text"` would silently delete the keyboard
+     stepping this component's header says it exists to protect.
+     `tests/components/stepper-spinner.test.js` pins both halves of that. */
+  .fab-stepper-input::-webkit-outer-spin-button,
+  .fab-stepper-input::-webkit-inner-spin-button {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
   }
 
   .fab-stepper-input:focus-visible {

@@ -23,8 +23,12 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
+  // The shared macro-name resolver (issue 1036), lifted out of this file so the essence
+  // editor's property-macro card resolves names the same way rather than re-deriving the
+  // `globalThis.fromUuid` indirection and the stale-resolution latch.
+  import { resolveMacroName } from '../../../../../utils/macroReference.js';
+  import ItemDropZone from '../ItemDropZone.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
@@ -72,28 +76,12 @@
   let resolvedMacroName = $state('');
   let resolvedMacroMissing = $state(false);
   $effect(() => {
-    const uuid = value?.macroUuid;
     resolvedMacroName = '';
     resolvedMacroMissing = false;
-    if (!uuid) return;
-    let cancelled = false;
-    const resolve = globalThis.fromUuid;
-    if (typeof resolve !== 'function') {
-      resolvedMacroName = uuid;
-      return;
-    }
-    Promise.resolve(resolve(uuid))
-      .then((doc) => {
-        if (cancelled) return;
-        if (doc) resolvedMacroName = doc.name || uuid;
-        else resolvedMacroMissing = true;
-      })
-      .catch(() => {
-        if (!cancelled) resolvedMacroMissing = true;
-      });
-    return () => {
-      cancelled = true;
-    };
+    return resolveMacroName(value?.macroUuid, ({ name, missing }) => {
+      resolvedMacroName = name;
+      resolvedMacroMissing = missing;
+    });
   });
 
   function emit(patch) {
@@ -105,11 +93,29 @@
     emit({ dcMode: nextMode });
   }
 
+  // `ItemDropZone` has already refused anything that is not a Macro naming a document, so
+  // this only has to resolve the uuid out of whichever drag shape arrived. It keeps calling
+  // `resolveDropData` because the zone hands `onDrop` the RAW payload by contract.
   function handleMacroDrop(data) {
-    const { uuid, type } = resolveDropData(data);
-    if (type !== 'Macro' || !uuid) return;
+    const { uuid } = resolveDropData(data);
+    if (!uuid) return;
     emit({ macroUuid: uuid });
   }
+
+  // The card's label, resolved here so the markup stays declarative. It is the ONE string
+  // the zone renders — empty prompt, resolved name, or the missing notice.
+  const macroCardLabel = $derived.by(() => {
+    if (!value?.macroUuid) {
+      return text(
+        'FABRICATE.Admin.Manager.Checks.Crafting.MacroDropHint',
+        'Drag a macro here to compute the DC.'
+      );
+    }
+    if (resolvedMacroMissing) {
+      return text('FABRICATE.Admin.Manager.Checks.Crafting.MacroMissing', 'Linked macro not found');
+    }
+    return resolvedMacroName || value.macroUuid;
+  });
 </script>
 
 <div class="manager-checks-editor" data-simple-check-editor>
@@ -169,44 +175,26 @@
             'The macro is run with the selected ingredient set, the recipe, and the actor, and must return the DC.'
           )}
         </p>
-        <div
-          class="manager-component-source-drop-zone manager-checks-macro-drop-zone"
-          data-check-macro-dropzone
-          role="group"
-          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroTitle', 'DC macro')}
-          use:dragDrop={{ onDrop: handleMacroDrop, activeClass: 'is-drop-active' }}
-        >
-          <i class="fas fa-scroll" aria-hidden="true"></i>
-          {#if value?.macroUuid}
-            <span class="manager-checks-macro-name" class:is-missing={resolvedMacroMissing}>
-              {resolvedMacroMissing
-                ? text(
-                    'FABRICATE.Admin.Manager.Checks.Crafting.MacroMissing',
-                    'Linked macro not found'
-                  )
-                : resolvedMacroName || value.macroUuid}
-            </span>
-            <button
-              type="button"
-              class="manager-icon-button is-danger"
-              data-unlink-macro
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.MacroUnlink',
-                'Unlink macro'
-              )}
-              onclick={() => emit({ macroUuid: null })}
-            >
-              <i class="fas fa-times" aria-hidden="true"></i>
-            </button>
-          {:else}
-            <span
-              >{text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.MacroDropHint',
-                'Drag a macro here to compute the DC.'
-              )}</span
-            >
-          {/if}
-        </div>
+        <!-- The shared drop primitive (issue 1036). It was hand-rolled here — a bare
+             `use:dragDrop` div with its own linked/empty branch and its own unlink button
+             — while three other manager surfaces already rendered the same card through
+             `ItemDropZone`. Converting it is what gives this control the compendium-drag
+             acceptance the hand-rolled `resolveDropData` guard already had but the
+             primitive did not, and the MISSING treatment neither of them had.
+             `data-check-macro-dropzone` and `data-unlink-macro` are preserved by the
+             `kind` mapping: `manager-mounted.test.js` and the View Lab checks case both
+             select on the first. -->
+        <ItemDropZone
+          kind="check-macro"
+          documentType="Macro"
+          item={value?.macroUuid ? { name: macroCardLabel } : null}
+          state={resolvedMacroMissing ? 'missing' : 'linked'}
+          title={macroCardLabel}
+          emptyIcon="fas fa-scroll"
+          unlinkLabel={text('FABRICATE.Admin.Manager.Checks.Crafting.MacroUnlink', 'Unlink macro')}
+          onDrop={handleMacroDrop}
+          onUnlink={() => emit({ macroUuid: null })}
+        />
       </section>
     {/if}
   {/if}
