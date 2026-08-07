@@ -304,10 +304,17 @@
     height: 28px;
     text-align: center;
     padding: 0 4px;
+    appearance: textfield;
   }
 
+  /* NO native spinner: the −/+ buttons flanking this field and the browser's own Up/Down
+     handling already step it. `margin: 0` alone was here and did not suppress anything —
+     without `appearance: none` the buttons still draw, just flush. The field stays
+     `type="number"` so Up/Down keep working. */
   .essence-quantity-input::-webkit-outer-spin-button,
   .essence-quantity-input::-webkit-inner-spin-button {
+    appearance: none;
+    -webkit-appearance: none;
     margin: 0;
   }
 

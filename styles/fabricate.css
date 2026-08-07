@@ -1342,10 +1342,17 @@
   Scope + specificity are deliberate:
    - Text-entry types only. `checkbox`/`radio`/`range` are real controls (segmented
      toggles, the visibility allow-list) and must keep their native/scoped rendering,
-     so they are excluded. `number` is excluded because every number input in the
-     manager is a Stepper whose look is owned by that component's scoped `<style>`;
-     `search` is excluded because every search field is a themed `.manager-search`
-     pill. Both would be clobbered by a blanket rule.
+     so they are excluded. `number` is excluded because the numeric controls that HAVE
+     a considered look — the shared `Stepper` primitive and the `.manager-rule-stepper`
+     pair — own it in their own blocks and a blanket rule would clobber them; `search`
+     is excluded because every search field is a themed `.manager-search` pill.
+
+     This comment used to claim every number input in the manager IS a Stepper. It is
+     not: roughly twenty bare `type="number"` fields across the checks, gathering and
+     economy editors still render Foundry's chrome AND the native spinner. They are not
+     swept up here, because hiding a spinner on a field with no −/+ adjuncts would take
+     away its only pointer-driven stepping — the fix is to migrate them onto `Stepper`,
+     which is tracked separately.
    - Declared HERE, early, at `.fabricate-manager <element>[type]` (0,2,1) — enough to
      beat Foundry core, low enough that any later per-control class rule overrides it
      by source order. So the search pill, the steppers, etc. all still win.
@@ -13212,6 +13219,19 @@
 .fabricate-manager .manager-rule-stepper input {
   padding: 0 var(--fab-space-2);
   text-align: center;
+  appearance: textfield;
+}
+
+/* NO native spinner: this stepper is flanked by its own −/+ `manager-icon-button`s, and the
+   browser's Up/Down handling still steps the value, so the drawn arrows duplicate both and
+   crowd a centred field. The input stays `type="number"` so those keystrokes survive.
+   Matches the shared `Stepper` primitive (`components/Stepper.svelte`), which this control
+   predates; migrating it onto that primitive is tracked separately. */
+.fabricate-manager .manager-rule-stepper input::-webkit-outer-spin-button,
+.fabricate-manager .manager-rule-stepper input::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Recipe Visibility card: List mode and Knowledge-based are inline subheading
