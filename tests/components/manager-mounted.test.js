@@ -436,6 +436,11 @@ function compileManagerRoot() {
     'recipeCurrency.js',
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
+    // The essence colour fold (issue 1036), shared by the player card's tile and pips and by
+    // the inventory inspector's tile and essence chips. `InventoryItemCard` is compiled into
+    // this tree for the editor's "How players see it" preview and imports it statically, so
+    // omitting it HANGS this suite as `# cancelled` rather than naming the missing file.
+    'essenceTint.js',
     'recipeItemPreviewRow.js',
     // The essence editor's "How players see it" preview builds its two synthetic tiles with this
     // pure helper (issue 1036, round 3); it imports only craftingImageDefaults (already

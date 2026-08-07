@@ -40,6 +40,8 @@ const harness = createMountedComponentHarness({
     // import only craftingImageDefaults, so these three entries suffice.
     'src/ui/svelte/util/essencePreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // The essence colour fold, shared by the player card tile, its pips and the inspector.
+    'src/ui/svelte/util/essenceTint.js',
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Chip.svelte',

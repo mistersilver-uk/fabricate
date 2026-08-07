@@ -37,6 +37,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import { DEFAULT_CRAFTING_IMAGE } from '../../util/craftingImageDefaults.js';
+  import { essenceTintToken } from '../../util/essenceTint.js';
 
   let {
     item = null,
@@ -61,21 +62,15 @@
   const icon = $derived(
     typeof item?.icon === 'string' && item.icon.trim() !== '' ? item.icon : 'fas fa-mortar-pestle'
   );
-  // Shared by the essence glyph tile below AND each carrying-component pip: a raw
-  // `colorToken` sanitises to a bare `--fab-tag-*` palette key (the leading prefix
-  // tolerated, since the builder and the picker both accept either spelling), or to ''
-  // for anything else — including unset — so a caller can always safely interpolate the
-  // result into a `style` custom property.
-  function sanitizeTintToken(rawToken) {
-    const bare = String(rawToken || '').replace(/^--fab-tag-/, '');
-    return /^[a-z0-9-]+$/.test(bare) ? bare : '';
-  }
+  // Used by the essence glyph tile below AND each carrying-component pip. It moved to
+  // `util/essenceTint.js` when the inspector needed the same fold for its own tile and its
+  // essence chips: four copies of a sanitiser is four places for the palette rule to drift.
 
   // Issue 1036: the essence glyph tile renders in the essence's CHOSEN colour when one is set,
   // and stays the theme accent when it is not — mirroring the manager `Medallion` tint.
   // Anything unsanitisable DROPS to '' → no inline var is emitted → the CSS `var()` fallback
   // paints the accent, byte-identical to the pre-1036 render.
-  const essenceTint = $derived(sanitizeTintToken(item?.colorToken));
+  const essenceTint = $derived(essenceTintToken(item?.colorToken));
   const essenceTintStyle = $derived(
     essenceTint ? `--fab-essence-tint:var(--fab-tag-${essenceTint})` : undefined
   );
@@ -194,7 +189,7 @@
       {#if essencePips.length > 0}
         <span class="inventory-card-pips" data-inventory-pips>
           {#each essencePips as pip (pip.id)}
-            {@const pipTint = sanitizeTintToken(pip.colorToken)}
+            {@const pipTint = essenceTintToken(pip.colorToken)}
             <span
               class="inventory-card-pip"
               data-inventory-pip="essence"

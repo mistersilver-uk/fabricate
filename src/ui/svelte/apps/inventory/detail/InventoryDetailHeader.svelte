@@ -55,6 +55,7 @@
 -->
 <script>
   import CraftingThumb from '../../crafting/CraftingThumb.svelte';
+  import { essenceTintToken } from '../../../util/essenceTint.js';
 
   let {
     detailKey = '',
@@ -66,11 +67,24 @@
     totalAttrs = {},
     size = 64,
     chips = [],
+    colorToken = '',
     headerAction = null,
     children = null,
   } = $props();
 
   const chipList = $derived(Array.isArray(chips) ? chips.filter((chip) => chip != null) : []);
+
+  // Issue 1036: a selected ESSENCE wears its own colour here, exactly as it does on the
+  // inventory tile and on the manager medallion — the inspector is the surface that
+  // answers "which essence is this", so it cannot be the one place the colour is dropped.
+  //
+  // `has-tint` gates it rather than a `var(…, fallback)` chain, because the untinted tile
+  // must render byte-identically to before: a fallback chain would still route the
+  // background through `color-mix`, which is not the same paint as the flat `--fab-bg-3`
+  // it has today. No token → no class → the shipped rule, untouched. `Medallion` already
+  // states this convention.
+  const tint = $derived(essenceTintToken(colorToken));
+  const tintStyle = $derived(tint ? `;--fab-essence-tint:var(--fab-tag-${tint})` : '');
 </script>
 
 <div class="inventory-detail" data-inventory-detail={detailKey} {...attrs}>
@@ -78,7 +92,9 @@
     {#if icon}
       <span
         class="inventory-detail-essence"
-        style={`--inventory-detail-thumb-size:${size}px`}
+        class:has-tint={Boolean(tint)}
+        style={`--inventory-detail-thumb-size:${size}px${tintStyle}`}
+        data-essence-tint={tint || undefined}
         aria-hidden="true"
       >
         <i class={icon}></i>
@@ -138,6 +154,14 @@
     background: var(--fab-bg-3);
     color: var(--fab-accent);
     font-size: 24px;
+  }
+
+  /* The essence's own colour: the glyph takes it outright, and the tile washes toward it.
+     The 14% wash is the same weight the manager `Medallion` uses for its surface, so the
+     same essence reads as the same colour on both sides of the app. */
+  .inventory-detail-essence.has-tint {
+    background: color-mix(in srgb, var(--fab-essence-tint) 14%, var(--fab-bg-3));
+    color: var(--fab-essence-tint);
   }
 
   .inventory-detail-heading {

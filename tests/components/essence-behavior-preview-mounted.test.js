@@ -25,6 +25,8 @@ const harness = createMountedComponentHarness({
     // craftingImageDefaults; InventoryItemCard imports the same leaf.
     'src/ui/svelte/util/essencePreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // The essence colour fold, shared by the card tile, its pips and the inspector.
+    'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     'src/utils/essenceValidation.js',
   ],

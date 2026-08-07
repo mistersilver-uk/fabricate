@@ -24,6 +24,8 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // The essence colour fold, shared by the card tile, its pips and the inspector.
+    'src/ui/svelte/util/essenceTint.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // NOTE: `progressiveStageThresholds.js` / `progressiveResultOrder.js` are NOT needed
     // here. `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); the
