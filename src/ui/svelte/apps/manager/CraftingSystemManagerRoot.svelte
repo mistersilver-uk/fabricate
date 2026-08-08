@@ -108,7 +108,6 @@
   import SystemEditView from './SystemEditView.svelte';
   import SystemsBrowserView from './SystemsBrowserView.svelte';
   import TagsCategoriesView from './TagsCategoriesView.svelte';
-  import { resolveActiveCraftingCheckFormula } from '../../../../systems/craftingModifierResolver.js';
 
   let { store, services = null } = $props();
 
@@ -622,18 +621,16 @@
   );
 
   // Why the system's active crafting check reaches no `@craftingmod`, or '' when it
-  // does (issue 1055). Resolved from the PERSISTED system through the shared five-mode
-  // selector — the recipe editor is not the surface authoring those formulas, so the
-  // Checks-tab drafts are not in play here and the saved state is the truthful one.
-  // Any of the three causes makes a per-recipe override inert, so the Overview tab
-  // replaces its control with a banner naming which; a bare boolean cannot say which.
-  const recipeCraftingCheckFormula = $derived(resolveActiveCraftingCheckFormula(selectedSystem));
-  const recipeCraftingModifierInertCause = $derived.by(() => {
-    if (!recipeCraftingCheckFormula.slot) return 'noCheck';
-    if (!recipeCraftingCheckFormula.checkUsable) return 'noFormula';
-    if (!recipeCraftingCheckFormula.referencesModifier) return 'noPlaceholder';
-    return '';
-  });
+  // Consumes the inert-cause derivation from the store's `craftingCheck` projection
+  // (issue 1055), which resolves it from the PERSISTED system through the shared
+  // five-mode selector. The recipe editor is not the surface authoring those formulas,
+  // so the Checks-tab drafts are not in play here and the saved state is the truthful
+  // one. Any of the three causes makes a per-recipe override inert, so the Overview
+  // tab replaces its control with a banner naming which; a bare boolean cannot say
+  // which. See ChecksView.svelte's separate derivation for the draft-based consumer.
+  const recipeCraftingModifierInertCause = $derived(
+    selectedSystem?.craftingCheck?.modifierFormulaInertCause || ''
+  );
 
   // Routed-check outcome tiers (active type) offered to the recipe editor's
   // check-mode result-set assignment control as {id, name}. Failure tiers are

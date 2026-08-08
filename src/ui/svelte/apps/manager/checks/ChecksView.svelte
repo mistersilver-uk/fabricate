@@ -198,6 +198,11 @@
   // become answerable: no check at all, then no formula, then no `@craftingmod` in it.
   // Written as a guard chain rather than nested ternaries — the SonarCloud gate fails
   // those, and the ordering is the point.
+  // This derivation reads the DRAFT inputs because the GM is editing these formulas on
+  // this very tab. The store's separate projection reads the PERSISTED system and is
+  // consumed by the recipe editor and overview surfaces, which reflect only saved state.
+  // Both must exist: the store cannot see unsaved drafts, and the checks card must
+  // reflect them immediately for responsive feedback (issue 1055).
   function inertCauseFor(active) {
     if (!active.slot) return 'noCheck';
     if (!active.checkUsable) return 'noFormula';
