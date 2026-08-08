@@ -2506,12 +2506,13 @@ function _buildRecipeModifierAuthorityView(system, systemRecipes) {
   return {
     recipeModifierAuthority: system?.craftingCheck?.recipeModifierAuthority,
     modifierFormulaInertCause: inertCause,
-    // Recipes silenced by dropping to `none` (any override at all)...
+    // How many recipes in this system carry a check-modifier override AT ALL. This is a
+    // standing fact about the system, not a per-level figure: the card's disclosure reads
+    // "N recipes in this system carry a check-modifier override", then adds a separate
+    // per-level sentence saying what the selected authority does to them. So one count is
+    // correct at every level, and a `setOnly`-specific subset would have no sentence to
+    // live in — issue 1055 tried a second count and reverted it for exactly that reason.
     recipeModifierOverrideCount: overrides.length,
-    // ...and the subset silenced by dropping to `setOnly` (a RULE override).
-    recipeModifierRuleOverrideCount: overrides.filter(
-      (recipe) => typeof recipe.craftingModifier.policy === 'string'
-    ).length,
   };
 }
 

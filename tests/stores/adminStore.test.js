@@ -528,7 +528,11 @@ describe('createAdminStore', () => {
       await store.selectSystem('sys1');
       const check = get(store.viewState).selectedSystem.craftingCheck;
       assert.equal(check.recipeModifierOverrideCount, 3, 'every override, empty set included');
-      assert.equal(check.recipeModifierRuleOverrideCount, 1, 'only the RULE half is a subset');
+      assert.equal(
+        check.recipeModifierRuleOverrideCount,
+        undefined,
+        'no per-level subset is projected: the disclosure states a level-independent fact'
+      );
     });
 
     // `@craftingmod` reaching no roll has three distinct causes with three distinct
