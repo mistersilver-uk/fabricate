@@ -4539,6 +4539,21 @@ const TABLE_CLOSE_PATTERN = /^\}\)?;$/;
  * this cannot find parses to null and widens to everything, so a rename fails safe — and
  * `tests/view-lab-cases.test.js` asserts all four names are still there, so it fails loudly too.
  *
+ * The spans are then checked AGAINST EACH OTHER, which is this parser's counterpart to
+ * {@link parseCaseLineRegions}' cross-check of every key against `caseIds` — the structural
+ * self-check without which a plausible authoring produces a plausible-looking wrong answer.
+ *
+ * The close search takes the first column-zero `};` AFTER the opening line, so a table authored on
+ * ONE line — `const BROKEN_STACKS = Object.freeze({ 'lab-actor-brenna': ['sm-longsword'] });`, 78
+ * columns and therefore a line Prettier will not break at `printWidth: 100` — skips past its own
+ * close and swallows the next table whole. Nothing downstream would notice: `regionsTouchedAt`
+ * takes the FIRST region containing a line, so the swallowed table's lines answer under the
+ * swallower's key. Measured on this fixture, with `BROKEN_STACKS` written that way and no check
+ * here: a `RECIPE_ITEM_COPIES` patch selects the 64 player frames and NONE of the ten Knowledge and
+ * Books & Scrolls frames it is evidence for — a silent wrong narrowing, which is the one outcome
+ * this whole table is built to make unreachable. Overlapping spans are therefore not a parse, and a
+ * non-parse widens to everything.
+ *
  * @param {string[]} sourceLines That fixture, by line.
  * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
  */
@@ -4552,6 +4567,14 @@ function parseLabActorTableRegions(sourceLines) {
     );
     if (end === -1) return null;
     regions.push({ key, start: start + 1, end: end + 1 });
+  }
+
+  // Sorted rather than assumed to be in file order: the loop above walks `LAB_ACTOR_FIXTURE_TABLES`
+  // in key order, which states which frames read each table and says nothing about where the
+  // fixture happens to declare them.
+  const ordered = [...regions].sort((left, right) => left.start - right.start);
+  if (ordered.some((region, index) => index > 0 && region.start <= ordered[index - 1].end)) {
+    return null;
   }
   return regions;
 }
@@ -4650,6 +4673,22 @@ function regionsTouchedAt(hunk, offset, regions) {
 }
 
 /**
+ * Whether two candidate anchors attributed a hunk to the same regions.
+ *
+ * Compared as SETS rather than as a joined string. A separator-joined signature conflates
+ * `{'a b', 'c'}` with `{'a', 'b c'}`, and nothing forbids a space in a region key — `CASE_ID_PATTERN`
+ * accepts any run of non-quote characters — so two candidates that disagree could sign identically
+ * and the disagreement rule would pass them through as agreement.
+ *
+ * @param {Set<string>} left One candidate's keys.
+ * @param {Set<string>} right Another candidate's keys.
+ * @returns {boolean} True when the two hold exactly the same keys.
+ */
+function sameKeys(left, right) {
+  return left.size === right.size && [...left].every((key) => right.has(key));
+}
+
+/**
  * The regions one hunk touches, located by CONTENT.
  *
  * The hunk's context and added lines are exactly the lines that must exist, in that order, in the
@@ -4683,19 +4722,16 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
   if (sequence.length === 0) return EVERY_PUBLISHABLE_CASE;
 
   let agreed = null;
-  let agreedSignature = null;
   for (const offset of anchorOffsets(sourceLines, sequence)) {
     const touched = regionsTouchedAt(hunk, offset, regions);
-    const signature =
-      touched === EVERY_PUBLISHABLE_CASE
-        ? null
-        : [...touched].sort((left, right) => left.localeCompare(right)).join(' ');
+    // One candidate widening settles it either way: if every candidate widens the answer is
+    // everything, and if only some do the candidates disagree, which is also everything.
+    if (touched === EVERY_PUBLISHABLE_CASE) return EVERY_PUBLISHABLE_CASE;
     if (agreed === null) {
       agreed = touched;
-      agreedSignature = signature;
       continue;
     }
-    if (signature !== agreedSignature) return EVERY_PUBLISHABLE_CASE;
+    if (!sameKeys(agreed, touched)) return EVERY_PUBLISHABLE_CASE;
   }
   return agreed ?? EVERY_PUBLISHABLE_CASE;
 }

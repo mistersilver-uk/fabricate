@@ -784,6 +784,58 @@ function patchAdding(source, lineNumbers) {
     .join('\n');
 }
 
+/**
+ * Text for a `-` line: content the checkout does NOT have, which is what every removed line in a
+ * `pulls/{n}/files` patch is.
+ *
+ * Deliberately not a comment and not blank. `isInertSourceLine` skips both, so a removed line
+ * shaped like a comment would be dropped before `regionsTouchedAt` ever placed it, and every
+ * assertion below would pass against a hunk whose removals were never attributed at all.
+ *
+ * @param {number} index Which removed line this is.
+ * @returns {string} A non-inert source line this repo does not contain.
+ */
+const removedText = (index) => `      { selector: '.a-line-this-checkout-does-not-have-${index}' },`;
+
+/**
+ * A unified diff for an EDIT — a hunk carrying `-` lines — rather than for a pure addition.
+ *
+ * This is the shape EVERY edited line has in GitHub's `patch` field, and `patchAdding` cannot
+ * produce it: the removed text is content the file being rendered no longer holds, surrounded by
+ * context that it does. That asymmetry is the whole of the removal path — the anchor sequence must
+ * EXCLUDE the removals (they are not in the new file) while the attribution walk must still PLACE
+ * them (they are still changed lines), and a removed line must not advance the new-file cursor.
+ *
+ * The anchor window is identical to `patchAdding([line])`'s — the same seven lines of `source` —
+ * so a one-line edit is directly comparable against the equivalent addition.
+ *
+ * @param {string[]} source The file the patch describes, by line.
+ * @param {object} edit The edit to describe.
+ * @param {number} edit.line The 1-based line of `source` the hunk is centred on.
+ * @param {number} [edit.removed] How many `-` lines to emit immediately before it.
+ * @param {boolean} [edit.replaced] True to emit `source[line - 1]` as `+` (a replace run), false to
+ *   emit it as context (a deletion-only hunk, which adds nothing at all).
+ * @returns {string} The patch.
+ */
+function patchEditing(source, { line, removed = 1, replaced = true }) {
+  const from = Math.max(1, line - 3);
+  const to = Math.min(source.length, line + 3);
+  const body = [];
+  for (let number = from; number <= to; number += 1) {
+    if (number === line) {
+      for (let index = 0; index < removed; index += 1) body.push(`-${removedText(index)}`);
+    }
+    body.push(`${number === line && replaced ? '+' : ' '}${source[number - 1]}`);
+  }
+
+  const counted = (marker) => body.filter((text) => text.startsWith(marker)).length;
+  const context = counted(' ');
+  return [
+    `@@ -${from},${context + counted('-')} +${from},${context + counted('+')} @@`,
+    ...body,
+  ].join('\n');
+}
+
 const registryPatch = (lineNumbers) => patchAdding(registrySource, lineNumbers);
 
 /** @returns {object} The `patches` option carrying one patch for one path. */
@@ -883,11 +935,27 @@ test('a registry change with no usable patch selects every publishable case', ()
     "    id: 'a-line-this-file-does-not-have',"
   );
 
+  // A malformed header over a body that WOULD anchor. The old fixture (`@@ this is not a hunk
+  // header @@\n+x`) stopped discriminating once attribution became content-anchored: `+x` occurs
+  // nowhere in the registry, so it widened whether the header was rejected or not, and relaxing
+  // `HUNK_HEADER_PATTERN` to `/^@@/` left the suite green. This body is a real seven-line window
+  // whose middle line is marked `+`, so the ONLY thing standing between it and a one-frame
+  // selection is the header-shape check.
+  const [, ...anchorableBody] = registryPatch([idLine]).split('\n');
+  const malformedHeader = ['@@ this is not a hunk header @@', ...anchorableBody].join('\n');
+  assert.deepEqual(
+    selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, registryPatch([idLine]))),
+    [FALLBACK_CASE_ID],
+    'the same body under a WELL-FORMED header must narrow to one case, or the fixture below ' +
+      'proves nothing about the header check'
+  );
+
   for (const [patch, why] of [
     ['', 'an empty patch'],
     ['   ', 'a blank patch'],
     ['not a diff at all', 'a patch with no hunk header'],
     ['@@ this is not a hunk header @@\n+x', 'an unparseable hunk header'],
+    [malformedHeader, 'an unparseable hunk header over a body that would otherwise anchor'],
     ['@@ -1,1 +1,1 @@\n?x', 'an unknown line marker'],
     [wrongRevision, 'a patch whose lines do not match this checkout'],
   ]) {
@@ -1039,12 +1107,17 @@ function shiftHunkHeaders(patch, delta) {
  * Shifts that keep every header a positive line number, including the most extreme negative one
  * available — which moves the first hunk to line 1.
  *
+ * Zero is filtered out rather than merely unlikely: a patch whose earliest hunk ALREADY starts at
+ * line 1 makes that extreme shift a no-op, and `shiftHunkHeaders`' own "this changed nothing"
+ * assertion would then fire on a patch that was never perturbable in the first place — a spurious
+ * failure that says nothing about the anchoring.
+ *
  * @param {string} patch A unified diff.
  * @returns {number[]} Deltas to apply.
  */
 function survivableShifts(patch) {
   const starts = [...patch.matchAll(/^@@ -(\d+),/gm)].map(([, start]) => Number(start));
-  return [3, 17, 400, 4000, 1 - Math.min(...starts)];
+  return [3, 17, 400, 4000, 1 - Math.min(...starts)].filter((delta) => delta !== 0);
 }
 
 /**
@@ -1063,26 +1136,67 @@ function caseIdByLine() {
 }
 
 /**
- * Every window of `size` consecutive registry lines that occurs more than once, with the case each
- * occurrence's middle line belongs to.
+ * The fixture table each `labActors.js` line sits in, derived the way the selector derives it —
+ * from a column-zero `const NAME = ` to the next column-zero `};` or `});`.
  *
- * Measured from the shipped file rather than invented. The ambiguity the agreement rule refuses is
- * a property of THIS registry — a synthetic fixture would prove the rule against a file nobody
- * ships, and would keep passing after the real duplication went away.
+ * @returns {Map<number, string>} Line number -> table name, for lines inside a fixture table.
+ */
+function tableNameByLine() {
+  const byLine = new Map();
+  for (const name of ['INVENTORIES', 'BROKEN_STACKS', 'RECIPE_ITEM_COPIES', 'LEARNED_RECIPES']) {
+    const start = labActorsSource.findIndex((line) => line.startsWith(`const ${name} = `));
+    assert.notEqual(start, -1, `${LAB_ACTORS_PATH} no longer declares ${name} at column zero`);
+    const end = labActorsSource.findIndex((line, at) => at > start && /^\}\)?;$/.test(line));
+    assert.notEqual(end, -1, `${name} has no column-zero close`);
+    for (let line = start + 1; line <= end + 1; line += 1) byLine.set(line, name);
+  }
+  return byLine;
+}
+
+/** One `size`-line window index per file, so a five-thousand-line scan happens once, not per query. */
+const windowIndexes = new Map();
+
+/**
+ * Every window of `size` consecutive lines of a file, mapped to the 1-based lines it starts at.
  *
+ * Indexed once per file rather than rescanned per question: the removal fixtures below ask about
+ * every candidate case literal, and a fresh scan apiece turns a millisecond test into a minute one.
+ *
+ * @param {string[]} source The file, by line.
  * @param {number} size Window length in lines; 7 is what one changed line plus git's three lines of
  *   context either side produces.
- * @returns {{starts: number[], ids: Array<string|undefined>}[]} The recurring windows.
+ * @returns {Map<string, number[]>} Window content -> the starts at which it occurs.
  */
-function recurringWindows(size) {
+function windowIndex(source, size) {
+  const cacheKey = `${size}`;
+  const perSize = windowIndexes.get(source) ?? new Map();
+  windowIndexes.set(source, perSize);
+  if (perSize.has(cacheKey)) return perSize.get(cacheKey);
+
   const byContent = new Map();
-  for (let start = 1; start + size - 1 <= registrySource.length; start += 1) {
-    const key = registrySource.slice(start - 1, start - 1 + size).join('\n');
+  for (let start = 1; start + size - 1 <= source.length; start += 1) {
+    const key = source.slice(start - 1, start - 1 + size).join('\n');
     byContent.set(key, [...(byContent.get(key) ?? []), start]);
   }
+  perSize.set(cacheKey, byContent);
+  return byContent;
+}
 
-  const owner = caseIdByLine();
-  return [...byContent.values()]
+/**
+ * Every window of `size` consecutive lines of a file that occurs more than once, with the region
+ * each occurrence's middle line belongs to.
+ *
+ * Measured from the shipped files rather than invented. The ambiguity the agreement rule refuses is
+ * a property of the files this repo actually renders from — a synthetic fixture would prove the
+ * rule against a file nobody ships, and would keep passing after the real duplication went away.
+ *
+ * @param {string[]} source The file, by line.
+ * @param {Map<number, string>} owner Line number -> region key, for lines inside a region.
+ * @param {number} size Window length in lines.
+ * @returns {{starts: number[], ids: Array<string|undefined>}[]} The recurring windows.
+ */
+function recurringWindows(source, owner, size) {
+  return [...windowIndex(source, size).values()]
     .filter((starts) => starts.length > 1)
     .map((starts) => ({
       starts,
@@ -1130,7 +1244,7 @@ test('ADDING a case still narrows to that case when the hunk header numbers are 
 
 test('a hunk whose content recurs in two different cases selects every publishable case', () => {
   const everything = publishableCases().length;
-  const windows = recurringWindows(7);
+  const windows = recurringWindows(registrySource, caseIdByLine(), 7);
   assert.ok(
     windows.length > 0,
     'this registry is supposed to contain seven-line windows that recur; if it no longer does, ' +
@@ -1161,23 +1275,31 @@ test('a hunk whose content recurs in two different cases selects every publishab
   }
 });
 
-test('no registry window recurs only within one case literal, so that branch has no fixture', () => {
+test('no window recurs within one region of either attributed input, so that branch has no fixture', () => {
   // The measurement, recorded rather than replaced by an invented fixture. `regionsTouchedByHunk`
   // ACCEPTS several candidate anchors when they all attribute identically — a window that recurs
-  // inside one case literal. This registry contains no such window, so there is nothing real to
-  // assert that branch against, and a synthetic file would only prove the test can build one.
+  // inside ONE region. NEITHER attributed input contains such a window: not this registry, and not
+  // `labActors.js`, whose four fixture tables share the region machinery. So there is nothing real
+  // to assert that branch against, and a synthetic file would only prove the test can build one.
   //
-  // If this ever fails, the registry has grown exactly the fixture that branch is missing: name it
-  // here and assert the branch narrows to the single case both occurrences share.
-  const sameCase = recurringWindows(7).filter(
-    (window) => window.ids.every(Boolean) && new Set(window.ids).size === 1
-  );
-  assert.deepEqual(
-    sameCase.map((window) => `${window.ids[0]} at ${window.starts.join(', ')}`),
-    [],
-    'a seven-line window now recurs inside a single case literal, which is the fixture the ' +
-      'all-candidates-agree branch of `regionsTouchedByHunk` has never had'
-  );
+  // Both inputs are measured rather than one, because the claim is about the branch and the branch
+  // serves both. If this ever fails, that input has grown exactly the fixture the branch is
+  // missing: name it here and assert the branch narrows to the single region both occurrences
+  // share.
+  for (const [where, source, owner] of [
+    ['the registry', registrySource, caseIdByLine()],
+    [LAB_ACTORS_PATH, labActorsSource, tableNameByLine()],
+  ]) {
+    const sameRegion = recurringWindows(source, owner, 7).filter(
+      (window) => window.ids.every(Boolean) && new Set(window.ids).size === 1
+    );
+    assert.deepEqual(
+      sameRegion.map((window) => `${window.ids[0]} at ${window.starts.join(', ')}`),
+      [],
+      `a seven-line window now recurs inside a single region of ${where}, which is the fixture ` +
+        'the all-candidates-agree branch of `regionsTouchedByHunk` has never had'
+    );
+  }
 });
 
 test('a hunk the selector cannot anchor selects every publishable case', () => {
@@ -1200,6 +1322,144 @@ test('a hunk the selector cannot anchor selects every publishable case', () => {
       everything,
       `${why} — that must select every frame`
     );
+  }
+});
+
+/**
+ * How many times the seven-line window centred on a line occurs in its own file.
+ *
+ * The removal fixtures below all assert a SINGLE id, so each needs a line whose window anchors
+ * uniquely — otherwise the agreement rule widens and the fixture would be measuring the ambiguity
+ * rule instead of the removal path, and would pass whatever the removal path did.
+ *
+ * @param {string[]} source The file, by line.
+ * @param {number} line The 1-based line the window is centred on.
+ * @returns {number} Occurrences of that window in the file.
+ */
+function windowOccurrences(source, line) {
+  const from = line - 3;
+  assert.ok(
+    from >= 1 && line + 3 <= source.length,
+    `line ${line} is within three lines of a file boundary, so it has no full anchor window`
+  );
+  return (windowIndex(source, 7).get(source.slice(from - 1, from + 6).join('\n')) ?? []).length;
+}
+
+/**
+ * Cases whose id line, and whose LAST content line, both anchor uniquely — so a fixture built at
+ * either lands on exactly one place in the file.
+ *
+ * Derived rather than listed, and drawn at an even stride through the qualifying set rather than
+ * from its head, so these cannot quietly become assertions about the registry's first few entries.
+ *
+ * `FALLBACK_CASE_ID` is excluded: the deletion-only fixture's wrong answer IS the fallback frame,
+ * so a fixture built on the fallback case could not tell the right answer from the wrong one.
+ *
+ * @param {number} howMany How many to return.
+ * @returns {{id: string, idLine: number, lastContentLine: number}[]} Qualifying cases.
+ */
+function uniquelyAnchoredCases(howMany) {
+  const qualifying = caseIds
+    .filter((id) => id !== FALLBACK_CASE_ID && registrySource.includes(`    id: '${id}',`))
+    .map((id) => {
+      const lines = caseLiteralLines(id);
+      // `.at(-1)` is the `  }),` that closes the literal, so `.at(-2)` is its last content line —
+      // the boundary a replace run has to be attributed on the correct side of.
+      return { id, idLine: registryLineOf(`    id: '${id}',`), lastContentLine: lines.at(-2) };
+    })
+    .filter(
+      ({ idLine, lastContentLine }) =>
+        windowOccurrences(registrySource, idLine) === 1 &&
+        windowOccurrences(registrySource, lastContentLine) === 1
+    );
+
+  assert.ok(
+    qualifying.length >= howMany,
+    `only ${qualifying.length} case literals anchor uniquely at both their id line and their last ` +
+      'content line, which is too few to build the removal fixtures on'
+  );
+  const stride = Math.floor(qualifying.length / howMany);
+  return Array.from({ length: howMany }, (_, index) => qualifying[index * stride]);
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The REMOVAL path (issue 1049 review).
+//
+// Every fixture above this point is addition-only, and `patchAdding` cannot emit a `-` line — so
+// the shape GitHub's `pulls/{n}/files` `patch` field has for every EDITED line was pinned by
+// nothing. Three separate defects survived that gap, each of which is a silent wrong answer rather
+// than an over-capture:
+//
+//   - building the anchor sequence from ALL lines instead of skipping the removals. Removed text is
+//     by definition absent from the file that will render, so every modify hunk would anchor
+//     nowhere and the whole narrowing would revert to 181 frames without one test going red;
+//   - advancing the new-file cursor on a removed line. A removed line occupies no new-file
+//     position, so counting it walks the cursor off the end of the case literal and attributes a
+//     replace run near a boundary to the NEIGHBOURING case;
+//   - attributing only `+` lines. A deletion-only hunk then touches nothing, and "nothing" is not
+//     "everything" — it collapses to the single fallback frame, which is a wrong narrowing rather
+//     than a safe widening.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+test('a one-line EDIT inside a case literal selects the same case its addition does', () => {
+  // The commonest diff shape there is, and the one no fixture had: one `-` for the old text, one
+  // `+` for the new, three lines of context either side. The anchor window is identical to the
+  // equivalent `patchAdding`, so the two must agree — asserted against the addition's own answer
+  // rather than against a hard-coded id, so the pair cannot drift apart.
+  for (const { id, idLine } of uniquelyAnchoredCases(3)) {
+    const patch = patchEditing(registrySource, { line: idLine });
+    assert.deepEqual(
+      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+      selectedIds([REGISTRY_PATH], registryPatches([idLine])),
+      `editing line ${idLine} must select what adding it selects`
+    );
+    assert.deepEqual(selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)), [id]);
+
+    // And under the merge-commit shift, which is the state this whole section exists for: an edit
+    // is no more anchored by its header's numbers than an addition is.
+    for (const delta of survivableShifts(patch)) {
+      assert.deepEqual(
+        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, shiftHunkHeaders(patch, delta))),
+        [id],
+        `an edit whose header is shifted by ${delta} lines must still select "${id}" alone`
+      );
+    }
+  }
+});
+
+test("a replace run at a case literal's last line is not attributed to its neighbour", () => {
+  // N removals followed by one addition, on the LAST content line of a literal — the shape a PR has
+  // when it replaces a block of steps with one. A removed line holds no new-file position, so
+  // counting it walks the cursor past the `  }),` that closes the case and into the literal that
+  // follows: the deeper the run, the further into the neighbour it lands. Eight is enough to clear
+  // the close line, the blank between elements and the next factory call.
+  for (const { id, lastContentLine } of uniquelyAnchoredCases(3)) {
+    for (const removed of [1, 3, 8]) {
+      const patch = patchEditing(registrySource, { line: lastContentLine, removed });
+      assert.deepEqual(
+        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+        [id],
+        `a ${removed}-line replace run at line ${lastContentLine} must stay inside "${id}" — ` +
+          'a removed line occupies no line of the file that will render'
+      );
+    }
+  }
+});
+
+test('a deletion-only hunk inside a case literal selects that case, not the fallback', () => {
+  // A hunk with `-` lines and no `+` at all still CHANGES the case it sits in, so it must select
+  // that case. Attributing only additions would make it select nothing — and nothing is not the
+  // safe answer here, it is the single fallback frame, published under a case the PR never touched.
+  // Asserted against `FALLBACK_CASE_ID` explicitly, because that is the wrong answer's shape.
+  for (const { id, idLine } of uniquelyAnchoredCases(3)) {
+    for (const removed of [1, 3]) {
+      const patch = patchEditing(registrySource, { line: idLine, removed, replaced: false });
+      assert.deepEqual(
+        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+        [id],
+        `deleting ${removed} line(s) inside "${id}" must select it, not the fallback frame`
+      );
+    }
   }
 });
 
@@ -1260,6 +1520,53 @@ test('a labActors patch confined to a stock table selects every player frame and
       `a shifted ${table} patch must select the same frames`
     );
   }
+});
+
+test('a labActors EDIT inside a stock table selects the same frames its addition does', () => {
+  // The region path has its own copy of nothing — it shares `regionsTouchedByHunk` with the
+  // registry — but it is the input a real PR is most likely to EDIT rather than append to, since
+  // restocking an actor rewrites a quantity in place. So the removal shape is pinned here too, and
+  // against the addition's own answer rather than a hard-coded list.
+  const line = labActorsLineOf("    'sm-iron-ore': 12,");
+  assert.equal(
+    windowOccurrences(labActorsSource, line),
+    1,
+    'this fixture line no longer anchors uniquely, so it cannot assert a single selection'
+  );
+
+  const players = playerCaseIds();
+  for (const [shape, patch] of [
+    ['a one-line edit', patchEditing(labActorsSource, { line })],
+    ['a replace run', patchEditing(labActorsSource, { line, removed: 4 })],
+    ['a deletion-only hunk', patchEditing(labActorsSource, { line, removed: 3, replaced: false })],
+  ]) {
+    assert.deepEqual(
+      selectedIds([LAB_ACTORS_PATH], patchesFor(LAB_ACTORS_PATH, patch)),
+      players,
+      `${shape} in INVENTORIES must select every player frame and only those`
+    );
+    assert.deepEqual(
+      selectedIds([LAB_ACTORS_PATH], patchesFor(LAB_ACTORS_PATH, shiftHunkHeaders(patch, 200))),
+      players,
+      `${shape} must select the same frames when its header does not land`
+    );
+  }
+});
+
+test('every knowledge render file the predicate probes is a real tracked file', () => {
+  // These four paths are STRINGS tested against each case's `sourceMatches` regexes, so a rename
+  // makes a probe match nothing — and nothing else notices. `every sourceMatches pattern resolves
+  // to at least one tracked file` does not: the pattern claiming `ItemPageInspector.svelte` is an
+  // alternation whose other branches still resolve, so it stays green while the probe goes dead,
+  // `manager-system-edit-normal` silently drops out of the knowledge selection, and this file's own
+  // mirror of the list drops it too — leaving the knowledge test passing against a smaller answer.
+  const missing = ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => !tracked.includes(file));
+  assert.deepEqual(
+    missing,
+    [],
+    'these knowledge-surface probes name no tracked file, so `rendersOwnedKnowledge` silently ' +
+      `stops admitting the frames that render them:\n  ${missing.join('\n  ')}`
+  );
 });
 
 test('a labActors patch confined to a knowledge table adds the frames that read owned copies', () => {
