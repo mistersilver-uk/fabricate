@@ -566,7 +566,7 @@ describe('createAdminStore', () => {
           resolutionMode: 'simple',
           craftingCheck: { simple: { rollFormula: '1d20 + 4' } },
         }),
-        'noModifierToken',
+        'noPlaceholder',
         'a formula that never spends the placeholder'
       );
       assert.equal(
