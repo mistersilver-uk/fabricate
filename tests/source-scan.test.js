@@ -53,24 +53,54 @@ const ABSENT = 'no-such-path-e3b0c442';
 // file could pass against a walk that reads nothing at all — the vacuity these gates keep finding.
 // The nested key is load-bearing twice: it proves the walk RECURSES, which is the only reason the
 // recursive listing (and therefore its attribution) exists.
-test('collects nested files under a root into one code-point-ordered corpus', () => {
+//
+// The two roots are passed in REVERSE code-point order deliberately, and that is what makes the
+// ordering assertion below a pin rather than a coincidence. `collectWorkingTreeSources` walks its
+// roots in the order given and sorts the accumulated corpus once at the end, so with the sort
+// removed this fixture comes back `b/...` first while code-point order puts `a/top.js` first —
+// measured, and true on any filesystem, because nothing about it depends on `readdir` order. A
+// single root cannot pin it: within one root the emission order IS `readdir`'s, which no standard
+// specifies, so half the possible orders leave the assertion inert without saying so.
+test('collects nested files under its roots into one code-point-ordered corpus', () => {
   const corpus = withTempTree(
     {
-      'top.js': 'top\n',
-      'nested/deep/leaf.svelte': 'leaf\n',
-      'nested/ignored.txt': 'not a scanned extension\n',
+      'a/top.js': 'top\n',
+      'b/nested/deep/leaf.svelte': 'leaf\n',
+      'b/nested/ignored.txt': 'not a scanned extension\n',
     },
-    (root) => collectWorkingTreeSources([root], ['.js', '.svelte'])
+    (root) =>
+      collectWorkingTreeSources([path.join(root, 'b'), path.join(root, 'a')], ['.js', '.svelte'])
   );
 
   const files = Object.keys(corpus);
   assert.equal(files.length, 2, `expected exactly the two scanned files, got ${files.join(', ')}`);
   assert.ok(
-    files.some((file) => file.endsWith('nested/deep/leaf.svelte')),
+    files.some((file) => file.endsWith('b/nested/deep/leaf.svelte')),
     `expected the walk to descend two levels, got ${files.join(', ')}`
   );
-  assert.deepEqual([...files].sort(), files, 'the corpus must be returned in path order');
+  assert.deepEqual(
+    [...files].sort(),
+    files,
+    `the corpus must be returned in path order, got ${files.join(', ')}`
+  );
   assert.deepEqual(Object.values(corpus).toSorted(), ['leaf\n', 'top\n']);
+});
+
+test('refuses a call that would answer with an empty corpus', () => {
+  // Both argument guards, because neither fails loudly on its own: an empty `roots` or an empty
+  // `extensions` yields an empty corpus, and every count assertion over an empty corpus passes —
+  // the vacuity this whole family of gates exists to catch. The extension list has no default ON
+  // PURPOSE (see the helper), so omitting it must throw rather than quietly pick one.
+  assert.throws(
+    () => collectWorkingTreeSources([], ['.js']),
+    { name: 'TypeError', message: /at least one repo-relative root/ },
+    'an empty root list must be refused, not answered with an empty corpus'
+  );
+  assert.throws(
+    () => collectWorkingTreeSources(['src'], []),
+    { name: 'TypeError', message: /there is no default/ },
+    'an empty extension list must be refused, not answered with an empty corpus'
+  );
 });
 
 test('names the caller-supplied root when the root itself is not there', () => {
@@ -160,6 +190,26 @@ test('tells a dangling symbolic link apart from a moving worktree', (t) => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('never rewrites a read failure that is not ENOENT', () => {
+  // The sibling of the check below, on the `readFile` half — and the one that was missing. With
+  // the rethrow deleted, `readFileSync` on a directory (EISDIR on every platform) falls through
+  // into the dangling-symlink branch, because a directory both exists and is not a symbolic link;
+  // measured, the reported failure was `"src" is a symbolic link whose target does not exist` with
+  // `cause.code: EISDIR`. That is this issue's own defect — a real error given a confident wrong
+  // attribution — so it is proved here rather than assumed from the sibling.
+  assert.throws(
+    () => readListedSource(path.join(repoRoot, 'src'), 'src'),
+    (error) => {
+      assert.notEqual(error.code, 'ENOENT', 'reading an existing directory cannot be ENOENT');
+      assert.ok(
+        !/symbolic link|corpus scan/.test(error.message),
+        `a non-ENOENT failure must reach the caller untouched, got: ${error.message}`
+      );
+      return true;
+    }
+  );
 });
 
 test('never rewrites a listing failure that is not ENOENT', () => {

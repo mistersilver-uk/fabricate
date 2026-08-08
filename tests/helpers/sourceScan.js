@@ -17,8 +17,9 @@
  *
  * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the
  * `npm test` glob, so nothing here is collected as a suite. Its own guarantees are
- * proved from inside the glob by `tests/source-scan.test.js` — in particular the two
- * attributed failures below, which no passing corpus scan ever reaches.
+ * proved from inside the glob by `tests/source-scan.test.js` — in particular the four
+ * attributed failure messages below (two per guarded syscall), which no passing corpus
+ * scan ever reaches.
  */
 
 import { lstatSync, readdirSync, readFileSync } from 'node:fs';
@@ -116,6 +117,11 @@ export function stripComments(source) {
  * `lstat` distinguishes them — it describes the LINK, so it still succeeds when the link is there
  * and its target is not — and it costs a syscall only on the failure path.
  *
+ * It asks `isSymbolicLink()` rather than mere existence, and the difference is the message being
+ * right rather than inverted: a path that the read could not find but the `lstat` finds as a
+ * NON-link was recreated between the two calls, which is precisely the moving worktree — so a
+ * truthiness test would report the transient case as the permanent one.
+ *
  * Exported for the same reason as `readScannedDirectory`: the transient branch requires a file to
  * disappear between its own `readdir` and its own `readFileSync`, which no test can schedule, so
  * the only way its wording is covered by anything is a direct call.
@@ -129,7 +135,7 @@ export function readListedSource(full, file) {
     return readFileSync(full, 'utf8');
   } catch (cause) {
     if (cause?.code !== 'ENOENT') throw cause;
-    if (lstatSync(full, { throwIfNoEntry: false })) {
+    if (lstatSync(full, { throwIfNoEntry: false })?.isSymbolicLink()) {
       throw new Error(
         `"${file}" is a symbolic link whose target does not exist, so the corpus scan cannot ` +
           'read it. This is NOT a moving worktree and re-running will produce exactly this ' +
@@ -297,7 +303,10 @@ function byPath(left, right) {
  * a scanned extension is read as a file and fails ENOENT permanently rather than transiently;
  * `readListedSource` says so rather than telling its reader to re-run.
  *
- * @param {readonly string[]} roots Repo-relative directories to walk, e.g. `['src', 'styles']`.
+ * @param {readonly string[]} roots Directories to walk, e.g. `['src', 'styles']`. Resolved against
+ *   the repo root, so an absolute path — which is what the tests' tmpdir fixtures pass — is used as
+ *   given. Walked in the order supplied, then sorted, so the supplied order does not reach the
+ *   caller.
  * @param {readonly string[]} extensions Extensions to include, e.g. `['.js', '.svelte']`.
  * @returns {Record<string, string>} `{ repo-relative path: text }`, in code-point path order.
  */

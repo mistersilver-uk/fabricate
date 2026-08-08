@@ -183,8 +183,10 @@ test('the corpus every check below reads is the whole tree, not a slice of it', 
   // By KEY, one per root — because a count threshold cannot see a single file go missing, and each
   // of these is a whole root's or a whole extension's worth of coverage standing on one file.
   // `lang/en.json` is the sharpest of the three: dropping `.json` (or the `lang` root) moves the
-  // count 550 -> 549, which no threshold can catch, and it is the one omission that leaves a LIVE
-  // filter clause dead — `file === 'lang/en.json'` in `renderSources` above.
+  // count 550 -> 549, which no threshold can catch, and it is the one omission that leaves a
+  // filter clause matching nothing — `file === 'lang/en.json'` in `renderSources` above. The
+  // clause still runs; it just stops selecting anything, and no check below asserts on what it
+  // selects, so this key is the only thing that would notice.
   for (const file of [
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'styles/fabricate.css',
