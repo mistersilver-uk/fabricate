@@ -1342,17 +1342,33 @@
   Scope + specificity are deliberate:
    - Text-entry types only. `checkbox`/`radio`/`range` are real controls (segmented
      toggles, the visibility allow-list) and must keep their native/scoped rendering,
-     so they are excluded. `number` is excluded because the numeric controls that HAVE
-     a considered look — the shared `Stepper` primitive and the `.manager-rule-stepper`
-     pair — own it in their own blocks and a blanket rule would clobber them; `search`
-     is excluded because every search field is a themed `.manager-search` pill.
+     so they are excluded. `number` is excluded because the numeric control that HAS a
+     considered look — the shared `Stepper` primitive — owns it in its own block and a
+     blanket rule would clobber it; `search` is excluded because every search field is a
+     themed `.manager-search` pill.
 
-     This comment used to claim every number input in the manager IS a Stepper. It is
-     not: roughly twenty bare `type="number"` fields across the checks, gathering and
-     economy editors still render Foundry's chrome AND the native spinner. They are not
-     swept up here, because hiding a spinner on a field with no −/+ adjuncts would take
-     away its only pointer-driven stepping — the fix is to migrate them onto `Stepper`,
-     which is tracked separately.
+     As of issue 1050 the `number` carve-out is nearly total: every editable numeric field
+     in the manager and the interactable/component editors is a `Stepper`, and the
+     `.manager-rule-stepper` pair this comment used to name alongside it is gone, folded
+     onto the primitive. Exactly TWO bare `type="number"` fields remain in `src/ui/svelte`,
+     both deliberate and both recorded in the non-reuse register:
+
+       R1  `components/ChanceSlider.svelte` — keeps its bare input because its sibling
+           `type="range"` track already gives a pointer a way to step the value, and its
+           own `handleNumberKeydown` keeps the keyboard one. Its spinner IS suppressed,
+           by the scoped rule at `.manager-drop-rate-percent`.
+       R2  `apps/manager/SystemEditView.svelte`'s currency sub-unit amount — a bare field
+           inside a bordered `.manager-availability-pill.is-currency` chip, which is not a
+           form row and cannot hold a Stepper without widening every wrapping chip. It
+           KEEPS its native spinner.
+
+     The rule that governs both, and the acceptance criterion for the whole migration: a
+     numeric field's native spinner is suppressed IF AND ONLY IF the field carries another
+     pointer-driven stepping affordance — the Stepper's −/+ adjuncts, or a sibling range
+     track in the same control. A field with neither keeps its spinner, because the arrows
+     are then its ONLY pointer path to the value. That is why R2's spinner stays and why no
+     blanket `input[type="number"]` suppression may be added here;
+     `tests/components/stepper-spinner.test.js` fails one that is.
    - Declared HERE, early, at `.fabricate-manager <element>[type]` (0,2,1) — enough to
      beat Foundry core, low enough that any later per-control class rule overrides it
      by source order. So the search pill, the steppers, etc. all still win.
@@ -12226,6 +12242,39 @@
   font: inherit;
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+/*
+  NO native spinner on the ChanceSlider's number half (issue 1050, register entry R1).
+
+  This is the one field in the tree that earns spinner suppression WITHOUT the shared
+  `Stepper`'s −/+ adjuncts, and the reason is the sibling it ships with: the same control
+  renders a `type="range"` track bound to the same value, so a pointer already has a
+  stepping affordance here. The drawn arrows would be a THIRD path to one number. That is
+  the same `iff` the rest of this change applies — a spinner is suppressed only where
+  another pointer-driven stepping affordance exists — reached by a different affordance.
+
+  Keyboard stepping is NOT lost, which is what separates this from the regression the spinner
+  fix (issue 1036) refused to ship: `handleNumberKeydown` handles Up/Down itself (the component
+  intercepts them to commit through its own clamp), so removing the drawn buttons removes
+  drawn buttons only. `SystemEditView`'s currency sub-unit amount (register entry R2) is the
+  contrasting case and deliberately KEEPS its spinner: it is a bare field in a chip with no
+  range track and no adjuncts, so the arrows are its only pointer path.
+
+  Scoped to `.manager-drop-rate-percent` — the wrapper ChanceSlider puts around its number
+  input — rather than to `input[type="number"]`, so it cannot reach R2 or any future bare
+  field. `tests/components/stepper-spinner.test.js` asserts exactly that: a spinner rule
+  whose selector names no specific control fails the gate.
+
+  It also sits directly under the geometry rule above because the `%` affix is absolutely
+  positioned at `right: 6px` over the padding this reserves; the spinner used to draw
+  underneath it.
+*/
+.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
+.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
