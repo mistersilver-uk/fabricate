@@ -11,7 +11,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const themeIds = Object.values(FABRICATE_THEME_IDS);
 
-// The bulk edit panel's muted copy is SVELTE-SCOPED, not in the global sheet — `grep -c
+// The bulk edit panels' muted copy is SVELTE-SCOPED, not in the global sheet — `grep -c
 // fab-bulk-edit styles/fabricate.css` returns 0. Injecting only `styles/fabricate.css` and
 // then adding a `.fab-bulk-edit-*` node to the fixture would match no rule at all: the node
 // would inherit `--fab-mv2-text`, score the contrast of a colour this panel never renders,
@@ -20,8 +20,26 @@ const themeIds = Object.values(FABRICATE_THEME_IDS);
 // CSS appended AFTER the global sheet (matching `css: 'injected'` ordering in
 // svelte.config.js) with the real `svelte-<hash>` class stamped onto the fixture node
 // (matching specificity). Both halves are load-bearing; either alone proves nothing.
+//
+// ── WHAT THESE TWO SAMPLES DO AND DO NOT COVER ───────────────────────────────────────
+// Issue 1015 moved EIGHT declarations across three components from `--fab-text-subtle` to
+// `--fab-mv2-text-muted`. All eight land on the same token, so what actually varies between
+// them is the COLUMN they render on, and that is what is sampled here: one probe per
+// distinct backdrop, not one probe per declaration.
+//  - `--fab-mv2-surface-1`, the inspector rail's own fill, where the shell's and
+//    `BulkEditSection`'s copy renders — sampled through `.fab-bulk-edit-subhint`.
+//  - `--fab-mv2-bg`, the Recipe Studio pick card's fill, a DIFFERENT colour inside the same
+//    rail — sampled through `.fab-bulk-book-pick-meta`, whose card supplies that background
+//    from its own shipped rule rather than from a preview helper.
+// What remains uncovered is per-DECLARATION drift: a single one of the eight reverting to
+// `--fab-text-subtle` while its neighbours stay muted moves no number here. That is the
+// deliberate limit of this gate, not an oversight — it is a rendered CONTRAST gate, and
+// which token a given rule names is a source-level fact.
 const BULK_EDIT_SECTION = scopedComponentCss(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkEditSection.svelte')
+);
+const RECIPE_BULK_EDIT_PANEL = scopedComponentCss(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte')
 );
 // The player Crafting/Gathering apps and the standalone Recipe Editor were
 // removed; the Crafting System Manager is the remaining themed surface. The new
@@ -71,6 +89,7 @@ function themePage(theme, width, height, body) {
         <style>
           ${css}
           ${BULK_EDIT_SECTION.css}
+          ${RECIPE_BULK_EDIT_PANEL.css}
           :root { --font-primary: Arial, sans-serif; }
           body {
             margin: 0;
@@ -159,6 +178,46 @@ function bulkEditSubhint() {
   );
 }
 
+/*
+ * The Recipe Studio pick card's muted meta line — the SECOND column the issue 1015 recolour
+ * has to clear. It sits in the same rail as the sub-hint above but on `--fab-mv2-bg`, and
+ * six of the seven themes failed AA on it before the recolour, so a gate that sampled only
+ * the rail's own fill would have called that pass.
+ *
+ * The whole card is reproduced rather than just its meta line, because the background under
+ * test is `.fab-bulk-book-pick`'s OWN declaration. No `preview-*` helper stands in for it:
+ * lifting the fill out of the shipped rule would let the card's real background change
+ * without moving this ratio, which is the failure the sub-hint's helper above accepts only
+ * because the rail's fill is a global-sheet rule this fixture already renders.
+ *
+ * Every class here is stamped in one `stampAll` pass off the component's own compiler
+ * output, so renaming any of them unstamps the node rather than leaving it measuring an
+ * inherited colour on an unstyled box.
+ */
+function bulkBookPickCard() {
+  const markup = `
+    <div class="fab-bulk-book-pick">
+      <div class="fab-bulk-book-pick-head">
+        <span class="fab-bulk-book-pick-art" aria-hidden="true"><i class="fas fa-book"></i></span>
+        <span class="fab-bulk-book-pick-copy">
+          <strong class="fab-bulk-book-pick-name">Alchemical Primer</strong>
+          <span class="fab-bulk-book-pick-meta" data-contrast-bulk-bg-muted>Journal entry - 6 pages</span>
+        </span>
+      </div>
+    </div>`;
+  return [
+    'fab-bulk-book-pick',
+    'fab-bulk-book-pick-head',
+    'fab-bulk-book-pick-art',
+    'fab-bulk-book-pick-copy',
+    'fab-bulk-book-pick-name',
+    'fab-bulk-book-pick-meta'
+  ].reduce(
+    (fixture, className) => withScopeHash(fixture, className, RECIPE_BULK_EDIT_PANEL.hashClass),
+    markup
+  );
+}
+
 function managerFixture(theme, width, height) {
   return themePage(theme, width, height, `
     <section class="fabricate fabricate-manager surface-root" data-fabricate-theme="${theme}" data-manager-view="systems" data-surface-backdrop>
@@ -211,6 +270,7 @@ function managerFixture(theme, width, height) {
                fab-on-danger exists at all. -->
           <button type="button" class="manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
           ${bulkEditSubhint()}
+          ${bulkBookPickCard()}
         </aside>
       </div>
     </section>`);
@@ -245,16 +305,28 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   assert.ok(contrastSample(result, '[data-contrast-soft]') >= 4.5, `${theme}/${surfaceId}/${width} chip/status text contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid]') >= 4.5, `${theme}/${surfaceId}/${width} solid action contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid-armed]') >= 4.5, `${theme}/${surfaceId}/${width} armed danger action contrast should pass WCAG AA`);
-  // The bulk edit panel's muted copy, on the inspector's own fill (issue 1015). Its scoped
-  // rule must actually be the one that won, or the ratio below is the ratio of the panel's
-  // PRIMARY text and says nothing about the muted scale this asserts.
-  const bulkMuted = result.contrastSamples.find(entry => entry.selector === '[data-contrast-bulk-muted]');
+  // The bulk edit panels' muted copy (issue 1015), one probe per COLUMN it renders on.
+  assertScopedSamplePassesAA(result, '[data-contrast-bulk-muted]', `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`);
+  assertScopedSamplePassesAA(result, '[data-contrast-bulk-bg-muted]', `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`);
+}
+
+/*
+ * A Svelte-SCOPED sample: its rule must be the one that actually won, or the ratio is the
+ * ratio of the panel's PRIMARY text and says nothing about the muted scale being asserted.
+ *
+ * `contrastSamples.find` is looked up here rather than dereferenced inline because a drifted
+ * selector list would otherwise throw a TypeError instead of naming the missing probe —
+ * `contrastSample` already states that with `assert.ok`, and this check has to state it too.
+ */
+function assertScopedSamplePassesAA(result, selector, label) {
+  const sample = result.contrastSamples.find(entry => entry.selector === selector);
+  assert.ok(sample, `expected contrast sample for ${selector} (${label})`);
   assert.notEqual(
-    bulkMuted.color,
-    bulkMuted.inheritedColor,
-    `${theme}/${surfaceId}/${width} bulk edit muted copy computed the inherited --fab-mv2-text (${bulkMuted.color}) — its scoped rule did not apply, so the ratio below would prove nothing`
+    sample.color,
+    sample.inheritedColor,
+    `${label} computed the inherited --fab-mv2-text (${sample.color}) — its scoped rule did not apply, so the ratio would prove nothing`
   );
-  assert.ok(contrastSample(result, '[data-contrast-bulk-muted]') >= 4.5, `${theme}/${surfaceId}/${width} bulk edit muted copy contrast should pass WCAG AA`);
+  assert.ok(contrastSample(result, selector) >= 4.5, `${label} contrast should pass WCAG AA`);
 }
 
 async function inspectRenderedSurface(page) {
@@ -288,7 +360,7 @@ async function inspectRenderedSurface(page) {
 
     const backdrop = document.querySelector('[data-surface-backdrop]');
     const backdropBackgroundColor = getComputedStyle(backdrop).backgroundColor;
-    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-bulk-muted]'].map(selector => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {

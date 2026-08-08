@@ -236,10 +236,24 @@
 
   /* THE DOCK PINS APPLY TO THE RAIL'S BOTTOM EDGE. The panel is taller than the
      inspector's scrollport in the Recipe and Component studios, so the panel's primary
-     action scrolled out of view exactly when the GM had staged enough to want it. (Not in
-     the Essence Studio: `EssenceBulkEditPanel` closes this shell and renders its delete
-     card as a SIBLING, so the shell does not span that rail's scrollable height and Apply
-     un-pins there. That is accepted, not a defect.)
+     action scrolled out of view exactly when the GM had staged enough to want it.
+
+     TWO SUPPORTED CONFIGURATIONS DO NOT PIN. Both are accepted, and neither is a
+     regression — `origin/main` behaves identically in each:
+      - THE ESSENCE STUDIO. `EssenceBulkEditPanel` closes this shell and renders its delete
+        card as a SIBLING, so the shell does not span that rail's scrollable height and
+        Apply un-pins there.
+      - A `fabricate-manager` CONTAINER AT 1120px OR NARROWER. There,
+        `@container fabricate-manager (max-width: 1120px)` in `styles/fabricate.css` gives
+        `.manager-body` `grid-auto-rows: max-content` + `overflow-y: auto`, so the BODY
+        becomes the scrollport and `.manager-inspector` is sized to its content. A rail that
+        never overflows has no scroll range, and a sticky box with no scroll range has
+        nothing to stick within. Measured at a 1000px container: the rail does not scroll,
+        the body does, and Apply's overhang runs 1350px to 0 across the range — against a
+        perfect pin at 1400px. The manager's supported minimum is 1024px, so issue 1015's
+        symptom does persist below that breakpoint. Closing it means re-deciding which box
+        scrolls once the three regions stack, which is that block's decision and not this
+        rule's; do NOT reach into the `@container` block from here.
 
      A SECOND sticky rule rather than reuse of `.manager-inspector-card.is-sticky`
      (styles/fabricate.css): that class is a bordered, rounded, TOP-anchored card SHELL,
@@ -253,15 +267,42 @@
      `.fabricate-manager` host rather than stacking inside the rail. A `z-index` here would
      be an unfalsifiable guess at a conflict that does not exist.
 
-     ALL THREE BLEEDS ARE LOAD-BEARING, not cosmetic. Chromium constrains a sticky box to
-     its containing block, which ends at `.manager-inspector`'s CONTENT box, while the
-     scrollport it sticks to is that element's PADDING box (`padding: var(--fab-space-3)`,
-     styles/fabricate.css). Without the negative bottom INSET a `--fab-space-3` strip of
-     the scrollport stays uncovered and a staged row reads through it at mid-scroll;
-     without the matching negative bottom MARGIN the dock jumps by that same strip at
-     maximum scroll. The inline pair is the same trade sideways: the negative margin takes
-     the fill out to the rail's edges so the dock reads as an edge rather than a floating
-     slab, and the matching padding puts the button back exactly where it was.
+     ALL THREE BLEEDS ARE LOAD-BEARING, and the two vertical ones for DIFFERENT reasons.
+     TWO clamps act on a sticky box at once, and each negative value answers one of them:
+
+      - `bottom` answers the SCROLLPORT clamp. Chromium measures a sticky inset from the
+        scroll container's CONTENT box, while the rail the GM sees runs on to its PADDING
+        box — `--fab-space-3` lower, because `.manager-inspector` carries
+        `padding: var(--fab-space-3)` (styles/fabricate.css). Measured by construction:
+        with the rail's `padding-bottom` forced to 40px, `bottom: 0` still rests the dock on
+        the content-box edge and the shipped inset still rests it exactly `--fab-space-3`
+        below that edge. So the inset is what carries the fill out to the line the eye reads
+        as the bottom of the rail, and it is written as the SAME token as the rail's padding
+        so the two cannot drift apart.
+      - `margin-bottom` answers the CONTAINING-BLOCK clamp. A sticky box may not escape its
+        containing block — here `.fab-bulk-edit-panel` — and that clamp applies to its
+        MARGIN box. At maximum scroll the panel's bottom edge has arrived at the rail's
+        content-box bottom, so the clamp starts to bind at exactly the point the inset above
+        needs the dock a `--fab-space-3` lower. The matching negative bottom margin lifts
+        the margin box that far above the border box, which is what lets the border box keep
+        the position the inset asked for.
+
+     Measured on this shell in a real rail — `tests/components/bulk-edit-dock-pinning.test.js`
+     renders precisely this stack — with the rail's padding-box bottom at 520 and its
+     content-box bottom at 508, reading the dock's bottom at scroll top / mid / max:
+
+       bottom -space-3 + margin-bottom -space-3   520 / 520 / 519.91   <- shipped
+       bottom -space-3, no margin-bottom          520 / 520 / 507.91   <- drops at the end
+       bottom 0, with or without the margin       508 / 508 / 508      <- a strip uncovered
+       no `position: sticky` at all               643 / 582 / 520      <- meets only at max
+
+     All three declarations are therefore load-bearing, and the last row is why that gate
+     samples the TOP of the scroll range as well as the bottom: a dock that never sticks at
+     all is indistinguishable from a pinned one at maximum scroll.
+
+     The inline pair is the same trade sideways: the negative margin takes the fill out to
+     the rail's edges so the dock reads as an edge rather than a floating slab, and the
+     matching padding puts the button back exactly where it was.
 
      THE BUTTON'S OWN BOX IS UNTOUCHED. `.fab-bulk-edit-apply` swaps places with
      `.manager-component-browser-inspector-edit` in the rail's bottom slot, so a changed
