@@ -76,7 +76,8 @@ async function mountPills(selectedIds, props = {}) {
     selectedIds,
     testId: 'pill',
     noneSelectedLabel: NONE_LABEL,
-    onToggle: (id, next) => toggles.push({ id, next, focused: focusDescriptor(globalThis.document.activeElement) }),
+    onToggle: (id, next) =>
+      toggles.push({ id, next, focused: focusDescriptor(globalThis.document.activeElement) }),
     ...props,
   });
   return { root, toggles };
@@ -85,9 +86,15 @@ async function mountPills(selectedIds, props = {}) {
 describe('ModifierPillSelect announcement contract (issue 1055)', () => {
   it('carries the live region on its own status node, not on the pill row', async () => {
     const { root } = await mountPills(['med', 'alch']);
-    const status = root.querySelector('[data-modifier-pill-select="pill"] [data-modifier-pill-status]');
+    const status = root.querySelector(
+      '[data-modifier-pill-select="pill"] [data-modifier-pill-status]'
+    );
     assert.ok(Boolean(status), 'the status node lives inside the control');
-    assert.equal(status.getAttribute('aria-live'), 'polite', 'announced after the current utterance, not over it');
+    assert.equal(
+      status.getAttribute('aria-live'),
+      'polite',
+      'announced after the current utterance, not over it'
+    );
     const row = root.querySelector('[data-modifier-pill-row]');
     assert.ok(Boolean(row), 'pre-condition: the pill row still renders');
     assert.ok(
@@ -100,7 +107,10 @@ describe('ModifierPillSelect announcement contract (issue 1055)', () => {
     const { root } = await mountPills(['med', 'alch']);
     const status = () => root.querySelector('[data-modifier-pill-status]').textContent;
     assert.ok(status().includes('Medicine'), 'the summary names the selection');
-    assert.ok(status().includes('Alchemy'), '…all of it — "2 selected" says nothing about which two');
+    assert.ok(
+      status().includes('Alchemy'),
+      '…all of it — "2 selected" says nothing about which two'
+    );
 
     // A removal is the case the old region could not announce at all.
     await harness.setProps({ selectedIds: ['alch'] });
