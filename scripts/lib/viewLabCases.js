@@ -2213,7 +2213,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // a `Gathering(Economy|…)` pattern and every one of them `expectView`s somewhere else, so a
     // change to `GatheringEconomyView.svelte` published a frame that does not contain it. It is
     // also this change's tightest layout: the row is a four-track grid of two filled, comfortable
-    // steppers, re-pinned from `56px 56px` to `102px 102px`, which is why the actor subsection was
+    // steppers, re-pinned from `56px 56px` to `106px 106px`, which is why the actor subsection was
     // reflowed out of `.manager-economy-stamina-grid` to the card's full width.
     query: { system: 'lab-herbalism' },
     // The state is DRIVEN rather than seeded. The fixture world enables stamina on no system, and

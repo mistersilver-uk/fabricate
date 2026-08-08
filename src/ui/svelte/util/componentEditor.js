@@ -6,11 +6,11 @@ export function getDefaultEssenceIcon() {
 
 function compareComponentEditorEssenceOptions(left, right) {
   const nameCompare = String(left?.name || '').localeCompare(String(right?.name || ''), undefined, {
-    sensitivity: 'base'
+    sensitivity: 'base',
   });
   if (nameCompare !== 0) return nameCompare;
   return String(left?.id || '').localeCompare(String(right?.id || ''), undefined, {
-    sensitivity: 'base'
+    sensitivity: 'base',
   });
 }
 
@@ -44,14 +44,14 @@ export function buildEditableEssenceOptions(essenceDefinitions = [], currentEsse
   const quantities = toEssenceQuantityMap(currentEssences);
 
   return definitions
-    .map(def => ({
+    .map((def) => ({
       id: def.id,
       name: def.name || def.id,
       icon: String(def.icon || '').trim() || DEFAULT_ESSENCE_ICON,
       // Default-true, matching the persisted convention: a definition predating the field
       // is enabled, and only an explicit `false` disables.
       enabled: def.enabled !== false,
-      quantity: clampComponentEssenceQuantity(quantities[def.id])
+      quantity: clampComponentEssenceQuantity(quantities[def.id]),
     }))
     .sort(compareComponentEditorEssenceOptions);
 }
@@ -60,13 +60,6 @@ export function clampComponentEssenceQuantity(value) {
   const quantity = Number(value);
   if (!Number.isFinite(quantity) || quantity <= 0) return 0;
   return Math.max(0, Math.floor(quantity));
-}
-
-export function adjustComponentEssenceQuantity(current, delta) {
-  const base = clampComponentEssenceQuantity(current);
-  const amount = Number(delta);
-  if (!Number.isFinite(amount)) return base;
-  return Math.max(0, base + Math.trunc(amount));
 }
 
 export function getComponentEditorHintKey({ showTags = false, showEssences = false } = {}) {
@@ -80,9 +73,15 @@ export function buildComponentEditorState(system, item) {
   const showTags = !!system;
   const showEssences = system?.features?.essences === true;
 
-  const tagSource = Array.isArray(system?.itemTags) ? system.itemTags : (Array.isArray(system?.tags) ? system.tags : []);
+  const tagSource = Array.isArray(system?.itemTags)
+    ? system.itemTags
+    : Array.isArray(system?.tags)
+      ? system.tags
+      : [];
   const selectedTags = new Set(item?.tags || []);
-  const essenceDefinitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+  const essenceDefinitions = Array.isArray(system?.essenceDefinitions)
+    ? system.essenceDefinitions
+    : [];
   const currentEssences = item?.essences && typeof item.essences === 'object' ? item.essences : {};
 
   return {
@@ -93,14 +92,14 @@ export function buildComponentEditorState(system, item) {
     hasEditableFields: showTags || showEssences,
     hintKey: getComponentEditorHintKey({ showTags, showEssences }),
     tagOptions: showTags
-      ? tagSource.map(tag => ({
-        tag,
-        checked: selectedTags.has(tag)
-      }))
+      ? tagSource.map((tag) => ({
+          tag,
+          checked: selectedTags.has(tag),
+        }))
       : [],
     essenceOptions: showEssences
       ? buildEditableEssenceOptions(essenceDefinitions, currentEssences)
-      : []
+      : [],
   };
 }
 
@@ -109,7 +108,7 @@ export function buildComponentEditorUpdates(draft = {}) {
 
   if (draft.showTags) {
     updates.tags = Array.isArray(draft.tagOptions)
-      ? draft.tagOptions.filter(opt => opt?.checked).map(opt => opt.tag)
+      ? draft.tagOptions.filter((opt) => opt?.checked).map((opt) => opt.tag)
       : [];
   }
 

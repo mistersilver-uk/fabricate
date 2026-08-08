@@ -55,9 +55,13 @@
       <!-- `fill` rather than the inline default (D2): this is a 120px flex slot on an
            `align-items: flex-end` row beside a 36px formula field and a 36px comparison
            select, so an inline 102x28 island would change the control's width, height,
-           border and fill relative to its siblings. -->
+           border and fill relative to its siblings.
+
+           `min={0}`: a check DC below zero is not a DC, and the bare input this replaced
+           had no live `−` button that could reach -1 from 0 in a single click. -->
       <Stepper
         fill
+        min={0}
         value={dc ?? 15}
         ariaLabel={dcLabel}
         decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: dcLabel })}

@@ -679,6 +679,19 @@
     min-width: 0;
   }
 
+  /* The Phase 4 reflow moved the actor table out of `.manager-economy-stamina-grid` so it
+     could have the card's full width, which left the regeneration card with the same full
+     width — and it does not want it. `.manager-economy-regen-grid.is-single` is the DEFAULT
+     state (Manual-only regen), so the first thing a GM sees after enabling Stamina was a
+     two-option `<select>` stretched across all 706px of the card, with "Amount per
+     interval" — a direct child of the subsection — doing the same. 480px keeps the two-up
+     grid at a comfortable ~236px per field, which is WIDER than the ~190px the old 1.35fr
+     sub-column afforded, while leaving the single-column state a sane control width. The
+     actor table below is unaffected: it is a sibling subsection, not a child of this one. */
+  .manager-economy-subsection[data-economy-regen-card] {
+    max-width: 480px;
+  }
+
   .manager-economy-subtitle {
     display: inline-flex;
     align-items: center;
@@ -733,14 +746,21 @@
   /* One grid per row, shared by the header, so Current / Max (override) labels
      and the trailing action (save / roll) line up in the same columns.
 
-     102px is the stepper's own natural width (54px of chrome around its 48px
-     input), and `minmax(140px, 1fr)` floors the name column: track 1 was
-     `minmax(0, 1fr)`, which would have absorbed the widened cells by crushing the
-     actor name to the point where the table stopped identifying anybody while
-     still technically not scrolling. */
+     106px, not 102px. 102px is the stepper's natural width at the DEFAULT density —
+     54px of chrome around a 48px input — but D13 REQUIRES `comfortable` on both of
+     these cells (they are the point of a bulk-entry panel), and comfortable raises
+     the fixed chrome to 58px. At 102px the typeable field was therefore 44px, 4px
+     under the 48px the number the track was derived from assumes; 106px restores it.
+     There is ~384px of slack in track 1 at the card's full width, so the 8px comes
+     out of the name column and nowhere near its floor.
+
+     `minmax(140px, 1fr)` floors the name column: track 1 was `minmax(0, 1fr)`, which
+     would have absorbed the widened cells by crushing the actor name to the point
+     where the table stopped identifying anybody while still technically not
+     scrolling. */
   .manager-economy-actor-row {
     display: grid;
-    grid-template-columns: minmax(140px, 1fr) 102px 102px 64px;
+    grid-template-columns: minmax(140px, 1fr) 106px 106px 64px;
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
@@ -838,11 +858,5 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  @media (max-width: 980px) {
-    .manager-economy-stamina-grid {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

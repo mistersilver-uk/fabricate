@@ -13277,10 +13277,23 @@
    it, so `padding-left` is what lines it up under the description column: the row's icon
    track is 34px plus its 8px gap. (The old rule also carried `grid-column: 2`, which never
    did anything here — the parent is flex — and a `34px minmax(0, 1fr) 34px` template for
-   the three hand-rolled children that no longer exist.) */
+   the three hand-rolled children that no longer exist.)
+
+   `max-width` is the other half of the placement, and it is not cosmetic. This block gave
+   the field no width at all, so the filled stepper inside it resolved `width: 100%` against
+   the whole rules stack and rendered a limit field several hundred pixels wide with its −
+   and + an inch apart. Dropping `fill` would NOT have fixed that on the sibling cases in
+   `.manager-field` — an unfilled `.fab-stepper` is a flex item with `width: auto`, so
+   `align-items: stretch` widens it to exactly the same box, just 8px shorter and with a
+   48px input marooned in the middle of it — so the cap is applied here too, for one
+   remedy across all four sites. 160px is the pinned operand slot's width (:2150), which is
+   what the `fill` variant was measured against; it leaves a 106px typeable field, wider
+   than the 48px an unfilled stepper offers. Capping a SIZE from the layout context is
+   permitted; restyling the primitive's font, border, radius or fill is not. */
 .fabricate-manager .manager-rule-stepper {
   padding-left: 42px;
   min-width: 0;
+  max-width: 160px;
 }
 
 /* Recipe Visibility card: List mode and Knowledge-based are inline subheading
@@ -15347,6 +15360,20 @@
 .fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target {
   border-color: var(--fab-accent);
   color: var(--fab-mv2-accent);
+}
+
+/* The custom salvage DC is the only numeric control in this block; its siblings are a
+   full-width preset `<select>` and a manage-presets button, so the cap goes on the stepper
+   rather than on the `.manager-field` around it (issue 1050).
+
+   A cap, not a dropped `fill`. `.manager-field` is `display: flex; flex-direction: column`,
+   so an unfilled `.fab-stepper` — a flex item with `width: auto` — is widened to exactly
+   the same box by `align-items: stretch` (measured at 600/600px), just 8px shorter and with
+   a 48px input marooned inside a stretched border. 160px is the width the `fill` variant was
+   measured against and leaves a 106px typeable field. Taking a SIZE from the layout context
+   is permitted; restyling the primitive's font, border, radius or fill is not. */
+.fabricate-manager [data-salvage-dc-override] .fab-stepper {
+  max-width: 160px;
 }
 
 /* The salvage panel's heading IS its control row (issue 676): mode pill · divider ·

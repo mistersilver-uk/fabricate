@@ -84,9 +84,14 @@
         <!-- `fill`, so the stepper takes the row's pinned 102px track and the 36px height
              its `<input>` sibling resolves to rather than sitting in it as a narrower
              inline island. No `allowUnset`: a tier's DC has no absent state — 0 is a real
-             DC — and the `data-*` hook rides `inputProps` onto the real `<input>`. -->
+             DC — and the `data-*` hook rides `inputProps` onto the real `<input>`.
+
+             `min={0}`: 0 is a real DC but -1 is not, and a tier's DC starts at 0, so
+             without the clamp one click of the live `−` adjunct commits a negative DC.
+             The bare input this replaced had no `min` either, but it had no `−` either. -->
         <Stepper
           fill
+          min={0}
           value={tier.dc ?? 0}
           ariaLabel={dcLabel}
           decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: dcLabel })}

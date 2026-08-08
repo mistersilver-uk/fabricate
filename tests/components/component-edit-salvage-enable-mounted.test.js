@@ -396,6 +396,34 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     harness.remount();
   });
 
+  it('clearing the custom DC persists null, not 0 (issue 1050, D1a)', async () => {
+    // The genuine-absence half of D1a, at a CALL SITE rather than in the primitive. What
+    // ships otherwise proves only that the stepper EMITS `null` when an `allowUnset` field
+    // is cleared (`stepper-unset-fill.test.js`) and that this call site passes `allowUnset`
+    // (`stepper-call-site-contract.test.js`). Neither can see the handler in between:
+    // changing `setSalvageDcOverride`'s `: null` to `: 0` is format-clean, lint-clean and
+    // survives every other suite, while silently turning "inherit the system salvage DC"
+    // into a hard DC of zero that no salvage roll can fail.
+    //
+    // `null` and `0` are both falsy and both render as an empty-ish field, so only reading
+    // the emitted patch distinguishes them.
+    const { drafts, props: mountProps } = track({
+      component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 14 } },
+    });
+    const target = await harness.mount(mountProps);
+
+    const custom = target.querySelector('[data-salvage-dc-custom]');
+    assert.equal(custom.value, '14', 'the custom field starts at the persisted override');
+    custom.value = '';
+    custom.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    await flushRender();
+
+    const { dcOverride } = drafts.at(-1).updates.salvage;
+    assert.equal(dcOverride, null, 'a cleared override persists absence');
+    assert.notEqual(dcOverride, 0, 'and absence is not zero — a DC of 0 is a check nobody fails');
+    harness.remount();
+  });
+
   it('a persisted dcOverride matching a tier selects that tier, not Custom…', async () => {
     const target = await harness.mount(
       props({ component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 17 } } })

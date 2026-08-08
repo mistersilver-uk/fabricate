@@ -122,6 +122,20 @@ describe('Stepper unset-value state (issue 1050)', () => {
     assert.deepEqual(calls, [0], 'clamp(0 - 1) is 0, which is still a change from blank');
   });
 
+  it('keeps + effective on an unset field whose max is 0', async () => {
+    // The MIRROR of the case above, and it is load-bearing rather than symmetrical tidiness.
+    // "steps an unset field from its lower bound" claims BOTH adjuncts stay live while unset,
+    // but it sets `max: 20`, where the coerced `numericValue` of `0` is nowhere near the upper
+    // bound — `0 >= 20` is false with or without the `!isUnset &&` guard on `atMax`, so
+    // deleting that half of the guard survived the entire suite while deleting the `atMin` half
+    // was caught. `max: 0` is the shape that makes the upper guard decide the outcome, exactly
+    // as `min: 0` does for the lower one.
+    const { increment, calls } = await mountStepper({ allowUnset: true, value: null, max: 0 });
+    assert.ok(!increment.disabled, 'the adjunct is enabled, so it must not be a no-op');
+    increment.click();
+    assert.deepEqual(calls, [0], 'clamp(0 + 1) is 0, which is still a change from blank');
+  });
+
   it('is unchanged under the default allowUnset={false}, including for value={null}', async () => {
     const { input, calls } = await mountStepper({ value: null, min: 0 });
     assert.equal(input.value, '0', 'the value default moving from 0 to null changes nothing here');

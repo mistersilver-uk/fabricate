@@ -1652,11 +1652,23 @@
             {#if salvageDcShowCustomInput}
               <!-- `allowUnset`: a cleared field is not zero here, it is "inherit the
                    system salvage check DC" — the same `dcOverride: null` the preset
-                   select writes for its default option. -->
+                   select writes for its default option.
+
+                   `min={0}`: a salvage DC below zero is not a DC, and an unset field
+                   steps from `min ?? 0`, so without it one click of `−` on the blank
+                   field commits -1. The bare input this replaced had no `min` either,
+                   but it also had no live decrement button.
+
+                   `fill` needs a slot, and this one is supplied by the
+                   `[data-salvage-dc-override] .fab-stepper` cap in the global sheet. The
+                   field is a `.manager-field` (a `flex-direction: column` box) whose
+                   other child is a full-width preset `<select>`, so the cap sits on the
+                   stepper rather than on the field. -->
               <Stepper
                 value={salvageDraft.dcOverride}
                 allowUnset
                 step={1}
+                min={0}
                 fill
                 disabled={saving}
                 ariaLabel={text(

@@ -221,6 +221,36 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
   );
 });
 
+test('every inspected suite resolves at least one real component, so none passes vacuously', () => {
+  // The RATCHET on the guard above, and it is the missing half rather than a nicety. A suite
+  // whose declaration form `compiledPathsOf` cannot read contributes an EMPTY set: `named` is
+  // then empty, `required` is empty, and the suite reports clean while hanging on a missing
+  // component. That is not hypothetical — it is exactly how the `BARE_LOOP_COMPILE` defect
+  // survived, and disabling that branch today still leaves the suite above green.
+  //
+  // So: a suite that compiles something must resolve at least one path that is a real tracked
+  // `.svelte` file. Suites built on `createMountedComponentHarness` are exempt because its own
+  // `validateMountedComponentDependencies` throws in `before()` naming the missing module, which
+  // is a loud failure rather than a silent gap.
+  const unreadable = [];
+  for (const suitePath of repoPathsUnder('tests', '.test.js')) {
+    const suite = readRepoFile(suitePath);
+    if (!suite.includes('writeCompiledSvelte') && !suite.includes('compiledModules')) continue;
+    if (suite.includes('createMountedComponentHarness')) continue;
+
+    const compiled = new Set(compiledPathsOf(suite));
+    if (!componentPaths.some((path) => compiled.has(path))) unreadable.push(suitePath);
+  }
+
+  assert.deepEqual(
+    unreadable,
+    [],
+    'these suites compile components the parser cannot read, so the guard above holds over an '
+      + 'empty set for them and reports clean whatever they render:\n- '
+      + unreadable.join('\n- ')
+  );
+});
+
 test('the shared primitives are reachable from the manager root, so the guard has teeth', () => {
   // If this ever stops holding, the guard above is vacuous and the walk needs revisiting.
   const rootClosure = closures.get('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');

@@ -1208,10 +1208,19 @@
                a decrement control. `ariaLabel` carries the name. -->
           <div class="manager-field manager-task-dc-field">
             <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
+            <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps
+                 from `min ?? 0` — without it one click of `−` on the blank field commits
+                 -1. The bare input this replaced had no `min` either, but it also had no
+                 live decrement button.
+
+                 `fill` needs a slot to fill, and this card had none: the width comes from
+                 `.manager-task-dc-field`'s `max-width` in this component's `<style>`. See
+                 the note there for why dropping `fill` would not have been the fix. -->
             <Stepper
               value={dcOverrideValue}
               allowUnset
               step={1}
+              min={0}
               fill
               density="comfortable"
               placeholder={text(
@@ -2258,6 +2267,24 @@
     box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
   }
 
+  /* The DC override is a single field on an otherwise empty card, so nothing in the chain
+     above it ever gave it a width: `.manager-task-dc-card` and `.manager-task-dc-row` are
+     full-bleed and `.manager-field` is a `flex-direction: column` box that inherits its
+     parent's width. The filled stepper therefore resolved `width: 100%` against the whole
+     card — ~670px at `manager-gathering-task-editor-normal` and ~960px at `-stacked` — and
+     put the − and + most of a foot apart with the value floating between them.
+
+     A cap, rather than dropping `fill`. Dropping it fixes nothing here: an unfilled
+     `.fab-stepper` is a flex item with `width: auto`, and `align-items: stretch` widens it
+     to exactly the same box — measured at 600/600px — leaving a 48px input marooned in the
+     middle of a stretched border and the control 8px shorter than its siblings. 160px is
+     the width the `fill` variant was measured against (the pinned operand slot at
+     `styles/fabricate.css:2150`) and leaves a 106px typeable field. Taking a SIZE from the
+     layout context is permitted; restyling the primitive is not. */
+  .manager-task-dc-field {
+    max-width: 160px;
+  }
+
   .manager-task-nodes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -2283,6 +2310,23 @@
     display: flex;
     align-items: center;
     gap: var(--fab-space-2);
+  }
+
+  /* Size the unit `<select>` to its content instead of letting it take `width: 100%` from
+     the blanket `.fabricate-manager .manager-field select` rule.
+
+     Both flex items are `width: 100%` otherwise — the filled stepper by the `fill` variant
+     and the select by that blanket rule — so they split a `minmax(160px, 1fr)` track 50/50
+     and the typeable half falls to ~22-42px. That is under half the 48px an UNFILLED
+     stepper gives and about a third of what the bare input this replaced had: "1440" would
+     not fit in it. The stepper is the control being constrained by the wrong sibling, so
+     the sibling is what gets pinned; `fill` stays, and the stepper takes the remaining
+     track. Scoped (0,3,1) beats the blanket rule's (0,2,1), so this is not a source-order
+     result. The chance row is deliberately not included — its sibling is a `%` caption that
+     already sizes to content. */
+  .manager-task-node-interval-row select {
+    flex: 0 0 auto;
+    width: auto;
   }
 
   /* Depleted-behavior authoring: a sub-block of the node card. */

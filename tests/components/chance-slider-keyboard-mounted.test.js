@@ -18,6 +18,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
+import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { pressArrowKey } from '../helpers/numericKeyboardStep.js';
 
@@ -52,9 +53,13 @@ describe('ChanceSlider keyboard stepping (issue 1050, R1)', () => {
     const { calls, number } = await mountSlider({ value: 40, min: 0, max: 100, step: 1 });
     pressArrowKey(number, 'up');
     assert.deepEqual(calls, [41], 'ArrowUp commits the stepped value through the clamp');
+    // Read the field AFTER the step that moved it away from its mounted value. Asserting
+    // '40' only at the end of the round trip cannot fail: the field starts at 40, so that
+    // assertion holds whether the handler wrote anything back or not.
+    assert.equal(number.value, '41', 'and the field shows the stepped value, not the old one');
     pressArrowKey(number, 'down');
     assert.deepEqual(calls, [41, 40], 'and ArrowDown steps back');
-    assert.equal(number.value, '40', 'the displayed value follows the commit');
+    assert.equal(number.value, '40', 'with the field following the second commit too');
   });
 
   it('clamps a keyboard step at the bounds rather than running past them', async () => {
@@ -74,7 +79,19 @@ describe('ChanceSlider keyboard stepping (issue 1050, R1)', () => {
   it('keeps the range track as the pointer affordance the suppression rule relies on', async () => {
     // R1's whole justification. If the range half ever went away, the number field would be a bare
     // input with a suppressed spinner and no pointer path at all — R2's situation, but broken.
-    const { range } = await mountSlider({ value: 40 });
-    assert.equal(range.type, 'range', 'the sibling track is still a real range input');
+    //
+    // This used to assert `range.type === 'range'`, which the `input[type="range"]` query that
+    // FOUND the element already entails — it could not fail. What R1 actually rests on is not
+    // that a range element exists but that it drives the SAME value: one number, two
+    // affordances. So the track is dragged and the number half is read back, which is the part
+    // the query cannot imply and which fails if the two halves are ever decoupled.
+    const { calls, number, range } = await mountSlider({ value: 40, min: 0, max: 100, step: 1 });
+    range.value = '73';
+    range.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    flushSync();
+    await tick();
+    flushSync();
+    assert.deepEqual(calls, [73], 'dragging the track commits through the shared clamp');
+    assert.equal(number.value, '73', 'and the number half re-renders to the value the track set');
   });
 });

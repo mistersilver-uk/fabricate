@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adjustComponentEssenceQuantity,
   buildComponentEditorState,
   buildComponentEditorUpdates,
   clampComponentEssenceQuantity,
@@ -242,12 +241,6 @@ test('item-card essences round-trip through open then save without loss', () => 
     'ess-fire': 4,
     'ess-water': 2
   });
-});
-
-test('adjustComponentEssenceQuantity increments and clamps at zero', () => {
-  assert.equal(adjustComponentEssenceQuantity(2, 1), 3);
-  assert.equal(adjustComponentEssenceQuantity(2, -1), 1);
-  assert.equal(adjustComponentEssenceQuantity(0, -1), 0);
 });
 
 test('clampComponentEssenceQuantity coerces invalid values to non-negative integers', () => {
