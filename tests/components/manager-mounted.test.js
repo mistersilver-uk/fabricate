@@ -587,6 +587,13 @@ function compileManagerRoot() {
     // Folder-aware import mapping (issue 771): the modal's match-by-name pre-fill leaf.
     // Omitting it HANGS the mounted manager suite (the modal is always in the tree).
     'src/utils/matchFolderVocabulary.js',
+    // The `@craftingmod` ownership module (issues 770, 1055). The root, the Checks
+    // card and the recipe Overview tab all import it — the root to pick the check its
+    // resolution mode actually rolls, the two cards to resolve what an ABSENT
+    // `recipeModifierAuthority` means. This list has NO dependency validator, so
+    // omitting it does not fail the suite: every mounted manager test is reported as
+    // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
+    'src/systems/craftingModifierResolver.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -4366,49 +4373,196 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  // The check-modifier policy group is rendered through the shared RadioCardGroup
-  // primitive (issue 855), and its two hook attributes are a hand-maintained mirror:
-  // `scripts/foundry-test-run.mjs` scrolls to `[data-crafting-modifier-policy]` for the
-  // smoke frame and `scripts/lib/viewLabCases.js` clicks
-  // `[data-crafting-modifier-policy-option="playerPicks"] input`. Neither producer runs
-  // in `npm test`, so re-plumbing the group through a different primitive could drop
-  // either attribute with no unit failure at all. Pin both here.
-  it('checks view: the modifier policy group keeps its capture-harness hooks and shows an icon per policy (issue 855)', () => {
+  // The check-modifier RULE and AUTHORITY groups are both rendered through the shared
+  // RadioCardGroup primitive (issues 855, 1055), and their hook attributes are a
+  // hand-maintained mirror: `scripts/foundry-test-run.mjs` scrolls to
+  // `[data-crafting-modifier-policy]` for the smoke frame and `scripts/lib/viewLabCases.js`
+  // clicks `[data-crafting-modifier-policy-option="playerPicks"] input` /
+  // `[data-crafting-modifier-authority-option="…"] input`. Neither producer runs in
+  // `npm test`, so re-plumbing either group through a different primitive could drop an
+  // attribute with no unit failure at all. Pin both groups here — the authority axis is
+  // new, and it earns the same pinning for the same reason.
+  //
+  // `byRecipe` is deliberately absent from the rule list: it never named a rule, it named
+  // WHO decides, and that is the second group below.
+  it('checks view: the modifier rule and authority groups keep their capture-harness hooks and show an icon per option (issues 855, 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'highest',
+      craftingRecipeModifierAuthority: 'setOnly',
     });
-    const group = target.querySelector(
-      '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
-    );
-    assert.ok(group, 'the policy group still resolves by [data-crafting-modifier-policy]');
-    const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
-    assert.deepEqual(
-      options.map((option) => option.getAttribute('data-crafting-modifier-policy-option')),
-      ['addAll', 'highest', 'byRecipe', 'playerPicks'],
-      'all four policies still carry the per-option hook, in authoring order'
-    );
-    for (const option of options) {
-      const value = option.getAttribute('data-crafting-modifier-policy-option');
-      assert.ok(
-        Boolean(option.querySelector('[data-tool-choice-icon] i')),
-        `the ${value} card renders an icon tile`
+    for (const { attr, optionAttr, values } of [
+      {
+        attr: 'data-crafting-modifier-policy',
+        optionAttr: 'data-crafting-modifier-policy-option',
+        values: ['addAll', 'highest', 'playerPicks'],
+      },
+      {
+        attr: 'data-crafting-modifier-authority',
+        optionAttr: 'data-crafting-modifier-authority-option',
+        values: ['none', 'setOnly', 'setAndRule'],
+      },
+    ]) {
+      const group = target.querySelector(`[data-crafting-modifier-catalogue] [${attr}]`);
+      assert.ok(Boolean(group), `the group still resolves by [${attr}]`);
+      const options = [...group.querySelectorAll(`[${optionAttr}]`)];
+      assert.deepEqual(
+        options.map((option) => option.getAttribute(optionAttr)),
+        values,
+        `${attr}: every option carries the per-option hook, in authoring order`
       );
-      assert.ok(
-        Boolean(option.querySelector('input[type="radio"]')),
-        `the ${value} card is still driven by a real radio input`
-      );
+      for (const option of options) {
+        const value = option.getAttribute(optionAttr);
+        assert.ok(
+          Boolean(option.querySelector('[data-tool-choice-icon] i')),
+          `the ${value} card renders an icon tile`
+        );
+        assert.ok(
+          Boolean(option.querySelector('input[type="radio"]')),
+          `the ${value} card is still driven by a real radio input`
+        );
+      }
     }
+    assert.equal(
+      target.querySelector('[data-crafting-modifier-authority-option="setOnly"] input').checked,
+      true,
+      'the passed authority level is pinned on the radio-cards'
+    );
   });
 
-  it('checks view: the modifier catalogue card is hidden when the crafting check has no formula (issue 770)', () => {
+  // Retargeted from "the card is hidden when the check has no formula" (issue 770). The
+  // card is now rendered in that state ON PURPOSE (issue 1055 criterion 10): hiding it
+  // reported nothing about a catalogue that reaches no roll, which is the defect the
+  // card must state rather than conceal. It stamps WHICH of the three causes applies.
+  it('checks view: the modifier catalogue card renders an inert notice naming the cause when the check has no formula (issue 1055)', () => {
     mountChecksView({ resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } });
+    const card = target.querySelector('[data-crafting-modifier-catalogue]');
+    assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
+    const notice = card.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'the inert notice renders');
     assert.equal(
-      target.querySelector('[data-crafting-modifier-catalogue]'),
-      null,
-      'a formula-less (unusable) check offers no modifier catalogue'
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noFormula',
+      'and names WHICH cause applies — one boolean cannot carry three remedies'
+    );
+  });
+
+  it('checks view: the inert cause discriminates no-check, no-formula and no-placeholder (issue 1055)', () => {
+    for (const { props, cause } of [
+      // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
+      // rollFormula ternary had no case for it and reported the simple slot's formula.
+      {
+        props: {
+          resolutionMode: 'alchemy',
+          alchemyCheckMode: 'none',
+          craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        },
+        cause: 'noCheck',
+      },
+      {
+        props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
+        cause: 'noFormula',
+      },
+      {
+        props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '1d20 + 4' } },
+        cause: 'noPlaceholder',
+      },
+    ]) {
+      mountChecksView(props);
+      const notice = target.querySelector('[data-crafting-modifier-inert]');
+      assert.ok(Boolean(notice), `${cause}: an inert notice renders`);
+      assert.equal(notice.getAttribute('data-crafting-modifier-inert'), cause);
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+    // …and a live `@craftingmod` formula shows no notice at all.
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+    });
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'a formula that spends @craftingmod is not inert'
+    );
+  });
+
+  it('checks view: the downgrade disclosure states the override count and the current level’s consequence (issue 1055)', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingRecipeModifierAuthority: 'none',
+      craftingModifierOverrideCount: 3,
+    });
+    const disclosure = target.querySelector('[data-crafting-modifier-authority-impact]');
+    assert.ok(Boolean(disclosure), 'the disclosure renders when overrides exist');
+    assert.equal(disclosure.getAttribute('data-crafting-modifier-authority-impact'), '3');
+    assert.ok(
+      disclosure.textContent.includes('3'),
+      'the count is stated BEFORE the click, not after the fact'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    // Zero overrides has nothing to disclose.
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingModifierOverrideCount: 0,
+    });
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-authority-impact]'),
+      'no overrides → no disclosure'
+    );
+  });
+
+  it('checks view: an unstamped system shows the level the ENGINE would apply, not a blank group (issue 1055)', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      // No `craftingRecipeModifierAuthority` at all — the unstamped state.
+    });
+    const checked = [
+      ...target.querySelectorAll('[data-crafting-modifier-authority-option]'),
+    ].filter((option) => option.querySelector('input').checked);
+    assert.equal(checked.length, 1, 'exactly one level is shown as selected');
+    assert.equal(
+      checked[0].getAttribute('data-crafting-modifier-authority-option'),
+      'setAndRule',
+      'absence resolves as setAndRule — the pre-1055 behaviour the engine still applies'
+    );
+  });
+
+  it('checks view: the default-set intro changes when recipes cannot narrow the set (issue 1055)', () => {
+    const introText = (authority) => {
+      mountChecksView({
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        craftingCheckModifiers: [
+          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+        ],
+        craftingRecipeModifierAuthority: authority,
+      });
+      const heading = target.querySelector('#manager-crafting-modifier-defaults-label');
+      const text = heading.nextElementSibling.textContent;
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      return text;
+    };
+    assert.ok(
+      introText('setOnly').includes('Overview tab'),
+      'a delegating system tells the GM where a recipe narrows the set'
+    );
+    assert.ok(
+      !introText('none').includes('Overview tab'),
+      'at `none` no recipe can narrow it, so the sentence must not promise a control that is gone'
     );
   });
 
