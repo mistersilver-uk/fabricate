@@ -9,7 +9,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -37,6 +37,13 @@ import { runFixturedScreenshotSection } from '../scripts/lib/smokeSectionFixture
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', 'utf8');
+// The two things that author click targets against the rendered manager: the Foundry smoke
+// harness and the View Lab case registry. A selector shape that is unclickable is unclickable
+// in both, so guards about selector shape iterate this list rather than naming one producer.
+const CAPTURE_PRODUCERS = [
+  { path: 'scripts/foundry-test-run.mjs', source: HARNESS },
+  { path: 'scripts/lib/viewLabCases.js', source: readFileSync('scripts/lib/viewLabCases.js', 'utf8') },
+];
 const KNOWLEDGE_LABELS = [
   'manager-knowledge-owned-copies',
   'manager-knowledge-empty-tab',
@@ -712,6 +719,30 @@ test('the recipe bulk-edit frames pin their rows by NAME, not by position', () =
   assert.match(strategy, /throw new Error\(`Recipe browser rendered no row named/);
 });
 
+// Every `<SegmentedControl … />` call site's `optionDataAttr`, read out of the components
+// themselves. The ban below is keyed on THIS set — on the component that traps the click — and
+// deliberately not on how an attribute happens to be spelled. A name-shaped key (`*-option`)
+// is wrong in both directions: it misses the real `SegmentedControl` axes that are not spelled
+// that way (`data-trigger-outcome`, `data-trigger-tier-step-mode`, `data-recipe-tag-match`),
+// and it over-bans `RadioCardGroup`, whose radio is a visible 16x16 in-flow control
+// (`.manager-resolution-option input[type='radio']` in `styles/fabricate.css`) that a producer
+// may click through perfectly safely.
+const SVELTE_UI_ROOT = join('src', 'ui', 'svelte');
+
+function segmentedControlCallSites() {
+  const usages = [];
+  let occurrences = 0;
+  for (const entry of readdirSync(SVELTE_UI_ROOT, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.svelte')) continue;
+    const source = readFileSync(join(entry.parentPath, entry.name), 'utf8');
+    occurrences += (source.match(/<SegmentedControl\b/g) ?? []).length;
+    for (const usage of source.match(/<SegmentedControl\b[\s\S]*?\/>/g) ?? []) {
+      usages.push(usage);
+    }
+  }
+  return { usages, occurrences };
+}
+
 // A real smoke failure, not a hypothetical: the two recipe bulk-edit frames staged their
 // segmented axes with `[data-recipe-bulk-lock-option="lock"] input`, and both steps timed out
 // after 30s with `<span class="manager-segment-label">Lock</span> intercepts pointer events`.
@@ -725,10 +756,16 @@ test('the recipe bulk-edit frames pin their rows by NAME, not by position', () =
 // tri-state tag chips and a number field), and the harness's only other `-option=` selector
 // merely counts `.is-active`. So no smoke step had ever successfully clicked a segment.
 //
+// The View Lab registry never carried this defect. Its two genuine `SegmentedControl` steps —
+// `[data-recipe-bulk-status-option="enable"]` and `[data-recipe-bulk-lock-option="lock"]` in
+// `scripts/lib/viewLabCases.js` — were authored against the label from the start, which is
+// correct. The ban is prophylactic for BOTH producers: it is the shape that is unclickable, so
+// nothing about it is specific to the harness that happened to hit it first.
+//
 // This is a source-text guard because `npm test` cannot run the harness — it top-level-imports
 // Playwright and launches Docker — and `scripts/foundry-test-run.mjs` is outside the ESLint and
 // Prettier globs too, so nothing else here would catch the regression before a 13-minute run.
-test('a segmented-control smoke step clicks the LABEL, never the hidden radio inside it', () => {
+test('no capture producer clicks the hidden radio inside a SegmentedControl segment', () => {
   const helper = HARNESS.match(/async function clickSegment\([\s\S]*?\n\}\n/)?.[0];
   assert.ok(helper, 'the segment-click helper was not found in the harness');
   assert.match(
@@ -744,15 +781,44 @@ test('a segmented-control smoke step clicks the LABEL, never the hidden radio in
   assert.match(HARNESS, /clickSegment\(bulkPanel, 'data-recipe-bulk-lock-option', 'lock'\)/);
   assert.match(HARNESS, /clickSegment\(bulkPanel, 'data-recipe-bulk-status-option', 'enable'\)/);
 
-  // And the shape itself is banned harness-wide. `input:checked` is deliberately still legal:
-  // the unstaged frame asserts the sentinel radio is checked with `waitFor({state:'attached'})`,
-  // which reads the a11y tree and never hit-tests, so it needs the input and cannot intercept.
-  const offenders = HARNESS.match(/-option="[^"]*"\] input['"`]/g) ?? [];
-  assert.deepEqual(
-    offenders,
-    [],
-    'a `-option="…"] input` click target is the segmented-control interception trap',
+  const { usages, occurrences } = segmentedControlCallSites();
+  const attributes = [
+    ...new Set(usages.map((usage) => usage.match(/optionDataAttr="([^"]+)"/)?.[1]).filter(Boolean)),
+  ];
+
+  // A derived ban whose input set silently empties passes forever while checking nothing, so
+  // the derivation states its own preconditions rather than degrading to a no-op (issue #948).
+  // Every `<SegmentedControl` must have parsed into a whole element — an unterminated one would
+  // let `[\s\S]*?\/>` run past its call site and read a LATER component's `optionDataAttr`.
+  assert.equal(
+    occurrences,
+    usages.length,
+    'every <SegmentedControl call site parsed as one self-closing element',
   );
+  assert.ok(attributes.length > 0, 'the SegmentedControl optionDataAttr scan derived nothing to ban');
+  for (const attribute of attributes) {
+    assert.match(attribute, /^[\w-]+$/, `${attribute} is a plain name safe to key a selector ban on`);
+  }
+  // Non-empty is not the same as reaching the call sites that matter: the two axes the harness
+  // clicks by name above must be IN the derived set, which is also what proves those two are
+  // segmented controls rather than some other primitive that happens to take `optionDataAttr`.
+  for (const clicked of ['data-recipe-bulk-status-option', 'data-recipe-bulk-lock-option']) {
+    assert.ok(attributes.includes(clicked), `${clicked} is a derived SegmentedControl axis`);
+  }
+
+  // `input:checked` is deliberately still legal: the unstaged recipe frame asserts the sentinel
+  // radio is checked with `waitFor({ state: 'attached' })`, which reads the accessibility tree
+  // and never hit-tests, so it needs the input and cannot be intercepted by the label.
+  for (const producer of CAPTURE_PRODUCERS) {
+    for (const attribute of attributes) {
+      const trap = new RegExp(`\\[${attribute}="[^"]*"\\] input(?!:checked)`, 'g');
+      assert.deepEqual(
+        producer.source.match(trap) ?? [],
+        [],
+        `${producer.path}: \`[${attribute}="…"] input\` is the segmented-control interception trap`,
+      );
+    }
+  }
 });
 
 test('each issue-772 bulk-edit frame stages the axes only IT can evidence', () => {
