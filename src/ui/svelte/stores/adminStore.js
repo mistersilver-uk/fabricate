@@ -2467,12 +2467,12 @@ function _descriptionTextCandidate(value, seen = new Set()) {
  * formula never spends `@craftingmod`". The order matters: a mode with no check slot has
  * no formula to inspect, and an unauthored formula cannot reference the token.
  * @param {ReturnType<typeof resolveActiveCraftingCheckFormula>} formula
- * @returns {'noCheck'|'noFormula'|'noModifierToken'|null}
+ * @returns {'noCheck'|'noFormula'|'noPlaceholder'|null}
  */
 function _craftingModifierInertCause(formula) {
   if (formula.slot === null) return 'noCheck';
   if (!formula.checkUsable) return 'noFormula';
-  if (!formula.referencesModifier) return 'noModifierToken';
+  if (!formula.referencesModifier) return 'noPlaceholder';
   return null;
 }
 
@@ -2505,11 +2505,6 @@ function _buildRecipeModifierAuthorityView(system, systemRecipes) {
   );
   return {
     recipeModifierAuthority: system?.craftingCheck?.recipeModifierAuthority,
-    // True only when the check this system's resolution mode ACTUALLY rolls spends
-    // `@craftingmod`; everything the catalogue configures is silently inert otherwise.
-    // Derived FROM the cause rather than beside it, so the boolean and the explanation
-    // cannot contradict each other — the card renders one or the other, never both.
-    modifierFormulaActive: inertCause === null,
     modifierFormulaInertCause: inertCause,
     // Recipes silenced by dropping to `none` (any override at all)...
     recipeModifierOverrideCount: overrides.length,
