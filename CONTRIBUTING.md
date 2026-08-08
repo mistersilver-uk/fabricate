@@ -599,11 +599,12 @@ A `window` case's shortfall is accounted for by a class-level entry in the known
 As of this writing the registry holds 181 cases: 138 `exact`, 4 `window`, 39 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
-By default a PR touching the case registry, `labActors.js`, or any other file the lab depends on selects every publishable case, because a shared fixture can alter any frame at once.
-Two inputs narrow that default.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects every publishable case, because a shared fixture can alter any frame at once.
+Three inputs narrow that default.
 A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.
 A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
-Both narrowings locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers, and every location the content recurs at must agree on the same cases before the narrowing is used.
+A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.
+The two case-registry and actor-fixture narrowings locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers, and every location the content recurs at must agree on the same cases before the narrowing is used.
 A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the whole-corpus default.
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored unambiguously.
 
