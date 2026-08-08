@@ -17,19 +17,11 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 
-let idCounter = 0;
-globalThis.foundry = {
-  utils: {
-    randomID: () => `id-${++idCounter}`,
-    getProperty: (object, path) =>
-      String(path)
-        .split('.')
-        .reduce((value, key) => (value == null ? undefined : value[key]), object),
-  },
-};
-globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
-globalThis.fromUuid = async () => null;
+// `game` is installed per test by `installSettings` below, so only the utils half is
+// shared; it must be in place before the dynamic import that follows.
+installFoundryUtilsEnv();
 globalThis.fromUuidSync = () => null;
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');

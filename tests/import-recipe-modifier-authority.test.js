@@ -9,20 +9,12 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { installFoundryUtilsEnv } from './helpers/foundryEnv.js';
 
-let idCounter = 0;
-globalThis.foundry = {
-  utils: {
-    randomID: () => `id-${++idCounter}`,
-    getProperty: (object, path) =>
-      String(path)
-        .split('.')
-        .reduce((value, key) => (value == null ? undefined : value[key]), object),
-  },
-};
+// The importer needs its own `game` (a pack list and a GM), so only the utils half is
+// shared; both must be in place before the dynamic imports that follow.
+installFoundryUtilsEnv();
 globalThis.game = { packs: [], fabricate: null, user: { isGM: true } };
-globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
-globalThis.fromUuid = async () => null;
 
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
 const { buildExportPayload, prepareForImport, validateImportData } = await import(
