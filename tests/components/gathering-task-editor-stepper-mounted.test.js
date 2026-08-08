@@ -23,8 +23,10 @@ import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const EDITOR_PATH = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
 
 const harness = createMountedComponentHarness({
   repoRoot,
@@ -43,9 +45,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+    EDITOR_PATH,
   ],
-  componentPath: 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+  componentPath: EDITOR_PATH,
 });
 
 before(() => harness.setup());
@@ -248,5 +250,35 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     await sync();
     assert.equal(stepNativeNumberInput(dc, 'down'), '14', 'ArrowDown steps it back');
     assert.equal(lastWrite(updates, (patch) => patch.dcOverride), 14, 'and commits that too');
+  });
+
+  it('lets the respawn unit select size to its content, on specificity not source order', () => {
+    // The interval row is `display: flex` with two `width: 100%` children — the filled stepper
+    // and the unit `<select>`, which takes its width from the blanket
+    // `.fabricate-manager .manager-field select` rule. They split the track 50/50, leaving the
+    // typeable half at ~22-42px: under half of what an unfilled stepper offers, and not enough
+    // for "1440". The remedy pins the SIBLING, so the stepper keeps `fill` and takes the rest.
+    //
+    // The attribute qualifier in that rule is what makes it work, and it is easy to delete as
+    // redundant because `select` alone reads like it says the same thing. It does not. Svelte 5
+    // emits its scoping class as `:where(.svelte-hash)` on every compound after the first, and
+    // `:where()` contributes ZERO specificity — so the unqualified form compiles to (0,2,1),
+    // exactly TIES the blanket rule, and resolves on the load order of two separately delivered
+    // stylesheets. Asserted on the compiled CSS rather than the source, because the source is
+    // not where the tie happens.
+    const compiled = scopedComponentCss(resolve(repoRoot, EDITOR_PATH)).css;
+    const rule = /\.manager-task-node-interval-row[^{]*select[^{]*\{[^}]*\}/.exec(
+      compiled.replace(/\/\*[\s\S]*?\*\//g, '')
+    );
+    assert.ok(Boolean(rule), 'the interval-row select rule survives compilation');
+    const selector = rule[0].split('{')[0];
+    // `:where()` is free, so it is excluded from the count on purpose.
+    const classColumn = selector.replace(/:where\([^)]*\)/g, '').match(/\.[\w-]+|\[[^\]]+\]/g);
+    assert.ok(
+      classColumn.length > 2,
+      `${selector.trim()} must out-specify \`.fabricate-manager .manager-field select\` (0,2,1), `
+        + `but its class column is ${classColumn.length}`
+    );
+    assert.match(rule[0], /width: auto/, 'and it is the width that is being released');
   });
 });

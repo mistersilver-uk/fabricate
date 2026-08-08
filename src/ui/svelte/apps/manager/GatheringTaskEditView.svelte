@@ -2321,10 +2321,16 @@
      stepper gives and about a third of what the bare input this replaced had: "1440" would
      not fit in it. The stepper is the control being constrained by the wrong sibling, so
      the sibling is what gets pinned; `fill` stays, and the stepper takes the remaining
-     track. Scoped (0,3,1) beats the blanket rule's (0,2,1), so this is not a source-order
-     result. The chance row is deliberately not included — its sibling is a `%` caption that
-     already sizes to content. */
-  .manager-task-node-interval-row select {
+     track. The chance row is deliberately not included — its sibling is a `%` caption that
+     already sizes to content.
+
+     The `[data-…-unit]` qualifier is LOAD-BEARING, not a second way of saying `select`.
+     Svelte 5 emits its scoping class as `:where(.svelte-hash)` on every compound after the
+     first, and `:where()` contributes ZERO specificity — so a plain
+     `.manager-task-node-interval-row select` compiles to (0,2,1) and merely TIES the blanket
+     rule, resolving on the source order of two separately loaded stylesheets. The attribute
+     lifts the class column to 3 and makes it win outright. */
+  .manager-task-node-interval-row select[data-gathering-task-node-interval-unit] {
     flex: 0 0 auto;
     width: auto;
   }
