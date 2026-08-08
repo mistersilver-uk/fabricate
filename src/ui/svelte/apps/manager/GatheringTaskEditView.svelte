@@ -1035,7 +1035,13 @@
         </div>
 
         <div class="manager-task-stamina-row">
-          <label class="manager-field manager-task-stamina-cost-field">
+          <!-- `<div>`, not `<label>`: an implicit label binds to its FIRST labelable
+               descendant, and a `Stepper`'s first labelable descendant is the `−` button —
+               so clicking the visible caption DECREMENTED the value instead of focusing the
+               field. Every Stepper below carries its own `ariaLabel`, so nothing is lost by
+               dropping the implicit association, and `tests/components/stepper-call-site-contract.test.js`
+               fails any `<label>` in `src/ui/svelte` that wraps a Stepper this way. -->
+          <div class="manager-field manager-task-stamina-cost-field">
             <span
               >{text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')}</span
             >
@@ -1057,7 +1063,7 @@
               inputProps={{ 'data-gathering-task-stamina-cost': '' }}
               onChange={(next) => updateStaminaCost(next)}
             />
-          </label>
+          </div>
 
           <div class="manager-field manager-task-stamina-modifiers">
             <span
@@ -1197,7 +1203,10 @@
         </div>
 
         <div class="manager-task-dc-row">
-          <label class="manager-field manager-task-dc-field">
+          <!-- `<div>`, not `<label>` — see the stamina cost field above: a Stepper's first
+               labelable descendant is its `−` button, so a wrapping label made the caption
+               a decrement control. `ariaLabel` carries the name. -->
+          <div class="manager-field manager-task-dc-field">
             <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
             <Stepper
               value={dcOverrideValue}
@@ -1219,7 +1228,7 @@
               inputProps={{ 'data-gathering-task-dc-override': '' }}
               onChange={(next) => updateDcOverride(next)}
             />
-          </label>
+          </div>
         </div>
       </section>
     {/if}
@@ -1239,7 +1248,8 @@
         </div>
 
         <div class="manager-task-nodes-grid">
-          <label class="manager-field">
+          <!-- `<div>`, not `<label>` — see the stamina cost field above. -->
+          <div class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
             <Stepper
               value={nodes.max > 0 ? nodes.max : null}
@@ -1259,7 +1269,7 @@
               inputProps={{ 'data-gathering-task-node-count': '' }}
               onChange={(next) => setNodeCount(next)}
             />
-          </label>
+          </div>
 
           <label class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
@@ -1303,7 +1313,10 @@
           </label>
 
           {#if respawnIsOverTime}
-            <label class="manager-field manager-task-node-interval">
+            <!-- `<div>`, not `<label>` — see the stamina cost field above. The Stepper is
+                 the row's first labelable descendant, ahead of the unit `<select>`, so the
+                 caption bound to its `−` button rather than to either control. -->
+            <div class="manager-field manager-task-node-interval">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
               <div class="manager-task-node-interval-row">
                 <Stepper
@@ -1341,7 +1354,7 @@
                   >
                 </select>
               </div>
-            </label>
+            </div>
 
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnGainMode', 'Each interval')}</span
@@ -1368,7 +1381,8 @@
           {/if}
 
           {#if respawnIsChance}
-            <label class="manager-field">
+            <!-- `<div>`, not `<label>` — see the stamina cost field above. -->
+            <div class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
               <div class="manager-task-node-chance-row">
                 <Stepper
@@ -1389,7 +1403,7 @@
                 />
                 <span class="manager-muted">%</span>
               </div>
-            </label>
+            </div>
           {/if}
 
           {#if respawnIsExpression}
