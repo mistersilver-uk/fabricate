@@ -1,13 +1,36 @@
 /**
- * The shared `DialogV2` / `game.i18n` stubs both roll-prompt suites drive
- * (`tests/roll-prompt-options.test.js` and `tests/roll-prompt-bulk.test.js`).
+ * The shared `DialogV2` / `game.i18n` stubs the roll-prompt suites drive
+ * (`tests/roll-prompt-options.test.js` and `tests/roll-prompt-bulk.test.js`), plus the
+ * whole interactive ROLL environment the engine suites drive
+ * (`tests/crafting-engine-modifier-choice.test.js`).
  *
  * Extracted rather than copied: SonarCloud counts `tests/**` for duplication, and
  * `stubDialogCapture` is the exact shape of near-identical block the new-code
  * duplication gate fails on. `promptCheckRoll` and `promptBulkCheckRoll` share
  * `renderDieRow`, `renderBonusInput`, `renderRollModePicker`, `readSharedRollChoice`
  * and `buildRollButtons`, so they also share one test harness by right.
+ *
+ * {@link stubInteractiveRollEnvironment} lives HERE for the same reason and is
+ * deliberately COMPOSED from the two dialog stubs above rather than restating them
+ * (issue 1055): its `DialogV2.wait` half was a near-verbatim second copy of
+ * `stubDialogCapture`, and re-emitting those lines in a new file would count as new
+ * duplicated code against the very gate this module exists to satisfy. Only the `Roll`
+ * recorder and `foundry.utils.getProperty` are new here.
  */
+
+/**
+ * A dependency-free `foundry.utils.getProperty`: the engine's roll runners walk
+ * dotted paths through it, and it is the one Foundry util the interactive path needs.
+ * @param {object|null|undefined} object
+ * @param {string} path
+ * @returns {*}
+ */
+function getProperty(object, path) {
+  if (!object || !path) return undefined;
+  return String(path)
+    .split('.')
+    .reduce((value, key) => (value == null ? undefined : value[key]), object);
+}
 
 /**
  * Stub `foundry.applications.api.DialogV2.wait`: capture the rendered content and
@@ -100,5 +123,67 @@ export function stubI18n(table, { rollMode } = {}) {
   return () => {
     if (original === undefined) delete globalThis.game;
     else globalThis.game = original;
+  };
+}
+
+/**
+ * Install the interactive roll environment an engine check runner needs: a `Roll` that
+ * RECORDS every rolled formula, and a `DialogV2.wait` that either answers with
+ * `pickedId` or dismisses.
+ *
+ * The rolled formula string is the observable these engine tests assert on, because it
+ * is the only place the whole chain — authority resolution, eligible-set resolution,
+ * scalar reduction (or deferred interactive choice) and substitution — becomes visible
+ * as one value. A resolver-level assertion cannot see a runner that never threads the
+ * context at all.
+ *
+ * @param {object} [options]
+ * @param {string|null} [options.pickedId] The value the prompt's `craftingModifier`
+ *   radio reports. An id the descriptor does not offer resolves to 0 in production
+ *   (`modifierChoiceValue`), which is what makes "a descriptor was built at all"
+ *   observable in the rolled string.
+ * @param {boolean} [options.dismiss] Resolve `wait` as a DISMISSAL (`null`, the real
+ *   `rejectClose: false` shape) instead of confirming.
+ * @returns {{rolled: string[], dialog: object, restore: () => void}}
+ */
+export function stubInteractiveRollEnvironment({ pickedId = null, dismiss = false } = {}) {
+  const rolled = [];
+  const previousRoll = globalThis.Roll;
+  class RollStub {
+    constructor(formula) {
+      this.formula = formula;
+    }
+    async evaluate() {
+      rolled.push(this.formula);
+      return { total: 12, dice: [] };
+    }
+  }
+  RollStub.replaceFormulaData = (expression, data = {}) =>
+    String(expression).replaceAll(/@([\w.]+)/g, (_match, path) => {
+      const value = getProperty(data, path);
+      return value === undefined || value === null ? `@${path}` : String(value);
+    });
+  RollStub.validate = () => true;
+  globalThis.Roll = RollStub;
+
+  // Both dialog stubs REPLACE `globalThis.foundry` wholesale and restore the original,
+  // so the utils half is attached to whichever object they installed rather than being
+  // built alongside a third copy of the DialogV2 stub.
+  const dialog = dismiss
+    ? stubDialogDismissal()
+    : stubDialogCapture({
+        situationalBonus: { value: '' },
+        rollMode: { value: 'publicroll' },
+        craftingModifier: { value: pickedId },
+      });
+  globalThis.foundry.utils = { getProperty };
+
+  return {
+    rolled,
+    dialog,
+    restore() {
+      globalThis.Roll = previousRoll;
+      dialog.restore();
+    },
   };
 }
