@@ -314,17 +314,31 @@
               value={tool?.breakage?.formula || ''}
               oninput={(event) => patchBreakage({ formula: event.currentTarget.value })}
             /></label
-          ><label class="manager-recipe-field"
-            ><span class="manager-recipe-micro-label"
+          ><!-- `<div>`, not `<label>`: an implicit label binds to its FIRST labelable
+               descendant, and a Stepper's is the `−` button, so clicking "Break below"
+               would decrement the threshold. The name comes from `ariaLabel`. The old
+               `manager-recipe-name-input` class is DROPPED rather than pushed through
+               `inputProps` — it is the bare-field box treatment, and the stepper brings
+               its own. -->
+          <div class="manager-recipe-field">
+            <span class="manager-recipe-micro-label"
               >{text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}</span
-            ><input
-              class="manager-recipe-name-input"
-              data-tool-breakage-threshold
-              type="number"
+            >
+            <Stepper
               value={tool?.breakage?.threshold ?? 0}
-              oninput={(event) => patchBreakage({ threshold: Number(event.currentTarget.value) })}
-            /></label
-          >
+              step={1}
+              fill
+              ariaLabel={text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}
+              decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                label: text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below'),
+              })}
+              incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                label: text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below'),
+              })}
+              inputProps={{ 'data-tool-breakage-threshold': '' }}
+              onChange={(threshold) => patchBreakage({ threshold })}
+            />
+          </div>
         </div>
       {/if}
     {:else}

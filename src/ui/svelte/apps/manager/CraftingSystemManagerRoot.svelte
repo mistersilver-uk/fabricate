@@ -8246,54 +8246,83 @@
                                 </button>
                               </header>
                               <div class="manager-character-modifier-row-bounds">
-                                <label class="manager-field">
+                                <!-- `<div>`, not `<label>`: an implicit label binds to its FIRST
+                                     labelable descendant, which for a Stepper is the `−` button —
+                                     clicking the visible caption would decrement the bound rather
+                                     than focus the field. The accessible name comes from the
+                                     Stepper's own `ariaLabel` instead. -->
+                                <div class="manager-field">
                                   <span
                                     >{text(
                                       'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
                                       'Min'
                                     )}</span
                                   >
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={ref.min ?? ''}
-                                    oninput={(event) =>
+                                  <Stepper
+                                    value={ref.min}
+                                    allowUnset
+                                    step={1}
+                                    fill
+                                    ariaLabel={text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                      'Min'
+                                    )}
+                                    decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                                      label: text(
+                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                        'Min'
+                                      ),
+                                    })}
+                                    incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                                      label: text(
+                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                        'Min'
+                                      ),
+                                    })}
+                                    onChange={(min) =>
                                       onUpdateDropCharacterModifier(
                                         selectedGatheringDrop.id,
                                         ref.id,
-                                        {
-                                          min:
-                                            event.currentTarget.value === ''
-                                              ? null
-                                              : Number(event.currentTarget.value),
-                                        }
+                                        { min }
                                       )}
                                   />
-                                </label>
-                                <label class="manager-field">
+                                </div>
+                                <div class="manager-field">
                                   <span
                                     >{text(
                                       'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
                                       'Max'
                                     )}</span
                                   >
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={ref.max ?? ''}
-                                    oninput={(event) =>
+                                  <Stepper
+                                    value={ref.max}
+                                    allowUnset
+                                    step={1}
+                                    fill
+                                    ariaLabel={text(
+                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                      'Max'
+                                    )}
+                                    decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                                      label: text(
+                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                        'Max'
+                                      ),
+                                    })}
+                                    incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                                      label: text(
+                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                        'Max'
+                                      ),
+                                    })}
+                                    onChange={(max) =>
                                       onUpdateDropCharacterModifier(
                                         selectedGatheringDrop.id,
                                         ref.id,
-                                        {
-                                          max:
-                                            event.currentTarget.value === ''
-                                              ? null
-                                              : Number(event.currentTarget.value),
-                                        }
+                                        { max }
                                       )}
                                   />
-                                </label>
+                                </div>
                               </div>
                               <div class="manager-character-modifier-override-row">
                                 <button
@@ -8686,46 +8715,69 @@
                             </button>
                           </header>
                           <div class="manager-character-modifier-row-bounds">
-                            <label class="manager-field">
+                            <!-- `<div>`, not `<label>` — see the drop-scope bounds above. -->
+                            <div class="manager-field">
                               <span
                                 >{text(
                                   'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
                                   'Min'
                                 )}</span
                               >
-                              <input
-                                type="number"
-                                step="1"
-                                value={ref.min ?? ''}
-                                oninput={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    min:
-                                      event.currentTarget.value === ''
-                                        ? null
-                                        : Number(event.currentTarget.value),
-                                  })}
+                              <Stepper
+                                value={ref.min}
+                                allowUnset
+                                step={1}
+                                fill
+                                ariaLabel={text(
+                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                  'Min'
+                                )}
+                                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                                  label: text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                    'Min'
+                                  ),
+                                })}
+                                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                                  label: text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
+                                    'Min'
+                                  ),
+                                })}
+                                onChange={(min) => onUpdateEventCharacterModifier(ref.id, { min })}
                               />
-                            </label>
-                            <label class="manager-field">
+                            </div>
+                            <div class="manager-field">
                               <span
                                 >{text(
                                   'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
                                   'Max'
                                 )}</span
                               >
-                              <input
-                                type="number"
-                                step="1"
-                                value={ref.max ?? ''}
-                                oninput={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    max:
-                                      event.currentTarget.value === ''
-                                        ? null
-                                        : Number(event.currentTarget.value),
-                                  })}
+                              <Stepper
+                                value={ref.max}
+                                allowUnset
+                                step={1}
+                                fill
+                                ariaLabel={text(
+                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                  'Max'
+                                )}
+                                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                                  label: text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                    'Max'
+                                  ),
+                                })}
+                                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                                  label: text(
+                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
+                                    'Max'
+                                  ),
+                                })}
+                                onChange={(max) => onUpdateEventCharacterModifier(ref.id, { max })}
                               />
-                            </label>
+                            </div>
                           </div>
                           <div class="manager-character-modifier-override-row">
                             <button

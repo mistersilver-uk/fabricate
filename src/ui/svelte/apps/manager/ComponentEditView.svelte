@@ -674,14 +674,12 @@
     setSalvage({ outcomeRouting: next });
   }
 
-  function setSalvageDcOverride(rawValue) {
-    const trimmed = String(rawValue ?? '').trim();
-    if (trimmed === '') {
-      setSalvage({ dcOverride: null });
-      return;
-    }
-    const numeric = Number(trimmed);
-    setSalvage({ dcOverride: Number.isFinite(numeric) ? numeric : null });
+  // `Stepper` reports a clamped NUMBER, or `null` when an `allowUnset` field is
+  // cleared, so the string-parsing half of this adapter is gone. The `null` fold
+  // stays: `null` is the persisted "inherit the system salvage DC" value, which is
+  // exactly what clearing the field now sends.
+  function setSalvageDcOverride(next) {
+    setSalvage({ dcOverride: Number.isFinite(next) ? next : null });
   }
 
   function salvageComponentName(componentId) {
@@ -1652,20 +1650,33 @@
               {/each}
             </select>
             {#if salvageDcShowCustomInput}
-              <input
-                type="number"
-                step="1"
-                class="manager-input"
-                value={salvageDraft.dcOverride === null || salvageDraft.dcOverride === undefined
-                  ? ''
-                  : salvageDraft.dcOverride}
-                aria-label={text(
+              <!-- `allowUnset`: a cleared field is not zero here, it is "inherit the
+                   system salvage check DC" — the same `dcOverride: null` the preset
+                   select writes for its default option. -->
+              <Stepper
+                value={salvageDraft.dcOverride}
+                allowUnset
+                step={1}
+                fill
+                disabled={saving}
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
                   'Custom salvage DC'
                 )}
-                data-salvage-dc-custom
-                oninput={(event) => setSalvageDcOverride(event.currentTarget.value)}
-                disabled={saving}
+                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                  label: text(
+                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
+                    'Custom salvage DC'
+                  ),
+                })}
+                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                  label: text(
+                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
+                    'Custom salvage DC'
+                  ),
+                })}
+                inputProps={{ 'data-salvage-dc-custom': '' }}
+                onChange={setSalvageDcOverride}
               />
             {/if}
             <!-- Kept by decision 7 (it replaced the hard-coded tier list, not this

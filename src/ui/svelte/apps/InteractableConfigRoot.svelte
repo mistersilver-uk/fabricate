@@ -30,6 +30,7 @@
   import { localize } from '../util/foundryBridge.js';
   import { describeVisualStatus, describeActivationGate } from '../../interactableConfigView.js';
   import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
+  import Stepper from '../components/Stepper.svelte';
 
   let { services = null } = $props();
 
@@ -555,20 +556,39 @@
             <span class="fab-ic-fact-muted">{scopedNode.current} / {scopedNode.max}</span>
           </p>
 
-          <label class="fab-ic-field">
+          <!-- `<div>`, not `<label>`: an implicit label binds to its FIRST labelable
+               descendant, and a Stepper's is the `−` button, so clicking the caption
+               would decrement the count. `ariaLabel` carries the name instead.
+
+               NO `allowUnset`, even though the bare input this replaces rendered blank
+               for 0. Absence cannot survive the write path: every scoped-node patch goes
+               through `normalizeNodeConfig`, which hard-codes `max: max ?? 0`, so
+               `onChange(null)` would silently persist 0 while the field claimed to have
+               cleared the pool. It is cosmetic-zero and shows `0`.
+
+               The commit moment also moves from `change` to `input`, matching every other
+               migrated field; the persisted value is identical. -->
+          <div class="fab-ic-field">
             <span class="fab-ic-field-label"
               >{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span
             >
-            <input
-              type="number"
-              min="0"
-              step="1"
-              placeholder="—"
-              value={scopedNode.max > 0 ? scopedNode.max : ''}
-              onchange={(e) => setNodeCount(e.currentTarget.value)}
-              data-interactable-node-count
+            <Stepper
+              value={scopedNode.max}
+              min={0}
+              step={1}
+              fill
+              density="comfortable"
+              ariaLabel={text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}
+              decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                label: text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count'),
+              })}
+              incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                label: text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count'),
+              })}
+              inputProps={{ 'data-interactable-node-count': '' }}
+              onChange={(next) => setNodeCount(next)}
             />
-          </label>
+          </div>
 
           <label class="fab-ic-field">
             <span class="fab-ic-field-label"

@@ -14300,7 +14300,13 @@
   color: var(--fab-mv2-accent);
 }
 
+/* `align-items: end` bottom-aligns the two fields, so the migrated Break-below stepper
+   has to stand exactly as tall as the sibling Formula text input (34px, see the
+   `.manager-recipe-field input` rule below) or the pair reads as two control heights.
+   Taking a SIZE from the layout context is what `--fab-stepper-fill-height` is for. */
 .fabricate-manager .manager-tool-inline-fields {
+  --fab-stepper-fill-height: 34px;
+
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fab-space-3);
@@ -16700,8 +16706,11 @@
   --fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;
 }
 
+/* The weight track is 158px, not 112px: it holds a Stepper (102px — 54px of chrome
+   around its 48px input) plus the 6px chip gap plus the ~50px selection-share readout.
+   At 112px the readout wrapped and the control overflowed its track. */
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;
+  --fab-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;
 }
 
 .fabricate-manager .manager-environment-comp-band {
@@ -16891,8 +16900,16 @@
   min-width: 0;
 }
 
+/* The weight cell holds a FILLED Stepper, so the slot is pinned here rather than on the
+   control: `fill` makes the stepper `width: 100%` of this item, and an `auto` basis would
+   collapse it to its 54px of chrome (its input is `flex: 1 1 0; min-width: 0`). 102px is
+   the primitive's natural width. `--fab-stepper-fill-height` keeps the row at the 28px
+   the bare input had instead of the 36px default — taking a SIZE from the layout context
+   is allowed, unlike restyling the primitive's border, background or type. */
 .fabricate-manager .manager-environment-comp-weight-field {
-  flex: 0 0 auto;
+  --fab-stepper-fill-height: 28px;
+
+  flex: 0 0 102px;
   margin: 0;
 }
 
@@ -16901,16 +16918,9 @@
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-environment-comp-weight-field input {
-  width: 42px;
-  height: 28px;
-  padding: var(--fab-space-2xs) var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 4px;
-  background: var(--fab-mv2-surface-1);
-  color: var(--fab-mv2-text);
-  font: inherit;
-}
+/* The bare-input box treatment that used to live here is deleted, not guarded: the
+   weight field is a Stepper now, which brings its own chrome, and a `.fab-stepper-input`
+   left inside this rule would be re-bordered and re-sized inside the stepper's own box. */
 
 .fabricate-manager .manager-environment-comp-weight-percent {
   min-width: 0;
@@ -17411,8 +17421,11 @@
     --fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;
   }
 
+  /* The weight track does NOT narrow with the container: 102px is the stepper's natural
+     width and the selection-share readout still has to fit beside it. Only the name
+     column gives, which is what `minmax(0, 1fr)` on track 1 is there for. */
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 100px 64px 110px 72px;
+    --fab-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;
   }
 
 }

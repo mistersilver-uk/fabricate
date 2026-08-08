@@ -77,6 +77,12 @@ const WRITE_COMPILED = /writeCompiledSvelte\(\s*([^)]*?)\s*\)/g;
 const COMPILED_MODULES = /compiledModules\s*:\s*\[([\s\S]*?)\]/g;
 // A template-literal compile inside a loop: writeCompiledSvelte(`prefix/${part}.svelte`).
 const TEMPLATE_COMPILE = /^`([^`$]*)\$\{(\w+)\}([^`]*)`$/;
+// The SAME compile loop with no template at all — `writeCompiledSvelte(component)` over a
+// list of whole paths (`environment-composition-list-mounted`). Without this the argument is
+// a bare identifier, `literalsIn` finds no quoted path in it, and the suite reads as
+// compiling NOTHING — so every primitive its tree renders passes vacuously. That is not
+// hypothetical: this guard reported clean while that suite hung on a missing `Stepper`.
+const BARE_LOOP_COMPILE = /^(\w+)$/;
 // Deliberately path-SHAPED rather than `'([^']+)'`. These lists are heavily commented and the
 // comments contain apostrophes ("the manager's ONE chip"), which desynchronise naive quote
 // pairing and make it read prose as module paths. Requiring no whitespace inside the quotes
@@ -111,18 +117,31 @@ function compiledPathsOf(suite) {
     ...[...suite.matchAll(COMPILED_MODULES)].map(([, body]) => body),
   ];
 
+  // The list a `for (const <variable> of …)` compile loop iterates, inline or by const name.
+  const loopMembers = (variable) => {
+    const binding = new RegExp(
+      `for\\s*\\(\\s*const\\s+${variable}\\s+of\\s+(\\[[^\\]]*\\]|\\w+)\\s*\\)`
+    ).exec(suite);
+    if (!binding) return null;
+    return literalsIn(binding[1].startsWith('[') ? binding[1] : (arrays.get(binding[1]) ?? ''));
+  };
+
   for (const region of regions) {
     const template = TEMPLATE_COMPILE.exec(region.trim());
     if (template) {
       // A compile loop. The iterated list is either inline — `for (const part of ['A','B'])`
       // — or a named const, and both forms are in use in the same suite.
       const [, prefix, variable, suffix] = template;
-      const binding = new RegExp(
-        `for\\s*\\(\\s*const\\s+${variable}\\s+of\\s+(\\[[^\\]]*\\]|\\w+)\\s*\\)`
-      ).exec(suite);
-      if (!binding) continue;
-      const source = binding[1].startsWith('[') ? binding[1] : (arrays.get(binding[1]) ?? '');
-      for (const member of literalsIn(source)) declared.push(`${prefix}${member}${suffix}`);
+      const members = loopMembers(variable);
+      if (!members) continue;
+      for (const member of members) declared.push(`${prefix}${member}${suffix}`);
+      continue;
+    }
+
+    const bare = BARE_LOOP_COMPILE.exec(region.trim());
+    if (bare) {
+      // The same loop with whole paths and no template around the variable.
+      for (const member of loopMembers(bare[1]) ?? []) declared.push(member);
       continue;
     }
 

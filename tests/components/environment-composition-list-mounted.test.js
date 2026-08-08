@@ -127,7 +127,9 @@ describe('CompositionList mounted layout', () => {
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionStatePill.svelte',
       'src/ui/svelte/apps/manager/environment/OverrideIndicator.svelte',
-      'src/ui/svelte/components/Pagination.svelte'
+      'src/ui/svelte/components/Pagination.svelte',
+      // The shared numeric stepper (issue 1050): the blind-weight cell renders it.
+      'src/ui/svelte/components/Stepper.svelte'
     ]) {
       writeCompiledSvelte(component);
     }

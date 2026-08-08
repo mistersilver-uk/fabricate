@@ -34,6 +34,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',

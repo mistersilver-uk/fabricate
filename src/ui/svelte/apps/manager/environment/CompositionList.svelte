@@ -11,6 +11,7 @@
   import CompositionStatePill from './CompositionStatePill.svelte';
   import OverrideIndicator from './OverrideIndicator.svelte';
   import Pagination from '../../../components/Pagination.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
 
   let {
     kind = 'task',
@@ -287,22 +288,37 @@
             </div>
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
-                <label class="manager-environment-comp-weight-field">
-                  <span class="sr-only"
-                    >{text(
+                <!-- A `<div>` with the name carried by `ariaLabel`, not a `<label>`
+                     wrapping an `.sr-only` caption: an implicit label binds to its FIRST
+                     labelable descendant, which for a Stepper is the `−` button.
+                     The commit moment moves from `change` to `input`, matching every
+                     other stepper; the persisted value is identical. -->
+                <div class="manager-environment-comp-weight-field">
+                  <Stepper
+                    value={weightFor(entry.id)}
+                    min={0}
+                    step={1}
+                    fill
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
                       'Weight'
-                    )}</span
-                  >
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    data-composition-weight={entry.id}
-                    value={weightFor(entry.id)}
-                    onchange={(event) => onWeightChange(entry.id, event.currentTarget.value)}
+                    )}
+                    decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                      label: text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
+                        'Weight'
+                      ),
+                    })}
+                    incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                      label: text(
+                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
+                        'Weight'
+                      ),
+                    })}
+                    inputProps={{ 'data-composition-weight': entry.id }}
+                    onChange={(weight) => onWeightChange(entry.id, weight)}
                   />
-                </label>
+                </div>
                 <span
                   class="manager-environment-comp-weight-percent"
                   data-composition-weight-percent={entry.id}
