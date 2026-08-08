@@ -237,6 +237,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/CraftingListingBuilder.js',
+  // Same rule, issue 1055: the builder resolves the displayed check formula through the
+  // SAME `@craftingmod` context the engine rolls, so it now imports the resolver. One
+  // entry suffices — the resolver is a pure, import-free module by design.
+  'src/systems/craftingModifierResolver.js',
   // Same rule, issue 917: the builder now shares its step->recipe view projection and
   // its active-run step read with CraftingEngine through this import-free leaf, so it
   // must be copied alongside the builder.
