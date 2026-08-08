@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -22,6 +23,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-check-triggers-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js'
   ],
   compiledModules: [
@@ -30,6 +32,9 @@ const harness = createMountedComponentHarness({
     // closure of every declared module, so this entry is required whether or not a
     // given test renders it.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // The shared numeric stepper: the condition Value field and the tier-step operand are
+    // both built on it (issue 1050), and the same static-closure rule applies.
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
@@ -99,14 +104,26 @@ function mountRouted(tierStep, { outcomeOptions = ROUTED_TIERS, onChange } = {})
   });
 }
 
+/**
+ * The simple-check mount: one `1d20` check over `triggers`, with the break pills off.
+ *
+ * The sibling of `mountRouted` above and there for the same reason — seven cases spelled out the
+ * same four props to say "a simple check over 1d20", which is one call written seven times, and
+ * SonarCloud counts duplication in `tests/**` exactly as it does in `src/`.
+ */
+function mountSimple(triggers, overrides = {}) {
+  return harness.mount({
+    value: triggerBlock(triggers),
+    rollFormula: '1d20',
+    kind: 'simple',
+    showBreakTools: false,
+    ...overrides
+  });
+}
+
 describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   it('always renders the trigger list and its outcome toggle; never a label input', async () => {
-    const root = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const root = await mountSimple([rollTotalTrigger]);
     assert.ok(root.querySelector('[data-check-triggers]'), 'the trigger editor renders');
     const selected = root.querySelector('[data-trigger="t1"] [data-trigger-outcome="failure"]');
     assert.ok(selected, 'the failure outcome segment renders for a trigger');
@@ -127,12 +144,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   });
 
   it('offers Automatic success / No effect / Automatic failure for a non-progressive check', async () => {
-    const root = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const root = await mountSimple([rollTotalTrigger]);
     const labels = [...root.querySelectorAll('[data-trigger-outcome]')].map((b) =>
       b.textContent.trim()
     );
@@ -163,12 +175,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   });
 
   it('gates the break-tools pill on showBreakTools (authority)', async () => {
-    const hidden = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const hidden = await mountSimple([rollTotalTrigger]);
     assert.equal(
       hidden.querySelector('[data-trigger-break]'),
       null,
@@ -176,12 +183,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     );
     harness.remount();
 
-    const shown = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: true
-    });
+    const shown = await mountSimple([rollTotalTrigger], { showBreakTools: true });
     assert.ok(
       shown.querySelector('[data-trigger-break]'),
       'the break pill renders when showBreakTools is true (checkDriven)'
@@ -190,13 +192,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
 
   it('toggles a trigger outcome through the segmented control and emits the new block', async () => {
     const emitted = [];
-    const root = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false,
-      onChange: (next) => emitted.push(next)
-    });
+    const root = await mountSimple([rollTotalTrigger], { onChange: (next) => emitted.push(next) });
     chooseSegment(
       root.querySelector('[data-trigger="t1"]'),
       'data-trigger-outcome',
@@ -211,10 +207,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
 
   it('adds a trigger from the empty state, defaulting breakTools to showBreakTools', async () => {
     const emitted = [];
-    const root = await harness.mount({
-      value: triggerBlock([]),
-      rollFormula: '1d20',
-      kind: 'simple',
+    const root = await mountSimple([], {
       showBreakTools: true,
       onChange: (next) => emitted.push(next)
     });
@@ -282,12 +275,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     );
     harness.remount();
 
-    const simple = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const simple = await mountSimple([rollTotalTrigger]);
     assert.ok(
       !simple.querySelector('[data-trigger-tier-step]'),
       'a simple check has no tiers to step and renders no control'
@@ -488,5 +476,26 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     }
     chooseSegment(card, 'data-trigger-tier-step-mode', 'down');
     assert.equal(emitted.at(-1).triggers[0].tierStep.mode, 'down', 'the step is authored');
+  });
+  // Issue 1050, Phase 2's keyboard non-regression entry. The condition Value field is a bare
+  // `type="number"` no longer — it is a `Stepper`, which owns NO keydown handler, so Up/Down are
+  // native `<input type="number">` behaviour and the only things keeping them alive are that the
+  // element stays a number input and that its `input` event still reaches the commit path.
+  // `stepUp()` throws on a non-steppable input, so a drift to `type="text"` fails here rather
+  // than silently shipping a click-only control.
+  it('still steps the condition value from the keyboard', async () => {
+    const emitted = [];
+    const root = await mountSimple([rollTotalTrigger], { onChange: (next) => emitted.push(next) });
+    const field = root.querySelector('[data-trigger="t1"] [data-trigger-value]');
+    assert.equal(
+      stepMigratedNumberField(field, 'up', 'the condition value field'),
+      '4',
+      'ArrowUp steps the displayed value'
+    );
+    assert.equal(
+      emitted.at(-1).triggers[0].condition.value,
+      4,
+      'and the step reaches the trigger through the commit path'
+    );
   });
 });

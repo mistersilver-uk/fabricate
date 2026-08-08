@@ -2203,6 +2203,85 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-gathering-economy-actors',
+    label: 'Manager — Gathering economy actor stamina pools',
+    // `beyond`: the live smoke never walks the Gathering Settings tab, so there is no counterpart
+    // frame for this to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The actor stamina table is the ONLY surface no case reached (issue 1050). Eight cases carry
+    // a `Gathering(Economy|…)` pattern and every one of them `expectView`s somewhere else, so a
+    // change to `GatheringEconomyView.svelte` published a frame that does not contain it. It is
+    // also this change's tightest layout: the row is a four-track grid of two filled, comfortable
+    // steppers, re-pinned from `56px 56px` to `106px 106px`, which is why the actor subsection was
+    // reflowed out of `.manager-economy-stamina-grid` to the card's full width.
+    query: { system: 'lab-herbalism' },
+    // The state is DRIVEN rather than seeded. The fixture world enables stamina on no system, and
+    // seeding one would be a `tests/view-lab/**` change — which `LAB_INFRASTRUCTURE_PATTERN` maps
+    // to the whole 157-frame corpus, and which would put a stamina readout into the player
+    // gathering frames of whichever system it was seeded on (`GatheringDetail.svelte` renders one
+    // whenever `staminaEnabled`). Four GM gestures reach the same state and disturb nothing:
+    // enable the Stamina limitation, give it a max expression (without one
+    // `seedActorStaminaIfNeeded` no-ops and Roll does nothing at all), then roll the FIRST
+    // character's pool. That leaves Brenna rolled and Idrin and Vosk un-rolled, so one row renders
+    // the live, comfortable, filled steppers and two render the DISABLED state — and the rolled
+    // row's Max stepper renders its rolled-max PLACEHOLDER, which is the unset-value state D1
+    // added. All three states in one frame.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '[data-economy-mode-option="stamina"]' },
+      { selector: '[data-economy-stamina-max]', fill: '12' },
+      { selector: '[data-economy-actor-roll]' },
+      // A CONFIRMING step, not a cosmetic one. `runSteps` throws when a selector matches nothing,
+      // so this turns "the roll silently did not land" — which would otherwise publish a table of
+      // three identically disabled rows under a name claiming otherwise — into a loud capture
+      // failure. It scrolls the rolled row into frame as its side effect.
+      { selector: '[data-economy-actor-rolled="true"]', scroll: true },
+    ],
+    expectView: 'environments',
+    kinds: ['manager', 'environments'],
+    // Deliberately NO pattern for `components/Stepper.svelte`: `BROAD_SIGNAL_PATTERN` matches
+    // `^src/ui/svelte/components/`, and `selectRenderFileCases` `continue`s on a broad-signal file
+    // BEFORE it consults any case's `sourceMatches`, so such an entry would be unreachable code.
+    // A broad signal adds `REPRESENTATIVE_CASE_IDS` only, which is why this case still needs its
+    // own `GatheringEconomyView` pattern to be selected by a change to the view itself.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-environment-edit-blind-weights',
+    label: 'Manager — Environment edit blind task weights',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `CompositionList`'s weight field renders in ONE state — `showBlindWeights`, which is
+    // `kind === 'task' && selectionMode === 'blind'` — and no case reached it: the list's single
+    // existing claim (`manager-environments-browse-normal`) stops at the environments browser.
+    // Shadow Thicket is the world's blind-selection environment and already carries authored
+    // weights for both of its forced tasks, so its Tasks tab renders the field populated rather
+    // than empty. Phase 4 deleted that field's bespoke `width: 42px` global rule and widened the
+    // `--fab-env-comp-grid` weight track to fit a filled stepper beside the percent readout; this
+    // is the frame that shows whether it fits, in both the wide and the `max-width: 960px`
+    // container branch.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-tasks' },
+    ],
+    expectView: 'environment-edit',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/environment\//,
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-tool-parity-01-library-1280x720',
     label: 'Manager — Tool parity 01 library 1280x720',
     smokeLabels: ['manager-tool-parity-01-library-1280x720'],

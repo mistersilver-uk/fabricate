@@ -2,7 +2,11 @@
   "FABRICATE": {
     "ModuleName": "Fabricate - Universal Crafting",
     "Common": {
-      "General": "General"
+      "General": "General",
+      "Stepper": {
+        "Decrease": "Decrease {label}",
+        "Increase": "Increase {label}"
+      }
     },
     "Migration": {
       "CatalystsToTools": {
@@ -1424,6 +1428,11 @@
           "TaskStaminaCost": "Cost per attempt",
           "TaskStaminaModifiers": "Per-actor cost modifiers",
           "TaskStaminaModifiersHint": "Adjust the cost for an actor (e.g. a strong character mines for less).",
+          "TaskStaminaModifierOperator": "Operator",
+          "TaskStaminaModifierMin": "Minimum",
+          "TaskStaminaModifierMax": "Maximum",
+          "TaskStaminaModifierMinPlaceholder": "min",
+          "TaskStaminaModifierMaxPlaceholder": "max",
           "TaskNodesTitle": "Resource node",
           "TaskNodesHint": "Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.",
           "TaskNodesEconomyHint": "Canvas per-tile depletion and depleted-tile behavior are only available when this system has resource nodes enabled. Turn on the Resource nodes toggle in the system's Economy settings to author a resource node here.",

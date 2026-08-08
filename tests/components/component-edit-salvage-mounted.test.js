@@ -18,6 +18,10 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  COMPONENT_EDIT_VIEW_COMPILED_MODULES,
+  COMPONENT_EDIT_VIEW_RAW_MODULES,
+} from '../helpers/componentEditViewModules.js';
 
 function flushRender() {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -29,52 +33,8 @@ const repoRoot = resolve(__dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-edit-salvage-',
-  rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
-    'src/ui/svelte/util/componentEditor.js',
-    // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
-    // withhold a disabled essence from the quantity grid. A missing raw module HANGS the
-    // suite rather than failing it, so the shared harness validator throws for it up front.
-    'src/utils/essenceValidation.js',
-    // The component category vocabulary (issue 676), imported by ComponentEditView.
-    // A deliberately import-free leaf, so this single entry suffices — but omit it
-    // and the mounted suite HANGS (# cancelled) rather than failing.
-    'src/utils/componentCategories.js',
-    // The salvage DC control's pure option model (issue 676). Import-free leaf.
-    'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
-    // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
-    // check' for the persisted 'routed' token. Import-free leaf.
-    'src/ui/svelte/apps/manager/resolutionModeOptions.js',
-    'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    // The identity strip's drop target + its portaled overflow menu (issue 676).
-    'src/ui/svelte/actions/dragDrop.js',
-    'src/ui/svelte/actions/portal.js',
-    'src/ui/svelte/util/iconPickerPopover.js',
-  ],
-  // ToggleCard is rendered by the salvage block; a component the tree renders but the
-  // harness does not list HANGS the suite (# cancelled) rather than failing it. The
-  // component under test must be listed here too — the harness imports `componentPath`
-  // from the temp tree but only compiles what `compiledModules` names.
-  compiledModules: [
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
-    // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
-    // The salvage result quantity + the progressive DC are the shared Stepper (issue
-    // 676). Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and
-    // the suite HANGS (# cancelled) rather than failing.
-    'src/ui/svelte/components/Stepper.svelte',
-    // The shared essence quantity card (issue 772). `ComponentEditView` renders it after
-    // the extraction, so it is in this tree's static import closure whether or not a given
-    // test turns the essences section on.
-    'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
-    'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
-    'src/ui/svelte/apps/manager/ComponentEditView.svelte',
-  ],
+  rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
 

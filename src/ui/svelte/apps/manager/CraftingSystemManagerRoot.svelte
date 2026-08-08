@@ -1,6 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
+  import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
@@ -2253,11 +2255,6 @@
   function updateSelectedGatheringCondition(kind, value) {
     if (!selectedSystemId || !kind) return;
     store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
-  }
-
-  function adjustGatheringRuleLimit(field, delta) {
-    const current = Number(selectedGatheringRules?.[field] || 1);
-    updateSelectedGatheringRules({ [field]: Math.max(1, Math.floor(current + delta)) });
   }
 
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
@@ -8245,56 +8242,16 @@
                                   <i class="fas fa-trash" aria-hidden="true"></i>
                                 </button>
                               </header>
-                              <div class="manager-character-modifier-row-bounds">
-                                <label class="manager-field">
-                                  <span
-                                    >{text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
-                                      'Min'
-                                    )}</span
-                                  >
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={ref.min ?? ''}
-                                    oninput={(event) =>
-                                      onUpdateDropCharacterModifier(
-                                        selectedGatheringDrop.id,
-                                        ref.id,
-                                        {
-                                          min:
-                                            event.currentTarget.value === ''
-                                              ? null
-                                              : Number(event.currentTarget.value),
-                                        }
-                                      )}
-                                  />
-                                </label>
-                                <label class="manager-field">
-                                  <span
-                                    >{text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
-                                      'Max'
-                                    )}</span
-                                  >
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={ref.max ?? ''}
-                                    oninput={(event) =>
-                                      onUpdateDropCharacterModifier(
-                                        selectedGatheringDrop.id,
-                                        ref.id,
-                                        {
-                                          max:
-                                            event.currentTarget.value === ''
-                                              ? null
-                                              : Number(event.currentTarget.value),
-                                        }
-                                      )}
-                                  />
-                                </label>
-                              </div>
+                              <CharacterModifierBoundsRow
+                                min={ref.min}
+                                max={ref.max}
+                                onChange={(patch) =>
+                                  onUpdateDropCharacterModifier(
+                                    selectedGatheringDrop.id,
+                                    ref.id,
+                                    patch
+                                  )}
+                              />
                               <div class="manager-character-modifier-override-row">
                                 <button
                                   type="button"
@@ -8685,48 +8642,11 @@
                               <i class="fas fa-trash" aria-hidden="true"></i>
                             </button>
                           </header>
-                          <div class="manager-character-modifier-row-bounds">
-                            <label class="manager-field">
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
-                                  'Min'
-                                )}</span
-                              >
-                              <input
-                                type="number"
-                                step="1"
-                                value={ref.min ?? ''}
-                                oninput={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    min:
-                                      event.currentTarget.value === ''
-                                        ? null
-                                        : Number(event.currentTarget.value),
-                                  })}
-                              />
-                            </label>
-                            <label class="manager-field">
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
-                                  'Max'
-                                )}</span
-                              >
-                              <input
-                                type="number"
-                                step="1"
-                                value={ref.max ?? ''}
-                                oninput={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    max:
-                                      event.currentTarget.value === ''
-                                        ? null
-                                        : Number(event.currentTarget.value),
-                                  })}
-                              />
-                            </label>
-                          </div>
+                          <CharacterModifierBoundsRow
+                            min={ref.min}
+                            max={ref.max}
+                            onChange={(patch) => onUpdateEventCharacterModifier(ref.id, patch)}
+                          />
                           <div class="manager-character-modifier-override-row">
                             <button
                               type="button"
@@ -9029,42 +8949,11 @@
                   </span>
                 </div>
                 {#if selectedGatheringRules.rewardSelectionMode === 'limitedDrops'}
-                  <div class="manager-rule-stepper" data-gathering-rule-stepper="rewardLimit">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseRewardLimit',
-                        'Decrease reward limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('rewardLimit', -1)}
-                      ><i class="fas fa-minus" aria-hidden="true"></i></button
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={selectedGatheringRules.rewardLimit}
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.RewardLimit',
-                        'Reward limit'
-                      )}
-                      oninput={(event) =>
-                        updateSelectedGatheringRules({
-                          rewardLimit: Number(event.target.value || 1),
-                        })}
-                    />
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseRewardLimit',
-                        'Increase reward limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('rewardLimit', 1)}
-                      ><i class="fas fa-plus" aria-hidden="true"></i></button
-                    >
-                  </div>
+                  <GatheringRuleLimitStepper
+                    rule="rewardLimit"
+                    value={selectedGatheringRules.rewardLimit}
+                    onChange={(rewardLimit) => updateSelectedGatheringRules({ rewardLimit })}
+                  />
                 {/if}
 
                 <div class="manager-rule-row">
@@ -9152,42 +9041,11 @@
                   </span>
                 </div>
                 {#if selectedGatheringRules.eventSelectionMode === 'limitedDrops'}
-                  <div class="manager-rule-stepper" data-gathering-rule-stepper="eventLimit">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit',
-                        'Decrease event limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('eventLimit', -1)}
-                      ><i class="fas fa-minus" aria-hidden="true"></i></button
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={selectedGatheringRules.eventLimit}
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.EventLimit',
-                        'Event limit'
-                      )}
-                      oninput={(event) =>
-                        updateSelectedGatheringRules({
-                          eventLimit: Number(event.target.value || 1),
-                        })}
-                    />
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseEventLimit',
-                        'Increase event limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('eventLimit', 1)}
-                      ><i class="fas fa-plus" aria-hidden="true"></i></button
-                    >
-                  </div>
+                  <GatheringRuleLimitStepper
+                    rule="eventLimit"
+                    value={selectedGatheringRules.eventLimit}
+                    onChange={(eventLimit) => updateSelectedGatheringRules({ eventLimit })}
+                  />
                 {/if}
 
                 <div class="manager-rule-row">

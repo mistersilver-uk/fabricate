@@ -7,6 +7,8 @@
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import Stepper from '../../components/Stepper.svelte';
+  import { stepperLabels } from '../../components/stepperLabels.js';
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
 
@@ -462,18 +464,14 @@
   function removeStaminaCostModifier(index) {
     onUpdateTask({ staminaCostModifiers: staminaCostModifiers.filter((_, i) => i !== index) });
   }
-  function numericFieldValue(value) {
-    return value === null || value === undefined ? '' : value;
-  }
-
   // Per-task gathering DC override (progressive has no DC, so the field is shown
   // only for routed; d100 has no DC either). null = use the system gathering
-  // check default DC. Mirrors the stamina-cost numeric field: '' when null,
-  // null when blank, truncated integer otherwise.
+  // check default DC. The Stepper renders an unset value blank on its own
+  // (allowUnset), so this only normalizes `undefined` to `null`.
   const dcOverrideEnabled = $derived(resolutionMode === 'routed');
-  const dcOverrideValue = $derived(numericFieldValue(task?.dcOverride));
+  const dcOverrideValue = $derived(task?.dcOverride ?? null);
   function updateDcOverride(value) {
-    if (value === '' || value === null || value === undefined) {
+    if (value === null || value === undefined) {
       onUpdateTask({ dcOverride: null });
       return;
     }
@@ -527,12 +525,11 @@
     updateNodes({ respawn: { ...respawn, ...patch } });
   }
   function setNodeCount(value) {
-    const next = Number(value);
-    if (!Number.isFinite(next) || next <= 0) {
+    if (value === null || value === undefined || value <= 0) {
       onUpdateTask({ nodes: null });
       return;
     }
-    const max = Math.floor(next);
+    const max = Math.floor(value);
     updateNodes({ max, current: max });
   }
   function setRespawnInterval(value, unit) {
@@ -794,6 +791,26 @@
   }
 </script>
 
+<!--
+  Every task section opens with the same card header — an `<h3>` title over an optional
+  muted hint — so the markup is declared once here instead of at each section.
+
+  The two headers that also host a controls cluster (the component browser's two searches,
+  the drop rules search and add button) keep their own markup: a header with a second child
+  is a different composition, and routing those controls through a snippet parameter would
+  move them away from the card they belong to for no gain.
+-->
+{#snippet taskCardHeader(title, hint)}
+  <div class="manager-task-card-header">
+    <div class="manager-task-drop-header-copy">
+      <h3>{title}</h3>
+      {#if hint}
+        <p class="manager-muted">{hint}</p>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
 <main
   class="manager-main manager-gathering-task-edit-view"
   class:has-reward-rule-notice={showRewardRuleNotice}
@@ -1026,32 +1043,32 @@
 
     {#if staminaEnabled}
       <section class="manager-task-stamina-card" data-gathering-task-stamina>
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaTitle', 'Stamina cost')}</h3>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Economy.TaskStaminaHint',
-                'Stamina spent per attempt when this system has stamina enabled.'
-              )}
-            </p>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Economy.TaskStaminaTitle', 'Stamina cost'),
+          text(
+            'FABRICATE.Admin.Manager.Economy.TaskStaminaHint',
+            'Stamina spent per attempt when this system has stamina enabled.'
+          )
+        )}
 
         <div class="manager-task-stamina-row">
-          <label class="manager-field manager-task-stamina-cost-field">
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
+          <div class="manager-field manager-task-stamina-cost-field">
             <span
               >{text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')}</span
             >
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={staminaCostValue > 0 ? staminaCostValue : ''}
-              oninput={(event) => updateStaminaCost(event.currentTarget.value)}
-              data-gathering-task-stamina-cost
+            <Stepper
+              value={staminaCostValue}
+              min={0}
+              step={1}
+              fill
+              {...stepperLabels(
+                text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')
+              )}
+              inputProps={{ 'data-gathering-task-stamina-cost': '' }}
+              onChange={(next) => updateStaminaCost(next)}
             />
-          </label>
+          </div>
 
           <div class="manager-field manager-task-stamina-modifiers">
             <span
@@ -1087,38 +1104,41 @@
                     value={ref.operator}
                     onchange={(event) =>
                       updateStaminaCostModifier(index, { operator: event.currentTarget.value })}
-                    aria-label="operator"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierOperator',
+                      'Operator'
+                    )}
                   >
                     <option value="-">−</option>
                     <option value="+">+</option>
                   </select>
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder="min"
-                    value={numericFieldValue(ref.min)}
-                    oninput={(event) =>
-                      updateStaminaCostModifier(index, {
-                        min:
-                          event.currentTarget.value === ''
-                            ? null
-                            : Number(event.currentTarget.value),
-                      })}
-                    aria-label="min"
+                  <Stepper
+                    value={ref.min}
+                    allowUnset
+                    step={1}
+                    fill
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMinPlaceholder',
+                      'min'
+                    )}
+                    {...stepperLabels(
+                      text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMin', 'Minimum')
+                    )}
+                    onChange={(next) => updateStaminaCostModifier(index, { min: next })}
                   />
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder="max"
-                    value={numericFieldValue(ref.max)}
-                    oninput={(event) =>
-                      updateStaminaCostModifier(index, {
-                        max:
-                          event.currentTarget.value === ''
-                            ? null
-                            : Number(event.currentTarget.value),
-                      })}
-                    aria-label="max"
+                  <Stepper
+                    value={ref.max}
+                    allowUnset
+                    step={1}
+                    fill
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMaxPlaceholder',
+                      'max'
+                    )}
+                    {...stepperLabels(
+                      text('FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMax', 'Maximum')
+                    )}
+                    onChange={(next) => updateStaminaCostModifier(index, { max: next })}
                   />
                   <button
                     type="button"
@@ -1147,66 +1167,75 @@
 
     {#if dcOverrideEnabled}
       <section class="manager-task-dc-card" data-gathering-task-dc>
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>
-              {text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override')}
-            </h3>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
-                'Override the system gathering check DC for this task. Leave blank to use the system default.'
-              )}
-            </p>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override'),
+          text(
+            'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
+            'Override the system gathering check DC for this task. Leave blank to use the system default.'
+          )
+        )}
 
         <div class="manager-task-dc-row">
-          <label class="manager-field manager-task-dc-field">
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
+          <div class="manager-field manager-task-dc-field">
             <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
-            <input
-              type="number"
-              step="1"
+            <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps
+                 from `min ?? 0` — without it one click of `−` on the blank field commits
+                 -1. The bare input this replaced had no `min` either, but it also had no
+                 live decrement button.
+
+                 `fill` needs a slot to fill, and this card had none: the width comes from
+                 `.manager-task-dc-field`'s `max-width` in this component's `<style>`. See
+                 the note there for why dropping `fill` would not have been the fix. -->
+            <Stepper
+              value={dcOverrideValue}
+              allowUnset
+              step={1}
+              min={0}
+              fill
+              density="comfortable"
               placeholder={text(
                 'FABRICATE.Admin.Manager.Gathering.TaskDcOverridePlaceholder',
                 'System default'
               )}
-              value={dcOverrideValue}
-              oninput={(event) => updateDcOverride(event.currentTarget.value)}
-              data-gathering-task-dc-override
+              {...stepperLabels(text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC'))}
+              inputProps={{ 'data-gathering-task-dc-override': '' }}
+              onChange={(next) => updateDcOverride(next)}
             />
-          </label>
+          </div>
         </div>
       </section>
     {/if}
 
     {#if nodesEnabled}
       <section class="manager-task-nodes-card" data-gathering-task-nodes>
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Economy.TaskNodesHint',
-                'Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.'
-              )}
-            </p>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node'),
+          text(
+            'FABRICATE.Admin.Manager.Economy.TaskNodesHint',
+            'Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.'
+          )
+        )}
 
         <div class="manager-task-nodes-grid">
-          <label class="manager-field">
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
+          <div class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
+            <Stepper
+              value={nodes.max > 0 ? nodes.max : null}
+              allowUnset
+              min={0}
+              step={1}
+              fill
+              density="comfortable"
               placeholder="—"
-              value={nodes.max > 0 ? nodes.max : ''}
-              oninput={(event) => setNodeCount(event.currentTarget.value)}
-              data-gathering-task-node-count
+              {...stepperLabels(
+                text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')
+              )}
+              inputProps={{ 'data-gathering-task-node-count': '' }}
+              onChange={(next) => setNodeCount(next)}
             />
-          </label>
+          </div>
 
           <label class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeDeplete', 'Deplete')}</span>
@@ -1250,17 +1279,20 @@
           </label>
 
           {#if respawnIsOverTime}
-            <label class="manager-field manager-task-node-interval">
+            <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. The
+                 Stepper precedes the unit `<select>`, so the caption bound to the Stepper's
+                 `−` button rather than to either control the reader would expect. -->
+            <div class="manager-field manager-task-node-interval">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
               <div class="manager-task-node-interval-row">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={intervalParts.value || ''}
-                  oninput={(event) =>
-                    setRespawnInterval(event.currentTarget.value, intervalParts.unit)}
-                  data-gathering-task-node-interval
+                <Stepper
+                  value={intervalParts.value}
+                  min={0}
+                  step={1}
+                  fill
+                  {...stepperLabels(text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every'))}
+                  inputProps={{ 'data-gathering-task-node-interval': '' }}
+                  onChange={(next) => setRespawnInterval(next, intervalParts.unit)}
                 />
                 <select
                   value={intervalParts.unit}
@@ -1282,7 +1314,7 @@
                   >
                 </select>
               </div>
-            </label>
+            </div>
 
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnGainMode', 'Each interval')}</span
@@ -1309,21 +1341,25 @@
           {/if}
 
           {#if respawnIsChance}
-            <label class="manager-field">
+            <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
+            <div class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
               <div class="manager-task-node-chance-row">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={Math.round((Number(respawn.chance) || 0) * 100) || ''}
-                  oninput={(event) => setRespawnChance(event.currentTarget.value)}
-                  data-gathering-task-node-chance
+                <Stepper
+                  value={Math.round((Number(respawn.chance) || 0) * 100)}
+                  min={0}
+                  max={100}
+                  step={1}
+                  fill
+                  {...stepperLabels(
+                    text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')
+                  )}
+                  inputProps={{ 'data-gathering-task-node-chance': '' }}
+                  onChange={(next) => setRespawnChance(next)}
                 />
                 <span class="manager-muted">%</span>
               </div>
-            </label>
+            </div>
           {/if}
 
           {#if respawnIsExpression}
@@ -1421,11 +1457,10 @@
         class="manager-task-nodes-card manager-task-nodes-hint-card"
         data-gathering-task-nodes-hint
       >
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node'),
+          null
+        )}
         <p class="manager-muted manager-task-nodes-hint-text">
           <i class="fas fa-circle-info" aria-hidden="true"></i>
           <span
@@ -2178,6 +2213,24 @@
     box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
   }
 
+  /* The DC override is a single field on an otherwise empty card, so nothing in the chain
+     above it ever gave it a width: `.manager-task-dc-card` and `.manager-task-dc-row` are
+     full-bleed and `.manager-field` is a `flex-direction: column` box that inherits its
+     parent's width. The filled stepper therefore resolved `width: 100%` against the whole
+     card — ~670px at `manager-gathering-task-editor-normal` and ~960px at `-stacked` — and
+     put the − and + most of a foot apart with the value floating between them.
+
+     A cap, rather than dropping `fill`. Dropping it fixes nothing here: an unfilled
+     `.fab-stepper` is a flex item with `width: auto`, and `align-items: stretch` widens it
+     to exactly the same box — measured at 600/600px — leaving a 48px input marooned in the
+     middle of a stretched border and the control 8px shorter than its siblings. 160px is
+     the width the `fill` variant was measured against (the pinned operand slot at
+     `styles/fabricate.css:2150`) and leaves a 106px typeable field. Taking a SIZE from the
+     layout context is permitted; restyling the primitive is not. */
+  .manager-task-dc-field {
+    max-width: 160px;
+  }
+
   .manager-task-nodes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -2205,9 +2258,27 @@
     gap: var(--fab-space-2);
   }
 
-  .manager-task-node-interval-row input,
-  .manager-task-node-chance-row input {
-    min-width: 0;
+  /* Size the unit `<select>` to its content instead of letting it take `width: 100%` from
+     the blanket `.fabricate-manager .manager-field select` rule.
+
+     Both flex items are `width: 100%` otherwise — the filled stepper by the `fill` variant
+     and the select by that blanket rule — so they split a `minmax(160px, 1fr)` track 50/50
+     and the typeable half falls to ~22-42px. That is under half the 48px an UNFILLED
+     stepper gives and about a third of what the bare input this replaced had: "1440" would
+     not fit in it. The stepper is the control being constrained by the wrong sibling, so
+     the sibling is what gets pinned; `fill` stays, and the stepper takes the remaining
+     track. The chance row is deliberately not included — its sibling is a `%` caption that
+     already sizes to content.
+
+     The `[data-…-unit]` qualifier is LOAD-BEARING, not a second way of saying `select`.
+     Svelte 5 emits its scoping class as `:where(.svelte-hash)` on every compound after the
+     first, and `:where()` contributes ZERO specificity — so a plain
+     `.manager-task-node-interval-row select` compiles to (0,2,1) and merely TIES the blanket
+     rule, resolving on the source order of two separately loaded stylesheets. The attribute
+     lifts the class column to 3 and makes it win outright. */
+  .manager-task-node-interval-row select[data-gathering-task-node-interval-unit] {
+    flex: 0 0 auto;
+    width: auto;
   }
 
   /* Depleted-behavior authoring: a sub-block of the node card. */
@@ -2291,7 +2362,7 @@
 
   .manager-task-stamina-modifier-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 56px 72px 72px auto;
+    grid-template-columns: minmax(0, 1fr) 56px 102px 102px auto;
     gap: var(--fab-space-2);
     align-items: center;
   }

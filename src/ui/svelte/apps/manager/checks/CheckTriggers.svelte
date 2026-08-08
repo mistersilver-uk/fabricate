@@ -36,6 +36,8 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
   import SegmentedControl from '../SegmentedControl.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
     value = null,
@@ -236,6 +238,16 @@
     text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepMode', 'Tier step mode')
   );
 
+  // The tier-step operand's ONLY name is "Steps up" / "Steps down", so parametrizing the
+  // shared adjunct strings with it reads as "Decrease Steps up". Its adjuncts take the
+  // row's own label — "Tier step" — instead, which is both grammatical and the name this
+  // surface already gives the control the operand belongs to. So the shared derivation is
+  // spread from `tierStepLabel` and only `ariaLabel` is overridden after it, at the tag.
+  const tierStepAdjunctLabels = $derived(stepperLabels(tierStepLabel));
+  const conditionValueLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Breakage.Value', 'Value')
+  );
+
   const breakOnLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeBreakOn', 'Break')
   );
@@ -301,12 +313,6 @@
 
   function removeTrigger(id) {
     emit(triggers.filter((trigger) => trigger.id !== id));
-  }
-
-  function numeric(rawValue) {
-    if (rawValue === '' || rawValue === '-') return 0;
-    const parsed = Number(rawValue);
-    return Number.isNaN(parsed) ? 0 : parsed;
   }
 
   function outcomeFor(trigger) {
@@ -477,16 +483,18 @@
                   {/each}
                 </select>
               </label>
-              <label class="manager-field">
-                <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.Value', 'Value')}</span>
-                <input
-                  type="number"
-                  data-trigger-value
+              <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in
+                   `Stepper.svelte`. -->
+              <div class="manager-field">
+                <span>{conditionValueLabel}</span>
+                <Stepper
+                  fill
                   value={condition.value ?? 0}
-                  oninput={(event) =>
-                    updateCondition(trigger.id, { value: numeric(event.currentTarget.value) })}
+                  {...stepperLabels(conditionValueLabel)}
+                  inputProps={{ 'data-trigger-value': '' }}
+                  onChange={(next) => updateCondition(trigger.id, { value: next })}
                 />
-              </label>
+              </div>
             {/if}
           </div>
 
@@ -569,21 +577,33 @@
               class={`manager-field manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
             >
               {#if step.mode === 'up' || step.mode === 'down'}
-                <input
-                  type="number"
-                  min="1"
-                  data-trigger-tier-step-steps
-                  aria-label={step.mode === 'up'
+                <!-- `fill` is what keeps the canonical no-movement guarantee (ui-integration
+                     spec, "a stable operand slot at one pinned width"): the slot stays
+                     pinned at 160px and the primitive stretches into it, so swapping mode
+                     between this stepper, the tier `<select>` and the inert placeholder
+                     leaves the control's POSITION and BOX SIZE unchanged — which is the
+                     guarantee the spec actually makes, and all the no-movement rule needs.
+                     Radius and fill still differ (the stepper paints 8px /
+                     `--fab-surface-soft`, a `.manager-field` control 6px / `--fab-mv2-bg`);
+                     claiming otherwise was an overclaim corrected alongside the spec text.
+                     `data-trigger-tier-step-steps` rides `inputProps` onto the real
+                     `<input>` — the smoke harness calls Playwright's `fill()` and
+                     `inputValue()` on it, and neither resolves against a wrapper `<div>`.
+                     `Math.trunc` stays: `Stepper` clamps but does not truncate. -->
+                <Stepper
+                  fill
+                  value={step.steps}
+                  min={1}
+                  {...tierStepAdjunctLabels}
+                  ariaLabel={step.mode === 'up'
                     ? text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsUp', 'Steps up')
                     : text(
                         'FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsDown',
                         'Steps down'
                       )}
-                  value={step.steps}
-                  oninput={(event) =>
-                    updateTierStep(trigger.id, {
-                      steps: Math.max(1, Math.trunc(numeric(event.currentTarget.value))),
-                    })}
+                  inputProps={{ 'data-trigger-tier-step-steps': '' }}
+                  onChange={(next) =>
+                    updateTierStep(trigger.id, { steps: Math.max(1, Math.trunc(next)) })}
                 />
               {:else if step.mode === 'target' && outcomeOptions.length > 0}
                 <!-- A <select> whose value matches no option renders its FIRST option as
