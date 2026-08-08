@@ -2,6 +2,7 @@
 <script>
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
+  import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
@@ -55,11 +56,6 @@
   } from '../../../../utils/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
-  // The shared numeric stepper (issue 1050). The gathering reward/event limit fields were
-  // a hand-rolled −/+ pair around a bare `type="number"` that predated this primitive;
-  // they keep their bespoke aria-label keys and take `fill` so the control still resolves
-  // to the 36px full-width box the `<select>` above it does.
-  import Stepper from '../../components/Stepper.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
@@ -8953,26 +8949,11 @@
                   </span>
                 </div>
                 {#if selectedGatheringRules.rewardSelectionMode === 'limitedDrops'}
-                  <div class="manager-rule-stepper" data-gathering-rule-stepper="rewardLimit">
-                    <Stepper
-                      fill
-                      value={selectedGatheringRules.rewardLimit}
-                      min={1}
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.RewardLimit',
-                        'Reward limit'
-                      )}
-                      decrementLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseRewardLimit',
-                        'Decrease reward limit'
-                      )}
-                      incrementLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseRewardLimit',
-                        'Increase reward limit'
-                      )}
-                      onChange={(rewardLimit) => updateSelectedGatheringRules({ rewardLimit })}
-                    />
-                  </div>
+                  <GatheringRuleLimitStepper
+                    rule="rewardLimit"
+                    value={selectedGatheringRules.rewardLimit}
+                    onChange={(rewardLimit) => updateSelectedGatheringRules({ rewardLimit })}
+                  />
                 {/if}
 
                 <div class="manager-rule-row">
@@ -9060,26 +9041,11 @@
                   </span>
                 </div>
                 {#if selectedGatheringRules.eventSelectionMode === 'limitedDrops'}
-                  <div class="manager-rule-stepper" data-gathering-rule-stepper="eventLimit">
-                    <Stepper
-                      fill
-                      value={selectedGatheringRules.eventLimit}
-                      min={1}
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.EventLimit',
-                        'Event limit'
-                      )}
-                      decrementLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit',
-                        'Decrease event limit'
-                      )}
-                      incrementLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseEventLimit',
-                        'Increase event limit'
-                      )}
-                      onChange={(eventLimit) => updateSelectedGatheringRules({ eventLimit })}
-                    />
-                  </div>
+                  <GatheringRuleLimitStepper
+                    rule="eventLimit"
+                    value={selectedGatheringRules.eventLimit}
+                    onChange={(eventLimit) => updateSelectedGatheringRules({ eventLimit })}
+                  />
                 {/if}
 
                 <div class="manager-rule-row">

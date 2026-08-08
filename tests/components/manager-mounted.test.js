@@ -389,6 +389,9 @@ function compileManagerRoot() {
     // statically, so it is in this tree's module graph whichever view is showing, and an
     // omission HANGS every mounted manager test as `# cancelled` rather than failing one.
     'CharacterModifierBoundsRow',
+    // The reward / event limit count under a `limitedDrops` rule row (issue 1050). The root
+    // imports it statically, so an omission HANGS this suite as `# cancelled`.
+    'GatheringRuleLimitStepper',
     'EnvironmentEditorTabs',
     'EnvironmentOverviewTab',
     'EnvironmentTasksTab',
