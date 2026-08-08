@@ -384,6 +384,11 @@ function compileManagerRoot() {
   // categories, component categories, item tags — issue 676).
   writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyPanel.svelte');
   for (const environmentComponent of [
+    // The character-modifier Min / Max pair, extracted out of the root (issue 1050) because
+    // the drop scope and the event scope shipped the same markup twice. The ROOT imports it
+    // statically, so it is in this tree's module graph whichever view is showing, and an
+    // omission HANGS every mounted manager test as `# cancelled` rather than failing one.
+    'CharacterModifierBoundsRow',
     'EnvironmentEditorTabs',
     'EnvironmentOverviewTab',
     'EnvironmentTasksTab',

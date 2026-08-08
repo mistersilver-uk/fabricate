@@ -34,6 +34,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  CHARACTER_MODIFIER_BOUNDS_PATH,
+  CHARACTER_MODIFIER_BOUNDS_SCOPES,
   MIGRATED_INPUT_HOOKS,
   MINIMUM_SCANNED_SVELTE_FILES,
   STEPPER_PATH,
@@ -230,6 +232,37 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
     }
   });
 
+  it('routes both character-modifier scopes through the one shared bounds row', () => {
+    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max — and the
+    // table above can only carry one entry for them now that the row is a single shared
+    // component with a single `<Stepper>` inside it. This is the rest of that coverage: the
+    // drop scope and the event scope both reach `allowUnset` through this component, and
+    // neither has grown a second copy that the one table entry would not see.
+    const root = markup['src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'] ?? '';
+    const rendered = [...root.matchAll(/<CharacterModifierBoundsRow\b[\s\S]*?\/>/g)].map(
+      (tag) => tag[0]
+    );
+    assert.equal(rendered.length, 2, 'one bounds row per character-modifier scope, no more');
+    assert.deepEqual(
+      CHARACTER_MODIFIER_BOUNDS_SCOPES.filter(
+        (scope) => rendered.filter((tag) => tag.includes(scope)).length !== 1
+      ),
+      [],
+      'each scope wires the shared row to exactly one of its own update functions'
+    );
+    // And the component the two of them render really is the one the table entry resolves in,
+    // so this cannot pass against some other file with the same tag name.
+    assert.ok(
+      Object.hasOwn(markup, CHARACTER_MODIFIER_BOUNDS_PATH),
+      'the shared bounds row is a tracked component in the scanned corpus'
+    );
+    assert.equal(
+      stepperTags(markup[CHARACTER_MODIFIER_BOUNDS_PATH]).length,
+      1,
+      'and it holds exactly one Stepper, which is what makes one table entry cover four fields'
+    );
+  });
+
   it('lets the primitive emit null only under allowUnset, which closes the cosmetic-zero half', () => {
     // This is what turns "passes no allowUnset" into "its update function never receives null".
     // Without it, a future change could commit `null` from some other branch and every
@@ -261,6 +294,17 @@ describe('no <label> implicitly binds a Stepper (issue 1050)', () => {
       labelsBindingAStepper('<label class="f">\n<span>DC</span>\n<select></select>\n<Stepper />\n</label>'),
       [],
       'and a label whose first labelable descendant is a real control is not'
+    );
+    // An explicit `for` is a DIFFERENT binding, not this one. HTML consults descendants only
+    // when `for` is absent, so a `for` label cannot make its caption a decrement button — and
+    // where the id names the Stepper's own input it is the correct spelling, focusing the
+    // typeable field. Reporting it would be a false positive rather than a stricter rule.
+    assert.deepEqual(
+      labelsBindingAStepper(
+        '<label class="f" for="dc">\n<span>DC</span>\n<Stepper inputProps={{ id: "dc" }} />\n</label>'
+      ),
+      [],
+      'an explicitly bound label is not an implicit binding'
     );
   });
 

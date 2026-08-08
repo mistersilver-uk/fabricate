@@ -113,11 +113,45 @@ function endOfBracedExpression(source, start) {
 }
 
 /**
- * Every `<Stepper … />` tag in a component, as source text.
+ * Scan forward from just past an opening tag name to the index one past the tag's `>`.
  *
- * The tag ends at the first `/>` that is NOT inside a `{ … }` expression, for the same reason
- * {@link endOfBracedExpression} exists: an inline arrow such as `onChange={(next) => f(next)}`
- * contains no `/>`, but a regex terminator would still be guessing.
+ * The terminator is the first `>` that is NOT inside a `{ … }` expression or a quoted attribute
+ * value, for the same reason {@link endOfBracedExpression} exists: an inline arrow such as
+ * `onChange={(next) => f(next)}` contains a `>` that closes nothing.
+ *
+ * A sibling of {@link endOfBracedExpression} rather than an inner loop, because folded into its
+ * caller the two nested `while`s plus five branches compute to a cognitive complexity of ~21
+ * against Sonar's threshold of 15 (`S3776`) — and this file sits outside every `npm run lint`
+ * scope, so nothing local would have said so.
+ *
+ * @param {string} source
+ * @param {number} start Index just past the opening tag's name.
+ * @returns {number} Index one past the tag's `>`, or the end of the scan when unterminated.
+ */
+function endOfTag(source, start) {
+  let index = start;
+  while (index < source.length) {
+    const character = source[index];
+    if (character === '{') {
+      const end = endOfBracedExpression(source, index);
+      if (end < 0) return index;
+      index = end;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      const close = source.indexOf(character, index + 1);
+      if (close < 0) return index;
+      index = close + 1;
+      continue;
+    }
+    if (character === '>') return index + 1;
+    index += 1;
+  }
+  return index;
+}
+
+/**
+ * Every `<Stepper … />` tag in a component, as source text.
  *
  * @param {string} source Component source (comments already stripped by the caller).
  * @returns {string[]}
@@ -127,28 +161,7 @@ export function stepperTags(source) {
   const open = /<Stepper\b/g;
   let match;
   while ((match = open.exec(source)) !== null) {
-    let index = match.index + match[0].length;
-    while (index < source.length) {
-      const character = source[index];
-      if (character === '{') {
-        const end = endOfBracedExpression(source, index);
-        if (end < 0) break;
-        index = end;
-        continue;
-      }
-      if (character === '"' || character === "'") {
-        const close = source.indexOf(character, index + 1);
-        if (close < 0) break;
-        index = close + 1;
-        continue;
-      }
-      if (character === '>') {
-        index += 1;
-        break;
-      }
-      index += 1;
-    }
-    tags.push(source.slice(match.index, index));
+    tags.push(source.slice(match.index, endOfTag(source, match.index + match[0].length)));
   }
   return tags;
 }
@@ -240,6 +253,31 @@ export const BARE_NUMBER_FIELD_REGISTER = Object.freeze([
 ]);
 
 /**
+ * The shared component rendering the character-modifier Min / Max pair for BOTH scopes.
+ *
+ * D1a lists four genuine-absence fields here — drop min/max and event min/max — and they were
+ * four `<Stepper>` tags in `CraftingSystemManagerRoot` until the row was extracted. They are one
+ * call site now, so the table below carries one entry, and
+ * {@link CHARACTER_MODIFIER_BOUNDS_SCOPES} is what keeps the other three fields covered: it
+ * pins that both scopes still reach `allowUnset` through this component rather than having
+ * quietly grown a second, unasserted copy.
+ */
+export const CHARACTER_MODIFIER_BOUNDS_PATH =
+  'src/ui/svelte/apps/manager/environment/CharacterModifierBoundsRow.svelte';
+
+/**
+ * The two update functions the shared bounds row is wired to, one per scope.
+ *
+ * Asserted as an exact set: a third scope that rendered the row would have to be added here
+ * deliberately, and a scope that stopped rendering it — the way a regression would reintroduce
+ * a local copy — fails rather than silently dropping out of the D1a coverage above.
+ */
+export const CHARACTER_MODIFIER_BOUNDS_SCOPES = Object.freeze([
+  'onUpdateDropCharacterModifier',
+  'onUpdateEventCharacterModifier',
+]);
+
+/**
  * D1a's two tables, as the fixture for the unset-value split (V10).
  *
  * `kind` is the whole point: `genuine-absence` fields persist `null` as a distinct domain value
@@ -284,32 +322,13 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
       evidence: 'an unbounded upper bound persists as literal null',
     },
     {
-      id: 'drop character modifier min',
-      path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-      anchor: ['onUpdateDropCharacterModifier', '{ min }'],
+      id: 'character modifier bounds',
+      path: CHARACTER_MODIFIER_BOUNDS_PATH,
+      anchor: ['bound.patch(next)'],
       kind: 'genuine-absence',
-      evidence: 'an unbounded modifier bound in the drop scope',
-    },
-    {
-      id: 'drop character modifier max',
-      path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-      anchor: ['onUpdateDropCharacterModifier', '{ max }'],
-      kind: 'genuine-absence',
-      evidence: 'an unbounded modifier bound in the drop scope',
-    },
-    {
-      id: 'event character modifier min',
-      path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-      anchor: ['onUpdateEventCharacterModifier', '{ min }'],
-      kind: 'genuine-absence',
-      evidence: 'an unbounded modifier bound in the event scope',
-    },
-    {
-      id: 'event character modifier max',
-      path: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-      anchor: ['onUpdateEventCharacterModifier', '{ max }'],
-      kind: 'genuine-absence',
-      evidence: 'an unbounded modifier bound in the event scope',
+      evidence:
+        'an unbounded modifier bound persists as literal null, and 0 is itself a legitimate '
+        + 'bound, so the two have to stay distinguishable',
     },
     {
       id: 'economy actor draftMaxOverride',
@@ -374,7 +393,17 @@ export const UNSET_VALUE_CALL_SITES = Object.freeze(
 const LABELABLE = /<(input|select|textarea|button|meter|output|progress|Stepper)\b/;
 
 /**
- * Every `<label>` in a component whose FIRST labelable descendant is a `<Stepper>`.
+ * Every `<label>` with NO `for` attribute whose first labelable descendant is a `<Stepper>`.
+ *
+ * The `for` exclusion is the difference between the rule this implements and a rule that would
+ * over-report. HTML's labeled-control algorithm consults descendants ONLY when `for` is absent:
+ * with `for` present the label binds to the element carrying that id, and a `for` naming no
+ * element leaves the label with no labeled control at all. Neither case can turn a caption into
+ * a decrement button, which is the whole defect here — a `<label for>` around a Stepper whose
+ * input carries the same id is in fact the CORRECT spelling, focusing the typeable field.
+ *
+ * No such markup exists in the tree today; excluding it keeps the detector's name honest rather
+ * than leaving a false positive waiting for the first caller that writes one.
  *
  * @param {string} source Component source with comments already stripped.
  * @returns {number[]} 1-based line numbers of the offending `<label>` tags.
@@ -384,8 +413,10 @@ export function labelsBindingAStepper(source) {
   const open = /<label\b/g;
   let match;
   while ((match = open.exec(source)) !== null) {
+    const openTagEnd = endOfTag(source, match.index + match[0].length);
+    if (/\bfor=/.test(source.slice(match.index, openTagEnd))) continue;
     let depth = 1;
-    let index = match.index + match[0].length;
+    let index = openTagEnd;
     while (index < source.length && depth > 0) {
       if (source.startsWith('<label', index)) {
         depth += 1;
@@ -399,7 +430,7 @@ export function labelsBindingAStepper(source) {
       }
       index += 1;
     }
-    const first = LABELABLE.exec(source.slice(match.index + match[0].length, index));
+    const first = LABELABLE.exec(source.slice(openTagEnd, index));
     if (first?.[1] === 'Stepper') {
       offenders.push(source.slice(0, match.index).split('\n').length);
     }
