@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
+import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -553,9 +553,14 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
     // Native `<input type="number">` stepping, which is the only keyboard path `Stepper` offers:
     // it owns no keydown handler, so `stepUp()` plus the `input` event the browser fires is the
-    // faithful simulation. `stepUp()` also throws on a non-number input, so a drift to
-    // `type="text"` fails here rather than silently losing the arrows.
-    assert.equal(stepNativeNumberInput(current, 'up'), '4', 'ArrowUp steps the Current cell');
+    // faithful simulation. The shared helper also asserts the hook landed on the real `<input>`
+    // and that it is still a number input, so a drift to `type="text"` fails here rather than
+    // silently losing the arrows.
+    assert.equal(
+      stepMigratedNumberField(current, 'up', 'the Current cell'),
+      '4',
+      'ArrowUp steps the Current cell'
+    );
     flushSync();
 
     // Clearing the override is a real edit on a field whose domain admits absence.

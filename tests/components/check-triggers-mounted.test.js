@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
+import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -510,9 +510,11 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
       onChange: (next) => emitted.push(next)
     });
     const field = root.querySelector('[data-trigger="t1"] [data-trigger-value]');
-    assert.ok(Boolean(field), 'the condition value field renders');
-    assert.equal(field.tagName, 'INPUT', 'the hook rides inputProps onto the real <input>');
-    assert.equal(stepNativeNumberInput(field, 'up'), '4', 'ArrowUp steps the displayed value');
+    assert.equal(
+      stepMigratedNumberField(field, 'up', 'the condition value field'),
+      '4',
+      'ArrowUp steps the displayed value'
+    );
     assert.equal(
       emitted.at(-1).triggers[0].condition.value,
       4,

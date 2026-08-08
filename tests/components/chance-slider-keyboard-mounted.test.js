@@ -48,33 +48,63 @@ async function mountSlider(props = {}) {
   return { calls, number, range };
 }
 
-describe('ChanceSlider keyboard stepping (issue 1050, R1)', () => {
-  it('steps and commits on ArrowUp and ArrowDown', async () => {
-    const { calls, number } = await mountSlider({ value: 40, min: 0, max: 100, step: 1 });
-    pressArrowKey(number, 'up');
-    assert.deepEqual(calls, [41], 'ArrowUp commits the stepped value through the clamp');
-    // Read the field AFTER the step that moved it away from its mounted value. Asserting
-    // '40' only at the end of the round trip cannot fail: the field starts at 40, so that
-    // assertion holds whether the handler wrote anything back or not.
-    assert.equal(number.value, '41', 'and the field shows the stepped value, not the old one');
-    pressArrowKey(number, 'down');
-    assert.deepEqual(calls, [41, 40], 'and ArrowDown steps back');
-    assert.equal(number.value, '40', 'with the field following the second commit too');
-  });
-
-  it('clamps a keyboard step at the bounds rather than running past them', async () => {
+/**
+ * The press-and-commit cases, as a table.
+ *
+ * Each one mounts a slider, presses arrows and reads back what the component committed — so
+ * written out as separate `it()` bodies they were the same six lines three times over, differing
+ * only in the props, the presses and the expected values. Those are the table; the body below is
+ * written once.
+ *
+ * `commits` is the WHOLE call log after each press, not the last entry, so a case that committed
+ * twice for one press fails rather than passing on its final value. `displays` is asserted after
+ * every press for the reason the first case's comment used to give: reading the field only at the
+ * END of a round trip that returns to its starting value cannot fail — it starts there — so the
+ * read has to happen while the value is somewhere the mount did not put it.
+ */
+const KEYBOARD_CASES = [
+  {
+    title: 'steps and commits on ArrowUp and ArrowDown',
+    props: { value: 40, min: 0, max: 100, step: 1 },
+    presses: [
+      { direction: 'up', commits: [41], displays: '41', why: 'ArrowUp steps through the clamp' },
+      {
+        direction: 'down',
+        commits: [41, 40],
+        displays: '40',
+        why: 'and ArrowDown steps back',
+      },
+    ],
+  },
+  {
     // The clamp is the reason this component handles the key itself instead of leaving it to the
     // browser, so a keyboard test that never reached a bound would not distinguish the two.
-    const { calls, number } = await mountSlider({ value: 100, min: 0, max: 100, step: 1 });
-    pressArrowKey(number, 'up');
-    assert.deepEqual(calls, [100], 'stepping past the max commits the max');
-  });
+    title: 'clamps a keyboard step at the bounds rather than running past them',
+    props: { value: 100, min: 0, max: 100, step: 1 },
+    presses: [
+      { direction: 'up', commits: [100], displays: '100', why: 'stepping past the max commits it' },
+    ],
+  },
+  {
+    title: 'honours a step size larger than one',
+    props: { value: 20, min: 0, max: 100, step: 5 },
+    presses: [
+      { direction: 'up', commits: [25], displays: '25', why: 'it steps by its own `step`, not 1' },
+    ],
+  },
+];
 
-  it('honours a step size larger than one', async () => {
-    const { calls, number } = await mountSlider({ value: 20, min: 0, max: 100, step: 5 });
-    pressArrowKey(number, 'up');
-    assert.deepEqual(calls, [25], 'the component steps by its own `step`, not by 1');
-  });
+describe('ChanceSlider keyboard stepping (issue 1050, R1)', () => {
+  for (const testCase of KEYBOARD_CASES) {
+    it(testCase.title, async () => {
+      const { calls, number } = await mountSlider(testCase.props);
+      for (const press of testCase.presses) {
+        pressArrowKey(number, press.direction);
+        assert.deepEqual(calls, press.commits, press.why);
+        assert.equal(number.value, press.displays, `${press.why} — and the field follows it`);
+      }
+    });
+  }
 
   it('keeps the range track as the pointer affordance the suppression rule relies on', async () => {
     // R1's whole justification. If the range half ever went away, the number field would be a bare

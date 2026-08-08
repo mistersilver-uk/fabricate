@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
-import { stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
+import { stepMigratedNumberField, stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -246,7 +246,11 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     // the browser fires afterwards still reaches `onInput` -> `commit` -> the call site.
     const { field, updates, sync } = await mountEditor();
     const dc = field('[data-gathering-task-dc-override]');
-    assert.equal(stepNativeNumberInput(dc, 'up'), '15', 'ArrowUp steps the displayed value');
+    assert.equal(
+      stepMigratedNumberField(dc, 'up', 'the DC override'),
+      '15',
+      'ArrowUp steps the displayed value'
+    );
     assert.equal(lastWrite(updates, (patch) => patch.dcOverride), 15, 'and commits it');
     await sync();
     assert.equal(stepNativeNumberInput(dc, 'down'), '14', 'ArrowDown steps it back');

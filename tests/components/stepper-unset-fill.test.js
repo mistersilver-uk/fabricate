@@ -89,52 +89,74 @@ describe('Stepper unset-value state (issue 1050)', () => {
     assert.deepEqual(calls, [], 'and reports no change');
   });
 
-  it('steps an unset field from its lower bound, with both adjuncts live', async () => {
-    const { increment, decrement, calls } = await mountStepper({
-      allowUnset: true,
-      value: null,
-      min: 5,
-      max: 20
+  // ── The adjuncts of an UNSET field, as a table ────────────────────────────────────
+  //
+  // Four cases with one shape: mount an unset field under some bounds, check which adjuncts are
+  // live, click a sequence, read the commits. Written out they were the same five lines four
+  // times over, so the shape is written once below and the cases carry only what differs — plus
+  // the reason each case exists, which is the part that is NOT interchangeable.
+  const UNSET_ADJUNCT_CASES = [
+    {
+      title: 'steps an unset field from its lower bound, with both adjuncts live',
+      props: { min: 5, max: 20 },
+      live: ['increment', 'decrement'],
+      clicks: ['increment'],
+      commits: [6],
+      why: '+ steps from min, not from the coerced 0'
+    },
+    {
+      title: 'steps an unset field with no lower bound from 0, in both directions',
+      // The `min = null` half of the baseline rule, which the `min = 5` case above cannot state:
+      // with no bound, `min ?? 0` and `numericValue` agree, so only the pairing of the two cases
+      // pins the branch. The mutation this catches is DELETION of the `isUnset ? (min ?? 0) : …`
+      // baseline — not a `??` -> `||` typo, which is indistinguishable for every value `min` takes
+      // (the fallback IS 0), so a test written for that rationale would pass under either operator
+      // and be recorded as covering something it does not.
+      props: {},
+      live: [],
+      clicks: ['increment', 'decrement'],
+      commits: [1, -1],
+      why: 'an unbounded unset field steps from 0 and is not clamped'
+    },
+    {
+      title: 'keeps − effective on an unset field whose min is 0',
+      props: { min: 0 },
+      live: ['decrement'],
+      clicks: ['decrement'],
+      commits: [0],
+      why: 'clamp(0 - 1) is 0, which is still a change from blank'
+    },
+    {
+      title: 'keeps + effective on an unset field whose max is 0',
+      // The MIRROR of the case above, and it is load-bearing rather than symmetrical tidiness.
+      // "steps an unset field from its lower bound" claims BOTH adjuncts stay live while unset,
+      // but it sets `max: 20`, where the coerced `numericValue` of `0` is nowhere near the upper
+      // bound — `0 >= 20` is false with or without the `!isUnset &&` guard on `atMax`, so
+      // deleting that half of the guard survived the entire suite while deleting the `atMin` half
+      // was caught. `max: 0` is the shape that makes the upper guard decide the outcome, exactly
+      // as `min: 0` does for the lower one.
+      props: { max: 0 },
+      live: ['increment'],
+      clicks: ['increment'],
+      commits: [0],
+      why: 'clamp(0 + 1) is 0, which is still a change from blank'
+    }
+  ];
+
+  for (const testCase of UNSET_ADJUNCT_CASES) {
+    it(testCase.title, async () => {
+      const parts = await mountStepper({ allowUnset: true, value: null, ...testCase.props });
+      for (const name of testCase.live) {
+        assert.ok(
+          !parts[name].disabled,
+          `${name} stays live while there is no value to be at the bound of, so it must not be `
+            + 'a no-op'
+        );
+      }
+      for (const name of testCase.clicks) parts[name].click();
+      assert.deepEqual(parts.calls, testCase.commits, testCase.why);
     });
-    assert.ok(!increment.disabled, 'nothing is at the max bound while there is no value');
-    assert.ok(!decrement.disabled, 'nor at the min bound');
-    increment.click();
-    assert.deepEqual(calls, [6], '+ steps from min, not from the coerced 0');
-  });
-
-  it('steps an unset field with no lower bound from 0, in both directions', async () => {
-    // The `min = null` half of the baseline rule, which the `min = 5` case above cannot state:
-    // with no bound, `min ?? 0` and `numericValue` agree, so only the pairing of the two cases
-    // pins the branch. The mutation this catches is DELETION of the `isUnset ? (min ?? 0) : …`
-    // baseline — not a `??` -> `||` typo, which is indistinguishable for every value `min` takes
-    // (the fallback IS 0), so a test written for that rationale would pass under either operator
-    // and be recorded as covering something it does not.
-    const { increment, decrement, calls } = await mountStepper({ allowUnset: true, value: null });
-    increment.click();
-    decrement.click();
-    assert.deepEqual(calls, [1, -1], 'an unbounded unset field steps from 0 and is not clamped');
-  });
-
-  it('keeps − effective on an unset field whose min is 0', async () => {
-    const { decrement, calls } = await mountStepper({ allowUnset: true, value: null, min: 0 });
-    assert.ok(!decrement.disabled, 'the adjunct is enabled, so it must not be a no-op');
-    decrement.click();
-    assert.deepEqual(calls, [0], 'clamp(0 - 1) is 0, which is still a change from blank');
-  });
-
-  it('keeps + effective on an unset field whose max is 0', async () => {
-    // The MIRROR of the case above, and it is load-bearing rather than symmetrical tidiness.
-    // "steps an unset field from its lower bound" claims BOTH adjuncts stay live while unset,
-    // but it sets `max: 20`, where the coerced `numericValue` of `0` is nowhere near the upper
-    // bound — `0 >= 20` is false with or without the `!isUnset &&` guard on `atMax`, so
-    // deleting that half of the guard survived the entire suite while deleting the `atMin` half
-    // was caught. `max: 0` is the shape that makes the upper guard decide the outcome, exactly
-    // as `min: 0` does for the lower one.
-    const { increment, calls } = await mountStepper({ allowUnset: true, value: null, max: 0 });
-    assert.ok(!increment.disabled, 'the adjunct is enabled, so it must not be a no-op');
-    increment.click();
-    assert.deepEqual(calls, [0], 'clamp(0 + 1) is 0, which is still a change from blank');
-  });
+  }
 
   it('is unchanged under the default allowUnset={false}, including for value={null}', async () => {
     const { input, calls } = await mountStepper({ value: null, min: 0 });

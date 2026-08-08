@@ -28,6 +28,8 @@
  * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the `npm test` glob.
  */
 
+import assert from 'node:assert/strict';
+
 /**
  * Step a native number input the way the browser does for an Up/Down key press.
  *
@@ -40,6 +42,33 @@ export function stepNativeNumberInput(input, direction = 'up') {
   else input.stepDown();
   input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
   return input.value;
+}
+
+/**
+ * Assert a migrated field is a real, steppable number input, then step it once.
+ *
+ * This is the preamble every keyboard non-regression test in the migration shares, and it is
+ * three assertions rather than one because three different defects would each ship a
+ * click-only control:
+ *
+ *   - the field is missing entirely (a renamed hook, a gated branch), so every later assertion
+ *     would throw on `null` rather than report the field;
+ *   - the `data-*` hook landed on the `Stepper`'s wrapper `<div>` instead of riding `inputProps`
+ *     onto the real `<input>` — a `<div>` has no `stepUp()` and no `value`, and the smoke
+ *     harness's `fill()` / `inputValue()` do not resolve against one either;
+ *   - the element drifted to `type="text"`, which removes the arrows AND the native keyboard
+ *     stepping this whole check exists to protect.
+ *
+ * @param {HTMLInputElement} field The element a suite located by its `data-*` hook.
+ * @param {'up'|'down'} [direction] Which arrow was pressed.
+ * @param {string} [name] How to describe the field when an assertion fails.
+ * @returns {string} The field's value after the step, for the caller to assert on.
+ */
+export function stepMigratedNumberField(field, direction = 'up', name = 'the migrated field') {
+  assert.ok(Boolean(field), `${name} renders`);
+  assert.equal(field.tagName, 'INPUT', `${name}'s data-* hook rides inputProps onto the <input>`);
+  assert.equal(field.type, 'number', `${name} is still a native number input, so Up/Down step it`);
+  return stepNativeNumberInput(field, direction);
 }
 
 /**
