@@ -13,7 +13,7 @@
 -->
 <script>
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
-  import { localize } from '../util/foundryBridge.js';
+  import { formatList, localize } from '../util/foundryBridge.js';
 
   let {
     options = [],
@@ -39,10 +39,20 @@
   } = $props();
 
   let open = $state(false);
+  let menuButton = $state(null);
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // `text`'s interpolating sibling, with the same fallback contract: the fallback carries
+  // the same `{name}` placeholders so an unlocalized build reads identically rather than
+  // printing a raw brace.
+  function format(key, fallback, data) {
+    const translated = localize(key, data);
+    if (translated && translated !== key) return translated;
+    return fallback.replace(/\{(\w+)\}/g, (_match, name) => String(data?.[name] ?? ''));
   }
 
   const allOptions = $derived(Array.isArray(options) ? options : []);
@@ -57,12 +67,63 @@
     );
   }
 
+  // The live region's whole content, restated on every change to either axis.
+  //
+  // `aria-live` used to sit on the pill row itself, which announced almost nothing:
+  // `aria-relevant` defaults to `additions text`, so REMOVING a keyed `{#each}` child is
+  // excluded outright and only emptying the row announced at all — incidentally, via the
+  // `{:else}` placeholder's text node. Adding announced the whole new pill subtree,
+  // including the remove button's own label, so a pick read as "Medicine, Remove
+  // Medicine". `aria-relevant="removals"` is not the fix (support for it is unreliable
+  // and it would still re-read pill chrome); a text node the default `additions text`
+  // already covers is, and it can say something worth hearing.
+  //
+  // Names as well as a count, through the active language's list conventions —
+  // "Medicine, Alchemy and Herbalism" is a language rule, not a separator — because "3
+  // selected" does not tell a non-sighted GM WHICH three the pill row now shows.
+  const selectionSummary = $derived.by(() => {
+    if (selectedOptions.length === 0) {
+      return (
+        noneSelectedLabel ||
+        text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillNone', 'No modifiers selected.')
+      );
+    }
+    const names = formatList(selectedOptions.map((option) => optionLabel(option)));
+    if (selectedOptions.length === 1) {
+      return format(
+        'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillSelectedOne',
+        '1 modifier selected: {names}',
+        { names }
+      );
+    }
+    return format(
+      'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillSelected',
+      '{count} modifiers selected: {names}',
+      { count: selectedOptions.length, names }
+    );
+  });
+
   function add(id) {
     onToggle(id, true);
     open = false;
   }
 
-  function remove(id) {
+  // Focus dies with the removed pill and drops to `<body>`, stranding a keyboard user at
+  // the top of the document with no way back to the control they were operating. Move it
+  // BEFORE emitting: every candidate below is a node that exists right now and survives
+  // the update (the `{#each}` is keyed), so there is no re-render to wait on and no
+  // ordering question. Next pill first, then the previous one — removing the LAST pill of
+  // several has no "next", and jumping to the menu button while pills remain reads as
+  // being thrown out of the row — and the menu button, which always exists, last.
+  function focusAfterRemoval(button) {
+    const pill = button?.closest?.('[data-modifier-pill]');
+    const neighbour = pill?.nextElementSibling || pill?.previousElementSibling || null;
+    const target = neighbour?.querySelector?.('[data-modifier-pill-remove]') || menuButton;
+    target?.focus?.();
+  }
+
+  function remove(id, event) {
+    focusAfterRemoval(event?.currentTarget);
     onToggle(id, false);
   }
 </script>
@@ -83,6 +144,7 @@
       aria-haspopup="listbox"
       aria-expanded={open}
       {disabled}
+      bind:this={menuButton}
       data-modifier-pill-menu-button
       onclick={() => (open = !open)}
     >
@@ -118,11 +180,7 @@
       </div>
     {/if}
   </div>
-  <!-- The pill row is the control's only feedback that a menu pick or a pill removal
-       landed, and neither gesture moves focus into the row, so a screen-reader user is
-       otherwise told nothing at all. `polite` announces the changed row after the
-       current utterance rather than interrupting it. -->
-  <div class="manager-availability-pill-row" aria-live="polite" data-modifier-pill-row>
+  <div class="manager-availability-pill-row" data-modifier-pill-row>
     {#each selectedOptions as option (option.id)}
       <span class="manager-availability-pill is-modifier" data-modifier-pill={option.id}>
         <i class={option.icon || 'fa-solid fa-dice-d20'} aria-hidden="true"></i>
@@ -133,7 +191,7 @@
           {disabled}
           aria-label={`${text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillRemove', 'Remove')} ${optionLabel(option)}`}
           data-modifier-pill-remove={option.id}
-          onclick={() => remove(option.id)}
+          onclick={(event) => remove(option.id, event)}
         >
           <i class="fas fa-xmark" aria-hidden="true"></i>
         </button>
@@ -148,4 +206,30 @@
       </span>
     {/each}
   </div>
+  <!-- The pill row is the control's only feedback that a menu pick or a pill removal
+       landed, and neither gesture moves focus into the row, so without this a
+       screen-reader user is told nothing at all. The region is this summary ALONE, not
+       the row: a live region wrapped around the pills announces each added pill's whole
+       subtree (its remove button's label included) and nothing at all on a removal.
+       `polite` announces after the current utterance rather than interrupting it.
+       Visually hidden here rather than through the global `.sr-only` utility, which is
+       scoped to the two app theme roots — this is a shared primitive and must not depend
+       on which root it is dropped into. -->
+  <span class="manager-modifier-pill-status" aria-live="polite" data-modifier-pill-status
+    >{selectionSummary}</span
+  >
 </div>
+
+<style>
+  .manager-modifier-pill-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
