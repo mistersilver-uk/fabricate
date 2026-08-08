@@ -20,6 +20,7 @@ import {
   minimumViewportFor,
 } from '../scripts/lib/foundryChromeSpec.js';
 import {
+  ACTOR_KNOWLEDGE_RENDER_FILES,
   FALLBACK_CASE_ID,
   VIEW_LAB_CASES,
   caseIds,
@@ -30,6 +31,7 @@ import {
   labelForCaseId,
   mapChangedFilesToCases,
   normalizePath,
+  parseLabActorTableRegions,
   publishableCases,
 } from '../scripts/lib/viewLabCases.js';
 
@@ -1136,6 +1138,18 @@ function caseIdByLine() {
 }
 
 /**
+ * The four per-actor fixture tables the selector keys on, named once for every check below that has
+ * to say them out loud. This IS a hand-written mirror of `LAB_ACTOR_FIXTURE_TABLES`' keys — the
+ * canary further down is what makes it a guard rather than a second thing to keep in step.
+ */
+const FIXTURE_TABLE_NAMES = [
+  'INVENTORIES',
+  'BROKEN_STACKS',
+  'RECIPE_ITEM_COPIES',
+  'LEARNED_RECIPES',
+];
+
+/**
  * The fixture table each `labActors.js` line sits in, derived the way the selector derives it —
  * from a column-zero `const NAME = ` to the next column-zero `};` or `});`.
  *
@@ -1143,7 +1157,7 @@ function caseIdByLine() {
  */
 function tableNameByLine() {
   const byLine = new Map();
-  for (const name of ['INVENTORIES', 'BROKEN_STACKS', 'RECIPE_ITEM_COPIES', 'LEARNED_RECIPES']) {
+  for (const name of FIXTURE_TABLE_NAMES) {
     const start = labActorsSource.findIndex((line) => line.startsWith(`const ${name} = `));
     assert.notEqual(start, -1, `${LAB_ACTORS_PATH} no longer declares ${name} at column zero`);
     const end = labActorsSource.findIndex((line, at) => at > start && /^\}\)?;$/.test(line));
@@ -1473,14 +1487,6 @@ test('a deletion-only hunk inside a case literal selects that case, not the fall
 // derived clothing, and its wrong answers would be silent.
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The manager render files a case must claim to be admitted by the knowledge-table predicate. */
-const ACTOR_KNOWLEDGE_RENDER_FILES = [
-  'src/ui/svelte/apps/manager/KnowledgeView.svelte',
-  'src/ui/svelte/apps/manager/BooksScrollsView.svelte',
-  'src/ui/svelte/apps/manager/ItemPageInspector.svelte',
-  'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
-];
-
 const playerCaseIds = () =>
   publishableCases()
     .filter((viewCase) => viewCase.app === 'fabricate-app')
@@ -1557,9 +1563,13 @@ test('every knowledge render file the predicate probes is a real tracked file', 
   // These four paths are STRINGS tested against each case's `sourceMatches` regexes, so a rename
   // makes a probe match nothing — and nothing else notices. `every sourceMatches pattern resolves
   // to at least one tracked file` does not: the pattern claiming `ItemPageInspector.svelte` is an
-  // alternation whose other branches still resolve, so it stays green while the probe goes dead,
-  // `manager-system-edit-normal` silently drops out of the knowledge selection, and this file's own
-  // mirror of the list drops it too — leaving the knowledge test passing against a smaller answer.
+  // alternation whose other branches still resolve, so it stays green while the probe goes dead and
+  // `manager-system-edit-normal` silently drops out of the knowledge selection.
+  //
+  // The list is IMPORTED, not restated. A copy here would go on naming the renamed file, so this
+  // test and `knowledgeSurfaceCaseIds` below would both stay green against a live probe that had
+  // stopped matching anything — the test claiming to check what the predicate probes while
+  // checking a second list nothing consults.
   const missing = ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => !tracked.includes(file));
   assert.deepEqual(
     missing,
@@ -1652,10 +1662,11 @@ test('a labActors change outside its fixture tables selects every publishable ca
 });
 
 test('the four labActors fixture tables the selector keys on still exist under those names', () => {
-  // The selector finds each table by a column-zero `const NAME = ` line. A rename fails SAFE — the
-  // parse returns null and the whole corpus is selected — which is correct and invisible: the only
-  // symptom would be a job quietly back at twenty minutes. So it has to fail LOUDLY here too.
-  const declared = ['INVENTORIES', 'BROKEN_STACKS', 'RECIPE_ITEM_COPIES', 'LEARNED_RECIPES'].filter(
+  // The selector finds each table by a column-zero `const NAME = ` line whose statement that line
+  // OPENS. Either half failing fails SAFE — the parse returns null and the whole corpus is selected
+  // — which is correct and invisible: the only symptom would be a job quietly back at twenty
+  // minutes. So both have to fail LOUDLY here too.
+  const declared = FIXTURE_TABLE_NAMES.filter(
     (name) => !labActorsSource.some((line) => line.startsWith(`const ${name} = `))
   );
   assert.deepEqual(
@@ -1664,6 +1675,119 @@ test('the four labActors fixture tables the selector keys on still exist under t
     'these fixture tables are no longer declared at column zero under these names, so ' +
       '`parseLabActorTableRegions` finds nothing and every labActors change captures all 181 ' +
       `frames again:\n  ${declared.join('\n  ')}`
+  );
+
+  // The second invisible shape, which the probe above cannot see: a table collapsed onto ONE line
+  // still `startsWith` its own declaration. It parses to a span that runs to the NEXT column-zero
+  // `};` — so it answers for whatever is declared in between, under the wrong table's key, and
+  // that is a wrong NARROWING rather than a safe widening. `parseLabActorTableRegions` refuses it,
+  // and this is where the fixture drifting into that shape gets named.
+  const selfClosing = FIXTURE_TABLE_NAMES.filter(
+    (name) => !labActorsSource.find((line) => line.startsWith(`const ${name} = `)).endsWith('{')
+  );
+  assert.deepEqual(
+    selfClosing,
+    [],
+    'these fixture tables close their own opening line instead of opening a block, so ' +
+      '`parseLabActorTableRegions` refuses the file and every labActors change captures all 181 ' +
+      `frames again:\n  ${selfClosing.join('\n  ')}`
+  );
+});
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// `parseLabActorTableRegions`, driven directly (issue 1049 review).
+//
+// The tests above reach it only through `mapChangedFilesToCases`, over the file this repo actually
+// ships — which is well-formed, so both of its refusals are unreachable from there and were pinned
+// by nothing. It is already a pure function of an injected `string[]`, so a synthetic fixture needs
+// no file, no path injection and no second copy of the walk: just call it.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * One top-level fixture table, authored the way Prettier authors them.
+ *
+ * @param {string} name The constant's name.
+ * @param {object} [shape] How to author it.
+ * @param {boolean} [shape.oneLine] True to close the whole statement on the opening line.
+ * @returns {string[]} Its lines, followed by the blank line that separates declarations.
+ */
+function tableBlock(name, { oneLine = false } = {}) {
+  const entry = "'lab-actor-brenna': ['sm-longsword']";
+  if (oneLine) return [`const ${name} = Object.freeze({ ${entry} });`, ''];
+  return [`const ${name} = {`, `  ${entry},`, '};', ''];
+}
+
+test('parseLabActorTableRegions maps each fixture table to its own span, in file order', () => {
+  // Declared in an order the parser's own loop does not walk: it iterates
+  // `LAB_ACTOR_FIXTURE_TABLES`' keys, which state which frames read each table and say nothing
+  // about where the fixture declares them. The spans must be the FILE's, not the key list's.
+  const declared = ['LEARNED_RECIPES', 'INVENTORIES', 'RECIPE_ITEM_COPIES', 'BROKEN_STACKS'];
+  const regions = parseLabActorTableRegions(declared.flatMap((name) => tableBlock(name)));
+
+  assert.ok(regions, 'a well-formed fixture must parse');
+  assert.deepEqual(
+    [...regions].sort((left, right) => left.start - right.start),
+    declared.map((key, index) => ({ key, start: index * 4 + 1, end: index * 4 + 3 })),
+    'each table must span exactly its own three lines, so the four spans are disjoint and every ' +
+      "line inside one belongs to no other — which is what makes `regionsTouchedAt`'s first-match " +
+      'lookup an attribution rather than a guess'
+  );
+});
+
+test('parseLabActorTableRegions refuses a table whose opening line closes its own statement', () => {
+  // The direct check on the assumption, and NOT reachable through the overlap check: the one-lined
+  // table here swallows a plain const rather than another table, so no two table spans overlap and
+  // the consequence check passes. Verified by mutation — deleting the opening-line check from
+  // `parseLabActorTableRegions` makes this fixture parse, with `BROKEN_STACKS` spanning lines 5-9
+  // and answering for every line of `TOOL_DURABILITY`.
+  const swallowed = ['const TOOL_DURABILITY = {', "  'sm-hammer': 3,", '};', ''];
+  const source = [
+    ...tableBlock('INVENTORIES'),
+    ...tableBlock('BROKEN_STACKS', { oneLine: true }),
+    ...swallowed,
+    ...tableBlock('RECIPE_ITEM_COPIES'),
+    ...tableBlock('LEARNED_RECIPES'),
+  ];
+  assert.equal(
+    parseLabActorTableRegions(source),
+    null,
+    'a one-lined table runs to the next column-zero `};`, so it answers for a const it does not ' +
+      'feed — a wrong narrowing, and the one outcome this parse is built to make unreachable'
+  );
+
+  // The same file with that table opened properly parses, so the refusal is about the shape of
+  // that one line and nothing else about the fixture.
+  const opened = [...source];
+  opened.splice(4, 2, ...tableBlock('BROKEN_STACKS'));
+  assert.ok(parseLabActorTableRegions(opened), 'the control fixture must parse');
+});
+
+test('parseLabActorTableRegions refuses tables whose spans overlap', () => {
+  // The consequence check, on the shape the direct check above cannot see: a legitimate opener —
+  // it ends in `{` — whose close the column-zero search cannot find, because a second call wraps
+  // it. `INVENTORIES` then runs to `BROKEN_STACKS`' close and contains it whole.
+  const wrapped = [
+    'const INVENTORIES = Object.freeze(withDefaults({',
+    "  'lab-actor-brenna': { 'sm-iron-ore': 12 },",
+    '}));',
+    '',
+  ];
+  const tail = [
+    ...tableBlock('BROKEN_STACKS'),
+    ...tableBlock('RECIPE_ITEM_COPIES'),
+    ...tableBlock('LEARNED_RECIPES'),
+  ];
+  assert.equal(
+    parseLabActorTableRegions([...wrapped, ...tail]),
+    null,
+    'a table whose close the parser cannot see swallows the next one, and the swallowed table ' +
+      "then answers under the swallower's key"
+  );
+
+  // Same tables, same order, a close the parser can see: the refusal is the overlap, not the wrap.
+  assert.ok(
+    parseLabActorTableRegions([...tableBlock('INVENTORIES'), ...tail]),
+    'the control fixture must parse'
   );
 });
 

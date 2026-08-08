@@ -4481,8 +4481,12 @@ function rendersOwnedComponents(viewCase) {
  * `ItemPageInspector.svelte` is here even though only `manager-books-scrolls-normal` renders it in
  * a captured frame today: `manager-system-edit-normal` declares it in `sourceMatches` too, and
  * honouring a case's own declaration costs one frame and removes the need to second-guess it.
+ *
+ * Exported so `tests/view-lab-cases.test.js` can check THESE strings resolve to tracked files,
+ * rather than a hand-written copy of them. A copy would keep a renamed component's probe looking
+ * guarded while the live probe went dead — the mirror-rot this file guards everywhere else.
  */
-const ACTOR_KNOWLEDGE_RENDER_FILES = Object.freeze([
+export const ACTOR_KNOWLEDGE_RENDER_FILES = Object.freeze([
   'src/ui/svelte/apps/manager/KnowledgeView.svelte',
   'src/ui/svelte/apps/manager/BooksScrollsView.svelte',
   'src/ui/svelte/apps/manager/ItemPageInspector.svelte',
@@ -4527,6 +4531,12 @@ const LAB_ACTOR_FIXTURE_TABLES = Object.freeze({
   LEARNED_RECIPES: rendersOwnedKnowledge,
 });
 
+/**
+ * The line OPENING a top-level fixture table. A legitimate opener ends in `{` — `const NAME = {` or
+ * `const NAME = Object.freeze({` — because the table's entries are on the lines that follow it.
+ */
+const TABLE_OPEN_PATTERN = /\{$/;
+
 /** The line closing a top-level fixture table: `};`, or `});` for an `Object.freeze` wrapper. */
 const TABLE_CLOSE_PATTERN = /^\}\)?;$/;
 
@@ -4539,29 +4549,44 @@ const TABLE_CLOSE_PATTERN = /^\}\)?;$/;
  * this cannot find parses to null and widens to everything, so a rename fails safe — and
  * `tests/view-lab-cases.test.js` asserts all four names are still there, so it fails loudly too.
  *
- * The spans are then checked AGAINST EACH OTHER, which is this parser's counterpart to
+ * The parse is then self-checked TWICE, which is this parser's counterpart to
  * {@link parseCaseLineRegions}' cross-check of every key against `caseIds` — the structural
- * self-check without which a plausible authoring produces a plausible-looking wrong answer.
+ * self-check without which a plausible authoring produces a plausible-looking wrong answer. Both
+ * checks defend the same assumption from opposite ends, and neither subsumes the other.
  *
- * The close search takes the first column-zero `};` AFTER the opening line, so a table authored on
- * ONE line — `const BROKEN_STACKS = Object.freeze({ 'lab-actor-brenna': ['sm-longsword'] });`, 78
- * columns and therefore a line Prettier will not break at `printWidth: 100` — skips past its own
- * close and swallows the next table whole. Nothing downstream would notice: `regionsTouchedAt`
- * takes the FIRST region containing a line, so the swallowed table's lines answer under the
- * swallower's key. Measured on this fixture, with `BROKEN_STACKS` written that way and no check
- * here: a `RECIPE_ITEM_COPIES` patch selects the 64 player frames and NONE of the ten Knowledge and
- * Books & Scrolls frames it is evidence for — a silent wrong narrowing, which is the one outcome
- * this whole table is built to make unreachable. Overlapping spans are therefore not a parse, and a
- * non-parse widens to everything.
+ * The assumption is that a table's opening line OPENS it. The close search takes the first
+ * column-zero `};` AFTER that line, so a table authored on ONE line — `const BROKEN_STACKS =
+ * Object.freeze({ 'lab-actor-brenna': ['sm-longsword'] });`, 78 columns and therefore a line
+ * Prettier will not break at `printWidth: 100` — skips past its own close and swallows whatever is
+ * declared next. Nothing downstream would notice: `regionsTouchedAt` takes the FIRST region
+ * containing a line, so the swallowed lines answer under the swallower's key. Measured on this
+ * fixture, with `BROKEN_STACKS` written that way and neither check here: a `RECIPE_ITEM_COPIES`
+ * patch selects the 64 player frames and NONE of the ten Knowledge and Books & Scrolls frames it is
+ * evidence for — a silent wrong narrowing, which is the one outcome this whole table is built to
+ * make unreachable. So the assumption is checked DIRECTLY: an opener ends in `{`, and anything else
+ * — a one-liner's `});` most of all — is not a parse.
+ *
+ * Checking the consequence as well is not belt-and-braces. Overlapping spans catch a swallow only
+ * when what got swallowed is another TABLE, which is true of today's fixture by layout accident: a
+ * `const SOMETHING = {…};` declared between two tables would be swallowed with no two spans
+ * overlapping at all. And the direct check alone would leave `regionsTouchedAt`'s first-match
+ * lookup merely believed to be unambiguous rather than shown to be: disjoint spans are what make
+ * the region containing a line the ONLY region containing it. Overlapping spans are therefore not a
+ * parse either, and a non-parse widens to everything.
+ *
+ * Exported for `tests/view-lab-cases.test.js`, which drives both refusals from synthetic line
+ * arrays. It is already a pure function of an injected `string[]`, so testing it takes no file, no
+ * path injection and no second copy of the walk — only the export.
  *
  * @param {string[]} sourceLines That fixture, by line.
  * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
  */
-function parseLabActorTableRegions(sourceLines) {
+export function parseLabActorTableRegions(sourceLines) {
   const regions = [];
   for (const key of Object.keys(LAB_ACTOR_FIXTURE_TABLES)) {
     const start = sourceLines.findIndex((line) => line.startsWith(`const ${key} = `));
     if (start === -1) return null;
+    if (!TABLE_OPEN_PATTERN.test(sourceLines[start])) return null;
     const end = sourceLines.findIndex(
       (line, index) => index > start && TABLE_CLOSE_PATTERN.test(line)
     );
