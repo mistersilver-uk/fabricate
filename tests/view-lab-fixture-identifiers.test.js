@@ -152,9 +152,16 @@ function identifierPins(selector) {
   return pins;
 }
 
-// `data-popover-option` is deliberately absent from IDENTITY_SOURCES: the travel pickers reuse that
-// attribute with region ids and actor ids as its value space (issue #1021), so a single
-// definitions-only source set would falsely reject the picker cases that legitimately use it.
+// `data-popover-option` is deliberately absent from IDENTITY_SOURCES, on a forward-looking rather
+// than a current-state ground. Today the attribute has one producer, `SearchablePopover.svelte`,
+// which stamps it only for an option carrying a `dataId`, and exactly one caller supplies one —
+// `RecipeBulkEditPanel.svelte`, with `dataId: book.id` — so its whole value space is recipe book ids.
+// The Travel tab's region-override and move-to-party pickers are `SearchablePopover` consumers that
+// do not stamp `dataId` yet, and the component's own contract names them as the intended adopters:
+// an option needs an identity handle because "without one the only handle is the display label,
+// which is localized and therefore not a selector". When they adopt it the same attribute will also
+// carry region ids and actor ids, and a source set defined from recipe book ids alone would then
+// falsely reject the picker cases that legitimately name those (issue #1021).
 //
 // Twenty of the twenty-five `expectSelector`-bearing cases key on an attribute IDENTITY_SOURCES does
 // not recognise — `data-bulk-book-state`, `data-essence-view`, `data-inventory-bulk-panel`,
@@ -197,23 +204,28 @@ test('every fixture id a selector names exists in the lab world', () => {
   );
 });
 
-/**
- * Set by the `expectSelector` sweep test below and read by the non-vacuity check that follows it.
- * Counts recognised pins the sweep's own loop visited — not a value recomputed independently — so a
- * sweep silently rewired onto the wrong field, or over an always-empty collection, is caught the
- * same way an empty `IDENTITY_SOURCES` entry already is.
- */
-let expectSelectorRecognizedCount = 0;
-
 test('every fixture id an expectSelector names exists in the lab world', () => {
   const unknown = [];
+  let recognized = 0;
   for (const viewCase of VIEW_LAB_CASES) {
     if (typeof viewCase.expectSelector !== 'string') continue;
     for (const pin of identifierPins(viewCase.expectSelector)) {
-      expectSelectorRecognizedCount++;
+      recognized++;
       if (!pin.known) unknown.push(`${viewCase.id}: [${pin.name}="${pin.value}"]`);
     }
   }
+
+  // This sweep is prospective: today every recognised expectSelector pin duplicates a value its own
+  // case's steps already pinned, so a rename is caught by the step sweep first. A guard that
+  // currently catches nothing needs a guard of its own, because one wired to the wrong field or run
+  // over an always-empty collection passes exactly as loudly as a correct one. Counting the pins
+  // the loop above actually visited, rather than recomputing them here, is what makes that visible.
+  assert.ok(
+    recognized > 0,
+    'this sweep visited no expectSelector pin IDENTITY_SOURCES recognises, so the assertion below ' +
+      'would pass even if every case were pinned to a nonexistent fixture'
+  );
+
   assert.deepEqual(
     unknown,
     [],
@@ -231,14 +243,4 @@ test('the identity sources are populated, so the checks above are not vacuous', 
     assert.ok(values.size > 0, `no lab fixture supplies values for ${name}`);
   }
   assert.ok(Object.values(LAB_SYSTEM_IDS).length >= 5, 'expected one system per resolution mode');
-
-  // The expectSelector sweep above is prospective: today every recognised expectSelector pin
-  // duplicates a value its own case's steps already pinned, so a rename is caught by the step sweep
-  // first. This checks the sweep itself is not a no-op wired to the wrong field or an always-empty
-  // collection, which would pass exactly as loudly as a correct one.
-  assert.ok(
-    expectSelectorRecognizedCount > 0,
-    "no case's expectSelector yielded a fixture id IDENTITY_SOURCES recognises, so the " +
-      'expectSelector check above would pass even if every case were pinned to a nonexistent fixture'
-  );
 });
