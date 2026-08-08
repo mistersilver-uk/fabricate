@@ -84,7 +84,10 @@ import {
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
 } from '../../../systems/currencyProfile.js';
-import { normalizeModifierPolicy } from '../../../systems/craftingModifierResolver.js';
+import {
+  normalizeModifierPolicy,
+  resolveActiveCraftingCheckFormula,
+} from '../../../systems/craftingModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
@@ -2458,6 +2461,66 @@ function _descriptionTextCandidate(value, seen = new Set()) {
 }
 
 /**
+ * Which of the three reasons a `@craftingmod` catalogue is INERT applies, or `null` when
+ * it is live. Discriminated rather than collapsed to one boolean because each cause needs
+ * different GM-facing copy — "this mode rolls no check" is a different fix from "this
+ * formula never spends `@craftingmod`". The order matters: a mode with no check slot has
+ * no formula to inspect, and an unauthored formula cannot reference the token.
+ * @param {ReturnType<typeof resolveActiveCraftingCheckFormula>} formula
+ * @returns {'noCheck'|'noFormula'|'noModifierToken'|null}
+ */
+function _craftingModifierInertCause(formula) {
+  if (formula.slot === null) return 'noCheck';
+  if (!formula.checkUsable) return 'noFormula';
+  if (!formula.referencesModifier) return 'noModifierToken';
+  return null;
+}
+
+/**
+ * The recipe-modifier delegation facts the Checks card needs (issue 1055), projected as
+ * an extension of the `craftingCheck` allowlist below.
+ *
+ * `recipeModifierAuthority` is passed through RAW and is deliberately NOT defaulted — no
+ * `|| 'setAndRule'`, no `?? 'none'`. Absence is a real fourth state ("not yet stamped"),
+ * distinct from all three authored levels, and the authoring card renders it as such. A
+ * default here would forge a GM decision that was never made and would make the stamped
+ * and unstamped worlds indistinguishable to the UI. The key is always emitted so the
+ * shape is fixed; its value is `undefined` when unresolved. What absence MEANS at
+ * resolution time is `resolveRecipeModifierAuthority`'s answer (`setAndRule`), and this
+ * projection deliberately does not pre-empt it.
+ *
+ * The two counts are the downgrade disclosure's input — lowering the level leaves stored
+ * overrides on disk but stops honouring them, so the card states how many recipes that
+ * silences BEFORE the GM saves. They are separate because the two downgrades silence
+ * different populations: dropping to `none` unhonours every override, while dropping to
+ * `setOnly` unhonours only the rule half.
+ *
+ * @param {object} system The selected crafting system.
+ * @param {Array<object>} systemRecipes That system's recipes.
+ */
+function _buildRecipeModifierAuthorityView(system, systemRecipes) {
+  const inertCause = _craftingModifierInertCause(resolveActiveCraftingCheckFormula(system));
+  const overrides = (Array.isArray(systemRecipes) ? systemRecipes : []).filter(
+    (recipe) => recipe?.craftingModifier && typeof recipe.craftingModifier === 'object'
+  );
+  return {
+    recipeModifierAuthority: system?.craftingCheck?.recipeModifierAuthority,
+    // True only when the check this system's resolution mode ACTUALLY rolls spends
+    // `@craftingmod`; everything the catalogue configures is silently inert otherwise.
+    // Derived FROM the cause rather than beside it, so the boolean and the explanation
+    // cannot contradict each other — the card renders one or the other, never both.
+    modifierFormulaActive: inertCause === null,
+    modifierFormulaInertCause: inertCause,
+    // Recipes silenced by dropping to `none` (any override at all)...
+    recipeModifierOverrideCount: overrides.length,
+    // ...and the subset silenced by dropping to `setOnly` (a RULE override).
+    recipeModifierRuleOverrideCount: overrides.filter(
+      (recipe) => typeof recipe.craftingModifier.policy === 'string'
+    ).length,
+  };
+}
+
+/**
  * Build the full selectedSystem view data object.
  * Mirrors RecipeManagerApp._prepareContext() selectedSystem section.
  */
@@ -2467,7 +2530,8 @@ function _buildSelectedSystemViewData(
   componentTagOptions,
   essenceDefinitions,
   availableScriptMacros,
-  sceneOptions
+  sceneOptions,
+  systemRecipes = []
 ) {
   if (!selectedSystem) return null;
 
@@ -2598,6 +2662,11 @@ function _buildSelectedSystemViewData(
       defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
         ? [...selectedSystem.craftingCheck.defaultModifierIds]
         : [],
+      // The delegation axis and its two supporting derivations (issue 1055). Spread from
+      // a named builder so this allowlist keeps stating what it carries while the giant
+      // literal gains no new branches — see `_buildRecipeModifierAuthorityView` for why
+      // `recipeModifierAuthority` is passed through undefaulted.
+      ..._buildRecipeModifierAuthorityView(selectedSystem, systemRecipes),
     },
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -5293,11 +5362,16 @@ export function createAdminStore(services) {
           associatedItemName: associatedItem?.name || null,
         };
       });
+      // Hoisted out of the `_buildEssenceCards` argument list: the modifier-authority
+      // projection needs the same list to count the recipes a downgrade would silence,
+      // and one read serves both.
+      const systemRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || [];
+
       essenceCards = _buildEssenceCards(
         essenceDefinitions,
         managedItems,
         managedItemOptions,
-        recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || []
+        systemRecipes
       );
 
       selectedSystemData = _buildSelectedSystemViewData(
@@ -5306,7 +5380,8 @@ export function createAdminStore(services) {
         componentTagOptions,
         essenceDefinitions,
         availableScriptMacros,
-        sceneOptions
+        sceneOptions,
+        systemRecipes
       );
 
       recipeListData = _buildRecipeList(
@@ -5754,7 +5829,19 @@ export function createAdminStore(services) {
     const name = _nextSystemName(systemManager);
     const description =
       'Configure categories, item tags, essences, and crafting behaviour for this system.';
-    const system = await systemManager.createSystem({ name, description });
+    // A system authored HERE — through the manager UI, by a GM who is about to be shown
+    // the authority control — starts undelegated (issue 1055). It is stated at this call
+    // site rather than defaulted inside `CraftingSystemManager.createSystem`, which stays
+    // authority-neutral on purpose: the importer (`CompendiumImporter.js:339`) and every
+    // programmatic caller go through that same method and must keep landing on the
+    // unresolved state, so that the migration and the initialize-time fallback can derive
+    // the level from the payload's own recipes instead of inheriting this UI's opinion.
+    // Sniffing the input's key shape inside the manager would conflate the two callers.
+    const system = await systemManager.createSystem({
+      name,
+      description,
+      craftingCheck: { recipeModifierAuthority: 'none' },
+    });
     selectedSystemId.set(system.id);
     _clearSystemScopedSearches();
     activeTab.set('systems');
