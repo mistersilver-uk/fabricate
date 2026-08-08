@@ -1374,6 +1374,36 @@ A locked recipe stays **visible** to players but only a GM can craft it, a disti
 The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
 The change persists immediately (like `enabled`), outside the recipe draft's Save.
 
+### Recipe crafting-check modifier control (issue 1055)
+
+The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) renders one of three mutually exclusive dispositions, evaluated in this priority order, driven by the system's `craftingCheck.recipeModifierAuthority` (resolved the same way the engine resolves it — an unstamped system is treated as `setAndRule`, never as an invented default) and by whether the system's actively-rolled check formula references `@craftingmod` at all:
+
+1. **Inert banner** (any authority level) — shown when the catalogue is non-empty but the system's active check cannot spend `@craftingmod`, for one of three causes: `noCheck` (this resolution mode rolls no crafting check at all), `noFormula` (a check slot exists but has no authored roll formula), or `noPlaceholder` (a formula is authored but never references `@craftingmod`).
+   The control is replaced entirely — nothing authored here could change a roll — and the banner names which cause applies from the recipe's point of view (distinct copy from the Checks card's equivalent notice).
+2. **Read-only summary** (authority `none`) — the eligible-modifier catalogue exists and the formula is live, but this system delegates neither axis: the grid renders no control at all, and a full-bleed banner below it names the inherited eligible set (or states the default set is empty) and deep-links to the Checks tab, where both the catalogue and the authority level are actually set.
+3. **Controls** (authority `setOnly` or `setAndRule`) — the grid renders a picker cell for the eligible-id subset, and, only at `setAndRule`, an adjacent combination-rule select (labelled "Combination rule", options `addAll`/`highest`/`playerPicks`, no `byRecipe`).
+   At `setOnly` the combination rule stays system-wide and only the picker cell renders.
+
+The per-recipe select-row grid's worst case stays at five cells — Category, Check tier, Minimum success tier, the combination-rule select, and the picker cell — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a sixth grid cell.
+Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting); selecting **No modifiers** writes an authored empty `modifierIds` array (`@craftingmod` resolves to 0 for that recipe); selecting **Inherit system default** drops the `modifierIds` key.
+Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
+
+The inert banner and the `none`-authority summary reuse the resolution-mode banner's chrome (`RecipeModeBanner`, prop-ified with a `tone` and a `dataAttr` name so it can render twice on one tab without colliding) rather than inventing a second visual language for "this is set elsewhere".
+Both banners render full-bleed below the grid, replacing the control the grid would otherwise hold, rather than squeezing into a single grid cell.
+
+**Five-mode active-check-formula table.** Whether a system's active check can spend `@craftingmod` at all — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`craftingModifierResolver.js`), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to the `craftingCheck` sub-config that mode actually rolls:
+
+| Resolution mode       | Check config                 | Notes                                                        |
+|------------------------|-------------------------------|---------------------------------------------------------------|
+| `simple`               | `craftingCheck.simple`        | optional                                                       |
+| `routedByIngredients`  | `craftingCheck.simple`        | optional; shares the simple slot                               |
+| `routedByCheck`        | `craftingCheck.routed`        | required                                                       |
+| `progressive`          | `craftingCheck.progressive`   | required                                                       |
+| `alchemy`              | per `alchemy.checkMode`       | `none` → no check, `simple` → `simple`, `tiered` → `routed`   |
+
+A catalogue can be inert for three DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), a slot exists but carries no authored roll formula (`noFormula`), or a formula is authored but never contains the `@craftingmod` token (`noPlaceholder`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
+The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
+
 ### Tools tab
 
 The recipe editor's Tools tab authors Tool references only.

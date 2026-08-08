@@ -54,6 +54,7 @@ The `runtimeStateIncluded: false` marker MUST stay honest with this boundary.
 Import MUST accept exports of any prior `schemaVersion` by upcasting through a migration before validation.
 A legacy export carries no `schemaVersion` and is treated as schema `1`.
 The migration MUST be idempotent: migrating an already-current payload is a no-op, and migrating a migrated payload equals migrating it once.
+A payload's `craftingCheck.recipeModifierAuthority` MUST be derived by `migrateExportPayload` from the payload's own system and recipes, by the same rule as the world-side `1.20.0` settings migration (retire a persisted `byRecipe` policy to `addAll` at both levels, then stamp the authority only where it is still absent/`null`), and this derivation MUST run **branch-independently** of the schema-envelope upcast: a bundle already at the current `schemaVersion` still needs it, because the authority is a field added on an OLD schema version and its absence is orthogonal to the envelope version.
 
 ### GM gating
 
@@ -129,6 +130,8 @@ Terminating the progress indicator on failure MUST NOT suppress, wrap, or alter 
 ### Round-trip integrity
 
 For supported authoring data, a single-store keep-mode `export → import → export` MUST be equivalent modulo the volatile envelope fields `exportedAt` and `fabricateVersion`.
+`craftingCheck.recipeModifierAuthority` MUST round-trip through `export → import → export` under keep mode.
+An overwrite import MAY leave the field absent, or (from malformed source data) `null`, rather than an explicit resolved value; either resolves as `setAndRule` at the resolver and reconverges to a resolved value the next time the world initializes (the initialize-time fallback stamp, or a later re-run of the `1.20.0` migration), so this is not a behaviour regression, only a transient unresolved-authority state.
 
 ## Out of Scope
 
