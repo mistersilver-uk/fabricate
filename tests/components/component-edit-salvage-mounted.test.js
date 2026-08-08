@@ -31,6 +31,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-edit-salvage-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/componentEditor.js',
     // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
     // withhold a disabled essence from the quantity grid. A missing raw module HANGS the

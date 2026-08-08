@@ -4,6 +4,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from './SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   // The shared essence quantity card (issue 772). It lives under `components/` — the
@@ -1671,22 +1672,12 @@
                 min={0}
                 fill
                 disabled={saving}
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
-                  'Custom salvage DC'
+                {...stepperLabels(
+                  text(
+                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
+                    'Custom salvage DC'
+                  )
                 )}
-                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                  label: text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
-                    'Custom salvage DC'
-                  ),
-                })}
-                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                  label: text(
-                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
-                    'Custom salvage DC'
-                  ),
-                })}
                 inputProps={{ 'data-salvage-dc-custom': '' }}
                 onChange={setSalvageDcOverride}
               />

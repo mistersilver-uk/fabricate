@@ -13,6 +13,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
     rollFormula = '',
@@ -63,9 +64,7 @@
         fill
         min={0}
         value={dc ?? 15}
-        ariaLabel={dcLabel}
-        decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: dcLabel })}
-        incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: dcLabel })}
+        {...stepperLabels(dcLabel)}
         inputProps={{ 'data-check-dc': '' }}
         onChange={(next) => onChange({ dc: next })}
       />

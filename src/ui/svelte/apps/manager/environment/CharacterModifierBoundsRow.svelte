@@ -24,6 +24,7 @@
 -->
 <script>
   import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
@@ -71,9 +72,7 @@
         allowUnset
         step={1}
         fill
-        ariaLabel={bound.label}
-        decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: bound.label })}
-        incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: bound.label })}
+        {...stepperLabels(bound.label)}
         onChange={(next) => onChange(bound.patch(next))}
       />
     </div>

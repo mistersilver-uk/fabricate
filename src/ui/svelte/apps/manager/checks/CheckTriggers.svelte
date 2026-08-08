@@ -37,6 +37,7 @@
   import { parseDiceGroups } from '../../../../../utils/craftingCheckExpression.js';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
     value = null,
@@ -240,13 +241,9 @@
   // The tier-step operand's ONLY name is "Steps up" / "Steps down", so parametrizing the
   // shared adjunct strings with it reads as "Decrease Steps up". Its adjuncts take the
   // row's own label — "Tier step" — instead, which is both grammatical and the name this
-  // surface already gives the control the operand belongs to.
-  const stepsDecreaseLabel = $derived(
-    localize('FABRICATE.Common.Stepper.Decrease', { label: tierStepLabel })
-  );
-  const stepsIncreaseLabel = $derived(
-    localize('FABRICATE.Common.Stepper.Increase', { label: tierStepLabel })
-  );
+  // surface already gives the control the operand belongs to. So the shared derivation is
+  // spread from `tierStepLabel` and only `ariaLabel` is overridden after it, at the tag.
+  const tierStepAdjunctLabels = $derived(stepperLabels(tierStepLabel));
   const conditionValueLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Breakage.Value', 'Value')
   );
@@ -494,13 +491,7 @@
                 <Stepper
                   fill
                   value={condition.value ?? 0}
-                  ariaLabel={conditionValueLabel}
-                  decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                    label: conditionValueLabel,
-                  })}
-                  incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                    label: conditionValueLabel,
-                  })}
+                  {...stepperLabels(conditionValueLabel)}
                   inputProps={{ 'data-trigger-value': '' }}
                   onChange={(next) => updateCondition(trigger.id, { value: next })}
                 />
@@ -600,14 +591,13 @@
                   fill
                   value={step.steps}
                   min={1}
+                  {...tierStepAdjunctLabels}
                   ariaLabel={step.mode === 'up'
                     ? text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsUp', 'Steps up')
                     : text(
                         'FABRICATE.Admin.Manager.Checks.Breakage.TierStepStepsDown',
                         'Steps down'
                       )}
-                  decrementLabel={stepsDecreaseLabel}
-                  incrementLabel={stepsIncreaseLabel}
                   inputProps={{ 'data-trigger-tier-step-steps': '' }}
                   onChange={(next) =>
                     updateTierStep(trigger.id, { steps: Math.max(1, Math.trunc(next)) })}

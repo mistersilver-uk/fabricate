@@ -27,6 +27,40 @@ export const UI_SVELTE_DIR = 'src/ui/svelte';
 export const STEPPER_PATH = 'src/ui/svelte/components/Stepper.svelte';
 
 /**
+ * The ONE derivation of a Stepper's three accessible names from a field's own label.
+ *
+ * The two adjunct names are not independent strings — they are `localize()` of the two
+ * parametrized `FABRICATE.Common.Stepper.*` keys against the input's label — so spelling that
+ * derivation out per call site is one implementation written ~20 times. It lives in this module
+ * and call sites spread it; {@link spreadsSharedStepperLabels} is what lets the naming rule
+ * recognize a spread, and `tests/util/stepper-labels.test.js` is what makes recognizing it sound.
+ */
+export const STEPPER_LABELS_PATH = 'src/ui/svelte/components/stepperLabels.js';
+
+/**
+ * Whether a `<Stepper>` tag reaches all three accessible names through the shared derivation.
+ *
+ * Two spellings, both real in the tree:
+ *   - `{...stepperLabels(label)}` — spread inline, the ordinary case.
+ *   - `{...tierStepAdjunctLabels}` — spread through a component-level binding assigned from it,
+ *     which is how a call site whose INPUT name differs from its adjuncts' spells it (the
+ *     tier-step operand is "Steps up", but its adjuncts read the row's "Tier step").
+ *
+ * The binding form is resolved against the component's own source rather than accepted on the
+ * name, so an unrelated `{...props}` spread cannot satisfy the naming rule.
+ *
+ * @param {string} tag A single `<Stepper …/>` tag.
+ * @param {string} source The component source the tag came from, comments already stripped.
+ * @returns {boolean}
+ */
+export function spreadsSharedStepperLabels(tag, source) {
+  return [...tag.matchAll(/\{\s*\.\.\.\s*([A-Za-z_$][\w$]*)\s*(\()?/g)].some(([, name, call]) => {
+    if (name === 'stepperLabels') return Boolean(call);
+    return new RegExp(String.raw`\b${name}\b[^\n]*=[^\n]*stepperLabels\(`).test(source);
+  });
+}
+
+/**
  * A floor on the enumeration, so a glob typo cannot pass vacuously.
  *
  * The tree holds ~265 `.svelte` files today. The floor is deliberately far below that and NOT a

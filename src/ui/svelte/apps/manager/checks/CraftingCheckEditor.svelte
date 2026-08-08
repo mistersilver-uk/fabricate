@@ -25,6 +25,7 @@
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -290,9 +291,7 @@
               <Stepper
                 fill
                 value={outcome.dc ?? 0}
-                ariaLabel={dcLabel}
-                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: dcLabel })}
-                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: dcLabel })}
+                {...stepperLabels(dcLabel)}
                 inputProps={{ 'data-outcome-dc': '' }}
                 onChange={(dc) => updateOutcome(outcome.id, { dc })}
               />
@@ -300,22 +299,14 @@
               <Stepper
                 fill
                 value={outcome.start ?? 0}
-                ariaLabel={startLabel}
-                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                  label: startLabel,
-                })}
-                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                  label: startLabel,
-                })}
+                {...stepperLabels(startLabel)}
                 inputProps={{ 'data-outcome-start': '' }}
                 onChange={(start) => updateOutcome(outcome.id, { start })}
               />
               <Stepper
                 fill
                 value={outcome.end ?? 0}
-                ariaLabel={endLabel}
-                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: endLabel })}
-                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: endLabel })}
+                {...stepperLabels(endLabel)}
                 inputProps={{ 'data-outcome-end': '' }}
                 onChange={(end) => updateOutcome(outcome.id, { end })}
               />

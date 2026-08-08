@@ -38,6 +38,7 @@ import {
   CHARACTER_MODIFIER_BOUNDS_SCOPES,
   MIGRATED_INPUT_HOOKS,
   MINIMUM_SCANNED_SVELTE_FILES,
+  STEPPER_LABELS_PATH,
   STEPPER_PATH,
   UNSET_VALUE_CALL_SITES,
   collectSvelteSources,
@@ -45,6 +46,7 @@ import {
   labelsBindingAStepper,
   objectLiteralKeys,
   repoRoot,
+  spreadsSharedStepperLabels,
   stepperTags,
   withoutComments,
 } from '../helpers/stepperSourceContract.js';
@@ -132,15 +134,20 @@ describe('Stepper call sites (issue 1050)', () => {
 
   it('names both adjuncts and the input at every call site', () => {
     // `Stepper` is an import-free leaf and localizes NOTHING itself, so an omitted label ships an
-    // anonymous button rather than an English one. Shorthand (`{decrementLabel}`) counts: the two
-    // pass-through wrappers, `EssenceQuantityCard` and `ComponentBulkEditPanel`, spell it that way.
+    // anonymous button rather than an English one. Three spellings count. Explicit props; shorthand
+    // (`{decrementLabel}`), which the two pass-through wrappers `EssenceQuantityCard` and
+    // `ComponentBulkEditPanel` use; and a spread of the shared `stepperLabels(label)` derivation,
+    // which supplies all three at once and is what the ~20 migrated fields now use. The spread only
+    // counts as coverage because `tests/util/stepper-labels.test.js` pins that the helper returns
+    // exactly those three props — without that this rule would be reading a `{...}` as a promise.
     const named = (tag, prop) =>
       new RegExp(String.raw`(?:\b${prop}=|\{\s*${prop}\s*\})`).test(tag);
     const anonymous = CALL_SITES.filter(
-      ({ tag }) =>
-        !named(tag, 'ariaLabel')
-        || !named(tag, 'decrementLabel')
-        || !named(tag, 'incrementLabel')
+      ({ path, tag }) =>
+        !spreadsSharedStepperLabels(tag, markup[path])
+        && (!named(tag, 'ariaLabel')
+          || !named(tag, 'decrementLabel')
+          || !named(tag, 'incrementLabel'))
     ).map(({ path }) => path);
     assert.deepEqual(anonymous, [], 'every Stepper names its input and both of its adjuncts');
   });
@@ -162,11 +169,22 @@ describe('Stepper call sites (issue 1050)', () => {
         `${name} is parametrized on {label}, which is what makes one key serve every field`
       );
     }
-    // And the keys are actually the ones the call sites reach for, so renaming either half fails.
-    const users = CALL_SITES.filter(({ tag }) =>
-      tag.includes('FABRICATE.Common.Stepper.Decrease')
+    // And the keys are the ones the tree actually reaches for. The reach is now through ONE
+    // module rather than repeated per call site, so this asserts against that module — and
+    // against at least one call site still arriving through it, so a helper nothing spreads
+    // could not satisfy the rule on its own.
+    const labelsSource = readFileSync(resolve(repoRoot, STEPPER_LABELS_PATH), 'utf8');
+    for (const name of ['Decrease', 'Increase']) {
+      assert.match(
+        labelsSource,
+        new RegExp(String.raw`=\s*'FABRICATE\.Common\.Stepper\.${name}'`),
+        `the shared derivation localizes ${name}, so renaming that half of the pair fails here`
+      );
+    }
+    const users = CALL_SITES.filter(({ path, tag }) =>
+      spreadsSharedStepperLabels(tag, markup[path])
     ).length;
-    assert.ok(users > 0, 'at least one call site localizes the shared Decrease key');
+    assert.ok(users > 0, 'call sites reach the shared Decrease/Increase keys through the helper');
   });
 
   it('never passes disabled through inputProps', () => {

@@ -18,6 +18,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/gatheringImageDefaults.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/essenceIcons.js',

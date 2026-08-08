@@ -21,6 +21,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import { stepperLabels } from '../../components/stepperLabels.js';
   import ResolutionModeCard from './ResolutionModeCard.svelte';
 
   let { services = null, systemId = '' } = $props();
@@ -500,13 +501,9 @@
                   fill
                   density="comfortable"
                   disabled={!actor.rolled}
-                  ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`}
-                  decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                    label: `${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`,
-                  })}
-                  incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                    label: `${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`,
-                  })}
+                  {...stepperLabels(
+                    `${text('FABRICATE.Admin.Manager.Economy.Current', 'Current')} — ${actor.name}`
+                  )}
                   inputProps={{ 'data-economy-actor-current': '' }}
                   onChange={(next) => (actor.draftCurrent = next)}
                 />
@@ -522,13 +519,9 @@
                   density="comfortable"
                   disabled={!actor.rolled || actor.maxReadOnly === true}
                   placeholder={actor.rolledMax != null ? String(actor.rolledMax) : '—'}
-                  ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`}
-                  decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                    label: `${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`,
-                  })}
-                  incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                    label: `${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`,
-                  })}
+                  {...stepperLabels(
+                    `${text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')} — ${actor.name}`
+                  )}
                   inputProps={{ 'data-economy-actor-max': '' }}
                   onChange={(next) => (actor.draftMaxOverride = next)}
                 />

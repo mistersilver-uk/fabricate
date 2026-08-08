@@ -470,6 +470,12 @@ function compileManagerRoot() {
   // single low-layer source of truth), so copy that module and its transitive
   // model/util/config dependencies verbatim.
   for (const rawPath of [
+    // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
+    // (issue 1050). It sits beside the primitive under `components/` rather than in the
+    // `util/` loop above, and every migrated call site in this tree imports it — the
+    // character-modifier bounds row, the check editors, the task editor, the economy view.
+    // This suite has NO dependency validator, so omitting it HANGS it as `# cancelled`.
+    'src/ui/svelte/components/stepperLabels.js',
     'src/models/Recipe.js',
     'src/models/Ingredient.js',
     'src/models/IngredientSet.js',

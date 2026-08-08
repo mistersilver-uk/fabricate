@@ -86,12 +86,16 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-economy-view-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
-    const util = join(tempRoot, 'src/ui/svelte/util/foundryBridge.js');
-    mkdirSync(dirname(util), { recursive: true });
-    writeFileSync(
-      util,
-      readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8')
-    );
+    // `stepperLabels.js` is the shared adjunct-name derivation the view's Steppers import
+    // (issue 1050); omitting it leaves the compiled component with an unresolvable import.
+    for (const modulePath of [
+      'src/ui/svelte/util/foundryBridge.js',
+      'src/ui/svelte/components/stepperLabels.js',
+    ]) {
+      const destination = join(tempRoot, modulePath);
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
+    }
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');

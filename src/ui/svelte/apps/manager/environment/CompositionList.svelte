@@ -12,6 +12,7 @@
   import OverrideIndicator from './OverrideIndicator.svelte';
   import Pagination from '../../../components/Pagination.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
     kind = 'task',
@@ -299,22 +300,9 @@
                     min={0}
                     step={1}
                     fill
-                    ariaLabel={text(
-                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
-                      'Weight'
+                    {...stepperLabels(
+                      text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')
                     )}
-                    decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                      label: text(
-                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
-                        'Weight'
-                      ),
-                    })}
-                    incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                      label: text(
-                        'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
-                        'Weight'
-                      ),
-                    })}
                     inputProps={{ 'data-composition-weight': entry.id }}
                     onChange={(weight) => onWeightChange(entry.id, weight)}
                   />

@@ -31,6 +31,7 @@
   import { describeVisualStatus, describeActivationGate } from '../../interactableConfigView.js';
   import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
   import Stepper from '../components/Stepper.svelte';
+  import { stepperLabels } from '../components/stepperLabels.js';
 
   let { services = null } = $props();
 
@@ -583,13 +584,9 @@
               step={1}
               fill
               density="comfortable"
-              ariaLabel={text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}
-              decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                label: text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count'),
-              })}
-              incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                label: text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count'),
-              })}
+              {...stepperLabels(
+                text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')
+              )}
               inputProps={{ 'data-interactable-node-count': '' }}
               onChange={(next) => setNodeCount(next)}
             />

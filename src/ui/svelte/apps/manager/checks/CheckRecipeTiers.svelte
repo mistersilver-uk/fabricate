@@ -8,6 +8,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let { tiers = [], defaultDc = 0, onChange = () => {} } = $props();
 
@@ -93,9 +94,7 @@
           fill
           min={0}
           value={tier.dc ?? 0}
-          ariaLabel={dcLabel}
-          decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: dcLabel })}
-          incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: dcLabel })}
+          {...stepperLabels(dcLabel)}
           inputProps={{ 'data-tier-dc': '' }}
           onChange={(dc) => updateTier(tier.id, { dc })}
         />

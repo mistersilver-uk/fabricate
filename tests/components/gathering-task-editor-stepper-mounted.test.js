@@ -33,6 +33,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-gathering-task-stepper-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

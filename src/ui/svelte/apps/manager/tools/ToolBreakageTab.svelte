@@ -4,6 +4,7 @@
   import { toolBreakageChanceColor } from '../../../util/chanceColorScale.js';
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../Chip.svelte';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
@@ -328,13 +329,9 @@
               value={tool?.breakage?.threshold ?? 0}
               step={1}
               fill
-              ariaLabel={text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')}
-              decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
-                label: text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below'),
-              })}
-              incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
-                label: text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below'),
-              })}
+              {...stepperLabels(
+                text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')
+              )}
               inputProps={{ 'data-tool-breakage-threshold': '' }}
               onChange={(threshold) => patchBreakage({ threshold })}
             />
