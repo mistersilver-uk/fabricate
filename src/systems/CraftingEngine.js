@@ -31,6 +31,7 @@ import {
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCraftingModifierChoice,
+  buildCraftingModifierContext,
   CRAFTING_MOD_TOKEN,
   makeRollDataExpressionEvaluator,
   resolveModifierPolicy,
@@ -4216,7 +4217,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCraftingModifierContext(system, recipe);
     const result = await runFormulaPassFail({
       formula,
       dc,
@@ -4282,7 +4283,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCraftingModifierContext(system, recipe);
     const result = await runFormulaRouted({
       formula,
       dc,
@@ -4331,24 +4332,6 @@ export class CraftingEngine {
    */
   _markEngineEvaluated(result) {
     return { ...result, engineEvaluated: true };
-  }
-
-  /**
-   * Build the `@craftingmod` modifier context (issue 770) from the system's crafting
-   * check catalogue + default policy and the recipe's optional override. Threaded to
-   * the shared check runners, which resolve `@craftingmod` to a scalar against the
-   * crafter's roll data before the formula reaches Foundry's `Roll`. A formula with no
-   * `@craftingmod` token ignores this context entirely (full back-compat).
-   * @private
-   */
-  _buildCraftingModifierContext(system, recipe) {
-    const check = system?.craftingCheck || {};
-    return {
-      catalogue: check.checkModifiers,
-      systemPolicy: check.defaultModifierPolicy,
-      defaultModifierIds: check.defaultModifierIds,
-      recipeModifier: recipe?.craftingModifier ?? null,
-    };
   }
 
   /**
@@ -4422,7 +4405,7 @@ export class CraftingEngine {
   ) {
     const progressive = system?.craftingCheck?.progressive || {};
     const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
-    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCraftingModifierContext(system, recipe);
     const result = await runFormulaProgressive({
       formula,
       triggers: progressive.checkBreakage?.triggers,

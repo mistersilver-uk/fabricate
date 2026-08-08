@@ -23,6 +23,7 @@ import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
 
+import { buildCraftingModifierContext } from './craftingModifierResolver.js';
 import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 
 /**
@@ -708,14 +709,17 @@ export class CraftingListingBuilder {
     // false when the formula does not reduce to a number for this actor (error state).
     const resolution =
       rollFormula.length > 0 && craftingActor
-        ? this._resolveCheckFormula(rollFormula, craftingActor, {
-            // The `@craftingmod` context (issue 770): resolve the same scalar the
-            // engine rolls, so the displayed formula matches what evaluates.
-            catalogue: checks.checkModifiers,
-            systemPolicy: checks.defaultModifierPolicy,
-            defaultModifierIds: checks.defaultModifierIds,
-            recipeModifier: recipe?.craftingModifier ?? null,
-          })
+        ? // The `@craftingmod` context (issues 770, 1055): the SAME builder the engine
+          // threads to its check runners, not a second literal of the same shape. The
+          // display path and the evaluation path must agree on every axis the context
+          // carries — including `recipeModifierAuthority`, which decides whether a
+          // recipe's override is honoured at all — or the listed formula shows a
+          // scalar the roll will not use (`resolution-modes/spec.md` requirement 71).
+          this._resolveCheckFormula(
+            rollFormula,
+            craftingActor,
+            buildCraftingModifierContext(system, recipe)
+          )
         : null;
     // A routed fixed check (routedByCheck, or alchemy tiered) matches by value
     // range, not DC, so it has no meaningful DC — null it so the player card hides
