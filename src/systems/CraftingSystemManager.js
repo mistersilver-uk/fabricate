@@ -2246,11 +2246,22 @@ export class CraftingSystemManager {
    * exercised rather than changing a roll. Do not "fix" this by re-deriving the policy
    * signal; there is none left to read.
    *
+   * A system the `1.20.0` migration deliberately skipped (a NO-SEED decision) does NOT
+   * stay unstamped once this walk runs: `initialize()` normalizes every system
+   * (`:296`, via `_normalizeCraftingCheck`) BEFORE this walk (`:97`), and normalization
+   * always produces a full `craftingCheck` object, so the `!check` guard below never
+   * observes the skipped system's actual pre-normalization shape — this fallback
+   * stamps it anyway on the same in-memory pass. The migration's no-seed decision
+   * therefore does not survive to disk; only its DIVERGENCE from this fallback's
+   * derivation (the paragraph above) is preserved.
+   *
    * FIRES ON ABSENT **OR** `null`. After `_normalizeCheckModifierConfig` the absent form
    * is the only one that occurs — that normalizer omits the key rather than writing a
-   * placeholder — so a literal `=== null` test alone would be dead code. Both are tested
-   * so a system that reached this map without passing through the normalizer (a future
-   * caller, a hand-built fixture) is still stamped.
+   * placeholder — so a literal `=== null` test alone would be dead code. The `!== null`
+   * half is kept as correct defensive code for a system that reaches this map without
+   * passing through the normalizer (a future caller, a hand-built fixture), and because
+   * amendment A4 requires absent-OR-`null` to both stamp; only the absent half is
+   * exercised by `tests/crafting-system-modifier-authority-stamp.test.js` today.
    *
    * MUTATES IN MEMORY UN-GATED, exactly like the walk that calls it. The derivation reads
    * only `RecipeManager#getRecipes`, which filters on `category` and `craftingSystemId`
@@ -2265,6 +2276,8 @@ export class CraftingSystemManager {
    */
   _stampRecipeModifierAuthority(system, recipes) {
     const check = system?.craftingCheck;
+    // Unreachable on a normalized system (see the JSDoc above) — kept as defensive
+    // code, not as evidence that a no-seed system stays unstamped.
     if (!check || typeof check !== 'object') return false;
     const authored = check.recipeModifierAuthority;
     if (authored !== undefined && authored !== null) return false;
