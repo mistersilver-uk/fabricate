@@ -12,6 +12,7 @@
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
+import { applyRecipeModifierAuthority } from './migrateRecipeModifierAuthority.js';
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
 
 /**
@@ -31,6 +32,29 @@ function upcastLegacyTools(migrated) {
 }
 
 /**
+ * Retire the `byRecipe` modifier policy and derive `craftingCheck.recipeModifierAuthority`
+ * for an imported bundle (issue 1055), mirroring the world-side 1.20.0 migration. An
+ * export bundle is already the shape that derivation wants — one system plus its recipes —
+ * so the shared per-system transform is applied directly, with no grouping.
+ *
+ * THIS MUST STAY BRANCH-INDEPENDENT, exactly like `upcastLegacyTools` above and for the
+ * same reason: `migrateExportPayload` returns early once `payload.schemaVersion` is already
+ * current, and every bundle written by the shipping build carries the current schema. A
+ * derivation reachable only from the legacy branch would therefore never run on a real
+ * bundle. The authority is a NEW field on an OLD schema version, so its absence is
+ * orthogonal to the envelope version and both branches must derive it.
+ *
+ * Idempotent: the policy mapping is a fixpoint and the stamp fires only on an absent/`null`
+ * authority, so an authored value in the bundle always survives the import.
+ * @private
+ */
+function deriveRecipeModifierAuthority(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  applyRecipeModifierAuthority(system, Array.isArray(migrated.recipes) ? migrated.recipes : []);
+}
+
+/**
  * @param {*} payload - Parsed export JSON of any prior schema
  * @returns {object} Upcast payload at the current schema version
  */
@@ -39,12 +63,13 @@ export function migrateExportPayload(payload) {
     return payload;
   }
 
-  // Already current — no-op for the schema envelope, but still upcast legacy tools (a
-  // schema-2 export can predate #561's first-class tool fields). Clone so callers never
-  // alias the input.
+  // Already current — no-op for the schema envelope, but still run every field-level
+  // upcast, because a schema-2 export can predate #561's first-class tool fields or
+  // #1055's modifier authority. Clone so callers never alias the input.
   if (payload.schemaVersion === FABRICATE_EXPORT_SCHEMA_VERSION) {
     const current = structuredClone(payload);
     upcastLegacyTools(current);
+    deriveRecipeModifierAuthority(current);
     return current;
   }
 
@@ -75,6 +100,7 @@ export function migrateExportPayload(payload) {
   }
 
   upcastLegacyTools(migrated);
+  deriveRecipeModifierAuthority(migrated);
 
   return migrated;
 }

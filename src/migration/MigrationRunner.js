@@ -25,6 +25,7 @@ import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngred
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
 import { migrateRecipeItemCapsPerItem } from './migrateRecipeItemCapsPerItem.js';
+import { migrateRecipeModifierAuthority } from './migrateRecipeModifierAuthority.js';
 import { migrateRemoveLegacyCheckSources } from './migrateRemoveLegacyCheckSources.js';
 import { migrateRemoveResultSelectionProviders } from './migrateRemoveResultSelectionProviders.js';
 import { migrateRemoveSystemProvider } from './migrateRemoveSystemProvider.js';
@@ -318,6 +319,21 @@ const MIGRATIONS = [
     // (time requirements ignored) — so the downgrade is lossless.
     downgradeTo: '1.18.0',
     migrate: (data) => migrateDefaultOnTimeRequirements(data.systems),
+  },
+  {
+    version: '1.20.0',
+    label:
+      'Retire the byRecipe modifier policy (mapped to the identically-reducing addAll at ' +
+      'both the system and recipe level) and stamp the new system-level ' +
+      'craftingCheck.recipeModifierAuthority, which now owns recipe-override delegation',
+    // The last release before the split: a world downgraded to it sums for `addAll`
+    // exactly as it did for `byRecipe`, and `_normalizeCheckModifierConfig` is an
+    // allowlist literal that drops the unknown `recipeModifierAuthority` key on read —
+    // so the downgrade is lossless and lands on that release's own schema.
+    downgradeTo: '1.19.0',
+    // Reads/returns `{ recipes, systems }`: a system's authority is derived from its
+    // recipes, so both settings are needed and both are rewritten.
+    migrate: (data) => migrateRecipeModifierAuthority(data),
   },
   // Future migrations added here in version order
 ];
