@@ -4256,7 +4256,10 @@ export const VIEW_LAB_CASES = Object.freeze([
   //      that on `document.body`. Recorded evidence: the published light frame's header bar
   //      samples rgb(51,51,51) where the dark frames do not. That is a sample from a FRAME —
   //      drawn with the 14.365 harvested chrome (`tests/view-lab/chrome-provenance.json`) — and
-  //      not a source reading.
+  //      not a source reading, so nothing in the tree carries that number. Re-check it the way
+  //      it was taken: render the pair (`node scripts/view-lab-screenshots.mjs apps
+  //      coverage-theme-light-player,coverage-theme-light-manager`) and sample the header bar
+  //      of the PNGs in `ui-screenshot-artifact/apps/`.
   //   2. Foundry's light theme keeps a DARK window header: `.window-header .window-title` is
   //      `--color-light-1` under both themes, because neither theme block redefines that token.
   //      That one was probed in core's `css/foundry2.css` at 14.361 (see the caveat below).
@@ -4278,11 +4281,16 @@ export const VIEW_LAB_CASES = Object.freeze([
   // `src/ui/svelte/apps/manager/SystemsBrowserView.svelte`, which has no `<style>` block, and no
   // `.manager-title` rule in `styles/fabricate.css` sets `color`; the player's
   // `h2.crafting-detail-name` comes from `src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte`,
-  // whose scoped rule sets size and truncation only. Each inherits from the nearest ancestor that
-  // does set a colour, and in both windows that is a Fabricate root INSIDE `.window-content`
-  // (`.fabricate-manager`, and `.fabricate-app-shell` in
-  // `src/ui/svelte/apps/FabricateAppRoot.svelte`), which is closer to the heading than anything
-  // core puts on the window frame or the body.
+  // whose scoped rule sets size and truncation only. Each inherits its colour from a Fabricate
+  // ancestor INSIDE `.window-content`, which is closer to the heading than anything core puts on
+  // the window frame or the body. For the manager that ancestor is the root itself,
+  // `.fabricate-manager`. For the player the shell root `.fabricate-app-shell` in
+  // `src/ui/svelte/apps/FabricateAppRoot.svelte` sets `color: var(--fab-text)` for every tab, and
+  // in this frame a nearer rule — `.crafting-view-grid` in
+  // `src/ui/svelte/apps/crafting/CraftingView.svelte` — re-declares the same value, so either one
+  // would do the job. Do not assume the shell root is the NEAREST colour source on the player
+  // side — on this tab it is not — so chase a heading-colour leak by walking the chain from the
+  // heading up, rather than by editing the shell and waiting for something to move.
   //
   // NOT VERIFIED: whether core also sets a `color` on the heading ELEMENT (`h1`–`h6`) under
   // `theme-light`. Proximity is no defence against that — a rule matching the heading itself
