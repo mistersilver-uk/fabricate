@@ -67,6 +67,10 @@
     // authority level leaves them on disk and stops honouring them, so the card states
     // the count beside the control rather than after the fact.
     affectedRecipeCount = 0,
+    // How many recipes carry an override WITH a rule (policy). At `setOnly` level, only
+    // these recipes are affected by a downgrade (the rest keep their set overrides); at
+    // `none` all overrides are affected.
+    affectedRecipeRuleCount = 0,
     // Why the catalogue reaches no roll, or '' when it does: 'noCheck' (this resolution
     // mode rolls no crafting check at all), 'noFormula' (a check slot exists but has no
     // authored roll formula) or 'noPlaceholder' (a formula is authored but never spends
@@ -202,8 +206,20 @@
   // The level the ENGINE would apply, so an unstamped system shows `setAndRule` (what it
   // actually does) instead of a blank group or an invented `none`.
   const selectedAuthority = $derived(resolveRecipeModifierAuthority({ recipeModifierAuthority }));
+  // Select the appropriate count based on the authority level. The disclosure informs
+  // about recipes whose overrides are inactive at this level:
+  // - at `none`: all overrides are inactive → show total count
+  // - at `setOnly`: only rule overrides are inactive → show rule count
+  // - at `setAndRule`: no overrides are inactive → show 0 (no disclosure)
+  const relevantAffectedCount = $derived(
+    selectedAuthority === 'setAndRule'
+      ? 0
+      : selectedAuthority === 'setOnly'
+        ? affectedRecipeRuleCount
+        : affectedRecipeCount
+  );
   const overrideCount = $derived(
-    Number.isFinite(affectedRecipeCount) ? Math.max(0, Math.trunc(affectedRecipeCount)) : 0
+    Number.isFinite(relevantAffectedCount) ? Math.max(0, Math.trunc(relevantAffectedCount)) : 0
   );
   const inert = $derived(INERT_COPY[inertCause] || null);
   const defaultIds = $derived(Array.isArray(defaultModifierIds) ? defaultModifierIds : []);

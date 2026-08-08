@@ -4489,20 +4489,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('checks view: the downgrade disclosure states the override count and the current level’s consequence (issue 1055)', () => {
+  it(‘checks view: the downgrade disclosure states the override count and the current level’s consequence (issue 1055)’, () => {
+    // At `none` level, the disclosure shows all overrides (total count).
     mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingRecipeModifierAuthority: 'none',
+      resolutionMode: ‘simple’,
+      craftingCheckSimple: { rollFormula: ‘1d20 + @craftingmod’ },
+      craftingCheckModifiers: [{ id: ‘med’, label: ‘Medicine’, expression: ‘@abilities.med.mod’ }],
+      craftingRecipeModifierAuthority: ‘none’,
       craftingModifierOverrideCount: 3,
+      craftingModifierRuleOverrideCount: 1,
     });
-    const disclosure = target.querySelector('[data-crafting-modifier-authority-impact]');
-    assert.ok(Boolean(disclosure), 'the disclosure renders when overrides exist');
-    assert.equal(disclosure.getAttribute('data-crafting-modifier-authority-impact'), '3');
+    const disclosure = target.querySelector(‘[data-crafting-modifier-authority-impact]’);
+    assert.ok(Boolean(disclosure), ‘the disclosure renders when overrides exist’);
+    assert.equal(disclosure.getAttribute(‘data-crafting-modifier-authority-impact’), ‘3’);
     assert.ok(
-      disclosure.textContent.includes('3'),
-      'the count is stated BEFORE the click, not after the fact'
+      disclosure.textContent.includes(‘3’),
+      ‘the count is stated BEFORE the click, not after the fact’
     );
 
     unmount(mounted);
@@ -4510,14 +4512,69 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.remove();
     // Zero overrides has nothing to disclose.
     mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      resolutionMode: ‘simple’,
+      craftingCheckSimple: { rollFormula: ‘1d20 + @craftingmod’ },
+      craftingCheckModifiers: [{ id: ‘med’, label: ‘Medicine’, expression: ‘@abilities.med.mod’ }],
       craftingModifierOverrideCount: 0,
+      craftingModifierRuleOverrideCount: 0,
     });
     assert.ok(
-      !target.querySelector('[data-crafting-modifier-authority-impact]'),
-      'no overrides → no disclosure'
+      !target.querySelector(‘[data-crafting-modifier-authority-impact]’),
+      ‘no overrides → no disclosure’
+    );
+  });
+
+  it(‘checks view: at `setOnly` level, the disclosure shows only recipes with rule overrides (issue 1055)’, () => {
+    // At `setOnly`, a downgrade affects only recipes with rule overrides; set-only
+    // overrides keep working.
+    mountChecksView({
+      resolutionMode: ‘simple’,
+      craftingCheckSimple: { rollFormula: ‘1d20 + @craftingmod’ },
+      craftingCheckModifiers: [{ id: ‘med’, label: ‘Medicine’, expression: ‘@abilities.med.mod’ }],
+      craftingRecipeModifierAuthority: ‘setOnly’,
+      craftingModifierOverrideCount: 3,
+      craftingModifierRuleOverrideCount: 1,
+    });
+    const disclosure = target.querySelector(‘[data-crafting-modifier-authority-impact]’);
+    assert.ok(Boolean(disclosure), ‘the disclosure renders when rule overrides exist’);
+    assert.equal(
+      disclosure.getAttribute(‘data-crafting-modifier-authority-impact’),
+      ‘1’,
+      ‘at setOnly level, only rule overrides are affected by a downgrade’
+    );
+    assert.ok(disclosure.textContent.includes(‘1’), ‘the rule count is displayed’);
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    // If no recipes have rule overrides, setOnly has nothing to disclose.
+    mountChecksView({
+      resolutionMode: ‘simple’,
+      craftingCheckSimple: { rollFormula: ‘1d20 + @craftingmod’ },
+      craftingCheckModifiers: [{ id: ‘med’, label: ‘Medicine’, expression: ‘@abilities.med.mod’ }],
+      craftingRecipeModifierAuthority: ‘setOnly’,
+      craftingModifierOverrideCount: 3,
+      craftingModifierRuleOverrideCount: 0,
+    });
+    assert.ok(
+      !target.querySelector(‘[data-crafting-modifier-authority-impact]’),
+      ‘at setOnly, no disclosure when there are no rule overrides’
+    );
+  });
+
+  it(‘checks view: at `setAndRule` level, there is no impact disclosure (issue 1055)’, () => {
+    // At `setAndRule`, nothing changes if you "downgrade" from here (there is nowhere to go).
+    mountChecksView({
+      resolutionMode: ‘simple’,
+      craftingCheckSimple: { rollFormula: ‘1d20 + @craftingmod’ },
+      craftingCheckModifiers: [{ id: ‘med’, label: ‘Medicine’, expression: ‘@abilities.med.mod’ }],
+      craftingRecipeModifierAuthority: ‘setAndRule’,
+      craftingModifierOverrideCount: 3,
+      craftingModifierRuleOverrideCount: 1,
+    });
+    assert.ok(
+      !target.querySelector(‘[data-crafting-modifier-authority-impact]’),
+      ‘at setAndRule level, no disclosure (nothing is being silenced)’
     );
   });
 

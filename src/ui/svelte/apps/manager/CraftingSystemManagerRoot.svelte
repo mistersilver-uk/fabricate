@@ -7117,6 +7117,8 @@
             craftingRecipeModifierAuthority={selectedSystem?.craftingCheck?.recipeModifierAuthority}
             craftingModifierOverrideCount={selectedSystem?.craftingCheck
               ?.recipeModifierOverrideCount || 0}
+            craftingModifierRuleOverrideCount={selectedSystem?.craftingCheck
+              ?.recipeModifierRuleOverrideCount || 0}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==

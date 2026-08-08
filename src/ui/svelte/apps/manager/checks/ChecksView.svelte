@@ -62,8 +62,11 @@
     // and a `= 'none'` here would silently revoke delegation the engine still honours.
     craftingRecipeModifierAuthority = undefined,
     // How many of the system's recipes carry a `craftingModifier` override, for the
-    // catalogue card's downgrade disclosure.
+    // catalogue card's downgrade disclosure (shown at `none` level).
     craftingModifierOverrideCount = 0,
+    // How many of the system's recipes carry a `craftingModifier` override WITH a rule
+    // (policy), for the catalogue card's downgrade disclosure (shown at `setOnly` level).
+    craftingModifierRuleOverrideCount = 0,
     // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
     // already honours. Restored as live-persisting toggles below the alchemy check-mode
     // selector. Defaults mirror the manager normalizer (all three ON; learnOnCraft
@@ -336,6 +339,7 @@
     defaultModifierIds={craftingDefaultModifierIds}
     recipeModifierAuthority={craftingRecipeModifierAuthority}
     affectedRecipeCount={craftingModifierOverrideCount}
+    affectedRecipeRuleCount={craftingModifierRuleOverrideCount}
     inertCause={craftingModifierInertCause}
     onChange={onUpdateCraftingCheckModifiers}
   />
