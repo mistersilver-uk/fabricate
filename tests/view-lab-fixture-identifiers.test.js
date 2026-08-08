@@ -130,6 +130,45 @@ function attributePairs(selector) {
   }));
 }
 
+/**
+ * The identifier pins in a selector that `IDENTITY_SOURCES` recognises, each marked with whether
+ * its value exists in the lab world.
+ *
+ * A pin whose attribute name `IDENTITY_SOURCES` does not recognise, or whose value is empty, is not
+ * returned at all — the caller never sees it, exactly as the original step loop silently skipped it.
+ * Both the step sweep and the `expectSelector` sweep below call this so their extraction and
+ * matching cannot drift apart.
+ *
+ * @param {string} selector
+ * @returns {{name: string, value: string, known: boolean}[]}
+ */
+function identifierPins(selector) {
+  const pins = [];
+  for (const { name, value } of attributePairs(selector)) {
+    const source = IDENTITY_SOURCES[name];
+    if (!source || value === '') continue;
+    pins.push({ name, value, known: source.has(value) });
+  }
+  return pins;
+}
+
+// `data-popover-option` is deliberately absent from IDENTITY_SOURCES, on a forward-looking rather
+// than a current-state ground. Today the attribute has one producer, `SearchablePopover.svelte`,
+// which stamps it only for an option carrying a `dataId`, and exactly one caller supplies one —
+// `RecipeBulkEditPanel.svelte`, with `dataId: book.id` — so its whole value space is recipe book ids.
+// The Travel tab's region-override and move-to-party pickers are `SearchablePopover` consumers that
+// do not stamp `dataId` yet, and the component's own contract names them as the intended adopters:
+// an option needs an identity handle because "without one the only handle is the display label,
+// which is localized and therefore not a selector". When they adopt it the same attribute will also
+// carry region ids and actor ids, and a source set defined from recipe book ids alone would then
+// falsely reject the picker cases that legitimately name those (issue #1021).
+//
+// Twenty of the twenty-five `expectSelector`-bearing cases key on an attribute IDENTITY_SOURCES does
+// not recognise — `data-bulk-book-state`, `data-essence-view`, `data-inventory-bulk-panel`,
+// `data-inventory-bulk-queue-row`, and others — and fall through `identifierPins`'s skip for the
+// same reason a step naming one of those attributes would. Widening IDENTITY_SOURCES to cover them
+// is out of scope here (issue #1021); this sweep only guards the five that already resolve.
+
 test('every query.system names a real lab crafting system', () => {
   const known = new Set(Object.values(LAB_SYSTEM_IDS));
   const unknown = [];
@@ -151,12 +190,8 @@ test('every fixture id a selector names exists in the lab world', () => {
   for (const viewCase of VIEW_LAB_CASES) {
     for (const step of viewCase.steps ?? []) {
       if (typeof step !== 'object') continue;
-      for (const { name, value } of attributePairs(step.selector)) {
-        const source = IDENTITY_SOURCES[name];
-        if (!source || value === '') continue;
-        if (!source.has(value)) {
-          unknown.push(`${viewCase.id}: [${name}="${value}"]`);
-        }
+      for (const pin of identifierPins(step.selector)) {
+        if (!pin.known) unknown.push(`${viewCase.id}: [${pin.name}="${pin.value}"]`);
       }
     }
   }
@@ -165,6 +200,38 @@ test('every fixture id a selector names exists in the lab world', () => {
     [],
     'these selectors name a fixture the lab world does not contain, so the step matches nothing and ' +
       'the case cannot reach its state. Either the fixture was renamed or the case was:\n  ' +
+      unknown.join('\n  ')
+  );
+});
+
+test('every fixture id an expectSelector names exists in the lab world', () => {
+  const unknown = [];
+  let recognized = 0;
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (typeof viewCase.expectSelector !== 'string') continue;
+    for (const pin of identifierPins(viewCase.expectSelector)) {
+      recognized++;
+      if (!pin.known) unknown.push(`${viewCase.id}: [${pin.name}="${pin.value}"]`);
+    }
+  }
+
+  // This sweep is prospective: today every recognised expectSelector pin duplicates a value its own
+  // case's steps already pinned, so a rename is caught by the step sweep first. A guard that
+  // currently catches nothing needs a guard of its own, because one wired to the wrong field or run
+  // over an always-empty collection passes exactly as loudly as a correct one. Counting the pins
+  // the loop above actually visited, rather than recomputing them here, is what makes that visible.
+  assert.ok(
+    recognized > 0,
+    'this sweep visited no expectSelector pin IDENTITY_SOURCES recognises, so the assertion below ' +
+      'would pass even if every case were pinned to a nonexistent fixture'
+  );
+
+  assert.deepEqual(
+    unknown,
+    [],
+    "these expectSelectors (not steps) name a fixture the lab world does not contain, so the case's " +
+      'own state assertion matches nothing even after the case reaches it. Either the fixture was ' +
+      'renamed or the expectSelector was:\n  ' +
       unknown.join('\n  ')
   );
 });
