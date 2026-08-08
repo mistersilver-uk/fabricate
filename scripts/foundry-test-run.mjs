@@ -7508,14 +7508,28 @@ async function main() {
             ],
             defaultModifierPolicy: 'highest',
             defaultModifierIds: ['med', 'herb'],
+            // The authority level this system delegates to its recipes (issue 1055), and it must
+            // be `setAndRule` or this seed stops working: Brew Healing Potion below overrides the
+            // combination RULE (`playerPicks`), and the rule axis is honoured only at this level.
+            // At `setOnly` the override would be silently ignored, the system's `highest` would
+            // resolve the roll deterministically, and the Phase-E interactive modifier fieldset —
+            // the capture this seed exists for — would never open.
+            //
+            // Authored rather than left absent even though absence RESOLVES to `setAndRule`. The
+            // smoke's job is to prove the shipped product against a real world, and a world that
+            // depends on an unstamped default is testing the fallback, not the feature.
+            recipeModifierAuthority: 'setAndRule',
             routed: {
               type: 'relative',
               // `1d20 + 20 + @craftingmod` (base total 21-40, plus a small ability mod) always
               // meets the Masterwork threshold, so the Phase-E Brew Healing Potion craft
               // deterministically succeeds. `@craftingmod` resolves to a scalar BEFORE the
-              // formula reaches Foundry's Roll (issue 770): the recipe's `byRecipe` override
-              // uses only the `alch` modifier (a starter-hero INT mod, roughly -1..+3), which
-              // the +20 base absorbs. Before #431 the routed check was authored-only (never
+              // formula reaches Foundry's Roll (issue 770): the recipe's `playerPicks` override
+              // offers the `med` and `herb` modifiers (starter-hero WIS and DEX mods, roughly
+              // -1..+3 each), and whichever the player picks the +20 base absorbs — which is what
+              // makes the choice photographable without making the craft flaky. This comment used
+              // to say `byRecipe` and `alch`, and named neither the policy nor the ids the seed
+              // below actually carries. Before #431 the routed check was authored-only (never
               // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
               // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
               // the routed-check and validation-tab captures still render their authored outcomes.
@@ -10117,24 +10131,40 @@ async function main() {
         }
 
         // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
-        // 770). The seed authors a populated catalogue (Medicine / Alchemy / Herbalism)
-        // with a "Highest" default policy on the crafting check, so the frame shows
-        // the redesigned rows — IconPicker + label + the `@`-adorned expression field —
-        // plus the default-modifier pill multi-select. A DEDICATED frame (not the
-        // failure-consumption one above, which the same tab scrolls elsewhere for) so
-        // both cards get exact, un-cropped evidence.
+        // 770, re-aimed by issue 1055). The seed authors a populated catalogue (Medicine
+        // / Alchemy / Herbalism) with a "Highest" default combination rule and a
+        // `setAndRule` authority level, so the frame shows the redesigned rows —
+        // IconPicker + label + the `@`-adorned expression field — plus both axis groups
+        // and the downgrade-impact line the one overriding recipe produces. A DEDICATED
+        // frame (not the failure-consumption one above, which the same tab scrolls
+        // elsewhere for) so both cards get exact, un-cropped evidence.
         try {
           const modifierCard = page
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
             .first();
           await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
-          // Scroll to the "Default combination" policy radio-group rather than the card
-          // top: the four policy options — Add all / Highest / By recipe / Player
-          // picks (issue 770 Phase 2, #855) — are the changed surface, and they sit
-          // below the (stable) IconPicker/label/@-expression rows. This keeps the bottom
-          // rows in view above the policy cards for context.
-          const policyGroup = modifierCard.locator('[data-crafting-modifier-policy]').first();
-          await policyGroup.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          // Scroll to the AUTHORITY radio-group rather than the card top or the rule
+          // group: the card now authors two axes (issue 1055) as two stacked
+          // RadioCardGroups — the combination rule (Add all / Highest / Player picks,
+          // three options since `byRecipe` was retired off this axis) and the authority
+          // level (none / setOnly / setAndRule). `scrollIntoViewIfNeeded` lands its
+          // anchor near the bottom edge, so anchoring the LOWER of the two frames both,
+          // with the IconPicker/label/@-expression rows above them for context.
+          // Anchoring the rule group — which is what this did — now crops the authority
+          // group out of the one frame that exists to show the axes are separate.
+          //
+          // The GROUP, and a scroll rather than a click. Targeting an option's inner
+          // radio is the segmented-control interception trap, and
+          // `tests/screenshot-capture-scoping.test.js` bans that selector shape in this
+          // file generically — over the shape rather than over any literal attribute
+          // name, because this harness spells that family by interpolation. (The same
+          // shape is legal in `scripts/lib/viewLabCases.js`, which drives the authority
+          // levels: RadioCardGroup's radio is a visible in-flow control, and the ban
+          // there would be an over-ban.) Nothing here needs to press an authority card
+          // anyway — the seed authors `setAndRule` — and if that ever changes,
+          // `clickSegment()` targets the wrapping label, which is the safe route.
+          const authorityGroup = modifierCard.locator('[data-crafting-modifier-authority]').first();
+          await authorityGroup.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-checks-crafting-modifiers');
           process.stdout.write('  D0: checks crafting modifiers screenshotted\n');

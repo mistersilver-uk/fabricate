@@ -3008,6 +3008,22 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // `hb-r-stillroom` instead, which also exercises `Recipe._normalizeCraftingModifier`'s new value.
   defaultModifierPolicy: 'highest',
   defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature'],
+  // AUTHORED rather than left absent (issue 1055). Absence resolves to `setAndRule` too, so this
+  // changes no rendering — but the two are different worlds, and the lab is the one world where
+  // "not yet stamped" is indistinguishable from "stamped by a GM" in every frame. Stamping it is
+  // what makes `hb-r-stillroom`'s `playerPicks` RULE override honoured by declaration rather than
+  // by fallback, which is what keeps the interactive prompt and the recipe editor's rule select
+  // reachable if the absent-default is ever revisited.
+  //
+  // This const has ONE consumer — `lab-herbalism` — so authoring the level here is not a shared
+  // edit. `SIMPLE_CHECK` is the shared one (alchemy, jewelry, tidewrack) and is left alone.
+  //
+  // The `none` and `setOnly` levels are deliberately NOT authored on a second system. Reaching a
+  // level costs one click on a control this change ships; giving another system a catalogue costs
+  // a permanent rewrite of every frame that system already has, because a non-empty catalogue is
+  // what un-hides the recipe editor's whole modifier row. See the `none`/`setOnly` cases in
+  // `scripts/lib/viewLabCases.js`, which drive the level instead of authoring it.
+  recipeModifierAuthority: 'setAndRule',
 });
 
 export function buildLabContent() {

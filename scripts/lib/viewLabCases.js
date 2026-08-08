@@ -1006,14 +1006,30 @@ export const VIEW_LAB_CASES = Object.freeze([
     // "Inherit system default (Highest)" — the label composed from the SYSTEM policy, which is
     // the half of the control a per-recipe frame cannot otherwise show, and the half that would
     // have silently read "(Add all)" had the label map not gained a `playerPicks` entry.
+    //
+    // Issue 1055 gave the same frame a SECOND inherit to show, on the other axis: the eligible-set
+    // tri-state now sits inside the picker cell on `Inherit system default`, and under it the
+    // inherited set is NAMED rather than left as the word "inheriting". The two inherits read
+    // differently on purpose — one composes the system's rule into its label, the other lists the
+    // system's modifiers — and this is the only frame carrying both.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-kiln"]' },
       { selector: '#recipe-tab-overview' },
+      // The rule cell and the picker cell are two cells of ONE grid row, so anchoring either
+      // frames both. Left on the rule cell, which exists only at `setAndRule` and is therefore
+      // also the anchor that fails loudly if this system ever stops delegating the rule axis.
       { selector: '[data-recipe-crafting-modifier]', scroll: true },
     ],
     expectView: 'recipe-edit',
+    // Both axes, in one selector, because either alone would pass over the state this case is the
+    // opposite of: the rule cell proves `setAndRule` (it renders at no lower level), and the
+    // inherited-names paragraph proves the set axis is on `Inherit` rather than on a custom set —
+    // which is the sibling case below.
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor]:has([data-recipe-crafting-modifier]) ' +
+      '[data-recipe-crafting-modifier-inherited]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -1031,8 +1047,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-normal'],
     // `hb-r-stillroom` authors `{ policy: 'playerPicks', modifierIds: [...three] }`, which is what
     // makes `hasModifierOverride` true — so this frame carries BOTH halves of the control at once:
-    // the select on its new fourth option, and the eligible-modifier pill row that only an
+    // the select on its `playerPicks` option, and the eligible-modifier pill row that only an
     // overriding recipe draws.
+    //
+    // This is the `setAndRule` COMPOSITION frame for issue 1055: the widest the modifier row ever
+    // gets, both cells present, with the eligible-set tri-state reading `Custom set` above its
+    // pills. `lab-herbalism` is progressive, so its grid is three cells — Category, rule, picker.
+    // The four-cell arrangement (a Check tier or a Minimum success tier alongside) is unreachable
+    // here and the FIVE-cell one is unreachable anywhere: `resolveRecipeCheckTierOptions` offers
+    // tiers only for simple-static or routed-RELATIVE, and `resolveRecipeFixedOutcomeTierOptions`
+    // offers a minimum tier only for routedByCheck + FIXED, so those two cells are mutually
+    // exclusive by construction and no system can render both.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -1041,6 +1066,201 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
+    // The rule cell AND the pill row: the first is what `setAndRule` adds over `setOnly`, the
+    // second is what a `Custom set` adds over `Inherit`. Asserting the picker cell alone would be
+    // satisfied by all three of this frame's neighbours.
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor]:has([data-recipe-crafting-modifier]) ' +
+      '[data-recipe-crafting-modifier-picker] [data-modifier-pill-select]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  // ── The two authority levels below `setAndRule` (issue 1055) ─────────────────────────────────
+  //
+  // Both are reached by CLICKING the authority group, not by authoring a second catalogued system,
+  // and the choice is the same one `manager-checks-crafting-modifiers-player-picks` and
+  // `manager-checks-crafting-dynamic-dc` already record. The cost asymmetry is stark here:
+  //
+  //   - A click costs one step. `selectAuthority` emits `{ recipeModifierAuthority }` through
+  //     `onChange` -> `adminStore.saveCraftingCheckModifiers` -> `updateSystem` + `refresh`, so it
+  //     is a real persisted world write, and the lab's settings Map holds it for the life of the
+  //     page — which is what lets the case navigate away to the recipe editor and still see it.
+  //   - Authoring costs a permanent rewrite. `RecipeOverviewTab` gates the ENTIRE modifier row on
+  //     `craftingModifierOptions.length > 0`, so a level can only be authored onto a system that
+  //     has a catalogue, and giving a second lab system one would add a control (or a banner) to
+  //     every recipe Overview frame that system already has. A new SEVENTH system instead would
+  //     move the manager's system-library row count and the rail's system count — the cost
+  //     `labContent.js`'s `LAB_SYSTEM_IDS` already discloses for the sixth.
+  //
+  // Both run on `lab-herbalism` for the same reason the sibling frames do: it is the only system
+  // carrying a catalogue, and a catalogue is what makes any of this render at all.
+  managerCase({
+    id: 'manager-recipe-edit-crafting-modifier-none',
+    label: 'Manager — Recipe edit crafting modifier, system authority',
+    // BEYOND the smoke. The capture walk never presses an authority card, and its seeded system is
+    // `setAndRule`, so there is no counterpart frame of the read-only summary to fall short of.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The `none` READ-ONLY SUMMARY. At this level the recipe decides neither axis, so the grid
+    // cells are gone entirely and a neutral-toned banner below the grid states what the system
+    // sets and names the modifiers this recipe therefore uses. Photographing it beside the
+    // info-toned resolution-mode banner — which sits above the tab body and is unavoidably in the
+    // same frame — is the point: the two share `RecipeModeBanner`'s chrome by design, so this is
+    // the only frame that shows the tone difference doing the work of telling them apart.
+    //
+    // `hb-r-kiln` deliberately, which is the same recipe the `setAndRule` inherit frame opens.
+    // Holding the recipe constant and changing only the level is what makes the two readable as a
+    // before/after of the SAME screen rather than as two different recipes.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      // Legal HERE and banned in `scripts/foundry-test-run.mjs`, which is not an inconsistency:
+      // `tests/screenshot-capture-scoping.test.js` bans the shape in the harness generically
+      // because that file spells this family by interpolation, and exempts `RadioCardGroup` in
+      // this registry because its radio is a visible in-flow 16x16 control that is safe to click
+      // through. The card persists on change, so no Save step follows.
+      { selector: '[data-crafting-modifier-authority-option="none"] input' },
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-kiln"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-modifier-banner]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // In BOTH directions, because a click that silently did not land would publish the
+    // `setAndRule` frame under this name: the banner must be present AND the picker cell must be
+    // gone. The picker is the right negative half — it is the cell that survives `setOnly` too, so
+    // requiring its absence pins the level at `none` rather than merely below `setAndRule`.
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor]:has([data-recipe-modifier-banner="none"])' +
+      ':not(:has([data-recipe-crafting-modifier-picker]))',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-crafting-modifier-set-only',
+    label: 'Manager — Recipe edit crafting modifier, set only',
+    // BEYOND the smoke, for the same reason as the sibling above.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The `setOnly` COMPOSITION: the picker cell alone, with no rule cell beside it. This is the
+    // frame the grid arrangement has to be judged from — the tri-state select lives INSIDE the
+    // picker cell rather than being a cell of its own precisely so that this two-cell case still
+    // aligns with Category, and a CSS nudge that used to force that alignment was removed on the
+    // strength of it. Nothing else in the registry renders the modifier row at width two.
+    //
+    // `hb-r-stillroom` deliberately: its authored `modifierIds` put the tri-state on `Custom set`
+    // and draw the pill row, so the cell is at its TALLEST here. A cell that aligns with Category
+    // only when it happens to be short would not be evidence of anything.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-crafting-modifier-authority-option="setOnly"] input' },
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-stillroom"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // Present-and-absent again, and this pair is the entire difference between this frame and
+    // `manager-recipe-edit-crafting-modifier-player-picks`: same recipe editor, same picker cell,
+    // and the rule cell is the only thing that tells them apart.
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor]:has([data-recipe-crafting-modifier-picker])' +
+      ':not(:has([data-recipe-crafting-modifier]))',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\//,
+    ],
+  }),
+  // ── The inert catalogue (issue 1055) ──────────────────────────────────────────────────────────
+  //
+  // A catalogue whose modifiers reach no roll is the defect this change reports rather than hides,
+  // and it is reported TWICE — as a notice on the Checks card that says how to fix it, and as a
+  // warning banner on the recipe Overview that says what the GM loses. Two surfaces, two frames:
+  // they are in different views, so no single photograph holds both.
+  //
+  // `noPlaceholder` of the three causes, because it is the only one that is invisible without the
+  // notice. `noCheck` and `noFormula` are both legible from the check editor directly above the
+  // card — no mode, or an empty formula field — whereas a formula that simply never spends
+  // `@craftingmod` looks exactly like a working one.
+  //
+  // Reached by EDITING the formula rather than by authoring an inert system, and by editing the
+  // one system that has a catalogue rather than by giving a catalogue to one of the four systems
+  // whose formulas are already `@craftingmod`-free. Authoring would cost what the authority cases
+  // above record, and would additionally have to keep an inert system permanently inert, which is
+  // the state every other herbalism frame is evidence AGAINST.
+  //
+  // Both cases SAVE. `RecipeOverviewTab`'s cause is resolved from the PERSISTED system
+  // (`CraftingSystemManagerRoot`'s `recipeCraftingCheckFormula`), and the Checks editor stages
+  // into a draft, so an unsaved fill would leave both surfaces reading the old formula —
+  // `manager-recipes-no-check` records the same trap and the same remedy.
+  managerCase({
+    id: 'manager-checks-crafting-modifier-inert',
+    label: 'Manager — Checks crafting modifiers inert',
+    // BEYOND the smoke. Its seeded formula spends `@craftingmod`, and the walk never edits one, so
+    // no counterpart frame of the notice exists.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      // A formula that is present and VALID but spends no `@craftingmod`. Clearing the field
+      // instead would reach `noFormula`, which is a different notice with a different remedy.
+      { selector: '[data-check-roll-formula]', fill: '1d20 + @abilities.int.mod' },
+      { selector: '[data-checks-save]' },
+      { selector: '[data-crafting-modifier-inert]', scroll: true },
+    ],
+    expectView: 'checks',
+    // The CAUSE, not just the notice. All three causes render through the same element with the
+    // same chrome, so a frame that reached `noFormula` — one stray character in the fill — would
+    // satisfy a presence-only assertion while photographing the wrong sentence.
+    expectSelector: '.fabricate-manager [data-crafting-modifier-inert="noPlaceholder"]',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-crafting-modifier-inert',
+    label: 'Manager — Recipe edit crafting modifier inert',
+    // BEYOND the smoke, for the same reason as the sibling above.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // The recipe end of the same fact. The inert banner BEATS both other dispositions — a level
+    // the engine cannot honour is not worth authoring against — so this frame is also the only
+    // evidence that the controls are withdrawn rather than left live-but-useless, and the only one
+    // showing the warning tone of `RecipeModeBanner` at all.
+    //
+    // `hb-r-kiln` again, so the three levels and this state are four pictures of one screen.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-check-roll-formula]', fill: '1d20 + @abilities.int.mod' },
+      { selector: '[data-checks-save]' },
+      'Crafting',
+      { selector: '[data-recipe-edit="hb-r-kiln"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-modifier-inert]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // The cause, and the withdrawal. `lab-herbalism` is `setAndRule`, so an inert state that
+    // failed to suppress the controls would still render the rule cell — which is exactly what
+    // this frame claims cannot happen.
+    expectSelector:
+      '.fabricate-manager [data-recipe-editor]:has([data-recipe-modifier-inert="noPlaceholder"])' +
+      ':not(:has([data-recipe-crafting-modifier]))',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -1572,17 +1792,30 @@ export const VIEW_LAB_CASES = Object.freeze([
     // that scrolls to it. Populated on herbalism alone: a non-empty catalogue also un-hides the
     // recipe editor's per-recipe modifier override, which would have added a control to every
     // already-captured smithing recipe Overview frame.
+    //
+    // RE-PINNED for issue 1055. The card now authors TWO axes — the combination rule and the
+    // authority level — as two stacked `RadioCardGroup`s, and the frame's whole subject is that
+    // they are two axes rather than the one conflated select they replace. The old anchor (the
+    // default-modifier pill row, the card's last element) scrolled BOTH groups off the top the
+    // moment the second one was added, which would have published a picture of the pill row under
+    // a case named for the policy block.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      // The card is taller than the window, so `scrollIntoViewIfNeeded` on the card itself lands
-      // the frame above the default-modifier pill select. Anchoring on the LAST thing the card
-      // draws is what puts the whole policy block — radios and pills — inside the frame.
-      { selector: '[data-crafting-modifier-defaults]', scroll: true },
+      // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so anchoring the LAST of
+      // the three things this frame is named for — rule group, authority group, impact line —
+      // puts all three in frame with the catalogue rows above them for context.
+      { selector: '[data-crafting-modifier-authority-impact]', scroll: true },
     ],
     expectView: 'checks',
+    // The impact line renders only over a non-zero count, so an anchor that silently missed would
+    // leave `scrollIntoViewIfNeeded`'s own `.catch(() => {})` to publish the card's top under this
+    // name. The VALUE is asserted too, not just presence: `hb-r-stillroom` is the single recipe in
+    // this system carrying an override, so a count that is not 1 means the projection changed and
+    // the singular copy in frame is no longer the copy this case is evidence for.
+    expectSelector: '.fabricate-manager [data-crafting-modifier-authority-impact="1"]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
@@ -1593,8 +1826,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-checks-crafting-modifiers-player-picks',
     label: 'Manager — Checks crafting modifiers, Player picks selected',
     // BEYOND the smoke. Its catalogue is authored `highest` and its walk never presses a policy
-    // radio, so there is no counterpart frame of a SELECTED fourth option to fall short of — only
-    // of the card at rest, which the sibling case above already pairs with.
+    // radio, so there is no counterpart frame of a SELECTED option to fall short of — only of the
+    // card at rest, which the sibling case above already pairs with.
     reaches: 'beyond',
     smokeLabels: [],
     // The selection is made by CLICKING, not by authoring. `selectPolicy` emits
@@ -1608,9 +1841,17 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#checks-tab-crafting' },
       { selector: '[data-crafting-modifier-policy-option="playerPicks"] input' },
-      { selector: '[data-crafting-modifier-defaults]', scroll: true },
+      // RE-PINNED onto the group this case is NAMED for (issue 1055). The authority group and the
+      // impact line now sit between the rule group and the default-modifier pills, so the old pill
+      // anchor pushed the selected option — the entire subject — off the top of the frame.
+      { selector: '[data-crafting-modifier-policy]', scroll: true },
     ],
     expectView: 'checks',
+    // The click is the case. `is-active` is what a selected `RadioCardGroup` option carries, so
+    // asserting it is what tells a silently-missed click apart from a card at rest — which is
+    // precisely the sibling frame above, published under this name.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-policy-option="playerPicks"].is-active',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
