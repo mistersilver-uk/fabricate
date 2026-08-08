@@ -42,6 +42,7 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
+import { RECIPE_MODIFIER_AUTHORITIES } from './craftingModifierResolver.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -603,13 +604,26 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the crafting check-modifier catalogue + default resolution policy
-   * (issue 770): `checkModifiers` is a named catalogue of `{id,label,icon?,expression}`
-   * entries feeding the `@craftingmod` placeholder; `defaultModifierPolicy` is one of
-   * `addAll`/`highest`/`byRecipe`/`playerPicks` (default `addAll`); `defaultModifierIds` names the
-   * catalogue entries applied by default. Malformed entries are dropped, a bad
-   * expression coerces to an empty string, and a default id naming nothing in the
-   * catalogue is dropped (order + de-dup preserved).
+   * Normalize the crafting check-modifier catalogue, combination rule and delegation
+   * level (issues 770, 1055): `checkModifiers` is a named catalogue of
+   * `{id,label,icon?,expression}` entries feeding the `@craftingmod` placeholder;
+   * `defaultModifierPolicy` is the COMBINATION RULE, one of
+   * `addAll`/`highest`/`playerPicks` (default `addAll`; the retired `byRecipe` coerces
+   * to the default here and is translated to `addAll` on read by
+   * `normalizeModifierPolicy`); `defaultModifierIds` names the catalogue entries applied
+   * by default. Malformed entries are dropped, a bad expression coerces to an empty
+   * string, and a default id naming nothing in the catalogue is dropped (order + de-dup
+   * preserved).
+   *
+   * `recipeModifierAuthority` — how much of the two modifier axes the system delegates
+   * to its recipes — deliberately **PRESERVES ABSENCE**: an unresolved value omits the
+   * key entirely rather than writing a placeholder, exactly as `normalized.icon` is
+   * attached only when authored below. Absence means "not yet stamped", it resolves as
+   * `setAndRule` (pre-1055 behaviour) at the resolver, and it is what the `1.20.0`
+   * migration and the initialize-time fallback key on to know they still have work to
+   * do. Note the consequence, which the fallback depends on: after this normalizer runs,
+   * the unresolved state on a system is `undefined` — a literal `null` cannot survive
+   * here, so a `=== null` test downstream of normalization is dead code.
    * @private
    */
   _normalizeCheckModifierConfig(check) {
@@ -638,12 +652,19 @@ export class CraftingSystemManager {
       seenDefaults.add(id);
       return true;
     });
-    const defaultModifierPolicy = ['addAll', 'highest', 'byRecipe', 'playerPicks'].includes(
+    const defaultModifierPolicy = ['addAll', 'highest', 'playerPicks'].includes(
       check?.defaultModifierPolicy
     )
       ? check.defaultModifierPolicy
       : 'addAll';
-    return { checkModifiers, defaultModifierPolicy, defaultModifierIds };
+    const normalized = { checkModifiers, defaultModifierPolicy, defaultModifierIds };
+    // Absence-preserving: only a recognized level is attached, so `null`, `undefined`
+    // and a junk token all normalize to the SAME shape — key absent — and the stamp
+    // stays reachable.
+    if (RECIPE_MODIFIER_AUTHORITIES.includes(check?.recipeModifierAuthority)) {
+      normalized.recipeModifierAuthority = check.recipeModifierAuthority;
+    }
+    return normalized;
   }
 
   // Simple pass/fail crafting check authored in the Checks editor for simple and
