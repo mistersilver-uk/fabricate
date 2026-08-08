@@ -1,12 +1,12 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { createSvelteCompiler } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -16,24 +16,11 @@ let GatheringEconomyView;
 let mounted;
 let target;
 
-function rewriteClientImports(code) {
-  return code
-    .replace(/from 'svelte';/g, "from 'svelte/internal/client';")
-    .replace(/(from\s+['"][^'"]+\.svelte)(['"])/g, '$1.js$2');
-}
-
-function writeCompiledSvelte(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compile(source, {
-    filename: sourcePath,
-    generate: 'client',
-    dev: true,
-    css: 'injected',
-  });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
+// This suite predates `createMountedComponentHarness` and still drives its own temp tree, but
+// the compile-and-rewrite half was a verbatim copy of the shared compiler — the very duplication
+// `svelte-component-harness.js`'s own header says it exists to remove. `getTempRoot` is a thunk
+// because `tempRoot` is not assigned until `before()`.
+const { writeCompiledSvelte, writeRawModule } = createSvelteCompiler(repoRoot, () => tempRoot);
 
 /**
  * A rolled economy actor row, spelling out only what a case actually varies.
@@ -118,9 +105,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       'src/ui/svelte/util/foundryBridge.js',
       'src/ui/svelte/components/stepperLabels.js',
     ]) {
-      const destination = join(tempRoot, modulePath);
-      mkdirSync(dirname(destination), { recursive: true });
-      writeFileSync(destination, readFileSync(resolve(repoRoot, modulePath), 'utf8'));
+      writeRawModule(modulePath);
     }
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
