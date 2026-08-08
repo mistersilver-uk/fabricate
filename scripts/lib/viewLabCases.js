@@ -4247,12 +4247,64 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   // Foundry's LIGHT application theme. Everything else in this registry renders `theme-dark`,
   // because that is what the smoke world is configured for — but a GM is free to run light, and
-  // `styles/fabricate.css` sets no heading colour of its own, so headings inherit Foundry's
-  // `--color-text-primary`: rgb(17,17,17) under light, on Fabricate's own dark panels. These two
-  // frames are the evidence for that, and the regression guard once it is fixed.
+  // these two frames are the only guard over that cascade.
+  //
+  // A CORRECT frame here still looks DARK. Read this before filing one as broken.
+  //
+  //   1. The theme really does apply. Foundry themes by body class (`Game##configureUI` adds
+  //      `theme-light`), and `configureLabPage` in `tests/view-lab/foundryFrame.js` reproduces
+  //      that on `document.body`. Recorded evidence: the published light frame's header bar
+  //      samples rgb(51,51,51) where the dark frames do not. That is a sample from a FRAME —
+  //      drawn with the 14.365 harvested chrome (`tests/view-lab/chrome-provenance.json`) — and
+  //      not a source reading, so nothing in the tree carries that number. Re-check it the way
+  //      it was taken: render the pair (`node scripts/view-lab-screenshots.mjs apps
+  //      coverage-theme-light-player,coverage-theme-light-manager`) and sample the header bar
+  //      of the PNGs in `ui-screenshot-artifact/apps/`.
+  //   2. Foundry's light theme keeps a DARK window header: `.window-header .window-title` is
+  //      `--color-light-1` under both themes, because neither theme block redefines that token.
+  //      That one was probed in core's `css/foundry2.css` at 14.361 (see the caveat below).
+  //   3. Fabricate is theme-invariant at BOTH roots, and the pair needs both because the two
+  //      windows are built differently. The player window root `.fabricate.fabricate-app` sets
+  //      `background: var(--fab-bg-1)`, `color: var(--fab-text)` and `color-scheme: dark`. The
+  //      manager window root `.fabricate.crafting-system-manager` sets only `font-family` and
+  //      makes its `.window-content` transparent; the paint comes from `.fabricate-manager`
+  //      inside it (`color: var(--fab-mv2-text)`, `background: var(--fab-mv2-bg)`,
+  //      `color-scheme: dark`). All seven `[data-fabricate-theme]` palettes in
+  //      `styles/fabricate.css` are dark, and the module sheet loads at `layer(modules)`, which
+  //      outranks core's `layer(applications)`, so core's light parchment never paints.
+  //
+  // So light differs from dark in the window header bar, and that is what this pair covers.
+  //
+  // What it does NOT cover is a heading-colour leak, and the mechanism is INHERITANCE rather than
+  // per-component colours — do not restate it as "the components set their own". Neither headline
+  // heading declares a `color` at all: the manager's `h2.manager-title` comes from
+  // `src/ui/svelte/apps/manager/SystemsBrowserView.svelte`, which has no `<style>` block, and no
+  // `.manager-title` rule in `styles/fabricate.css` sets `color`; the player's
+  // `h2.crafting-detail-name` comes from `src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte`,
+  // whose scoped rule sets size and truncation only. Each inherits its colour from a Fabricate
+  // ancestor INSIDE `.window-content`, which is closer to the heading than anything core puts on
+  // the window frame or the body. For the manager that ancestor is the root itself,
+  // `.fabricate-manager`. For the player the shell root `.fabricate-app-shell` in
+  // `src/ui/svelte/apps/FabricateAppRoot.svelte` sets `color: var(--fab-text)` for every tab, and
+  // in this frame a nearer rule — `.crafting-view-grid` in
+  // `src/ui/svelte/apps/crafting/CraftingView.svelte` — re-declares the same value, so either one
+  // would do the job. Do not assume the shell root is the NEAREST colour source on the player
+  // side — on this tab it is not — so chase a heading-colour leak by walking the chain from the
+  // heading up, rather than by editing the shell and waiting for something to move.
+  //
+  // NOT VERIFIED: whether core also sets a `color` on the heading ELEMENT (`h1`–`h6`) under
+  // `theme-light`. Proximity is no defence against that — a rule matching the heading itself
+  // beats an ancestor's inherited value — so such a heading would leak here. A plain checkout
+  // has no `foundry2.css` to read (the `.foundry-chrome` cache is populated only by an explicit
+  // harvest, see `scripts/lib/foundryChromeCache.js`), which is also why reason 2 above is an
+  // older probe rather than something re-checked on every change. Harvest the chrome and grep
+  // `css/foundry2.css` for a heading-element `color` under the light theme to settle both.
+  //
+  // Either way, do not read these frames as proof the leak is gone. Issue 972 owns it, and it
+  // lives on the surfaces no Fabricate root colour reaches.
   playerCase({
     id: 'coverage-theme-light-player',
-    label: 'Coverage — player app on Foundry light theme',
+    label: 'Coverage — player app in Foundry light-theme chrome, dark Fabricate surfaces',
     smokeLabels: [],
     reaches: 'beyond',
     query: { tab: 'crafting', colorScheme: 'light' },
@@ -4262,7 +4314,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   managerCase({
     id: 'coverage-theme-light-manager',
-    label: 'Coverage — manager on Foundry light theme',
+    label: 'Coverage — manager in Foundry light-theme chrome, dark Fabricate surfaces',
     smokeLabels: [],
     reaches: 'beyond',
     query: { colorScheme: 'light' },
