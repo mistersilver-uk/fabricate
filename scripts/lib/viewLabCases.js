@@ -1200,7 +1200,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   // the state every other herbalism frame is evidence AGAINST.
   //
   // Both cases SAVE. `RecipeOverviewTab`'s cause is resolved from the PERSISTED system
-  // (`CraftingSystemManagerRoot`'s `recipeCraftingCheckFormula`), and the Checks editor stages
+  // (`CraftingSystemManagerRoot`'s `recipeCraftingModifierInertCause`), and the Checks editor stages
   // into a draft, so an unsaved fill would leave both surfaces reading the old formula —
   // `manager-recipes-no-check` records the same trap and the same remedy.
   managerCase({
