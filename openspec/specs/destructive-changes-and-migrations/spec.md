@@ -442,6 +442,41 @@ It matches on the trigger "no valid `recipeItemId` and a non-empty `linkedRecipe
 Treat that reverse-ref write as a transitional shim, not canonical output.
 A post-`1.13.0` **preserved alchemy-formula** `linkedRecipeItemUuid` still satisfies the reconciler's trigger; the current, intended behaviour is that the reconciler may re-process such preserved formula links (they are not exempt from the trigger).
 
+**A third, unrelated reconciliation shares the same walk (issue 1055).** `_migrateLegacyRecipeItems` also stamps `craftingCheck.recipeModifierAuthority` — see *Recipe Modifier Authority Migration* below for the versioned `1.20.0` migration this un-versioned fallback backstops.
+It fires only where the value is still unresolved (absent or `null`) on a system that already carries a `craftingCheck` block, keyed on the presence of ANY recipe-level `craftingModifier` override in that system: `setAndRule` when found, `none` otherwise.
+It runs UNGATED in memory on every `initialize()` (both GM and player clients derive the identical value from the identical recipe data), while persistence is gated by the same primary-GM tail that already persists the other two reconciliations — folded onto the shared `systemsChanged` flag rather than a second `save()`.
+It is independent of the other two reconciliations: it reads no field either of them writes, so its position in the walk is unconstrained.
+It deliberately diverges from the versioned `1.20.0` migration in one narrow case: it cannot read the system's persisted `defaultModifierPolicy === 'byRecipe'` signal, because `initialize()` normalizes every system (narrowing that field to `addAll`/`highest`/`playerPicks`) BEFORE this walk runs, so a persisted `byRecipe` has already been coerced away by the time the fallback executes.
+A legacy `byRecipe` system with no recipe-level override is therefore stamped `none` here where the `1.20.0` migration would stamp `setAndRule`; this is accepted because nothing arithmetic differs between the two stamps when there is no recipe override left to delegate to — every rolled formula is identical either way.
+
+### Recipe Modifier Authority Migration (`1.20.0`, `downgradeTo: '1.19.0'`, pure, clone-first, idempotent)
+
+Issue 1055 splits the conflated crafting-check modifier policy into two orthogonal axes: `craftingCheck.defaultModifierPolicy` keeps only the three combination rules (`addAll`/`highest`/`playerPicks`), and the new `craftingCheck.recipeModifierAuthority` owns how much of that decision a system delegates to its recipes.
+The `1.20.0` settings-data migration (`src/migration/migrateRecipeModifierAuthority.js`) reads and returns both the `craftingSystems` and `recipes` payloads as pure, clone-first data — it mutates only its own clones, never the runner's payload, so even a hypothetical throw would leave the pre-migration checkpoint untouched — and throws no `FatalMigrationError`.
+
+1. **`byRecipe` → `addAll`, at both levels.** Every system's `craftingCheck.defaultModifierPolicy` and every recipe's `craftingModifier.policy` carrying the retired `byRecipe` value is rewritten to `addAll`.
+   This transform is **observationally inert by design, not merely as a side effect**: `normalizeModifierPolicy`'s `LEGACY_POLICY_ALIASES` translates a persisted `byRecipe` at resolution time regardless of whether this migration ever ran, so an unmigrated `byRecipe` system already resolves identically to a migrated one.
+   Its value is data hygiene — an upgraded world should not keep a token the authoring UI no longer offers — not a behaviour change.
+   The recipe-level half of this transform runs for every recipe, independent of whether its system carries a `craftingCheck` block at all, because the mapping is owed to the recipe regardless of its system's shape.
+2. **Stamp `craftingCheck.recipeModifierAuthority`, conditionally.** The stamp fires ONLY where the value is absent or `null` (an authored value always wins, which is what makes re-running the migration idempotent without relying on the version gate), and ONLY into a system that already carries a `craftingCheck` block.
+   It does **not seed** a `craftingCheck` block onto a system that has none: `checkModifiers` lives inside `craftingCheck`, so such a system has no catalogue, no modifiers to combine, and no authority to observe, and the derivation can only differ from the absent-default `setAndRule` in exactly the case where the value is inert either way — seeding would force a `craftingSystems` write for every world for zero observable change.
+   Precedent: the *Progressive Reorder-Flag Retirement Migration* above makes the same call for the same reason.
+   The stamp is `setAndRule` (recipe may override both the eligible set and the combination rule) when the system was delegating before this change — either its persisted `defaultModifierPolicy` was `byRecipe`, or any of its recipes carries a `craftingModifier` override — otherwise `none`.
+   The delegation signal is read BEFORE transform 1 erases `byRecipe`; doing the two transforms in the other order would collapse every delegating system to `none`.
+   This mapping **preserves observed behaviour, which was broader than the retired `byRecipe` label's own promise**: `byRecipe` named only the combination rule, but the pre-1055 resolver already let ANY recipe override its eligible set regardless of the system's rule, so the stamp derives from "does any recipe carry an override at all", not from the `byRecipe` label alone.
+3. **Idempotent under re-run.** Transform 1 is a fixpoint (`addAll` is not `byRecipe`).
+   Transform 2 fires only on an unresolved authority, so a second pass finds every authority already resolved and changes nothing.
+4. **Mutated setting keys:** `craftingSystems` and `recipes`.
+5. **Lossless downgrade.** `downgradeTo: '1.19.0'` is lossless: the pre-change build sums for `addAll` exactly as it did for `byRecipe`, and the manager's check-modifier normalizer is an allowlist literal that never spreads its source, so it silently drops the unknown `recipeModifierAuthority` key on read — a downgraded world lands on that release's own schema and behaviour with no data loss.
+
+**Mirrored on import.** `migrateExportPayload` applies the identical per-system transform (shared with the settings-data migration, not a second implementation of it) to an imported bundle, branch-independently — it runs whether or not the payload's envelope `schemaVersion` needed upcasting, because the authority is a new field on an old schema version and its absence is orthogonal to the envelope version.
+It is idempotent for the same reason as the settings-data migration: an authored value in the bundle always survives the import.
+An overwrite import may therefore leave the imported system's `recipeModifierAuthority` absent (or, from malformed data, `null`) rather than an explicit resolved value — see `import-export/spec.md` §Round-trip integrity — which resolves as `setAndRule` and reconverges the next time the world initializes (the fallback stamp above, or a later re-run of this migration).
+
+**Lowering authority does not delete data.** Dropping a system from `setAndRule` to `setOnly` or `none`, or from `setOnly` to `none`, leaves every recipe's stored `craftingModifier` override exactly where it was — only whether the resolver HONOURS it changes.
+The two downgrades unhonour different populations: dropping to `none` stops honouring every stored override (both axes), while dropping to `setOnly` stops honouring only the combination-rule half (a stored `policy` override), leaving a stored `modifierIds` override still honoured.
+The Checks card's `CraftingModifierCatalogueCard` states the affected-recipe count beside the authority control as a **standing, persisted-live disclosure**, rendered whenever the count is non-zero, and restates what the currently-selected level already does to those recipes — it is NOT a pre-save confirmation: the authority control writes immediately on selection (`saveCraftingCheckModifiers`, persisted live), and this card has no "before saving" moment to gate on.
+
 ### Catalyst → Tool Migration (`0.6.0`)
 
 The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`.
