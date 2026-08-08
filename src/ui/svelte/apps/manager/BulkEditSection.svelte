@@ -77,7 +77,7 @@
      inner spacing, and this extra `space-2` is what turns the flat run back into groups. */
   .fab-bulk-edit-label {
     margin: var(--fab-space-2) 0 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -122,7 +122,7 @@
      copy is 0.62rem. */
   .fab-bulk-edit-hint {
     margin: 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     font-size: 0.58rem;
     font-weight: 400;
     line-height: 1.4;
@@ -130,7 +130,7 @@
 
   .fab-bulk-edit-subhint {
     margin: 0;
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     font-size: 0.62rem;
     font-weight: 400;
     line-height: 1.4;
