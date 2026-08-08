@@ -28,7 +28,14 @@
    - allowUnset: the field's domain admits absence (an inherited DC override, an
      unbounded modifier bound). See the block comment on the prop.
    - placeholder: shown while the input is empty. Wins over `inputProps.placeholder`.
-   - fill: stretch to the layout slot instead of sizing to content. See the CSS.
+   - fill: sets `width: 100%`, so it only stretches correctly inside a slot that already
+     has an intrinsic width (a sized grid track or flex basis, a fixed-width column) —
+     an unsized slot has nothing for `100%` to resolve against. Simply dropping `fill`
+     does NOT fix an unsized slot either: an unfilled `.fab-stepper` is still a flex
+     item, and `align-items: stretch` widens it to the same box regardless (measured in
+     Chromium, not assumed). Where a call site's slot has no intrinsic width, the fix is
+     a width cap in that layout context instead — four call sites do this at 160px. See
+     the CSS.
    - inputProps: extra ATTRIBUTES spread onto the underlying `<input>`.
    - onChange(value): called with the clamped number on every accepted edit, and with
      `null` when an `allowUnset` field is cleared.
@@ -75,8 +82,13 @@
     // Placeholder text for the input. The explicit prop WINS over
     // `inputProps.placeholder`; either route reaches the rendered input.
     placeholder = '',
-    // `true`: fill the layout slot rather than sizing to content. Mutually exclusive
-    // with `orientation="vertical"`, which is already full-width. See the CSS.
+    // `true`: sets `width: 100%` to fill the layout slot rather than sizing to content.
+    // Only correct when the slot has an intrinsic width to fill; an unsized slot leaves
+    // `100%` nothing to resolve against, and omitting `fill` does not fix that either —
+    // `align-items: stretch` widens an unfilled `.fab-stepper` to the same box anyway
+    // (measured in Chromium). Cap the width in the layout context instead when the slot
+    // is unsized; four call sites do this at 160px. Mutually exclusive with
+    // `orientation="vertical"`, which is already full-width. See the CSS.
     fill = false,
     // 'horizontal' (default): [−] [input] [+], for inline quantities.
     // 'vertical': up-chevron / big mono input / down-chevron, for the Overview
