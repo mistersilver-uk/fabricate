@@ -34,6 +34,7 @@
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
   import { evaluateRecipeReadiness, blocksEnable } from './recipe/recipeReadiness.js';
+  import { resolutionModeOptions } from './resolutionModeOptions.js';
 
   let {
     recipe = null,
@@ -74,6 +75,13 @@
     // silently drops to its default and the control never renders.
     craftingModifierOptions = [],
     craftingModifierPolicyDefault = 'addAll',
+    craftingModifierDefaultIds = [],
+    // The system's check-modifier authority level (issue 1055). NO default: absence is a
+    // real, load-bearing state ("not yet stamped"), and a `= 'none'` here would strip a
+    // delegation the engine still honours from every unstamped system.
+    craftingModifierAuthority = undefined,
+    craftingModifierInertCause = '',
+    onOpenChecks = () => {},
     // Category lives on the Overview tab (prototype §5.1). Threaded through this
     // wrapper so the Overview tab receives them (a tab prop skipping this wrapper
     // silently drops to its default and the control never renders).
@@ -376,6 +384,16 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // The resolution-mode banner's copy and icon are NOT re-authored: `resolutionModeOptions.js`
+  // already owns the canonical { value, icon, labelKey, descKey } list that System Settings
+  // and Crafting Settings render, so a second table would drift. The lookup moved here from
+  // RecipeModeBanner when that component was prop-ified (issue 1055) so a second banner —
+  // the Overview tab's check-modifier summary — can reuse the same chrome with its own copy.
+  const modeOption = $derived(
+    resolutionModeOptions.find((option) => option.value === resolutionMode) ||
+      resolutionModeOptions[0]
+  );
+
   // The recipe image is always editable: a recipe can belong to many books & scrolls
   // (recipeIds[] is many-to-many), so it no longer mirrors or locks to a single linked
   // recipe item's image.
@@ -429,7 +447,23 @@
         }}
       />
 
-      <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
+      <RecipeModeBanner
+        value={modeOption.value}
+        icon={modeOption.icon}
+        kicker={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}
+        label={text(modeOption.labelKey, modeOption.fallback)}
+        scope={text(
+          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem',
+          'set for this crafting system'
+        )}
+        description={text(modeOption.descKey, modeOption.descFallback)}
+        actionLabel={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Settings', 'System settings')}
+        actionHint={text(
+          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint',
+          'Resolution mode is set for the whole crafting system, not per recipe.'
+        )}
+        onAction={onOpenCraftingSettings}
+      />
 
       <div
         class="manager-editor-tab-panel"
@@ -459,6 +493,10 @@
             {minSuccessTierOptions}
             {craftingModifierOptions}
             {craftingModifierPolicyDefault}
+            {craftingModifierDefaultIds}
+            {craftingModifierAuthority}
+            {craftingModifierInertCause}
+            {onOpenChecks}
             {locked}
             {onToggleLocked}
             {multiStepEnabled}
