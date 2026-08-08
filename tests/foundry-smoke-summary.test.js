@@ -11,6 +11,8 @@ import {
   classifyCapturedError,
   computeSmokeSignal,
   evaluateSmokeOutcome,
+  explainSmokeSummaryRefusal,
+  formatFailedStep,
   isTransientPageTeardown,
   shouldTolerateSmokeTeardown,
   TRANSIENT_TEARDOWN_SKIP_PREFIX,
@@ -614,4 +616,303 @@ test('source (F4): both teardown-skip writer sites reference the exported TRANSI
     !source.includes('transient page teardown (skipped): '),
     'the prefix literal must live only in foundrySmokeSignal.js, not re-inlined in the harness'
   );
+});
+
+// ── The refusal diagnostic (issue #1019) ──────────────────────────────────
+
+// `evaluateSmokeOutcome`'s excerpt format was entirely unpinned before #1019: dropping the
+// step name, dropping the error, changing the `|| 'failed'` fallback and changing the `'; '`
+// join ALL passed this suite. `assert.match` cannot close that — three of those four mutants
+// survive any substring match by construction — so these four cases assert the WHOLE message
+// with `assert.equal`. The message is the harness's terminal throw: it goes to stderr AND into
+// `results.errors`, which is serialized into `summary.json`, and `npm run test:foundry` is not
+// in the PR gate set, so a silent format regression would ship green.
+test('evaluateSmokeOutcome pins its failed-step excerpt byte for byte', () => {
+  // (a) step name + error, and the `: ` between them.
+  assert.equal(
+    evaluateSmokeOutcome({ steps: [{ step: 'alpha', passed: false, error: 'boom' }] }).message,
+    '1 step(s) failed: alpha: boom'
+  );
+  // (b) the `|| 'failed'` fallback, which no other test exercises.
+  assert.equal(
+    evaluateSmokeOutcome({ steps: [{ step: 'alpha', passed: false }] }).message,
+    '1 step(s) failed: alpha: failed'
+  );
+  // (c) the `'; '` join between two failed steps.
+  assert.equal(
+    evaluateSmokeOutcome({
+      steps: [
+        { step: 'alpha', passed: false, error: 'boom' },
+        { step: 'beta', passed: false, error: 'bang' },
+      ],
+    }).message,
+    '2 step(s) failed: alpha: boom; beta: bang'
+  );
+  // (d) the runtime-console-error suffix, verbatim.
+  assert.equal(
+    evaluateSmokeOutcome({
+      steps: [{ step: 'alpha', passed: false, error: 'boom' }],
+      consoleErrors: ['x', 'y'],
+    }).message,
+    '1 step(s) failed: alpha: boom (+2 runtime console error(s) captured)'
+  );
+});
+
+// The harness's step record is `{ step, passed, error, skipped }`. The key is `step`, NOT
+// `name` (`scripts/foundry-test-run.mjs:1655`, `:1657`, and every other push site), so an
+// implementation reading `s.name` against a hand-written `{ name: … }` fixture would pass its
+// own tests and emit an empty excerpt against a real summary.
+test('formatFailedStep reads the `step` key and falls back to `failed`', () => {
+  assert.equal(formatFailedStep({ step: 'screenshot-manager', passed: false, error: 'boom' }), 'screenshot-manager: boom');
+  assert.equal(formatFailedStep({ step: 'screenshot-manager', passed: false }), 'screenshot-manager: failed');
+  assert.equal(formatFailedStep({}), 'undefined: failed');
+});
+
+// Every field at its accepting value. Each fixture below patches ONLY the field it is about.
+// The natural pair `{ passed: false, stepFailures: 2 }` is deliberately NOT used: `passed !==
+// true` short-circuits the gate's disjunction, so the second field proves nothing and kills no
+// mutant. `{ passed: true, stepFailures: 1 }` is not a summary the harness can emit — that is
+// the point, and it is what makes the fixture able to detect its own condition's removal.
+const ACCEPTING_SUMMARY = Object.freeze({
+  passed: true,
+  stepFailures: 0,
+  consoleErrorCount: 0,
+  degraded: false,
+  rendererCrashed: false,
+});
+
+const refusalFor = (patch) => explainSmokeSummaryRefusal({ ...ACCEPTING_SUMMARY, ...patch });
+
+// The names the message headed each condition block with, parsed back out.
+const namedConditions = (message) =>
+  message
+    .split('\n')
+    .map((line) => /^ {2}(\w+): /.exec(line))
+    .filter(Boolean)
+    .map((match) => match[1]);
+
+// The gate's five-condition predicate, restated with its OWN `!==` comparisons so this file
+// can compute the expected answer independently of the builder it is testing. Anything looser
+// here (`> 0` for a count, truthiness for a flag) would make the oracle agree with a defective
+// builder instead of catching it.
+const CONDITION_ORDER = ['passed', 'stepFailures', 'consoleErrorCount', 'degraded', 'rendererCrashed'];
+const OFF_NOMINAL = Object.freeze({
+  passed: false,
+  stepFailures: 3,
+  consoleErrorCount: 2,
+  degraded: true,
+  rendererCrashed: true,
+});
+const trippedConditions = (summary) =>
+  CONDITION_ORDER.filter((name) =>
+    name === 'passed'
+      ? summary.passed !== true
+      : name === 'stepFailures'
+        ? summary.stepFailures !== 0
+        : name === 'consoleErrorCount'
+          ? summary.consoleErrorCount !== 0
+          : name === 'degraded'
+            ? summary.degraded !== false
+            : summary.rendererCrashed !== false
+  );
+
+// NEVER SILENT, NEVER PARTIAL. Item 8's floor is "at least one condition", but "at least one"
+// permits a first-match-wins builder that emits "the run did not pass" and nothing else on the
+// real incident summary — reproducing the exact class-of-fault message this change exists to
+// replace, green. So this asserts the named set EQUALS the tripped set, over every one of the
+// 31 non-empty combinations. It is the single test that kills both the first-condition-only
+// collapse and the `stepFailures !== 0` -> `> 0` weakening (an absent count is `!== 0` but not
+// `> 0`, so a weakened builder would drop it from the named set).
+test('explainSmokeSummaryRefusal names every tripped condition, over all 31 combinations', () => {
+  for (const offNominalValues of [OFF_NOMINAL, { ...OFF_NOMINAL, stepFailures: undefined, consoleErrorCount: undefined }]) {
+    for (let mask = 1; mask < 32; mask++) {
+      const patch = {};
+      CONDITION_ORDER.forEach((name, index) => {
+        if (mask & (1 << index)) patch[name] = offNominalValues[name];
+      });
+      const summary = { ...ACCEPTING_SUMMARY, ...patch };
+      const expected = trippedConditions(summary);
+      assert.ok(expected.length > 0, `mask ${mask} must trip the predicate`);
+      assert.deepEqual(
+        namedConditions(explainSmokeSummaryRefusal(summary)),
+        expected,
+        `mask ${mask} with ${JSON.stringify(patch)}`
+      );
+    }
+  }
+});
+
+test('explainSmokeSummaryRefusal reports each condition with the value it measured', () => {
+  assert.match(refusalFor({ passed: false }), /^ {2}passed: false — /m);
+  assert.match(refusalFor({ stepFailures: 4 }), /^ {2}stepFailures: 4 — /m);
+  assert.match(refusalFor({ consoleErrorCount: 12 }), /^ {2}consoleErrorCount: 12 — /m);
+  assert.match(refusalFor({ degraded: true }), /^ {2}degraded: true — /m);
+  assert.match(refusalFor({ rendererCrashed: true }), /^ {2}rendererCrashed: true — /m);
+});
+
+// An absent scalar trips `!== 0` and must NOT be rendered as `0`: "stepFailures: 0" beside a
+// refusal reads as a gate defect, and it is the shape a stale or truncated summary.json takes.
+test('explainSmokeSummaryRefusal renders an absent or non-numeric count as "not recorded"', () => {
+  for (const value of [undefined, null, '3', Number.NaN]) {
+    assert.match(refusalFor({ stepFailures: value }), /^ {2}stepFailures: not recorded — /m);
+    assert.match(refusalFor({ consoleErrorCount: value }), /^ {2}consoleErrorCount: not recorded — /m);
+  }
+  assert.match(refusalFor({ passed: undefined }), /^ {2}passed: not recorded — /m);
+  assert.match(refusalFor({ degraded: 'yes' }), /^ {2}degraded: not recorded — /m);
+  assert.match(refusalFor({ rendererCrashed: 1 }), /^ {2}rendererCrashed: not recorded — /m);
+});
+
+test('explainSmokeSummaryRefusal quotes the failing steps and the un-waived console errors', () => {
+  const message = refusalFor({
+    stepFailures: 2,
+    consoleErrorCount: 1,
+    steps: [
+      { step: 'screenshot-manager', passed: false, error: 'locator timeout' },
+      { step: 'craft-item-phase', passed: true },
+      { step: 'player-journal', passed: false },
+    ],
+    consoleErrors: ["pageerror: Cannot read properties of undefined (reading 'INTERFACE')"],
+  });
+  assert.match(message, /^ {4}- screenshot-manager: locator timeout$/m);
+  assert.match(message, /^ {4}- player-journal: failed$/m);
+  assert.ok(!message.includes('craft-item-phase'), 'a passing step is not evidence of a failure');
+  assert.match(message, /^ {4}- pageerror: Cannot read properties of undefined \(reading 'INTERFACE'\)$/m);
+});
+
+// `degraded` and `rendererCrashed` both fire on runs that PASSED and exited 0 (AGENTS.md:380),
+// so neither block may describe the run as having failed — and each still needs something
+// quotable, or a plain statement that the summary recorded nothing for it.
+test('explainSmokeSummaryRefusal gives degraded and rendererCrashed their own evidence', () => {
+  const degradedMessage = refusalFor({
+    degraded: true,
+    steps: [
+      { step: 'craft-item-phase', passed: true },
+      { step: 'player-journal', passed: true, skipped: true, error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed` },
+    ],
+  });
+  assert.match(degradedMessage, /^ {4}- player-journal: transient page teardown \(skipped\): target closed$/m);
+  assert.ok(!/\bfailed\b/.test(degradedMessage.split('\n\n')[1]), 'a tolerated teardown exits 0 and is not a failed run');
+
+  const crashMessage = refusalFor({ rendererCrashed: true });
+  assert.match(crashMessage, /^ {2}rendererCrashed: true — /m);
+  assert.match(crashMessage, /no per-step record/);
+
+  // A `degraded: true` summary whose steps array records no tolerated teardown says so rather
+  // than naming a flag and falling silent.
+  assert.match(refusalFor({ degraded: true, steps: [] }), /recorded no tolerated-teardown step/);
+});
+
+// An early phase abort (`scripts/foundry-test-run.mjs`'s outer catch) writes `passed: false`
+// with all four signals clean. The refusal must say that explicitly instead of naming the
+// verdict and leaving the contributor to guess what tripped it.
+test('explainSmokeSummaryRefusal explains a bare passed:false with nothing else recorded', () => {
+  const message = refusalFor({ passed: false });
+  assert.deepEqual(namedConditions(message), ['passed']);
+  assert.match(message, /records no failing step, un-waived console error, tolerated teardown, or renderer crash/);
+  assert.match(message, /aborted before/);
+
+  // With other conditions present, the verdict block points at them rather than repeating them.
+  assert.match(refusalFor({ passed: false, consoleErrorCount: 3 }), /follows from the condition\(s\) below/);
+});
+
+test('explainSmokeSummaryRefusal caps each excerpt at five entries with a (+N more) tail', () => {
+  const errorsOfLength = (count) => Array.from({ length: count }, (_, index) => `console-error-${index + 1}`);
+
+  const five = refusalFor({ consoleErrorCount: 5, consoleErrors: errorsOfLength(5) });
+  assert.match(five, /^ {4}- console-error-5$/m);
+  assert.ok(!five.includes('more)'), 'exactly five entries needs no truncation tail');
+
+  const six = refusalFor({ consoleErrorCount: 6, consoleErrors: errorsOfLength(6) });
+  assert.match(six, /^ {4}- console-error-5$/m);
+  assert.ok(!six.includes('console-error-6'), 'the sixth entry is truncated away');
+  assert.match(six, /^ {4}\(\+1 more\)$/m);
+});
+
+test('explainSmokeSummaryRefusal survives absent, null, and non-array evidence fields', () => {
+  for (const value of [undefined, null, 'not an array', 42, {}]) {
+    const message = explainSmokeSummaryRefusal({
+      ...ACCEPTING_SUMMARY,
+      passed: false,
+      stepFailures: 1,
+      consoleErrorCount: 1,
+      degraded: true,
+      rendererCrashed: true,
+      steps: value,
+      consoleErrors: value,
+      waivedConsoleErrors: value,
+    });
+    assert.deepEqual(namedConditions(message), CONDITION_ORDER);
+    assert.match(message, /recorded no failing step/);
+    assert.match(message, /recorded no un-waived console error/);
+  }
+  // And the whole summary being absent is not a crash either.
+  assert.equal(typeof explainSmokeSummaryRefusal(undefined), 'string');
+  assert.equal(typeof explainSmokeSummaryRefusal(null), 'string');
+});
+
+// `waivedConsoleErrors` is a `string[]` (`scripts/foundry-test-run.mjs:207`, `:6627`, `:6650`,
+// `:13279`), not a count — reading it as a number would render `[Object]`-shaped nonsense or
+// silently print nothing.
+test('explainSmokeSummaryRefusal reports how many console errors were suppressed', () => {
+  assert.match(
+    refusalFor({ passed: false, waivedConsoleErrors: ['favicon 404', 'pageerror: minimum resolution'] }),
+    /suppressed 2 waived console error\(s\)/
+  );
+  // An empty or absent array prints no suppression note at all. Matched on the whole phrase:
+  // the verdict block's own "un-waived console error" contains "waived console error".
+  const suppressionNote = /suppressed \d+ waived console error/;
+  assert.ok(!suppressionNote.test(refusalFor({ passed: false, waivedConsoleErrors: [] })));
+  assert.ok(!suppressionNote.test(refusalFor({ passed: false })));
+  assert.ok(!suppressionNote.test(refusalFor({ passed: false, waivedConsoleErrors: 'not an array' })));
+});
+
+// The gate reads ONE summary and therefore cannot attribute what it read to a head. The
+// procedure is always printed so the contributor is never left to invent it, and the
+// stepFailures-0-with-console-errors prior is worded as guidance about a class of summary
+// rather than as a finding about this one.
+test('explainSmokeSummaryRefusal always states the merge-base attribution procedure', () => {
+  for (const patch of [{ passed: false }, { stepFailures: 1 }, { rendererCrashed: true }]) {
+    const message = refusalFor(patch);
+    assert.match(message, /git merge-base HEAD origin\/main/);
+    assert.match(message, /already present at the pull request's base/);
+    assert.match(message, /stepFailures 0 with consoleErrorCount above 0/);
+    assert.match(message, /guidance/);
+    // It must never claim to have performed the comparison it is describing.
+    assert.match(message, /reads one summary/);
+  }
+});
+
+// The builder re-derives "which condition tripped" in a different file from the predicate that
+// decides whether to refuse — two encodings of one truth, guarded by test rather than by
+// structure. This is the half that keeps the failing-step SELECTION in step with the signal
+// the harness actually computes. It covers three of the five conditions: `computeSmokeSignal`
+// returns neither `passed` (set at `scripts/foundry-test-run.mjs:13157`/`:13160`) nor
+// `rendererCrashed` (`:13277`).
+test('explainSmokeSummaryRefusal quotes exactly the steps computeSmokeSignal counted', () => {
+  const results = {
+    steps: [
+      { step: 'boot', passed: true },
+      { step: 'screenshot-manager', passed: false, error: 'locator timeout' },
+      { step: 'craft-item-phase', passed: false, error: 'assertion' },
+      { step: 'player-journal', passed: true, skipped: true, error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed` },
+    ],
+    consoleErrors: ['boom'],
+  };
+  const signal = computeSmokeSignal(results);
+  assert.deepEqual(signal, { stepFailures: 2, consoleErrorCount: 1, degraded: true });
+
+  const message = explainSmokeSummaryRefusal({ ...ACCEPTING_SUMMARY, ...signal, passed: false, ...results });
+  const quotedSteps = message.split('\n').filter((line) => /^ {4}- (boot|screenshot-manager|craft-item-phase|player-journal): /.test(line));
+  // Two failing-step quotes plus the one tolerated-teardown quote `degraded` is entitled to.
+  assert.equal(quotedSteps.filter((line) => !line.includes(TRANSIENT_TEARDOWN_SKIP_PREFIX)).length, signal.stepFailures);
+  assert.equal(quotedSteps.filter((line) => line.includes(TRANSIENT_TEARDOWN_SKIP_PREFIX)).length, 1);
+});
+
+test('source: the run verdict that feeds summary.passed is set on both the success and the catch path', async () => {
+  const source = await readFile(HARNESS_PATH, 'utf8');
+
+  // `passed` is the one evidence condition `computeSmokeSignal` does NOT return, so the drift
+  // guard above cannot cover it. Anchor it here instead: both assignment sites must survive.
+  assert.match(source, /results\.passed = true;/);
+  assert.match(source, /results\.passed = false;/);
 });

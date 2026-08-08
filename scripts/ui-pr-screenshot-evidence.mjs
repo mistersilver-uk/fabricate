@@ -4,6 +4,13 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
+// The refusal diagnostic lives beside `evaluateSmokeOutcome` in the lib, NOT here (issue
+// #1019). Two reasons, both structural: the producer and this consumer then share one
+// `formatFailedStep`, so the gate quotes a failing step exactly as the harness's own throw
+// does; and this file is in `KNOWN_UNGATED_SCRIPTS`, outside both the `lint` and the
+// `format:check` globs, while `scripts/lib/foundrySmokeSignal.js` is inside both.
+import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 
@@ -1404,6 +1411,11 @@ function validateScreenshotRunEvidence({ sourceRoot, views, headSha }) {
     join(sourceRoot, 'screenshot-manifest.json'),
     'screenshot manifest'
   );
+  // The five evidence conditions. `!==` and not `> 0`/truthiness on purpose: a summary
+  // MISSING `stepFailures` entirely (a stale or truncated artifact) must refuse, and `>
+  // 0` would accept it and open the gate. `explainSmokeSummaryRefusal` re-derives which
+  // of the five tripped, using these same comparisons, and its own suite asserts the
+  // named set equals the tripped set over all 31 combinations.
   if (
     summary.passed !== true ||
     summary.stepFailures !== 0 ||
@@ -1411,7 +1423,7 @@ function validateScreenshotRunEvidence({ sourceRoot, views, headSha }) {
     summary.degraded !== false ||
     summary.rendererCrashed !== false
   ) {
-    throw new Error('Screenshot evidence comes from a failed or degraded smoke summary');
+    throw new Error(explainSmokeSummaryRefusal(summary));
   }
   const summaryRun = summary.screenshotRun || {};
   if (!summaryRun.runId || summaryRun.runId !== manifest.runId) {

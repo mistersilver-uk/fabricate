@@ -1,6 +1,21 @@
 /**
- * Pure helpers for the Foundry smoke harness's console-error waiver and its
- * split pass/fail signal (issue #628, task 2.1).
+ * Pure helpers for the Foundry smoke SUMMARY: the run's verdict (`passed`), its
+ * split signals (`stepFailures`, `consoleErrorCount`, `degraded` — issue #628,
+ * task 2.1), the console-error waiver those signals are computed behind, and
+ * their interpretation.
+ *
+ * The filename is narrower than the contents, deliberately. The split signal is
+ * one part of the summary, not the whole of it, and renaming the file would
+ * churn the single-source pin in `tests/foundry-smoke-summary.test.js` that
+ * keeps `TRANSIENT_TEARDOWN_SKIP_PREFIX` from being re-inlined in the harness.
+ *
+ * The charter covers BOTH sides of the summary (issue #1019). Everything here
+ * was producer-side until `explainSmokeSummaryRefusal`, which reads a persisted
+ * `summary.json` on behalf of a consumer — the PR screenshot-evidence gate in
+ * `scripts/ui-pr-screenshot-evidence.mjs`. That widening is the point rather
+ * than an accident: producer and consumer share one `formatFailedStep`, so the
+ * gate's refusal quotes a failing step in byte-identical form to the harness's
+ * own terminal throw and a contributor comparing the two reads one dialect.
  *
  * These are deliberately side-effect-free and import nothing from Playwright or
  * `foundry-test-run.mjs`. That harness runs `main()` (which launches Chromium)
@@ -180,13 +195,28 @@ export function computeSmokeSignal(results) {
   return {
     stepFailures: steps.filter((step) => step?.passed === false).length,
     consoleErrorCount: consoleErrors.length,
-    degraded: steps.some(
-      (step) =>
-        step?.skipped === true &&
-        typeof step?.error === 'string' &&
-        step.error.startsWith(TRANSIENT_TEARDOWN_SKIP_PREFIX)
-    ),
+    degraded: steps.some((step) => isToleratedTeardownStep(step)),
   };
+}
+
+/**
+ * Render ONE smoke step record as the single line both the harness's terminal
+ * throw and the screenshot-evidence gate's refusal quote it with.
+ *
+ * The record's key is `step`, NOT `name` (`scripts/foundry-test-run.mjs:1655`,
+ * `:1657`, and every other push site). Reading `name` here against a
+ * hand-written `{ name: … }` fixture passes its own test and emits an empty
+ * excerpt against a real `summary.json`, so the key is pinned by test.
+ *
+ * The `|| 'failed'` fallback matters for the same reason: a step recorded
+ * `passed: false` with no `error` is reachable, and rendering it as
+ * `step: undefined` would read as a harness defect rather than a step failure.
+ *
+ * @param {{ step?: string, error?: string }} step
+ * @returns {string}
+ */
+export function formatFailedStep(step) {
+  return `${step?.step}: ${step?.error || 'failed'}`;
 }
 
 /**
@@ -214,7 +244,7 @@ export function evaluateSmokeOutcome(results) {
 
   const failedSteps = steps.filter((step) => step?.passed === false);
   if (failedSteps.length > 0) {
-    const summary = failedSteps.map((step) => `${step.step}: ${step.error || 'failed'}`).join('; ');
+    const summary = failedSteps.map((step) => formatFailedStep(step)).join('; ');
     const consoleNote =
       consoleErrors.length > 0
         ? ` (+${consoleErrors.length} runtime console error(s) captured)`
@@ -235,4 +265,221 @@ export function evaluateSmokeOutcome(results) {
   }
 
   return { throws: false };
+}
+
+/**
+ * True when a step record is a TOLERATED transient renderer/page teardown: the
+ * harness recorded it `skipped` (not failed) and stamped its `error` with the
+ * shared prefix. This is the evidence behind `degraded`, so `computeSmokeSignal`
+ * and the refusal builder read it through one predicate rather than each
+ * re-spelling the prefix match.
+ *
+ * @param {{ skipped?: boolean, error?: unknown }} step
+ * @returns {boolean}
+ */
+function isToleratedTeardownStep(step) {
+  return (
+    step?.skipped === true &&
+    typeof step?.error === 'string' &&
+    step.error.startsWith(TRANSIENT_TEARDOWN_SKIP_PREFIX)
+  );
+}
+
+/** How many evidence lines a single condition quotes before it truncates. */
+const EVIDENCE_EXCERPT_CAP = 5;
+
+/** Indents for a condition heading and for the evidence quoted beneath it. */
+const CONDITION_INDENT = '  ';
+const EVIDENCE_INDENT = CONDITION_INDENT.repeat(2);
+
+function asEvidenceArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * A count's measured value, or `not recorded`.
+ *
+ * An absent or non-numeric count trips the gate's `!== 0` comparison, and it is
+ * exactly what a stale or truncated `summary.json` produces. Rendering it as
+ * `0` would print a refusal whose own stated value is an accepting one.
+ */
+function describeCount(value) {
+  return Number.isFinite(value) ? String(value) : 'not recorded';
+}
+
+/** A flag's measured value, or `not recorded` when the summary did not carry a boolean. */
+function describeFlag(value) {
+  return typeof value === 'boolean' ? String(value) : 'not recorded';
+}
+
+/**
+ * Quote up to `EVIDENCE_EXCERPT_CAP` entries, or state that the summary carried
+ * none. A condition that names a flag and then falls silent is the failure mode
+ * this whole diagnostic exists to remove, so the empty case is never empty.
+ */
+function quoteEvidence(entries, emptyNote) {
+  if (entries.length === 0) return [`${EVIDENCE_INDENT}${emptyNote}`];
+  const shown = entries.slice(0, EVIDENCE_EXCERPT_CAP);
+  const lines = shown.map((entry) => `${EVIDENCE_INDENT}- ${entry}`);
+  if (entries.length > shown.length) {
+    lines.push(`${EVIDENCE_INDENT}(+${entries.length - shown.length} more)`);
+  }
+  return lines;
+}
+
+/**
+ * The four NON-VERDICT conditions, each tested with the gate's own `!==`
+ * comparison.
+ *
+ * The comparisons are copied literally rather than paraphrased. Anything looser
+ * — `> 0` for a count, truthiness for a flag — lets the builder refuse while
+ * naming nothing, which is strictly worse than the ten-word message it replaces.
+ */
+function collectSignalConditions(summary, steps, consoleErrors) {
+  const conditions = [];
+  if (summary?.stepFailures !== 0) {
+    conditions.push({
+      name: 'stepFailures',
+      value: describeCount(summary?.stepFailures),
+      note: 'one or more phase steps did not pass',
+      evidence: quoteEvidence(
+        steps.filter((step) => step?.passed === false).map((step) => formatFailedStep(step)),
+        'the summary recorded no failing step for this condition'
+      ),
+    });
+  }
+  if (summary?.consoleErrorCount !== 0) {
+    conditions.push({
+      name: 'consoleErrorCount',
+      value: describeCount(summary?.consoleErrorCount),
+      note: 'un-waived runtime console errors reached the independent console gate',
+      evidence: quoteEvidence(
+        consoleErrors.map(String),
+        'the summary recorded no un-waived console error for this condition'
+      ),
+    });
+  }
+  if (summary?.degraded !== false) {
+    conditions.push({
+      name: 'degraded',
+      value: describeFlag(summary?.degraded),
+      // Exit 0. Say nothing here that describes the run as having failed.
+      note: 'a transient renderer/page teardown was tolerated, so the run exited 0 as a flake rather than a clean pass',
+      evidence: quoteEvidence(
+        steps.filter((step) => isToleratedTeardownStep(step)).map((step) => formatFailedStep(step)),
+        'the summary recorded no tolerated-teardown step for this condition'
+      ),
+    });
+  }
+  if (summary?.rendererCrashed !== false) {
+    conditions.push({
+      name: 'rendererCrashed',
+      value: describeFlag(summary?.rendererCrashed),
+      // Exit 0 as well: the page `crash` listener flags the run, it does not fail it.
+      note: 'the page reported a renderer crash (canonically an OOM), so the run exited 0 as a flake rather than a clean pass',
+      evidence: [
+        `${EVIDENCE_INDENT}the page crash event has no per-step record to quote, so the summary carries no evidence beyond the flag itself`,
+      ],
+    });
+  }
+  return conditions;
+}
+
+/**
+ * The VERDICT condition. `passed` is not a smoke signal — issue #628 split the
+ * signals OUT of it — so it gets its own block, and its evidence is the other
+ * conditions when any tripped.
+ *
+ * When none did, the summary is an early phase abort (the harness's outer catch
+ * writes `passed: false` before any per-step gate ran). Naming the verdict and
+ * stopping there would reproduce the class-of-fault message this replaces, so
+ * that case states what the summary does NOT contain.
+ */
+function describeVerdictCondition(summary, hasSignalConditions) {
+  return {
+    name: 'passed',
+    value: describeFlag(summary?.passed),
+    note: 'the run did not record a successful verdict',
+    evidence: [
+      hasSignalConditions
+        ? `${EVIDENCE_INDENT}the verdict follows from the condition(s) below`
+        : `${EVIDENCE_INDENT}the summary records no failing step, un-waived console error, tolerated teardown, or renderer crash to account for it — the shape of a run that aborted before its per-step gates ran`,
+    ],
+  };
+}
+
+const ATTRIBUTION_PROCEDURE = [
+  "Establishing whether this fault is already present at the pull request's base:",
+  '  This gate reads one summary, and one summary carries no evidence of which head',
+  '  produced what it recorded, so it cannot tell a fault this branch introduced from',
+  '  one that was already there. To establish that, run the same smoke at the merge',
+  '  base and compare the two summaries:',
+  '    git merge-base HEAD origin/main',
+  '    git switch --detach <merge-base> && npm run test:foundry',
+  '    read test-results/summary.json, then git switch -',
+  '  As guidance for what to compare first: stepFailures 0 with consoleErrorCount above 0 is',
+  '  more often ambient fixture-world noise already present at the base than a change-specific',
+  '  regression. That is a prior about a class of summary, not a finding about this one.',
+];
+
+/**
+ * Explain why a persisted smoke `summary.json` does not qualify as publishable
+ * screenshot evidence (issue #1019).
+ *
+ * The screenshot-evidence gate refuses on five conditions and used to report all
+ * five with one ten-word sentence, quoting none of the evidence it had just
+ * read. This names each condition that tripped WITH the value it measured,
+ * quotes a bounded excerpt of what the summary recorded for it, and states the
+ * attribution procedure the gate itself cannot perform.
+ *
+ * It reports LEGIBILITY, never detection: it does not and cannot establish
+ * whether the fault it is describing predates the branch.
+ *
+ * Multi-line by design. Its one caller prints it through `console.error` with no
+ * `::error::` annotation, so embedded newlines survive to the terminal intact.
+ *
+ * @param {{ passed?: unknown, stepFailures?: unknown, consoleErrorCount?: unknown,
+ *           degraded?: unknown, rendererCrashed?: unknown, steps?: unknown,
+ *           consoleErrors?: unknown, waivedConsoleErrors?: unknown }} [summary]
+ * @returns {string}
+ */
+export function explainSmokeSummaryRefusal(summary) {
+  const steps = asEvidenceArray(summary?.steps);
+  const consoleErrors = asEvidenceArray(summary?.consoleErrors);
+  const signalConditions = collectSignalConditions(summary, steps, consoleErrors);
+  const conditions =
+    summary?.passed === true
+      ? signalConditions
+      : [describeVerdictCondition(summary, signalConditions.length > 0), ...signalConditions];
+
+  const lines = [
+    'Screenshot evidence refused: the smoke summary does not qualify as publishable evidence.',
+    '',
+  ];
+  if (conditions.length === 0) {
+    // Unreachable from the gate, which calls this only after its predicate tripped.
+    // Kept total rather than throwing, and worded so it can never read as a finding.
+    lines.push(
+      'No evidence condition tripped in this summary, so this refusal names nothing. Report it as a gate defect.'
+    );
+  } else {
+    lines.push(`Disqualifying evidence conditions (${conditions.length} of 5):`);
+    for (const condition of conditions) {
+      lines.push(
+        `${CONDITION_INDENT}${condition.name}: ${condition.value} — ${condition.note}`,
+        ...condition.evidence
+      );
+    }
+  }
+
+  const waivedCount = asEvidenceArray(summary?.waivedConsoleErrors).length;
+  if (waivedCount > 0) {
+    lines.push(
+      '',
+      `The run also suppressed ${waivedCount} waived console error(s); a waived entry never disqualifies a run, and each is listed under waivedConsoleErrors in the summary.`
+    );
+  }
+
+  lines.push('', ...ATTRIBUTION_PROCEDURE);
+  return lines.join('\n');
 }
