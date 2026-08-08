@@ -14,10 +14,12 @@
   and the `data-*` marker the manager contract and the mounted suite resolve against. A third
   limited rule is one entry in the table below plus one call site.
 
-  Authored per-limit strings rather than the parametrized `FABRICATE.Common.Stepper.*` pair the
-  rest of the migration uses: these two already ship four keys of their own, and re-pointing them
-  at the shared pair would orphan those keys. They stay literals so the lang-key scans still see
-  them in source.
+  Authored per-limit strings rather than the shared parametrized adjunct pair in
+  `components/stepperLabels.js` that the rest of the migration uses: these two already ship four
+  keys of their own, and re-pointing them would orphan those. They stay literals so the lang-key
+  scans still see them in source — and the shared pair is named here by its MODULE rather than by
+  its key path, because `ui-lang-keys-resolve.test.js` scans this file for key literals and a bare
+  namespace base resolves to an object rather than a string, which that gate counts.
 
   The wrapper's placement — `padding-left` under the description column and the 160px cap that
   keeps a filled stepper from resolving `width: 100%` against the whole rules stack — lives in the
