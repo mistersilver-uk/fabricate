@@ -26,6 +26,19 @@
  * PATH-free execution of `format:check` (`runPrettierCheck`) proves the real command reaches the
  * real component corpus, with a positive control proving Prettier actually reports an
  * unformatted component rather than reporting clean by construction.
+ *
+ * Issue 1017 added the last piece: that execution runs the real CLI over the live working tree, so
+ * a file appearing or vanishing mid-run used to surface as a bare CLI error with nothing to say
+ * the tree had moved. The failure report now discriminates on Prettier's EXIT CODE — 1 is
+ * Prettier's own verdict about files it read, 2 is an operational error and no verdict at all —
+ * and adds what it observed of the tree either side of the run. See `formatCheckReport` for why
+ * the notes are additive rather than a substitution, and why additive does not mean last.
+ *
+ * `formatCheckReport` is the one thing here that a green run never inspects, so it gets the same
+ * treatment as the positive control above: `describe('the failure report ...')` calls it directly
+ * for each exit code. Without that, deleting its exit-2 note, breaking the constant that selects
+ * it, or making its listing note unreachable all leave this file 11/11 green — measured, which is
+ * why those tests exist.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -116,6 +129,111 @@ const FIXTURE_ARGV = ['--plugin', SVELTE_PLUGIN_PATH, '--no-config'];
 
 const UNFORMATTED_COMPONENT = '<script>\n  let x = 1\n</script>\n\n<div>{x}</div>\n';
 const FORMATTED_COMPONENT = '<script>\n  let x = 1;\n</script>\n\n<div>{x}</div>\n';
+
+/**
+ * Prettier's exit codes, which are the only trustworthy verdict this test has.
+ *
+ * `1` is Prettier's own answer about files it READ: at least one of them is unformatted. `2` is an
+ * operational error — Prettier reporting that it could not do the job, not a verdict about
+ * formatting. `legacy-cli.mjs` sets it at six distinct sites, so exit 2 is a CLASS rather than one
+ * cause, and the report below names the class instead of diagnosing a member of it.
+ *
+ * Measured against this repository's own binary, because guessing here is how the previous wording
+ * came to be wrong. `output` is stdout and stderr together, the way the report below joins them:
+ *
+ *   | condition                                       | exit | output                                        |
+ *   |-------------------------------------------------|------|-----------------------------------------------|
+ *   | glob matched no file                            | 2    | `All matched files use Prettier code style!`  |
+ *   | no parser inferable (`--no-config` on `.svelte`)| 2    | `Error occurred when checking code style ...` |
+ *   | parse error in a component's MARKUP             | 2    | `Error occurred when checking code style ...` |
+ *   | parse error in an embedded `<script>`           | 0/1  | the SyntaxError, then the ordinary verdict    |
+ *   | present but unformatted                         | 1    | `Code style issues found in the above file.`  |
+ *
+ * The two parse-error rows are one condition to a READER and two to the CLI, which is why they are
+ * listed apart rather than jointly as "a parse error". A markup error throws out of the plugin and
+ * is an operational error. An error inside an embedded `<script>` is swallowed, that region is
+ * reproduced verbatim, and the exit code is then whatever the rest of the file deserves — measured
+ * at 0 when the surrounding markup was already formatted, so a component Prettier could not fully
+ * parse can pass `--check` with the SyntaxError printed beside the clean sweep.
+ *
+ * Two things follow, and both are why this file reads the exit code rather than the output. The
+ * stdout line is NOT constant at exit 2 — the empty glob prints the clean sweep, the missing parser
+ * does not — so no single sentence identifies the condition. And exit 2 OUTRANKS exit 1: the CLI
+ * sets 1 only `if (... && !process.exitCode)`, so a run that both matched nothing and found real
+ * formatting problems exits 2 while its output complains about code style.
+ */
+const PRETTIER_UNFORMATTED = 1;
+const PRETTIER_OPERATIONAL_ERROR = 2;
+
+/**
+ * The failure report for a non-zero `format:check`: this test's own reading of the run, then
+ * Prettier's output verbatim and complete.
+ *
+ * The notes are ADDITIVE, never a replacement, and that is the whole design. The realistic
+ * collision is someone adding a new unformatted `.svelte` while this runs — the listing moved AND
+ * Prettier genuinely complained — and a report that substituted "the worktree changed" for
+ * Prettier's message would eat the real failure and send the reader to re-run a gate that will
+ * fail again for the reason it just discarded.
+ *
+ * ADDITIVE DOES NOT MEAN LAST, which is the ordering this file learned the hard way. Measured on a
+ * forced exit 2: appended, the note landed at TAP line 1670 against a lede at line 183, because
+ * `--log-level debug` puts ~270 `resolve config from ...` lines in between — and the reader's
+ * SECOND line was `All matched files use Prettier code style!`, the exact sentence the note exists
+ * to contradict, 1,487 lines before the contradiction arrived. So the discriminating clause is
+ * folded into the lede and the notes precede the verbatim block. Prettier's output is unabridged
+ * either way; only its position moved.
+ *
+ * The exit code is the discriminator. The listing diff is only enrichment: it names WHICH paths
+ * moved, and it is reported at any exit code, because a moving tree is worth knowing about
+ * whatever Prettier concluded.
+ *
+ * @param {{status: number, stdout: string, stderr: string}} result The Prettier run.
+ * @param {string[]} before Components listed immediately before the invocation.
+ * @param {string[]} after Components listed immediately after it.
+ * @returns {string} The report.
+ */
+function formatCheckReport(result, before, after) {
+  const operational = result.status === PRETTIER_OPERATIONAL_ERROR;
+  const report = [
+    operational
+      ? 'expected the current repository to already satisfy format:check, got exit 2 — an' +
+        ' OPERATIONAL ERROR rather than a formatting verdict, so any "All matched files use' +
+        ' Prettier code style!" line in the output below is meaningless:'
+      : `expected the current repository to already satisfy format:check, got exit ${result.status}:`,
+  ];
+
+  if (operational) {
+    report.push(
+      'Exit 2 says Prettier could not do the job. It does not say which job it could not do, and' +
+        ' the possibilities have opposite remedies, so read the output below rather than assuming' +
+        ' one. "Unable to read file" is a tree moving under the run — re-run. "No parser could be' +
+        ' inferred" is real and permanent — the resolved config lost prettier-plugin-svelte (see' +
+        ' the module header) and every re-run fails identically. "No files matching the pattern' +
+        ' were found" is the one this report will NOT pick for you, because Prettier prints it' +
+        ' identically either way: a target may have vanished under this run, or it may have been' +
+        ' deleted or renamed long ago and never taken out of the format:check argv — and this' +
+        ' gate pins every one of those targets by equality, so a stale entry produces this' +
+        ' message on every run, forever. Re-running tells you which: if it passes, it was the' +
+        ' tree; if it names the same path again, drop it from GATE_TARGETS and from the script' +
+        ' together. Exit 2 also outranks exit 1, so this run may ALSO have found genuinely' +
+        ' unformatted files; the output below is worth reading in full.'
+    );
+  }
+
+  const named = (files) => files.map((file) => path.relative(repoRoot, file)).join(', ');
+  const appeared = after.filter((file) => !before.includes(file));
+  const vanished = before.filter((file) => !after.includes(file));
+  if (appeared.length > 0 || vanished.length > 0) {
+    report.push(
+      'The component listing also changed across the invocation, so the worktree was moving while' +
+        ` this ran: ${appeared.length} appeared${appeared.length > 0 ? ` (${named(appeared)})` : ''},` +
+        ` ${vanished.length} vanished${vanished.length > 0 ? ` (${named(vanished)})` : ''}.`
+    );
+  }
+
+  report.push(`${result.stdout}${result.stderr}`);
+  return report.join('\n\n');
+}
 
 describe('Prettier covers Svelte components', () => {
   // Without this the sweep below could pass by finding nothing to check — the same vacuity in a
@@ -254,11 +372,32 @@ describe('format:check actually reaches the component corpus when executed', () 
   // zero, with the exit code staying 0 either way — the exact silent failure issue 946 reports).
   it('inspects the real component corpus, not a reconstruction of it', () => {
     const argv = assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
+    // Listed immediately either side of the invocation, deliberately rather than reusing the
+    // module-level `components`: that binding is computed at load and separated from this run by
+    // five async tests which each call `getFileInfo` over all 267 components, so comparing against
+    // it would widen the window being described by seconds for no gain. These two calls bracket
+    // the run and nothing else.
+    const before = listSvelteComponents(path.join(repoRoot, 'src'));
     const result = runPrettierCheck([...argv.slice(1), '--log-level', 'debug']);
-    assert.equal(
-      result.status,
-      0,
-      `expected the current repository to already satisfy format:check, got:\n${result.stdout}${result.stderr}`
+    const after = listSvelteComponents(path.join(repoRoot, 'src'));
+    const report = formatCheckReport(result, before, after);
+    // The bracketing is asserted, not just taken: `before`/`after` are what the listing diff is
+    // computed FROM, so two empty arrays would leave the diff permanently silent while every
+    // assertion here still passed. This is the only test that runs the real brackets.
+    assert.ok(
+      before.length > 100 && after.length > 100,
+      `the bracketing listings must be the real component corpus — got ${before.length} before` +
+        ` and ${after.length} after; an empty bracket makes the moved-file diff a no-op`
+    );
+    assert.equal(result.status, 0, report);
+    // And the report this test would have failed with must be the report, not a stand-in: a green
+    // run never reads its own failure message, so nothing else here notices if the call is
+    // replaced by a literal or stops carrying Prettier's own output.
+    assert.ok(
+      report.includes(`${result.stdout}${result.stderr}`),
+      'the failure report must carry the output Prettier produced, verbatim and complete — the' +
+        ' notes are additive, and a report that dropped or abridged that output would eat the' +
+        ' real failure'
     );
     const inspected = [
       ...`${result.stdout}${result.stderr}`.matchAll(/resolve config from '([^']+\.svelte)'/g),
@@ -284,7 +423,7 @@ describe('format:check actually reaches the component corpus when executed', () 
     );
     assert.equal(
       outcome.status,
-      1,
+      PRETTIER_UNFORMATTED,
       `expected an unformatted component to fail --check, got:\n${outcome.stdout}${outcome.stderr}`
     );
     assert.match(
@@ -305,6 +444,158 @@ describe('format:check actually reaches the component corpus when executed', () 
       outcome.status,
       0,
       `expected a properly formatted component to pass --check, got:\n${outcome.stdout}${outcome.stderr}`
+    );
+  });
+});
+
+/**
+ * The diagnostic itself, called directly.
+ *
+ * Everything above only ever reads `formatCheckReport` through a passing assertion, which never
+ * looks at its message — so the whole of it was unproven, and measurably so: breaking the exit-2
+ * constant, deleting the exit-2 note and making the listing note unreachable each left this file
+ * 11/11 green. It is a pure function of `(result, before, after)`, so no CLI spawn is needed to
+ * fix that; the fixtures below are the real CLI outputs, copied from runs against this
+ * repository's own Prettier binary.
+ */
+describe('the report a failing format:check would actually print', () => {
+  // The exit codes here are LITERALS, not `PRETTIER_OPERATIONAL_ERROR`/`PRETTIER_UNFORMATTED`, and
+  // that is the difference between a test and a tautology. Prettier owns these numbers; the
+  // constants are only this file's names for them. Written with the constants, this suite agrees
+  // with the code by construction — measured: changing `PRETTIER_OPERATIONAL_ERROR` to 3 moved the
+  // fixture along with the branch and left all 14 tests green, which is the very hole this whole
+  // block exists to close.
+  const EMPTY_GLOB = {
+    status: 2,
+    stdout: 'Checking formatting...\nAll matched files use Prettier code style!\n',
+    stderr: '[error] No files matching the pattern were found: "src/**/*.svelte".\n',
+  };
+  const UNFORMATTED = {
+    status: 1,
+    stdout: 'Checking formatting...\n',
+    stderr:
+      '[warn] src/ui/svelte/apps/manager/ExplainerCard.svelte\n' +
+      '[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n',
+  };
+  const componentPath = (name) => path.join(repoRoot, 'src/ui/svelte/apps/manager', name);
+  const steady = [componentPath('ExplainerCard.svelte')];
+
+  it("reports exit 1 as Prettier's own verdict, with nothing added to it", () => {
+    const report = formatCheckReport(UNFORMATTED, steady, steady);
+
+    assert.ok(
+      report.includes(`${UNFORMATTED.stdout}${UNFORMATTED.stderr}`),
+      `exit 1 is Prettier's answer about files it read, and must survive verbatim:\n${report}`
+    );
+    assert.match(report, /got exit 1/, 'the exit code is the discriminator, so state it');
+    assert.ok(
+      !/operational error/i.test(report),
+      `exit 1 IS the formatting verdict — calling it an operational error would send the reader` +
+        ` to re-run a gate that is telling them the truth:\n${report}`
+    );
+    // The lede above is the only place the phrase "operational error" appears, so the assertion
+    // before this one cannot see the exit-2 NOTE at all — measured: `if (operational)` mutated to
+    // `if (true)` shipped 14/14 green, with an exit-1 run carrying the whole "read the output,
+    // it may be a moving tree" paragraph. This names the note's first words instead.
+    assert.ok(
+      !/Exit 2 says/.test(report),
+      `the exit-2 note must not be attached to a formatting verdict — it tells the reader the run` +
+        ` reached no verdict, which at exit 1 is false:\n${report}`
+    );
+    assert.ok(
+      !/listing also changed/.test(report),
+      `an unmoved listing must produce no listing note at all:\n${report}`
+    );
+  });
+
+  it('reports exit 2 as an operational error, ahead of the output that contradicts it', () => {
+    const report = formatCheckReport(EMPTY_GLOB, steady, steady);
+    const outputAt = report.indexOf(EMPTY_GLOB.stdout);
+    // The report's own notes, with Prettier's verbatim output cut off. Scoped deliberately: the
+    // fixture's stderr IS `[error] No files matching the pattern were found`, so an unscoped match
+    // for that sentence passes on the fixture whether or not the note mentions it at all.
+    const notes = report.slice(0, outputAt);
+
+    assert.match(
+      notes,
+      /operational error/i,
+      'exit 2 is not a formatting verdict, and the reader has to be told so'
+    );
+    // Named because their remedies are opposite. The earliest wording identified ONE cause ("a
+    // pattern matched no file"), which is wrong: `No parser could be inferred` reaches this same
+    // gate — it is the loud failure path the module header describes — and re-running never fixes
+    // it. Enumerate and point at Prettier's own output instead of diagnosing.
+    assert.match(notes, /No parser could be inferred/, 'name the permanent cause');
+    assert.match(notes, /re-run/, 'and the remedy for the transient one');
+
+    // The empty-glob message is pinned as UNDECIDABLE, and pinned because it has already regressed
+    // once: a revision of this note bucketed it with the transient causes and told the reader to
+    // re-run. Measured against this repository's own binary — `--check` on a literal path that is
+    // not on disk prints exactly `[error] No files matching the pattern were found: "<path>".` and
+    // exits 2, the same sentence a mid-run deletion produces, because a path that fails `lstat`
+    // falls through as a glob and fast-glob matches nothing. `format:check` pins every one of its
+    // target paths by argv equality, so a deleted or renamed target that nobody removed from
+    // GATE_TARGETS is the likeliest producer of this message, and it is permanent. The note must
+    // therefore refuse to choose, the way `readScannedDirectory`'s missing-root message does.
+    const emptyGlobAt = notes.indexOf('"No files matching the pattern were found"');
+    assert.ok(
+      emptyGlobAt >= 0,
+      'the exit-2 note must quote the empty-glob message — it is the cause the argv pin makes' +
+        ` likeliest, and the one the previous wording got wrong:\n${notes}`
+    );
+    // Attached to that message specifically, not merely present somewhere: the refusal has to
+    // follow the sentence it is about, or it reads as the remedy for the transient cause listed
+    // before it — which is the shape the regression had.
+    assert.ok(
+      notes.indexOf('Re-running tells you which') > emptyGlobAt,
+      'the empty-glob message must not be bucketed as transient: it reads identically whether a' +
+        ' pinned target vanished under this run or was deleted weeks ago, so the note has to hand' +
+        ` the reader the experiment instead of an answer it cannot have:\n${notes}`
+    );
+
+    assert.ok(
+      report.includes(`${EMPTY_GLOB.stdout}${EMPTY_GLOB.stderr}`),
+      `the note is additive: substituting it for Prettier's own output would eat a real failure in` +
+        ` the collision where the tree moved AND something is genuinely unformatted:\n${report}`
+    );
+
+    // ORDERING, which is a real defect rather than a preference: appended, this note landed 1,487
+    // TAP lines below the lede, behind ~270 lines of `--log-level debug` output, and the reader
+    // met "All matched files use Prettier code style!" as their SECOND line — the exact sentence
+    // the note exists to contradict.
+    assert.ok(
+      report.indexOf('Exit 2 says Prettier could not do the job') < outputAt,
+      `the explanation must precede the verbatim output, not follow ~270 debug lines of it:\n${report}`
+    );
+    assert.ok(
+      report.indexOf('All matched files') < outputAt,
+      `the lede must disarm the clean-sweep line before the reader meets it:\n${report}`
+    );
+  });
+
+  it('names the components that appeared and vanished across the invocation', () => {
+    const vanished = componentPath('Vanished.svelte');
+    const appeared = componentPath('Appeared.svelte');
+    const kept = componentPath('ExplainerCard.svelte');
+    // Exit 0 on purpose: the listing diff is enrichment reported at ANY exit code, because a tree
+    // moving under the run is worth knowing about whatever Prettier concluded.
+    const report = formatCheckReport(
+      { status: 0, stdout: '', stderr: '' },
+      [kept, vanished],
+      [kept, appeared]
+    );
+
+    assert.ok(
+      report.includes(`1 appeared (${path.relative(repoRoot, appeared)})`),
+      `the report must name what appeared, not just count it:\n${report}`
+    );
+    assert.ok(
+      report.includes(`1 vanished (${path.relative(repoRoot, vanished)})`),
+      `the report must name what vanished, not just count it:\n${report}`
+    );
+    assert.ok(
+      !report.includes('ExplainerCard'),
+      `a component present either side of the run did not move and is not news:\n${report}`
     );
   });
 });
