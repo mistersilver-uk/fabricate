@@ -557,9 +557,7 @@
             <span class="fab-ic-fact-muted">{scopedNode.current} / {scopedNode.max}</span>
           </p>
 
-          <!-- `<div>`, not `<label>`: an implicit label binds to its FIRST labelable
-               descendant, and a Stepper's is the `−` button, so clicking the caption
-               would decrement the count. `ariaLabel` carries the name instead.
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`.
 
                NO `allowUnset`, even though the bare input this replaces rendered blank
                for 0. Absence cannot survive the write path: every scoped-node patch goes

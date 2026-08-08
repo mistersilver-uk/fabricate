@@ -483,9 +483,8 @@
                   {/each}
                 </select>
               </label>
-              <!-- A `<div>`, not the `<label>` it was: an implicit `<label>` binds to its
-                   FIRST labelable descendant, and a stepper's is the `−` button, so
-                   clicking the visible "Value" text would have decremented the value. -->
+              <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in
+                   `Stepper.svelte`. -->
               <div class="manager-field">
                 <span>{conditionValueLabel}</span>
                 <Stepper

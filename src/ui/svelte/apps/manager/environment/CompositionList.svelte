@@ -289,11 +289,10 @@
             </div>
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
-                <!-- A `<div>` with the name carried by `ariaLabel`, not a `<label>`
-                     wrapping an `.sr-only` caption: an implicit label binds to its FIRST
-                     labelable descendant, which for a Stepper is the `−` button.
-                     The commit moment moves from `change` to `input`, matching every
-                     other stepper; the persisted value is identical. -->
+                <!-- A `<div>`, not the `<label>` wrapping an `.sr-only` caption it was: see
+                     the NAMING contract in `Stepper.svelte`. The commit moment moves from
+                     `change` to `input`, matching every other stepper; the persisted value
+                     is identical. -->
                 <div class="manager-environment-comp-weight-field">
                   <Stepper
                     value={weightFor(entry.id)}

@@ -1036,12 +1036,7 @@
         </div>
 
         <div class="manager-task-stamina-row">
-          <!-- `<div>`, not `<label>`: an implicit label binds to its FIRST labelable
-               descendant, and a `Stepper`'s first labelable descendant is the `−` button —
-               so clicking the visible caption DECREMENTED the value instead of focusing the
-               field. Every Stepper below carries its own `ariaLabel`, so nothing is lost by
-               dropping the implicit association, and `tests/components/stepper-call-site-contract.test.js`
-               fails any `<label>` in `src/ui/svelte` that wraps a Stepper this way. -->
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
           <div class="manager-field manager-task-stamina-cost-field">
             <span
               >{text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')}</span
@@ -1171,9 +1166,7 @@
         </div>
 
         <div class="manager-task-dc-row">
-          <!-- `<div>`, not `<label>` — see the stamina cost field above: a Stepper's first
-               labelable descendant is its `−` button, so a wrapping label made the caption
-               a decrement control. `ariaLabel` carries the name. -->
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
           <div class="manager-field manager-task-dc-field">
             <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
             <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps
@@ -1280,9 +1273,9 @@
           </label>
 
           {#if respawnIsOverTime}
-            <!-- `<div>`, not `<label>` — see the stamina cost field above. The Stepper is
-                 the row's first labelable descendant, ahead of the unit `<select>`, so the
-                 caption bound to its `−` button rather than to either control. -->
+            <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. The
+                 Stepper precedes the unit `<select>`, so the caption bound to the Stepper's
+                 `−` button rather than to either control the reader would expect. -->
             <div class="manager-field manager-task-node-interval">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
               <div class="manager-task-node-interval-row">

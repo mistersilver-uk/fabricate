@@ -60,10 +60,7 @@
 </script>
 
 <div class="manager-character-modifier-row-bounds">
-  <!-- `<div>`, not `<label>`: an implicit label binds to its FIRST labelable descendant,
-       which for a Stepper is the `−` button — clicking the visible caption would
-       decrement the bound rather than focus the field. The accessible name comes from
-       the Stepper's own `ariaLabel` instead. -->
+  <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
   {#each bounds as bound (bound.key)}
     <div class="manager-field">
       <span>{bound.label}</span>

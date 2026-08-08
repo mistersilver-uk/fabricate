@@ -315,9 +315,7 @@
               value={tool?.breakage?.formula || ''}
               oninput={(event) => patchBreakage({ formula: event.currentTarget.value })}
             /></label
-          ><!-- `<div>`, not `<label>`: an implicit label binds to its FIRST labelable
-               descendant, and a Stepper's is the `−` button, so clicking "Break below"
-               would decrement the threshold. The name comes from `ariaLabel`. The old
+          ><!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. The old
                `manager-recipe-name-input` class is DROPPED rather than pushed through
                `inputProps` — it is the bare-field box treatment, and the stepper brings
                its own. -->

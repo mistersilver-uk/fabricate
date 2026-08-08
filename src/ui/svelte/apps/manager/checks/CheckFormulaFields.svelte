@@ -47,10 +47,7 @@
     />
   </label>
   {#if showDc}
-    <!-- A `<div>`, not the `<label>` it was. An implicit `<label>` binds to its FIRST
-         labelable descendant, and a stepper's first labelable descendant is the `−`
-         button — so clicking the visible "DC" text would have decremented the DC. The
-         `<span>` stays the visible label and the input takes its name from `ariaLabel`. -->
+    <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in `Stepper.svelte`. -->
     <div class="manager-field manager-checks-threshold-field">
       <span>{dcLabel}</span>
       <!-- `fill` rather than the inline default (D2): this is a 120px flex slot on an

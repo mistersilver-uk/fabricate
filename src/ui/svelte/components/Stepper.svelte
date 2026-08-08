@@ -60,6 +60,18 @@
   disabled: … }}` would disable only the input and leave −/+ live on a control the
   caller believes is off — and every DOM assertion that checks `input.disabled` would
   still pass, so the defect ships green.
+
+  NAMING is `ariaLabel`, never a wrapping `<label>`. This is a property of the primitive, so
+  it is stated here once rather than at each call site. A `<label>` with no `for` binds to
+  its FIRST labelable descendant, and this component's is the `−` button: a caption and a
+  Stepper inside one `<label>` therefore makes clicking the caption DECREMENT the value
+  instead of focusing the field. Call sites spell it as a `<div>` with a sibling `<span>`
+  caption and pass the name through `ariaLabel`, so nothing is lost by dropping the implicit
+  association. `tests/components/stepper-call-site-contract.test.js` fails any `<label>` in
+  `src/ui/svelte` that wraps a Stepper this way, so the rule is enforced mechanically and a
+  call site needs only to point back here. A `<label for>` naming the input's own id is a
+  DIFFERENT and correct binding — HTML consults descendants only when `for` is absent — and
+  focuses the typeable field, so the guard allows it.
 -->
 <script>
   let {
