@@ -451,11 +451,132 @@ describe('createAdminStore', () => {
         return get(store.viewState).selectedSystem.craftingCheck.defaultModifierPolicy;
       };
 
-      for (const policy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+      for (const policy of ['addAll', 'highest', 'playerPicks']) {
         assert.equal(await projectPolicy(policy), policy, `${policy} survives the projection`);
       }
+      // Retargeted for issue 1055: `byRecipe` is no longer a combination rule the card
+      // can render, so the projection must translate it rather than surface a value with
+      // no radio-card — exactly the unselectable-state defect this test was written for,
+      // in the other direction.
+      assert.equal(
+        await projectPolicy('byRecipe'),
+        'addAll',
+        'the retired byRecipe projects as the rule it arithmetically was'
+      );
       assert.equal(await projectPolicy('bogus'), 'addAll', 'an unknown policy still falls back');
       assert.equal(await projectPolicy(undefined), 'addAll', 'an absent policy still defaults');
+    });
+
+    // Absence is a real fourth state (issue 1055): a defaulted projection would forge a
+    // GM decision that was never made and make the stamped and unstamped worlds
+    // indistinguishable to the authoring UI.
+    it('projects recipeModifierAuthority WITHOUT defaulting its absence (issue 1055)', async () => {
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      const store = createAdminStore(services);
+      const projectAuthority = async (craftingCheck) => {
+        sys.craftingCheck = { mode: 'passFail', ...craftingCheck };
+        await store.refresh();
+        return get(store.viewState).selectedSystem.craftingCheck;
+      };
+
+      for (const authority of ['none', 'setOnly', 'setAndRule']) {
+        assert.equal(
+          (await projectAuthority({ recipeModifierAuthority: authority })).recipeModifierAuthority,
+          authority
+        );
+      }
+      const unstamped = await projectAuthority({});
+      assert.equal(
+        Object.hasOwn(unstamped, 'recipeModifierAuthority'),
+        true,
+        'the key is always emitted so the projected shape is fixed'
+      );
+      assert.equal(
+        unstamped.recipeModifierAuthority,
+        undefined,
+        '…but its value is undefined, never a forged default'
+      );
+    });
+
+    // The downgrade disclosure's two inputs. They are two numbers, not one, because the
+    // two downgrades silence different populations: dropping to `none` unhonours every
+    // override, dropping to `setOnly` unhonours only the rule half.
+    it('derives both recipe-override counts for the downgrade disclosure (issue 1055)', async () => {
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.craftingCheck = { mode: 'passFail', recipeModifierAuthority: 'setAndRule' };
+      const origManager = services.getRecipeManager();
+      const recipes = [
+        // A rule + set override — silenced by BOTH downgrades.
+        { id: 'r-rule', craftingSystemId: 'sys1', craftingModifier: { policy: 'highest', modifierIds: ['med'] } },
+        // A set-only override — silenced only by `none`.
+        { id: 'r-set', craftingSystemId: 'sys1', craftingModifier: { modifierIds: ['med'] } },
+        // An AUTHORED EMPTY set is still an override.
+        { id: 'r-empty', craftingSystemId: 'sys1', craftingModifier: { modifierIds: [] } },
+        // No override at all.
+        { id: 'r-plain', craftingSystemId: 'sys1', craftingModifier: null },
+      ].map((raw) => makeRecipe({ ...raw, name: raw.id, toJSON: () => ({ ...raw, name: raw.id }) }));
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          recipes.filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const check = get(store.viewState).selectedSystem.craftingCheck;
+      assert.equal(check.recipeModifierOverrideCount, 3, 'every override, empty set included');
+      assert.equal(check.recipeModifierRuleOverrideCount, 1, 'only the RULE half is a subset');
+    });
+
+    // `@craftingmod` reaching no roll has three distinct causes with three distinct
+    // remedies, so the projection discriminates them rather than collapsing to a boolean.
+    it('projects which of the three inert causes applies to the active check (issue 1055)', async () => {
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      const store = createAdminStore(services);
+      const projectCause = async (system) => {
+        Object.assign(sys, system);
+        await store.refresh();
+        return get(store.viewState).selectedSystem.craftingCheck.modifierFormulaInertCause;
+      };
+
+      assert.equal(
+        await projectCause({
+          resolutionMode: 'alchemy',
+          alchemy: { checkMode: 'none' },
+          craftingCheck: { simple: { rollFormula: '1d20 + @craftingmod' } },
+        }),
+        'noCheck',
+        'a mode that rolls no check at all'
+      );
+      assert.equal(
+        await projectCause({
+          resolutionMode: 'simple',
+          alchemy: { checkMode: 'none' },
+          craftingCheck: { simple: { rollFormula: '' } },
+        }),
+        'noFormula',
+        'a slot with no authored formula'
+      );
+      assert.equal(
+        await projectCause({
+          resolutionMode: 'simple',
+          craftingCheck: { simple: { rollFormula: '1d20 + 4' } },
+        }),
+        'noModifierToken',
+        'a formula that never spends the placeholder'
+      );
+      assert.equal(
+        await projectCause({
+          resolutionMode: 'simple',
+          craftingCheck: { simple: { rollFormula: '1d20 + @craftingmod' } },
+        }),
+        null,
+        'a live @craftingmod formula is not inert'
+      );
     });
 
     it('saveCraftingCheckModifiers preserves sibling check fields and replaces the catalogue array (issue 770 persistence trap)', async () => {
@@ -2338,6 +2459,9 @@ describe('createAdminStore', () => {
     });
 
     it('viewState.recipes projects the per-recipe craftingModifier override for the editor (issue 770 allowlist)', async () => {
+      // Retargeted for issue 1055: the seeded rule was `byRecipe`, which the authoring
+      // surface can no longer produce, so the fixture modelled a state the editor would
+      // never round-trip. `highest` is a live rule and exercises the same allowlist.
       // The recipe list projection is a hand-built ALLOWLIST. Omitting craftingModifier
       // makes the Overview override control seed from `undefined` → render "Inherit
       // system default" → and (since the editor saves the whole draft) silently write the
@@ -2352,7 +2476,7 @@ describe('createAdminStore', () => {
           id: 'r-mod',
           name: 'Brew Healing Potion',
           craftingSystemId: 'sys1',
-          craftingModifier: { policy: 'byRecipe', modifierIds: ['alch'] },
+          craftingModifier: { policy: 'highest', modifierIds: ['alch'] },
         }),
       });
       services.getRecipeManager = () => ({
@@ -2368,8 +2492,43 @@ describe('createAdminStore', () => {
       assert.ok(projected, 'recipe should be projected');
       assert.deepEqual(
         projected.craftingModifier,
-        { policy: 'byRecipe', modifierIds: ['alch'] },
+        { policy: 'highest', modifierIds: ['alch'] },
         'the override surfaces so the editor renders OVERRIDE, not inherit'
+      );
+    });
+
+    // The AUTHORED EMPTY set has to cross the same allowlist (issue 1055). It is the one
+    // override shape a truthiness or length test silently drops, and dropping it here
+    // would put the Overview select back on "Inherit" — the exact collapse this change
+    // exists to remove.
+    it('viewState.recipes projects an AUTHORED EMPTY craftingModifier set (issue 1055)', async () => {
+      const services = createMockServices();
+      const origManager = services.getRecipeManager();
+      const recipe = makeRecipe({
+        id: 'r-empty',
+        name: 'No Modifiers',
+        craftingSystemId: 'sys1',
+        toJSON: () => ({
+          id: 'r-empty',
+          name: 'No Modifiers',
+          craftingSystemId: 'sys1',
+          craftingModifier: { modifierIds: [] },
+        }),
+      });
+      services.getRecipeManager = () => ({
+        ...origManager,
+        getRecipes: (filter) =>
+          [recipe].filter(
+            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
+          ),
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+      const projected = get(store.viewState).recipes.find((r) => r.id === 'r-empty');
+      assert.deepEqual(
+        projected.craftingModifier,
+        { modifierIds: [] },
+        'an authored empty set is an override, and must not project as inherit'
       );
     });
 

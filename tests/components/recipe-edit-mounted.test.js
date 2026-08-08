@@ -62,6 +62,12 @@ const RAW_MODULES = [
   // before, and a missing raw module HANGS the suite (`# cancelled`) instead of
   // failing it.
   'src/ui/svelte/apps/manager/resolutionModeOptions.js',
+  // The Overview tab asks the resolver what an absent `recipeModifierAuthority` means
+  // before deciding whether to render the modifier controls at all (issue 1055), and
+  // RecipeEditView imports the same module. This harness DOES validate its dependency
+  // graph, so omitting it throws a named "add it to rawModules" error rather than
+  // hanging — unlike the manager harness, whose inline list has no validator.
+  'src/systems/craftingModifierResolver.js',
   // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
@@ -490,14 +496,20 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('threads the per-recipe crafting-modifier override through RecipeEditView to the Overview tab (issue 770)', async () => {
+  it('threads the per-recipe crafting-modifier override through RecipeEditView to the Overview tab (issues 770, 1055)', async () => {
     // The catalogue options + default policy are RecipeEditView wrapper props; a tab
     // prop the wrapper fails to forward silently drops to its default and never renders.
     // Mount THROUGH the wrapper so a missing forward fails here.
+    //
+    // Retargeted for issue 1055: the seeded override was `policy: 'byRecipe'`, which is
+    // no longer a COMBINATION RULE at all — it named who decides, and that moved onto
+    // the system's `recipeModifierAuthority`. The rule axis this control authors now
+    // offers three values, and the authority prop is left ABSENT here, which is the
+    // unstamped state the resolver reads as `setAndRule` (so both controls render).
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, craftingModifier: { policy: 'byRecipe', modifierIds: ['med'] } },
+        recipe: { ...RECIPE, craftingModifier: { policy: 'addAll', modifierIds: ['med'] } },
         onUpdateRecipe: (patch) => patches.push(patch),
         craftingModifierOptions: [
           { id: 'med', label: 'Medicine' },
@@ -512,10 +524,11 @@ describe('RecipeEditView (mounted)', () => {
       'the crafting-modifier override control renders when the wrapper forwards options'
     );
     const select = field.querySelector('[data-recipe-field="craftingModifierPolicy"]');
-    assert.equal(select.value, 'byRecipe', 'reflects the recipe override policy');
+    assert.equal(select.value, 'addAll', 'reflects the recipe override rule');
     assert.deepEqual(
       [...select.querySelectorAll('option')].map((o) => o.value),
-      ['', 'addAll', 'highest', 'byRecipe', 'playerPicks']
+      ['', 'addAll', 'highest', 'playerPicks'],
+      'the retired byRecipe value is no longer offered as a combination rule'
     );
     // The Phase-2 "Player picks" override round-trips through the wrapper (issue 770 P2).
     select.value = 'playerPicks';
@@ -543,18 +556,188 @@ describe('RecipeEditView (mounted)', () => {
     picker.querySelector('[data-modifier-pill-option="alch"]').click();
     await flushRender();
     assert.deepEqual(patches.at(-1), {
-      craftingModifier: { policy: 'byRecipe', modifierIds: ['med', 'alch'] },
+      craftingModifier: { policy: 'addAll', modifierIds: ['med', 'alch'] },
     });
-    // Removing the (only pre-selected) pill leaves a policy-only override. The control
-    // is controlled, so each toggle acts on the original `['med']` prop.
+    // Removing the LAST pill posts an AUTHORED EMPTY set, not a dropped key (issue 1055
+    // defect 3): emptying the row used to mean "inherit", so a GM could not express
+    // "this recipe gets no check modifiers". The control is controlled, so each toggle
+    // acts on the original `['med']` prop.
     picker.querySelector('[data-modifier-pill-remove="med"]').click();
     await flushRender();
-    assert.deepEqual(patches.at(-1), { craftingModifier: { policy: 'byRecipe' } });
-    // Switching the policy select back to "inherit" clears the whole override.
+    assert.deepEqual(patches.at(-1), {
+      craftingModifier: { policy: 'addAll', modifierIds: [] },
+    });
+    // Switching the rule select back to "inherit" clears only the RULE axis and keeps
+    // the recipe's eligible set (issue 1055): the two axes are independent now, so a
+    // rule change must not silently discard the set the GM chose. The control is
+    // controlled, so this acts on the original `['med']` prop.
     select.value = '';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await flushRender();
-    assert.deepEqual(patches.at(-1), { craftingModifier: null });
+    assert.deepEqual(patches.at(-1), { craftingModifier: { modifierIds: ['med'] } });
+    editHarness.remount();
+  });
+
+  // The whole point of the authority axis: the SYSTEM decides which of the two recipe
+  // controls exist. Mounted through the wrapper, because the level is a wrapper prop and
+  // an unforwarded one silently drops to its default and renders the pre-1055 shape.
+  const authorityProps = (overrides = {}) =>
+    identityProps({
+      recipe: { ...RECIPE, craftingModifier: { policy: 'addAll', modifierIds: ['med'] } },
+      craftingModifierOptions: [
+        { id: 'med', label: 'Medicine' },
+        { id: 'alch', label: 'Alchemy' },
+      ],
+      craftingModifierDefaultIds: ['med', 'alch'],
+      craftingModifierPolicyDefault: 'highest',
+      ...overrides,
+    });
+
+  it('renders both modifier controls at setAndRule, the picker alone at setOnly, and neither at none (issue 1055)', async () => {
+    for (const [authority, rule, picker] of [
+      ['setAndRule', true, true],
+      ['setOnly', false, true],
+      ['none', false, false],
+      // ABSENT is the unstamped state and resolves as `setAndRule`, so an unstamped
+      // system keeps the controls it had before the axis existed.
+      [undefined, true, true],
+    ]) {
+      const target = await editHarness.mount(
+        authorityProps({ craftingModifierAuthority: authority })
+      );
+      assert.equal(
+        Boolean(target.querySelector('[data-recipe-crafting-modifier]')),
+        rule,
+        `authority ${String(authority)}: rule select rendered = ${rule}`
+      );
+      assert.equal(
+        Boolean(target.querySelector('[data-recipe-crafting-modifier-picker]')),
+        picker,
+        `authority ${String(authority)}: picker cell rendered = ${picker}`
+      );
+      editHarness.remount();
+    }
+  });
+
+  it('replaces the modifier controls with a read-only summary banner at authority none (issue 1055)', async () => {
+    const target = await editHarness.mount(authorityProps({ craftingModifierAuthority: 'none' }));
+    const banner = target.querySelector('[data-recipe-modifier-banner]');
+    assert.ok(Boolean(banner), 'the none summary banner replaces the controls');
+    assert.equal(banner.getAttribute('data-recipe-modifier-banner'), 'none');
+    assert.ok(
+      banner.textContent.includes('Medicine') && banner.textContent.includes('Alchemy'),
+      'the summary NAMES the inherited default set rather than saying "inheriting"'
+    );
+    assert.ok(
+      Boolean(banner.querySelector('[data-recipe-modifier-banner-checks]')),
+      'and routes to the Checks tab, where the level is actually set'
+    );
+    // Its own hook, NOT the resolution-mode banner's: both render on this tab and a
+    // shared attribute would resolve to whichever came first.
+    assert.ok(
+      Boolean(target.querySelector('[data-recipe-mode-banner]')),
+      'the resolution-mode banner still renders alongside it under its own hook'
+    );
+    editHarness.remount();
+  });
+
+  it('replaces the modifier controls with the inert banner naming the cause (issue 1055 criterion 10)', async () => {
+    for (const cause of ['noCheck', 'noFormula', 'noPlaceholder']) {
+      const target = await editHarness.mount(
+        authorityProps({
+          craftingModifierAuthority: 'setAndRule',
+          craftingModifierInertCause: cause,
+        })
+      );
+      const banner = target.querySelector('[data-recipe-modifier-inert]');
+      assert.ok(Boolean(banner), `${cause}: the inert banner renders`);
+      assert.equal(
+        banner.getAttribute('data-recipe-modifier-inert'),
+        cause,
+        'the banner stamps WHICH cause applies — one boolean cannot say'
+      );
+      assert.ok(
+        !target.querySelector('[data-recipe-crafting-modifier-picker]'),
+        `${cause}: an inert catalogue offers no per-recipe control`
+      );
+      assert.ok(
+        !target.querySelector('[data-recipe-modifier-banner]'),
+        `${cause}: the inert banner beats the none summary — they are mutually exclusive`
+      );
+      editHarness.remount();
+    }
+  });
+
+  it('writes the tri-state eligible-set select: inherit drops the key, none authors an empty set (issue 1055)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      authorityProps({
+        craftingModifierAuthority: 'setOnly',
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    const setSelect = target.querySelector('[data-recipe-field="craftingModifierSet"]');
+    assert.ok(Boolean(setSelect), 'the tri-state select lives INSIDE the picker cell');
+    assert.deepEqual(
+      [...setSelect.querySelectorAll('option')].map((option) => option.value),
+      ['inherit', 'custom', 'none']
+    );
+    assert.equal(setSelect.value, 'custom', 'a non-empty authored set reads back as Custom set');
+
+    setSelect.value = 'none';
+    setSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: { modifierIds: [] } },
+      'No modifiers authors an EMPTY array — @craftingmod resolves to 0, not inherit'
+    );
+
+    setSelect.value = 'inherit';
+    setSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: null },
+      'Inherit drops the key entirely, which is the only way back to the system default'
+    );
+    editHarness.remount();
+  });
+
+  it('reads an AUTHORED EMPTY set back as "No modifiers", never as inherit (issue 1055)', async () => {
+    const target = await editHarness.mount(
+      authorityProps({
+        craftingModifierAuthority: 'setOnly',
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
+      })
+    );
+    const setSelect = target.querySelector('[data-recipe-field="craftingModifierSet"]');
+    assert.equal(setSelect.value, 'none', 'Array.isArray, not length, discriminates the tri-state');
+    assert.ok(
+      !target.querySelector('[data-recipe-crafting-modifier-inherited]'),
+      'an authored empty set is not "inheriting the system default set"'
+    );
+    editHarness.remount();
+  });
+
+  it('names the inherited default set under Inherit rather than saying "inheriting" (issue 1055)', async () => {
+    const target = await editHarness.mount(
+      authorityProps({
+        craftingModifierAuthority: 'setOnly',
+        recipe: { ...RECIPE, craftingModifier: null },
+      })
+    );
+    const inherited = target.querySelector('[data-recipe-crafting-modifier-inherited]');
+    assert.ok(Boolean(inherited), 'Inherit hides the pill row and names the set instead');
+    assert.ok(
+      inherited.textContent.includes('Medicine') && inherited.textContent.includes('Alchemy'),
+      'the inherited names come from the system default id list'
+    );
+    assert.ok(
+      !target.querySelector('[data-modifier-pill-select="recipe-crafting-modifier"]'),
+      'there is nothing to author under Inherit, so no pill row renders'
+    );
     editHarness.remount();
   });
 
