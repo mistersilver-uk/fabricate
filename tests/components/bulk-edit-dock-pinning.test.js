@@ -21,10 +21,22 @@
  *       scroll offset  — kills `bottom: 0` AND the deletion of `position: sticky`;
  *   (b) the dock's left and right sit on the inspector's padding-box left and right
  *                      — kills the loss of the inline bleed;
- *   (c) the dock's computed `background-color` is fully opaque
- *                      — kills `transparent` (a see-through dock is not a dock);
+ *   (c) the dock's computed `background-color` AND its computed `opacity` are both fully
+ *       opaque         — kills `transparent` (a see-through dock is not a dock), and kills
+ *                        an `opacity` below 1, which leaves the fill's own alpha at 1 and
+ *                        makes the dock see-through anyway;
  *   (d) the dock element is in the RENDERED PRODUCT markup and is Apply's parent
- *                      — kills deleting the wrapper.
+ *                      — kills deleting the wrapper;
+ *   (e) Apply's own left, right and bottom sit on the inspector's CONTENT box
+ *                      — kills losing the `padding-inline` or `padding-bottom` that pay the
+ *                        dock's negative margins back. Without (e) the shell's claim that
+ *                        the padding "puts the button back exactly where it was" is
+ *                        unmeasured, and deleting either declaration ships green with Apply
+ *                        12px out of column or missing its bottom gutter.
+ *
+ * (b) and (e) are the two halves of one bleed and are asserted against DIFFERENT boxes on
+ * purpose: the dock's fill runs to the rail's padding box, the button it wraps stays on the
+ * rail's content box, and the padding is exactly that difference.
  *
  * ── THE MARKUP IS THE PRODUCT'S, NOT A FIXTURE'S ─────────────────────────────────
  * (d) is only worth anything if the markup under test comes from the component. So this
@@ -60,6 +72,21 @@
  * `BulkEditPanelShell.svelte`. This gate measures the configuration the dock is FOR, so
  * `CONTAINER_WIDTH_PX` sits above that breakpoint on purpose. Lower it and this gate goes
  * vacuous rather than red, which is why `MIN_OVERFLOW_PX` is asserted first.
+ *
+ * ── TWO KNOWN LIMITS OF THE MEASUREMENT ──────────────────────────────────────────
+ * HEADLESS CHROMIUM HAS NO CLASSIC SCROLLBAR. The rail scrolls here with an overlay
+ * scrollbar, so its padding box is its full border-box width and (b) can hold exactly. A
+ * classic scrollbar in a Foundry client insets the scrollport, and the dock's right edge
+ * would sit that gutter short of the border box. That is pre-existing product behaviour of
+ * every `overflow-y: auto` column in `styles/fabricate.css`, not something the dock
+ * introduced, and it is not what this gate is measuring.
+ *
+ * THE PIN IS CHROMIUM-MEASURED. `bottom` is set from the scroll container's CONTENT box
+ * here, which is what makes the negative inset necessary at all (see the two-clamp note in
+ * `BulkEditPanelShell.svelte`). On an engine that measures the sticky inset from the PADDING
+ * box instead, that inset would instead push the dock's own bottom padding under the rail's
+ * edge — Apply stays fully visible and pinned, so the degradation is cosmetic and still
+ * strictly better than `main`, where Apply scrolled away outright.
  */
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
@@ -91,7 +118,10 @@ const EPSILON_PX = 1;
 // ever stop producing a real scroll range, this fails LOUDLY instead.
 const MIN_OVERFLOW_PX = 48;
 const CONTAINER_WIDTH_PX = 1200;
-const INSPECTOR_HEIGHT_PX = 520;
+// The height of the whole manager HOST, not a declaration on `.manager-inspector` — the rail
+// takes it through `.fabricate-manager`'s `height: 100%` and its `1fr` body row, minus the
+// two band rows below. It is named for the box whose scroll range it decides.
+const INSPECTOR_HOST_HEIGHT_PX = 520;
 const AXIS_ROW_COUNT = 18;
 
 const shell = createMountedComponentHarness({
@@ -118,6 +148,12 @@ const stagedAxes = createRawSnippet(() => ({
  * `--fab-mv2-*` tokens AND the `fabricate-manager` container the width branch above reads,
  * `.manager-body` supplies the three-column grid, and `.manager-inspector` is the scrollport
  * whose padding box the dock is asserted against.
+ *
+ * The two empty `.probe-shell-band` divs are load-bearing, not filler. `.fabricate-manager`
+ * is `grid-template-rows: auto auto 1fr`, and the app fills the first two rows with its
+ * header and toolbar; without them `.manager-body` lands in the first `auto` row, is sized
+ * to its content instead of the leftover height, and the rail never overflows — the vacuous
+ * configuration `MIN_OVERFLOW_PX` exists to catch.
  */
 function inspectorPage(productMarkup) {
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -126,7 +162,7 @@ function inspectorPage(productMarkup) {
     <style>
       :root { --font-primary: Arial, sans-serif; }
       html, body { margin: 0; padding: 0; }
-      .probe-host { width: ${CONTAINER_WIDTH_PX}px; height: ${INSPECTOR_HEIGHT_PX}px; }
+      .probe-host { width: ${CONTAINER_WIDTH_PX}px; height: ${INSPECTOR_HOST_HEIGHT_PX}px; }
       .probe-row { margin: 0; padding: 6px 0; font-size: 12px; }
     </style></head>
     <body>
@@ -156,36 +192,63 @@ function measureDock() {
   const dock = inspector.querySelector('.fab-bulk-edit-dock');
   if (!dock) return { dockRendered: false };
 
+  // The fill and the element's own alpha are read before the geometry, so a dock that lost
+  // its Apply button still reports them and (c) fails on its own terms rather than on an
+  // undefined it never asked about.
+  const dockStyle = getComputedStyle(dock);
+  const paint = { backgroundColor: dockStyle.backgroundColor, opacity: dockStyle.opacity };
+
+  const apply = dock.querySelector('[data-component-bulk-apply]');
+  if (!apply) return { dockRendered: true, applyRendered: false, ...paint };
+
   const inspectorStyle = getComputedStyle(inspector);
   const border = {
     bottom: parseFloat(inspectorStyle.borderBottomWidth),
     left: parseFloat(inspectorStyle.borderLeftWidth),
     right: parseFloat(inspectorStyle.borderRightWidth),
   };
+  const padding = {
+    bottom: parseFloat(inspectorStyle.paddingBottom),
+    left: parseFloat(inspectorStyle.paddingLeft),
+    right: parseFloat(inspectorStyle.paddingRight),
+  };
 
   const sampleAt = (label, scrollTop) => {
     inspector.scrollTop = scrollTop;
     const rail = inspector.getBoundingClientRect();
     const box = dock.getBoundingClientRect();
+    const applyBox = apply.getBoundingClientRect();
+    // The scrollport is the inspector's PADDING box, which is the edge the dock covers
+    // out to; its border box is one hairline wider on the left.
+    const padBottom = rail.bottom - border.bottom;
+    const padLeft = rail.left + border.left;
+    const padRight = rail.right - border.right;
     return {
       label,
       scrollTop: inspector.scrollTop,
-      // The scrollport is the inspector's PADDING box, which is the edge the dock covers
-      // out to; its border box is one hairline wider on the left.
-      padBottom: rail.bottom - border.bottom,
-      padLeft: rail.left + border.left,
-      padRight: rail.right - border.right,
+      padBottom,
+      padLeft,
+      padRight,
+      // The rail's CONTENT box — where every OTHER item in this column sits, and therefore
+      // where Apply has to keep sitting for the dock to be invisible to the button.
+      contentBottom: padBottom - padding.bottom,
+      contentLeft: padLeft + padding.left,
+      contentRight: padRight - padding.right,
       dockBottom: box.bottom,
       dockLeft: box.left,
       dockRight: box.right,
+      applyBottom: applyBox.bottom,
+      applyLeft: applyBox.left,
+      applyRight: applyBox.right,
     };
   };
 
   const overflow = inspector.scrollHeight - inspector.clientHeight;
   return {
     dockRendered: true,
+    applyRendered: true,
     overflow,
-    backgroundColor: getComputedStyle(dock).backgroundColor,
+    ...paint,
     samples: [
       sampleAt('scroll top', 0),
       sampleAt('mid scroll', Math.floor(overflow / 2)),
@@ -252,6 +315,7 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
   it('holds the dock on the rail scrollport at the top, middle and bottom of the scroll range', () => {
     // (a) and (b), plus the anti-vacuity preconditions that make them mean anything.
     assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
+    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
     assert.ok(
       measured.overflow >= MIN_OVERFLOW_PX,
       `the rail must genuinely overflow for a sticky assertion to say anything (overflow ${measured.overflow}px, need at least ${MIN_OVERFLOW_PX}px) — either the panel shrank or .manager-inspector stopped being the scrollport`
@@ -278,15 +342,50 @@ describe('the bulk edit dock is pinned to the inspector scrollport', () => {
     }
   });
 
+  it('leaves the Apply button on the rail content box the dock bled out of', () => {
+    // (e). The dock's three bleeds are paid back by matching padding, and the shell's own
+    // comment calls that padding load-bearing: it "puts the button back exactly where it
+    // was". Nothing measured it, so `padding-inline` deleted (Apply spills 12px past the
+    // content edge on each side) and `padding-bottom` deleted (Apply loses its bottom
+    // gutter) both shipped green. Apply's own box is what the swap with
+    // `.manager-component-browser-inspector-edit` depends on, so it is asserted against the
+    // rail's CONTENT box — the column every sibling in the panel is laid out on.
+    assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
+    assert.ok(measured.applyRendered, 'the Apply button is absent from the rendered dock');
+
+    for (const sample of measured.samples) {
+      for (const [edge, actual, expected] of [
+        ['bottom', sample.applyBottom, sample.contentBottom],
+        ['left', sample.applyLeft, sample.contentLeft],
+        ['right', sample.applyRight, sample.contentRight],
+      ]) {
+        assert.ok(
+          Math.abs(actual - expected) <= EPSILON_PX,
+          `at ${sample.label} (scrollTop ${sample.scrollTop}) Apply's ${edge} edge is ${actual}px but the inspector's content-box ${edge} is ${expected}px — the dock's bleed is no longer paid back by its matching padding, so the primary action has moved out of the column every other panel row sits on`
+        );
+      }
+    }
+  });
+
   it('fills the dock opaquely so staged rows cannot read through it', () => {
     // (c). The dock's only job while it covers the rail is to be a surface: at less than
     // full alpha the staged rows scroll visibly UNDER the primary action, which is the
     // symptom issue 1015 was filed for wearing a sticky position.
+    //
+    // BOTH channels, because `background-color` alone is only half the question: an
+    // `opacity: 0.4` on `.fab-bulk-edit-dock` leaves the fill's own alpha at 1 and still
+    // makes the whole dock — border, shadow, Apply and all — see-through, and that mutation
+    // passed every other assertion in this file.
     assert.ok(measured.dockRendered, 'the dock is absent from the rendered rail');
     assert.equal(
       alphaOf(measured.backgroundColor),
       1,
       `the dock's background-color computed to ${measured.backgroundColor} — a translucent or transparent dock lets the content it is pinned over read through it`
+    );
+    assert.equal(
+      measured.opacity,
+      '1',
+      `the dock's opacity computed to ${measured.opacity} — the fill is opaque but the element is not, so the staged rows still read straight through it`
     );
   });
 });
