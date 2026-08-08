@@ -12,6 +12,7 @@
   exception and emits `onToggleEnabled()`.
 -->
 <script>
+  import { untrack } from 'svelte';
   import Chip from '../Chip.svelte';
   import RecipeModeBanner from './RecipeModeBanner.svelte';
   import { formatList, localize } from '../../../util/foundryBridge.js';
@@ -133,21 +134,27 @@
 
   // The banner copy for each inert cause. Same three causes the Checks card names, said
   // from this tab's point of view: what the GM loses here, not what to fix there.
+  //
+  // Each sentence closes on "check modifiers change nothing for this recipe" rather than
+  // on "PER-RECIPE check modifiers would change nothing": this banner also renders at
+  // authority `none`, where a per-recipe check modifier is not a thing that exists, so
+  // the old wording named a control the GM cannot see. Phrasing it as the recipe's
+  // outcome is true at all three levels and needs no conditional.
   const MODIFIER_INERT_COPY = {
     noCheck: {
       key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoCheck',
       fallback:
-        'This system resolves without a crafting check, so per-recipe check modifiers would change nothing.',
+        'This system resolves without a crafting check, so check modifiers change nothing for this recipe.',
     },
     noFormula: {
       key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoFormula',
       fallback:
-        'The system’s crafting check has no roll formula yet, so per-recipe check modifiers would change nothing.',
+        'The system’s crafting check has no roll formula yet, so check modifiers change nothing for this recipe.',
     },
     noPlaceholder: {
       key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoPlaceholder',
       fallback:
-        'The system’s crafting-check formula never references @craftingmod, so per-recipe check modifiers would change nothing.',
+        'The system’s crafting-check formula never references @craftingmod, so check modifiers change nothing for this recipe.',
     },
   };
 
@@ -181,7 +188,40 @@
     if (!Array.isArray(craftingModifier?.modifierIds)) return 'inherit';
     return craftingModifier.modifierIds.length > 0 ? 'custom' : 'none';
   }
-  const modifierSetMode = $derived(setModeOf(recipe?.craftingModifier));
+
+  // …which leaves exactly ONE state the persisted shape cannot express: "Custom set,
+  // nothing picked yet". It writes `modifierIds: []`, the same bytes as "No modifiers".
+  // Read purely, that made Custom set unreachable on a system with a catalogue but an
+  // EMPTY `defaultModifierIds` — the ordinary "every recipe picks its own" setup that
+  // `setOnly`/`setAndRule` exist to serve. The seed came back empty, `setModeOf` mapped
+  // it to `none`, and the control snapped to "No modifiers" as though it had rejected
+  // the GM's choice; the same snap ran going No modifiers → Custom set.
+  //
+  // So the select reads the persisted shape for everything EXCEPT that one collision,
+  // where a local pin decides which of the two identical shapes was meant. Deliberately
+  // narrower than holding the whole mode locally: every other transition still comes
+  // straight off `recipe`, so no external edit can be masked by stale local intent, and
+  // nothing has to bookkeep which writes were ours. The PERSISTED shape is untouched —
+  // only the select's reading is sticky.
+  //
+  // The pin drops when the GM picks another option (`changeModifierSetMode`) and when a
+  // DIFFERENT recipe arrives — the id is compared explicitly because every draft patch
+  // replaces the whole `recipe` object, so tracking its identity alone would clear the
+  // pin on the component's own write.
+  let pinnedCustomSet = $state(false);
+  let pinnedRecipeId = $state(untrack(() => recipe?.id ?? null));
+
+  $effect(() => {
+    const id = recipe?.id ?? null;
+    if (id === pinnedRecipeId) return;
+    pinnedRecipeId = id;
+    pinnedCustomSet = false;
+  });
+
+  const persistedSetMode = $derived(setModeOf(recipe?.craftingModifier));
+  const modifierSetMode = $derived(
+    pinnedCustomSet && persistedSetMode === 'none' ? 'custom' : persistedSetMode
+  );
 
   // Name the modifiers a set actually contains, through the ACTIVE language's list
   // conventions — "Medicine, Alchemy and Herbalism" is a language rule, not a separator.
@@ -217,6 +257,9 @@
   // Inherit drops the key; Custom set seeds from what is already chosen, falling back to
   // the system default set so "customize" starts from what the recipe was inheriting
   // rather than from nothing; No modifiers writes the authored empty array.
+  //
+  // Custom set PINS itself and every other option releases the pin, which is what makes
+  // "Custom set, seeded empty" a state the control can show at all.
   function changeModifierSetMode(mode) {
     const next = {};
     const policy = recipe?.craftingModifier?.policy;
@@ -228,6 +271,7 @@
     } else if (mode === 'none') {
       next.modifierIds = [];
     }
+    pinnedCustomSet = mode === 'custom';
     emitCraftingModifier(next);
   }
 
@@ -481,9 +525,20 @@
               'Eligible modifiers'
             )}</span
           >
+          <!-- The micro-label above names TWO things: it implicitly labels this select
+               (it is inside the `<label>`) and its id is the pill group's
+               `aria-labelledby` below, so a screen-reader user heard "Eligible
+               modifiers, combo box" and then "Eligible modifiers, group" and could not
+               tell the two controls apart. The select takes an explicit accessible name
+               that starts with the visible label (WCAG 2.5.3 label-in-name) and adds
+               what it actually chooses: WHERE the eligible set comes from. -->
           <select
             data-recipe-field="craftingModifierSet"
             value={modifierSetMode}
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Recipe.CraftingModifierPickSource',
+              'Eligible modifiers source'
+            )}
             onchange={(event) => changeModifierSetMode(event.currentTarget.value)}
             disabled={saving}
           >
@@ -588,7 +643,10 @@
       kicker={text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}
       label={text(
         'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertLabel',
-        'not used by this system’s check'
+        // Sentence case, matching `ModifierAuthorityNone` ("Set by the system") — both
+        // render through the same `{kicker}: {label}` slot on this tab, so a lowercase
+        // one read as a fragment beside its sentence-cased sibling.
+        'Not used by this system’s check'
       )}
       description={text(modifierInert.key, modifierInert.fallback)}
       actionLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecks', 'Checks tab')}
