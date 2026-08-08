@@ -791,6 +791,26 @@
   }
 </script>
 
+<!--
+  Every task section opens with the same card header — an `<h3>` title over an optional
+  muted hint — so the markup is declared once here instead of at each section.
+
+  The two headers that also host a controls cluster (the component browser's two searches,
+  the drop rules search and add button) keep their own markup: a header with a second child
+  is a different composition, and routing those controls through a snippet parameter would
+  move them away from the card they belong to for no gain.
+-->
+{#snippet taskCardHeader(title, hint)}
+  <div class="manager-task-card-header">
+    <div class="manager-task-drop-header-copy">
+      <h3>{title}</h3>
+      {#if hint}
+        <p class="manager-muted">{hint}</p>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
 <main
   class="manager-main manager-gathering-task-edit-view"
   class:has-reward-rule-notice={showRewardRuleNotice}
@@ -1023,17 +1043,13 @@
 
     {#if staminaEnabled}
       <section class="manager-task-stamina-card" data-gathering-task-stamina>
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>{text('FABRICATE.Admin.Manager.Economy.TaskStaminaTitle', 'Stamina cost')}</h3>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Economy.TaskStaminaHint',
-                'Stamina spent per attempt when this system has stamina enabled.'
-              )}
-            </p>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Economy.TaskStaminaTitle', 'Stamina cost'),
+          text(
+            'FABRICATE.Admin.Manager.Economy.TaskStaminaHint',
+            'Stamina spent per attempt when this system has stamina enabled.'
+          )
+        )}
 
         <div class="manager-task-stamina-row">
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
@@ -1151,19 +1167,13 @@
 
     {#if dcOverrideEnabled}
       <section class="manager-task-dc-card" data-gathering-task-dc>
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>
-              {text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override')}
-            </h3>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
-                'Override the system gathering check DC for this task. Leave blank to use the system default.'
-              )}
-            </p>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Gathering.TaskDcOverrideTitle', 'Check DC override'),
+          text(
+            'FABRICATE.Admin.Manager.Gathering.TaskDcOverrideHint',
+            'Override the system gathering check DC for this task. Leave blank to use the system default.'
+          )
+        )}
 
         <div class="manager-task-dc-row">
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
@@ -1199,20 +1209,16 @@
 
     {#if nodesEnabled}
       <section class="manager-task-nodes-card" data-gathering-task-nodes>
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
-            <p class="manager-muted">
-              {text(
-                'FABRICATE.Admin.Manager.Economy.TaskNodesHint',
-                'Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.'
-              )}
-            </p>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node'),
+          text(
+            'FABRICATE.Admin.Manager.Economy.TaskNodesHint',
+            'Finite nodes for this task, depleted as it is gathered and optionally respawning over world time.'
+          )
+        )}
 
         <div class="manager-task-nodes-grid">
-          <!-- `<div>`, not `<label>` — see the stamina cost field above. -->
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
           <div class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
             <Stepper
@@ -1335,7 +1341,7 @@
           {/if}
 
           {#if respawnIsChance}
-            <!-- `<div>`, not `<label>` — see the stamina cost field above. -->
+            <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
             <div class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
               <div class="manager-task-node-chance-row">
@@ -1451,11 +1457,10 @@
         class="manager-task-nodes-card manager-task-nodes-hint-card"
         data-gathering-task-nodes-hint
       >
-        <div class="manager-task-card-header">
-          <div class="manager-task-drop-header-copy">
-            <h3>{text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node')}</h3>
-          </div>
-        </div>
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Economy.TaskNodesTitle', 'Resource node'),
+          null
+        )}
         <p class="manager-muted manager-task-nodes-hint-text">
           <i class="fas fa-circle-info" aria-hidden="true"></i>
           <span
