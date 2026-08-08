@@ -16,10 +16,12 @@
  * different suite names.
  *
  * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the
- * `npm test` glob, so nothing here is collected as a suite.
+ * `npm test` glob, so nothing here is collected as a suite. Its own guarantees are
+ * proved from inside the glob by `tests/source-scan.test.js` — in particular the two
+ * attributed failures below, which no passing corpus scan ever reaches.
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 /** The repo root, resolved from this file's own location. */
@@ -108,15 +110,33 @@ export function stripComments(source) {
  * cause: the corpus would be one file short, every count assertion over it would still pass, and
  * whichever gate depended on the missing file would report a defect in the code it polices.
  *
+ * ONE ENOENT HERE IS NOT TRANSIENT, so it is discriminated rather than assumed: a dangling
+ * symbolic link with a scanned extension is listed by `readdir` and fails ENOENT on every read,
+ * forever. Telling its reader to re-run would send them round a loop that cannot terminate. The
+ * `lstat` distinguishes them — it describes the LINK, so it still succeeds when the link is there
+ * and its target is not — and it costs a syscall only on the failure path.
+ *
+ * Exported for the same reason as `readScannedDirectory`: the transient branch requires a file to
+ * disappear between its own `readdir` and its own `readFileSync`, which no test can schedule, so
+ * the only way its wording is covered by anything is a direct call.
+ *
  * @param {string} full Absolute path, as listed by the walk.
  * @param {string} file The repo-relative form, for the message.
  * @returns {string} The file's text.
  */
-function readListedSource(full, file) {
+export function readListedSource(full, file) {
   try {
     return readFileSync(full, 'utf8');
   } catch (cause) {
     if (cause?.code !== 'ENOENT') throw cause;
+    if (lstatSync(full, { throwIfNoEntry: false })) {
+      throw new Error(
+        `"${file}" is a symbolic link whose target does not exist, so the corpus scan cannot ` +
+          'read it. This is NOT a moving worktree and re-running will produce exactly this ' +
+          'failure again: repoint or remove the link, or scan a root that does not contain it.',
+        { cause }
+      );
+    }
     throw new Error(
       `the worktree changed during the corpus scan: "${file}" was listed by the directory walk ` +
         'but had gone by the time it was read. Nothing is wrong with the code under test — ' +
@@ -128,12 +148,56 @@ function readListedSource(full, file) {
 }
 
 /**
+ * List one directory, turning an ENOENT into a report of which of its two causes it is.
+ *
+ * This is the `readdir` half of the guard `readListedSource` gives the `readFile` half, and it was
+ * missing: the recursive listing was the last unguarded syscall in the walk, so a DIRECTORY going
+ * away mid-scan produced exactly the unattributed `ENOENT ... scandir` this helper exists to
+ * eliminate. That is not exotic — `git merge --ff-only`, the operation that produced the original
+ * report, removes directories whenever it lands a folder rename.
+ *
+ * The two cases are told apart because their remedies are opposite, and `isRoot` is the only thing
+ * that can tell them apart. A directory the walk itself listed a moment ago can only have gone
+ * away during this run, so re-running is the answer. A ROOT was never listed by anything — the
+ * caller named it — so it is just as likely to be a root that does not exist (a permanent caller
+ * bug, where re-running loops forever) as a root the tree moved out from under.
+ *
+ * Exported so both messages can be proved directly against a real ENOENT: the recursive case needs
+ * a directory to vanish between its parent's listing and its own, which no test can schedule.
+ *
+ * @param {string} dir Absolute directory to list.
+ * @param {object} options
+ * @param {boolean} options.isRoot Whether `dir` is a caller-named root rather than a listed child.
+ * @returns {import('node:fs').Dirent[]} The directory's entries.
+ */
+export function readScannedDirectory(dir, { isRoot }) {
+  try {
+    return readdirSync(dir, { withFileTypes: true });
+  } catch (cause) {
+    if (cause?.code !== 'ENOENT') throw cause;
+    const named = relative(repoRoot, dir).replaceAll('\\', '/') || dir;
+    throw new Error(
+      isRoot
+        ? `the corpus scan was given a root that is not there: "${named}" does not exist under ` +
+            `${repoRoot}. Either the caller's root list names a directory that never existed or has ` +
+            'been renamed — a real failure that will repeat on every re-run — or the worktree moved ' +
+            'and took the root with it. Re-running tells you which: if it passes, it was the tree.'
+        : `the worktree changed during the corpus scan: directory "${named}" was listed by its ` +
+            'parent but had gone by the time the walk descended into it. Nothing is wrong with the ' +
+            'code under test — re-run. (A directory the walk listed itself moments ago cannot be a ' +
+            'caller naming something that does not exist; only the tree moving explains it.)',
+      { cause }
+    );
+  }
+}
+
+/**
  * Walk `dir`, adding every file whose name ends with one of `extensions` to `sources`.
  *
- * Classification is `readdirSync(dir, { withFileTypes: true })` + `entry.isDirectory()` rather
- * than a `statSync` per entry: the kind arrives with the listing, so there is one fewer unguarded
- * syscall between a path being listed and being read. `listSvelteComponents` in
- * `scripts/lib/svelteComponentFiles.js` is the in-repo precedent.
+ * Classification is `readdir` with `withFileTypes` (through `readScannedDirectory`) plus
+ * `entry.isDirectory()` rather than a `statSync` per entry: the kind arrives with the listing, so
+ * there is one fewer unguarded syscall between a path being listed and being read.
+ * `listSvelteComponents` in `scripts/lib/svelteComponentFiles.js` is the in-repo precedent.
  *
  * A `Dirent` describes the LINK, so `entry.isDirectory()` is false for a symlink to a directory,
  * where `statSync` follows it and recurses. That difference is real; see the symlink note on
@@ -141,16 +205,21 @@ function readListedSource(full, file) {
  *
  * Paths are normalized to forward slashes so an assertion reads the same on Windows.
  *
+ * Both syscalls the walk makes are attributed: the listing through `readScannedDirectory` and the
+ * read through `readListedSource`. `isRoot` is what lets the listing say WHICH failure it is, and
+ * it is `false` for every recursive call because those directories were listed by this same walk.
+ *
  * @param {string} dir Absolute directory to walk.
  * @param {readonly string[]} extensions Extensions to include.
  * @param {Record<string, string>} sources Accumulator, mutated in place.
+ * @param {boolean} isRoot Whether `dir` is a caller-named root rather than a listed child.
  * @returns {Record<string, string>} `sources`.
  */
-function walkSources(dir, extensions, sources) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+function walkSources(dir, extensions, sources, isRoot) {
+  for (const entry of readScannedDirectory(dir, { isRoot })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      walkSources(full, extensions, sources);
+      walkSources(full, extensions, sources, false);
     } else if (extensions.some((extension) => entry.name.endsWith(extension))) {
       const file = relative(repoRoot, full).replaceAll('\\', '/');
       sources[file] = readListedSource(full, file);
@@ -168,7 +237,7 @@ function walkSources(dir, extensions, sources) {
  * @returns {Record<string, string>}
  */
 export function collectSources(dir, { extensions = SCANNED_EXTENSIONS } = {}) {
-  return walkSources(dir, extensions, {});
+  return walkSources(dir, extensions, {}, true);
 }
 
 /**
@@ -208,7 +277,10 @@ function byPath(left, right) {
  *
  * WHAT IT DOES NOT DO — the window is NARROWED, not closed. The walk is ~55 ms over this
  * repository's ~550 files, against the two-call window it replaces, but a file removed between its
- * own `readdir` and its own `readFileSync` still fails. Deliberately: see `readListedSource`.
+ * own `readdir` and its own `readFileSync`, or a directory removed between its parent's listing and
+ * its own, still fails. Deliberately, and ATTRIBUTED: see `readListedSource` and
+ * `readScannedDirectory`. Failing loudly with the cause named is the deliverable; not failing at
+ * all would need a snapshot of the tree, which is the thing a working-tree gate must not take.
  *
  * EXTENSIONS ARE THE CALLER'S, with no default, and that is load-bearing rather than fussy. These
  * three roots hold 548 files at `SCANNED_EXTENSIONS` but 550 including `.css` and `.json`, and the
@@ -221,7 +293,9 @@ function byPath(left, right) {
  * SYMLINKS. The walk classifies with `Dirent.isDirectory()`, which is false for a symlink to a
  * directory that `statSync` would follow and recurse into. Read that as a caveat, not as an
  * equivalence: it is safe for `src/`, `styles/` and `lang/` only because those roots contain no
- * symlinks (verified: zero). A root that did would not be descended into.
+ * symlinks (verified: zero). A root that did would not be descended into. A DANGLING symlink with
+ * a scanned extension is read as a file and fails ENOENT permanently rather than transiently;
+ * `readListedSource` says so rather than telling its reader to re-run.
  *
  * @param {readonly string[]} roots Repo-relative directories to walk, e.g. `['src', 'styles']`.
  * @param {readonly string[]} extensions Extensions to include, e.g. `['.js', '.svelte']`.
@@ -239,7 +313,7 @@ export function collectWorkingTreeSources(roots, extensions) {
   }
 
   const sources = {};
-  for (const root of roots) walkSources(resolve(repoRoot, root), extensions, sources);
+  for (const root of roots) walkSources(resolve(repoRoot, root), extensions, sources, true);
   return Object.fromEntries(
     Object.keys(sources)
       .sort(byPath)

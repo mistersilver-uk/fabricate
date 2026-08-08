@@ -115,7 +115,7 @@ function renderSources() {
  * One hop, not a full closure. A nav list is either inline in the component or in a module beside
  * it, and widening further starts readmitting the coincidences this scoping exists to exclude.
  *
- * @param {Map<string, string>} sources Tracked render sources.
+ * @param {Map<string, string>} sources Render sources, keyed by repo-relative path.
  * @param {string} template The id-building fragment, e.g. `manager-crafting-nav-${`.
  * @returns {Array<[string, string]>} `[path, text]` pairs to search.
  */
@@ -170,8 +170,15 @@ test('the corpus every check below reads is the whole tree, not a slice of it', 
     sourceFiles.length >= 500,
     `expected the whole ${CORPUS_ROOTS.join('/, ')}/ tree, got ${sourceFiles.length} files`
   );
+  // Defence in depth rather than a live guard: 283 non-`.svelte` files mean the `>= 500` above
+  // already forces `>= 217` components, so nothing reaches this that did not red first. It stays
+  // because it stops being implied the moment either number moves — and it now names its threshold
+  // and its roots, like its two neighbours, so a future failure is readable on its own.
   const components = sourceFiles.filter((file) => file.endsWith('.svelte'));
-  assert.ok(components.length >= 200, `expected the component tree, got ${components.length}`);
+  assert.ok(
+    components.length >= 200,
+    `expected >= 200 .svelte files under ${CORPUS_ROOTS.join('/, ')}/, got ${components.length}`
+  );
 
   // By KEY, one per root — because a count threshold cannot see a single file go missing, and each
   // of these is a whole root's or a whole extension's worth of coverage standing on one file.
