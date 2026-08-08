@@ -7,6 +7,7 @@
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import Stepper from '../../components/Stepper.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
 
@@ -462,18 +463,14 @@
   function removeStaminaCostModifier(index) {
     onUpdateTask({ staminaCostModifiers: staminaCostModifiers.filter((_, i) => i !== index) });
   }
-  function numericFieldValue(value) {
-    return value === null || value === undefined ? '' : value;
-  }
-
   // Per-task gathering DC override (progressive has no DC, so the field is shown
   // only for routed; d100 has no DC either). null = use the system gathering
-  // check default DC. Mirrors the stamina-cost numeric field: '' when null,
-  // null when blank, truncated integer otherwise.
+  // check default DC. The Stepper renders an unset value blank on its own
+  // (allowUnset), so this only normalizes `undefined` to `null`.
   const dcOverrideEnabled = $derived(resolutionMode === 'routed');
-  const dcOverrideValue = $derived(numericFieldValue(task?.dcOverride));
+  const dcOverrideValue = $derived(task?.dcOverride ?? null);
   function updateDcOverride(value) {
-    if (value === '' || value === null || value === undefined) {
+    if (value === null || value === undefined) {
       onUpdateTask({ dcOverride: null });
       return;
     }
@@ -527,12 +524,11 @@
     updateNodes({ respawn: { ...respawn, ...patch } });
   }
   function setNodeCount(value) {
-    const next = Number(value);
-    if (!Number.isFinite(next) || next <= 0) {
+    if (value === null || value === undefined || value <= 0) {
       onUpdateTask({ nodes: null });
       return;
     }
-    const max = Math.floor(next);
+    const max = Math.floor(value);
     updateNodes({ max, current: max });
   }
   function setRespawnInterval(value, unit) {
@@ -1043,13 +1039,23 @@
             <span
               >{text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt')}</span
             >
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={staminaCostValue > 0 ? staminaCostValue : ''}
-              oninput={(event) => updateStaminaCost(event.currentTarget.value)}
-              data-gathering-task-stamina-cost
+            <Stepper
+              value={staminaCostValue}
+              min={0}
+              step={1}
+              fill
+              ariaLabel={text(
+                'FABRICATE.Admin.Manager.Economy.TaskStaminaCost',
+                'Cost per attempt'
+              )}
+              decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                label: text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt'),
+              })}
+              incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                label: text('FABRICATE.Admin.Manager.Economy.TaskStaminaCost', 'Cost per attempt'),
+              })}
+              inputProps={{ 'data-gathering-task-stamina-cost': '' }}
+              onChange={(next) => updateStaminaCost(next)}
             />
           </label>
 
@@ -1087,38 +1093,67 @@
                     value={ref.operator}
                     onchange={(event) =>
                       updateStaminaCostModifier(index, { operator: event.currentTarget.value })}
-                    aria-label="operator"
+                    aria-label={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierOperator',
+                      'Operator'
+                    )}
                   >
                     <option value="-">−</option>
                     <option value="+">+</option>
                   </select>
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder="min"
-                    value={numericFieldValue(ref.min)}
-                    oninput={(event) =>
-                      updateStaminaCostModifier(index, {
-                        min:
-                          event.currentTarget.value === ''
-                            ? null
-                            : Number(event.currentTarget.value),
-                      })}
-                    aria-label="min"
+                  <Stepper
+                    value={ref.min}
+                    allowUnset
+                    step={1}
+                    fill
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMinPlaceholder',
+                      'min'
+                    )}
+                    ariaLabel={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMin',
+                      'Minimum'
+                    )}
+                    decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                      label: text(
+                        'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMin',
+                        'Minimum'
+                      ),
+                    })}
+                    incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                      label: text(
+                        'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMin',
+                        'Minimum'
+                      ),
+                    })}
+                    onChange={(next) => updateStaminaCostModifier(index, { min: next })}
                   />
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder="max"
-                    value={numericFieldValue(ref.max)}
-                    oninput={(event) =>
-                      updateStaminaCostModifier(index, {
-                        max:
-                          event.currentTarget.value === ''
-                            ? null
-                            : Number(event.currentTarget.value),
-                      })}
-                    aria-label="max"
+                  <Stepper
+                    value={ref.max}
+                    allowUnset
+                    step={1}
+                    fill
+                    placeholder={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMaxPlaceholder',
+                      'max'
+                    )}
+                    ariaLabel={text(
+                      'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMax',
+                      'Maximum'
+                    )}
+                    decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                      label: text(
+                        'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMax',
+                        'Maximum'
+                      ),
+                    })}
+                    incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                      label: text(
+                        'FABRICATE.Admin.Manager.Economy.TaskStaminaModifierMax',
+                        'Maximum'
+                      ),
+                    })}
+                    onChange={(next) => updateStaminaCostModifier(index, { max: next })}
                   />
                   <button
                     type="button"
@@ -1164,16 +1199,25 @@
         <div class="manager-task-dc-row">
           <label class="manager-field manager-task-dc-field">
             <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
-            <input
-              type="number"
-              step="1"
+            <Stepper
+              value={dcOverrideValue}
+              allowUnset
+              step={1}
+              fill
+              density="comfortable"
               placeholder={text(
                 'FABRICATE.Admin.Manager.Gathering.TaskDcOverridePlaceholder',
                 'System default'
               )}
-              value={dcOverrideValue}
-              oninput={(event) => updateDcOverride(event.currentTarget.value)}
-              data-gathering-task-dc-override
+              ariaLabel={text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}
+              decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                label: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC'),
+              })}
+              incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                label: text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC'),
+              })}
+              inputProps={{ 'data-gathering-task-dc-override': '' }}
+              onChange={(next) => updateDcOverride(next)}
             />
           </label>
         </div>
@@ -1197,14 +1241,23 @@
         <div class="manager-task-nodes-grid">
           <label class="manager-field">
             <span>{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
+            <Stepper
+              value={nodes.max > 0 ? nodes.max : null}
+              allowUnset
+              min={0}
+              step={1}
+              fill
+              density="comfortable"
               placeholder="—"
-              value={nodes.max > 0 ? nodes.max : ''}
-              oninput={(event) => setNodeCount(event.currentTarget.value)}
-              data-gathering-task-node-count
+              ariaLabel={text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}
+              decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                label: text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count'),
+              })}
+              incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                label: text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count'),
+              })}
+              inputProps={{ 'data-gathering-task-node-count': '' }}
+              onChange={(next) => setNodeCount(next)}
             />
           </label>
 
@@ -1253,14 +1306,20 @@
             <label class="manager-field manager-task-node-interval">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
               <div class="manager-task-node-interval-row">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={intervalParts.value || ''}
-                  oninput={(event) =>
-                    setRespawnInterval(event.currentTarget.value, intervalParts.unit)}
-                  data-gathering-task-node-interval
+                <Stepper
+                  value={intervalParts.value}
+                  min={0}
+                  step={1}
+                  fill
+                  ariaLabel={text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}
+                  decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                    label: text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every'),
+                  })}
+                  incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                    label: text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every'),
+                  })}
+                  inputProps={{ 'data-gathering-task-node-interval': '' }}
+                  onChange={(next) => setRespawnInterval(next, intervalParts.unit)}
                 />
                 <select
                   value={intervalParts.unit}
@@ -1312,14 +1371,21 @@
             <label class="manager-field">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}</span>
               <div class="manager-task-node-chance-row">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={Math.round((Number(respawn.chance) || 0) * 100) || ''}
-                  oninput={(event) => setRespawnChance(event.currentTarget.value)}
-                  data-gathering-task-node-chance
+                <Stepper
+                  value={Math.round((Number(respawn.chance) || 0) * 100)}
+                  min={0}
+                  max={100}
+                  step={1}
+                  fill
+                  ariaLabel={text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance')}
+                  decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                    label: text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance'),
+                  })}
+                  incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                    label: text('FABRICATE.Admin.Manager.Economy.RespawnChance', 'Chance'),
+                  })}
+                  inputProps={{ 'data-gathering-task-node-chance': '' }}
+                  onChange={(next) => setRespawnChance(next)}
                 />
                 <span class="manager-muted">%</span>
               </div>
@@ -2205,11 +2271,6 @@
     gap: var(--fab-space-2);
   }
 
-  .manager-task-node-interval-row input,
-  .manager-task-node-chance-row input {
-    min-width: 0;
-  }
-
   /* Depleted-behavior authoring: a sub-block of the node card. */
   .manager-task-depleted-behavior {
     display: flex;
@@ -2291,7 +2352,7 @@
 
   .manager-task-stamina-modifier-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 56px 72px 72px auto;
+    grid-template-columns: minmax(0, 1fr) 56px 102px 102px auto;
     gap: var(--fab-space-2);
     align-items: center;
   }
