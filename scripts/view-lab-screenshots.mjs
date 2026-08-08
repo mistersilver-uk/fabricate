@@ -9,6 +9,19 @@
  * deliberately outside the `npm test` glob: browser flake must never surface as `# cancelled`
  * in the main suite.
  *
+ * A CHANGE TO THIS FILE SELECTS EVERY PUBLISHABLE CASE, and that is a decision rather than an
+ * oversight (issue 1049). Two of the lab's other inputs are narrowed from their own diff — the case
+ * registry per case literal, `labActors.js` per fixture table — and the obvious next move is to
+ * narrow this one too, on the grounds that argument parsing and the step vocabulary cannot change a
+ * pixel while the render path can. That distinction is not drawable from a diff of this module.
+ * `runSteps`' verb table, `assertViewportFits`, the console-error gate, the readiness wait and the
+ * `frame.screenshot()` call are interleaved here, and `commandApps` reads `process.argv` and drives
+ * the render in the same function — so a region map over this file would have to cut through the
+ * middle of a function, and a wrong cut fails in the silent direction: a run that photographs a
+ * corpus its own driver just changed and publishes it as unaffected. The narrowings that do exist
+ * are the ones whose regions are declarative data with a readership that can be read off the render
+ * path; this file is neither.
+ *
  * Commands:
  *   chrome    capture the empty window chrome for every app - the fidelity baseline
  */
