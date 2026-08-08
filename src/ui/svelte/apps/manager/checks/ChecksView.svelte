@@ -25,6 +25,7 @@
   import ProgressiveCraftingCheckEditor from './ProgressiveCraftingCheckEditor.svelte';
   import CraftingModifierCatalogueCard from './CraftingModifierCatalogueCard.svelte';
   import ChecksValidationTab from './ChecksValidationTab.svelte';
+  import { resolveActiveCraftingCheckFormula } from '../../../../../systems/craftingModifierResolver.js';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
@@ -56,6 +57,13 @@
     craftingCheckModifiers = [],
     craftingDefaultModifierPolicy = 'addAll',
     craftingDefaultModifierIds = [],
+    // The system's check-modifier authority level (issue 1055). NO default value: an
+    // absent key means "not yet stamped", the resolver decides what that resolves to,
+    // and a `= 'none'` here would silently revoke delegation the engine still honours.
+    craftingRecipeModifierAuthority = undefined,
+    // How many of the system's recipes carry a `craftingModifier` override, for the
+    // catalogue card's downgrade disclosure.
+    craftingModifierOverrideCount = 0,
     // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
     // already honours. Restored as live-persisting toggles below the alchemy check-mode
     // selector. Defaults mirror the manager normalizer (all three ON; learnOnCraft
@@ -166,16 +174,38 @@
   );
   const craftingProgressive = $derived(resolutionMode === 'progressive');
 
-  // The active non-alchemy crafting check's authored roll formula: a check is usable
-  // iff it has an authored rollFormula (issue 770 gate for the modifier catalogue).
-  const craftingCheckUsable = $derived(
-    (craftingRouted
-      ? craftingCheck?.rollFormula
-      : craftingProgressive
-        ? craftingCheckProgressive?.rollFormula
-        : craftingCheckSimple?.rollFormula
-    )?.trim?.().length > 0
+  // Which crafting check this system's resolution mode actually rolls, and whether a
+  // `@craftingmod` in it is live. Resolved through the shared five-mode selector rather
+  // than the local rollFormula ternary that stood here (issue 1055): that copy had no
+  // case for alchemy at `checkMode: 'none'`, which rolls nothing at all, so it reported
+  // the tiered/simple slot's formula for a mode that never reaches it.
+  //
+  // Fed from the DRAFTS, not the persisted system: the GM is editing those formulas on
+  // this very tab, and a notice that lags behind the field above it is worse than none.
+  const activeCraftingCheck = $derived(
+    resolveActiveCraftingCheckFormula({
+      resolutionMode,
+      alchemy: { checkMode: alchemyCheckMode },
+      craftingCheck: {
+        simple: craftingCheckSimple,
+        routed: craftingCheck,
+        progressive: craftingCheckProgressive,
+      },
+    })
   );
+
+  // The three reasons a check-modifier catalogue reaches no roll, in the order they
+  // become answerable: no check at all, then no formula, then no `@craftingmod` in it.
+  // Written as a guard chain rather than nested ternaries — the SonarCloud gate fails
+  // those, and the ordering is the point.
+  function inertCauseFor(active) {
+    if (!active.slot) return 'noCheck';
+    if (!active.checkUsable) return 'noFormula';
+    if (!active.referencesModifier) return 'noPlaceholder';
+    return '';
+  }
+
+  const craftingModifierInertCause = $derived(inertCauseFor(activeCraftingCheck));
   const salvageRouted = $derived(salvageResolutionMode === 'routed');
   const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
   const salvageSimple = $derived(
@@ -287,6 +317,24 @@
   const page = $derived(PAGES[activeTab] || PAGES.crafting);
   const hasMenu = $derived(activeTab !== 'validation');
 </script>
+
+<!-- Rendered in BOTH crafting branches (alchemy and non-alchemy) from one definition.
+     The card used to render only where the active check had an authored roll formula,
+     which hid it in exactly the two states it now has to explain — a catalogue that
+     reaches no roll is the defect, and a card that disappears reports nothing. A
+     snippet rather than a second call site: the prop list is the contract, and two
+     copies of it drift (and count against the new-code duplication gate). -->
+{#snippet craftingModifierCard()}
+  <CraftingModifierCatalogueCard
+    checkModifiers={craftingCheckModifiers}
+    defaultModifierPolicy={craftingDefaultModifierPolicy}
+    defaultModifierIds={craftingDefaultModifierIds}
+    recipeModifierAuthority={craftingRecipeModifierAuthority}
+    affectedRecipeCount={craftingModifierOverrideCount}
+    inertCause={craftingModifierInertCause}
+    onChange={onUpdateCraftingCheckModifiers}
+  />
+{/snippet}
 
 <div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
   <ChecksEditorTabs
@@ -437,6 +485,8 @@
               </p>
             </section>
           {/if}
+
+          {@render craftingModifierCard()}
         </div>
       {:else if activeTab === 'crafting' && (craftingRouted || craftingSimple || craftingProgressive)}
         <!-- Non-alchemy crafting: the per-mode editor plus the system-level failure
@@ -522,14 +572,7 @@
             </div>
           </section>
 
-          {#if craftingCheckUsable}
-            <CraftingModifierCatalogueCard
-              checkModifiers={craftingCheckModifiers}
-              defaultModifierPolicy={craftingDefaultModifierPolicy}
-              defaultModifierIds={craftingDefaultModifierIds}
-              onChange={onUpdateCraftingCheckModifiers}
-            />
-          {/if}
+          {@render craftingModifierCard()}
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
         <div data-checks-panel="salvage">
