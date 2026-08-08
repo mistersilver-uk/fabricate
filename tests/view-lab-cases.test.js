@@ -719,38 +719,49 @@ test('every case records the smoke labels it corresponds to', () => {
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
 const REGISTRY_PATH = 'scripts/lib/viewLabCases.js';
-const registrySource = readFileSync(resolve(ROOT, REGISTRY_PATH), 'utf8').split('\n');
+const LAB_ACTORS_PATH = 'tests/view-lab/world/labActors.js';
+const RUNNER_PATH = 'scripts/view-lab-screenshots.mjs';
+const sourceOf = (path) => readFileSync(resolve(ROOT, path), 'utf8').split('\n');
+const registrySource = sourceOf(REGISTRY_PATH);
+const labActorsSource = sourceOf(LAB_ACTORS_PATH);
 
 /** @returns {string[]} The ids a changed set selects, in registry order. */
 const selectedIds = (files, options) =>
   mapChangedFilesToCases(files, options).map((viewCase) => viewCase.id);
 
 /**
- * The 1-based registry line holding an exact piece of text, asserted present so that a rename fails
- * the test loudly rather than quietly turning it into an assertion about line 0.
+ * The 1-based line of a file holding an exact piece of text, asserted present so that a rename
+ * fails the test loudly rather than quietly turning it into an assertion about line 0.
  *
+ * @param {string[]} source The file, by line.
  * @param {string} text The whole line.
+ * @param {string} where The file's path, for the failure message.
  * @returns {number} Its 1-based line number.
  */
-function registryLineOf(text) {
-  const index = registrySource.indexOf(text);
-  assert.notEqual(index, -1, `the registry no longer contains the line: ${text}`);
+function lineOf(source, text, where) {
+  const index = source.indexOf(text);
+  assert.notEqual(index, -1, `${where} no longer contains the line: ${text}`);
   return index + 1;
 }
 
+const registryLineOf = (text) => lineOf(registrySource, text, 'the registry');
+const labActorsLineOf = (text) => lineOf(labActorsSource, text, LAB_ACTORS_PATH);
+
 /**
- * A unified diff claiming those 1-based registry lines were just ADDED, with the three lines of
+ * A unified diff claiming those 1-based lines of a file were just ADDED, with the three lines of
  * context either side that `git` emits, and contiguous lines grouped into one hunk as it groups
  * them.
  *
  * The `+` lines carry the file's CURRENT text, which is exactly what a patch for a change that has
- * landed looks like — and what the selector verifies each line against before trusting a single
- * line number in it.
+ * landed looks like — and, together with the context, is the sequence the selector locates each
+ * hunk by. One builder for every attributed input rather than one per input: the shape of the diff
+ * is the same fact whichever file it describes.
  *
+ * @param {string[]} source The file the patch describes, by line.
  * @param {number[]} lineNumbers Lines to mark as added.
  * @returns {string} The patch.
  */
-function registryPatch(lineNumbers) {
+function patchAdding(source, lineNumbers) {
   const runs = [];
   for (const line of [...new Set(lineNumbers)].sort((a, b) => a - b)) {
     const last = runs.at(-1);
@@ -761,10 +772,10 @@ function registryPatch(lineNumbers) {
   return runs
     .map((run) => {
       const from = Math.max(1, run[0] - 3);
-      const to = Math.min(registrySource.length, run.at(-1) + 3);
+      const to = Math.min(source.length, run.at(-1) + 3);
       const body = [];
       for (let number = from; number <= to; number += 1) {
-        body.push(`${run.includes(number) ? '+' : ' '}${registrySource[number - 1]}`);
+        body.push(`${run.includes(number) ? '+' : ' '}${source[number - 1]}`);
       }
       return [`@@ -${from},${body.length - run.length} +${from},${body.length} @@`, ...body].join(
         '\n'
@@ -773,10 +784,17 @@ function registryPatch(lineNumbers) {
     .join('\n');
 }
 
+const registryPatch = (lineNumbers) => patchAdding(registrySource, lineNumbers);
+
+/** @returns {object} The `patches` option carrying one patch for one path. */
+const patchesFor = (path, patch) => ({ patches: { [path]: patch } });
+
 /** @returns {object} The `patches` option carrying one patch for this registry. */
-const registryPatches = (lineNumbers) => ({
-  patches: { [REGISTRY_PATH]: registryPatch(lineNumbers) },
-});
+const registryPatches = (lineNumbers) => patchesFor(REGISTRY_PATH, registryPatch(lineNumbers));
+
+/** @returns {object} The `patches` option carrying one patch for the lab's actor fixture. */
+const labActorsPatches = (lineNumbers) =>
+  patchesFor(LAB_ACTORS_PATH, patchAdding(labActorsSource, lineNumbers));
 
 /**
  * The 1-based span of the case literal containing an id line, found the way a reader would: up to
@@ -976,5 +994,428 @@ test('the capture workflow hands the selector the patches it can narrow on', () 
     workflow,
     /mapChangedFilesToCases\(files, \{ patches \}\)/,
     'the patches must reach the selector'
+  );
+});
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Content-anchored attribution (issue 1049).
+//
+// `pr-screenshots.yml` runs on `pull_request`, so `actions/checkout` gives the job the MERGE commit
+// while the `patch` field from `pulls/{n}/files` describes the PR HEAD. A PR whose base moved the
+// file it patches therefore arrives with hunk headers whose line numbers do not land on the file
+// that will render — not a corner case, but the normal state of any PR that has been open while
+// something else merged.
+//
+// The first narrowing seeded a cursor from the header and compared each line against
+// `sourceLines[cursor - 1]`, so that PR silently paid the twenty-minute whole-corpus capture. Worse
+// in the other direction: a shifted patch landing on a verbatim twin of its own content verified
+// SUCCESSFULLY against the wrong occurrence and published a frame under a case name it does not
+// show. Both are pinned below, as is the precision deliberately given up to close the second one.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The same patch with every hunk header's line numbers moved and its BODY untouched — what a
+ * merge-commit checkout effectively does to a head-generated diff.
+ *
+ * The substitution is asserted to have applied. A `replaceAll` that quietly matched nothing would
+ * leave every assertion below passing against the unshifted patch, which reads as "the anchoring
+ * works" while nothing was perturbed.
+ *
+ * @param {string} patch A unified diff.
+ * @param {number} delta Lines to move every header by.
+ * @returns {string} The shifted patch.
+ */
+function shiftHunkHeaders(patch, delta) {
+  const shifted = patch.replaceAll(
+    /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@/gm,
+    (_, oldStart, oldCount, newStart, newCount) =>
+      `@@ -${Number(oldStart) + delta},${oldCount} +${Number(newStart) + delta},${newCount} @@`
+  );
+  assert.notEqual(shifted, patch, `shifting by ${delta} matched no hunk header, so it changed nothing`);
+  return shifted;
+}
+
+/**
+ * Shifts that keep every header a positive line number, including the most extreme negative one
+ * available — which moves the first hunk to line 1.
+ *
+ * @param {string} patch A unified diff.
+ * @returns {number[]} Deltas to apply.
+ */
+function survivableShifts(patch) {
+  const starts = [...patch.matchAll(/^@@ -(\d+),/gm)].map(([, start]) => Number(start));
+  return [3, 17, 400, 4000, 1 - Math.min(...starts)];
+}
+
+/**
+ * The case literal each registry line sits in, derived the way a reader would — from the factory
+ * call that opens an element to the line that closes it.
+ *
+ * @returns {Map<number, string>} Line number -> case id, for lines inside a case literal.
+ */
+function caseIdByLine() {
+  const byLine = new Map();
+  for (const id of caseIds) {
+    if (!registrySource.includes(`    id: '${id}',`)) continue;
+    for (const line of caseLiteralLines(id)) byLine.set(line, id);
+  }
+  return byLine;
+}
+
+/**
+ * Every window of `size` consecutive registry lines that occurs more than once, with the case each
+ * occurrence's middle line belongs to.
+ *
+ * Measured from the shipped file rather than invented. The ambiguity the agreement rule refuses is
+ * a property of THIS registry — a synthetic fixture would prove the rule against a file nobody
+ * ships, and would keep passing after the real duplication went away.
+ *
+ * @param {number} size Window length in lines; 7 is what one changed line plus git's three lines of
+ *   context either side produces.
+ * @returns {{starts: number[], ids: Array<string|undefined>}[]} The recurring windows.
+ */
+function recurringWindows(size) {
+  const byContent = new Map();
+  for (let start = 1; start + size - 1 <= registrySource.length; start += 1) {
+    const key = registrySource.slice(start - 1, start - 1 + size).join('\n');
+    byContent.set(key, [...(byContent.get(key) ?? []), start]);
+  }
+
+  const owner = caseIdByLine();
+  return [...byContent.values()]
+    .filter((starts) => starts.length > 1)
+    .map((starts) => ({
+      starts,
+      ids: starts.map((start) => owner.get(start + Math.floor(size / 2))),
+    }));
+}
+
+test('a patch whose hunk headers do not land still selects exactly what its content names', () => {
+  // The regression this replaces: the same patch with its headers moved down three lines selected
+  // all 181 frames. The assertion is deliberately the same IDS, not merely a smaller count — a
+  // narrowing that lands on the wrong case is worse than one that widens, and a count cannot tell
+  // the two apart.
+  const inline = caseIds.filter((id) => registrySource.includes(`    id: '${id}',`));
+  for (const id of [inline[0], inline[Math.floor(inline.length / 2)], inline.at(-1)]) {
+    const patch = registryPatch([registryLineOf(`    id: '${id}',`)]);
+    assert.deepEqual(
+      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)),
+      [id],
+      'an aligned patch whose content is unique must still narrow to its own case'
+    );
+    for (const delta of survivableShifts(patch)) {
+      assert.deepEqual(
+        selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, shiftHunkHeaders(patch, delta))),
+        [id],
+        `a header shifted by ${delta} lines must select the same case, not the whole corpus`
+      );
+    }
+  }
+});
+
+test('ADDING a case still narrows to that case when the hunk header numbers are wrong', () => {
+  // The frame a PR that adds a case most needs is that case's own. Before content anchoring, a base
+  // that had moved this file cost exactly that: 181 frames instead of the one that is new.
+  const id = 'coverage-experimental-off-player';
+  const patch = registryPatch(caseLiteralLines(id));
+  assert.deepEqual(selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)), [id]);
+  for (const delta of survivableShifts(patch)) {
+    assert.deepEqual(
+      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, shiftHunkHeaders(patch, delta))),
+      [id],
+      `a header shifted by ${delta} lines must still select the added case alone`
+    );
+  }
+});
+
+test('a hunk whose content recurs in two different cases selects every publishable case', () => {
+  const everything = publishableCases().length;
+  const windows = recurringWindows(7);
+  assert.ok(
+    windows.length > 0,
+    'this registry is supposed to contain seven-line windows that recur; if it no longer does, ' +
+      'this test is measuring nothing and the agreement rule has lost its fixture'
+  );
+
+  const crossCase = windows.filter(
+    (window) => window.ids.every(Boolean) && new Set(window.ids).size > 1
+  );
+  assert.ok(
+    crossCase.length > 0,
+    'no recurring window spans two different case literals any more, so nothing here can prove ' +
+      'that an ambiguous hunk widens instead of guessing'
+  );
+
+  // The middle line of the window, patched with its OWN correct line numbers. This is the precision
+  // the agreement rule deliberately gives up: the patch is aligned, it verifies, and it is still
+  // ambiguous — the identical window elsewhere would attribute it to a different case, so the only
+  // honest answer is the whole corpus.
+  for (const window of crossCase.slice(0, 3)) {
+    const line = window.starts[0] + 3;
+    assert.equal(
+      selectedIds([REGISTRY_PATH], registryPatches([line])).length,
+      everything,
+      `line ${line} sits in a window that also occurs at ${window.starts.slice(1).join(', ')}, ` +
+        `attributing to ${[...new Set(window.ids)].join(' / ')} — an aligned patch there must widen`
+    );
+  }
+});
+
+test('no registry window recurs only within one case literal, so that branch has no fixture', () => {
+  // The measurement, recorded rather than replaced by an invented fixture. `regionsTouchedByHunk`
+  // ACCEPTS several candidate anchors when they all attribute identically — a window that recurs
+  // inside one case literal. This registry contains no such window, so there is nothing real to
+  // assert that branch against, and a synthetic file would only prove the test can build one.
+  //
+  // If this ever fails, the registry has grown exactly the fixture that branch is missing: name it
+  // here and assert the branch narrows to the single case both occurrences share.
+  const sameCase = recurringWindows(7).filter(
+    (window) => window.ids.every(Boolean) && new Set(window.ids).size === 1
+  );
+  assert.deepEqual(
+    sameCase.map((window) => `${window.ids[0]} at ${window.starts.join(', ')}`),
+    [],
+    'a seven-line window now recurs inside a single case literal, which is the fixture the ' +
+      'all-candidates-agree branch of `regionsTouchedByHunk` has never had'
+  );
+});
+
+test('a hunk the selector cannot anchor selects every publishable case', () => {
+  const everything = publishableCases().length;
+
+  // Every way a hunk can fail to name a unique place in the file that will render. The zero-context
+  // hunk is the one worth stating out loud: `-U0` produces a hunk whose body is entirely removals,
+  // so the sequence that must EXIST in the new file is empty — and an empty sequence occurs at
+  // every offset, which is not an attribution.
+  for (const [patch, why] of [
+    ['@@ -100,0 +100,0 @@', 'a zero-context (`-U0`) hunk anchors nowhere'],
+    ['@@ -1,2 +1,0 @@\n-one\n-two', 'a removal-only hunk has no new-file content to find'],
+    [
+      '@@ -1,2 +1,3 @@\n a line this registry does not contain\n+nor this one',
+      'content this checkout does not have',
+    ],
+  ]) {
+    assert.equal(
+      selectedIds([REGISTRY_PATH], patchesFor(REGISTRY_PATH, patch)).length,
+      everything,
+      `${why} — that must select every frame`
+    );
+  }
+});
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// `labActors.js`, attributed by fixture table (issue 1049).
+//
+// Narrowed on the axis that IS derivable — which fixture table a diff is confined to, and which
+// cases render actor-owned data at all — and NOT per actor. Only three of 181 cases name an actor
+// id; every player frame draws the whole roster through `ComponentSourcesBar` and computes its
+// listings from all three inventories, so a per-actor list would be hand-maintained work wearing
+// derived clothing, and its wrong answers would be silent.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** The manager render files a case must claim to be admitted by the knowledge-table predicate. */
+const ACTOR_KNOWLEDGE_RENDER_FILES = [
+  'src/ui/svelte/apps/manager/KnowledgeView.svelte',
+  'src/ui/svelte/apps/manager/BooksScrollsView.svelte',
+  'src/ui/svelte/apps/manager/ItemPageInspector.svelte',
+  'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
+];
+
+const playerCaseIds = () =>
+  publishableCases()
+    .filter((viewCase) => viewCase.app === 'fabricate-app')
+    .map((viewCase) => viewCase.id);
+
+const knowledgeSurfaceCaseIds = () =>
+  publishableCases()
+    .filter((viewCase) =>
+      viewCase.sourceMatches.some((pattern) =>
+        ACTOR_KNOWLEDGE_RENDER_FILES.some((file) => pattern.test(file))
+      )
+    )
+    .map((viewCase) => viewCase.id);
+
+test('a labActors patch confined to a stock table selects every player frame and only those', () => {
+  // No manager surface renders a component stack: the manager's only walk of `actor.items`
+  // (`_collectKnowledgeOwnedCopies`) keeps just the items matching a recipe-item definition, so a
+  // component stack or a `toolBroken` flag reaches no manager frame.
+  const players = playerCaseIds();
+  for (const [table, text] of [
+    ['INVENTORIES', "    'sm-iron-ore': 12,"],
+    ['BROKEN_STACKS', "  'lab-actor-brenna': ['sm-longsword'],"],
+  ]) {
+    const patches = labActorsPatches([labActorsLineOf(text)]);
+    assert.deepEqual(
+      selectedIds([LAB_ACTORS_PATH], patches),
+      players,
+      `a ${table} change must select every player frame and no manager frame`
+    );
+    // Derived, not listed, and shift-proof for the same reason the registry is.
+    assert.deepEqual(
+      selectedIds(
+        [LAB_ACTORS_PATH],
+        patchesFor(LAB_ACTORS_PATH, shiftHunkHeaders(patches.patches[LAB_ACTORS_PATH], 200))
+      ),
+      players,
+      `a shifted ${table} patch must select the same frames`
+    );
+  }
+});
+
+test('a labActors patch confined to a knowledge table adds the frames that read owned copies', () => {
+  // Owned copies and learned entries are read by the whole Knowledge surface — roster meta, tab
+  // badges, both tabs, the owned-copy row's uses/inert/spent chips, the learned row's source ladder
+  // — and by `ItemPageInspector`'s learned-by stat on the Books & Scrolls library.
+  const expected = publishableCases()
+    .filter(
+      (viewCase) =>
+        viewCase.app === 'fabricate-app' || knowledgeSurfaceCaseIds().includes(viewCase.id)
+    )
+    .map((viewCase) => viewCase.id);
+
+  for (const [table, text] of [
+    ['RECIPE_ITEM_COPIES', "      id: 'copy-scroll',"],
+    ['LEARNED_RECIPES', "    'hb-r-kiln': { sourceItemUuid: null, learnedAt: 1_195_000 },"],
+  ]) {
+    assert.deepEqual(
+      selectedIds([LAB_ACTORS_PATH], labActorsPatches([labActorsLineOf(text)])),
+      expected,
+      `a ${table} change must select the player frames plus the Knowledge / Books & Scrolls ones`
+    );
+  }
+
+  // Strictly narrower than everything, or the assertion above is satisfied by capitulation.
+  assert.ok(expected.length < publishableCases().length, 'the knowledge tables widened to all');
+  // And strictly wider than the stock tables, or the two predicates are the same predicate.
+  assert.ok(expected.length > playerCaseIds().length, 'the knowledge tables added no manager frame');
+});
+
+test('every knowledge or books-scrolls case is inside the sourceMatches-derived set', () => {
+  // The predicate is keyed on `sourceMatches` rather than on `kinds`, because `sourceMatches`
+  // already declares which render files a case is evidence about and is ALREADY gated for
+  // completeness by `tests/view-lab-source-coverage.test.js`. A `kinds`-keyed predicate would need
+  // a hand-listed set of nav selectors to police instead.
+  //
+  // The two derivations must therefore agree in the direction that matters: a case tagged as a
+  // Knowledge or Books & Scrolls frame that does NOT claim one of those render files would be
+  // dropped from the selection silently. The reverse is allowed and is one frame today —
+  // `manager-system-edit-normal` declares `ItemPageInspector` in its own `sourceMatches`, so
+  // honouring its declaration costs that frame rather than second-guessing it.
+  const derived = new Set(knowledgeSurfaceCaseIds());
+  const missing = publishableCases()
+    .filter((viewCase) => (viewCase.kinds ?? []).some((kind) => ['knowledge', 'books-scrolls'].includes(kind)))
+    .map((viewCase) => viewCase.id)
+    .filter((id) => !derived.has(id));
+
+  assert.deepEqual(
+    missing,
+    [],
+    'these cases are tagged as Knowledge or Books & Scrolls frames but claim none of ' +
+      `${ACTOR_KNOWLEDGE_RENDER_FILES.join(', ')} in sourceMatches, so a change to an owned copy ` +
+      `or a learned recipe would not select them:\n  ${missing.join('\n  ')}`
+  );
+  assert.ok(derived.size > 0, 'nothing claims the knowledge render files, so the predicate is dead');
+});
+
+test('a labActors change outside its fixture tables selects every publishable case', () => {
+  const everything = publishableCases().length;
+
+  // `ACTOR_DEFINITIONS` is deliberately on this side. A name and a portrait are not confined to the
+  // surfaces that read an actor's holdings: `ActorSelectTopBar` draws them on every player frame,
+  // and the manager draws them in the Knowledge roster, the Gathering → Travel party rows, the
+  // grant-access roster and the stamina roster. The builders below reach further still —
+  // `buildDocumentIndex` is the uuid table `fromUuid` resolves against.
+  for (const line of [
+    "    name: 'Brenna Karrunsdottir',",
+    'function ownedItem(componentId, component, quantity, index) {',
+    'function recipeItemCopy({ id, uuid, name, icon, usage = null }) {',
+    'export function buildLabActors(content) {',
+    'export function buildDocumentIndex(content, actors) {',
+  ]) {
+    assert.equal(
+      selectedIds([LAB_ACTORS_PATH], labActorsPatches([labActorsLineOf(line)])).length,
+      everything,
+      `a change to \`${line.trim()}\` must select every frame`
+    );
+  }
+
+  // And with no patch at all, which is how every caller but the capture workflow asks.
+  assert.equal(selectedIds([LAB_ACTORS_PATH]).length, everything);
+  assert.equal(selectedIds([LAB_ACTORS_PATH], { patches: {} }).length, everything);
+});
+
+test('the four labActors fixture tables the selector keys on still exist under those names', () => {
+  // The selector finds each table by a column-zero `const NAME = ` line. A rename fails SAFE — the
+  // parse returns null and the whole corpus is selected — which is correct and invisible: the only
+  // symptom would be a job quietly back at twenty minutes. So it has to fail LOUDLY here too.
+  const declared = ['INVENTORIES', 'BROKEN_STACKS', 'RECIPE_ITEM_COPIES', 'LEARNED_RECIPES'].filter(
+    (name) => !labActorsSource.some((line) => line.startsWith(`const ${name} = `))
+  );
+  assert.deepEqual(
+    declared,
+    [],
+    'these fixture tables are no longer declared at column zero under these names, so ' +
+      '`parseLabActorTableRegions` finds nothing and every labActors change captures all 181 ' +
+      `frames again:\n  ${declared.join('\n  ')}`
+  );
+});
+
+test('the capture runner still selects every publishable case, and records that decision', () => {
+  const everything = publishableCases().length;
+  const runnerSource = sourceOf(RUNNER_PATH);
+
+  assert.equal(selectedIds([RUNNER_PATH]).length, everything);
+  // Supplying a patch must not narrow an input nobody has attributed. The patch path is the one
+  // that grew, so this is the assertion that it grew only where it was meant to.
+  assert.equal(
+    selectedIds(
+      [RUNNER_PATH],
+      patchesFor(
+        RUNNER_PATH,
+        patchAdding(runnerSource, [lineOf(runnerSource, 'const READY_TIMEOUT_MS = 20_000;', RUNNER_PATH)])
+      )
+    ).length,
+    everything,
+    'the runner is not an attributed input; a patch for it must not narrow anything'
+  );
+
+  // The decision is a decision, not an omission — so it is written down where the next person to
+  // wonder "why is this one not narrowed too?" will read it.
+  assert.ok(
+    runnerSource.some((line) => line.includes('SELECTS EVERY PUBLISHABLE CASE')),
+    `${RUNNER_PATH} must record why it is not narrowed from its own diff`
+  );
+});
+
+test('the capture workflow renders and publishes the one id list it computed', () => {
+  // What makes "frames this PR did not re-render survive the publish" true by construction rather
+  // than by luck: ONE selection, computed over the PR's whole changed-file set, handed to the
+  // renderer, and published from the directory that renderer wrote — without wiping it first.
+  const workflow = readFileSync(resolve(ROOT, '.github/workflows/pr-screenshots.yml'), 'utf8');
+  const runner = readFileSync(resolve(ROOT, RUNNER_PATH), 'utf8');
+
+  assert.equal(
+    [...workflow.matchAll(/echo "ids=/g)].length,
+    1,
+    'a second id list would let render and publish disagree about what the PR selected'
+  );
+  assert.match(
+    workflow,
+    /CASE_IDS: \$\{\{ steps\.select\.outputs\.ids }}/,
+    'the renderer must consume the selection step\'s own output'
+  );
+  assert.match(workflow, /view-lab-screenshots\.mjs apps "\$CASE_IDS"/);
+
+  // The publish step names the directory the renderer writes. Derived from the runner rather than
+  // trusted twice, so a moved output directory fails here instead of publishing an empty set.
+  assert.match(runner, /join\(ARTIFACT_DIR, 'apps'\)/, 'the runner no longer writes `apps/`');
+  assert.match(workflow, /--output-dir ui-screenshot-artifact\/apps/);
+
+  // `--clean` wipes that directory. The workflow must not pass it: a scoped render followed by a
+  // wiping publish would drop every frame the PR did not re-select, which is exactly the failure a
+  // narrowing makes reachable.
+  assert.ok(
+    !/view-lab-screenshots\.mjs apps[^\n]*--clean/.test(workflow),
+    'the workflow wipes the frame directory before a scoped render, so unrendered frames are lost'
   );
 });
