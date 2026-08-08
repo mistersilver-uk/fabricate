@@ -908,6 +908,44 @@ describe('createAdminStore', () => {
       assert.ok(vs.systems.some((s) => s.id === sysId));
     });
 
+    // The authority seed (issue 1055). A system authored HERE — through the manager UI,
+    // by a GM who is about to be shown the authority control — starts UNDELEGATED, and
+    // the stamp is made at this call site rather than inside
+    // `CraftingSystemManager.createSystem`, which stays authority-neutral on purpose so
+    // the importer and every programmatic caller keep landing on the unresolved state.
+    //
+    // Nothing else gates it. Drop the `craftingCheck` argument (or move it down into the
+    // manager) and every UI-authored system lands unstamped,
+    // `resolveRecipeModifierAuthority` reads that as `setAndRule`, and the
+    // initialize-time fallback then re-derives it from recipe presence — so a brand-new
+    // empty system silently delegates BOTH axes instead of starting undelegated, which
+    // is the inverse of the design.
+    it('createSystem stamps the new system as undelegated — recipeModifierAuthority none (issue 1055)', async () => {
+      const services = createMockServices();
+      const manager = services.getCraftingSystemManager();
+      const create = manager.createSystem;
+      const seeds = [];
+      manager.createSystem = async (data) => {
+        seeds.push(data);
+        return create(data);
+      };
+      const store = createAdminStore(services);
+
+      const created = await store.createSystem();
+
+      assert.equal(seeds.length, 1, 'exactly one system is created');
+      assert.equal(
+        seeds[0].craftingCheck?.recipeModifierAuthority,
+        'none',
+        'the UI states `none`; an unstamped system resolves as setAndRule and delegates both axes'
+      );
+      assert.equal(
+        created.craftingCheck?.recipeModifierAuthority,
+        'none',
+        'and the stamp reaches the system the caller goes on to open'
+      );
+    });
+
     // The manager root routes this through the same "did it happen?" helper as
     // `selectSystem`, and that helper treats ONLY `false` as no — so the return value is a
     // contract, not an incidental. On success it hands back the system; on a declined

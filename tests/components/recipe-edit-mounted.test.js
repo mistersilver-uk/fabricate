@@ -721,6 +721,139 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
+  // The "Custom set, nothing picked yet" pin (issue 1055).
+  //
+  // That state writes `{ modifierIds: [] }` — the same persisted bytes as "No modifiers"
+  // — so read purely, picking Custom set snapped straight back to No modifiers on the
+  // ordinary system this exists to serve: a catalogue with an EMPTY default set, where
+  // the seed comes back empty. A local pin decides which of the two identical shapes was
+  // meant, and it is released by any other pick and by a DIFFERENT recipe arriving.
+  //
+  // Every assertion below reads the select AFTER a prop change that genuinely moves the
+  // derived value, so Svelte has to write the DOM either way: with the pin the select
+  // lands on `custom`, without it on `none`. Re-asserting a value the test itself typed,
+  // with no such move in between, would pass under both.
+  const emptyDefaultSetProps = (overrides = {}) =>
+    authorityProps({
+      craftingModifierAuthority: 'setOnly',
+      craftingModifierDefaultIds: [],
+      recipe: { ...RECIPE, craftingModifier: null },
+      ...overrides,
+    });
+
+  /** Pick an option on the tri-state select the way a GM does, and report the patch. */
+  async function pickModifierSetMode(target, mode) {
+    const select = target.querySelector('[data-recipe-field="craftingModifierSet"]');
+    select.value = mode;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+  }
+
+  it('holds "Custom set" when the seeded set comes back empty (issue 1055)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      emptyDefaultSetProps({ onUpdateRecipe: (patch) => patches.push(patch) })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'inherit',
+      'pre-condition: a recipe with no override inherits'
+    );
+
+    await pickModifierSetMode(target, 'custom');
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: { modifierIds: [] } },
+      'with nothing to seed from, Custom set writes the authored empty array'
+    );
+
+    // Feed the patch back exactly as the root's draft does. THIS is the read-back that
+    // used to snap to "No modifiers": the derived mode moves off `inherit` either way,
+    // so the select is rewritten and the assertion cannot pass on the typed value.
+    await editHarness.setProps({ recipe: { ...RECIPE, ...patches.at(-1) } });
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'custom',
+      'the control must not reject the GM’s choice by snapping back to No modifiers'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-modifier-pill-select="recipe-crafting-modifier"]')),
+      'and the pill row is offered, so there is somewhere to pick the custom set'
+    );
+    editHarness.remount();
+  });
+
+  it('releases the "Custom set" pin when the GM picks another option (issue 1055)', async () => {
+    for (const [released, expected] of [
+      // No modifiers is the sharp one: it writes the SAME shape the pin is holding, so
+      // only the release tells the two readings apart.
+      ['none', { craftingModifier: { modifierIds: [] } }],
+      ['inherit', { craftingModifier: null }],
+    ]) {
+      const patches = [];
+      const target = await editHarness.mount(
+        emptyDefaultSetProps({ onUpdateRecipe: (patch) => patches.push(patch) })
+      );
+      await pickModifierSetMode(target, 'custom');
+      await editHarness.setProps({ recipe: { ...RECIPE, ...patches.at(-1) } });
+
+      await pickModifierSetMode(target, released);
+      assert.deepEqual(patches.at(-1), expected, `${released} writes its own persisted shape`);
+      // Park the recipe on a NON-empty set, then land it back on the authored empty set
+      // — the one shape the pin masks. Both assertions are load-bearing: a still-held pin
+      // leaves the derived mode on `custom` throughout, Svelte skips both DOM writes, and
+      // the select is left showing whatever this test last typed.
+      await editHarness.setProps({
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+      });
+      assert.equal(
+        target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+        'custom',
+        `picking ${released} left the select stale — it was never rewritten, so the pin is still held`
+      );
+      await editHarness.setProps({
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
+      });
+      assert.equal(
+        target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+        'none',
+        `picking ${released} drops the pin, so an empty authored set reads as No modifiers again`
+      );
+      editHarness.remount();
+    }
+  });
+
+  it('releases the "Custom set" pin when a DIFFERENT recipe arrives (issue 1055)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      emptyDefaultSetProps({ onUpdateRecipe: (patch) => patches.push(patch) })
+    );
+    await pickModifierSetMode(target, 'custom');
+    await editHarness.setProps({ recipe: { ...RECIPE, ...patches.at(-1) } });
+
+    // The pin survives a same-recipe patch: `patchRecipeDraft` replaces the whole
+    // `recipe` object on every keystroke, so tracking object identity alone would clear
+    // the pin on the component's own write.
+    await editHarness.setProps({
+      recipe: { ...RECIPE, name: 'Renamed mid-edit', craftingModifier: { modifierIds: [] } },
+    });
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'custom',
+      'a same-id draft patch must not clear the pin — every patch is a new object'
+    );
+
+    await editHarness.setProps({
+      recipe: { ...RECIPE, id: 'r2', craftingModifier: { modifierIds: [] } },
+    });
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'none',
+      'a different recipe gets its own reading, not the previous one’s local intent'
+    );
+    editHarness.remount();
+  });
+
   it('names the inherited default set under Inherit rather than saying "inheriting" (issue 1055)', async () => {
     const target = await editHarness.mount(
       authorityProps({
