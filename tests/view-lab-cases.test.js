@@ -8,7 +8,6 @@
  * screenshot — which is exactly why they belong in `npm test` rather than in the capture run.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +34,7 @@ import {
   publishableCases,
 } from '../scripts/lib/viewLabCases.js';
 
+import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,9 +45,32 @@ const content = buildLabContent();
 /** The viewport the capture driver uses; asserted here so the arithmetic is gated, not just run. */
 const CAPTURE_VIEWPORT = { width: 1920, height: 1080 };
 
-const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' })
-  .split('\0')
-  .filter(Boolean);
+/**
+ * The roots every check below draws its corpus from, and the extensions that make them complete.
+ *
+ * `.css` and `.json` are not decoration. Without them the corpus is 548 files instead of 550, and
+ * the two it drops are `styles/fabricate.css` and `lang/en.json` — which reds the orphan check
+ * with two false orphans (both theme cases claim `/^styles\/fabricate\.css$/`) and kills the
+ * `lang/en.json` clause in the render-source filter below. They are stated HERE, per caller, rather
+ * than added to `SCANNED_EXTENSIONS`: that constant is shared with three literal gates that scan
+ * `src/` only, where widening it would be inert today and would silently move their scope the first
+ * time a `.json` landed under `src/`.
+ */
+const CORPUS_ROOTS = ['src', 'styles', 'lang'];
+const CORPUS_EXTENSIONS = ['.js', '.mjs', '.svelte', '.css', '.json'];
+
+/**
+ * The corpus, read from the WORKING TREE in a single walk.
+ *
+ * This used to be `git ls-files` followed by a `readFileSync` of each path it named — the index
+ * asked what exists and the working tree asked what it contains. That divergence threw ENOENT
+ * inside the render-source accessor for real once, six tests failing at once right after a
+ * `git merge --ff-only`, and it also answered silently wrong: an unstaged component was invisible
+ * and a staged deletion still counted. See `collectWorkingTreeSources` for what the single walk
+ * does and does not fix — the window is narrowed to ~55 ms, not closed.
+ */
+const sourceCorpus = collectWorkingTreeSources(CORPUS_ROOTS, CORPUS_EXTENSIONS);
+const sourceFiles = Object.keys(sourceCorpus);
 
 /**
  * Hooks the CAPTURE DRIVER hard-codes, which appear in no case and were therefore guarded by
@@ -68,22 +91,20 @@ const DRIVER_HOOKS = [
 ];
 
 /**
- * Every tracked file that can carry a UI hook, keyed by path so a check can be scoped to the
+ * Every source file that can carry a UI hook, keyed by path so a check can be scoped to the
  * component that actually renders the thing rather than to the whole tree. Scoping is what stops a
  * check passing on a coincidence, which has happened three times in this file.
  *
  * Includes : some nav ids are declared in a plain module rather than a component.
  */
-function trackedRenderSources() {
+function renderSources() {
   return new Map(
-    tracked
-      .filter(
-        (file) =>
-          file.endsWith('.svelte') ||
-          file === 'lang/en.json' ||
-          (file.startsWith('src/ui/') && file.endsWith('.js'))
-      )
-      .map((file) => [file, readFileSync(resolve(ROOT, file), 'utf8')])
+    Object.entries(sourceCorpus).filter(
+      ([file]) =>
+        file.endsWith('.svelte') ||
+        file === 'lang/en.json' ||
+        (file.startsWith('src/ui/') && file.endsWith('.js'))
+    )
   );
 }
 
@@ -135,6 +156,47 @@ function escapeForRegExp(value) {
   return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
+test('the corpus every check below reads is the whole tree, not a slice of it', () => {
+  // Every other check in this file answers against `sourceCorpus`, so a corpus that quietly lost a
+  // root or an extension would not fail — it would go VACUOUS, and the orphan check would then
+  // report the absence as a stranded pattern in the registry. That is not hypothetical: at
+  // `SCANNED_EXTENSIONS` (no `.css`, no `.json`) this corpus is 548 files and the orphan check
+  // reds with two false orphans, both `/^styles\/fabricate\.css$/`.
+  //
+  // The thresholds are deliberately NOT the `> 100` used elsewhere in this repo, which is far too
+  // loose to be a pin here: dropping `.svelte` leaves 283 files and dropping `.js` leaves 269, and
+  // `> 100` survives both.
+  assert.ok(
+    sourceFiles.length >= 500,
+    `expected the whole ${CORPUS_ROOTS.join('/, ')}/ tree, got ${sourceFiles.length} files`
+  );
+  const components = sourceFiles.filter((file) => file.endsWith('.svelte'));
+  assert.ok(components.length >= 200, `expected the component tree, got ${components.length}`);
+
+  // By KEY, one per root — because a count threshold cannot see a single file go missing, and each
+  // of these is a whole root's or a whole extension's worth of coverage standing on one file.
+  // `lang/en.json` is the sharpest of the three: dropping `.json` (or the `lang` root) moves the
+  // count 550 -> 549, which no threshold can catch, and it is the one omission that leaves a LIVE
+  // filter clause dead — `file === 'lang/en.json'` in `renderSources` above.
+  for (const file of [
+    'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+    'styles/fabricate.css',
+    'lang/en.json',
+  ]) {
+    assert.ok(
+      Object.hasOwn(sourceCorpus, file),
+      `"${file}" is missing from the corpus, so every check keyed on it is now vacuous`
+    );
+  }
+
+  // `tests/view-lab-chrome-license.test.js` still shells out to `git ls-files`, and must keep
+  // doing so. Tracked-ness is that test's SUBJECT, not its input: it proves no harvested
+  // proprietary Foundry asset is tracked, which is a question only the index can answer. A tree
+  // walk there would find the same harvested files sitting untracked in a working directory and
+  // report the repository clean, silently retiring the check. The divergence this file just
+  // removed was a bug precisely because tracked-ness was never what it was asking about.
+});
+
 test('case ids are unique and non-empty', () => {
   assert.equal(new Set(caseIds).size, caseIds.length, 'duplicate case id');
   for (const id of caseIds) {
@@ -153,22 +215,25 @@ test('every case names a window the chrome spec knows how to build', () => {
   }
 });
 
-test('every sourceMatches pattern resolves to at least one tracked file', () => {
+test('every sourceMatches pattern resolves to at least one source file', () => {
   // The anti-drift invariant carried over from the first View Lab attempt: a pattern that matches
   // nothing is indistinguishable from a pattern that matches everything until a PR needs it.
   const orphans = [];
   for (const viewCase of VIEW_LAB_CASES) {
     assert.ok(viewCase.sourceMatches.length > 0, `case "${viewCase.id}" declares no sourceMatches`);
     for (const pattern of viewCase.sourceMatches) {
-      if (!tracked.some((file) => pattern.test(normalizePath(file)))) {
+      if (!sourceFiles.some((file) => pattern.test(normalizePath(file)))) {
         orphans.push(`${viewCase.id}: ${pattern}`);
       }
     }
   }
+  // The roots are named because the corpus is scoped to them: a pattern aimed at `scripts/` or
+  // `tests/` is out of scope rather than stranded, and reads as the latter without them.
   assert.deepEqual(
     orphans,
     [],
-    `these patterns match no tracked file — a rename probably stranded them:\n  ${orphans.join('\n  ')}`
+    `these patterns match no file under ${CORPUS_ROOTS.map((root) => `${root}/`).join(', ')} — a ` +
+      `rename probably stranded them, or the pattern points outside those roots:\n  ${orphans.join('\n  ')}`
   );
 });
 
@@ -177,7 +242,7 @@ test('every interaction step names text that exists in the manager UI', () => {
   // the case would capture whichever screen happened to be showing.
   // Includes `src/ui/**/*.js`: the crafting sub-tab ids the selector steps target are declared in
   // `crafting/craftingNav.js`, not in any component file.
-  const sources = trackedRenderSources();
+  const sources = renderSources();
   const haystack = [...sources.values()].join('\n');
 
   const missing = [];
@@ -352,7 +417,7 @@ test('the hooks the capture driver hard-codes still exist in the UI', () => {
   // what the new player attribute mirrors. Renaming the REAL attribute then left the guard green,
   // because the prose still matched. A check whose haystack includes its own documentation cannot
   // fail on a rename that only the documentation survives.
-  const haystack = [...trackedRenderSources().values()]
+  const haystack = [...renderSources().values()]
     .join('\n')
     .replaceAll(/<!--[\S\s]*?-->/g, '')
     .replaceAll(/\/\*[\S\s]*?\*\//g, '')
@@ -1559,10 +1624,10 @@ test('a labActors EDIT inside a stock table selects the same frames its addition
   }
 });
 
-test('every knowledge render file the predicate probes is a real tracked file', () => {
+test('every knowledge render file the predicate probes is a real source file', () => {
   // These four paths are STRINGS tested against each case's `sourceMatches` regexes, so a rename
   // makes a probe match nothing — and nothing else notices. `every sourceMatches pattern resolves
-  // to at least one tracked file` does not: the pattern claiming `ItemPageInspector.svelte` is an
+  // to at least one source file` does not: the pattern claiming `ItemPageInspector.svelte` is an
   // alternation whose other branches still resolve, so it stays green while the probe goes dead and
   // `manager-system-edit-normal` silently drops out of the knowledge selection.
   //
@@ -1570,12 +1635,13 @@ test('every knowledge render file the predicate probes is a real tracked file', 
   // test and `knowledgeSurfaceCaseIds` below would both stay green against a live probe that had
   // stopped matching anything — the test claiming to check what the predicate probes while
   // checking a second list nothing consults.
-  const missing = ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => !tracked.includes(file));
+  const missing = ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => !sourceFiles.includes(file));
   assert.deepEqual(
     missing,
     [],
-    'these knowledge-surface probes name no tracked file, so `rendersOwnedKnowledge` silently ' +
-      `stops admitting the frames that render them:\n  ${missing.join('\n  ')}`
+    `these knowledge-surface probes name no file under ${CORPUS_ROOTS.map((root) => `${root}/`).join(', ')}, ` +
+      'so `rendersOwnedKnowledge` silently stops admitting the frames that render them:\n  ' +
+      missing.join('\n  ')
   );
 });
 

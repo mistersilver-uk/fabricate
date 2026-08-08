@@ -26,6 +26,13 @@
  * PATH-free execution of `format:check` (`runPrettierCheck`) proves the real command reaches the
  * real component corpus, with a positive control proving Prettier actually reports an
  * unformatted component rather than reporting clean by construction.
+ *
+ * Issue 1017 added the last piece: that execution runs the real CLI over the live working tree, so
+ * a file appearing or vanishing mid-run used to surface as a bare CLI error with nothing to say
+ * the tree had moved. The failure report now discriminates on Prettier's EXIT CODE — 1 is
+ * Prettier's own verdict about files it read, 2 means a pattern matched nothing — and appends what
+ * it observed of the tree either side of the run. See `formatCheckReport` for why the note is
+ * additive rather than a substitution.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -116,6 +123,68 @@ const FIXTURE_ARGV = ['--plugin', SVELTE_PLUGIN_PATH, '--no-config'];
 
 const UNFORMATTED_COMPONENT = '<script>\n  let x = 1\n</script>\n\n<div>{x}</div>\n';
 const FORMATTED_COMPONENT = '<script>\n  let x = 1;\n</script>\n\n<div>{x}</div>\n';
+
+/**
+ * Prettier's exit codes, which are the only trustworthy verdict this test has.
+ *
+ * `1` is Prettier's own answer about files it read: at least one is unformatted. `2` is an
+ * operational error, and the one that reaches this gate is "the glob resolved to no file" —
+ * `[error] No files matching the pattern were found`. The difference matters because at exit 2
+ * Prettier STILL prints `All matched files use Prettier code style!` to stdout, so anything
+ * reading stdout for a verdict reads a clean sweep off a run that inspected nothing.
+ */
+const PRETTIER_UNFORMATTED = 1;
+const PRETTIER_NO_FILES_MATCHED = 2;
+
+/**
+ * The failure report for a non-zero `format:check`: Prettier's own output verbatim, plus whatever
+ * this test can add about the tree it ran over.
+ *
+ * The notes are ADDITIVE, never a replacement, and that is the whole design. The realistic
+ * collision is someone adding a new unformatted `.svelte` while this runs — the listing moved AND
+ * Prettier genuinely complained — and a report that substituted "the worktree changed" for
+ * Prettier's message would eat the real failure and send the reader to re-run a gate that will
+ * fail again for the reason it just discarded.
+ *
+ * The exit code is the discriminator. The listing diff is only enrichment: it names WHICH paths
+ * moved, and it is reported at any exit code, because a moving tree is worth knowing about
+ * whatever Prettier concluded.
+ *
+ * @param {{status: number, stdout: string, stderr: string}} result The Prettier run.
+ * @param {string[]} before Components listed immediately before the invocation.
+ * @param {string[]} after Components listed immediately after it.
+ * @returns {string} The report.
+ */
+function formatCheckReport(result, before, after) {
+  const report = [
+    `expected the current repository to already satisfy format:check, got exit ${result.status}:`,
+    `${result.stdout}${result.stderr}`,
+  ];
+
+  if (result.status === PRETTIER_NO_FILES_MATCHED) {
+    report.push(
+      'Exit 2 is NOT a formatting verdict — it means a pattern matched no file at all. Note that' +
+        ' the stdout above still says every matched file is clean, which is why this test reads' +
+        ' the exit code and not the output. Either the worktree changed during the run (a path' +
+        ' the gate names moved or vanished while Prettier was walking it — re-run), or a' +
+        ' `format:check` target names a path that no longer exists, which is a real and permanent' +
+        ' failure that will repeat on every re-run.'
+    );
+  }
+
+  const named = (files) => files.map((file) => path.relative(repoRoot, file)).join(', ');
+  const appeared = after.filter((file) => !before.includes(file));
+  const vanished = before.filter((file) => !after.includes(file));
+  if (appeared.length > 0 || vanished.length > 0) {
+    report.push(
+      'The component listing also changed across the invocation, so the worktree was moving while' +
+        ` this ran: ${appeared.length} appeared${appeared.length > 0 ? ` (${named(appeared)})` : ''},` +
+        ` ${vanished.length} vanished${vanished.length > 0 ? ` (${named(vanished)})` : ''}.`
+    );
+  }
+
+  return report.join('\n\n');
+}
 
 describe('Prettier covers Svelte components', () => {
   // Without this the sweep below could pass by finding nothing to check — the same vacuity in a
@@ -254,12 +323,15 @@ describe('format:check actually reaches the component corpus when executed', () 
   // zero, with the exit code staying 0 either way — the exact silent failure issue 946 reports).
   it('inspects the real component corpus, not a reconstruction of it', () => {
     const argv = assertGateArgv(packageJson, 'format:check', FORMAT_CHECK_ARGV);
+    // Listed immediately either side of the invocation, deliberately rather than reusing the
+    // module-level `components`: that binding is computed at load and separated from this run by
+    // five async tests which each call `getFileInfo` over all 267 components, so comparing against
+    // it would widen the window being described by seconds for no gain. These two calls bracket
+    // the run and nothing else.
+    const before = listSvelteComponents(path.join(repoRoot, 'src'));
     const result = runPrettierCheck([...argv.slice(1), '--log-level', 'debug']);
-    assert.equal(
-      result.status,
-      0,
-      `expected the current repository to already satisfy format:check, got:\n${result.stdout}${result.stderr}`
-    );
+    const after = listSvelteComponents(path.join(repoRoot, 'src'));
+    assert.equal(result.status, 0, formatCheckReport(result, before, after));
     const inspected = [
       ...`${result.stdout}${result.stderr}`.matchAll(/resolve config from '([^']+\.svelte)'/g),
     ].map((match) => match[1]);
@@ -284,7 +356,7 @@ describe('format:check actually reaches the component corpus when executed', () 
     );
     assert.equal(
       outcome.status,
-      1,
+      PRETTIER_UNFORMATTED,
       `expected an unformatted component to fail --check, got:\n${outcome.stdout}${outcome.stderr}`
     );
     assert.match(
