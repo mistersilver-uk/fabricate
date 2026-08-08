@@ -5,10 +5,24 @@ import { readFileSync } from 'node:fs';
 import { extname, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { FABRICATE_THEME_IDS } from '../../src/ui/theme.js';
+import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const css = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const themeIds = Object.values(FABRICATE_THEME_IDS);
+
+// The bulk edit panel's muted copy is SVELTE-SCOPED, not in the global sheet — `grep -c
+// fab-bulk-edit styles/fabricate.css` returns 0. Injecting only `styles/fabricate.css` and
+// then adding a `.fab-bulk-edit-*` node to the fixture would match no rule at all: the node
+// would inherit `--fab-mv2-text`, score the contrast of a colour this panel never renders,
+// and pass no matter what the panel's own declarations said. So this gate reproduces what
+// Svelte actually ships, exactly as the font-size gates do — the component's real compiled
+// CSS appended AFTER the global sheet (matching `css: 'injected'` ordering in
+// svelte.config.js) with the real `svelte-<hash>` class stamped onto the fixture node
+// (matching specificity). Both halves are load-bearing; either alone proves nothing.
+const BULK_EDIT_SECTION = scopedComponentCss(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkEditSection.svelte')
+);
 // The player Crafting/Gathering apps and the standalone Recipe Editor were
 // removed; the Crafting System Manager is the remaining themed surface. The new
 // unified Fabricate shell is an empty placeholder whose focus/contrast styling
@@ -56,6 +70,7 @@ function themePage(theme, width, height, body) {
         <meta charset="utf-8">
         <style>
           ${css}
+          ${BULK_EDIT_SECTION.css}
           :root { --font-primary: Arial, sans-serif; }
           body {
             margin: 0;
@@ -85,6 +100,17 @@ function themePage(theme, width, height, body) {
             color: var(--fab-text-muted);
             line-height: 1.35;
           }
+          /* The bulk panel renders on the INSPECTOR's fill, and contrastSample composites a
+             sample's own background over [data-surface-backdrop] — which is the manager root
+             at --fab-mv2-bg, a different colour. A transparent sample would therefore be
+             scored against the wrong column and could pass while the shipped surface failed.
+             Stated as the TOKEN the rail actually uses, never a literal: the
+             theme-colour-contract gate forbids literals under src/ui/ and styles/, and a
+             literal here would silently stop tracking the seven themes it stands for.
+             (No backticks in here — this whole block is a JS template literal.) */
+          .preview-bulk-surface {
+            background: var(--fab-mv2-surface-1);
+          }
         </style>
       </head>
       <body>
@@ -110,6 +136,27 @@ function managerRows() {
       <button type="button" class="manager-button" data-boundary>Open</button>
     </article>
   `).join('');
+}
+
+/*
+ * The bulk edit panel's STANDING SENTENCE, rendered on the inspector's own fill.
+ *
+ * It carries its OWN `data-contrast-*` hook rather than reusing one: `contrastSample` reads
+ * the FIRST node matching a selector (see the note on the armed danger button above), and
+ * every existing hook already resolves to a node earlier in this fixture. It deliberately
+ * carries NO `data-region` — regions are pairwise-intersected below, and a probe nested
+ * inside the inspector region would report as an overlap with its own parent.
+ *
+ * The `svelte-<hash>` class is stamped by the component's own compiler output, so renaming
+ * the scoped class in `BulkEditSection.svelte` unstamps this node rather than leaving it
+ * quietly measuring an inherited colour.
+ */
+function bulkEditSubhint() {
+  return withScopeHash(
+    '<p class="fab-bulk-edit-subhint preview-bulk-surface" data-contrast-bulk-muted>Applying essences overwrites the essence values on every selected component.</p>',
+    'fab-bulk-edit-subhint',
+    BULK_EDIT_SECTION.hashClass
+  );
 }
 
 function managerFixture(theme, width, height) {
@@ -163,6 +210,7 @@ function managerFixture(theme, width, height) {
                foundry-native and is marginal in ironblood-forge, which is why
                fab-on-danger exists at all. -->
           <button type="button" class="manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
+          ${bulkEditSubhint()}
         </aside>
       </div>
     </section>`);
@@ -173,7 +221,14 @@ function contrastSample(result, selector) {
   assert.ok(sample, `expected contrast sample for ${selector}`);
   const backdrop = parseColor(sample.backdropBackgroundColor);
   const background = composite(parseColor(sample.backgroundColor), backdrop);
-  return contrastRatio(parseColor(sample.color), background);
+  // The FOREGROUND is composited over its background too, not just the background over the
+  // backdrop. `luminance` destructures `{ r, g, b }` and drops alpha, so a translucent text
+  // colour used to be scored as though it were fully opaque — which reads as a PASS for a
+  // colour the eye never receives. That is not hypothetical here: several themes express
+  // their muted and subtle text as the SAME rgb triple at DIFFERENT alpha, so without this
+  // the two tokens are indistinguishable to this gate and swapping one for the other would
+  // move no number at all.
+  return contrastRatio(composite(parseColor(sample.color), background), background);
 }
 
 function assertRenderedResult(result, theme, surfaceId, width) {
@@ -190,6 +245,16 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   assert.ok(contrastSample(result, '[data-contrast-soft]') >= 4.5, `${theme}/${surfaceId}/${width} chip/status text contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid]') >= 4.5, `${theme}/${surfaceId}/${width} solid action contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid-armed]') >= 4.5, `${theme}/${surfaceId}/${width} armed danger action contrast should pass WCAG AA`);
+  // The bulk edit panel's muted copy, on the inspector's own fill (issue 1015). Its scoped
+  // rule must actually be the one that won, or the ratio below is the ratio of the panel's
+  // PRIMARY text and says nothing about the muted scale this asserts.
+  const bulkMuted = result.contrastSamples.find(entry => entry.selector === '[data-contrast-bulk-muted]');
+  assert.notEqual(
+    bulkMuted.color,
+    bulkMuted.inheritedColor,
+    `${theme}/${surfaceId}/${width} bulk edit muted copy computed the inherited --fab-mv2-text (${bulkMuted.color}) — its scoped rule did not apply, so the ratio below would prove nothing`
+  );
+  assert.ok(contrastSample(result, '[data-contrast-bulk-muted]') >= 4.5, `${theme}/${surfaceId}/${width} bulk edit muted copy contrast should pass WCAG AA`);
 }
 
 async function inspectRenderedSurface(page) {
@@ -223,14 +288,18 @@ async function inspectRenderedSurface(page) {
 
     const backdrop = document.querySelector('[data-surface-backdrop]');
     const backdropBackgroundColor = getComputedStyle(backdrop).backgroundColor;
-    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]'].map(selector => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-bulk-muted]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {
         selector,
         color: style.color,
         backgroundColor: style.backgroundColor,
-        backdropBackgroundColor
+        backdropBackgroundColor,
+        // What the node would read as with no rule of its own — the inherited `--fab-mv2-text`
+        // from `.fabricate-manager`. A probe whose scoped rule silently stopped applying
+        // computes exactly this, so comparing against it is what keeps the sample honest.
+        inheritedColor: getComputedStyle(element.parentElement).color
       };
     });
     const badHitTargets = Array.from(document.querySelectorAll('[data-hit]'))

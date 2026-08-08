@@ -99,16 +99,18 @@
 
   {@render children?.()}
 
-  <button
-    type="button"
-    class="manager-button fab-bulk-edit-apply"
-    {...applyHook}
-    disabled={!canApply}
-    onclick={() => onApply()}
-  >
-    <i class="fas fa-check-double" aria-hidden="true"></i>
-    <span>{applyLabel}</span>
-  </button>
+  <div class="fab-bulk-edit-dock">
+    <button
+      type="button"
+      class="manager-button fab-bulk-edit-apply"
+      {...applyHook}
+      disabled={!canApply}
+      onclick={() => onApply()}
+    >
+      <i class="fas fa-check-double" aria-hidden="true"></i>
+      <span>{applyLabel}</span>
+    </button>
+  </div>
 </section>
 
 <style>
@@ -163,7 +165,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     font-family: inherit;
     font-size: 0.62rem;
     font-weight: 600;
@@ -230,6 +232,51 @@
     color: var(--fab-mv2-text-muted);
     font-size: 0.62rem;
     line-height: 1.35;
+  }
+
+  /* THE DOCK PINS APPLY TO THE RAIL'S BOTTOM EDGE. The panel is taller than the
+     inspector's scrollport in the Recipe and Component studios, so the panel's primary
+     action scrolled out of view exactly when the GM had staged enough to want it. (Not in
+     the Essence Studio: `EssenceBulkEditPanel` closes this shell and renders its delete
+     card as a SIBLING, so the shell does not span that rail's scrollable height and Apply
+     un-pins there. That is accepted, not a defect.)
+
+     A SECOND sticky rule rather than reuse of `.manager-inspector-card.is-sticky`
+     (styles/fabricate.css): that class is a bordered, rounded, TOP-anchored card SHELL,
+     and Apply is not a card. This mirrors its idiom at the opposite edge — surface fill, a
+     hairline against the content it covers, and a shadow thrown away from the edge it is
+     pinned to — without inheriting a card's border box.
+
+     NO `z-index`, deliberately. Nothing this dock can overlap establishes a competing
+     stacking context: `Chip`, `BulkEditSelect` and all three bulk panels declare neither
+     `position` nor `z-index`, and `SearchablePopover` portals out to the
+     `.fabricate-manager` host rather than stacking inside the rail. A `z-index` here would
+     be an unfalsifiable guess at a conflict that does not exist.
+
+     ALL THREE BLEEDS ARE LOAD-BEARING, not cosmetic. Chromium constrains a sticky box to
+     its containing block, which ends at `.manager-inspector`'s CONTENT box, while the
+     scrollport it sticks to is that element's PADDING box (`padding: var(--fab-space-3)`,
+     styles/fabricate.css). Without the negative bottom INSET a `--fab-space-3` strip of
+     the scrollport stays uncovered and a staged row reads through it at mid-scroll;
+     without the matching negative bottom MARGIN the dock jumps by that same strip at
+     maximum scroll. The inline pair is the same trade sideways: the negative margin takes
+     the fill out to the rail's edges so the dock reads as an edge rather than a floating
+     slab, and the matching padding puts the button back exactly where it was.
+
+     THE BUTTON'S OWN BOX IS UNTOUCHED. `.fab-bulk-edit-apply` swaps places with
+     `.manager-component-browser-inspector-edit` in the rail's bottom slot, so a changed
+     min-height or font-size would desynchronise the swap. The dock therefore adds no
+     padding, border or min-height that resizes or re-types the button. */
+  .fab-bulk-edit-dock {
+    position: sticky;
+    bottom: calc(-1 * var(--fab-space-3));
+    margin-inline: calc(-1 * var(--fab-space-3));
+    margin-bottom: calc(-1 * var(--fab-space-3));
+    padding-inline: var(--fab-space-3);
+    padding-bottom: var(--fab-space-3);
+    border-top: 1px solid var(--fab-mv2-border);
+    background: var(--fab-mv2-surface-1);
+    box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
   }
 
   /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an
