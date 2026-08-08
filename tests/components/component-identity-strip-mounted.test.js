@@ -31,6 +31,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-component-identity-strip-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/portal.js',

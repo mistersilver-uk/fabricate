@@ -25,12 +25,19 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  BARE_NUMBER_FIELD_REGISTER,
+  BARE_NUMBER_INPUT,
+  MINIMUM_SCANNED_SVELTE_FILES,
+  STEPPER_PATH,
+  collectSvelteSources,
+  withoutComments,
+} from '../helpers/stepperSourceContract.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
-const stepperSource = read('src/ui/svelte/components/Stepper.svelte');
-const componentEditorSource = read('src/ui/svelte/apps/ComponentEditorRoot.svelte');
+const stepperSource = read(STEPPER_PATH);
 const globalCss = read('styles/fabricate.css');
 
 /**
@@ -44,9 +51,34 @@ function ruleBody(source, selectorPattern) {
   return match ? match[1] : '';
 }
 
-/** Source with HTML and CSS comments removed — prose about markup is not markup. */
-function withoutComments(source) {
-  return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+/**
+ * The class tokens of every selector in the global sheet that suppresses a native spinner.
+ *
+ * One entry per selector, so a rule listing `::-webkit-outer-spin-button` and
+ * `::-webkit-inner-spin-button` contributes two — which is what a per-selector judgement needs.
+ */
+function spinnerSuppressionSelectors(css) {
+  return [...withoutComments(css).matchAll(/([^{},]*)::-webkit-(?:inner|outer)-spin-button/g)].map(
+    ([, selector]) => selector.trim()
+  );
+}
+
+/**
+ * The area roots. A selector whose only classes are these names NO specific control — it is a
+ * blanket rule wearing a scope.
+ */
+const AREA_ROOTS = new Set([
+  'fabricate-manager',
+  'fabricate-app',
+  'fabricate-interactable-config',
+  'fabricate-component-editor',
+]);
+
+/** Whether a suppression selector names a specific control rather than a whole area. */
+function namesASpecificControl(selector) {
+  return (selector.match(/\.[A-Za-z][\w-]*/g) ?? []).some(
+    (token) => !AREA_ROOTS.has(token.slice(1))
+  );
 }
 
 describe('numeric steppers suppress the native spinner (issue 1036)', () => {
@@ -78,16 +110,28 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     // Comments stripped: this file's own prose explains why the type matters, and that
     // explanation must not be counted as if it were markup.
     const markup = withoutComments(stepperSource);
-    // Both orientation branches render their own input; neither may drift to `type="text"`.
+    // ONE field, declared as a `{#snippet}` and rendered into both orientation branches. The
+    // count is still EXACT and still the drift guard it was when each branch wrote its own
+    // `<input>`: a branch that grew a second, hand-written field — the way this duplication
+    // arose in the first place — pushes it back to 2 and fails here.
     const numberInputs = markup.match(/type="number"/g) ?? [];
     assert.equal(
       numberInputs.length,
-      2,
-      'the vertical and horizontal branches both keep type="number"'
+      1,
+      'the one shared numericField snippet is the component\'s only number input'
     );
     assert.ok(
       !/type="text"/.test(markup),
-      'no branch swaps to a text input, which would remove native keyboard stepping'
+      'it does not drift to a text input, which would remove native keyboard stepping'
+    );
+    // …and both orientations really do reach it, which is the half the count above stopped
+    // stating once the two branches shared a definition. Without this, deleting the render
+    // from the vertical branch would leave a component with no field in that orientation and
+    // an exact-count assertion that still passed.
+    assert.equal(
+      (markup.match(/\{@render numericField\(\)\}/g) ?? []).length,
+      2,
+      'the vertical and horizontal branches both render it'
     );
     // The component still owns no keydown handler, which is WHY the type matters. If one is
     // ever added, this assertion should be replaced by a mounted key-press test rather than
@@ -98,37 +142,103 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     );
   });
 
-  it('completes the half-finished suppression on the component editor quantity field', () => {
-    const spinner = ruleBody(
-      componentEditorSource,
-      String.raw`\.essence-quantity-input::-webkit-inner-spin-button`
-    );
-    assert.match(spinner, /appearance: none;/);
-    assert.match(spinner, /-webkit-appearance: none;/);
-    assert.match(
-      ruleBody(componentEditorSource, String.raw`\.essence-quantity-input`),
-      /appearance: textfield;/
-    );
-  });
+  // The component editor's essence quantity field and the two gathering rule limit fields
+  // each had their own copy of this suppression, because each hand-rolled its own −/+ pair
+  // around a bare `type="number"`. Issue 1050 folded all three onto the shared `Stepper`,
+  // so the declarations they pinned are GONE — the primitive's own rule above is the single
+  // remaining one, and a per-surface assertion here would now only re-pin dead CSS.
 
-  it('suppresses the spinner on the gathering rule steppers', () => {
-    const spinner = ruleBody(
-      globalCss,
-      String.raw`\.fabricate-manager \.manager-rule-stepper input::-webkit-inner-spin-button`
-    );
-    assert.match(spinner, /appearance: none;/);
-    assert.match(spinner, /-webkit-appearance: none;/);
-  });
+  // ── THE REPO-WIDE SCAN (issue 1050) ────────────────────────────────────────────────
+  //
+  // This replaces the pre-migration `does not blanket-suppress spinners on bare number fields`
+  // assertion, which could only say what the sheet must NOT contain. Every editable numeric field
+  // is now a `Stepper`, so the stronger statement is available and is the one made here: the exact
+  // set of bare `type="number"` fields that survive, and the reason each survives.
+  //
+  // `Stepper.svelte` is excluded BY PATH rather than by count, and its own exact-count-of-2
+  // assertion above is what stops that exclusion hiding a regression in the primitive.
+  const sources = collectSvelteSources();
+  const scannedPaths = Object.keys(sources);
+  const bareFieldCounts = new Map(
+    scannedPaths
+      .filter((path) => path !== STEPPER_PATH)
+      .map((path) => [path, (withoutComments(sources[path]).match(BARE_NUMBER_INPUT) ?? []).length])
+      .filter(([, count]) => count > 0)
+  );
 
-  it('does not blanket-suppress spinners on bare number fields', () => {
-    // The ~20 bare `type="number"` fields across the checks, gathering and economy editors
-    // carry NO −/+ adjuncts, so their spinner is the only pointer-driven stepping they have.
-    // Hiding it there would be a regression, not a fix; they are migrated onto `Stepper`
-    // separately. A blanket `input[type="number"]` suppression would do exactly that damage,
-    // so its absence is the assertion.
+  it('walks a non-trivial number of components, so the scan cannot pass vacuously', () => {
+    // Fail CLOSED. A glob typo, a moved directory or a renamed extension returns an empty corpus,
+    // and every assertion below would then hold over nothing at all. The floor is far under the
+    // ~265 files present so an added component never has to update it.
     assert.ok(
-      !/input\[type=["']number["']\][^{]*::-webkit-(?:inner|outer)-spin-button/.test(globalCss),
-      'no blanket number-input spinner rule exists in the global sheet'
+      scannedPaths.length >= MINIMUM_SCANNED_SVELTE_FILES,
+      `scanned only ${scannedPaths.length} .svelte files under src/ui/svelte; expected at least `
+        + `${MINIMUM_SCANNED_SVELTE_FILES}, so the enumeration is broken rather than the tree`
+    );
+    assert.ok(
+      scannedPaths.includes(STEPPER_PATH),
+      'the corpus reaches the shared primitive, so excluding it below excludes something real'
+    );
+  });
+
+  it('leaves exactly the two registered bare number fields, and no others', () => {
+    // The register is drift-guarded in BOTH directions. A third bare field appearing anywhere
+    // fails as an unmigrated field; a register entry whose file no longer holds a bare field fails
+    // as a stale allowlist, so migrating either one later cannot leave dead permission behind.
+    assert.deepEqual(
+      [...bareFieldCounts.keys()].sort(),
+      BARE_NUMBER_FIELD_REGISTER.map((entry) => entry.path).sort(),
+      'every bare `type="number"` outside the primitive must carry a written reason in the '
+        + 'non-reuse register:\n  '
+        + BARE_NUMBER_FIELD_REGISTER.map((entry) => `${entry.register} ${entry.path}: ${entry.reason}`).join('\n  ')
+    );
+    assert.equal(
+      [...bareFieldCounts.values()].reduce((total, count) => total + count, 0),
+      2,
+      'each register entry holds exactly one bare field, so the total is two'
+    );
+  });
+
+  it('suppresses a spinner only where the selector names a specific control', () => {
+    // The narrowed form of the assertion this replaces, and the ONLY mechanical guard on register
+    // entry R2. A blanket `.fabricate-manager input[type="number"]::-webkit-inner-spin-button`
+    // would strip the currency sub-unit amount's arrows — a field with no adjuncts and no range
+    // track, whose spinner is therefore its only pointer path to the value. That is exactly the
+    // regression PR #1037 refused to ship, and the whole `iff` criterion depends on it not
+    // happening. R1's rule passes because it names `.manager-drop-rate-percent`.
+    const selectors = spinnerSuppressionSelectors(globalCss);
+    assert.ok(
+      selectors.length > 0,
+      'the global sheet suppresses at least one spinner, so this assertion is not vacuous'
+    );
+    assert.deepEqual(
+      selectors.filter((selector) => !namesASpecificControl(selector)),
+      [],
+      'a spinner suppression whose selector names only an area root reaches every bare field in '
+        + 'that area, including the ones whose spinner is their only pointer affordance'
+    );
+    assert.ok(
+      !selectors.some((selector) => selector.includes('manager-availability-pill')),
+      'R2 (the currency sub-unit amount) keeps its native spinner: it is a bare field in a chip '
+        + 'with no other pointer-driven stepping affordance'
+    );
+  });
+
+  it('suppresses the ChanceSlider spinner, which is R1 earning the iff a different way', () => {
+    // R1 is the one field allowed to keep a bare input AND lose its arrows, because its sibling
+    // `type="range"` track already gives a pointer a way to step the same value. Without this the
+    // register entry would be a claim in a comment with nothing behind it.
+    const rule = ruleBody(
+      globalCss,
+      String.raw`\.fabricate-manager \.manager-drop-rate-percent input\[type="number"\]::-webkit-outer-spin-button`
+    );
+    assert.match(rule, /appearance: none;/);
+    assert.match(rule, /-webkit-appearance: none;/);
+    assert.match(
+      readFileSync(resolve(repoRoot, 'src/ui/svelte/components/ChanceSlider.svelte'), 'utf8'),
+      /onkeydown=\{handleNumberKeydown\}/,
+      'and keeps its own keydown handler, which is what stops the suppression removing keyboard '
+        + 'stepping — the difference between R1 and the regression #1037 refused to ship'
     );
   });
 });

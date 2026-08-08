@@ -4,6 +4,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from './SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   // The shared essence quantity card (issue 772). It lives under `components/` — the
@@ -674,14 +675,12 @@
     setSalvage({ outcomeRouting: next });
   }
 
-  function setSalvageDcOverride(rawValue) {
-    const trimmed = String(rawValue ?? '').trim();
-    if (trimmed === '') {
-      setSalvage({ dcOverride: null });
-      return;
-    }
-    const numeric = Number(trimmed);
-    setSalvage({ dcOverride: Number.isFinite(numeric) ? numeric : null });
+  // `Stepper` reports a clamped NUMBER, or `null` when an `allowUnset` field is
+  // cleared, so the string-parsing half of this adapter is gone. The `null` fold
+  // stays: `null` is the persisted "inherit the system salvage DC" value, which is
+  // exactly what clearing the field now sends.
+  function setSalvageDcOverride(next) {
+    setSalvage({ dcOverride: Number.isFinite(next) ? next : null });
   }
 
   function salvageComponentName(componentId) {
@@ -1652,20 +1651,35 @@
               {/each}
             </select>
             {#if salvageDcShowCustomInput}
-              <input
-                type="number"
-                step="1"
-                class="manager-input"
-                value={salvageDraft.dcOverride === null || salvageDraft.dcOverride === undefined
-                  ? ''
-                  : salvageDraft.dcOverride}
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
-                  'Custom salvage DC'
-                )}
-                data-salvage-dc-custom
-                oninput={(event) => setSalvageDcOverride(event.currentTarget.value)}
+              <!-- `allowUnset`: a cleared field is not zero here, it is "inherit the
+                   system salvage check DC" — the same `dcOverride: null` the preset
+                   select writes for its default option.
+
+                   `min={0}`: a salvage DC below zero is not a DC, and an unset field
+                   steps from `min ?? 0`, so without it one click of `−` on the blank
+                   field commits -1. The bare input this replaced had no `min` either,
+                   but it also had no live decrement button.
+
+                   `fill` needs a slot, and this one is supplied by the
+                   `[data-salvage-dc-override] .fab-stepper` cap in the global sheet. The
+                   field is a `.manager-field` (a `flex-direction: column` box) whose
+                   other child is a full-width preset `<select>`, so the cap sits on the
+                   stepper rather than on the field. -->
+              <Stepper
+                value={salvageDraft.dcOverride}
+                allowUnset
+                step={1}
+                min={0}
+                fill
                 disabled={saving}
+                {...stepperLabels(
+                  text(
+                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
+                    'Custom salvage DC'
+                  )
+                )}
+                inputProps={{ 'data-salvage-dc-custom': '' }}
+                onChange={setSalvageDcOverride}
               />
             {/if}
             <!-- Kept by decision 7 (it replaced the hard-coded tier list, not this

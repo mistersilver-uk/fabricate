@@ -1342,17 +1342,33 @@
   Scope + specificity are deliberate:
    - Text-entry types only. `checkbox`/`radio`/`range` are real controls (segmented
      toggles, the visibility allow-list) and must keep their native/scoped rendering,
-     so they are excluded. `number` is excluded because the numeric controls that HAVE
-     a considered look — the shared `Stepper` primitive and the `.manager-rule-stepper`
-     pair — own it in their own blocks and a blanket rule would clobber them; `search`
-     is excluded because every search field is a themed `.manager-search` pill.
+     so they are excluded. `number` is excluded because the numeric control that HAS a
+     considered look — the shared `Stepper` primitive — owns it in its own block and a
+     blanket rule would clobber it; `search` is excluded because every search field is a
+     themed `.manager-search` pill.
 
-     This comment used to claim every number input in the manager IS a Stepper. It is
-     not: roughly twenty bare `type="number"` fields across the checks, gathering and
-     economy editors still render Foundry's chrome AND the native spinner. They are not
-     swept up here, because hiding a spinner on a field with no −/+ adjuncts would take
-     away its only pointer-driven stepping — the fix is to migrate them onto `Stepper`,
-     which is tracked separately.
+     As of issue 1050 the `number` carve-out is nearly total: every editable numeric field
+     in the manager and the interactable/component editors is a `Stepper`, and the
+     `.manager-rule-stepper` pair this comment used to name alongside it is gone, folded
+     onto the primitive. Exactly TWO bare `type="number"` fields remain in `src/ui/svelte`,
+     both deliberate and both recorded in the non-reuse register:
+
+       R1  `components/ChanceSlider.svelte` — keeps its bare input because its sibling
+           `type="range"` track already gives a pointer a way to step the value, and its
+           own `handleNumberKeydown` keeps the keyboard one. Its spinner IS suppressed,
+           by the scoped rule at `.manager-drop-rate-percent`.
+       R2  `apps/manager/SystemEditView.svelte`'s currency sub-unit amount — a bare field
+           inside a bordered `.manager-availability-pill.is-currency` chip, which is not a
+           form row and cannot hold a Stepper without widening every wrapping chip. It
+           KEEPS its native spinner.
+
+     The rule that governs both, and the acceptance criterion for the whole migration: a
+     numeric field's native spinner is suppressed IF AND ONLY IF the field carries another
+     pointer-driven stepping affordance — the Stepper's −/+ adjuncts, or a sibling range
+     track in the same control. A field with neither keeps its spinner, because the arrows
+     are then its ONLY pointer path to the value. That is why R2's spinner stays and why no
+     blanket `input[type="number"]` suppression may be added here;
+     `tests/components/stepper-spinner.test.js` fails one that is.
    - Declared HERE, early, at `.fabricate-manager <element>[type]` (0,2,1) — enough to
      beat Foundry core, low enough that any later per-control class rule overrides it
      by source order. So the search pill, the steppers, etc. all still win.
@@ -2041,27 +2057,34 @@
   min-width: 0;
 }
 
+/* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050.
+   That is the shared `Stepper`'s own natural width — 54px of fixed chrome (two 22px
+   adjuncts, 2x2px gap, 2x2px padding, 2x1px border) plus its 48px input. The `fill`
+   variant carries `min-width: 0`, so there is no compression cliff below it; 102px is the
+   DESIGN minimum, the width at which the typeable field is as wide as an unfilled stepper,
+   not a hard limit. If a rendered frame overflows, narrow the fixed Start/End pair first —
+   they are the least-used columns. */
 .fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: minmax(140px, 1fr) 84px 104px 124px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 104px 124px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
+  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 124px 40px;
 }
 
 /* checkDriven authority drops the per-outcome break-tools column (tool breakage is
    authored via the CheckBreakage editor instead). */
 .fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
-  grid-template-columns: minmax(140px, 1fr) 84px 104px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 104px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
-  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 40px;
+  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 40px;
 }
 
 /* Simple-check recipe tiers: Name + DC + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-tier {
-  grid-template-columns: minmax(140px, 1fr) 96px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 40px;
 }
 
 /* Unified per-check trigger editor (issue 419 recombine). Each trigger is a
@@ -2308,7 +2331,13 @@
   border-color: var(--fab-mv2-danger);
 }
 
-.fabricate-manager .manager-checks-outcome-row input {
+/* `:not(.fab-stepper-input)` — same collision, same reason as the `.manager-field` rule at
+   :7854, on the outcome rows the checks editors build by hand. This rule is
+   `.fabricate-manager .manager-checks-outcome-row input` at (0,3,0), which out-specifies the
+   Stepper's own scoped `.fab-stepper-input` chrome, so a migrated DC / Start / End field
+   would be re-bordered and stretched to a 36px box INSIDE the stepper's own bordered box.
+   The stepper takes the row's 36px on its WRAPPER instead, via the `fill` variant. */
+.fabricate-manager .manager-checks-outcome-row input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
   height: 36px;
@@ -12215,6 +12244,39 @@
   text-align: center;
 }
 
+/*
+  NO native spinner on the ChanceSlider's number half (issue 1050, register entry R1).
+
+  This is the one field in the tree that earns spinner suppression WITHOUT the shared
+  `Stepper`'s −/+ adjuncts, and the reason is the sibling it ships with: the same control
+  renders a `type="range"` track bound to the same value, so a pointer already has a
+  stepping affordance here. The drawn arrows would be a THIRD path to one number. That is
+  the same `iff` the rest of this change applies — a spinner is suppressed only where
+  another pointer-driven stepping affordance exists — reached by a different affordance.
+
+  Keyboard stepping is NOT lost, which is what separates this from the regression the spinner
+  fix (issue 1036) refused to ship: `handleNumberKeydown` handles Up/Down itself (the component
+  intercepts them to commit through its own clamp), so removing the drawn buttons removes
+  drawn buttons only. `SystemEditView`'s currency sub-unit amount (register entry R2) is the
+  contrasting case and deliberately KEEPS its spinner: it is a bare field in a chip with no
+  range track and no adjuncts, so the arrows are its only pointer path.
+
+  Scoped to `.manager-drop-rate-percent` — the wrapper ChanceSlider puts around its number
+  input — rather than to `input[type="number"]`, so it cannot reach R2 or any future bare
+  field. `tests/components/stepper-spinner.test.js` asserts exactly that: a spinner rule
+  whose selector names no specific control fails the gate.
+
+  It also sits directly under the geometry rule above because the `%` affix is absolutely
+  positioned at `right: 6px` over the padding this reserves; the spinner used to draw
+  underneath it.
+*/
+.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
+.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
@@ -13191,11 +13253,18 @@
   font-weight: 400;
 }
 
-.fabricate-manager .manager-rule-field select,
-.fabricate-manager .manager-rule-stepper input {
+/* The `<select>` alone. This was a two-selector rule that also painted
+   `.manager-rule-stepper input` — the reward/event limit fields, which were a hand-rolled
+   −/+ pair around a bare `type="number"`. They are the shared `Stepper` now (issue 1050),
+   which brings its own borderless chrome and takes the 36px on its WRAPPER via `fill`, so
+   the input half of this rule would have re-bordered and re-sized a control INSIDE the
+   stepper's own bordered box. The `padding` that used to sit in its own follow-up rule is
+   folded in here rather than left as a duplicate selector. */
+.fabricate-manager .manager-rule-field select {
   width: 100%;
   min-width: 0;
   height: 36px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -13203,35 +13272,28 @@
   font-weight: 400;
 }
 
-.fabricate-manager .manager-rule-field select {
-  padding: 0 var(--fab-space-2);
-}
+/* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a
+   SIBLING of its `.manager-rule-row` inside the flex `.manager-rules-stack`, not a child of
+   it, so `padding-left` is what lines it up under the description column: the row's icon
+   track is 34px plus its 8px gap. (The old rule also carried `grid-column: 2`, which never
+   did anything here — the parent is flex — and a `34px minmax(0, 1fr) 34px` template for
+   the three hand-rolled children that no longer exist.)
 
+   `max-width` is the other half of the placement, and it is not cosmetic. This block gave
+   the field no width at all, so the filled stepper inside it resolved `width: 100%` against
+   the whole rules stack and rendered a limit field several hundred pixels wide with its −
+   and + an inch apart. Dropping `fill` would NOT have fixed that on the sibling cases in
+   `.manager-field` — an unfilled `.fab-stepper` is a flex item with `width: auto`, so
+   `align-items: stretch` widens it to exactly the same box, just 8px shorter and with a
+   48px input marooned in the middle of it — so the cap is applied here too, for one
+   remedy across all four sites. 160px is the pinned operand slot's width (:2150), which is
+   what the `fill` variant was measured against; it leaves a 106px typeable field, wider
+   than the 48px an unfilled stepper offers. Capping a SIZE from the layout context is
+   permitted; restyling the primitive's font, border, radius or fill is not. */
 .fabricate-manager .manager-rule-stepper {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
-  gap: var(--fab-space-chip);
   padding-left: 42px;
   min-width: 0;
-}
-
-.fabricate-manager .manager-rule-stepper input {
-  padding: 0 var(--fab-space-2);
-  text-align: center;
-  appearance: textfield;
-}
-
-/* NO native spinner: this stepper is flanked by its own −/+ `manager-icon-button`s, and the
-   browser's Up/Down handling still steps the value, so the drawn arrows duplicate both and
-   crowd a centred field. The input stays `type="number"` so those keystrokes survive.
-   Matches the shared `Stepper` primitive (`components/Stepper.svelte`), which this control
-   predates; migrating it onto that primitive is tracked separately. */
-.fabricate-manager .manager-rule-stepper input::-webkit-outer-spin-button,
-.fabricate-manager .manager-rule-stepper input::-webkit-inner-spin-button {
-  appearance: none;
-  -webkit-appearance: none;
-  margin: 0;
+  max-width: 160px;
 }
 
 /* Recipe Visibility card: List mode and Knowledge-based are inline subheading
@@ -14300,7 +14362,13 @@
   color: var(--fab-mv2-accent);
 }
 
+/* `align-items: end` bottom-aligns the two fields, so the migrated Break-below stepper
+   has to stand exactly as tall as the sibling Formula text input (34px, see the
+   `.manager-recipe-field input` rule below) or the pair reads as two control heights.
+   Taking a SIZE from the layout context is what `--fab-stepper-fill-height` is for. */
 .fabricate-manager .manager-tool-inline-fields {
+  --fab-stepper-fill-height: 34px;
+
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fab-space-3);
@@ -14766,8 +14834,15 @@
   line-height: 1.4;
 }
 
-.fabricate-manager .manager-tool-breakage-method > .manager-recipe-field input,
-.fabricate-manager .manager-tool-inline-fields .manager-recipe-field input {
+/* `:not(.fab-stepper-input)` on BOTH selectors — same collision, same reason as :7854. At
+   (0,3,1) this out-specifies the Stepper's own scoped chrome, so the tool breakage threshold
+   would be re-bordered and stretched to 34px inside the stepper's own bordered box. The
+   guard has to go on each selector in the list rather than on the list: the OTHER selector
+   still carries the sibling formula TEXT input, which is not a stepper and must keep this
+   rule. Note that dropping the `manager-recipe-name-input` class does not help here — the
+   rule keys on `.manager-recipe-field input`, not on that class. */
+.fabricate-manager .manager-tool-breakage-method > .manager-recipe-field input:not(.fab-stepper-input),
+.fabricate-manager .manager-tool-inline-fields .manager-recipe-field input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -15285,6 +15360,20 @@
 .fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target {
   border-color: var(--fab-accent);
   color: var(--fab-mv2-accent);
+}
+
+/* The custom salvage DC is the only numeric control in this block; its siblings are a
+   full-width preset `<select>` and a manage-presets button, so the cap goes on the stepper
+   rather than on the `.manager-field` around it (issue 1050).
+
+   A cap, not a dropped `fill`. `.manager-field` is `display: flex; flex-direction: column`,
+   so an unfilled `.fab-stepper` — a flex item with `width: auto` — is widened to exactly
+   the same box by `align-items: stretch` (measured at 600/600px), just 8px shorter and with
+   a 48px input marooned inside a stretched border. 160px is the width the `fill` variant was
+   measured against and leaves a 106px typeable field. Taking a SIZE from the layout context
+   is permitted; restyling the primitive's font, border, radius or fill is not. */
+.fabricate-manager [data-salvage-dc-override] .fab-stepper {
+  max-width: 160px;
 }
 
 /* The salvage panel's heading IS its control row (issue 676): mode pill · divider ·
@@ -16693,8 +16782,11 @@
   --fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;
 }
 
+/* The weight track is 158px, not 112px: it holds a Stepper (102px — 54px of chrome
+   around its 48px input) plus the 6px chip gap plus the ~50px selection-share readout.
+   At 112px the readout wrapped and the control overflowed its track. */
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;
+  --fab-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;
 }
 
 .fabricate-manager .manager-environment-comp-band {
@@ -16884,8 +16976,16 @@
   min-width: 0;
 }
 
+/* The weight cell holds a FILLED Stepper, so the slot is pinned here rather than on the
+   control: `fill` makes the stepper `width: 100%` of this item, and an `auto` basis would
+   collapse it to its 54px of chrome (its input is `flex: 1 1 0; min-width: 0`). 102px is
+   the primitive's natural width. `--fab-stepper-fill-height` keeps the row at the 28px
+   the bare input had instead of the 36px default — taking a SIZE from the layout context
+   is allowed, unlike restyling the primitive's border, background or type. */
 .fabricate-manager .manager-environment-comp-weight-field {
-  flex: 0 0 auto;
+  --fab-stepper-fill-height: 28px;
+
+  flex: 0 0 102px;
   margin: 0;
 }
 
@@ -16894,16 +16994,9 @@
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-environment-comp-weight-field input {
-  width: 42px;
-  height: 28px;
-  padding: var(--fab-space-2xs) var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 4px;
-  background: var(--fab-mv2-surface-1);
-  color: var(--fab-mv2-text);
-  font: inherit;
-}
+/* The bare-input box treatment that used to live here is deleted, not guarded: the
+   weight field is a Stepper now, which brings its own chrome, and a `.fab-stepper-input`
+   left inside this rule would be re-bordered and re-sized inside the stepper's own box. */
 
 .fabricate-manager .manager-environment-comp-weight-percent {
   min-width: 0;
@@ -17404,8 +17497,11 @@
     --fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;
   }
 
+  /* The weight track does NOT narrow with the container: 102px is the stepper's natural
+     width and the selection-share readout still has to fit beside it. Only the name
+     column gives, which is what `minmax(0, 1fr)` on track 1 is there for. */
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 100px 64px 110px 72px;
+    --fab-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;
   }
 
 }

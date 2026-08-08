@@ -384,6 +384,14 @@ function compileManagerRoot() {
   // categories, component categories, item tags — issue 676).
   writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyPanel.svelte');
   for (const environmentComponent of [
+    // The character-modifier Min / Max pair, extracted out of the root (issue 1050) because
+    // the drop scope and the event scope shipped the same markup twice. The ROOT imports it
+    // statically, so it is in this tree's module graph whichever view is showing, and an
+    // omission HANGS every mounted manager test as `# cancelled` rather than failing one.
+    'CharacterModifierBoundsRow',
+    // The reward / event limit count under a `limitedDrops` rule row (issue 1050). The root
+    // imports it statically, so an omission HANGS this suite as `# cancelled`.
+    'GatheringRuleLimitStepper',
     'EnvironmentEditorTabs',
     'EnvironmentOverviewTab',
     'EnvironmentTasksTab',
@@ -465,6 +473,12 @@ function compileManagerRoot() {
   // single low-layer source of truth), so copy that module and its transitive
   // model/util/config dependencies verbatim.
   for (const rawPath of [
+    // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
+    // (issue 1050). It sits beside the primitive under `components/` rather than in the
+    // `util/` loop above, and every migrated call site in this tree imports it — the
+    // character-modifier bounds row, the check editors, the task editor, the economy view.
+    // This suite has NO dependency validator, so omitting it HANGS it as `# cancelled`.
+    'src/ui/svelte/components/stepperLabels.js',
     'src/models/Recipe.js',
     'src/models/Ingredient.js',
     'src/models/IngredientSet.js',

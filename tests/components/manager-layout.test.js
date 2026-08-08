@@ -1433,9 +1433,10 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
   const ruleCopyBlock = blockFor('.fabricate-manager .manager-rule-copy');
   const ruleCopyDescriptionBlock = blockFor('.fabricate-manager .manager-rule-copy span');
   const ruleFieldBlock = blockFor('.fabricate-manager .manager-rule-field');
-  const ruleInputBlock = blockFor(
-    '.fabricate-manager .manager-rule-field select,\n.fabricate-manager .manager-rule-stepper input'
-  );
+  // Was a two-selector rule that also painted `.manager-rule-stepper input`. That field is
+  // the shared `Stepper` now (issue 1050) and brings its own chrome, so the rule is the
+  // `<select>` alone.
+  const ruleInputBlock = blockFor('.fabricate-manager .manager-rule-field select');
 
   assert.ok(
     ruleRowBlock.includes('grid-template-columns: 34px minmax(0, 1fr);'),
@@ -3767,9 +3768,7 @@ test('manager environments browser and edit route define compact responsive geom
   const editorViewBlock = blockFor('.fabricate-manager .manager-environment-edit-view');
   const detailsGridBlock = blockFor('.fabricate-manager .manager-environment-details-grid');
   const workspaceBlock = blockFor('.fabricate-manager .manager-environment-workspace');
-  const weightInputBlock = blockFor(
-    '.fabricate-manager .manager-environment-comp-weight-field input'
-  );
+  const weightFieldBlock = blockFor('.fabricate-manager .manager-environment-comp-weight-field');
   const compMenuBlock = blockFor('.fabricate-manager .manager-environment-comp-menu');
   const compMenuButtonBlock = blockFor('.fabricate-manager .manager-environment-comp-menu button');
   const compMenuIconBlock = blockFor(
@@ -3909,8 +3908,8 @@ test('manager environments browser and edit route define compact responsive geom
   assert.ok(
     css.includes(
       '.manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]'
-    ) && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;'),
-    'blind-mode tasks add a compact Weight column for the input and calculated percentage'
+    ) && css.includes('--fab-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;'),
+    'blind-mode tasks reserve a Weight column wide enough for the stepper and its calculated percentage'
   );
   assert.ok(
     environmentCompContainerQuery.includes(
@@ -3921,10 +3920,24 @@ test('manager environments browser and edit route define compact responsive geom
       ),
     'narrow task rows key off manager container width and keep enough action-column width for quick action plus menu buttons'
   );
+  // The NARROW blind row, pinned nowhere before the weight field became a Stepper. The
+  // weight track must NOT shrink with the container — 102px is the primitive's natural
+  // width and the selection-share readout still sits beside it — so only the name column
+  // gives. Without this pin the container-query branch could drift back to a width the
+  // control overflows, on exactly the 880/900px View Lab cases that render it.
   assert.ok(
-    weightInputBlock.includes('width: 42px;') &&
-      weightInputBlock.includes('padding: var(--fab-space-2xs) var(--fab-space-1);'),
-    'blind task weight input should be visually sized for three characters'
+    environmentCompContainerQuery.includes(
+      '.fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"]'
+    ) &&
+      environmentCompContainerQuery.includes(
+        '--fab-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;'
+      ),
+    'narrow blind task rows keep the full-width Weight column so the stepper never overflows it'
+  );
+  assert.ok(
+    weightFieldBlock.includes('flex: 0 0 102px;') &&
+      weightFieldBlock.includes('--fab-stepper-fill-height: 28px;'),
+    'the blind task weight slot pins the stepper to its natural width and to the row height the bare input had'
   );
   assert.ok(
     compQuickActionBlock.includes('flex: 0 0 34px;'),

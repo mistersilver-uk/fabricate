@@ -177,6 +177,40 @@ It renders the same DOM as the labelled variant and differs only in CSS: the seg
 The variant additionally titles each tile with that same label, which is the pointer equivalent of the name the clipped text already gives assistive technology; the labelled variant adds no such tooltip, since it would only repeat words already on screen.
 Because the markup is unchanged, a per-option test or capture hook still resolves to the enclosing `<label>` in both variants — the click target a screenshot step depends on.
 
+#### Numeric entry
+
+Every editable numeric field in the manager and in the interactable and component editors renders through one shared stepper primitive — a typeable `type="number"` input with `−`/`+` adjuncts, a clamp, and no native spinner — EXCEPT the documented non-conformances recorded below.
+The exception clause is not optional decoration: two such fields exist today, so a rule stated absolutely would be falsified the moment it was written.
+The Recipe Studio duration-unit requirement is an INSTANCE of this rule rather than a local exception of its own.
+A bare `type="number"` with no adjuncts is a second numeric-entry design and is not an acceptable rendering: it inherits Foundry's host chrome, offers the browser's drawn arrows as its only pointer affordance, and shares neither the clamp nor the commit path.
+
+The primitive is the point of arrival, so a hand-rolled `−`/`+` pair around a bare input does not satisfy this either, however closely it copies the shape.
+A caller passes hooks and attributes through the primitive's attribute spread and behaviour through its change callback; a `disabled` state is the primitive's own top-level concern, because the adjuncts read it and a spread-only disable would leave them live on a control the caller believes is off.
+
+**Unset numeric values.**
+A numeric field whose domain admits "unset" — a DC override that inherits the system value, an unbounded modifier bound, an absent task node count, an absent max override — renders BLANK rather than zero, persists absence rather than `0`, and still offers its `−`/`+` adjuncts, which step from the field's lower bound.
+Neither adjunct is disabled while the field is unset, because nothing is at a bound when there is no value.
+A field whose blank rendering is merely cosmetic for zero is NOT such a field: `0` is its real persisted value, so it shows `0`.
+The distinction is a domain fact and is decided per field from what the model stores, never from how the old control happened to look.
+
+**Native spinner suppression.**
+A numeric field's native spinner is suppressed IF AND ONLY IF the field carries another pointer-driven stepping affordance — the stepper's `−`/`+` adjuncts, or a sibling range track in the same control bound to the same value.
+A field with neither keeps its spinner, because the arrows are then the ONLY pointer path to its value and hiding them would leave the field keyboard-only.
+Suppression is therefore never expressed as a blanket `input[type="number"]` rule: every suppression names the specific control it applies to.
+
+Two live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+
+- `src/ui/svelte/components/ChanceSlider.svelte` keeps a bare number input paired with its range track, and is a non-conformance to the FIRST rule only.
+  Its range track is already a pointer-driven stepping affordance for the same value, so adding adjuncts would make three pointer paths to one number, and its `%` affix is absolutely positioned exactly where the `+` adjunct would land.
+  It therefore keeps its own keydown handler, which is what preserves keyboard stepping there, and its spinner IS suppressed by a rule scoped to that control — the `iff` above reached through the range track rather than through adjuncts.
+- `src/ui/svelte/apps/manager/SystemEditView.svelte`'s currency sub-unit amount keeps a bare number input AND its native spinner.
+  It sits inside a bordered, filled currency chip with its own minimum height, and a bordered filled stepper inside a bordered filled chip widens every wrapping chip; a chip is not a form row.
+  Keeping its spinner is the correct `iff` outcome rather than a lapse, since it has no other pointer affordance at all.
+
+One known limitation is recorded with them.
+An interactable's own node-pool `max` cannot express absence today, because `src/systems/gatheringNodeConfig.js` normalizes it to `0` on every write.
+That field therefore renders `0` rather than blank and is treated as cosmetic-zero; making it genuinely nullable is a behaviour change to the node config, not a control substitution, and is out of scope for a control-substitution refactor.
+
 ## Responsive Product UI
 
 Foundry ApplicationV2 windows can be resized independently of the browser viewport.
@@ -439,7 +473,11 @@ Each trigger pairs an expressive dice-matching condition with three effects (iss
 - **The tier-step effect gets its OWN row inside the trigger card**, below the outcome/break row rather than as a third field in it: at the pinned 1280x820 manager geometry the outcome control and the break pill already spend most of the trigger card's width, and a four-segment control plus an operand does not fit what is left.
   The row renders on **routed** check editors only (there are no tiers to step on a simple or progressive check) and is explicitly **not** gated on tool-breakage authority the way the break pill is — stepping is not a breakage concept.
   This is a control that routed **gathering** checks and **fixed**-type routed checks have never had: the retired toggle was relative crafting/salvage only, so those screens gain an effect they previously could not author at all.
-- The row carries a four-segment `SegmentedControl` (No step / Step up / Step down / Target tier) and a **stable operand slot** at one pinned width whose contents swap by mode — a `min="1"` number input for `up`/`down`, a tier `<select>` for `target`, and an inert disabled placeholder for `none` — so changing mode never moves the control out from under the GM's pointer in a wrapping row.
+- The row carries a four-segment `SegmentedControl` (No step / Step up / Step down / Target tier) and a **stable operand slot** at one pinned width whose contents swap by mode — a shared stepper clamped at a minimum of 1 for `up`/`down`, a tier `<select>` for `target`, and an inert disabled placeholder for `none` — so changing mode never moves the control out from under the GM's pointer in a wrapping row.
+  The stepper FILLS the pinned slot rather than sizing to its own content, and that direction is the requirement: the 160px pin and the no-movement guarantee are unchanged, so the primitive is made to fill the existing slot rather than the slot being re-measured to the primitive.
+  The guarantee that holds across a mode swap is POSITION and BOX SIZE: each mode renders one box of the same width and height in the same place, so nothing under the GM's pointer moves and no row rewraps.
+  It is deliberately not a claim about the operand's whole appearance — the stepper keeps its own 8px radius and soft surface fill where the `<select>` and the inert placeholder render at 6px on the manager's field background, because a layout-context rule may take a SIZE from its slot but must not restyle the primitive's border, radius or fill (see line 88).
+  A stepper sized to its content would break the size half outright, standing as a narrower and shorter island beside a `<select>` and a placeholder that both still render at the pinned width.
   Every rendered `SegmentedControl` takes a radio `name` unique per CONTROL, not per trigger: a trigger card renders two of them, and a shared group name would make choosing a tier-step mode uncheck the outcome radio.
 - **The `target` select never displays a tier it has not persisted.**
   `tierId` defaults to `null` and a `<select>` whose value matches no option renders its FIRST option as selected, so the select carries a disabled placeholder option ("Choose a tier…") selected while `tierId` is `null`, and renders a dangling id as an appended disabled "Missing tier" option plus an invalid-field treatment on the operand slot.

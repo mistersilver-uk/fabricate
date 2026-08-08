@@ -1,10 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../util/foundryBridge.js';
-  import {
-    adjustComponentEssenceQuantity,
-    clampComponentEssenceQuantity,
-  } from '../util/componentEditor.js';
+  import { clampComponentEssenceQuantity } from '../util/componentEditor.js';
+  // The shared numeric stepper (issue 1050). This card used to hand-roll the −/+ pair
+  // around a bare `type="number"`, which duplicated the primitive's shape without its
+  // clamp, its commit path or its spinner suppression. It takes the INLINE default
+  // rather than `fill`: the card is an `auto auto 1fr` grid with no sized slot for the
+  // control to fill.
+  import Stepper from '../components/Stepper.svelte';
   // The add-new offer projection (issue 1036). This standalone window reaches the SAME
   // whitelist rebuild the in-manager editor does — `handleSave` hands `essenceDraft`
   // straight to `buildComponentEditorUpdates` — so the draft stays whole and only the
@@ -64,12 +67,6 @@
     if (option) option.quantity = quantity;
   }
 
-  function adjustEssenceQuantity(essenceId, delta) {
-    const option = essenceDraft.find((entry) => entry.id === essenceId);
-    if (!option) return;
-    option.quantity = adjustComponentEssenceQuantity(option.quantity, delta);
-  }
-
   async function handleSave() {
     if (saving || !editorState.hasEditableFields) return;
     saving = true;
@@ -120,30 +117,19 @@
           <div class="essence-grid">
             {#each offeredEssences as option (option.id)}
               <article class="essence-card">
-                <button
-                  type="button"
-                  class="essence-step essence-step-minus"
-                  onclick={() => adjustEssenceQuantity(option.id, -1)}
-                  aria-label={localize('FABRICATE.Admin.Items.Editor.DecrementEssence', {
-                    name: option.name,
-                  })}
-                  title={localize('FABRICATE.Admin.Items.Editor.DecrementEssence', {
-                    name: option.name,
-                  })}
-                >
-                  <i class="fas fa-minus"></i>
-                </button>
-
-                <input
-                  class="essence-quantity-input"
-                  type="number"
-                  min="0"
-                  step="1"
+                <Stepper
                   value={option.quantity}
-                  aria-label={localize('FABRICATE.Admin.Items.Editor.QuantityLabel', {
+                  min={0}
+                  ariaLabel={localize('FABRICATE.Admin.Items.Editor.QuantityLabel', {
                     name: option.name,
                   })}
-                  oninput={(event) => setEssenceQuantity(option.id, event.currentTarget.value)}
+                  decrementLabel={localize('FABRICATE.Admin.Items.Editor.DecrementEssence', {
+                    name: option.name,
+                  })}
+                  incrementLabel={localize('FABRICATE.Admin.Items.Editor.IncrementEssence', {
+                    name: option.name,
+                  })}
+                  onChange={(next) => setEssenceQuantity(option.id, next)}
                 />
 
                 <div class="essence-icon" aria-hidden="true">
@@ -151,20 +137,6 @@
                 </div>
 
                 <strong class="essence-name">{option.name}</strong>
-
-                <button
-                  type="button"
-                  class="essence-step essence-step-plus"
-                  onclick={() => adjustEssenceQuantity(option.id, 1)}
-                  aria-label={localize('FABRICATE.Admin.Items.Editor.IncrementEssence', {
-                    name: option.name,
-                  })}
-                  title={localize('FABRICATE.Admin.Items.Editor.IncrementEssence', {
-                    name: option.name,
-                  })}
-                >
-                  <i class="fas fa-plus"></i>
-                </button>
               </article>
             {/each}
           </div>
@@ -265,9 +237,13 @@
     gap: 8px;
   }
 
+  /* Three tracks, not five. The card once ran [−][qty][icon][name][+] and put the
+     control before the thing it counted with its `+` stranded on the trailing edge;
+     folding the pair onto the shared `Stepper` collapses −/qty/+ into one island and
+     the grid to [stepper][icon][name]. */
   .essence-card {
     display: grid;
-    grid-template-columns: auto auto auto 1fr auto;
+    grid-template-columns: auto auto 1fr;
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
@@ -298,49 +274,12 @@
     font-size: 0.88rem;
   }
 
-  .essence-quantity-input {
-    width: 44px;
-    min-width: 44px;
-    height: 28px;
-    text-align: center;
-    padding: 0 4px;
-    appearance: textfield;
-  }
-
-  /* NO native spinner: the −/+ buttons flanking this field and the browser's own Up/Down
-     handling already step it. `margin: 0` alone was here and did not suppress anything —
-     without `appearance: none` the buttons still draw, just flush. The field stays
-     `type="number"` so Up/Down keep working. */
-  .essence-quantity-input::-webkit-outer-spin-button,
-  .essence-quantity-input::-webkit-inner-spin-button {
-    appearance: none;
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  .essence-step {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
-    border: 1px solid var(--fab-border-strong);
-    background: var(--fab-overlay-dark-04, var(--fab-overlay-dark-05));
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    color: inherit;
-  }
-
-  .essence-step i {
-    font-size: 9px;
-    opacity: 0.85;
-  }
-
-  .essence-step:hover,
-  .essence-step:focus-visible {
-    border-color: var(--color-text-accent, var(--fab-text-subtle));
-    background: var(--fab-overlay-dark-08);
-  }
+  /* `.essence-quantity-input`, its half-finished `::-webkit-*-spin-button` suppression and
+     the `.essence-step` button treatment are GONE with the hand-rolled pair. They are
+     deleted rather than left behind because Svelte does not extend a parent's scope class
+     to a child component's internals: a selector kept here would match nothing AND emit
+     `Unused CSS selector`, which fails the compiler-warning gate. The stepper's chrome,
+     including the spinner suppression, is the primitive's own. */
 
   .component-editor-footer {
     display: flex;

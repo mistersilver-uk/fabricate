@@ -62,13 +62,6 @@ export function clampComponentEssenceQuantity(value) {
   return Math.max(0, Math.floor(quantity));
 }
 
-export function adjustComponentEssenceQuantity(current, delta) {
-  const base = clampComponentEssenceQuantity(current);
-  const amount = Number(delta);
-  if (!Number.isFinite(amount)) return base;
-  return Math.max(0, base + Math.trunc(amount));
-}
-
 export function getComponentEditorHintKey({ showTags = false, showEssences = false } = {}) {
   if (showTags && showEssences) return 'FABRICATE.Admin.Items.Editor.HintTagsAndEssences';
   if (showTags) return 'FABRICATE.Admin.Items.Editor.HintTagsOnly';

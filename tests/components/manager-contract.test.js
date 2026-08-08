@@ -103,6 +103,12 @@ const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
+// The reward and event limit counts are one shared component (issue 1050), so the marker the
+// root used to carry twice is emitted there from its `rule` prop.
+const gatheringRuleLimitStepperSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte'),
+  'utf8'
+);
 const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
 // The paginated rows/columns are the shared studio-library shelf now, so the `<ul>` and its
 // `role="list"` are rendered there rather than in each browser view.
@@ -2366,13 +2372,21 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('manager-rule-copy'),
       'root should render rule descriptions beside inspector icons'
     );
+    // The two limits are one shared component now (issue 1050), so the marker they were
+    // asserted through lives there and is driven by the `rule` prop. Both halves are pinned:
+    // the root still renders one of each, and the component still emits the marker from the
+    // prop — so a root that stopped rendering a limit, or a component that stopped marking
+    // it, fails here rather than one covering for the other.
+    for (const rule of ['rewardLimit', 'eventLimit']) {
+      assert.match(
+        rootSource,
+        new RegExp(String.raw`<GatheringRuleLimitStepper\s+rule="${rule}"`),
+        `root should render the ${rule} stepper`
+      );
+    }
     assert.ok(
-      rootSource.includes('data-gathering-rule-stepper="rewardLimit"'),
-      'root should render the reward limit stepper'
-    );
-    assert.ok(
-      rootSource.includes('data-gathering-rule-stepper="eventLimit"'),
-      'root should render the event limit stepper'
+      gatheringRuleLimitStepperSource.includes('data-gathering-rule-stepper={rule}'),
+      'the shared limit stepper marks itself with the rules field it edits'
     );
     assert.ok(
       rootSource.includes('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop'),
