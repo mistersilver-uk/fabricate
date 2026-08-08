@@ -582,7 +582,11 @@
                      spec, "a stable operand slot at one pinned width"): the slot stays
                      pinned at 160px and the primitive stretches into it, so swapping mode
                      between this stepper, the tier `<select>` and the inert placeholder
-                     changes neither width, height, border nor fill.
+                     leaves the control's POSITION and BOX SIZE unchanged — which is the
+                     guarantee the spec actually makes, and all the no-movement rule needs.
+                     Radius and fill still differ (the stepper paints 8px /
+                     `--fab-surface-soft`, a `.manager-field` control 6px / `--fab-mv2-bg`);
+                     claiming otherwise was an overclaim corrected alongside the spec text.
                      `data-trigger-tier-step-steps` rides `inputProps` onto the real
                      `<input>` — the smoke harness calls Playwright's `fill()` and
                      `inputValue()` on it, and neither resolves against a wrapper `<div>`.
