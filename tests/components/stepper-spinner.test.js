@@ -30,7 +30,6 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
 const stepperSource = read('src/ui/svelte/components/Stepper.svelte');
-const componentEditorSource = read('src/ui/svelte/apps/ComponentEditorRoot.svelte');
 const globalCss = read('styles/fabricate.css');
 
 /**
@@ -98,27 +97,11 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     );
   });
 
-  it('completes the half-finished suppression on the component editor quantity field', () => {
-    const spinner = ruleBody(
-      componentEditorSource,
-      String.raw`\.essence-quantity-input::-webkit-inner-spin-button`
-    );
-    assert.match(spinner, /appearance: none;/);
-    assert.match(spinner, /-webkit-appearance: none;/);
-    assert.match(
-      ruleBody(componentEditorSource, String.raw`\.essence-quantity-input`),
-      /appearance: textfield;/
-    );
-  });
-
-  it('suppresses the spinner on the gathering rule steppers', () => {
-    const spinner = ruleBody(
-      globalCss,
-      String.raw`\.fabricate-manager \.manager-rule-stepper input::-webkit-inner-spin-button`
-    );
-    assert.match(spinner, /appearance: none;/);
-    assert.match(spinner, /-webkit-appearance: none;/);
-  });
+  // The component editor's essence quantity field and the two gathering rule limit fields
+  // each had their own copy of this suppression, because each hand-rolled its own −/+ pair
+  // around a bare `type="number"`. Issue 1050 folded all three onto the shared `Stepper`,
+  // so the declarations they pinned are GONE — the primitive's own rule above is the single
+  // remaining one, and a per-surface assertion here would now only re-pin dead CSS.
 
   it('does not blanket-suppress spinners on bare number fields', () => {
     // The ~20 bare `type="number"` fields across the checks, gathering and economy editors

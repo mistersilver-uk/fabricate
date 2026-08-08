@@ -27,7 +27,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/componentEditor.js',
     'src/utils/essenceValidation.js',
   ],
-  compiledModules: ['src/ui/svelte/apps/ComponentEditorRoot.svelte'],
+  // The essence quantity control is the shared `Stepper` (issue 1050). Omitting it here
+  // does not fail this suite — it HANGS it, reported as `# cancelled`.
+  compiledModules: [
+    'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/apps/ComponentEditorRoot.svelte',
+  ],
   componentPath: 'src/ui/svelte/apps/ComponentEditorRoot.svelte',
 });
 
@@ -101,7 +106,7 @@ describe('1036 ComponentEditorRoot — the add-new essence offer', () => {
       onSave: (payload) => saved.push(payload),
     });
 
-    const earthInput = [...target.querySelectorAll('.essence-quantity-input')].at(
+    const earthInput = [...target.querySelectorAll('.fab-stepper-input')].at(
       essenceNames(target).indexOf('Earth')
     );
     earthInput.value = '2';

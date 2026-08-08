@@ -24,6 +24,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { findRangeConflicts } from '../../../../../utils/craftingCheckExpression.js';
   import RadioCardGroup from '../RadioCardGroup.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
@@ -104,6 +105,15 @@
   // place a GM reviews per-check issues.
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
+  // The three numeric column labels, hoisted because each is now needed THREE times: its
+  // header cell, its stepper's accessible name, and the `{label}` slot in the shared
+  // `Decrease {label}` / `Increase {label}` adjunct strings.
+  const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±'));
+  const startLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')
+  );
+  const endLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End'));
+
   const successOnLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccessOn', 'Success')
   );
@@ -149,12 +159,6 @@
       next = { ...base, dc: 0 };
     }
     emit({ [outcomesKey]: [...outcomes, next] });
-  }
-
-  function numeric(rawValue) {
-    if (rawValue === '' || rawValue === '-') return 0;
-    const parsed = Number(rawValue);
-    return Number.isNaN(parsed) ? 0 : parsed;
   }
 
   function rowInvalid(index) {
@@ -241,16 +245,10 @@
             >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeName', 'Name')}</span
           >
           {#if type === 'relative'}
-            <span role="columnheader"
-              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}</span
-            >
+            <span role="columnheader">{dcLabel}</span>
           {:else}
-            <span role="columnheader"
-              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}</span
-            >
-            <span role="columnheader"
-              >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}</span
-            >
+            <span role="columnheader">{startLabel}</span>
+            <span role="columnheader">{endLabel}</span>
           {/if}
           <span role="columnheader"
             >{text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeColumn', 'Outcome')}</span
@@ -280,31 +278,46 @@
               oninput={(event) => updateOutcome(outcome.id, { name: event.currentTarget.value })}
             />
 
+            <!-- `fill` rather than the inline default: these are pinned 102px subgrid
+                 tracks beside a 36px name field, and an inline-flex island would leave the
+                 numeric columns a different height and width from every sibling on the row.
+                 `allowUnset` is deliberately absent — a tier threshold has no "unset"
+                 meaning, so 0 is the real value and is shown as 0.
+                 Every `data-*` hook goes through `inputProps` so it lands on the real
+                 `<input>`: on the wrapper it would resolve to a `<div>` and break both the
+                 mounted `.value` reads and Playwright's `fill()` / `inputValue()`. -->
             {#if type === 'relative'}
-              <input
-                type="number"
-                data-outcome-dc
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±')}
+              <Stepper
+                fill
                 value={outcome.dc ?? 0}
-                oninput={(event) =>
-                  updateOutcome(outcome.id, { dc: numeric(event.currentTarget.value) })}
+                ariaLabel={dcLabel}
+                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: dcLabel })}
+                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: dcLabel })}
+                inputProps={{ 'data-outcome-dc': '' }}
+                onChange={(dc) => updateOutcome(outcome.id, { dc })}
               />
             {:else}
-              <input
-                type="number"
-                data-outcome-start
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')}
+              <Stepper
+                fill
                 value={outcome.start ?? 0}
-                oninput={(event) =>
-                  updateOutcome(outcome.id, { start: numeric(event.currentTarget.value) })}
+                ariaLabel={startLabel}
+                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', {
+                  label: startLabel,
+                })}
+                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', {
+                  label: startLabel,
+                })}
+                inputProps={{ 'data-outcome-start': '' }}
+                onChange={(start) => updateOutcome(outcome.id, { start })}
               />
-              <input
-                type="number"
-                data-outcome-end
-                aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeEnd', 'End')}
+              <Stepper
+                fill
                 value={outcome.end ?? 0}
-                oninput={(event) =>
-                  updateOutcome(outcome.id, { end: numeric(event.currentTarget.value) })}
+                ariaLabel={endLabel}
+                decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: endLabel })}
+                incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: endLabel })}
+                inputProps={{ 'data-outcome-end': '' }}
+                onChange={(end) => updateOutcome(outcome.id, { end })}
               />
             {/if}
 

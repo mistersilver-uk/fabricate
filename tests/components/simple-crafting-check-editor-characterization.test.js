@@ -47,6 +47,9 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    // The shared numeric stepper the DC, tier-DC and trigger fields are built on
+    // (issue 1050). Omitting it HANGS this suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',

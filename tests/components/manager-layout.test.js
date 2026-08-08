@@ -1433,9 +1433,10 @@ test('manager gathering rules inspector stacks descriptions above normal-weight 
   const ruleCopyBlock = blockFor('.fabricate-manager .manager-rule-copy');
   const ruleCopyDescriptionBlock = blockFor('.fabricate-manager .manager-rule-copy span');
   const ruleFieldBlock = blockFor('.fabricate-manager .manager-rule-field');
-  const ruleInputBlock = blockFor(
-    '.fabricate-manager .manager-rule-field select,\n.fabricate-manager .manager-rule-stepper input'
-  );
+  // Was a two-selector rule that also painted `.manager-rule-stepper input`. That field is
+  // the shared `Stepper` now (issue 1050) and brings its own chrome, so the rule is the
+  // `<select>` alone.
+  const ruleInputBlock = blockFor('.fabricate-manager .manager-rule-field select');
 
   assert.ok(
     ruleRowBlock.includes('grid-template-columns: 34px minmax(0, 1fr);'),

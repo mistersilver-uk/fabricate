@@ -54,6 +54,11 @@
   } from '../../../../utils/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
+  // The shared numeric stepper (issue 1050). The gathering reward/event limit fields were
+  // a hand-rolled −/+ pair around a bare `type="number"` that predated this primitive;
+  // they keep their bespoke aria-label keys and take `fill` so the control still resolves
+  // to the 36px full-width box the `<select>` above it does.
+  import Stepper from '../../components/Stepper.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
   import ComponentEditView from './ComponentEditView.svelte';
@@ -2253,11 +2258,6 @@
   function updateSelectedGatheringCondition(kind, value) {
     if (!selectedSystemId || !kind) return;
     store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
-  }
-
-  function adjustGatheringRuleLimit(field, delta) {
-    const current = Number(selectedGatheringRules?.[field] || 1);
-    updateSelectedGatheringRules({ [field]: Math.max(1, Math.floor(current + delta)) });
   }
 
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
@@ -9030,40 +9030,24 @@
                 </div>
                 {#if selectedGatheringRules.rewardSelectionMode === 'limitedDrops'}
                   <div class="manager-rule-stepper" data-gathering-rule-stepper="rewardLimit">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseRewardLimit',
-                        'Decrease reward limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('rewardLimit', -1)}
-                      ><i class="fas fa-minus" aria-hidden="true"></i></button
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
+                    <Stepper
+                      fill
                       value={selectedGatheringRules.rewardLimit}
-                      aria-label={text(
+                      min={1}
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Rules.RewardLimit',
                         'Reward limit'
                       )}
-                      oninput={(event) =>
-                        updateSelectedGatheringRules({
-                          rewardLimit: Number(event.target.value || 1),
-                        })}
-                    />
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
+                      decrementLabel={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseRewardLimit',
+                        'Decrease reward limit'
+                      )}
+                      incrementLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Rules.IncreaseRewardLimit',
                         'Increase reward limit'
                       )}
-                      onclick={() => adjustGatheringRuleLimit('rewardLimit', 1)}
-                      ><i class="fas fa-plus" aria-hidden="true"></i></button
-                    >
+                      onChange={(rewardLimit) => updateSelectedGatheringRules({ rewardLimit })}
+                    />
                   </div>
                 {/if}
 
@@ -9153,40 +9137,24 @@
                 </div>
                 {#if selectedGatheringRules.eventSelectionMode === 'limitedDrops'}
                   <div class="manager-rule-stepper" data-gathering-rule-stepper="eventLimit">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit',
-                        'Decrease event limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('eventLimit', -1)}
-                      ><i class="fas fa-minus" aria-hidden="true"></i></button
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
+                    <Stepper
+                      fill
                       value={selectedGatheringRules.eventLimit}
-                      aria-label={text(
+                      min={1}
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Rules.EventLimit',
                         'Event limit'
                       )}
-                      oninput={(event) =>
-                        updateSelectedGatheringRules({
-                          eventLimit: Number(event.target.value || 1),
-                        })}
-                    />
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
+                      decrementLabel={text(
+                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit',
+                        'Decrease event limit'
+                      )}
+                      incrementLabel={text(
                         'FABRICATE.Admin.Manager.Environment.Rules.IncreaseEventLimit',
                         'Increase event limit'
                       )}
-                      onclick={() => adjustGatheringRuleLimit('eventLimit', 1)}
-                      ><i class="fas fa-plus" aria-hidden="true"></i></button
-                    >
+                      onChange={(eventLimit) => updateSelectedGatheringRules({ eventLimit })}
+                    />
                   </div>
                 {/if}
 

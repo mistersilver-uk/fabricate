@@ -30,6 +30,9 @@ const harness = createMountedComponentHarness({
     // closure of every declared module, so this entry is required whether or not a
     // given test renders it.
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    // The shared numeric stepper: the condition Value field and the tier-step operand are
+    // both built on it (issue 1050), and the same static-closure rule applies.
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte'

@@ -2041,27 +2041,34 @@
   min-width: 0;
 }
 
+/* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050.
+   That is the shared `Stepper`'s own natural width — 54px of fixed chrome (two 22px
+   adjuncts, 2x2px gap, 2x2px padding, 2x1px border) plus its 48px input. The `fill`
+   variant carries `min-width: 0`, so there is no compression cliff below it; 102px is the
+   DESIGN minimum, the width at which the typeable field is as wide as an unfilled stepper,
+   not a hard limit. If a rendered frame overflows, narrow the fixed Start/End pair first —
+   they are the least-used columns. */
 .fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: minmax(140px, 1fr) 84px 104px 124px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 104px 124px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
+  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 124px 40px;
 }
 
 /* checkDriven authority drops the per-outcome break-tools column (tool breakage is
    authored via the CheckBreakage editor instead). */
 .fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
-  grid-template-columns: minmax(140px, 1fr) 84px 104px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 104px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
-  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 40px;
+  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 40px;
 }
 
 /* Simple-check recipe tiers: Name + DC + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-tier {
-  grid-template-columns: minmax(140px, 1fr) 96px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 40px;
 }
 
 /* Unified per-check trigger editor (issue 419 recombine). Each trigger is a
@@ -13197,11 +13204,18 @@
   font-weight: 400;
 }
 
-.fabricate-manager .manager-rule-field select,
-.fabricate-manager .manager-rule-stepper input {
+/* The `<select>` alone. This was a two-selector rule that also painted
+   `.manager-rule-stepper input` — the reward/event limit fields, which were a hand-rolled
+   −/+ pair around a bare `type="number"`. They are the shared `Stepper` now (issue 1050),
+   which brings its own borderless chrome and takes the 36px on its WRAPPER via `fill`, so
+   the input half of this rule would have re-bordered and re-sized a control INSIDE the
+   stepper's own bordered box. The `padding` that used to sit in its own follow-up rule is
+   folded in here rather than left as a duplicate selector. */
+.fabricate-manager .manager-rule-field select {
   width: 100%;
   min-width: 0;
   height: 36px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -13209,35 +13223,15 @@
   font-weight: 400;
 }
 
-.fabricate-manager .manager-rule-field select {
-  padding: 0 var(--fab-space-2);
-}
-
+/* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a
+   SIBLING of its `.manager-rule-row` inside the flex `.manager-rules-stack`, not a child of
+   it, so `padding-left` is what lines it up under the description column: the row's icon
+   track is 34px plus its 8px gap. (The old rule also carried `grid-column: 2`, which never
+   did anything here — the parent is flex — and a `34px minmax(0, 1fr) 34px` template for
+   the three hand-rolled children that no longer exist.) */
 .fabricate-manager .manager-rule-stepper {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
-  gap: var(--fab-space-chip);
   padding-left: 42px;
   min-width: 0;
-}
-
-.fabricate-manager .manager-rule-stepper input {
-  padding: 0 var(--fab-space-2);
-  text-align: center;
-  appearance: textfield;
-}
-
-/* NO native spinner: this stepper is flanked by its own −/+ `manager-icon-button`s, and the
-   browser's Up/Down handling still steps the value, so the drawn arrows duplicate both and
-   crowd a centred field. The input stays `type="number"` so those keystrokes survive.
-   Matches the shared `Stepper` primitive (`components/Stepper.svelte`), which this control
-   predates; migrating it onto that primitive is tracked separately. */
-.fabricate-manager .manager-rule-stepper input::-webkit-outer-spin-button,
-.fabricate-manager .manager-rule-stepper input::-webkit-inner-spin-button {
-  appearance: none;
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 /* Recipe Visibility card: List mode and Knowledge-based are inline subheading

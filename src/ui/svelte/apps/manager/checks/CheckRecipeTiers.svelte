@@ -7,6 +7,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Stepper from '../../../components/Stepper.svelte';
 
   let { tiers = [], defaultDc = 0, onChange = () => {} } = $props();
 
@@ -20,13 +21,11 @@
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
-  function numeric(rawValue) {
-    if (rawValue === '' || rawValue === '-') return 0;
-    const parsed = Number(rawValue);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  }
-
   const list = $derived(Array.isArray(tiers) ? tiers : []);
+
+  // Named once: the column header, the stepper's accessible name, and the `{label}` slot
+  // in the shared `Decrease {label}` / `Increase {label}` adjunct strings all read it.
+  const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC'));
 
   function addTier() {
     onChange([...list, { id: newId(), name: '', dc: Number(defaultDc) || 0 }]);
@@ -68,8 +67,7 @@
       <span role="columnheader"
         >{text('FABRICATE.Admin.Manager.Checks.Crafting.TierName', 'Name')}</span
       >
-      <span role="columnheader">{text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')}</span
-      >
+      <span role="columnheader">{dcLabel}</span>
       <span
         role="columnheader"
         aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeActions', 'Actions')}
@@ -83,12 +81,18 @@
           value={tier.name || ''}
           oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
         />
-        <input
-          type="number"
-          data-tier-dc
-          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC')}
+        <!-- `fill`, so the stepper takes the row's pinned 102px track and the 36px height
+             its `<input>` sibling resolves to rather than sitting in it as a narrower
+             inline island. No `allowUnset`: a tier's DC has no absent state — 0 is a real
+             DC — and the `data-*` hook rides `inputProps` onto the real `<input>`. -->
+        <Stepper
+          fill
           value={tier.dc ?? 0}
-          oninput={(event) => updateTier(tier.id, { dc: numeric(event.currentTarget.value) })}
+          ariaLabel={dcLabel}
+          decrementLabel={localize('FABRICATE.Common.Stepper.Decrease', { label: dcLabel })}
+          incrementLabel={localize('FABRICATE.Common.Stepper.Increase', { label: dcLabel })}
+          inputProps={{ 'data-tier-dc': '' }}
+          onChange={(dc) => updateTier(tier.id, { dc })}
         />
         <button
           type="button"
