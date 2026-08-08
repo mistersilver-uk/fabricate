@@ -35,6 +35,32 @@ function writeCompiledSvelte(sourcePath) {
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
 }
 
+/**
+ * A rolled economy actor row, spelling out only what a case actually varies.
+ *
+ * Ten cases shipped this fixture as a full eight-key literal differing in two or three values,
+ * which is one fixture written ten times — and SonarCloud counts duplication in `tests/**` exactly
+ * as it does in `src/`. The defaults are the "rolled, no override" shape most cases want; `current:
+ * null, max: null, rolledMax: null` is the un-rolled one, and `maxOverride` is what the override
+ * cases set.
+ *
+ * @param {object} [overrides]
+ * @returns {object}
+ */
+function actor(overrides = {}) {
+  return {
+    actorId: 'a1',
+    name: 'Aria',
+    img: '',
+    current: 3,
+    max: 10,
+    rolledMax: 10,
+    maxOverride: null,
+    maxReadOnly: false,
+    ...overrides,
+  };
+}
+
 function makeServices(initialEconomy, actors = []) {
   const calls = { setEconomy: [], setStamina: [], adjustStamina: [], roll: [], getStamina: 0 };
   let economy = initialEconomy;
@@ -258,16 +284,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('persists config edits and reveals regen + actor controls when stamina is enabled', async () => {
     const actors = [
-      {
-        actorId: 'a1',
-        name: 'Aria',
-        img: '',
-        current: 3,
-        max: 10,
-        rolledMax: 10,
-        maxOverride: null,
-        maxReadOnly: false,
-      },
+      actor(),
     ];
     const { services, calls } = makeServices(
       {
@@ -326,26 +343,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('bulk-saves rolled characters (current + max override) from the header Save', async () => {
     const actors = [
-      {
-        actorId: 'a1',
-        name: 'Aria',
-        img: '',
-        current: 3,
-        max: 10,
-        rolledMax: 10,
-        maxOverride: null,
-        maxReadOnly: false,
-      },
-      {
-        actorId: 'a2',
-        name: 'Borin',
-        img: '',
-        current: null,
-        max: null,
-        rolledMax: null,
-        maxOverride: null,
-        maxReadOnly: false,
-      }, // un-rolled
+      actor(),
+      actor({ actorId: 'a2', name: 'Borin', current: null, max: null, rolledMax: null }), // un-rolled
     ];
     const { services, calls } = makeServices(
       { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
@@ -385,26 +384,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('disables the max-override cell for a rolled character whose max is read-only', async () => {
     const actors = [
-      {
-        actorId: 'a1',
-        name: 'Aria',
-        img: '',
-        current: 6,
-        max: 10,
-        rolledMax: 10,
-        maxOverride: null,
-        maxReadOnly: true,
-      }, // rolled, read-only max
-      {
-        actorId: 'a2',
-        name: 'Borin',
-        img: '',
-        current: 4,
-        max: 8,
-        rolledMax: 8,
-        maxOverride: null,
-        maxReadOnly: false,
-      }, // rolled, writable max
+      actor({ current: 6, maxReadOnly: true }), // rolled, read-only max
+      actor({ actorId: 'a2', name: 'Borin', current: 4, max: 8, rolledMax: 8 }), // rolled, writable max
     ];
     const { services } = makeServices(
       { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
@@ -427,26 +408,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('shows un-rolled characters as disabled with an emphasised dice button; rolled get a reset button', async () => {
     const actors = [
-      {
-        actorId: 'a1',
-        name: 'Aria',
-        img: '',
-        current: 6,
-        max: 10,
-        rolledMax: 10,
-        maxOverride: null,
-        maxReadOnly: false,
-      }, // rolled
-      {
-        actorId: 'a2',
-        name: 'Borin',
-        img: '',
-        current: null,
-        max: null,
-        rolledMax: null,
-        maxOverride: null,
-        maxReadOnly: false,
-      }, // un-rolled
+      actor({ current: 6 }), // rolled
+      actor({ actorId: 'a2', name: 'Borin', current: null, max: null, rolledMax: null }), // un-rolled
     ];
     const { services } = makeServices(
       { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
@@ -482,26 +445,8 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
 
   it('filters the character list by the search box', async () => {
     const actors = [
-      {
-        actorId: 'a1',
-        name: 'Aria',
-        img: '',
-        current: 1,
-        max: 5,
-        rolledMax: 5,
-        maxOverride: null,
-        maxReadOnly: false,
-      },
-      {
-        actorId: 'a2',
-        name: 'Borin',
-        img: '',
-        current: 2,
-        max: 8,
-        rolledMax: 8,
-        maxOverride: null,
-        maxReadOnly: false,
-      },
+      actor({ current: 1, max: 5, rolledMax: 5 }),
+      actor({ actorId: 'a2', name: 'Borin', current: 2, max: 8, rolledMax: 8 }),
     ];
     const { services } = makeServices(
       { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
@@ -530,16 +475,7 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
   // The two are asserted differently for exactly that reason.
   it('clears the max override to null, never hands Current a null, and still steps from the keyboard', async () => {
     const actors = [
-      {
-        actorId: 'a1',
-        name: 'Aria',
-        img: '',
-        current: 3,
-        max: 5,
-        rolledMax: 10,
-        maxOverride: 5,
-        maxReadOnly: false,
-      },
+      actor({ max: 5, maxOverride: 5 }),
     ];
     const { services, calls } = makeServices(
       { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },

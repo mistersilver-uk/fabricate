@@ -104,14 +104,26 @@ function mountRouted(tierStep, { outcomeOptions = ROUTED_TIERS, onChange } = {})
   });
 }
 
+/**
+ * The simple-check mount: one `1d20` check over `triggers`, with the break pills off.
+ *
+ * The sibling of `mountRouted` above and there for the same reason — seven cases spelled out the
+ * same four props to say "a simple check over 1d20", which is one call written seven times, and
+ * SonarCloud counts duplication in `tests/**` exactly as it does in `src/`.
+ */
+function mountSimple(triggers, overrides = {}) {
+  return harness.mount({
+    value: triggerBlock(triggers),
+    rollFormula: '1d20',
+    kind: 'simple',
+    showBreakTools: false,
+    ...overrides
+  });
+}
+
 describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   it('always renders the trigger list and its outcome toggle; never a label input', async () => {
-    const root = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const root = await mountSimple([rollTotalTrigger]);
     assert.ok(root.querySelector('[data-check-triggers]'), 'the trigger editor renders');
     const selected = root.querySelector('[data-trigger="t1"] [data-trigger-outcome="failure"]');
     assert.ok(selected, 'the failure outcome segment renders for a trigger');
@@ -132,12 +144,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   });
 
   it('offers Automatic success / No effect / Automatic failure for a non-progressive check', async () => {
-    const root = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const root = await mountSimple([rollTotalTrigger]);
     const labels = [...root.querySelectorAll('[data-trigger-outcome]')].map((b) =>
       b.textContent.trim()
     );
@@ -168,12 +175,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
   });
 
   it('gates the break-tools pill on showBreakTools (authority)', async () => {
-    const hidden = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const hidden = await mountSimple([rollTotalTrigger]);
     assert.equal(
       hidden.querySelector('[data-trigger-break]'),
       null,
@@ -181,12 +183,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
     );
     harness.remount();
 
-    const shown = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: true
-    });
+    const shown = await mountSimple([rollTotalTrigger], { showBreakTools: true });
     assert.ok(
       shown.querySelector('[data-trigger-break]'),
       'the break pill renders when showBreakTools is true (checkDriven)'
@@ -195,13 +192,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
 
   it('toggles a trigger outcome through the segmented control and emits the new block', async () => {
     const emitted = [];
-    const root = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false,
-      onChange: (next) => emitted.push(next)
-    });
+    const root = await mountSimple([rollTotalTrigger], { onChange: (next) => emitted.push(next) });
     chooseSegment(
       root.querySelector('[data-trigger="t1"]'),
       'data-trigger-outcome',
@@ -216,10 +207,7 @@ describe('CheckTriggers (mounted): unified outcome + break editor', () => {
 
   it('adds a trigger from the empty state, defaulting breakTools to showBreakTools', async () => {
     const emitted = [];
-    const root = await harness.mount({
-      value: triggerBlock([]),
-      rollFormula: '1d20',
-      kind: 'simple',
+    const root = await mountSimple([], {
       showBreakTools: true,
       onChange: (next) => emitted.push(next)
     });
@@ -287,12 +275,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     );
     harness.remount();
 
-    const simple = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false
-    });
+    const simple = await mountSimple([rollTotalTrigger]);
     assert.ok(
       !simple.querySelector('[data-trigger-tier-step]'),
       'a simple check has no tiers to step and renders no control'
@@ -502,13 +485,7 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
   // than silently shipping a click-only control.
   it('still steps the condition value from the keyboard', async () => {
     const emitted = [];
-    const root = await harness.mount({
-      value: triggerBlock([rollTotalTrigger]),
-      rollFormula: '1d20',
-      kind: 'simple',
-      showBreakTools: false,
-      onChange: (next) => emitted.push(next)
-    });
+    const root = await mountSimple([rollTotalTrigger], { onChange: (next) => emitted.push(next) });
     const field = root.querySelector('[data-trigger="t1"] [data-trigger-value]');
     assert.equal(
       stepMigratedNumberField(field, 'up', 'the condition value field'),
