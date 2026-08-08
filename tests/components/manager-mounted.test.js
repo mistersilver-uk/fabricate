@@ -4437,7 +4437,14 @@ describe('CraftingSystemManager mounted behavior', () => {
   // reported nothing about a catalogue that reaches no roll, which is the defect the
   // card must state rather than conceal. It stamps WHICH of the three causes applies.
   it('checks view: the modifier catalogue card renders an inert notice naming the cause when the check has no formula (issue 1055)', () => {
-    mountChecksView({ resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } });
+    // A non-empty catalogue is part of the fixture, not incidental: the notice reports a
+    // CATALOGUE that reaches no roll, so an empty one has nothing to warn about and is
+    // deliberately silent (see the `inert` gate in `CraftingModifierCatalogueCard`).
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    });
     const card = target.querySelector('[data-crafting-modifier-catalogue]');
     assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
     const notice = card.querySelector('[data-crafting-modifier-inert]');
@@ -4449,7 +4456,45 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // The other half of that gate, and the reason it exists: a brand-new system is
+  // `simple` + `rollFormula: ''` with no modifiers, so an ungated notice put a permanent
+  // warning ("These modifiers reach no roll…") directly above the empty state, warning
+  // about nothing on first contact with the tab. The cause is unchanged between the two
+  // mounts — only the catalogue is — so this pins the CATALOGUE as the gate rather than
+  // some incidental difference in the check.
+  it('checks view: an EMPTY catalogue shows no inert notice even when the cause applies (issue 1055)', () => {
+    const props = { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } };
+    mountChecksView({ ...props, craftingCheckModifiers: [] });
+    assert.ok(
+      Boolean(target.querySelector('[data-crafting-modifier-empty]')),
+      'the empty catalogue renders its empty state'
+    );
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'an empty catalogue has no modifiers to warn about, so the notice stays away'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    // Same cause, one modifier: the notice appears and still names the cause.
+    mountChecksView({
+      ...props,
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    });
+    const notice = target.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'one authored modifier is enough to make the notice worth showing');
+    assert.equal(
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noFormula',
+      'and the cause is unchanged by the catalogue gate'
+    );
+  });
+
   it('checks view: the inert cause discriminates no-check, no-formula and no-placeholder (issue 1055)', () => {
+    // Every case below carries a non-empty catalogue: the notice is gated on one, so an
+    // empty catalogue would make all four assertions read the same silent card.
+    const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
     for (const { props, cause } of [
       // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
       // rollFormula ternary had no case for it and reported the simple slot's formula.
@@ -4470,7 +4515,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         cause: 'noPlaceholder',
       },
     ]) {
-      mountChecksView(props);
+      mountChecksView({ ...props, craftingCheckModifiers: catalogue });
       const notice = target.querySelector('[data-crafting-modifier-inert]');
       assert.ok(Boolean(notice), `${cause}: an inert notice renders`);
       assert.equal(notice.getAttribute('data-crafting-modifier-inert'), cause);
@@ -4482,6 +4527,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: catalogue,
     });
     assert.ok(
       !target.querySelector('[data-crafting-modifier-inert]'),
@@ -5980,6 +6026,86 @@ describe('CraftingSystemManager mounted behavior', () => {
       !target.textContent.includes('Edit identity for this recipe.'),
       'learned mode no longer shows the identity-only subtitle'
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // The manager root's crafting-modifier WIRING (issue 1055).
+  //
+  // Both ENDS of each wire are already covered — `mountChecksView` mounts ChecksView
+  // directly and `recipe-edit-mounted.test.js` mounts RecipeEditView directly — but
+  // nothing mounted the ROOT against a system carrying
+  // `craftingCheck.recipeModifierAuthority`, so both forwards were deletable green.
+  // Dropping `craftingModifierAuthority={…}` from the RecipeEditView call site lets the
+  // prop fall to its `= undefined` default, `resolveRecipeModifierAuthority` reads that
+  // as `setAndRule`, and EVERY system — including one a GM explicitly set to `none` —
+  // renders both recipe controls again: acceptance criterion 1 shipping dead under a
+  // green suite. Dropping the ChecksView one pins the authority radio at `setAndRule`
+  // for every system the same way.
+  //
+  // Both cases assert the `setAndRule` end too, so a fixture that never reached the
+  // surface at all cannot pass them by rendering nothing.
+  const modifierAuthoritySystemCheck = (recipeModifierAuthority) => ({
+    simple: {
+      rollFormula: '1d20 + @craftingmod',
+      dc: 12,
+      thresholdMode: 'meet',
+      dcMode: 'static',
+      tiers: [],
+    },
+    checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    defaultModifierIds: ['med'],
+    recipeModifierAuthority,
+  });
+
+  it('root: the Checks card’s authority radio tracks the SYSTEM’s recipeModifierAuthority (issue 1055)', async () => {
+    for (const authority of ['none', 'setOnly']) {
+      mountManager([], { craftingCheck: modifierAuthoritySystemCheck(authority) });
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      const checked = [...target.querySelectorAll('[data-crafting-modifier-authority-option]')]
+        .filter((option) => option.querySelector('input').checked)
+        .map((option) => option.getAttribute('data-crafting-modifier-authority-option'));
+      assert.deepEqual(
+        checked,
+        [authority],
+        `the root forwards the system's own level (${authority}); an unforwarded prop pins every system at setAndRule`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: a `none` system’s recipe editor shows the modifier summary banner and no controls (issue 1055)', async () => {
+    for (const [authority, banner, controls] of [
+      ['none', true, false],
+      ['setAndRule', false, true],
+    ]) {
+      const editor = await openRecipeEditor([], {
+        craftingCheck: modifierAuthoritySystemCheck(authority),
+      });
+      assert.equal(
+        Boolean(editor.querySelector('.manager-main [data-recipe-modifier-banner]')),
+        banner,
+        `authority ${authority}: read-only summary banner rendered = ${banner}`
+      );
+      assert.equal(
+        Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier]')),
+        controls,
+        `authority ${authority}: combination-rule select rendered = ${controls}`
+      );
+      assert.equal(
+        Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
+        controls,
+        `authority ${authority}: eligible-modifier picker rendered = ${controls}`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
   });
 
   it('stages editor edits without persisting until the header Save is pressed', async () => {
