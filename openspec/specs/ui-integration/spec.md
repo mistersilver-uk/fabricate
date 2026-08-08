@@ -1384,7 +1384,8 @@ The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTa
 3. **Controls** (authority `setOnly` or `setAndRule`) — the grid renders a picker cell for the eligible-id subset, and, only at `setAndRule`, an adjacent combination-rule select (labelled "Combination rule", options `addAll`/`highest`/`playerPicks`, no `byRecipe`).
    At `setOnly` the combination rule stays system-wide and only the picker cell renders.
 
-The per-recipe select-row grid's worst case stays at five cells — Category, Check tier, Minimum success tier, the combination-rule select, and the picker cell — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a sixth grid cell.
+The per-recipe select-row grid's worst case is **four** cells — Category, the combination-rule select, the picker cell, and _at most one_ of Check tier / Minimum success tier — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a further grid cell.
+Check tier and Minimum success tier are mutually exclusive by construction and never render together: `resolveRecipeFixedOutcomeTierOptions` offers a minimum tier only for `routedByCheck` + `fixed`, while `resolveRecipeCheckTierOptions` under that same mode offers tiers only when the routed type is **not** `fixed`.
 Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting); selecting **No modifiers** writes an authored empty `modifierIds` array (`@craftingmod` resolves to 0 for that recipe); selecting **Inherit system default** drops the `modifierIds` key.
 Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
 
@@ -1403,6 +1404,12 @@ Both banners render full-bleed below the grid, replacing the control the grid wo
 
 A catalogue can be inert for three DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), a slot exists but carries no authored roll formula (`noFormula`), or a formula is authored but never contains the `@craftingmod` token (`noPlaceholder`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
 The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
+
+**Checks tab — crafting-modifier authority control.** `CraftingModifierCatalogueCard.svelte` authors two independent axes as two stacked `RadioCardGroup`s: **Combination rule** (`addAll` / `highest` / `playerPicks`) and, beneath it, **Authority level** (`none` "Set by the system" / `setOnly` "Recipes choose the set" / `setAndRule` "Recipes choose set and rule").
+The authority group renders the level the **engine** would apply, so an unstamped system displays `setAndRule` rather than a blank group or an invented `none`.
+When one or more of the system's recipes carry a `craftingModifier` override, the card states the count inline beneath the authority group together with a per-level consequence sentence, disclosed **before** the GM lowers the level; lowering it is reversible and deletes nothing, so no modal confirmation is used.
+The **Default modifiers** intro copy switches to a locked variant at authority `none` ("Which modifiers apply.
+Every recipe in this system uses this set."), because the delegating copy's promise that "a recipe can narrow this set" is false at that level.
 
 ### Tools tab
 
