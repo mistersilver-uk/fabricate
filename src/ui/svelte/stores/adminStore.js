@@ -2489,11 +2489,11 @@ function _craftingModifierInertCause(formula) {
  * resolution time is `resolveRecipeModifierAuthority`'s answer (`setAndRule`), and this
  * projection deliberately does not pre-empt it.
  *
- * The two counts are the downgrade disclosure's input — lowering the level leaves stored
- * overrides on disk but stops honouring them, so the card states how many recipes that
- * silences BEFORE the GM saves. They are separate because the two downgrades silence
- * different populations: dropping to `none` unhonours every override, while dropping to
- * `setOnly` unhonours only the rule half.
+ * The override count is the downgrade disclosure's input — lowering the level leaves
+ * stored overrides on disk but stops honouring them, so the card names the population
+ * first and then says, in its own per-level sentence, what the selected level does to
+ * them. See the count's own comment below for why that sentence split means ONE
+ * level-independent count is correct rather than one per level.
  *
  * @param {object} system The selected crafting system.
  * @param {Array<object>} systemRecipes That system's recipes.

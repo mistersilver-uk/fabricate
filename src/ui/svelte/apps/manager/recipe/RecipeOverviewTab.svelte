@@ -439,9 +439,13 @@
     <!-- Check-modifier override (issue 1055). The system's authority level decides what
          renders: `setAndRule` gets the rule select AND the picker cell, `setOnly` the
          picker cell alone, `none` neither (a read-only banner below the grid instead).
-         The grid's worst case therefore stays at five items — Category, Check tier, Min
-         success tier, rule select, picker cell — which is why the tri-state select lives
-         INSIDE the picker cell rather than becoming a sixth. -->
+         Five cells exist in this grid, but only FOUR can co-render — Category, Check tier
+         OR Min success tier, rule select, picker cell — because the two tier selects are
+         mutually exclusive by construction (`resolveRecipeCheckTierOptions` offers tiers
+         only for simple-static or routed-relative; `resolveRecipeFixedOutcomeTierOptions`
+         only for routedByCheck + fixed). Four is the budget a future widening must fit,
+         and it is why the tri-state select lives INSIDE the picker cell rather than
+         becoming another sibling. -->
     {#if showModifierControls}
       {#if modifierAuthority === 'setAndRule'}
         <label class="manager-recipe-field" data-recipe-crafting-modifier>
