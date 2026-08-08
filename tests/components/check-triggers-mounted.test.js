@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -491,5 +492,30 @@ describe('CheckTriggers (mounted): tier-step effect', () => {
     }
     chooseSegment(card, 'data-trigger-tier-step-mode', 'down');
     assert.equal(emitted.at(-1).triggers[0].tierStep.mode, 'down', 'the step is authored');
+  });
+  // Issue 1050, Phase 2's keyboard non-regression entry. The condition Value field is a bare
+  // `type="number"` no longer — it is a `Stepper`, which owns NO keydown handler, so Up/Down are
+  // native `<input type="number">` behaviour and the only things keeping them alive are that the
+  // element stays a number input and that its `input` event still reaches the commit path.
+  // `stepUp()` throws on a non-steppable input, so a drift to `type="text"` fails here rather
+  // than silently shipping a click-only control.
+  it('still steps the condition value from the keyboard', async () => {
+    const emitted = [];
+    const root = await harness.mount({
+      value: triggerBlock([rollTotalTrigger]),
+      rollFormula: '1d20',
+      kind: 'simple',
+      showBreakTools: false,
+      onChange: (next) => emitted.push(next)
+    });
+    const field = root.querySelector('[data-trigger="t1"] [data-trigger-value]');
+    assert.ok(Boolean(field), 'the condition value field renders');
+    assert.equal(field.tagName, 'INPUT', 'the hook rides inputProps onto the real <input>');
+    assert.equal(stepNativeNumberInput(field, 'up'), '4', 'ArrowUp steps the displayed value');
+    assert.equal(
+      emitted.at(-1).triggers[0].condition.value,
+      4,
+      'and the step reaches the trigger through the commit path'
+    );
   });
 });

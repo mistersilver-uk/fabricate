@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+import { stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -512,6 +513,72 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     const rows = target.querySelectorAll('[data-economy-actor-id]');
     assert.equal(rows.length, 1);
     assert.equal(rows[0].getAttribute('data-economy-actor-id'), 'a2');
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+  });
+  // ── Issue 1050: the two migrated cells ─────────────────────────────────────────────
+  //
+  // Phase 4's entry for the keyboard non-regression check, and the behavioural half of D1a for
+  // this view's two fields. `Max (override)` is GENUINE absence — `saveAll` maps `'' | null` to a
+  // null override meaning "use the rolled max" — while `Current` is COSMETIC zero, because
+  // `saveAll` writes `Number(draftCurrent) || 0` and absence is simply not a value it can persist.
+  // The two are asserted differently for exactly that reason.
+  it('clears the max override to null, never hands Current a null, and still steps from the keyboard', async () => {
+    const actors = [
+      {
+        actorId: 'a1',
+        name: 'Aria',
+        img: '',
+        current: 3,
+        max: 5,
+        rolledMax: 10,
+        maxOverride: 5,
+        maxReadOnly: false,
+      },
+    ];
+    const { services, calls } = makeServices(
+      { stamina: { enabled: true, regen: { policy: 'none' } }, nodes: { enabled: false } },
+      actors
+    );
+    await mountView({ services, systemId: 'sys-1' });
+
+    const row = '[data-economy-actor-id="a1"] ';
+    const current = target.querySelector(`${row}[data-economy-actor-current]`);
+    const override = target.querySelector(`${row}[data-economy-actor-max]`);
+
+    // Native `<input type="number">` stepping, which is the only keyboard path `Stepper` offers:
+    // it owns no keydown handler, so `stepUp()` plus the `input` event the browser fires is the
+    // faithful simulation. `stepUp()` also throws on a non-number input, so a drift to
+    // `type="text"` fails here rather than silently losing the arrows.
+    assert.equal(stepNativeNumberInput(current, 'up'), '4', 'ArrowUp steps the Current cell');
+    flushSync();
+
+    // Clearing the override is a real edit on a field whose domain admits absence.
+    override.value = '';
+    override.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    // Clearing Current is NOT: `allowUnset={false}` makes `onInput` return early on '', so the
+    // draft keeps its prior value and nothing null can reach the write below.
+    current.value = '';
+    current.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+
+    target.querySelector('[data-economy-bulk-save]').click();
+    flushSync();
+
+    assert.equal(calls.setStamina.length, 1);
+    assert.equal(
+      calls.setStamina[0].maxOverride,
+      null,
+      'clearing the override persists absence, so the rolled max applies again'
+    );
+    assert.equal(
+      calls.setStamina[0].current,
+      4,
+      'and Current keeps the keyboard-stepped value rather than being nulled'
+    );
+    assert.notEqual(calls.setStamina[0].current, null, 'a cosmetic-zero field never persists null');
     unmount(mounted);
     mounted = null;
     target.remove();

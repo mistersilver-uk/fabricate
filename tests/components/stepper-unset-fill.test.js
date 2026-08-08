@@ -102,6 +102,19 @@ describe('Stepper unset-value state (issue 1050)', () => {
     assert.deepEqual(calls, [6], '+ steps from min, not from the coerced 0');
   });
 
+  it('steps an unset field with no lower bound from 0, in both directions', async () => {
+    // The `min = null` half of the baseline rule, which the `min = 5` case above cannot state:
+    // with no bound, `min ?? 0` and `numericValue` agree, so only the pairing of the two cases
+    // pins the branch. The mutation this catches is DELETION of the `isUnset ? (min ?? 0) : …`
+    // baseline — not a `??` -> `||` typo, which is indistinguishable for every value `min` takes
+    // (the fallback IS 0), so a test written for that rationale would pass under either operator
+    // and be recorded as covering something it does not.
+    const { increment, decrement, calls } = await mountStepper({ allowUnset: true, value: null });
+    increment.click();
+    decrement.click();
+    assert.deepEqual(calls, [1, -1], 'an unbounded unset field steps from 0 and is not clamped');
+  });
+
   it('keeps − effective on an unset field whose min is 0', async () => {
     const { decrement, calls } = await mountStepper({ allowUnset: true, value: null, min: 0 });
     assert.ok(!decrement.disabled, 'the adjunct is enabled, so it must not be a no-op');
