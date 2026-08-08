@@ -27,6 +27,14 @@
     noneSelectedLabel = '',
     // A test hook mapped onto the outer element (`data-modifier-pill-select`).
     testId = '',
+    // The id of the caller's own label element (issue 1055). The control is a group of
+    // controls, not a labelled field, so it takes `role="group"` + `aria-labelledby`
+    // rather than a `<label for>`: the menu button and every pill remove button are
+    // separate focus stops that would otherwise be announced with no shared context.
+    // The label stays at the CALL SITE because its position differs — the Overview cell
+    // puts a micro-label above a tri-state select, the Checks card an `<h4>` above the
+    // whole default-set block — and only its id is needed here.
+    labelledBy = '',
     onToggle = () => {},
   } = $props();
 
@@ -61,6 +69,8 @@
 
 <div
   class="manager-field manager-availability-multi"
+  role="group"
+  aria-labelledby={labelledBy || undefined}
   data-modifier-pill-select={testId || undefined}
 >
   <div
@@ -108,7 +118,11 @@
       </div>
     {/if}
   </div>
-  <div class="manager-availability-pill-row" data-modifier-pill-row>
+  <!-- The pill row is the control's only feedback that a menu pick or a pill removal
+       landed, and neither gesture moves focus into the row, so a screen-reader user is
+       otherwise told nothing at all. `polite` announces the changed row after the
+       current utterance rather than interrupting it. -->
+  <div class="manager-availability-pill-row" aria-live="polite" data-modifier-pill-row>
     {#each selectedOptions as option (option.id)}
       <span class="manager-availability-pill is-modifier" data-modifier-pill={option.id}>
         <i class={option.icon || 'fa-solid fa-dice-d20'} aria-hidden="true"></i>
