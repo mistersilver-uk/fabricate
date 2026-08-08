@@ -110,16 +110,28 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
     // Comments stripped: this file's own prose explains why the type matters, and that
     // explanation must not be counted as if it were markup.
     const markup = withoutComments(stepperSource);
-    // Both orientation branches render their own input; neither may drift to `type="text"`.
+    // ONE field, declared as a `{#snippet}` and rendered into both orientation branches. The
+    // count is still EXACT and still the drift guard it was when each branch wrote its own
+    // `<input>`: a branch that grew a second, hand-written field — the way this duplication
+    // arose in the first place — pushes it back to 2 and fails here.
     const numberInputs = markup.match(/type="number"/g) ?? [];
     assert.equal(
       numberInputs.length,
-      2,
-      'the vertical and horizontal branches both keep type="number"'
+      1,
+      'the one shared numericField snippet is the component\'s only number input'
     );
     assert.ok(
       !/type="text"/.test(markup),
-      'no branch swaps to a text input, which would remove native keyboard stepping'
+      'it does not drift to a text input, which would remove native keyboard stepping'
+    );
+    // …and both orientations really do reach it, which is the half the count above stopped
+    // stating once the two branches shared a definition. Without this, deleting the render
+    // from the vertical branch would leave a component with no field in that orientation and
+    // an exact-count assertion that still passed.
+    assert.equal(
+      (markup.match(/\{@render numericField\(\)\}/g) ?? []).length,
+      2,
+      'the vertical and horizontal branches both render it'
     );
     // The component still owns no keydown handler, which is WHY the type matters. If one is
     // ever added, this assertion should be replaced by a mounted key-press test rather than

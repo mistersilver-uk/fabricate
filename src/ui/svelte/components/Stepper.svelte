@@ -33,13 +33,20 @@
    - onChange(value): called with the clamped number on every accepted edit, and with
      `null` when an `allowUnset` field is cleared.
 
+  ORIENTATION is an ORDER, not a second control. The input and the two adjuncts are
+  declared once each as `{#snippet}`s and the two branches differ only in the sequence
+  they `{@render}` them in (and in which icon each adjunct draws). They used to be
+  written out twice, which meant every change to the field — the `allowUnset` display
+  value, the `inputProps` spread, a `data-*` hook — had to be made in two places and was
+  a live clone the moment one of them was.
+
   `inputProps` CONTRACT — attributes and `data-*` only, NEVER event handlers. The
-  spread sits after `oninput={onInput} onblur={onBlur}` in both orientation branches
-  (it has to, so an explicit attribute a caller passes wins over the primitive's
-  default), which means an `oninput` or `onblur` routed through `inputProps` silently
-  REPLACES this component's commit path: the control keeps rendering and stepping and
-  simply stops reporting edits, with nothing failing loudly. Pass hooks and attributes
-  through `inputProps`; put behaviour in `onChange`.
+  spread sits after `oninput={onInput} onblur={onBlur}` on the input (it has to, so an
+  explicit attribute a caller passes wins over the primitive's default), which means an
+  `oninput` or `onblur` routed through `inputProps` silently REPLACES this component's
+  commit path: the control keeps rendering and stepping and simply stops reporting
+  edits, with nothing failing loudly. Pass hooks and attributes through `inputProps`;
+  put behaviour in `onChange`.
 
   `disabled` is the TOP-LEVEL prop, never an `inputProps` key. The adjuncts read the
   top-level prop (`disabled || atMin` / `disabled || atMax`), so `inputProps={{
@@ -127,6 +134,12 @@
   // the markup, so precedence is resolved here instead of by attribute order.
   const resolvedPlaceholder = $derived(placeholder || inputProps.placeholder || undefined);
 
+  // The ONLY thing that differs between the two orientations besides render order.
+  // Vertical stacks the pair as a spinner, so it draws chevrons and reads top-to-bottom;
+  // horizontal sits inline around the field, so it draws − and +.
+  const decrementIcon = $derived(isVertical ? 'fa-chevron-down' : 'fa-minus');
+  const incrementIcon = $derived(isVertical ? 'fa-chevron-up' : 'fa-plus');
+
   function commit(candidate) {
     if (!Number.isFinite(candidate)) return;
     const next = clamp(candidate);
@@ -161,6 +174,54 @@
   }
 </script>
 
+<!-- The typeable control. `type="number"` is load-bearing: this component owns no keydown
+     handler, so Up/Down are native number-input behaviour that fires `input` and lands in
+     `onInput` → `commit`. `tests/components/stepper-spinner.test.js` pins that, and pins
+     that BOTH branches below render this one snippet rather than growing a second field. -->
+{#snippet numericField()}
+  <input
+    type="number"
+    class="fab-stepper-input"
+    data-stepper-input
+    value={displayValue}
+    min={min ?? undefined}
+    max={max ?? undefined}
+    {step}
+    {disabled}
+    aria-label={ariaLabel || undefined}
+    oninput={onInput}
+    onblur={onBlur}
+    {...inputProps}
+    placeholder={resolvedPlaceholder}
+  />
+{/snippet}
+
+{#snippet decrementAdjunct()}
+  <button
+    type="button"
+    class="fab-stepper-adjunct"
+    data-stepper-decrement
+    aria-label={decrementLabel || undefined}
+    disabled={disabled || atMin}
+    onclick={() => commit(stepFrom - step)}
+  >
+    <i class="fas {decrementIcon}" aria-hidden="true"></i>
+  </button>
+{/snippet}
+
+{#snippet incrementAdjunct()}
+  <button
+    type="button"
+    class="fab-stepper-adjunct"
+    data-stepper-increment
+    aria-label={incrementLabel || undefined}
+    disabled={disabled || atMax}
+    onclick={() => commit(stepFrom + step)}
+  >
+    <i class="fas {incrementIcon}" aria-hidden="true"></i>
+  </button>
+{/snippet}
+
 <div
   class="fab-stepper"
   class:is-disabled={disabled}
@@ -169,77 +230,14 @@
   class:is-fill={fill}
 >
   {#if isVertical}
-    <button
-      type="button"
-      class="fab-stepper-adjunct"
-      data-stepper-increment
-      aria-label={incrementLabel || undefined}
-      disabled={disabled || atMax}
-      onclick={() => commit(stepFrom + step)}
-    >
-      <i class="fas fa-chevron-up" aria-hidden="true"></i>
-    </button>
-    <input
-      type="number"
-      class="fab-stepper-input"
-      data-stepper-input
-      value={displayValue}
-      min={min ?? undefined}
-      max={max ?? undefined}
-      {step}
-      {disabled}
-      aria-label={ariaLabel || undefined}
-      oninput={onInput}
-      onblur={onBlur}
-      {...inputProps}
-      placeholder={resolvedPlaceholder}
-    />
-    <button
-      type="button"
-      class="fab-stepper-adjunct"
-      data-stepper-decrement
-      aria-label={decrementLabel || undefined}
-      disabled={disabled || atMin}
-      onclick={() => commit(stepFrom - step)}
-    >
-      <i class="fas fa-chevron-down" aria-hidden="true"></i>
-    </button>
+    <!-- Increment on TOP, so the stack reads the way a spinner does. -->
+    {@render incrementAdjunct()}
+    {@render numericField()}
+    {@render decrementAdjunct()}
   {:else}
-    <button
-      type="button"
-      class="fab-stepper-adjunct"
-      data-stepper-decrement
-      aria-label={decrementLabel || undefined}
-      disabled={disabled || atMin}
-      onclick={() => commit(stepFrom - step)}
-    >
-      <i class="fas fa-minus" aria-hidden="true"></i>
-    </button>
-    <input
-      type="number"
-      class="fab-stepper-input"
-      data-stepper-input
-      value={displayValue}
-      min={min ?? undefined}
-      max={max ?? undefined}
-      {step}
-      {disabled}
-      aria-label={ariaLabel || undefined}
-      oninput={onInput}
-      onblur={onBlur}
-      {...inputProps}
-      placeholder={resolvedPlaceholder}
-    />
-    <button
-      type="button"
-      class="fab-stepper-adjunct"
-      data-stepper-increment
-      aria-label={incrementLabel || undefined}
-      disabled={disabled || atMax}
-      onclick={() => commit(stepFrom + step)}
-    >
-      <i class="fas fa-plus" aria-hidden="true"></i>
-    </button>
+    {@render decrementAdjunct()}
+    {@render numericField()}
+    {@render incrementAdjunct()}
   {/if}
 </div>
 
