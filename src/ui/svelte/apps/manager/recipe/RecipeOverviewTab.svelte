@@ -13,7 +13,9 @@
 -->
 <script>
   import Chip from '../Chip.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import RecipeModeBanner from './RecipeModeBanner.svelte';
+  import { formatList, localize } from '../../../util/foundryBridge.js';
+  import { resolveRecipeModifierAuthority } from '../../../../../systems/craftingModifierResolver.js';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
   import {
     GENERAL_RECIPE_CATEGORY,
@@ -55,14 +57,32 @@
     // only for a routed+fixed system, so the "Minimum success tier" control below
     // auto-hides everywhere else.
     minSuccessTierOptions = [],
-    // Per-recipe crafting-check modifier override (issue 770). `craftingModifierOptions`
-    // is the system's `checkModifiers` catalogue ({id,label}); non-empty only when the
-    // system's crafting check is usable and a catalogue is authored, so the control
-    // auto-hides everywhere else. `craftingModifierPolicyDefault` is the system default
-    // policy, surfaced in the "Inherit" option label. The control writes
-    // `recipe.craftingModifier` ({ policy?, modifierIds? } | null): null inherits.
+    // Per-recipe crafting-check modifier override (issue 770, reshaped by issue 1055).
+    // `craftingModifierOptions` is the system's `checkModifiers` catalogue ({id,label});
+    // an empty catalogue hides the whole surface. `craftingModifierPolicyDefault` is the
+    // system's combination rule, surfaced in the "Inherit" option label, and
+    // `craftingModifierDefaultIds` its default eligible set, which the Inherit state and
+    // the `none` summary NAME rather than describe abstractly.
+    //
+    // The control writes `recipe.craftingModifier` ({ policy?, modifierIds? } | null).
+    // The two keys are two independent axes: an absent `policy` inherits the rule, an
+    // absent `modifierIds` inherits the set, and an AUTHORED EMPTY `modifierIds` is "no
+    // modifiers" — a real override that resolves `@craftingmod` to 0, not an absence.
     craftingModifierOptions = [],
     craftingModifierPolicyDefault = 'addAll',
+    craftingModifierDefaultIds = [],
+    // How much of the above this system delegates (issue 1055): 'none' | 'setOnly' |
+    // 'setAndRule', or ABSENT for a system not yet stamped. Deliberately undefined by
+    // default and NOT coerced at any call site on the way here — `resolveRecipeModifierAuthority`
+    // owns what absence means, and it must mean the same thing here as in the engine.
+    craftingModifierAuthority = undefined,
+    // Why the system's active crafting check reaches no `@craftingmod` ('' when it does):
+    // 'noCheck' | 'noFormula' | 'noPlaceholder'. Any of the three makes a per-recipe
+    // override inert, so the control is replaced by a banner that says which — the Checks
+    // tab explaining it is no use to a GM looking at this tab.
+    craftingModifierInertCause = '',
+    // Deep link to the Checks tab, where both the catalogue and the authority level live.
+    onOpenChecks = () => {},
     // `recipe.locked` — persisted, engine-honoured (`guardCraftStart` refuses a
     // locked craft) and, until issue 643, written by NOTHING in the UI. Its write
     // path is never gated, unlike enable: a GM locks a recipe precisely while it is
@@ -100,44 +120,129 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Per-recipe crafting-modifier override state (issue 770). `overridePolicy` drives the
-  // select ('' = inherit the system default); `hasModifierOverride` decides whether the
-  // per-modifier picker shows. Writing null clears the override entirely (inherit).
+  // Per-recipe crafting-modifier override state (issue 770, reshaped by issue 1055).
+  // `byRecipe` is gone from the rule list: it never named a rule, it named who decides,
+  // and that is now the system's authority level.
   const MODIFIER_POLICY_LABELS = {
     addAll: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyAddAll', 'Add all'),
     highest: () => text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHighest', 'Highest'),
-    byRecipe: () =>
-      text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe', 'By recipe'),
     playerPicks: () =>
       text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicks', 'Player picks'),
   };
+  const MODIFIER_SET_LABEL_ID = 'manager-recipe-crafting-modifier-label';
+
+  // The banner copy for each inert cause. Same three causes the Checks card names, said
+  // from this tab's point of view: what the GM loses here, not what to fix there.
+  const MODIFIER_INERT_COPY = {
+    noCheck: {
+      key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoCheck',
+      fallback:
+        'This system resolves without a crafting check, so per-recipe check modifiers would change nothing.',
+    },
+    noFormula: {
+      key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoFormula',
+      fallback:
+        'The system’s crafting check has no roll formula yet, so per-recipe check modifiers would change nothing.',
+    },
+    noPlaceholder: {
+      key: 'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertNoPlaceholder',
+      fallback:
+        'The system’s crafting-check formula never references @craftingmod, so per-recipe check modifiers would change nothing.',
+    },
+  };
+
   const overridePolicy = $derived(recipe?.craftingModifier?.policy || '');
   const overrideModifierIds = $derived(recipe?.craftingModifier?.modifierIds || []);
-  const hasModifierOverride = $derived(!!recipe?.craftingModifier);
   const defaultPolicyLabel = $derived(
     (MODIFIER_POLICY_LABELS[craftingModifierPolicyDefault] || MODIFIER_POLICY_LABELS.addAll)()
   );
 
-  function changeModifierPolicy(value) {
-    if (!value) {
-      onUpdateRecipe({ craftingModifier: null });
-      return;
-    }
-    const modifierIds = recipe?.craftingModifier?.modifierIds || [];
-    onUpdateRecipe({
-      craftingModifier: { policy: value, ...(modifierIds.length ? { modifierIds } : {}) },
-    });
+  // What the ENGINE would honour, so an unstamped system keeps the pre-1055 controls
+  // rather than losing them to an invented default.
+  const modifierAuthority = $derived(
+    resolveRecipeModifierAuthority({ recipeModifierAuthority: craftingModifierAuthority })
+  );
+  const modifierInert = $derived(MODIFIER_INERT_COPY[craftingModifierInertCause] || null);
+  const hasModifierCatalogue = $derived(craftingModifierOptions.length > 0);
+  // Three dispositions, mutually exclusive: the inert banner beats everything (nothing
+  // authored here could matter), then the read-only summary at `none`, then the controls.
+  const showModifierInert = $derived(hasModifierCatalogue && !!modifierInert);
+  const showModifierSummary = $derived(
+    hasModifierCatalogue && !modifierInert && modifierAuthority === 'none'
+  );
+  const showModifierControls = $derived(
+    hasModifierCatalogue && !modifierInert && modifierAuthority !== 'none'
+  );
+
+  // The tri-state the eligible-set select reads back. An authored empty array is "no
+  // modifiers", NOT "inherit" — that collapse is the pre-1055 defect this replaces — so
+  // the discriminator is `Array.isArray`, exactly as it is in `Recipe` and the resolver.
+  function setModeOf(craftingModifier) {
+    if (!Array.isArray(craftingModifier?.modifierIds)) return 'inherit';
+    return craftingModifier.modifierIds.length > 0 ? 'custom' : 'none';
+  }
+  const modifierSetMode = $derived(setModeOf(recipe?.craftingModifier));
+
+  // Name the modifiers a set actually contains, through the ACTIVE language's list
+  // conventions — "Medicine, Alchemy and Herbalism" is a language rule, not a separator.
+  function modifierNames(ids) {
+    const byId = new Map(craftingModifierOptions.map((option) => [option.id, option.label]));
+    return formatList(
+      (Array.isArray(ids) ? ids : [])
+        .filter((id) => byId.has(id))
+        .map(
+          (id) =>
+            byId.get(id) ||
+            text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')
+        )
+    );
+  }
+  const inheritedNames = $derived(modifierNames(craftingModifierDefaultIds));
+
+  // One writer for the whole override, so the two axes cannot clobber each other: an
+  // empty bag means "no override at all" (null) and every other shape is preserved
+  // verbatim, INCLUDING `modifierIds: []`.
+  function emitCraftingModifier(next) {
+    onUpdateRecipe({ craftingModifier: Object.keys(next).length > 0 ? next : null });
   }
 
+  function changeModifierPolicy(value) {
+    const next = {};
+    if (value) next.policy = value;
+    const ids = recipe?.craftingModifier?.modifierIds;
+    if (Array.isArray(ids)) next.modifierIds = [...ids];
+    emitCraftingModifier(next);
+  }
+
+  // Inherit drops the key; Custom set seeds from what is already chosen, falling back to
+  // the system default set so "customize" starts from what the recipe was inheriting
+  // rather than from nothing; No modifiers writes the authored empty array.
+  function changeModifierSetMode(mode) {
+    const next = {};
+    const policy = recipe?.craftingModifier?.policy;
+    if (policy) next.policy = policy;
+    if (mode === 'custom') {
+      const seed =
+        overrideModifierIds.length > 0 ? overrideModifierIds : craftingModifierDefaultIds;
+      next.modifierIds = [...seed];
+    } else if (mode === 'none') {
+      next.modifierIds = [];
+    }
+    emitCraftingModifier(next);
+  }
+
+  // Clearing the LAST pill posts `{ modifierIds: [] }` — an authored empty set — never
+  // `null`. Posting null made emptying the row mean "inherit", so a GM could not express
+  // "this recipe gets no check modifiers" at all (issue 1055, defect 3).
   function toggleModifierId(id, checked) {
     const current = recipe?.craftingModifier?.modifierIds || [];
     const modifierIds = checked
       ? [...new Set([...current, id])]
       : current.filter((existing) => existing !== id);
-    const next = {};
-    if (recipe?.craftingModifier?.policy) next.policy = recipe.craftingModifier.policy;
-    if (modifierIds.length) next.modifierIds = modifierIds;
-    onUpdateRecipe({ craftingModifier: Object.keys(next).length ? next : null });
+    const next = { modifierIds };
+    const policy = recipe?.craftingModifier?.policy;
+    if (policy) next.policy = policy;
+    emitCraftingModifier(next);
   }
 
   const STEP_MODE_OPTIONS = [
@@ -331,57 +436,165 @@
         </select>
       </label>
     {/if}
-    {#if craftingModifierOptions.length > 0}
-      <label class="manager-recipe-field" data-recipe-crafting-modifier>
-        <span class="manager-recipe-micro-label"
-          >{text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}</span
-        >
-        <select
-          data-recipe-field="craftingModifierPolicy"
-          value={overridePolicy}
-          onchange={(event) => changeModifierPolicy(event.currentTarget.value || null)}
-          disabled={saving}
-        >
-          <option value=""
-            >{text(
-              'FABRICATE.Admin.Manager.Recipe.CraftingModifierInherit',
-              'Inherit system default'
-            ) + ` (${defaultPolicyLabel})`}</option
-          >
-          <option value="addAll">{MODIFIER_POLICY_LABELS.addAll()}</option>
-          <option value="highest">{MODIFIER_POLICY_LABELS.highest()}</option>
-          <option value="byRecipe">{MODIFIER_POLICY_LABELS.byRecipe()}</option>
-          <option value="playerPicks">{MODIFIER_POLICY_LABELS.playerPicks()}</option>
-        </select>
-      </label>
-      {#if hasModifierOverride}
-        <div class="manager-recipe-field" data-recipe-crafting-modifier-picker>
+    <!-- Check-modifier override (issue 1055). The system's authority level decides what
+         renders: `setAndRule` gets the rule select AND the picker cell, `setOnly` the
+         picker cell alone, `none` neither (a read-only banner below the grid instead).
+         The grid's worst case therefore stays at five items — Category, Check tier, Min
+         success tier, rule select, picker cell — which is why the tri-state select lives
+         INSIDE the picker cell rather than becoming a sixth. -->
+    {#if showModifierControls}
+      {#if modifierAuthority === 'setAndRule'}
+        <label class="manager-recipe-field" data-recipe-crafting-modifier>
           <span class="manager-recipe-micro-label"
+            >{text(
+              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading',
+              'Combination rule'
+            )}</span
+          >
+          <select
+            data-recipe-field="craftingModifierPolicy"
+            value={overridePolicy}
+            onchange={(event) => changeModifierPolicy(event.currentTarget.value || null)}
+            disabled={saving}
+          >
+            <option value=""
+              >{text(
+                'FABRICATE.Admin.Manager.Recipe.CraftingModifierInherit',
+                'Inherit system default'
+              ) + ` (${defaultPolicyLabel})`}</option
+            >
+            <option value="addAll">{MODIFIER_POLICY_LABELS.addAll()}</option>
+            <option value="highest">{MODIFIER_POLICY_LABELS.highest()}</option>
+            <option value="playerPicks">{MODIFIER_POLICY_LABELS.playerPicks()}</option>
+          </select>
+        </label>
+      {/if}
+      <div class="manager-recipe-field" data-recipe-crafting-modifier-picker>
+        <label class="manager-recipe-modifier-set-field">
+          <span class="manager-recipe-micro-label" id={MODIFIER_SET_LABEL_ID}
             >{text(
               'FABRICATE.Admin.Manager.Recipe.CraftingModifierPick',
               'Eligible modifiers'
             )}</span
           >
+          <select
+            data-recipe-field="craftingModifierSet"
+            value={modifierSetMode}
+            onchange={(event) => changeModifierSetMode(event.currentTarget.value)}
+            disabled={saving}
+          >
+            <option value="inherit"
+              >{text(
+                'FABRICATE.Admin.Manager.Recipe.CraftingModifierSetInherit',
+                'Inherit system default'
+              )}</option
+            >
+            <option value="custom"
+              >{text(
+                'FABRICATE.Admin.Manager.Recipe.CraftingModifierSetCustom',
+                'Custom set'
+              )}</option
+            >
+            <option value="none"
+              >{text(
+                'FABRICATE.Admin.Manager.Recipe.CraftingModifierSetNone',
+                'No modifiers'
+              )}</option
+            >
+          </select>
+        </label>
+        {#if modifierSetMode === 'inherit'}
+          <!-- Under Inherit there is nothing to author, so the pill row and its menu
+               button are hidden and the inherited set is NAMED instead — "inheriting"
+               with no names told the GM nothing about what this recipe actually rolls. -->
+          <p class="manager-muted" data-recipe-crafting-modifier-inherited>
+            {inheritedNames
+              ? `${text('FABRICATE.Admin.Manager.Recipe.CraftingModifierInherited', 'Inheriting the system default set:')} ${inheritedNames}`
+              : text(
+                  'FABRICATE.Admin.Manager.Recipe.CraftingModifierInheritedEmpty',
+                  'The system default set is empty, so no check modifier applies to this recipe.'
+                )}
+          </p>
+        {:else}
           <ModifierPillSelect
             options={craftingModifierOptions}
             selectedIds={overrideModifierIds}
             disabled={saving}
             testId="recipe-crafting-modifier"
+            labelledBy={MODIFIER_SET_LABEL_ID}
             menuLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierAdd', 'Add modifier')}
             allSelectedLabel={text(
               'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
               'All modifiers selected.'
             )}
             noneSelectedLabel={text(
-              'FABRICATE.Admin.Manager.Recipe.CraftingModifierInheritDefaults',
-              'Inheriting the system default modifiers.'
+              'FABRICATE.Admin.Manager.Recipe.CraftingModifierEmptySet',
+              'No modifiers — @craftingmod resolves to 0 for this recipe.'
             )}
             onToggle={toggleModifierId}
           />
-        </div>
-      {/if}
+        {/if}
+      </div>
     {/if}
   </div>
+
+  <!-- Both banners are FULL-BLEED below the grid, not grid cells: each replaces the
+       control the grid would otherwise hold, and a sentence squeezed into a 220px
+       column would wrap to five lines. They reuse the resolution-mode banner's chrome
+       (issue 1055) with their own tone, so the tab has one visual language for "this is
+       set elsewhere" rather than two. -->
+  {#if showModifierSummary}
+    <RecipeModeBanner
+      tone="neutral"
+      dataAttr="data-recipe-modifier-banner"
+      actionDataAttr="data-recipe-modifier-banner-checks"
+      value="none"
+      icon="fas fa-lock"
+      kicker={text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}
+      label={text(
+        'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityNone',
+        'Set by the system'
+      )}
+      scope={text(
+        'FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem',
+        'set for this crafting system'
+      )}
+      description={inheritedNames
+        ? `${text('FABRICATE.Admin.Manager.Recipe.CraftingModifierNoneSummary', 'This system sets check modifiers for every recipe. This one uses:')} ${inheritedNames}`
+        : text(
+            'FABRICATE.Admin.Manager.Recipe.CraftingModifierNoneSummaryEmpty',
+            'This system sets check modifiers for every recipe, and its default set is empty, so none applies here.'
+          )}
+      actionLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecks', 'Checks tab')}
+      actionHint={text(
+        'FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecksHint',
+        'Check modifiers, and how much of them a recipe may override, are set for the whole crafting system on the Checks tab.'
+      )}
+      onAction={onOpenChecks}
+    />
+  {/if}
+
+  {#if showModifierInert}
+    <RecipeModeBanner
+      tone="warning"
+      dataAttr="data-recipe-modifier-inert"
+      actionDataAttr="data-recipe-modifier-inert-checks"
+      value={craftingModifierInertCause}
+      icon="fas fa-triangle-exclamation"
+      kicker={text('FABRICATE.Admin.Manager.Recipe.CraftingModifier', 'Check modifiers')}
+      label={text(
+        'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertLabel',
+        'not used by this system’s check'
+      )}
+      description={text(modifierInert.key, modifierInert.fallback)}
+      actionLabel={text('FABRICATE.Admin.Manager.Recipe.CraftingModifierOpenChecks', 'Checks tab')}
+      actionHint={text(
+        'FABRICATE.Admin.Manager.Recipe.CraftingModifierInertHint',
+        'The crafting check and its @craftingmod placeholder are authored for the whole crafting system on the Checks tab.'
+      )}
+      onAction={onOpenChecks}
+    />
+  {/if}
 
   <!-- Two side-by-side status cards. "Locked" here means the recipe stays visible to
        players but only a GM can craft it (recipe.locked) — it is unrelated to the image
@@ -529,7 +742,26 @@
 </section>
 
 <style>
-  [data-recipe-crafting-modifier-picker] {
+  /* The picker cell is now a full grid cell that owns its own micro-label, so the
+     0.25rem nudge that used to align a bare pill row under the neighbouring select is
+     gone: at `setOnly` the cell is the only one in the row and that nudge pushed it
+     out of line with Category beside it. The cell stacks label → tri-state → pill row
+     on the shared `.manager-recipe-field` column rules. */
+  .manager-recipe-modifier-set-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+    min-width: 0;
+  }
+
+  /* The pill row reads as the tri-state's consequence, so it sits tight under it. It is
+     a child COMPONENT's root, so this component's scoping hash is not on it — reach it
+     through `:global`, nested under a selector that does carry the hash. */
+  [data-recipe-crafting-modifier-picker] :global([data-modifier-pill-select]) {
     margin-top: 0.25rem;
+  }
+
+  [data-recipe-crafting-modifier-inherited] {
+    margin-block: 0.25rem 0;
   }
 </style>
