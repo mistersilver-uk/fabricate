@@ -36,3 +36,4 @@ packs/*/LOCK
 packs/*/*.log
 design/
 ui-screenshot-artifact/
+node_modules
