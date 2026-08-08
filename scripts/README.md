@@ -339,7 +339,7 @@ Salvage has its own separate mode enum and is not covered by that claim — see 
 A `window`-reach case does not carry its own written excuse.
 Near-identical case comments would rot, so the shortfalls are recorded once per **class** in the
 known-gaps register below, which is where a reviewer can actually find them.
-There are 133 `exact` cases, 4 `window`, and 13 `beyond`, out of 150 total.
+There are 138 `exact` cases, 4 `window`, and 39 `beyond`, out of 181 total.
 
 ## Fidelity gap
 

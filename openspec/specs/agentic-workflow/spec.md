@@ -596,8 +596,12 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 #### Scenario: the producer's own inputs change
 
 - **WHEN** a PR changes the fixture world, the mounting page, or the case registry the producer renders from
-- **THEN** every publishable case is selected, because a change to a shared fixture can alter every frame at once
-- **AND** this holds even though none of those paths is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the whole corpus
+- **THEN** every publishable case is selected by default, because a change to a shared fixture can alter every frame at once
+- **AND** a narrower selection is permitted only on an axis a case already declares about itself, or from a diff whose hunks are verified against the content of the file the producer will actually render
+- **AND** that verification locates each of the diff's hunks by searching the file's own content rather than by trusting the line numbers the hunk header claims, and where the content recurs it accepts the result only when every candidate location attributes the change identically
+- **AND** that distinction matters because the producer renders a merge commit while the diff describes the head it was generated against, so trusting the header's line numbers verifies against a file whose lines may have shifted, and can silently attribute a change to the wrong case where a window of the file recurs verbatim
+- **AND** an input the registry does not narrow, a diff the registry cannot parse, or a verification that finds no anchor — an empty sequence, no occurrence, or occurrences whose candidates disagree — still selects every publishable case
+- **AND** this holds even though none of the producer's own inputs is itself a render file, since selecting on render files alone would select nothing for exactly the changes most able to invalidate the whole corpus
 
 #### Scenario: screenshot capture is blocked
 
