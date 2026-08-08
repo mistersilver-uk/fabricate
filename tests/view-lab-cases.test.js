@@ -1709,6 +1709,183 @@ test('every knowledge or books-scrolls case is inside the sourceMatches-derived 
   assert.ok(derived.size > 0, 'nothing claims the knowledge render files, so the predicate is dead');
 });
 
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// An oracle for `ACTOR_KNOWLEDGE_RENDER_FILES` itself (issue 1052).
+//
+// Every check above trusts the list's CONTENT to derive the expectation it then checks itself
+// against, which is tautological for a change to the list: deleting an entry moves both sides of
+// an assertion together, so `every knowledge or books-scrolls case is inside the sourceMatches-
+// derived set` cannot see the deletion at all. These three checks derive their expectation from
+// something the list does NOT control — the live registry's own admission arithmetic, and the
+// `kinds` tag vocabulary independently of any render-file probe — so a deleted entry actually
+// changes one side without moving the other.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @param {string[]} list Render-file paths, tested against each case's own `sourceMatches`.
+ * @returns {string[]} ids of publishable cases admitted by at least one path in `list`.
+ */
+const admittedCaseIds = (list) =>
+  publishableCases()
+    .filter((viewCase) =>
+      viewCase.sourceMatches.some((pattern) => list.some((file) => pattern.test(file)))
+    )
+    .map((viewCase) => viewCase.id);
+
+/**
+ * Entries in `ACTOR_KNOWLEDGE_RENDER_FILES` that admit no case on their own — because every case
+ * their own path could admit is already admitted by another entry declared in that SAME case's
+ * `sourceMatches`. Follows `UNCLAIMED_BY_DESIGN` in `tests/view-lab-source-coverage.test.js`: a
+ * frozen list of path plus reason, gated below in both directions so a stale exemption cannot
+ * outlive the thing it exempted.
+ *
+ * `RecipeItemEditorTabs.svelte` is redundant for a second reason worth recording but not acting
+ * on here: it is a pure tab strip taking `activeTab`, `badges` and `onSelect` — it reads no owned
+ * copy or learned-recipe data itself, which contradicts this file's own docblock ("the render
+ * files that read an actor's owned recipe-item copies or learned recipes"). Fixing that would mean
+ * editing `scripts/lib/viewLabCases.js`, which this file does not own.
+ */
+const REDUNDANT_BY_DESIGN = Object.freeze([
+  {
+    path: 'src/ui/svelte/apps/manager/BooksScrollsView.svelte',
+    reason:
+      'every case whose sourceMatches admits it also admits recipe-item/RecipeItemEditorTabs.svelte ' +
+      "through that case's own recipe-item/ pattern, so removing this entry alone changes no " +
+      'admitted set',
+  },
+  {
+    path: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
+    reason:
+      'every case whose sourceMatches admits it also admits BooksScrollsView.svelte directly, so ' +
+      'removing this entry alone changes no admitted set',
+  },
+]);
+
+test('every entry in ACTOR_KNOWLEDGE_RENDER_FILES is necessary, or recorded as redundant', () => {
+  // For each entry NOT covered by REDUNDANT_BY_DESIGN: removing it from the list must strictly
+  // shrink the admitted set. This is the direction a deletion of a NECESSARY entry cannot pass —
+  // `KnowledgeView.svelte` and `ItemPageInspector.svelte` both fail it once removed, which is the
+  // issue's own defect reproduced as a positive assertion.
+  const redundantPaths = new Set(REDUNDANT_BY_DESIGN.map((entry) => entry.path));
+  const full = admittedCaseIds(ACTOR_KNOWLEDGE_RENDER_FILES);
+  const notNecessary = [];
+  for (const entry of ACTOR_KNOWLEDGE_RENDER_FILES) {
+    if (redundantPaths.has(entry)) continue;
+    const without = admittedCaseIds(ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => file !== entry));
+    if (without.length >= full.length) notNecessary.push(entry);
+  }
+  assert.deepEqual(
+    notNecessary,
+    [],
+    'these entries admit no case that another entry does not already admit, so removing them from ' +
+      'the list changes nothing — record them in REDUNDANT_BY_DESIGN with a reason, or delete them:\n  ' +
+      notNecessary.join('\n  ')
+  );
+});
+
+test('REDUNDANT_BY_DESIGN entries are still list members, still redundant, and still explained', () => {
+  const full = admittedCaseIds(ACTOR_KNOWLEDGE_RENDER_FILES);
+  for (const entry of REDUNDANT_BY_DESIGN) {
+    // Direction one: a key that is no longer a list member. Renaming the file this entry names
+    // (without updating the exemption) must fail here rather than silently exempting nothing.
+    assert.ok(
+      ACTOR_KNOWLEDGE_RENDER_FILES.includes(entry.path),
+      `REDUNDANT_BY_DESIGN entry "${entry.path}" no longer names a member of ` +
+        'ACTOR_KNOWLEDGE_RENDER_FILES — delete the exemption or fix the rename'
+    );
+    // Direction two: a key that has become necessary. If the registry changes so this entry now
+    // admits a case nothing else does, the exemption itself would hide exactly the defect Task 1
+    // exists to catch.
+    const without = admittedCaseIds(
+      ACTOR_KNOWLEDGE_RENDER_FILES.filter((file) => file !== entry.path)
+    );
+    assert.equal(
+      without.length,
+      full.length,
+      `REDUNDANT_BY_DESIGN entry "${entry.path}" has become necessary — it now admits a case no ` +
+        'other list member admits. Remove the exemption and let the necessity check police it directly.'
+    );
+    assert.ok(
+      typeof entry.reason === 'string' && entry.reason.trim().length > 20,
+      `REDUNDANT_BY_DESIGN entry "${entry.path}" needs a real reason, not a placeholder`
+    );
+  }
+  assert.ok(REDUNDANT_BY_DESIGN.length > 0, 'expected at least one redundant-by-design entry');
+});
+
+/**
+ * Publishable cases the `knowledge`/`books-scrolls` tag vocabulary cannot reach, but which
+ * genuinely render an owned-knowledge surface — proven by declaring one of
+ * `ACTOR_KNOWLEDGE_RENDER_FILES` in their OWN `sourceMatches`, not asserted from outside it. Gated
+ * below the same way REDUNDANT_BY_DESIGN is: a member that stops declaring the render file, or
+ * that gains a `knowledge`/`books-scrolls` tag and so no longer needs the exemption, fails.
+ */
+const KNOWLEDGE_EXTRAS_BY_DESIGN = Object.freeze([
+  {
+    id: 'manager-system-edit-normal',
+    reason:
+      "declares ItemPageInspector.svelte in its own sourceMatches (the System Edit view's " +
+      "learned-by stat) but is tagged ['manager','system-edit'], neither of which is 'knowledge' " +
+      "or 'books-scrolls'",
+  },
+]);
+
+test('the admitted set equals the tagged cases plus the gated extras — nothing wider, nothing narrower', () => {
+  // This is the widening pin. Unlike the necessity check above, this one does not iterate the
+  // list's surviving members — it compares the WHOLE admitted set against an expectation the list
+  // does not control, so deleting a necessary entry (`KnowledgeView.svelte`,
+  // `ItemPageInspector.svelte`) shrinks one side without moving the other, and this fails.
+  const tagged = publishableCases()
+    .filter((viewCase) =>
+      (viewCase.kinds ?? []).some((kind) => ['knowledge', 'books-scrolls'].includes(kind))
+    )
+    .map((viewCase) => viewCase.id);
+  const extraIds = KNOWLEDGE_EXTRAS_BY_DESIGN.map((entry) => entry.id);
+  const expected = new Set([...tagged, ...extraIds]);
+  const admitted = new Set(admittedCaseIds(ACTOR_KNOWLEDGE_RENDER_FILES));
+
+  assert.deepEqual(
+    [...admitted].filter((id) => !expected.has(id)).sort(),
+    [],
+    'the admitted set now includes a case the tag vocabulary and the gated extras do not account ' +
+      'for — either tag it knowledge/books-scrolls, or add a justified KNOWLEDGE_EXTRAS_BY_DESIGN entry'
+  );
+  assert.deepEqual(
+    [...expected].filter((id) => !admitted.has(id)).sort(),
+    [],
+    'the admitted set has shrunk below the tagged cases plus the gated extras — a render file was ' +
+      'deleted from ACTOR_KNOWLEDGE_RENDER_FILES (or a case stopped declaring it) and evidence was ' +
+      'dropped silently'
+  );
+});
+
+test('KNOWLEDGE_EXTRAS_BY_DESIGN entries are still publishable, still untagged, and still justified', () => {
+  for (const entry of KNOWLEDGE_EXTRAS_BY_DESIGN) {
+    const viewCase = getCaseById(entry.id);
+    assert.ok(viewCase, `KNOWLEDGE_EXTRAS_BY_DESIGN entry "${entry.id}" names no case`);
+    assert.ok(
+      viewCase.publish,
+      `KNOWLEDGE_EXTRAS_BY_DESIGN entry "${entry.id}" is no longer publishable`
+    );
+    assert.ok(
+      !(viewCase.kinds ?? []).some((kind) => ['knowledge', 'books-scrolls'].includes(kind)),
+      `KNOWLEDGE_EXTRAS_BY_DESIGN entry "${entry.id}" is now tagged knowledge/books-scrolls — drop ` +
+        'the exemption, the tag vocabulary already covers it'
+    );
+    assert.ok(
+      viewCase.sourceMatches.some((pattern) =>
+        ACTOR_KNOWLEDGE_RENDER_FILES.some((file) => pattern.test(file))
+      ),
+      `KNOWLEDGE_EXTRAS_BY_DESIGN entry "${entry.id}" no longer declares any of ` +
+        `${ACTOR_KNOWLEDGE_RENDER_FILES.join(', ')} in its own sourceMatches`
+    );
+    assert.ok(
+      typeof entry.reason === 'string' && entry.reason.trim().length > 20,
+      `KNOWLEDGE_EXTRAS_BY_DESIGN entry "${entry.id}" needs a real reason, not a placeholder`
+    );
+  }
+});
+
 test('a labActors change outside its fixture tables selects every publishable case', () => {
   const everything = publishableCases().length;
 
