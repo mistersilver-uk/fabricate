@@ -121,9 +121,21 @@
     },
   ];
 
-  // Delegation icons: a padlock keeps every decision at the system, and the two scroll
-  // glyphs hand progressively more of it to the recipe. `fas fa-scroll` was freed by
-  // retiring the `byRecipe` RULE, which is the same idea this axis now carries properly.
+  // Delegation icons: a padlock keeps every decision at the system, a scroll hands the
+  // recipe its own eligible set, and a drafting pen-and-ruler hands it the rule as well.
+  // `fas fa-scroll` was freed by retiring the `byRecipe` RULE, which is the same idea
+  // this axis now carries properly.
+  //
+  // Every glyph here is Font Awesome FREE (`fontAwesomeFreeClassicIcons.js`, generated
+  // from FA Free 6.7.2). Foundry bundles FA Pro, so a Pro glyph would render — but a
+  // community package is not licensed to use one, so the licence, not the rendering, is
+  // what rules it out. `fa-pen-ruler` beats the other Free candidates on the merits too:
+  // it is the only one whose silhouette is not another sheet of paper, so it stays
+  // legible beside `fa-scroll` in a three-up card row, and a drafting instrument reads
+  // as "this recipe may redraw the rule" — exactly the extra power `setAndRule` grants
+  // over `setOnly`. (`file-pen` and `feather-pointed` collide with the scroll's
+  // silhouette and its "a document" reading; `user-pen` says an ACTOR decides, which is
+  // "Player picks" on the other axis; `sliders` says settings, not delegation.)
   const AUTHORITY_OPTIONS = [
     {
       value: 'none',
@@ -145,7 +157,7 @@
     },
     {
       value: 'setAndRule',
-      icon: 'fas fa-scroll-old',
+      icon: 'fas fa-pen-ruler',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthoritySetAndRule',
       fallback: 'Recipes choose set and rule',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthoritySetAndRuleDesc',
@@ -205,7 +217,14 @@
   const overrideCount = $derived(
     Number.isFinite(affectedRecipeCount) ? Math.max(0, Math.trunc(affectedRecipeCount)) : 0
   );
-  const inert = $derived(INERT_COPY[inertCause] || null);
+  // Gated on the catalogue being NON-EMPTY as well as on the cause. The notice reports a
+  // CATALOGUE that reaches no roll, and an empty catalogue is not one: a fresh crafting
+  // system is `simple` + `rollFormula: ''`, so an ungated notice put a permanent warning
+  // callout ("These modifiers reach no roll… Author one above") directly above the
+  // empty-catalogue empty state, warning about nothing on first contact with the tab.
+  // `RecipeOverviewTab` already gates its equivalent banner on `hasModifierCatalogue`;
+  // this is the same rule, on the surface that owns the catalogue.
+  const inert = $derived(modifiers.length > 0 ? INERT_COPY[inertCause] || null : null);
   const defaultIds = $derived(Array.isArray(defaultModifierIds) ? defaultModifierIds : []);
 
   function newId() {
@@ -370,13 +389,20 @@
   <h4 class="manager-modifier-subheading">
     {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'Combination rule')}
   </h4>
+  <!-- Three columns, not the default two. `--manager-radio-card-columns` is a FIXED
+       track count (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so a
+       three-option group at 2 columns strands one card alone on a second row. The rule
+       group was a clean 2x2 before `byRecipe` retired; both groups are now 3-up, and
+       stacked directly on top of each other, so a single orphan card would have read as
+       two. The manager window is 1280px wide, which clears ~260px per card. Precedent:
+       `ToolBreakageTab.svelte`. -->
   <RadioCardGroup
     legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
     legend="Combination rule"
     options={POLICY_OPTIONS}
     selectedValue={selectedPolicy}
     groupName="crafting-modifier-policy"
-    columns={2}
+    columns={3}
     dataAttr="data-crafting-modifier-policy"
     optionDataAttr="data-crafting-modifier-policy-option"
     onChange={selectPolicy}
@@ -397,7 +423,7 @@
     options={AUTHORITY_OPTIONS}
     selectedValue={selectedAuthority}
     groupName="crafting-modifier-authority"
-    columns={2}
+    columns={3}
     dataAttr="data-crafting-modifier-authority"
     optionDataAttr="data-crafting-modifier-authority-option"
     onChange={selectAuthority}
