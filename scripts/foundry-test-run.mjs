@@ -7506,30 +7506,30 @@ async function main() {
               { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask', expression: '@abilities.int.mod' },
               { id: 'herb', label: 'Herbalism', icon: 'fas fa-seedling', expression: '@abilities.dex.mod' }
             ],
-            defaultModifierPolicy: 'highest',
+            // `playerPicks` on the SYSTEM (issue 1055), and it must stay there or this seed stops
+            // working. A recipe can no longer override the combination rule — a recipe chooses
+            // WHICH modifiers apply, never HOW they combine — so the system is the only place the
+            // interactive rule can be authored. Under any other rule the roll resolves
+            // deterministically and the Phase-E interactive modifier fieldset, the capture this
+            // seed exists for, never opens.
+            defaultModifierPolicy: 'playerPicks',
             defaultModifierIds: ['med', 'herb'],
-            // The authority level this system delegates to its recipes (issue 1055), and it must
-            // be `setAndRule` or this seed stops working: Brew Healing Potion below overrides the
-            // combination RULE (`playerPicks`), and the rule axis is honoured only at this level.
-            // At `setOnly` the override would be silently ignored, the system's `highest` would
-            // resolve the roll deterministically, and the Phase-E interactive modifier fieldset —
-            // the capture this seed exists for — would never open.
-            //
-            // Authored rather than left absent even though absence RESOLVES to `setAndRule`. The
-            // smoke's job is to prove the shipped product against a real world, and a world that
-            // depends on an unstamped default is testing the fallback, not the feature.
-            recipeModifierAuthority: 'setAndRule',
+            // NO `maxModifierPicks`: absence is UNLIMITED, which is what makes the prompt render
+            // its MULTI-pick checkbox group ("Pick up to 2") rather than the historical pick-one
+            // radio group. That is the control this change introduces, so it is the one the smoke
+            // photographs against a real Foundry. A cap of 1 would reproduce the pre-change frame
+            // and prove nothing new.
             routed: {
               type: 'relative',
               // `1d20 + 20 + @craftingmod` (base total 21-40, plus a small ability mod) always
               // meets the Masterwork threshold, so the Phase-E Brew Healing Potion craft
               // deterministically succeeds. `@craftingmod` resolves to a scalar BEFORE the
-              // formula reaches Foundry's Roll (issue 770): the recipe's `playerPicks` override
+              // formula reaches Foundry's Roll (issue 770): the SYSTEM's `playerPicks` rule
               // offers the `med` and `herb` modifiers (starter-hero WIS and DEX mods, roughly
-              // -1..+3 each), and whichever the player picks the +20 base absorbs — which is what
-              // makes the choice photographable without making the craft flaky. This comment used
-              // to say `byRecipe` and `alch`, and named neither the policy nor the ids the seed
-              // below actually carries. Before #431 the routed check was authored-only (never
+              // -1..+3 each), and whatever the player leaves ticked the +20 base absorbs — which
+              // is what makes the choice photographable without making the craft flaky. Unbounded
+              // `playerPicks` SUMS the selection (issue 1055), so the worst case is both mods at
+              // once and the margin still holds. Before #431 the routed check was authored-only (never
               // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
               // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
               // the routed-check and validation-tab captures still render their authored outcomes.
@@ -7691,18 +7691,20 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
-          // Per-recipe check-modifier override (issue 856): this recipe overrides the
-          // system's `highest` default policy with `playerPicks`, rendering the Phase-E
-          // interactive roll prompt's modifier selection fieldset. The eligible modifiers
-          // ('med', 'herb') are the system defaults, matching WIS (Medicine) and DEX
-          // (Herbalism), which resolve to different ability scores on the smoke's dnd5e
-          // Starter Hero so the frame shows a real choice with two distinct radio chips.
-          // The `1d20 + 20 + @craftingmod` formula has large margin vs dc 5 Masterwork,
-          // so the craft succeeds regardless of which modifier the player selects. This
-          // recipe is the one selected by Phase-E's `selectCraftingRecipeByMode('routedByCheck')`
-          // (first in DOM order, alphabetically before Forge Iron Sword), making this
-          // the evidence frame for the playerPicks policy (issue 856).
-          craftingModifier: { policy: 'playerPicks', modifierIds: ['med', 'herb'] },
+          // NO per-recipe `craftingModifier` (issues 856, 1055). The interactive fieldset is
+          // reached through the SYSTEM's `playerPicks` rule above, which is the only place that
+          // rule can live now; a recipe persists a PICK and nothing else, and a pick is honoured
+          // only under `byRecipe`. Seeding one here would be inert data that reads as though it
+          // were driving the capture.
+          //
+          // The eligible modifiers ('med', 'herb') are therefore the system defaults, matching WIS
+          // (Medicine) and DEX (Herbalism), which resolve to different ability scores on the
+          // smoke's dnd5e Starter Hero so the frame shows two distinct value chips. The
+          // `1d20 + 20 + @craftingmod` formula has large margin vs dc 5 Masterwork, so the craft
+          // succeeds whichever boxes the player leaves ticked. This recipe is the one selected by
+          // Phase-E's `selectCraftingRecipeByMode('routedByCheck')` (first in DOM order,
+          // alphabetically before Forge Iron Sword), making it the evidence frame for the
+          // multi-pick prompt.
           // Single result group → produced on any non-failure outcome. The Phase-E
           // craft rolls `1d20 + 20 + @craftingmod` (always Masterwork), so this craft
           // deterministically succeeds and yields the single "Brewed Potion" group.
@@ -10132,39 +10134,38 @@ async function main() {
 
         // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
         // 770, re-aimed by issue 1055). The seed authors a populated catalogue (Medicine
-        // / Alchemy / Herbalism) with a "Highest" default combination rule and a
-        // `setAndRule` authority level, so the frame shows the redesigned rows —
-        // IconPicker + label + the `@`-adorned expression field — plus both axis groups
-        // and the downgrade-impact line the one overriding recipe produces. A DEDICATED
-        // frame (not the failure-consumption one above, which the same tab scrolls
-        // elsewhere for) so both cards get exact, un-cropped evidence.
+        // / Alchemy / Herbalism) on the `playerPicks` combination rule, so the frame
+        // shows the redesigned rows — IconPicker + label + the `@`-adorned expression
+        // field — plus the four-option rule group and the pick-cap field that the two
+        // SELECTING rules reveal, in its blank "Unlimited" state. A DEDICATED frame (not
+        // the failure-consumption one above, which the same tab scrolls elsewhere for) so
+        // both cards get exact, un-cropped evidence.
         try {
           const modifierCard = page
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
             .first();
           await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
-          // Scroll to the AUTHORITY radio-group rather than the card top or the rule
-          // group: the card now authors two axes (issue 1055) as two stacked
-          // RadioCardGroups — the combination rule (Add all / Highest / Player picks,
-          // three options since `byRecipe` was retired off this axis) and the authority
-          // level (none / setOnly / setAndRule). `scrollIntoViewIfNeeded` lands its
-          // anchor near the bottom edge, so anchoring the LOWER of the two frames both,
-          // with the IconPicker/label/@-expression rows above them for context.
-          // Anchoring the rule group — which is what this did — now crops the authority
-          // group out of the one frame that exists to show the axes are separate.
+          // Scroll to the PICK-CAP field rather than the card top or the rule group: the
+          // card authors two things (issue 1055) — the four-option combination rule as a
+          // 2x2 RadioCardGroup (Add all / Highest / Recipe picks / Player picks), and,
+          // under the two rules that DEFER the selection, the `maxModifierPicks` cap.
+          // `scrollIntoViewIfNeeded` lands its anchor near the bottom edge, so anchoring
+          // the LOWER of the two frames both, with the IconPicker/label/@-expression rows
+          // above them for context. Anchoring the rule group would crop out the field
+          // whose appearance is the consequence of the selected rule.
           //
-          // The GROUP, and a scroll rather than a click. Targeting an option's inner
+          // The FIELD, and a scroll rather than a click. Targeting a rule option's inner
           // radio is the segmented-control interception trap, and
           // `tests/screenshot-capture-scoping.test.js` bans that selector shape in this
           // file generically — over the shape rather than over any literal attribute
           // name, because this harness spells that family by interpolation. (The same
-          // shape is legal in `scripts/lib/viewLabCases.js`, which drives the authority
-          // levels: RadioCardGroup's radio is a visible in-flow control, and the ban
-          // there would be an over-ban.) Nothing here needs to press an authority card
-          // anyway — the seed authors `setAndRule` — and if that ever changes,
-          // `clickSegment()` targets the wrapping label, which is the safe route.
-          const authorityGroup = modifierCard.locator('[data-crafting-modifier-authority]').first();
-          await authorityGroup.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+          // shape is legal in `scripts/lib/viewLabCases.js`, which drives the rules:
+          // RadioCardGroup's radio is a visible in-flow control, and the ban there would
+          // be an over-ban.) Nothing here needs to press a rule card anyway — the seed
+          // authors `playerPicks` — and if that ever changes, `clickSegment()` targets
+          // the wrapping label, which is the safe route.
+          const maxPicksField = modifierCard.locator('[data-crafting-modifier-max-picks]').first();
+          await maxPicksField.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-checks-crafting-modifiers');
           process.stdout.write('  D0: checks crafting modifiers screenshotted\n');

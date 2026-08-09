@@ -1,11 +1,11 @@
 /**
- * Issue 1055 — the check-modifier authority across export -> import.
+ * Issue 1055 — the check-modifier pick cap across export -> import.
  *
  * The world-side `1.20.0` migration cannot help a bundle: an import arrives as JSON and
  * never passes through the settings the runner reads. `migrateExportPayload` mirrors the
- * derivation for the import path, and this drives the whole chain a GM actually takes —
- * `buildExportPayload` -> `prepareForImport` -> `CompendiumImporter.importFromPackData`
- * — rather than the derivation in isolation.
+ * stamp for the import path, and this drives the whole chain a GM actually takes —
+ * `buildExportPayload` -> `prepareForImport` -> `CompendiumImporter.importFromPackData` —
+ * rather than the derivation in isolation.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,11 +17,10 @@ installFoundryUtilsEnv();
 globalThis.game = { packs: [], fabricate: null, user: { isGM: true } };
 
 const { CompendiumImporter } = await import('../src/systems/CompendiumImporter.js');
-const { buildExportPayload, prepareForImport, validateImportData } = await import(
-  '../src/systems/CraftingSystemExporter.js'
-);
+const { buildExportPayload, prepareForImport, validateImportData } =
+  await import('../src/systems/CraftingSystemExporter.js');
 
-const AUTHORITY = 'recipeModifierAuthority';
+const MAX_PICKS = 'maxModifierPicks';
 
 function exportedSystem(craftingCheck = {}) {
   return {
@@ -29,7 +28,10 @@ function exportedSystem(craftingCheck = {}) {
     name: 'Legacy Herbalism',
     components: [],
     craftingCheck: {
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+      checkModifiers: [
+        { id: 'med', label: 'Medicine', expression: '@med' },
+        { id: 'alch', label: 'Alchemy', expression: '@alch' },
+      ],
       defaultModifierPolicy: 'addAll',
       defaultModifierIds: ['med'],
       ...craftingCheck,
@@ -48,7 +50,7 @@ function exportedRecipe(craftingModifier, id = 'r-1') {
   };
 }
 
-/** A pre-1055 bundle: no authority key anywhere, a legacy delegating policy. */
+/** A pre-1055 bundle: no cap key anywhere. */
 function legacyBundle({ system = exportedSystem(), recipes = [] } = {}) {
   return { fabricateVersion: '1.5.0', system, recipes };
 }
@@ -97,37 +99,42 @@ function makeRecipeManager({ created = [], updated = [], persisted = [] } = {}) 
 }
 
 // ---------------------------------------------------------------------------
-// prepareForImport derives the level before the importer ever sees the payload
+// prepareForImport stamps the cap before the importer ever sees the payload
 // ---------------------------------------------------------------------------
 
-test('prepareForImport derives setAndRule for a legacy bundle whose recipes carry overrides', () => {
+test('prepareForImport caps a legacy playerPicks bundle at one pick', () => {
   const packData = prepareForImport(
-    legacyBundle({ recipes: [exportedRecipe({ policy: 'byRecipe', modifierIds: ['med'] })] })
+    legacyBundle({ system: exportedSystem({ defaultModifierPolicy: 'playerPicks' }) })
   );
-  assert.equal(packData.system.craftingCheck[AUTHORITY], 'setAndRule');
   assert.equal(
-    packData.recipes[0].craftingModifier.policy,
-    'addAll',
-    'and the retired rule is rewritten on the way in'
+    packData.system.craftingCheck[MAX_PICKS],
+    1,
+    'an imported system behaves exactly like a migrated one rather than arriving unbounded'
   );
 });
 
-test('prepareForImport derives setAndRule from a legacy system-level byRecipe policy', () => {
+test('prepareForImport leaves a byRecipe bundle unbounded and its recipe picks intact', () => {
   const packData = prepareForImport(
-    legacyBundle({ system: exportedSystem({ defaultModifierPolicy: 'byRecipe' }) })
+    legacyBundle({
+      system: exportedSystem({ defaultModifierPolicy: 'byRecipe' }),
+      recipes: [exportedRecipe({ modifierIds: ['med', 'alch'] })],
+    })
   );
-  assert.equal(packData.system.craftingCheck.defaultModifierPolicy, 'addAll');
-  assert.equal(packData.system.craftingCheck[AUTHORITY], 'setAndRule');
+  assert.equal(packData.system.craftingCheck.defaultModifierPolicy, 'byRecipe');
+  assert.equal(Object.hasOwn(packData.system.craftingCheck, MAX_PICKS), false);
+  assert.deepEqual(packData.recipes[0].craftingModifier, { modifierIds: ['med', 'alch'] });
 });
 
-test('prepareForImport derives none for a bundle that never delegated', () => {
+test('prepareForImport leaves a non-selecting rule unbounded', () => {
   const packData = prepareForImport(legacyBundle({ recipes: [exportedRecipe(undefined)] }));
-  assert.equal(packData.system.craftingCheck[AUTHORITY], 'none');
+  assert.equal(Object.hasOwn(packData.system.craftingCheck, MAX_PICKS), false);
 });
 
-test('validateImportData accepts a bundle carrying the new authority field', () => {
+test('validateImportData accepts a bundle carrying the new cap field', () => {
   const result = validateImportData(
-    legacyBundle({ system: exportedSystem({ [AUTHORITY]: 'setOnly' }) })
+    legacyBundle({
+      system: exportedSystem({ defaultModifierPolicy: 'playerPicks', [MAX_PICKS]: 2 }),
+    })
   );
   assert.equal(result.valid, true, result.errors.join('; '));
 });
@@ -136,7 +143,7 @@ test('validateImportData accepts a bundle carrying the new authority field', () 
 // The importer itself
 // ---------------------------------------------------------------------------
 
-test('importing a legacy bundle creates a system carrying the derived authority', async () => {
+test('importing a legacy playerPicks bundle creates a system carrying the stamped cap', async () => {
   const created = [];
   const importer = new CompendiumImporter(
     makeSystemManager({ created }),
@@ -145,35 +152,43 @@ test('importing a legacy bundle creates a system carrying the derived authority'
 
   const summary = await importer.importFromPackData(
     prepareForImport(
-      legacyBundle({ recipes: [exportedRecipe({ policy: 'byRecipe', modifierIds: ['med'] })] })
+      legacyBundle({ system: exportedSystem({ defaultModifierPolicy: 'playerPicks' }) })
     )
   );
 
   assert.equal(summary.system.created, true);
-  assert.equal(created[0].craftingCheck[AUTHORITY], 'setAndRule');
+  assert.equal(created[0].craftingCheck[MAX_PICKS], 1);
 });
 
-test('importing a bundle that never delegated creates it undelegated', async () => {
+test('importing a byRecipe bundle creates it unbounded', async () => {
   const created = [];
   const importer = new CompendiumImporter(makeSystemManager({ created }), makeRecipeManager());
   await importer.importFromPackData(
-    prepareForImport(legacyBundle({ recipes: [exportedRecipe(undefined)] }))
+    prepareForImport(
+      legacyBundle({
+        system: exportedSystem({ defaultModifierPolicy: 'byRecipe' }),
+        recipes: [exportedRecipe({ modifierIds: ['med', 'alch'] })],
+      })
+    )
   );
-  assert.equal(created[0].craftingCheck[AUTHORITY], 'none');
+  assert.equal(
+    Object.hasOwn(created[0].craftingCheck, MAX_PICKS),
+    false,
+    'a recipe already picking two modifiers is not truncated by an unasked-for cap'
+  );
 });
 
 test('an OVERWRITE import replaces the existing check block wholesale (issue 1055, accepted)', async () => {
   // `updateSystem` shallow-merges only the TOP level, so an incoming `craftingCheck`
-  // replaces the existing one entirely. The incoming block always carries a derived
-  // level, so the GM's local choice is superseded by the bundle's — accepted, because
-  // the level is a property of the bundle's own recipes and is re-authorable in one
-  // click. What must NOT happen is a silent drop to an unresolved key on a system that
-  // had one, which would leave the authoring card showing a level nobody chose.
+  // replaces the existing one entirely. The incoming block carries whatever cap the
+  // bundle resolved to, so the GM's local cap is superseded by the bundle's — accepted,
+  // because the cap is a property of the bundle's own rule and is re-authorable in one
+  // click.
   const updated = [];
   const existing = {
     id: 'sys-legacy',
     name: 'Legacy Herbalism',
-    craftingCheck: { [AUTHORITY]: 'none', defaultModifierPolicy: 'highest' },
+    craftingCheck: { defaultModifierPolicy: 'highest', [MAX_PICKS]: 5 },
   };
   const importer = new CompendiumImporter(
     makeSystemManager({ systems: [existing], updated }),
@@ -182,16 +197,16 @@ test('an OVERWRITE import replaces the existing check block wholesale (issue 105
 
   const summary = await importer.importFromPackData(
     prepareForImport(
-      legacyBundle({ recipes: [exportedRecipe({ modifierIds: ['med'] })] })
+      legacyBundle({ system: exportedSystem({ defaultModifierPolicy: 'playerPicks' }) })
     ),
     { overwriteExisting: true }
   );
 
   assert.equal(summary.collisions[0].resolution, 'overwritten');
   assert.equal(
-    updated[0].craftingCheck[AUTHORITY],
-    'setAndRule',
-    'the incoming block wins wholesale, and it carries a RESOLVED level'
+    updated[0].craftingCheck[MAX_PICKS],
+    1,
+    'the incoming block wins wholesale, and it carries a RESOLVED cap'
   );
 });
 
@@ -214,27 +229,40 @@ test('a non-overwrite import of an existing system writes nothing at all', async
 // Round trip
 // ---------------------------------------------------------------------------
 
-test('export -> import round-trips the authored authority and every recipe override', async () => {
+test('export -> import round-trips the authored cap, the byRecipe rule and every recipe pick', async () => {
   const source = {
     id: 'sys-round',
     name: 'Round Trip',
     components: [],
     craftingCheck: {
-      checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
-      defaultModifierPolicy: 'highest',
+      checkModifiers: [
+        { id: 'med', label: 'Medicine', expression: '@med' },
+        { id: 'alch', label: 'Alchemy', expression: '@alch' },
+      ],
+      defaultModifierPolicy: 'byRecipe',
       defaultModifierIds: ['med'],
-      [AUTHORITY]: 'setOnly',
+      [MAX_PICKS]: 2,
     },
   };
   const sourceRecipes = [
-    { id: 'r-set', name: 'Subset', craftingSystemId: 'sys-round', craftingModifier: { modifierIds: ['med'] } },
+    {
+      id: 'r-set',
+      name: 'Subset',
+      craftingSystemId: 'sys-round',
+      craftingModifier: { modifierIds: ['med'] },
+    },
     // The one shape a truthiness test silently loses.
-    { id: 'r-empty', name: 'Empty', craftingSystemId: 'sys-round', craftingModifier: { modifierIds: [] } },
+    {
+      id: 'r-empty',
+      name: 'Empty',
+      craftingSystemId: 'sys-round',
+      craftingModifier: { modifierIds: [] },
+    },
     { id: 'r-plain', name: 'Plain', craftingSystemId: 'sys-round', craftingModifier: null },
   ];
 
   const payload = buildExportPayload(source, sourceRecipes, '2.0.0');
-  assert.equal(payload.system.craftingCheck[AUTHORITY], 'setOnly', 'the level is exported');
+  assert.equal(payload.system.craftingCheck[MAX_PICKS], 2, 'the cap is exported');
 
   const created = [];
   const createdRecipes = [];
@@ -246,16 +274,17 @@ test('export -> import round-trips the authored authority and every recipe overr
   await importer.importFromPackData(prepareForImport(JSON.parse(JSON.stringify(payload))));
 
   assert.equal(
-    created[0].craftingCheck[AUTHORITY],
-    'setOnly',
-    'an authored level survives the round trip — it is not re-derived as setAndRule'
+    created[0].craftingCheck[MAX_PICKS],
+    2,
+    'an authored cap survives the round trip — it is not re-derived as 1'
   );
+  assert.equal(created[0].craftingCheck.defaultModifierPolicy, 'byRecipe');
   const byId = new Map(createdRecipes.map((recipe) => [recipe.id, recipe]));
   assert.deepEqual(byId.get('r-set').craftingModifier, { modifierIds: ['med'] });
   assert.deepEqual(
     byId.get('r-empty').craftingModifier,
     { modifierIds: [] },
-    'an authored EMPTY set survives as an override, not as an absence'
+    'an authored EMPTY set survives as a pick, not as an absence'
   );
   assert.equal(byId.get('r-plain').craftingModifier, null);
 });

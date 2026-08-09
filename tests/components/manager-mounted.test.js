@@ -589,8 +589,9 @@ function compileManagerRoot() {
     'src/utils/matchFolderVocabulary.js',
     // The `@craftingmod` ownership module (issues 770, 1055). The root, the Checks
     // card and the recipe Overview tab all import it — the root to pick the check its
-    // resolution mode actually rolls, the two cards to resolve what an ABSENT
-    // `recipeModifierAuthority` means. This list has NO dependency validator, so
+    // resolution mode actually rolls, the two cards to normalize the combination rule,
+    // ask whether it defers the selection, and resolve what an ABSENT
+    // `maxModifierPicks` means. This list has NO dependency validator, so
     // omitting it does not fail the suite: every mounted manager test is reported as
     // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
     'src/systems/craftingModifierResolver.js',
@@ -1259,6 +1260,10 @@ function createStore(calls = [], options = {}) {
         ? []
         : [
             {
+              // `recipeOverrides` patches the recipe `openRecipeEditor` opens, so a test
+              // can seed a persisted field (a `craftingModifier` pick, say) without
+              // restating this whole fixture list as its own `options.recipes`.
+              ...options.recipeOverrides,
               id: 'r1',
               name: 'Healing Draught',
               img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
@@ -4373,63 +4378,133 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  // The check-modifier RULE and AUTHORITY groups are both rendered through the shared
-  // RadioCardGroup primitive (issues 855, 1055), and their hook attributes are a
-  // hand-maintained mirror: `scripts/foundry-test-run.mjs` scrolls to
-  // `[data-crafting-modifier-policy]` for the smoke frame and `scripts/lib/viewLabCases.js`
-  // clicks `[data-crafting-modifier-policy-option="playerPicks"] input` /
-  // `[data-crafting-modifier-authority-option="…"] input`. Neither producer runs in
-  // `npm test`, so re-plumbing either group through a different primitive could drop an
-  // attribute with no unit failure at all. Pin both groups here — the authority axis is
-  // new, and it earns the same pinning for the same reason.
+  // The check-modifier RULE group is rendered through the shared RadioCardGroup primitive
+  // (issues 855, 1055), and its hook attributes are a hand-maintained mirror:
+  // `scripts/foundry-test-run.mjs` scrolls to `[data-crafting-modifier-policy]` for the
+  // smoke frame and `scripts/lib/viewLabCases.js` clicks
+  // `[data-crafting-modifier-policy-option="…"] input`. Neither producer runs in
+  // `npm test`, so re-plumbing the group through a different primitive could drop an
+  // attribute with no unit failure at all.
   //
-  // `byRecipe` is deliberately absent from the rule list: it never named a rule, it named
-  // WHO decides, and that is the second group below.
-  it('checks view: the modifier rule and authority groups keep their capture-harness hooks and show an icon per option (issues 855, 1055)', () => {
+  // `byRecipe` is in the list: it is a first-class COMBINATION RULE ("Recipe picks"),
+  // authoring-ordered third so the two non-selecting rules sit on the top row of the 2x2
+  // and the two selecting rules on the bottom one.
+  it('checks view: the modifier rule group keeps its capture-harness hooks and shows an icon per option (issues 855, 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'highest',
-      craftingRecipeModifierAuthority: 'setOnly',
+      craftingDefaultModifierPolicy: 'byRecipe',
     });
-    for (const { attr, optionAttr, values } of [
-      {
-        attr: 'data-crafting-modifier-policy',
-        optionAttr: 'data-crafting-modifier-policy-option',
-        values: ['addAll', 'highest', 'playerPicks'],
-      },
-      {
-        attr: 'data-crafting-modifier-authority',
-        optionAttr: 'data-crafting-modifier-authority-option',
-        values: ['none', 'setOnly', 'setAndRule'],
-      },
-    ]) {
-      const group = target.querySelector(`[data-crafting-modifier-catalogue] [${attr}]`);
-      assert.ok(Boolean(group), `the group still resolves by [${attr}]`);
-      const options = [...group.querySelectorAll(`[${optionAttr}]`)];
-      assert.deepEqual(
-        options.map((option) => option.getAttribute(optionAttr)),
-        values,
-        `${attr}: every option carries the per-option hook, in authoring order`
+    const group = target.querySelector(
+      '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
+    );
+    assert.ok(Boolean(group), 'the group still resolves by [data-crafting-modifier-policy]');
+    const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
+    assert.deepEqual(
+      options.map((option) => option.getAttribute('data-crafting-modifier-policy-option')),
+      ['addAll', 'highest', 'byRecipe', 'playerPicks'],
+      'every option carries the per-option hook, in authoring order'
+    );
+    for (const option of options) {
+      const value = option.getAttribute('data-crafting-modifier-policy-option');
+      assert.ok(
+        Boolean(option.querySelector('[data-tool-choice-icon] i')),
+        `the ${value} card renders an icon tile`
       );
-      for (const option of options) {
-        const value = option.getAttribute(optionAttr);
-        assert.ok(
-          Boolean(option.querySelector('[data-tool-choice-icon] i')),
-          `the ${value} card renders an icon tile`
-        );
-        assert.ok(
-          Boolean(option.querySelector('input[type="radio"]')),
-          `the ${value} card is still driven by a real radio input`
-        );
-      }
+      assert.ok(
+        Boolean(option.querySelector('input[type="radio"]')),
+        `the ${value} card is still driven by a real radio input`
+      );
     }
     assert.equal(
-      target.querySelector('[data-crafting-modifier-authority-option="setOnly"] input').checked,
+      target.querySelector('[data-crafting-modifier-policy-option="byRecipe"] input').checked,
       true,
-      'the passed authority level is pinned on the radio-cards'
+      'the passed rule is pinned on the radio-cards'
     );
+    // The maintainer asked for TWO columns, and the count is the layout: `RadioCardGroup`
+    // uses a FIXED track count (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so
+    // four options at two columns is a clean 2x2 with no orphan row. Read off the custom
+    // property the group actually sets rather than off a computed width, which happy-dom
+    // does not resolve.
+    assert.match(
+      group.querySelector('.manager-resolution-mode-options').getAttribute('style') || '',
+      /--manager-radio-card-columns:\s*2/,
+      'the rule group is a 2x2 grid, not a four-across row'
+    );
+  });
+
+  // The pick cap (issue 1055). `data-crafting-modifier-max-picks` carries the READING —
+  // `"unlimited"` or the integer as a string — so the View Lab and the smoke harness can
+  // both assert which of the two states is on screen without parsing the input.
+  it('checks view: the pick cap renders only under a SELECTING rule, and states unlimited as a blank field', () => {
+    const props = {
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    };
+    // A cap on a selection nobody makes is a control with no effect, so the two
+    // non-selecting rules do not render it at all.
+    for (const craftingDefaultModifierPolicy of ['addAll', 'highest']) {
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 });
+      assert.ok(
+        !target.querySelector('[data-crafting-modifier-max-picks]'),
+        `${craftingDefaultModifierPolicy} selects nothing, so it shows no cap field`
+      );
+    }
+    for (const craftingDefaultModifierPolicy of ['byRecipe', 'playerPicks']) {
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null });
+      const field = target.querySelector('[data-crafting-modifier-max-picks]');
+      assert.ok(
+        Boolean(field),
+        `${craftingDefaultModifierPolicy} defers the selection, so it caps`
+      );
+      assert.equal(
+        field.getAttribute('data-crafting-modifier-max-picks'),
+        'unlimited',
+        'an absent cap reads as unlimited rather than as a magic number'
+      );
+      const input = field.querySelector('[data-crafting-modifier-max-picks-input]');
+      assert.ok(Boolean(input), 'the Stepper input carries its own hook');
+      assert.equal(input.value, '', 'unlimited is a BLANK field, not a 0 or a 1');
+      assert.match(
+        input.getAttribute('placeholder') || '',
+        /Unlimited/,
+        'and the placeholder is the only place that reading is stated'
+      );
+    }
+  });
+
+  it('checks view: an authored cap is rendered on the hook and in the Stepper', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'playerPicks',
+      craftingMaxModifierPicks: 1,
+    });
+    const field = target.querySelector('[data-crafting-modifier-max-picks]');
+    assert.equal(field.getAttribute('data-crafting-modifier-max-picks'), '1');
+    assert.equal(field.querySelector('[data-crafting-modifier-max-picks-input]').value, '1');
+    // A stored value the ENGINE reads as unlimited must not render as a cap that
+    // truncates nothing: the field routes through `resolveMaxModifierPicks`, so `0` and
+    // `-2` both come back as the blank unlimited state.
+    for (const junk of [0, -2, 2.5]) {
+      mountChecksView({
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: junk,
+      });
+      assert.equal(
+        target
+          .querySelector('[data-crafting-modifier-max-picks]')
+          .getAttribute('data-crafting-modifier-max-picks'),
+        'unlimited',
+        `a stored ${junk} is unlimited to the engine, so the field says so too`
+      );
+    }
   });
 
   // Retargeted from "the card is hidden when the check has no formula" (issue 770). The
@@ -4535,65 +4610,36 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
-  it('checks view: the downgrade disclosure states the override count and the current level’s consequence (issue 1055)', () => {
+  it('checks view: an unstamped system shows the rule the ENGINE would apply, not a blank group (issue 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingRecipeModifierAuthority: 'none',
-      craftingModifierOverrideCount: 3,
+      // No `craftingDefaultModifierPolicy` at all — the never-authored state.
     });
-    const disclosure = target.querySelector('[data-crafting-modifier-authority-impact]');
-    assert.ok(Boolean(disclosure), 'the disclosure renders when overrides exist');
-    assert.equal(disclosure.getAttribute('data-crafting-modifier-authority-impact'), '3');
-    assert.ok(
-      disclosure.textContent.includes('3'),
-      'the count is stated BEFORE the click, not after the fact'
+    const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')].filter(
+      (option) => option.querySelector('input').checked
     );
-
-    unmount(mounted);
-    mounted = null;
-    target.remove();
-    // Zero overrides has nothing to disclose.
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingModifierOverrideCount: 0,
-    });
-    assert.ok(
-      !target.querySelector('[data-crafting-modifier-authority-impact]'),
-      'no overrides → no disclosure'
-    );
-  });
-
-  it('checks view: an unstamped system shows the level the ENGINE would apply, not a blank group (issue 1055)', () => {
-    mountChecksView({
-      resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
-      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      // No `craftingRecipeModifierAuthority` at all — the unstamped state.
-    });
-    const checked = [
-      ...target.querySelectorAll('[data-crafting-modifier-authority-option]'),
-    ].filter((option) => option.querySelector('input').checked);
-    assert.equal(checked.length, 1, 'exactly one level is shown as selected');
+    assert.equal(checked.length, 1, 'exactly one rule is shown as selected');
     assert.equal(
-      checked[0].getAttribute('data-crafting-modifier-authority-option'),
-      'setAndRule',
-      'absence resolves as setAndRule — the pre-1055 behaviour the engine still applies'
+      checked[0].getAttribute('data-crafting-modifier-policy-option'),
+      'addAll',
+      'absence resolves as addAll — the rule the engine applies to an unasked system'
     );
   });
 
-  it('checks view: the default-set intro changes when recipes cannot narrow the set (issue 1055)', () => {
-    const introText = (authority) => {
+  // What the default set IS depends on the rule, and the three readings are materially
+  // different decisions — the whole eligible set nobody narrows, the fallback a recipe
+  // inherits until it picks its own, or the menu the player chooses from at roll time.
+  it('checks view: the default-set intro follows the combination rule (issue 1055)', () => {
+    const introText = (craftingDefaultModifierPolicy) => {
       mountChecksView({
         resolutionMode: 'simple',
         craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
         craftingCheckModifiers: [
           { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
         ],
-        craftingRecipeModifierAuthority: authority,
+        craftingDefaultModifierPolicy,
       });
       const heading = target.querySelector('#manager-crafting-modifier-defaults-label');
       const text = heading.nextElementSibling.textContent;
@@ -4603,13 +4649,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       return text;
     };
     assert.ok(
-      introText('setOnly').includes('Overview tab'),
-      'a delegating system tells the GM where a recipe narrows the set'
+      introText('byRecipe').includes('Overview tab'),
+      'under Recipe picks the GM is told where a recipe picks its own set'
     );
     assert.ok(
-      !introText('none').includes('Overview tab'),
-      'at `none` no recipe can narrow it, so the sentence must not promise a control that is gone'
+      introText('playerPicks').includes('roll time'),
+      'under Player picks the default set is the menu offered at roll time'
     );
+    for (const locked of ['addAll', 'highest']) {
+      assert.ok(
+        !introText(locked).includes('Overview tab'),
+        `at ${locked} nobody narrows the set, so the sentence must not promise a control that is not there`
+      );
+    }
   });
 
   it('the routed editor renders the tier-step row in BOTH tier types', () => {
@@ -6033,18 +6085,17 @@ describe('CraftingSystemManager mounted behavior', () => {
   //
   // Both ENDS of each wire are already covered — `mountChecksView` mounts ChecksView
   // directly and `recipe-edit-mounted.test.js` mounts RecipeEditView directly — but
-  // nothing mounted the ROOT against a system carrying
-  // `craftingCheck.recipeModifierAuthority`, so both forwards were deletable green.
-  // Dropping `craftingModifierAuthority={…}` from the RecipeEditView call site lets the
-  // prop fall to its `= undefined` default, `resolveRecipeModifierAuthority` reads that
-  // as `setAndRule`, and EVERY system — including one a GM explicitly set to `none` —
-  // renders both recipe controls again: acceptance criterion 1 shipping dead under a
-  // green suite. Dropping the ChecksView one pins the authority radio at `setAndRule`
-  // for every system the same way.
+  // nothing mounted the ROOT against a system carrying a `byRecipe` rule and a
+  // `maxModifierPicks` cap, so both forwards were deletable green. Dropping
+  // `craftingModifierPolicy={…}` from the RecipeEditView call site lets the prop fall to
+  // its `= 'addAll'` default and EVERY recipe loses its picker; dropping
+  // `craftingModifierMaxPicks={…}` lets it fall to `null` and every recipe becomes
+  // unbounded — a cap shipping dead under a green suite. Dropping the ChecksView ones
+  // pins the rule radio at `addAll` and hides the cap field for every system.
   //
-  // Both cases assert the `setAndRule` end too, so a fixture that never reached the
-  // surface at all cannot pass them by rendering nothing.
-  const modifierAuthoritySystemCheck = (recipeModifierAuthority) => ({
+  // Every case asserts BOTH ends, so a fixture that never reached the surface at all
+  // cannot pass by rendering nothing.
+  const modifierRuleSystemCheck = (defaultModifierPolicy, maxModifierPicks) => ({
     simple: {
       rollFormula: '1d20 + @craftingmod',
       dc: 12,
@@ -6052,24 +6103,28 @@ describe('CraftingSystemManager mounted behavior', () => {
       dcMode: 'static',
       tiers: [],
     },
-    checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    checkModifiers: [
+      { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+      { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+    ],
     defaultModifierIds: ['med'],
-    recipeModifierAuthority,
+    defaultModifierPolicy,
+    ...(maxModifierPicks === undefined ? {} : { maxModifierPicks }),
   });
 
-  it('root: the Checks card’s authority radio tracks the SYSTEM’s recipeModifierAuthority (issue 1055)', async () => {
-    for (const authority of ['none', 'setOnly']) {
-      mountManager([], { craftingCheck: modifierAuthoritySystemCheck(authority) });
+  it('root: the Checks card’s rule radio tracks the SYSTEM’s defaultModifierPolicy (issue 1055)', async () => {
+    for (const policy of ['highest', 'byRecipe', 'playerPicks']) {
+      mountManager([], { craftingCheck: modifierRuleSystemCheck(policy) });
       navButton('Checks').click();
       await tick();
       flushSync();
-      const checked = [...target.querySelectorAll('[data-crafting-modifier-authority-option]')]
+      const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')]
         .filter((option) => option.querySelector('input').checked)
-        .map((option) => option.getAttribute('data-crafting-modifier-authority-option'));
+        .map((option) => option.getAttribute('data-crafting-modifier-policy-option'));
       assert.deepEqual(
         checked,
-        [authority],
-        `the root forwards the system's own level (${authority}); an unforwarded prop pins every system at setAndRule`
+        [policy],
+        `the root forwards the system's own rule (${policy}); an unforwarded prop pins every system at addAll`
       );
       unmount(mounted);
       mounted = null;
@@ -6078,34 +6133,88 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  it('root: a `none` system’s recipe editor shows the modifier summary banner and no controls (issue 1055)', async () => {
-    for (const [authority, banner, controls] of [
-      ['none', true, false],
-      ['setAndRule', false, true],
+  it('root: the Checks card’s pick cap tracks the SYSTEM’s maxModifierPicks (issue 1055)', async () => {
+    for (const [maxModifierPicks, reading] of [
+      [2, '2'],
+      [undefined, 'unlimited'],
     ]) {
-      const editor = await openRecipeEditor([], {
-        craftingCheck: modifierAuthoritySystemCheck(authority),
-      });
+      mountManager([], { craftingCheck: modifierRuleSystemCheck('byRecipe', maxModifierPicks) });
+      navButton('Checks').click();
+      await tick();
+      flushSync();
       assert.equal(
-        Boolean(editor.querySelector('.manager-main [data-recipe-modifier-banner]')),
-        banner,
-        `authority ${authority}: read-only summary banner rendered = ${banner}`
-      );
-      assert.equal(
-        Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier]')),
-        controls,
-        `authority ${authority}: combination-rule select rendered = ${controls}`
-      );
-      assert.equal(
-        Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
-        controls,
-        `authority ${authority}: eligible-modifier picker rendered = ${controls}`
+        target
+          .querySelector('[data-crafting-modifier-max-picks]')
+          .getAttribute('data-crafting-modifier-max-picks'),
+        reading,
+        `the root forwards the system's own cap (${String(maxModifierPicks)})`
       );
       unmount(mounted);
       mounted = null;
       target.remove();
       target = null;
     }
+  });
+
+  it('root: only a byRecipe system’s recipe editor offers the modifier picker (issue 1055)', async () => {
+    for (const [policy, picker] of [
+      ['byRecipe', true],
+      ['addAll', false],
+      ['highest', false],
+      ['playerPicks', false],
+    ]) {
+      const editor = await openRecipeEditor([], {
+        craftingCheck: modifierRuleSystemCheck(policy),
+      });
+      assert.equal(
+        Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
+        picker,
+        `rule ${policy}: eligible-modifier picker rendered = ${picker}`
+      );
+      // The rejected design's surfaces are GONE, not merely hidden: no rule select on the
+      // recipe, and no neutral "the system decides" banner on every other rule.
+      assert.ok(
+        !editor.querySelector('.manager-main [data-recipe-crafting-modifier]'),
+        `rule ${policy}: a recipe never authors the combination rule`
+      );
+      assert.ok(
+        !editor.querySelector('.manager-main [data-recipe-modifier-banner]'),
+        `rule ${policy}: the read-only delegation banner is gone`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: the recipe picker’s cap hint tracks the SYSTEM’s maxModifierPicks (issue 1055)', async () => {
+    // Custom set + a cap of 1, so the picker is at its cap and reports `reached`.
+    const editor = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.equal(
+      editor
+        .querySelector('.manager-main [data-recipe-crafting-modifier-cap]')
+        ?.getAttribute('data-recipe-crafting-modifier-cap'),
+      'reached',
+      'the root forwards the cap; an unforwarded prop leaves every recipe unbounded and hides this hint entirely'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // …and an unbounded system states no cap at all.
+    const unbounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.ok(
+      !unbounded.querySelector('.manager-main [data-recipe-crafting-modifier-cap]'),
+      'unlimited states nothing rather than "up to Infinity"'
+    );
   });
 
   it('stages editor edits without persisting until the header Save is pressed', async () => {

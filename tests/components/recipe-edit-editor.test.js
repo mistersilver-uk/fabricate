@@ -438,9 +438,14 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
     assert.equal(bannerSource.includes('onChange'), false, 'no per-recipe mode control');
   });
 
-  // Two banners now stack on the Overview tab (issue 1055). `dataAttr` carries the
+  // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the
   // reported VALUE, so a shared hook would resolve to whichever rendered first, and the
-  // two value spaces (`simple`/`progressive`/… vs `none`/`noFormula`/…) are disjoint.
+  // two value spaces (`simple`/`progressive`/… vs `noCheck`/`noFormula`/…) are disjoint.
+  //
+  // The prop-ification stays load-bearing after the redesign dropped the neutral
+  // delegation banner: the inert warning's copy lives at ITS call site, so folding the
+  // lookup back into the component would re-create the mode-table drift it was extracted
+  // to prevent.
   it('takes its capture hook as a prop so two banners on one tab cannot collide', () => {
     assert.ok(bannerSource.includes('dataAttr'), 'the container hook is a prop');
     assert.ok(bannerSource.includes('actionDataAttr'), 'so is the action chip hook');
@@ -452,12 +457,21 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
       resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte'),
       'utf8'
     );
-    for (const attr of ['data-recipe-modifier-banner', 'data-recipe-modifier-inert']) {
+    for (const attr of ['data-recipe-modifier-inert', 'data-recipe-modifier-inert-checks']) {
       assert.ok(overviewSourceLocal.includes(attr), `the Overview tab passes its own ${attr}`);
       assert.equal(
         bannerSource.includes(attr),
         false,
         `${attr} belongs to the call site, not the component`
+      );
+    }
+    // The rejected design's neutral "the system decides" banner is GONE, not merely
+    // unrendered: no hook for it survives on either side.
+    for (const retired of ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner=']) {
+      assert.equal(
+        overviewSourceLocal.includes(retired),
+        false,
+        `${retired} is not emitted anywhere on the Overview tab`
       );
     }
   });

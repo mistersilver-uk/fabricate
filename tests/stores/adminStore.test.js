@@ -451,88 +451,76 @@ describe('createAdminStore', () => {
         return get(store.viewState).selectedSystem.craftingCheck.defaultModifierPolicy;
       };
 
-      for (const policy of ['addAll', 'highest', 'playerPicks']) {
+      // All FOUR rules, `byRecipe` included (issue 1055): it is a first-class rule with
+      // its own radio-card again, so a projection that translated it away would recreate
+      // this very defect — the GM clicks "Recipe picks" and the card re-renders on
+      // "Add all".
+      for (const policy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
         assert.equal(await projectPolicy(policy), policy, `${policy} survives the projection`);
       }
-      // Retargeted for issue 1055: `byRecipe` is no longer a combination rule the card
-      // can render, so the projection must translate it rather than surface a value with
-      // no radio-card — exactly the unselectable-state defect this test was written for,
-      // in the other direction.
-      assert.equal(
-        await projectPolicy('byRecipe'),
-        'addAll',
-        'the retired byRecipe projects as the rule it arithmetically was'
-      );
       assert.equal(await projectPolicy('bogus'), 'addAll', 'an unknown policy still falls back');
       assert.equal(await projectPolicy(undefined), 'addAll', 'an absent policy still defaults');
     });
 
-    // Absence is a real fourth state (issue 1055): a defaulted projection would forge a
-    // GM decision that was never made and make the stamped and unstamped worlds
-    // indistinguishable to the authoring UI.
-    it('projects recipeModifierAuthority WITHOUT defaulting its absence (issue 1055)', async () => {
+    // Absence is a real value (issue 1055) — UNLIMITED — so a defaulted projection would
+    // forge a GM decision that was never made and would silently truncate the recipe
+    // picks already on disk.
+    it('projects maxModifierPicks WITHOUT defaulting its absence (issue 1055)', async () => {
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
       const store = createAdminStore(services);
-      const projectAuthority = async (craftingCheck) => {
+      const projectCap = async (craftingCheck) => {
         sys.craftingCheck = { mode: 'passFail', ...craftingCheck };
         await store.refresh();
         return get(store.viewState).selectedSystem.craftingCheck;
       };
 
-      for (const authority of ['none', 'setOnly', 'setAndRule']) {
-        assert.equal(
-          (await projectAuthority({ recipeModifierAuthority: authority })).recipeModifierAuthority,
-          authority
-        );
+      for (const maxModifierPicks of [1, 2, 5]) {
+        assert.equal((await projectCap({ maxModifierPicks })).maxModifierPicks, maxModifierPicks);
       }
-      const unstamped = await projectAuthority({});
+      const unbounded = await projectCap({});
       assert.equal(
-        Object.hasOwn(unstamped, 'recipeModifierAuthority'),
+        Object.hasOwn(unbounded, 'maxModifierPicks'),
         true,
         'the key is always emitted so the projected shape is fixed'
       );
       assert.equal(
-        unstamped.recipeModifierAuthority,
+        unbounded.maxModifierPicks,
         undefined,
         '…but its value is undefined, never a forged default'
       );
+      // RAW, not resolved: the card routes it through `resolveMaxModifierPicks` itself so
+      // it can render "unlimited" as a BLANK field rather than as a magic number. A
+      // projection that pre-resolved would have to emit `Infinity` into the view state.
+      assert.equal(
+        (await projectCap({ maxModifierPicks: 0 })).maxModifierPicks,
+        0,
+        'an unusable stored value is passed through verbatim for the card to interpret'
+      );
     });
 
-    // The downgrade disclosure's two inputs. They are two numbers, not one, because the
-    // two downgrades silence different populations: dropping to `none` unhonours every
-    // override, dropping to `setOnly` unhonours only the rule half.
-    it('derives both recipe-override counts for the downgrade disclosure (issue 1055)', async () => {
+    // Deliberately NOT projected (issue 1055). Both authoring surfaces already receive
+    // the normalized rule and `policyDefersSelection` lives on the resolver, so the
+    // Checks card asks it LIVE against the radio group the GM is clicking. A projected
+    // copy would answer from the last PERSISTED rule and would be the one derivation on
+    // this axis capable of disagreeing with the card that reads it.
+    it('does NOT project a modifierPolicyDefersSelection key (issue 1055)', async () => {
       const services = createMockServices();
       const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
-      sys.craftingCheck = { mode: 'passFail', recipeModifierAuthority: 'setAndRule' };
-      const origManager = services.getRecipeManager();
-      const recipes = [
-        // A rule + set override — silenced by BOTH downgrades.
-        { id: 'r-rule', craftingSystemId: 'sys1', craftingModifier: { policy: 'highest', modifierIds: ['med'] } },
-        // A set-only override — silenced only by `none`.
-        { id: 'r-set', craftingSystemId: 'sys1', craftingModifier: { modifierIds: ['med'] } },
-        // An AUTHORED EMPTY set is still an override.
-        { id: 'r-empty', craftingSystemId: 'sys1', craftingModifier: { modifierIds: [] } },
-        // No override at all.
-        { id: 'r-plain', craftingSystemId: 'sys1', craftingModifier: null },
-      ].map((raw) => makeRecipe({ ...raw, name: raw.id, toJSON: () => ({ ...raw, name: raw.id }) }));
-      services.getRecipeManager = () => ({
-        ...origManager,
-        getRecipes: (filter) =>
-          recipes.filter(
-            (r) => !filter?.craftingSystemId || r.craftingSystemId === filter.craftingSystemId
-          ),
-      });
       const store = createAdminStore(services);
-      await store.selectSystem('sys1');
-      const check = get(store.viewState).selectedSystem.craftingCheck;
-      assert.equal(check.recipeModifierOverrideCount, 3, 'every override, empty set included');
-      assert.equal(
-        check.recipeModifierRuleOverrideCount,
-        undefined,
-        'no per-level subset is projected: the disclosure states a level-independent fact'
-      );
+      for (const defaultModifierPolicy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+        sys.craftingCheck = { mode: 'passFail', defaultModifierPolicy };
+        await store.refresh();
+        const check = get(store.viewState).selectedSystem.craftingCheck;
+        assert.equal(
+          Object.hasOwn(check, 'modifierPolicyDefersSelection'),
+          false,
+          `${defaultModifierPolicy}: the membership test is asked of the resolver, not projected`
+        );
+        // …and the retired delegation axis is not projected either.
+        assert.equal(Object.hasOwn(check, 'recipeModifierAuthority'), false);
+        assert.equal(Object.hasOwn(check, 'recipeModifierOverrideCount'), false);
+      }
     });
 
     // `@craftingmod` reaching no roll has three distinct causes with three distinct
@@ -638,6 +626,44 @@ describe('createAdminStore', () => {
       );
       // A sibling modifier field not in the patch is preserved from existing.
       assert.deepEqual(persisted.defaultModifierIds, ['med', 'alch']);
+    });
+
+    // A `maxModifierPicks: null` is a real VALUE in that patch, not an omission (issue
+    // 1055): absence means UNLIMITED, so clearing the field has to be able to overwrite a
+    // stored bound. A patch that dropped the null key would leave the old cap in place
+    // and the Stepper would spring back to its previous number on the next refresh.
+    it('saveCraftingCheckModifiers writes a null maxModifierPicks over a stored cap', async () => {
+      let persisted = null;
+      const services = createMockServices();
+      const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+      sys.craftingCheck = {
+        mode: 'passFail',
+        defaultModifierPolicy: 'byRecipe',
+        maxModifierPicks: 3,
+      };
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, updates) => {
+          persisted = updates.craftingCheck;
+          await origManager.updateSystem(id, updates);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      await store.saveCraftingCheckModifiers({ maxModifierPicks: null });
+
+      assert.equal(persisted.maxModifierPicks, null, 'the cleared cap reaches the write');
+      assert.equal(
+        persisted.defaultModifierPolicy,
+        'byRecipe',
+        'and the sibling rule is preserved by the same spread'
+      );
+      // …and a numeric cap still writes through, so the null above is the clear rather
+      // than the key being dropped wholesale.
+      await store.saveCraftingCheckModifiers({ maxModifierPicks: 2 });
+      assert.equal(persisted.maxModifierPicks, 2);
     });
 
     it('projects toolBreakage.authority as toolSpecific when the system has none (issue 419)', async () => {
@@ -908,19 +934,12 @@ describe('createAdminStore', () => {
       assert.ok(vs.systems.some((s) => s.id === sysId));
     });
 
-    // The authority seed (issue 1055). A system authored HERE — through the manager UI,
-    // by a GM who is about to be shown the authority control — starts UNDELEGATED, and
-    // the stamp is made at this call site rather than inside
-    // `CraftingSystemManager.createSystem`, which stays authority-neutral on purpose so
-    // the importer and every programmatic caller keep landing on the unresolved state.
-    //
-    // Nothing else gates it. Drop the `craftingCheck` argument (or move it down into the
-    // manager) and every UI-authored system lands unstamped,
-    // `resolveRecipeModifierAuthority` reads that as `setAndRule`, and the
-    // initialize-time fallback then re-derives it from recipe presence — so a brand-new
-    // empty system silently delegates BOTH axes instead of starting undelegated, which
-    // is the inverse of the design.
-    it('createSystem stamps the new system as undelegated — recipeModifierAuthority none (issue 1055)', async () => {
+    // NO `craftingCheck` seed (issue 1055). The authority level this call site used to
+    // stamp is gone, and its replacement — the combination rule — already has a defined
+    // default (`addAll`) that the manager and the importer share. A UI-only seed here
+    // could therefore only DISAGREE with them about what a new system starts as, so the
+    // absence of the argument is the contract.
+    it('createSystem seeds no craftingCheck opinion of its own (issue 1055)', async () => {
       const services = createMockServices();
       const manager = services.getCraftingSystemManager();
       const create = manager.createSystem;
@@ -935,14 +954,16 @@ describe('createAdminStore', () => {
 
       assert.equal(seeds.length, 1, 'exactly one system is created');
       assert.equal(
-        seeds[0].craftingCheck?.recipeModifierAuthority,
-        'none',
-        'the UI states `none`; an unstamped system resolves as setAndRule and delegates both axes'
+        seeds[0].craftingCheck,
+        undefined,
+        'the UI states name + description only; the manager owns every check default'
       );
+      // The two retired keys specifically: neither may reappear on the created system.
+      assert.equal(created.craftingCheck?.recipeModifierAuthority, undefined);
       assert.equal(
-        created.craftingCheck?.recipeModifierAuthority,
-        'none',
-        'and the stamp reaches the system the caller goes on to open'
+        created.craftingCheck?.maxModifierPicks,
+        undefined,
+        'a new system is UNLIMITED — a seeded cap would bound a rule the GM has not chosen'
       );
     });
 

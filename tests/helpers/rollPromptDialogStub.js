@@ -127,26 +127,67 @@ export function stubI18n(table, { rollMode } = {}) {
 }
 
 /**
+ * Build the `button.form.elements.craftingModifier` stand-in for a MULTI-PICK selection.
+ *
+ * A single-pick prompt renders a radio group, and `readSelectedModifierIds` can read a
+ * bare `{ value }` off it — which is why the single-pick path below still passes one. A
+ * multi-pick prompt renders a CHECKBOX group, and the two are not interchangeable: the
+ * field arrives as a `RadioNodeList`, whose `value` is specified to inspect *radio*
+ * inputs only and returns `''` for a checkbox group however many boxes are ticked. A
+ * `{ value }` stand-in therefore cannot express "these three are checked" at all, and a
+ * suite that tried would silently exercise the no-answer fallback instead of a selection.
+ *
+ * So a multi-pick stand-in is an ARRAY-LIKE of `{ checked, value }` entries — one per
+ * OFFERED option, exactly as the real list carries every input in the group — which is
+ * the shape `readSelectedModifierIds` walks. It is deliberately array-LIKE rather than a
+ * plain array: the production reader keys on `typeof field.length === 'number'` to tell a
+ * group from a lone input, and a real `RadioNodeList` is not an `Array`.
+ *
+ * @param {Array<{id: string}|string>} offered Every option the descriptor offers, in
+ *   descriptor order.
+ * @param {string[]} checkedIds The ids the player ticked.
+ * @returns {{length: number, [Symbol.iterator]: () => Iterator<object>}}
+ */
+export function checkboxGroupField(offered, checkedIds) {
+  const checked = new Set(checkedIds);
+  const entries = offered.map((option) => {
+    const value = typeof option === 'string' ? option : option.id;
+    return { value, checked: checked.has(value) };
+  });
+  // `RadioNodeList`-shaped: indexed, `length`, iterable — and NOT an `Array`.
+  const field = { length: entries.length, [Symbol.iterator]: () => entries[Symbol.iterator]() };
+  for (const [index, entry] of entries.entries()) field[index] = entry;
+  return field;
+}
+
+/**
  * Install the interactive roll environment an engine check runner needs: a `Roll` that
- * RECORDS every rolled formula, and a `DialogV2.wait` that either answers with
- * `pickedId` or dismisses.
+ * RECORDS every rolled formula, and a `DialogV2.wait` that either answers with a
+ * selection or dismisses.
  *
  * The rolled formula string is the observable these engine tests assert on, because it
- * is the only place the whole chain — authority resolution, eligible-set resolution,
- * scalar reduction (or deferred interactive choice) and substitution — becomes visible
- * as one value. A resolver-level assertion cannot see a runner that never threads the
- * context at all.
+ * is the only place the whole chain — rule resolution, eligible-set resolution, scalar
+ * reduction (or deferred interactive choice) and substitution — becomes visible as one
+ * value. A resolver-level assertion cannot see a runner that never threads the context
+ * at all.
  *
  * @param {object} [options]
- * @param {string|null} [options.pickedId] The value the prompt's `craftingModifier`
- *   radio reports. An id the descriptor does not offer resolves to 0 in production
- *   (`modifierChoiceValue`), which is what makes "a descriptor was built at all"
- *   observable in the rolled string.
+ * @param {string|null} [options.pickedId] The value a SINGLE-pick prompt's
+ *   `craftingModifier` radio reports. An id the descriptor does not offer is discarded in
+ *   production, which is what makes "a descriptor was built at all" observable in the
+ *   rolled string.
+ * @param {{offered: Array<{id: string}|string>, checkedIds: string[]}} [options.multiPick]
+ *   A MULTI-pick answer, supplied as the real checkbox group's shape (see
+ *   {@link checkboxGroupField}). Wins over `pickedId` when both are given.
  * @param {boolean} [options.dismiss] Resolve `wait` as a DISMISSAL (`null`, the real
  *   `rejectClose: false` shape) instead of confirming.
  * @returns {{rolled: string[], dialog: object, restore: () => void}}
  */
-export function stubInteractiveRollEnvironment({ pickedId = null, dismiss = false } = {}) {
+export function stubInteractiveRollEnvironment({
+  pickedId = null,
+  multiPick = null,
+  dismiss = false,
+} = {}) {
   const rolled = [];
   const previousRoll = globalThis.Roll;
   class RollStub {
@@ -174,7 +215,9 @@ export function stubInteractiveRollEnvironment({ pickedId = null, dismiss = fals
     : stubDialogCapture({
         situationalBonus: { value: '' },
         rollMode: { value: 'publicroll' },
-        craftingModifier: { value: pickedId },
+        craftingModifier: multiPick
+          ? checkboxGroupField(multiPick.offered, multiPick.checkedIds)
+          : { value: pickedId },
       });
   globalThis.foundry.utils = { getProperty };
 

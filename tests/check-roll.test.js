@@ -242,15 +242,26 @@ test('@craftingmod: runFormulaPassFail threads the modifier context through to t
 
 // ── interactive playerPicks: deferred @craftingmod substitution (issue 770 P2) ─
 
-// The interactive `playerPicks` descriptor: eligible modifiers + the highest-valued
+// The interactive `playerPicks` descriptor: eligible modifiers + the best legal
 // pre-selection. Herbalism (5) is the default; Medicine (3) is the override option.
+// `maxPicks: 1` is the single-pick descriptor the radio group renders.
 const PICK_CHOICE = {
   token: '@craftingmod',
   modifiers: [
     { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
     { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
   ],
+  maxPicks: 1,
+  defaultSelectedIds: ['herb'],
   defaultSelectedId: 'herb',
+};
+
+// …and the multi-pick descriptor: same options, a cap of 2, both pre-selected.
+const MULTI_PICK_CHOICE = {
+  ...PICK_CHOICE,
+  maxPicks: 2,
+  defaultSelectedIds: ['med', 'herb'],
+  defaultSelectedId: 'med',
 };
 
 test('playerPicks: the chosen modifier value substitutes @craftingmod before Roll (eval == display)', async () => {
@@ -341,6 +352,141 @@ test('playerPicks: an unknown chosen id resolves @craftingmod to 0 (never left u
   });
   assert.equal(rolledFormulas.at(-1), '1d20 + (0)', 'unknown id → 0, token still substituted');
   delete globalThis.Roll;
+});
+
+// ── multi-pick playerPicks: the returned SELECTION (issue 1055) ──────────────
+//
+// The prompt now returns `chosenModifierIds` (an array). `evaluateCheckRoll` reads it
+// back in a fixed precedence — array first, the historical scalar second, the
+// descriptor's own pre-selection third — and SUMS the survivors.
+
+/** Roll the interactive path once and report the formula that reached `Roll`. */
+async function rollChoice(modifierChoice, choice) {
+  const rolledFormulas = stubCraftingModRoll();
+  await evaluateCheckRoll(
+    '1d20 + @craftingmod',
+    { getRollData: () => ({}) },
+    {
+      interactive: true,
+      modifierChoice,
+      prompt: async () => ({ confirmed: true, advantage: 'normal', ...choice }),
+    }
+  );
+  const rolled = rolledFormulas.at(-1);
+  delete globalThis.Roll;
+  return rolled;
+}
+
+test('playerPicks: a multi-pick selection SUMS the chosen modifiers', async () => {
+  assert.equal(
+    await rollChoice(MULTI_PICK_CHOICE, { chosenModifierIds: ['med', 'herb'] }),
+    '1d20 + (8)',
+    'Medicine 3 + Herbalism 5'
+  );
+  assert.equal(
+    await rollChoice(MULTI_PICK_CHOICE, { chosenModifierIds: ['med'] }),
+    '1d20 + (3)',
+    'one of two picked → that modifier alone'
+  );
+});
+
+// `chosenModifierIds: []` is an ANSWER, not an absence. The player unticked everything,
+// which reduces `@craftingmod` to 0; falling through to the descriptor default here would
+// silently roll a modifier the player deliberately declined.
+test('playerPicks: an EMPTY chosenModifierIds is an answer and beats the default', async () => {
+  assert.equal(
+    await rollChoice(MULTI_PICK_CHOICE, { chosenModifierIds: [] }),
+    '1d20 + (0)',
+    'an empty array reduces to 0 rather than falling back to the pre-selection'
+  );
+  // The negative control: with NO selection field at all, the same descriptor DOES fall
+  // through to its pre-selection — so `(0)` above is the empty array being honoured
+  // rather than a dead path.
+  assert.equal(
+    await rollChoice(MULTI_PICK_CHOICE, {}),
+    '1d20 + (8)',
+    'a headless confirm with no selection opens the descriptor default (both pre-selected)'
+  );
+});
+
+test('playerPicks: the read-back precedence is ids, then the scalar, then the default', async () => {
+  assert.equal(
+    await rollChoice(MULTI_PICK_CHOICE, {
+      chosenModifierIds: ['med'],
+      chosenModifierId: 'herb',
+    }),
+    '1d20 + (3)',
+    'the array wins over the historical scalar'
+  );
+  assert.equal(
+    await rollChoice(MULTI_PICK_CHOICE, { chosenModifierId: 'herb' }),
+    '1d20 + (5)',
+    'the scalar is still honoured when no array came back — a harness supplying one keeps working'
+  );
+  assert.equal(
+    await rollChoice(MULTI_PICK_CHOICE, { chosenModifierIds: null, chosenModifierId: null }),
+    '1d20 + (8)',
+    'null on both falls through to the descriptor default, exactly as `??` did'
+  );
+});
+
+// The prompt is a UI control, so its cap is NOT the invariant: this layer re-derives the
+// legal selection from the descriptor and never trusts what came back. Survivors are
+// taken in ELIGIBLE-SET order and truncated — deliberately NOT best-N — so cheating the
+// prompt can never pay more than a legal pick.
+const OVER_LARGE_CHOICE = {
+  token: '@craftingmod',
+  modifiers: [
+    { id: 'med', label: 'Medicine', icon: 'fa-med', value: 3 },
+    { id: 'herb', label: 'Herbalism', icon: 'fa-herb', value: 5 },
+    { id: 'alch', label: 'Alchemy', icon: 'fa-alch', value: 11 },
+  ],
+  maxPicks: 2,
+  defaultSelectedIds: ['herb', 'alch'],
+  defaultSelectedId: 'herb',
+};
+
+test('playerPicks: an OVER-LARGE selection is truncated in eligible-set order, not best-N', async () => {
+  assert.equal(
+    await rollChoice(OVER_LARGE_CHOICE, { chosenModifierIds: ['med', 'herb', 'alch'] }),
+    '1d20 + (8)',
+    'the first two OFFERED survivors (Medicine 3 + Herbalism 5) — best-N would have paid 16'
+  );
+  // The order the prompt happened to report is irrelevant: the descriptor decides.
+  assert.equal(
+    await rollChoice(OVER_LARGE_CHOICE, { chosenModifierIds: ['alch', 'herb', 'med'] }),
+    '1d20 + (8)',
+    'reordering the returned array changes nothing'
+  );
+});
+
+test('playerPicks: unknown ids are DISCARDED before the cap is counted', async () => {
+  assert.equal(
+    await rollChoice(OVER_LARGE_CHOICE, {
+      chosenModifierIds: ['ghost', 'phantom', 'alch'],
+    }),
+    '1d20 + (11)',
+    'ids the descriptor never offered are dropped rather than consuming a slot'
+  );
+  assert.equal(
+    await rollChoice(OVER_LARGE_CHOICE, { chosenModifierIds: ['ghost'] }),
+    '1d20 + (0)',
+    'a lone unknown id still reduces to 0'
+  );
+});
+
+// A descriptor built before `maxPicks` existed must not silently widen to unlimited.
+test('playerPicks: an absent or junk maxPicks falls back to the historical single pick', async () => {
+  for (const maxPicks of [undefined, null, 0, -1, 2.5, 'two']) {
+    assert.equal(
+      await rollChoice(
+        { ...OVER_LARGE_CHOICE, maxPicks },
+        { chosenModifierIds: ['med', 'herb', 'alch'] }
+      ),
+      '1d20 + (3)',
+      `maxPicks ${String(maxPicks)} means 1, so only the first offered survivor counts`
+    );
+  }
 });
 
 test('playerPicks: the chosen value composes UNDER a situational bonus', async () => {
@@ -485,6 +631,53 @@ test('playerPicks: an empty base flavor gets the label alone, never an orphan bu
   delete globalThis.Roll;
 });
 
+// A multi-pick selection is ONE bullet segment with the labels comma-joined inside it,
+// so the flavor does not grow a separator per modifier. The single-pick output above is
+// unchanged, which is the point of joining inside the segment rather than outside it.
+test('playerPicks: multiple picked labels join with ", " INSIDE one bullet segment', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll(
+      '1d20 + @craftingmod',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: MULTI_PICK_CHOICE,
+        flavor: 'Healing Salve — Crafting check (DC 10)',
+        prompt: async () => ({
+          confirmed: true,
+          chosenModifierIds: ['med', 'herb'],
+          advantage: 'normal',
+        }),
+      }
+    )
+  );
+  assert.equal(
+    posted.at(-1).data.flavor,
+    'Healing Salve — Crafting check (DC 10) · Medicine, Herbalism',
+    'one bullet, then the labels comma-joined in descriptor order'
+  );
+  delete globalThis.Roll;
+});
+
+test('playerPicks: an EMPTY multi-pick selection leaves the flavor untouched', async () => {
+  const posted = stubCraftingModChatRoll();
+  await withChatMessage(() =>
+    evaluateCheckRoll(
+      '1d20 + @craftingmod',
+      { getRollData: () => ({}) },
+      {
+        interactive: true,
+        modifierChoice: MULTI_PICK_CHOICE,
+        flavor: 'Crafting check',
+        prompt: async () => ({ confirmed: true, chosenModifierIds: [], advantage: 'normal' }),
+      }
+    )
+  );
+  assert.equal(posted.at(-1).data.flavor, 'Crafting check', 'no orphan trailing "· "');
+  delete globalThis.Roll;
+});
+
 test('playerPicks: an unlabelled chosen modifier leaves the flavor untouched', async () => {
   const posted = stubCraftingModChatRoll();
   await withChatMessage(() =>
@@ -506,14 +699,43 @@ test('playerPicks: an unlabelled chosen modifier leaves the flavor untouched', a
   delete globalThis.Roll;
 });
 
-test('playerPicks non-interactive: @craftingmod resolves deterministically as highest', async () => {
+// THE BACK-COMPAT GUARANTEE (issue 1055), pinned in BOTH halves because only the pair
+// says anything. `playerPicks` sums the BEST LEGAL selection, so the CAP is what decides
+// the arithmetic: at 1 — the bound `1.20.0` stamps onto every pre-existing `playerPicks`
+// system — it is `max(3,5)` and identical to `highest`, which is what those worlds always
+// rolled; unbounded it is the plain sum, because picking everything is then legal.
+// Asserting only the unbounded half would let a regression that silently capped, or
+// silently uncapped, every world ship green.
+test('playerPicks non-interactive: a cap of 1 resolves @craftingmod exactly as highest', async () => {
   const rolledFormulas = stubCraftingModRoll();
   const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
-  // No prompt / not interactive: the scalar path resolves playerPicks as highest.
+  // No prompt / not interactive: the deterministic scalar path runs.
+  await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    craftingModifier: { ...MOD_CONTEXT, systemPolicy: 'playerPicks', maxModifierPicks: 1 },
+  });
+  assert.equal(
+    rolledFormulas.at(-1),
+    '1d20 + (5)',
+    'capped at one pick, playerPicks == highest(3,5) — the migrated world rolls what it always rolled'
+  );
+  // The same context under `highest` is the same string, which is the whole claim.
+  await evaluateCheckRoll('1d20 + @craftingmod', actor, {
+    craftingModifier: { ...MOD_CONTEXT, systemPolicy: 'highest' },
+  });
+  assert.equal(rolledFormulas.at(-1), '1d20 + (5)');
+  delete globalThis.Roll;
+});
+
+test('playerPicks non-interactive: UNBOUNDED resolves @craftingmod as the full sum', async () => {
+  const rolledFormulas = stubCraftingModRoll();
+  const actor = { getRollData: () => ({ abilities: { med: { mod: 3 }, alch: { mod: 5 } } }) };
+  // No `maxModifierPicks`: absence is UNLIMITED, so the best legal selection is
+  // everything, and everything sums. A system reaching this state on purpose is a GM who
+  // cleared the cap; a system reaching it by accident is what the migration prevents.
   await evaluateCheckRoll('1d20 + @craftingmod', actor, {
     craftingModifier: { ...MOD_CONTEXT, systemPolicy: 'playerPicks' },
   });
-  assert.equal(rolledFormulas.at(-1), '1d20 + (5)', 'non-interactive playerPicks == highest(3,5)');
+  assert.equal(rolledFormulas.at(-1), '1d20 + (8)', 'unbounded playerPicks sums 3 + 5');
   delete globalThis.Roll;
 });
 

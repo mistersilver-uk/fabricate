@@ -196,10 +196,11 @@ test('runner: craftingSystems left untouched (no write) when nothing needs renam
 
   await runner.run();
 
-  // Retargeted for issue 1055: `craftingSystems` IS written now, because the 1.20.0 pass
-  // stamps `craftingCheck.recipeModifierAuthority` on every system that carries a check
-  // block. The claim this test makes is about THIS migration, so it is asserted on the
-  // persisted payload's own fields rather than on the shared setting's write count.
+  // Retargeted for issue 1055: the 1.20.0 pass may write `craftingSystems` too, because
+  // it stamps `craftingCheck.maxModifierPicks` on every system already on the
+  // `playerPicks` combination rule. The claim this test makes is about THIS migration, so
+  // it is asserted on the persisted payload's own fields rather than on the shared
+  // setting's write count.
   const persisted = settings.store.get('craftingSystems')[0];
   assert.equal(
     persisted.craftingCheck.consumption.breakToolsOnFail,

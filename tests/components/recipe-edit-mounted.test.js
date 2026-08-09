@@ -62,11 +62,11 @@ const RAW_MODULES = [
   // before, and a missing raw module HANGS the suite (`# cancelled`) instead of
   // failing it.
   'src/ui/svelte/apps/manager/resolutionModeOptions.js',
-  // The Overview tab asks the resolver what an absent `recipeModifierAuthority` means
-  // before deciding whether to render the modifier controls at all (issue 1055), and
-  // RecipeEditView imports the same module. This harness DOES validate its dependency
-  // graph, so omitting it throws a named "add it to rawModules" error rather than
-  // hanging — unlike the manager harness, whose inline list has no validator.
+  // The Overview tab asks the resolver what an absent `maxModifierPicks` means before
+  // deciding whether to state a pick cap at all (issue 1055), and RecipeEditView imports
+  // the same module. This harness DOES validate its dependency graph, so omitting it
+  // throws a named "add it to rawModules" error rather than hanging — unlike the manager
+  // harness, whose inline list has no validator.
   'src/systems/craftingModifierResolver.js',
   // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
@@ -496,51 +496,38 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('threads the per-recipe crafting-modifier override through RecipeEditView to the Overview tab (issues 770, 1055)', async () => {
-    // The catalogue options + default policy are RecipeEditView wrapper props; a tab
+  it('threads the per-recipe crafting-modifier PICK through RecipeEditView to the Overview tab (issues 770, 1055)', async () => {
+    // The catalogue options + the system's rule are RecipeEditView wrapper props; a tab
     // prop the wrapper fails to forward silently drops to its default and never renders.
     // Mount THROUGH the wrapper so a missing forward fails here.
     //
-    // Retargeted for issue 1055: the seeded override was `policy: 'byRecipe'`, which is
-    // no longer a COMBINATION RULE at all — it named who decides, and that moved onto
-    // the system's `recipeModifierAuthority`. The rule axis this control authors now
-    // offers three values, and the authority prop is left ABSENT here, which is the
-    // unstamped state the resolver reads as `setAndRule` (so both controls render).
+    // Retargeted for issue 1055: a recipe persists a PICK and nothing else. There is no
+    // rule select on this tab at all — a recipe chooses WHICH modifiers apply, never HOW
+    // they combine — and the picker exists only under the system's `byRecipe` rule.
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, craftingModifier: { policy: 'addAll', modifierIds: ['med'] } },
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
         onUpdateRecipe: (patch) => patches.push(patch),
         craftingModifierOptions: [
           { id: 'med', label: 'Medicine' },
           { id: 'alch', label: 'Alchemy' },
         ],
-        craftingModifierPolicyDefault: 'highest',
+        craftingModifierPolicy: 'byRecipe',
       })
     );
-    const field = target.querySelector('[data-recipe-crafting-modifier]');
     assert.ok(
-      field,
-      'the crafting-modifier override control renders when the wrapper forwards options'
+      !target.querySelector('[data-recipe-crafting-modifier]'),
+      'the rejected design’s per-recipe RULE select is gone, not hidden'
     );
-    const select = field.querySelector('[data-recipe-field="craftingModifierPolicy"]');
-    assert.equal(select.value, 'addAll', 'reflects the recipe override rule');
-    assert.deepEqual(
-      [...select.querySelectorAll('option')].map((o) => o.value),
-      ['', 'addAll', 'highest', 'playerPicks'],
-      'the retired byRecipe value is no longer offered as a combination rule'
+    assert.ok(
+      !target.querySelector('[data-recipe-field="craftingModifierPolicy"]'),
+      'and so is its field hook'
     );
-    // The Phase-2 "Player picks" override round-trips through the wrapper (issue 770 P2).
-    select.value = 'playerPicks';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushRender();
-    assert.deepEqual(patches.at(-1), {
-      craftingModifier: { policy: 'playerPicks', modifierIds: ['med'] },
-    });
     // The per-modifier picker shows the catalogue as cancellable pills, with the
     // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
-    assert.ok(picker, 'the eligible-modifier picker shows for an active override');
+    assert.ok(picker, 'the eligible-modifier picker shows under the byRecipe rule');
     assert.ok(
       picker.querySelector('[data-modifier-pill="med"]'),
       'the selected modifier renders as a pill'
@@ -550,13 +537,14 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'an unselected modifier is not a pill'
     );
-    // Opening the menu and picking alch stages the combined set.
+    // Opening the menu and picking alch stages the combined set. The patch carries the
+    // ids ALONE — no rule rides along.
     picker.querySelector('[data-modifier-pill-menu-button]').click();
     await flushRender();
     picker.querySelector('[data-modifier-pill-option="alch"]').click();
     await flushRender();
     assert.deepEqual(patches.at(-1), {
-      craftingModifier: { policy: 'addAll', modifierIds: ['med', 'alch'] },
+      craftingModifier: { modifierIds: ['med', 'alch'] },
     });
     // Removing the LAST pill posts an AUTHORED EMPTY set, not a dropped key (issue 1055
     // defect 3): emptying the row used to mean "inherit", so a GM could not express
@@ -565,87 +553,64 @@ describe('RecipeEditView (mounted)', () => {
     picker.querySelector('[data-modifier-pill-remove="med"]').click();
     await flushRender();
     assert.deepEqual(patches.at(-1), {
-      craftingModifier: { policy: 'addAll', modifierIds: [] },
+      craftingModifier: { modifierIds: [] },
     });
-    // Switching the rule select back to "inherit" clears only the RULE axis and keeps
-    // the recipe's eligible set (issue 1055): the two axes are independent now, so a
-    // rule change must not silently discard the set the GM chose. The control is
-    // controlled, so this acts on the original `['med']` prop.
-    select.value = '';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushRender();
-    assert.deepEqual(patches.at(-1), { craftingModifier: { modifierIds: ['med'] } });
     editHarness.remount();
   });
 
-  // The whole point of the authority axis: the SYSTEM decides which of the two recipe
-  // controls exist. Mounted through the wrapper, because the level is a wrapper prop and
-  // an unforwarded one silently drops to its default and renders the pre-1055 shape.
-  const authorityProps = (overrides = {}) =>
+  // The whole point of the rule axis: the SYSTEM decides whether this recipe authors
+  // anything at all. Mounted through the wrapper, because the rule and the cap are
+  // wrapper props and an unforwarded one silently drops to its default.
+  const ruleProps = (overrides = {}) =>
     identityProps({
-      recipe: { ...RECIPE, craftingModifier: { policy: 'addAll', modifierIds: ['med'] } },
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
       craftingModifierOptions: [
         { id: 'med', label: 'Medicine' },
         { id: 'alch', label: 'Alchemy' },
       ],
       craftingModifierDefaultIds: ['med', 'alch'],
-      craftingModifierPolicyDefault: 'highest',
+      craftingModifierPolicy: 'byRecipe',
       ...overrides,
     });
 
-  it('renders both modifier controls at setAndRule, the picker alone at setOnly, and neither at none (issue 1055)', async () => {
-    for (const [authority, rule, picker] of [
-      ['setAndRule', true, true],
-      ['setOnly', false, true],
-      ['none', false, false],
-      // ABSENT is the unstamped state and resolves as `setAndRule`, so an unstamped
-      // system keeps the controls it had before the axis existed.
-      [undefined, true, true],
+  it('renders the modifier picker under byRecipe ONLY, and no banner under the rest (issue 1055)', async () => {
+    for (const [policy, picker] of [
+      ['byRecipe', true],
+      ['addAll', false],
+      ['highest', false],
+      ['playerPicks', false],
+      // The prop's own default, which is what an unforwarded wrapper prop lands on.
+      [undefined, false],
     ]) {
-      const target = await editHarness.mount(
-        authorityProps({ craftingModifierAuthority: authority })
-      );
-      assert.equal(
-        Boolean(target.querySelector('[data-recipe-crafting-modifier]')),
-        rule,
-        `authority ${String(authority)}: rule select rendered = ${rule}`
-      );
+      const target = await editHarness.mount(ruleProps({ craftingModifierPolicy: policy }));
       assert.equal(
         Boolean(target.querySelector('[data-recipe-crafting-modifier-picker]')),
         picker,
-        `authority ${String(authority)}: picker cell rendered = ${picker}`
+        `rule ${String(policy)}: picker cell rendered = ${picker}`
+      );
+      assert.ok(
+        !target.querySelector('[data-recipe-crafting-modifier]'),
+        `rule ${String(policy)}: a recipe never authors the combination rule`
+      );
+      // The rejected design put a neutral "the system decides" banner on every recipe of
+      // every system that never delegated. It is gone: under a non-`byRecipe` rule this
+      // tab renders NOTHING about check modifiers rather than a standing notice.
+      assert.ok(
+        !target.querySelector('[data-recipe-modifier-banner]'),
+        `rule ${String(policy)}: the read-only delegation banner is gone`
+      );
+      assert.ok(
+        !target.querySelector('[data-recipe-modifier-banner-checks]'),
+        `rule ${String(policy)}: …and so is its Checks-tab action hook`
       );
       editHarness.remount();
     }
   });
 
-  it('replaces the modifier controls with a read-only summary banner at authority none (issue 1055)', async () => {
-    const target = await editHarness.mount(authorityProps({ craftingModifierAuthority: 'none' }));
-    const banner = target.querySelector('[data-recipe-modifier-banner]');
-    assert.ok(Boolean(banner), 'the none summary banner replaces the controls');
-    assert.equal(banner.getAttribute('data-recipe-modifier-banner'), 'none');
-    assert.ok(
-      banner.textContent.includes('Medicine') && banner.textContent.includes('Alchemy'),
-      'the summary NAMES the inherited default set rather than saying "inheriting"'
-    );
-    assert.ok(
-      Boolean(banner.querySelector('[data-recipe-modifier-banner-checks]')),
-      'and routes to the Checks tab, where the level is actually set'
-    );
-    // Its own hook, NOT the resolution-mode banner's: both render on this tab and a
-    // shared attribute would resolve to whichever came first.
-    assert.ok(
-      Boolean(target.querySelector('[data-recipe-mode-banner]')),
-      'the resolution-mode banner still renders alongside it under its own hook'
-    );
-    editHarness.remount();
-  });
-
   it('replaces the modifier controls with the inert banner naming the cause (issue 1055 criterion 10)', async () => {
     for (const cause of ['noCheck', 'noFormula', 'noPlaceholder']) {
       const target = await editHarness.mount(
-        authorityProps({
-          craftingModifierAuthority: 'setAndRule',
+        ruleProps({
           craftingModifierInertCause: cause,
         })
       );
@@ -660,19 +625,31 @@ describe('RecipeEditView (mounted)', () => {
         !target.querySelector('[data-recipe-crafting-modifier-picker]'),
         `${cause}: an inert catalogue offers no per-recipe control`
       );
+      // This is the tab's ONLY check-modifier banner now, and it earns the interruption:
+      // the system's rule DID hand the pick to this recipe, and the check it will roll
+      // never spends `@craftingmod`, so the picks would reach no roll.
       assert.ok(
         !target.querySelector('[data-recipe-modifier-banner]'),
-        `${cause}: the inert banner beats the none summary — they are mutually exclusive`
+        `${cause}: the retired neutral summary banner does not co-render with it`
       );
       editHarness.remount();
     }
+    // …and under a rule that does not defer, an inert catalogue says nothing at all:
+    // there are no picks to warn about.
+    const quiet = await editHarness.mount(
+      ruleProps({ craftingModifierPolicy: 'addAll', craftingModifierInertCause: 'noPlaceholder' })
+    );
+    assert.ok(
+      !quiet.querySelector('[data-recipe-modifier-inert]'),
+      'a rule the recipe cannot author has no warning to give it'
+    );
+    editHarness.remount();
   });
 
   it('writes the tri-state eligible-set select: inherit drops the key, none authors an empty set (issue 1055)', async () => {
     const patches = [];
     const target = await editHarness.mount(
-      authorityProps({
-        craftingModifierAuthority: 'setOnly',
+      ruleProps({
         recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
         onUpdateRecipe: (patch) => patches.push(patch),
       })
@@ -707,8 +684,7 @@ describe('RecipeEditView (mounted)', () => {
 
   it('reads an AUTHORED EMPTY set back as "No modifiers", never as inherit (issue 1055)', async () => {
     const target = await editHarness.mount(
-      authorityProps({
-        craftingModifierAuthority: 'setOnly',
+      ruleProps({
         recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
       })
     );
@@ -734,8 +710,7 @@ describe('RecipeEditView (mounted)', () => {
   // lands on `custom`, without it on `none`. Re-asserting a value the test itself typed,
   // with no such move in between, would pass under both.
   const emptyDefaultSetProps = (overrides = {}) =>
-    authorityProps({
-      craftingModifierAuthority: 'setOnly',
+    ruleProps({
       craftingModifierDefaultIds: [],
       recipe: { ...RECIPE, craftingModifier: null },
       ...overrides,
@@ -856,8 +831,7 @@ describe('RecipeEditView (mounted)', () => {
 
   it('names the inherited default set under Inherit rather than saying "inheriting" (issue 1055)', async () => {
     const target = await editHarness.mount(
-      authorityProps({
-        craftingModifierAuthority: 'setOnly',
+      ruleProps({
         recipe: { ...RECIPE, craftingModifier: null },
       })
     );
@@ -874,14 +848,86 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('hides the crafting-modifier override when the system has no catalogue (issue 770)', async () => {
-    const target = await editHarness.mount(identityProps({ craftingModifierOptions: [] }));
-    assert.equal(
-      target.querySelector('[data-recipe-crafting-modifier]'),
-      null,
-      'no catalogue → no override control'
+  it('hides the crafting-modifier picker when the system has no catalogue (issue 770)', async () => {
+    const target = await editHarness.mount(
+      identityProps({ craftingModifierPolicy: 'byRecipe', craftingModifierOptions: [] })
+    );
+    assert.ok(
+      !target.querySelector('[data-recipe-crafting-modifier-picker]'),
+      'no catalogue → nothing to pick from, so no picker'
     );
     editHarness.remount();
+  });
+
+  // The pick cap is a SYSTEM fact this recipe cannot change, so it is stated STANDING —
+  // not only once the GM hits it and the menu button has already gone dead.
+  // `data-recipe-crafting-modifier-cap` carries which of the two readings is on screen.
+  it('states the pick cap standing, and marks it reached at the bound (issue 1055)', async () => {
+    // THREE catalogue entries, so "at the cap" is distinguishable from "everything is
+    // already selected" — with a two-entry catalogue and a cap of two the pill menu is
+    // dead for the other reason and the assertion would prove nothing.
+    const CAP_CATALOGUE = [
+      { id: 'med', label: 'Medicine' },
+      { id: 'alch', label: 'Alchemy' },
+      { id: 'herb', label: 'Herbalism' },
+    ];
+    const capOf = async (overrides) => {
+      const target = await editHarness.mount(
+        ruleProps({ craftingModifierOptions: CAP_CATALOGUE, ...overrides })
+      );
+      const hint = target.querySelector('[data-recipe-crafting-modifier-cap]');
+      const reading = hint?.getAttribute('data-recipe-crafting-modifier-cap') ?? null;
+      const text = hint?.textContent ?? '';
+      // `ModifierPillSelect` marks the add button with `aria-disabled`, not `disabled`:
+      // it is a `<button>` that must stay focusable so a keyboard user can still reach
+      // the explanation the hint carries.
+      const addDisabled =
+        target.querySelector('[data-modifier-pill-menu-button]')?.getAttribute('aria-disabled') ===
+        'true';
+      editHarness.remount();
+      return { reading, text, addDisabled };
+    };
+
+    const below = await capOf({
+      craftingModifierMaxPicks: 2,
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.equal(below.reading, 'available', 'one pick of two is below the cap');
+    assert.ok(below.text.includes('2'), 'the bound is stated as a number the GM can read');
+    assert.equal(below.addDisabled, false, 'and there is still room, so Add is live');
+
+    const at = await capOf({
+      craftingModifierMaxPicks: 2,
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'alch'] } },
+    });
+    assert.equal(at.reading, 'reached', 'two picks of two is AT the cap');
+    assert.equal(at.addDisabled, true, 'the Add menu goes dead at the bound');
+
+    // A cap of exactly 1 gets its own sentence rather than "up to 1 modifiers".
+    const one = await capOf({
+      craftingModifierMaxPicks: 1,
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.equal(one.reading, 'reached');
+    assert.ok(
+      !/up to 1\b/i.test(one.text),
+      'the singular reading is its own sentence, not a pluralized "up to 1 modifiers"'
+    );
+
+    // UNLIMITED states nothing at all: "up to Infinity" is not a sentence, and a hint
+    // that bounded nothing would be noise on every recipe of every unbounded system.
+    for (const craftingModifierMaxPicks of [null, undefined, 0, -1]) {
+      const unbounded = await capOf({
+        craftingModifierMaxPicks,
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'alch'] } },
+      });
+      assert.equal(
+        unbounded.reading,
+        null,
+        `${String(craftingModifierMaxPicks)} is unlimited to the engine, so no cap is stated`
+      );
+      assert.equal(unbounded.addDisabled, false, '…and nothing is at a bound');
+    }
   });
 
   it('renders the identity inputs in Overview and no recipe-item card', async () => {

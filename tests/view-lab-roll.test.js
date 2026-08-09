@@ -35,6 +35,12 @@ import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 import { buildLabActors } from './view-lab/world/labActors.js';
 import { rolledDiceGroups, evaluateCheckRoll } from '../src/systems/checkRoll.js';
+import {
+  buildCraftingModifierChoice,
+  buildCraftingModifierContext,
+  resolveActiveCraftingCheckFormula,
+  resolveModifierPolicy,
+} from '../src/systems/craftingModifierResolver.js';
 
 /** The two statics the shim hands through, reproduced verbatim from `installFoundryShim.js`. */
 const STATICS = {
@@ -350,4 +356,52 @@ test('the shim installs a Roll CONSTRUCTOR, so evaluateCheckRoll reaches the pro
     globalThis.game = previous.game;
     globalThis.ui = previous.ui;
   }
+});
+
+// The `player-crafting-roll-prompt` frame's PREMISE, read from the fixtures rather than
+// assumed (issue 1055). That case is the world's only picture of the interactive modifier
+// fieldset, and every input it depends on lives in `labContent.js`:
+// `CraftingEngine._buildInteractiveModifierChoice` returns a descriptor only when the
+// EFFECTIVE combination rule is `playerPicks`, the rolled formula spends `@craftingmod`,
+// and at least TWO modifiers are eligible.
+//
+// It rotted exactly once and cost a whole capture run to find. The rule used to be a
+// per-RECIPE override on `hb-r-stillroom`; issue 1055 removed a recipe's ability to
+// override the rule at all, `Recipe._normalizeCraftingModifier` began dropping the stored
+// `policy`, the system stayed on `highest` — and the case failed in CI with "nothing
+// matches `.fabricate-roll-prompt__modifiers`", which reads like a deleted CSS class
+// rather than like a fixture that stopped reaching the state. Nothing in `npm test`
+// noticed, because no unit test asserted the fixture could still get there.
+test('the lab fixtures still reach the interactive modifier fieldset (issue 1055)', () => {
+  const content = buildLabContent();
+  const herbalism = content.systems.find((system) => system.id === 'lab-herbalism');
+  assert.ok(herbalism, 'the herbalism fixture system exists');
+  const stillroom = content.recipes.find((recipe) => recipe.id === 'hb-r-stillroom');
+  assert.ok(stillroom, 'the roll-prompt case’s recipe exists');
+
+  // The rule is the SYSTEM's, full stop. A recipe may carry a pick, never a rule.
+  const active = resolveActiveCraftingCheckFormula(herbalism);
+  assert.ok(
+    active.referencesModifier,
+    'the rolled check still spends @craftingmod — without the token the engine offers no choice'
+  );
+  const context = buildCraftingModifierContext(herbalism, stillroom);
+  assert.equal(
+    resolveModifierPolicy(context),
+    'playerPicks',
+    'the effective rule is playerPicks; authored anywhere but the SYSTEM it is not honoured'
+  );
+
+  // …and the descriptor the prompt renders from. `null` here is the failure the CI capture
+  // reported: the dialog opens with no fieldset in it.
+  const choice = buildCraftingModifierChoice(context, () => 1);
+  assert.ok(choice, 'a modifier-choice descriptor is built');
+  assert.ok(
+    choice.modifiers.length >= 2,
+    `the two-option floor is cleared (${choice.modifiers.length} eligible)`
+  );
+  assert.ok(
+    choice.maxPicks >= 2,
+    'the cap leaves room for a MULTI-pick checkbox group rather than a pick-one radio group'
+  );
 });

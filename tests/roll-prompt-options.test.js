@@ -11,7 +11,7 @@ import {
 // `renderRollModePicker`, `readSharedRollChoice` and `buildRollButtons`, so a second
 // copy of the harness would be new test code duplicating new test code against
 // SonarCloud's new-code duplication gate.
-import { stubDialogCapture, stubI18n } from './helpers/rollPromptDialogStub.js';
+import { checkboxGroupField, stubDialogCapture, stubI18n } from './helpers/rollPromptDialogStub.js';
 
 const PICK_DESCRIPTOR = {
   modifiers: [
@@ -19,6 +19,15 @@ const PICK_DESCRIPTOR = {
     { id: 'herb', label: 'Herbalism', icon: 'fa-solid fa-herb', value: 5 },
   ],
   defaultSelectedId: 'herb',
+};
+
+// The same options under a cap of 2 — the shape `buildCraftingModifierChoice` produces
+// for an unbounded or multi-pick system (issue 1055).
+const MULTI_PICK_DESCRIPTOR = {
+  ...PICK_DESCRIPTOR,
+  maxPicks: 2,
+  defaultSelectedIds: ['med', 'herb'],
+  defaultSelectedId: 'med',
 };
 
 // The catalogue editor creates a row with `label: ''` and never forces a value, and the
@@ -172,6 +181,108 @@ describe('promptCheckRoll: playerPicks radio fieldset', () => {
         modifierChoice: PICK_DESCRIPTOR,
       });
       assert.equal(choice.chosenModifierId, 'herb');
+    } finally {
+      captured.restore();
+    }
+  });
+
+  // The control TYPE follows the cap, because the two say different things to the player
+  // and a checkbox that behaves like a radio is a lie about the control (issue 1055).
+  it('renders a CHECKBOX group with a stated bound above a cap of one', async () => {
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, ['med', 'herb']),
+    });
+    const restoreI18n = stubI18n({ 'FABRICATE.App.RollPrompt.PickUpTo': 'Pick up to {count}' });
+    try {
+      const choice = await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        modifierChoice: MULTI_PICK_DESCRIPTOR,
+      });
+      assert.match(captured.content, /type="checkbox" name="craftingModifier"/, 'checkbox group');
+      assert.doesNotMatch(captured.content, /type="radio"/, 'not a radio group');
+      assert.match(captured.content, /Pick up to 2/, 'the legend states the bound in words');
+      assert.match(captured.content, /value="med"\s+checked/, 'both pre-selected ids are checked');
+      assert.match(captured.content, /value="herb"\s+checked/);
+      assert.deepEqual(choice.chosenModifierIds, ['med', 'herb'], 'both ticked boxes returned');
+      assert.equal(
+        choice.chosenModifierId,
+        'med',
+        'the legacy singular field is the first of them'
+      );
+    } finally {
+      restoreI18n();
+      captured.restore();
+    }
+  });
+
+  // The reader walks the group's `checked` flags rather than reading `RadioNodeList#value`,
+  // which is specified to inspect RADIO inputs only and returns `''` for a checkbox group
+  // however many boxes are ticked. Reading `.value` alone would report "nothing picked"
+  // for every multi-pick roll.
+  it('reports a PARTIAL checkbox selection, and an empty one as an empty array', async () => {
+    for (const [checkedIds, expected] of [
+      [['herb'], ['herb']],
+      [[], []],
+    ]) {
+      const captured = stubDialogCapture({
+        situationalBonus: { value: '' },
+        rollMode: { value: 'publicroll' },
+        craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, checkedIds),
+      });
+      try {
+        const choice = await promptCheckRoll({
+          formula: '1d20 + (modifier)',
+          activity: 'Crafting',
+          modifierChoice: MULTI_PICK_DESCRIPTOR,
+        });
+        assert.deepEqual(choice.chosenModifierIds, expected);
+      } finally {
+        captured.restore();
+      }
+    }
+  });
+
+  it('omits the legacy singular field entirely for an empty selection', async () => {
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, []),
+    });
+    try {
+      const choice = await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        modifierChoice: MULTI_PICK_DESCRIPTOR,
+      });
+      assert.equal(
+        'chosenModifierId' in choice,
+        false,
+        'never present-but-undefined — an unticked group has no first id'
+      );
+    } finally {
+      captured.restore();
+    }
+  });
+
+  // The live cap binding is a UI affordance, not the invariant, and a submit that
+  // bypassed it must not over-report. `evaluateCheckRoll` re-imposes the cap too.
+  it('re-applies the cap to an over-large submitted selection', async () => {
+    const captured = stubDialogCapture({
+      situationalBonus: { value: '' },
+      rollMode: { value: 'publicroll' },
+      craftingModifier: checkboxGroupField(MULTI_PICK_DESCRIPTOR.modifiers, ['med', 'herb']),
+    });
+    try {
+      const choice = await promptCheckRoll({
+        formula: '1d20 + (modifier)',
+        activity: 'Crafting',
+        // The SAME two boxes ticked, but the descriptor only permits one.
+        modifierChoice: { ...MULTI_PICK_DESCRIPTOR, maxPicks: 1, defaultSelectedIds: ['herb'] },
+      });
+      assert.deepEqual(choice.chosenModifierIds, ['med'], 'truncated to the cap, in group order');
     } finally {
       captured.restore();
     }

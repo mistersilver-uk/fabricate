@@ -1653,15 +1653,18 @@ const HERBALISM_RECIPES = [
         },
       ],
       toolIds: ['hb-tool-mortar'],
-      // The world's only per-recipe check-modifier override, and the only route to the interactive
-      // `playerPicks` prompt: `resolveModifierPolicy` prefers the recipe's policy over the system's
-      // `highest`. The id subset is widened to all three catalogue entries so the prompt's fieldset
-      // offers three options with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2)
-      // rather than a row of identical chips — a pick-one control photographed against equal
-      // options shows nothing about picking. Three also clears the two-option floor below which the
-      // engine suppresses the descriptor entirely.
+      // The world's only per-recipe check-modifier PICK (issue 1055). It carries ids ALONE: a
+      // recipe chooses WHICH modifiers apply, never HOW they combine, so no `policy` is persisted
+      // here and the SYSTEM's rule decides whether this pick is honoured at all. Under the
+      // system's authored `playerPicks` it is not — the player selects at roll time — which is why
+      // every frame of this picker clicks the rule group over to `byRecipe` first.
+      //
+      // All three catalogue entries, so the picker draws three pills with three DIFFERENT values
+      // (Medicine +4, Herbalism kit +3, Nature +2) rather than a row of identical chips — a
+      // pick control photographed against equal options shows nothing about picking. Three is also
+      // what makes the pick-cap frames legible: a cap of 3 typed on the Checks tab puts this
+      // recipe's picker AT its bound, and a cap of 5 leaves it below one.
       craftingModifier: {
-        policy: 'playerPicks',
         modifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools'],
       },
     }
@@ -3001,29 +3004,38 @@ const PROGRESSIVE_CHECK = Object.freeze({
     stageAdvanceOnSuccess: 1,
   },
   checkModifiers: HERBALISM_CHECK_MODIFIERS,
-  // LEFT at `highest`, deliberately. Flipping the system default to `playerPicks` would rewrite
-  // `manager-checks-crafting-modifiers` — the frame that is this change's evidence for the
-  // catalogue card AT REST — so the at-rest and selected-state frames would stop being two
-  // different pictures. The Phase-2 policy is reached through a per-RECIPE override on
-  // `hb-r-stillroom` instead, which also exercises `Recipe._normalizeCraftingModifier`'s new value.
-  defaultModifierPolicy: 'highest',
-  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature'],
-  // AUTHORED rather than left absent (issue 1055). Absence resolves to `setAndRule` too, so this
-  // changes no rendering — but the two are different worlds, and the lab is the one world where
-  // "not yet stamped" is indistinguishable from "stamped by a GM" in every frame. Stamping it is
-  // what makes `hb-r-stillroom`'s `playerPicks` RULE override honoured by declaration rather than
-  // by fallback, which is what keeps the interactive prompt and the recipe editor's rule select
-  // reachable if the absent-default is ever revisited.
+  // `playerPicks` ON THE SYSTEM (issue 1055), and it has to be here rather than on a recipe.
+  // `player-crafting-roll-prompt` is the only frame of the interactive modifier fieldset, and
+  // `CraftingEngine._buildInteractiveModifierChoice` reaches it only when the EFFECTIVE rule is
+  // `playerPicks`. That rule used to be reachable as a per-recipe override on `hb-r-stillroom`;
+  // this change removes that capability outright — a recipe chooses WHICH modifiers apply, never
+  // HOW they combine, and `Recipe._normalizeCraftingModifier` now drops a stored `policy` on the
+  // way in — so the system is the only place left to author it. Left at `highest`, the prompt
+  // would never open and that frame would publish a crafting tab with no dialog over it.
   //
-  // This const has ONE consumer — `lab-herbalism` — so authoring the level here is not a shared
-  // edit. `SIMPLE_CHECK` is the shared one (alchemy, jewelry, tidewrack) and is left alone.
+  // It is also a NON-`byRecipe` rule, which is what keeps this the world in which the recipe
+  // Overview's modifier surface is absent entirely: see
+  // `manager-recipe-edit-crafting-modifier-absent` in `scripts/lib/viewLabCases.js`. `byRecipe` is
+  // reached by CLICKING the rule group, exactly as the pick cap is reached by typing into its
+  // Stepper. Authoring it onto a second system would cost a permanent rewrite of every frame that
+  // system already has, because a non-empty catalogue is what un-hides the recipe editor's
+  // modifier row at all.
+  defaultModifierPolicy: 'playerPicks',
+  // ALL THREE catalogue entries, up from two. The eligible set under `playerPicks` is this list,
+  // and the prompt needs at least TWO to render at all (the engine suppresses a one-option choice)
+  // — but three with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2) is what
+  // makes the frame show a choice rather than a row of interchangeable chips.
+  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools'],
+  // NO `maxModifierPicks` (issue 1055). Absence is the UNLIMITED reading, and it is the one this
+  // world must carry: it is what `manager-checks-crafting-modifiers` photographs as a blank field
+  // with an "Unlimited" placeholder, and the bounded frame beside it is reached by typing into the
+  // same Stepper. Authoring a cap here would make the unlimited state — the state every unasked
+  // world is in — unreachable in every frame.
   //
-  // The `none` and `setOnly` levels are deliberately NOT authored on a second system. Reaching a
-  // level costs one click on a control this change ships; giving another system a catalogue costs
-  // a permanent rewrite of every frame that system already has, because a non-empty catalogue is
-  // what un-hides the recipe editor's whole modifier row. See the `none`/`setOnly` cases in
-  // `scripts/lib/viewLabCases.js`, which drive the level instead of authoring it.
-  recipeModifierAuthority: 'setAndRule',
+  // Unlimited also gives the roll prompt its MULTI-pick form: `buildCraftingModifierChoice` clamps
+  // an unbounded cap to the option count, so `maxPicks` is 3 and the fieldset renders as a
+  // checkbox group legended "Pick up to 3" rather than as the historical pick-one radio group.
+  // That is the control this change introduces, so it is the one the frame is evidence for.
 });
 
 export function buildLabContent() {
