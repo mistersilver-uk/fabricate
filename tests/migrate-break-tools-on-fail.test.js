@@ -173,7 +173,7 @@ test('runs through MigrationRunner from 1.6.0, renames the key, and lands at the
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.19.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.20.0', 'advances to the new highest version');
   const system = settings.store.get('craftingSystems')[0];
   assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
   assert.equal('consumeCatalystsOnFail' in system.craftingCheck.consumption, false);
@@ -196,7 +196,17 @@ test('runner: craftingSystems left untouched (no write) when nothing needs renam
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
-  assert.equal(setKeys.includes('craftingSystems'), false, 'no rewrite when already migrated');
-  assert.equal(settings.store.get('migrationVersion'), '1.19.0');
+  // Retargeted for issue 1055: the 1.20.0 pass may write `craftingSystems` too, because
+  // it stamps `craftingCheck.maxModifierPicks` on every system already on the
+  // `playerPicks` combination rule. The claim this test makes is about THIS migration, so
+  // it is asserted on the persisted payload's own fields rather than on the shared
+  // setting's write count.
+  const persisted = settings.store.get('craftingSystems')[0];
+  assert.equal(
+    persisted.craftingCheck.consumption.breakToolsOnFail,
+    true,
+    'already-migrated breakage config is not renamed or stripped again'
+  );
+  assert.equal(persisted.visibilityMode, 'knowledge', 'no unrelated field is rewritten');
+  assert.equal(settings.store.get('migrationVersion'), '1.20.0');
 });

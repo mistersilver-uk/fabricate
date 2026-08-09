@@ -84,7 +84,10 @@ import {
   normalizeCurrencyConfig,
   normalizeCurrencyUnit,
 } from '../../../systems/currencyProfile.js';
-import { normalizeModifierPolicy } from '../../../systems/craftingModifierResolver.js';
+import {
+  normalizeModifierPolicy,
+  resolveActiveCraftingCheckFormula,
+} from '../../../systems/craftingModifierResolver.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
@@ -2458,6 +2461,52 @@ function _descriptionTextCandidate(value, seen = new Set()) {
 }
 
 /**
+ * Which of the three reasons a `@craftingmod` catalogue is INERT applies, or `null` when
+ * it is live. Discriminated rather than collapsed to one boolean because each cause needs
+ * different GM-facing copy — "this mode rolls no check" is a different fix from "this
+ * formula never spends `@craftingmod`". The order matters: a mode with no check slot has
+ * no formula to inspect, and an unauthored formula cannot reference the token.
+ * @param {ReturnType<typeof resolveActiveCraftingCheckFormula>} formula
+ * @returns {'noCheck'|'noFormula'|'noPlaceholder'|null}
+ */
+function _craftingModifierInertCause(formula) {
+  if (formula.slot === null) return 'noCheck';
+  if (!formula.checkUsable) return 'noFormula';
+  if (!formula.referencesModifier) return 'noPlaceholder';
+  return null;
+}
+
+/**
+ * The check-modifier facts the Checks card and the recipe editor need beyond the raw
+ * `craftingCheck` fields (issue 1055), projected as an extension of the allowlist below.
+ *
+ * `maxModifierPicks` is passed through RAW and is deliberately NOT defaulted — no `|| 1`,
+ * no `?? 0`. Absence is a real value ("unlimited"), distinct from every authored bound,
+ * and both authoring surfaces render it as such. A default here would forge a GM decision
+ * that was never made and would silently truncate recipe picks already on disk. The key is
+ * always emitted so the shape is fixed; its value is `undefined` when unbounded. What
+ * absence MEANS at resolution time is `resolveMaxModifierPicks`'s answer (`Infinity`), and
+ * this projection deliberately does not pre-empt it.
+ *
+ * "Does this rule defer the selection?" is deliberately NOT projected alongside it. Both
+ * surfaces already receive the normalized rule, and `policyDefersSelection` exists on the
+ * resolver so an authoring surface can ask it directly — which is what the Checks card
+ * does, live against the radio group the GM is clicking. A projected copy would answer
+ * from the last persisted rule and would be the one derivation on this axis capable of
+ * disagreeing with the card that reads it.
+ *
+ * @param {object} system The selected crafting system.
+ */
+function _buildCraftingModifierRuleView(system) {
+  return {
+    modifierFormulaInertCause: _craftingModifierInertCause(
+      resolveActiveCraftingCheckFormula(system)
+    ),
+    maxModifierPicks: system?.craftingCheck?.maxModifierPicks,
+  };
+}
+
+/**
  * Build the full selectedSystem view data object.
  * Mirrors RecipeManagerApp._prepareContext() selectedSystem section.
  */
@@ -2598,6 +2647,11 @@ function _buildSelectedSystemViewData(
       defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
         ? [...selectedSystem.craftingCheck.defaultModifierIds]
         : [],
+      // The pick cap and the two derivations both authoring surfaces read (issue 1055).
+      // Spread from a named builder so this allowlist keeps stating what it carries while
+      // the giant literal gains no new branches — see `_buildCraftingModifierRuleView` for
+      // why `maxModifierPicks` is passed through undefaulted.
+      ..._buildCraftingModifierRuleView(selectedSystem),
     },
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -5293,11 +5347,13 @@ export function createAdminStore(services) {
           associatedItemName: associatedItem?.name || null,
         };
       });
+      const systemRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || [];
+
       essenceCards = _buildEssenceCards(
         essenceDefinitions,
         managedItems,
         managedItemOptions,
-        recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || []
+        systemRecipes
       );
 
       selectedSystemData = _buildSelectedSystemViewData(
@@ -5754,6 +5810,10 @@ export function createAdminStore(services) {
     const name = _nextSystemName(systemManager);
     const description =
       'Configure categories, item tags, essences, and crafting behaviour for this system.';
+    // No `craftingCheck` seed (issue 1055). The authority level this used to stamp is
+    // gone, and its replacement — the combination rule — already has a defined default
+    // (`addAll`) that every caller shares, so a UI-only seed here would only be able to
+    // disagree with the manager and the importer about what a new system starts as.
     const system = await systemManager.createSystem({ name, description });
     selectedSystemId.set(system.id);
     _clearSystemScopedSearches();
@@ -8471,7 +8531,9 @@ export function createAdminStore(services) {
   // then re-defaults (silent data loss). The whole `checkModifiers`/`defaultModifierIds`
   // arrays are REPLACED by `game.settings.set` (array replace, not merge), so removing a
   // catalogue entry persists without any `-=` deletion. Callers pass a partial patch of
-  // { checkModifiers?, defaultModifierPolicy?, defaultModifierIds? }.
+  // { checkModifiers?, defaultModifierPolicy?, defaultModifierIds?, maxModifierPicks? }.
+  // A `maxModifierPicks: null` is a real value in that patch, not an omission: absence
+  // means UNLIMITED, so clearing the cap has to be able to overwrite a stored bound.
   async function saveCraftingCheckModifiers(patch = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);

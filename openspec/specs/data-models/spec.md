@@ -157,17 +157,36 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
 
-    // Per-recipe check-modifier catalogue (issue 770). A crafting-owned named
+    // Per-recipe check-modifier catalogue (issues 770, 1055). A crafting-owned named
     // catalogue (NOT gathering's characterModifiers — a different aggregate) feeding
     // the `@craftingmod` roll-formula placeholder. Each `expression` is a roll-data
     // fragment evaluated against the crafter (missing/failed → 0). Absent = empty
-    // catalogue + addAll policy = a no-op for a single-formula check (back-compat).
+    // catalogue + addAll rule = a no-op for a single-formula check (back-compat).
     checkModifiers?: { id: string, label: string, icon?: string, expression: string }[], // default []
-    // An unrecognized value falls back to "addAll" HERE (system level only); a bad
-    // recipe-level policy instead inherits this one. playerPicks resolves as highest
-    // whenever the deferred pick-one prompt is not offered (resolution-modes/spec.md).
+    // The COMBINATION RULE, owned by the SYSTEM alone (issue 1055). It states BOTH how
+    // the eligible values reduce to one number AND who selects them:
+    //   addAll      — sum the system's own default set. Nobody selects.
+    //   highest     — max(...) of the system's own default set. Nobody selects.
+    //   byRecipe    — "Recipe picks": the RECIPE author selects, at recipe-edit time.
+    //   playerPicks — the PLAYER selects, at roll time.
+    // `byRecipe` is a first-class rule, NOT a delegation of authority: a recipe chooses
+    // WHICH modifiers apply, never HOW they combine. Both selecting rules SUM what was
+    // picked and are bounded by `maxModifierPicks` below. An unrecognized value falls
+    // back to "addAll"; a recipe never overrides this field. `playerPicks` resolves
+    // deterministically to the best legal selection whenever the roll-time prompt is not
+    // offered (resolution-modes/spec.md).
     defaultModifierPolicy?: "addAll" | "highest" | "byRecipe" | "playerPicks",  // default "addAll"
     defaultModifierIds?: string[],  // default []; catalogue entries applied by default
+    // The cap on how many modifiers a SELECTING rule (`byRecipe`, `playerPicks`) may
+    // pick; meaningless under `addAll`/`highest`, and stored system-wide regardless of
+    // the current rule so flipping between the two selecting rules does not destroy it.
+    // PRESERVES ABSENCE — only a positive integer is attached, so `null`, `0`, `2.5` and
+    // junk all normalize to the SAME shape, key absent. Absence means UNLIMITED
+    // (`Infinity`), resolved at `resolveMaxModifierPicks` (`craftingModifierResolver.js`)
+    // and never defaulted at this shape: a system never asked the question must not
+    // silently acquire a bound that truncates recipe picks already on disk. See
+    // resolution-modes/spec.md §Check Source and the `1.20.0` migration below.
+    maxModifierPicks?: number,  // positive integer; default: key absent = unlimited
   },
 
   // Shared check sub-object shapes, reused by craftingCheck / salvageCraftingCheck /
@@ -954,14 +973,25 @@ Recipe = {
   // check; ignored otherwise. Semantics in resolution-modes/spec.md.
   minSuccessOutcomeId?: string | null,
 
-  // Optional per-recipe crafting-check modifier override (issue 770). Absent (null) =
-  // inherit the system's `craftingCheck.defaultModifierPolicy` + `defaultModifierIds`.
-  // Present = override the policy and/or the eligible id subset resolved into the
-  // `@craftingmod` placeholder (unknown ids dropped at resolution against the live
-  // catalogue). `byRecipe` at recipe level means "use exactly this recipe's modifierIds".
-  // The normalizer drops a malformed value to null and a policy-less + id-less object to
-  // null (nothing to override). Semantics in resolution-modes/spec.md §Check Source.
-  craftingModifier?: { policy?: "addAll" | "highest" | "byRecipe" | "playerPicks", modifierIds?: string[] } | null,
+  // The recipe author's PICK of crafting-check modifiers (issues 770, 1055). Absent
+  // (null) = picked nothing; inherit the system's `defaultModifierIds`. Present = names
+  // the eligible id subset resolved into the `@craftingmod` placeholder (unknown ids
+  // dropped at resolution against the live catalogue, and the survivors truncated to
+  // `craftingCheck.maxModifierPicks`). It is honoured ONLY under the system's `byRecipe`
+  // ("Recipe picks") combination rule; under `addAll`, `highest` and `playerPicks` a
+  // stored pick sits here and is not consulted at all.
+  // IT CARRIES NO RULE. A recipe chooses WHICH modifiers apply, never HOW they combine,
+  // so the combination rule is the system's alone. Older data may carry a `policy` key
+  // from the era when a recipe could override it; `Recipe._normalizeCraftingModifier`
+  // DROPS it on the way in, so it cannot round-trip back out through `toJSON`, and
+  // `resolveModifierPolicy` never reads it wherever it survives unnormalized on disk.
+  // `modifierIds` is keyed on `Array.isArray` AT THE POINT OF ENTRY, not on the
+  // filtered array's length: an authored `[]` is preserved as an authored EMPTY set
+  // (0 eligible modifiers, `@craftingmod` → 0), distinct from an absent `modifierIds`,
+  // which inherits. The normalizer drops a malformed value, and an object carrying no
+  // authored `modifierIds` array, to null (nothing picked). Semantics in
+  // resolution-modes/spec.md §Check Source.
+  craftingModifier?: { modifierIds?: string[] } | null,
 
   // Per-recipe access grants for the `restricted` visibility mode (issue 511, PR-B).
   // Which specific player-characters and players may see/read this recipe. Each is a
@@ -1043,12 +1073,17 @@ Recipe = {
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
     It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
     An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
-    13a. `craftingModifier` is an optional per-recipe crafting-check modifier override (issue 770): `{ policy?, modifierIds? } | null`, defaulting to `null` (inherit the system default policy + `defaultModifierIds`).
-    The normalizer keeps only a known `policy` (`addAll`/`highest`/`byRecipe`/`playerPicks`) and a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object with neither a valid policy nor a non-empty id list, round-trips to `null`.
-    An unrecognized policy is dropped at BOTH levels but to DIFFERENT defaults, and the two must not be conflated.
-    At recipe level (`Recipe._normalizeCraftingModifier`, the normalizer this requirement governs) an unrecognized `policy` becomes `null`, and a null recipe policy means _inherit the system's effective policy_ — which may be `highest`, `byRecipe` or `playerPicks`, not necessarily `addAll` — so a recipe carrying a bad policy plus a valid `modifierIds` list still resolves under the system's `defaultModifierPolicy` over its own id subset.
-    Only at system level (`craftingCheck.defaultModifierPolicy`, normalized by `CraftingSystemManager._normalizeCheckModifierConfig`) does an unrecognized policy fall back to `addAll`, because there is no further level to inherit from.
-    `playerPicks` needs no new per-recipe fields (the eligible-set model is unchanged; the policy only changes how the eligible set combines at roll time).
+    13a. `craftingModifier` is the recipe author's optional PICK of crafting-check modifiers (issues 770, 1055): `{ modifierIds? } | null`, defaulting to `null` (picked nothing; inherit the system's `defaultModifierIds`).
+    It authors ONE axis — WHICH modifiers apply — and never the combination rule; the rule is the system's `craftingCheck.defaultModifierPolicy` alone, and the pick is honoured only under that field's `byRecipe` ("Recipe picks") value.
+    The normalizer keeps a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object carrying no AUTHORED `modifierIds` array, round-trips to `null`.
+    A legacy `policy` key — persisted when a recipe could still override the rule — is DROPPED by the normalizer, so it never round-trips out through `toJSON()`, and an object carrying only a `policy` normalizes to `null` because it holds no pick.
+    That drop is a normalizer-level erasure, not a migration: the `1.20.0` migration deliberately leaves the raw key on disk (see `destructive-changes-and-migrations/spec.md`), and it is inert either way because `resolveModifierPolicy` reads only the system field.
+    `modifierIds` authoredness is keyed on `Array.isArray(input.modifierIds)` AT THE POINT OF ENTRY, before de-duplication/filtering — so an authored `[]`, or an authored array whose only entries are malformed (e.g. `[123, '']`), still round-trips as `{ modifierIds: [] }` (an authored EMPTY set: 0 eligible modifiers, `@craftingmod` → 0), never collapsing to `null` (inherit).
+    Keying on the filtered length instead would flip malformed import data from _inherit_ to _no modifiers_, which is the unsafe direction.
+    Whether the pick is actually honoured — rather than merely stored — is decided at the resolver, not by this normalizer: under any rule other than `byRecipe` it is ignored outright, and under `byRecipe` it is truncated to `craftingCheck.maxModifierPicks`.
+    See resolution-modes/spec.md §Check Source.
+    An unrecognized `defaultModifierPolicy` falls back to `addAll` at system level (`CraftingSystemManager._normalizeCheckModifierConfig`), which is the only level a rule exists at.
+    Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `byRecipe` reuses this same `modifierIds` list.
     Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.

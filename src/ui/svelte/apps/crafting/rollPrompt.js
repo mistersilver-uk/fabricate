@@ -36,6 +36,11 @@
  * the list is stripped silently, and so is every inline `on*` handler. So these builders
  * emit only allowlisted tags/attributes, and all state is read in the button callback
  * through `button.form.elements` rather than from a handler that would never survive.
+ *
+ * The one piece of live behaviour here — holding a multi-pick modifier group at its cap
+ * ({@link bindModifierPickCap}) — is wired from `DialogV2.wait`'s `render` callback for
+ * exactly that reason: it binds listeners to the already-sanitised DOM, so nothing about
+ * it depends on an attribute surviving the allowlist.
  */
 
 /**
@@ -81,6 +86,170 @@ const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
 function localize(key, fallback) {
   const resolved = globalThis.game?.i18n?.localize?.(key);
   return typeof resolved === 'string' && resolved && resolved !== key ? resolved : fallback;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The `playerPicks` modifier choice (issues 770, 1055).                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The prompt-facing plan for a `modifierChoice` descriptor: the options to render, how
+ * many of them the player may take, and which to open pre-selected.
+ *
+ * `maxPicks` is clamped into `[1, options.length]` and DEFAULTS TO 1 when the descriptor
+ * carries no usable cap, so a descriptor built before `playerPicks` became multi-pick
+ * still renders the single-select radio group it was written for. `defaultSelectedIds`
+ * falls back to the legacy singular `defaultSelectedId` for the same reason, and is
+ * truncated to the cap so the dialog can never OPEN in a state it forbids.
+ *
+ * @param {{modifiers?: Array<object>, maxPicks?: number, defaultSelectedIds?: string[],
+ *   defaultSelectedId?: string}|null|undefined} modifierChoice
+ * @returns {{options: Array<object>, maxPicks: number, defaultSelectedIds: string[]}}
+ */
+function planModifierChoice(modifierChoice) {
+  const options = Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [];
+  const rawCap = Number(modifierChoice?.maxPicks);
+  const cap = Number.isInteger(rawCap) && rawCap > 0 ? rawCap : 1;
+  const maxPicks = Math.max(Math.min(cap, options.length), 1);
+  const rawDefaults = Array.isArray(modifierChoice?.defaultSelectedIds)
+    ? modifierChoice.defaultSelectedIds
+    : [modifierChoice?.defaultSelectedId];
+  const defaultSelectedIds = rawDefaults
+    .filter((id) => typeof id === 'string' && id !== '')
+    .slice(0, maxPicks);
+  return { options, maxPicks, defaultSelectedIds };
+}
+
+/**
+ * Read the checked modifier ids off a submitted form field.
+ *
+ * The field is a same-named group, so it arrives as a `RadioNodeList` — and
+ * `RadioNodeList#value` is specified to inspect RADIO inputs only, returning `''` for a
+ * checkbox group however many boxes are ticked. Reading `.value` alone would therefore
+ * report "nothing picked" for every multi-pick roll, so the entries are walked and their
+ * `checked` flags read directly.
+ *
+ * The return distinguishes two cases a single array cannot:
+ *
+ * - `[]` — the field was present and the player checked NOTHING. A deliberate empty
+ *   selection, which `evaluateCheckRoll` reduces to 0.
+ * - `null` — no answer is readable (the field is absent, or it is a bare `{ value }`
+ *   stand-in with nothing in it). The caller then opens the descriptor's pre-selection,
+ *   which is what the headless/no-form path has always done.
+ *
+ * @param {object|null|undefined} field `button.form.elements.craftingModifier`.
+ * @returns {string[]|null}
+ */
+function readSelectedModifierIds(field) {
+  if (!field) return null;
+  const entries = typeof field.length === 'number' ? [...field] : [field];
+  const checkable = entries.filter((entry) => typeof entry?.checked === 'boolean');
+  if (checkable.length > 0) {
+    return checkable.filter((entry) => entry.checked).map((entry) => String(entry.value ?? ''));
+  }
+  // No `checked` flags to read (a headless form stand-in): fall back to a plain value,
+  // and report an empty one as "no answer" rather than as an empty selection.
+  const value = field.value;
+  return value ? [String(value)] : null;
+}
+
+/**
+ * Hold a multi-pick modifier fieldset at its cap by disabling the unchecked boxes once
+ * `maxPicks` are ticked, and releasing them again when one is cleared.
+ *
+ * This runs from `DialogV2.wait`'s `render` callback rather than from markup, because
+ * everything this module emits passes through `cleanHTML`, which strips every inline
+ * `on*` handler — an attribute-based guard would be silently deleted and the cap would
+ * read as enforced while doing nothing.
+ *
+ * It is a UI affordance, not the invariant: `evaluateCheckRoll` re-imposes the same cap
+ * on whatever the prompt returns, so a selection that gets past this (an out-of-date
+ * client, a scripted submit) is still truncated before it reaches the formula.
+ *
+ * @param {object|null|undefined} dialog The rendered dialog (or its element).
+ * @param {number} maxPicks
+ * @returns {void}
+ */
+function bindModifierPickCap(dialog, maxPicks) {
+  const root = dialog?.element ?? dialog;
+  const inputs = [...(root?.querySelectorAll?.('input[name="craftingModifier"]') ?? [])];
+  if (inputs.length === 0) return;
+  const sync = () => {
+    const checked = inputs.filter((input) => input.checked).length;
+    for (const input of inputs) input.disabled = !input.checked && checked >= maxPicks;
+  };
+  for (const input of inputs) input.addEventListener('change', sync);
+  sync();
+}
+
+/**
+ * One modifier row: the control, the icon slot, the label and the signed value chip.
+ *
+ * The icon slot and the chip are ALWAYS emitted (see {@link DEFAULT_MODIFIER_ICON}): the
+ * row is a flex row, so an icon-less or value-less catalogue entry that omitted either
+ * would collapse its gutter and misalign against its siblings.
+ *
+ * @param {{id?: string, label?: string, icon?: string, value?: unknown}} modifier
+ * @param {{inputType: 'radio'|'checkbox', preSelected: Set<string>, unnamedLabel: string}} context
+ * @returns {string}
+ */
+function renderModifierOption(modifier, { inputType, preSelected, unnamedLabel }) {
+  const id = escapeHtml(modifier?.id ?? '');
+  const checked = preSelected.has(modifier?.id) ? ' checked' : '';
+  const iconClass = modifier?.icon || DEFAULT_MODIFIER_ICON;
+  const iconHtml = `<i class="fabricate-roll-prompt__modifier-icon ${escapeHtml(iconClass)}" aria-hidden="true"></i>`;
+  // The catalogue editor creates entries with an empty label and never forces a value,
+  // so an unnamed modifier would otherwise render as icon + chip only and announce as
+  // bare "+3". Fall back to a localized placeholder name.
+  const label = modifier?.label || unnamedLabel;
+  const chip = `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(formatSigned(modifier?.value))}</span>`;
+  return (
+    `<label class="fabricate-roll-prompt__modifier-option">` +
+    `<input type="${inputType}" name="craftingModifier" value="${id}"${checked} />` +
+    `${iconHtml}<span class="fabricate-roll-prompt__modifier-label">${escapeHtml(label)}</span>${chip}</label>`
+  );
+}
+
+/**
+ * The "Check modifier" fieldset: one row per eligible modifier, opened on the
+ * descriptor's pre-selection.
+ *
+ * The control TYPE follows the cap, because the two say different things to the player
+ * and a checkbox that behaves like a radio is a lie about the control: at `maxPicks === 1`
+ * this is the pick-one radio group it has always been, and above 1 it is a checkbox group
+ * whose legend states the bound in words ("Pick up to 3"). The bound is also enforced
+ * live by {@link bindModifierPickCap} — and again, authoritatively, in
+ * `evaluateCheckRoll`, since a UI control's constraint is never the invariant.
+ *
+ * @param {{options: Array<object>, maxPicks: number, defaultSelectedIds: string[]}} plan
+ * @returns {string} Empty when there is nothing to offer.
+ */
+function renderModifierFieldset({ options, maxPicks, defaultSelectedIds }) {
+  if (options.length === 0) return '';
+  const multiPick = maxPicks > 1;
+  const context = {
+    inputType: multiPick ? 'checkbox' : 'radio',
+    preSelected: new Set(defaultSelectedIds),
+    unnamedLabel: localize('FABRICATE.App.RollPrompt.UnnamedModifier', 'Unnamed modifier'),
+  };
+  const optionsHtml = options.map((modifier) => renderModifierOption(modifier, context)).join('');
+  const legend = escapeHtml(localize('FABRICATE.App.RollPrompt.CheckModifier', 'Check modifier'));
+  // The cap has to be legible BEFORE the player runs into it: a box that silently stops
+  // responding reads as a broken dialog, whereas "Pick up to 3" explains the disabling.
+  // Single-pick renders no hint — a radio group already says "one" by construction.
+  const hint = multiPick
+    ? `<span class="fabricate-roll-prompt__modifiers-hint">${escapeHtml(
+        localize('FABRICATE.App.RollPrompt.PickUpTo', 'Pick up to {count}').replace(
+          '{count}',
+          String(maxPicks)
+        )
+      )}</span>`
+    : '';
+  return (
+    `<fieldset class="fabricate-roll-prompt__modifiers">` +
+    `<legend class="fabricate-roll-prompt__modifiers-legend">${legend}${hint}</legend>` +
+    `${optionsHtml}</fieldset>`
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -239,16 +408,20 @@ function buildRollButtons(allowAdvantage, readChoice) {
  * @param {boolean} [args.allowAdvantage] When true, offer Advantage/Normal/
  *   Disadvantage buttons (the formula has a plain `1d20`); else a single Roll.
  * @param {{modifiers: Array<{id:string,label:string,icon:string,value:number}>,
- *   defaultSelectedId: string}} [args.modifierChoice] The interactive `playerPicks`
- *   descriptor (issue 770 Phase 2). When present, a "Check modifier" radio fieldset is
- *   rendered (icon + label + value chip per option, `defaultSelectedId` pre-checked) and
- *   `readChoice` returns the selected `chosenModifierId`. Absent → no fieldset renders
- *   (byte-identical dialog).
+ *   maxPicks: number, defaultSelectedIds: string[], defaultSelectedId: string}}
+ *   [args.modifierChoice] The interactive `playerPicks` descriptor (issues 770, 1055).
+ *   When present, a "Check modifier" fieldset is rendered (icon + label + value chip per
+ *   option, `defaultSelectedIds` pre-checked) and `readChoice` returns the selection as
+ *   `chosenModifierIds`. The control follows `maxPicks`: a pick-one radio group at 1, a
+ *   capped checkbox group above it. Absent → no fieldset renders (byte-identical dialog).
  * @returns {Promise<{confirmed: true, bonus: string|null, rollMode: string|undefined,
- *   advantage: 'advantage'|'normal'|'disadvantage', chosenModifierId?: string}
- *   | {confirmed: false}>}
+ *   advantage: 'advantage'|'normal'|'disadvantage', chosenModifierIds?: string[],
+ *   chosenModifierId?: string} | {confirmed: false}>}
  *   `{ confirmed: true, … }` when the player rolls; `{ confirmed: false }` on
- *   Cancel (window close / Escape) or dismissal.
+ *   Cancel (window close / Escape) or dismissal. `chosenModifierIds` is the selection;
+ *   `chosenModifierId` is its first entry, kept so a single-pick consumer's contract is
+ *   unchanged — it mirrors the descriptor's own `defaultSelectedId`/`defaultSelectedIds`
+ *   pairing and is meaningful only at a cap of 1.
  */
 export async function promptCheckRoll({
   formula,
@@ -261,12 +434,21 @@ export async function promptCheckRoll({
   modifierChoice,
 } = {}) {
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
+  const {
+    options: modifierOptions,
+    maxPicks,
+    defaultSelectedIds,
+  } = planModifierChoice(modifierChoice);
   // Headless / no dialog API (tests): do not block the roll. When a `playerPicks`
   // choice was offered, confirm with the pre-selected default so `@craftingmod` still
   // resolves to a concrete value (never leaks unresolved to Foundry's Roll).
   if (!DialogV2?.wait) {
     return modifierChoice
-      ? { confirmed: true, chosenModifierId: modifierChoice.defaultSelectedId }
+      ? {
+          confirmed: true,
+          chosenModifierIds: defaultSelectedIds,
+          ...(defaultSelectedIds.length > 0 && { chosenModifierId: defaultSelectedIds[0] }),
+        }
       : { confirmed: true };
   }
 
@@ -303,47 +485,19 @@ export async function promptCheckRoll({
     formulaHtml = `<div class="fabricate-roll-prompt__formula fabricate-roll-prompt__formula--dc-only">${dcChip}</div>`;
   }
 
-  // Interactive `playerPicks` (issue 770 Phase 2): a PICK-ONE radio fieldset of the
-  // eligible modifiers (icon + label + signed value chip), the highest-valued option
-  // pre-checked. Only rendered when a `modifierChoice` descriptor is supplied — every
-  // other roll leaves this empty, so the dialog is byte-identical. The formula line
-  // shows a NEUTRAL `(modifier)` placeholder in the `@craftingmod` slot (substituted by
+  // Interactive `playerPicks` (issues 770, 1055): a fieldset of the eligible modifiers
+  // (icon + label + signed value chip), opened on the best legal pre-selection. Only
+  // rendered when a `modifierChoice` descriptor is supplied — every other roll leaves
+  // this empty, so the dialog is byte-identical. The formula line shows a NEUTRAL
+  // `(modifier)` placeholder in the `@craftingmod` slot (substituted by
   // `evaluateCheckRoll`), not a default number a non-default pick would contradict; the
-  // per-radio chips carry each option's value and the posted roll reflects the player's
-  // final selection.
-  let modifierChoiceHtml = '';
-  const modifierOptions =
-    modifierChoice && Array.isArray(modifierChoice.modifiers) ? modifierChoice.modifiers : [];
-  if (modifierOptions.length > 0) {
-    const unnamedLabel = localize('FABRICATE.App.RollPrompt.UnnamedModifier', 'Unnamed modifier');
-    const optionsHtml = modifierOptions
-      .map((modifier) => {
-        const id = escapeHtml(modifier?.id ?? '');
-        const checked = modifier?.id === modifierChoice.defaultSelectedId ? ' checked' : '';
-        // The icon slot is ALWAYS emitted (see DEFAULT_MODIFIER_ICON): an icon-less
-        // catalogue entry must not collapse the gutter and misalign its row.
-        const iconClass = modifier?.icon || DEFAULT_MODIFIER_ICON;
-        const iconHtml = `<i class="fabricate-roll-prompt__modifier-icon ${escapeHtml(iconClass)}" aria-hidden="true"></i>`;
-        // The catalogue editor creates entries with an empty label and never forces a
-        // value, so an unnamed modifier would otherwise render as icon + chip only and
-        // announce as bare "+3". Fall back to a localized placeholder name.
-        const label = modifier?.label || unnamedLabel;
-        // The chip is ALWAYS emitted too, for the same row-alignment reason;
-        // `formatSigned` owns the non-finite fallback so there is one behaviour.
-        const chip = `<span class="fabricate-roll-prompt__modifier-value">${escapeHtml(formatSigned(modifier?.value))}</span>`;
-        return (
-          `<label class="fabricate-roll-prompt__modifier-option">` +
-          `<input type="radio" name="craftingModifier" value="${id}"${checked} />` +
-          `${iconHtml}<span class="fabricate-roll-prompt__modifier-label">${escapeHtml(label)}</span>${chip}</label>`
-        );
-      })
-      .join('');
-    const legend = escapeHtml(localize('FABRICATE.App.RollPrompt.CheckModifier', 'Check modifier'));
-    modifierChoiceHtml =
-      `<fieldset class="fabricate-roll-prompt__modifiers">` +
-      `<legend class="fabricate-roll-prompt__modifiers-legend">${legend}</legend>` +
-      `${optionsHtml}</fieldset>`;
-  }
+  // per-option chips carry each option's value and the posted roll reflects the SUM of
+  // the player's final selection.
+  const modifierChoiceHtml = renderModifierFieldset({
+    options: modifierOptions,
+    maxPicks,
+    defaultSelectedIds,
+  });
 
   const bonusHtml = renderBonusInput();
   const configHtml = renderRollModePicker(defaultRollMode);
@@ -358,13 +512,19 @@ export async function promptCheckRoll({
   // that is unique to it.
   const readChoice = (button, advantage) => {
     const choice = readSharedRollChoice(button, defaultRollMode, advantage);
-    // Interactive `playerPicks`: the checked radio's value is the chosen modifier id;
-    // fall back to the pre-selected default when the field is absent (headless). Only
+    // Interactive `playerPicks`: the checked controls' values are the chosen modifier
+    // ids; fall back to the pre-selection when no answer is readable (headless). Only
     // added when a modifier choice was offered, so the non-`playerPicks` choice object
-    // is byte-identical.
+    // is byte-identical. The cap is re-applied here as well as in the live control
+    // binding, so a submit that bypassed the binding cannot over-report.
     if (modifierOptions.length > 0) {
-      const field = button?.form?.elements?.craftingModifier;
-      choice.chosenModifierId = field?.value || modifierChoice.defaultSelectedId;
+      const selected = readSelectedModifierIds(button?.form?.elements?.craftingModifier);
+      const ids = (selected ?? defaultSelectedIds).slice(0, maxPicks);
+      choice.chosenModifierIds = ids;
+      // The legacy singular field, mirroring the descriptor's own
+      // `defaultSelectedId = defaultSelectedIds[0]`. Omitted for an empty selection so
+      // it is never present-but-undefined.
+      if (ids.length > 0) choice.chosenModifierId = ids[0];
     }
     return choice;
   };
@@ -377,6 +537,12 @@ export async function promptCheckRoll({
     content,
     rejectClose: false,
     buttons,
+    // Attached only for a multi-pick fieldset, so every other dialog's config stays
+    // byte-identical and no `render` hook runs where there is nothing to bound.
+    ...(modifierOptions.length > 0 &&
+      maxPicks > 1 && {
+        render: (_event, dialog) => bindModifierPickCap(dialog, maxPicks),
+      }),
   }).catch(() => ({ confirmed: false }));
 
   // A dismissed dialog (rejectClose:false) resolves to null → treat as cancel.
@@ -538,10 +704,11 @@ export async function promptBulkCheckRoll({ allowAdvantage, count, subjects } = 
  * @param {string} args.activity Human-readable activity label ("Crafting" / "Salvage" / "Gathering").
  * @param {number} [args.dc] The DC surfaced to the prompt + flavor when finite.
  * @param {string} [args.img] The subject icon shown in the dialog header.
- * @param {{modifiers: Array, defaultSelectedId: string}} [args.modifierChoice] The
- *   deferred interactive `playerPicks` descriptor (issue 770 Phase 2); forwarded to
- *   `evaluateCheckRoll` → the prompt. Omitted from the bag when absent, so every
- *   non-`playerPicks` path builds a byte-identical rollOptions object.
+ * @param {{modifiers: Array, maxPicks: number, defaultSelectedIds: string[],
+ *   defaultSelectedId: string}} [args.modifierChoice] The deferred interactive
+ *   `playerPicks` descriptor (issues 770, 1055); forwarded to `evaluateCheckRoll` → the
+ *   prompt. Omitted from the bag when absent, so every non-`playerPicks` path builds a
+ *   byte-identical rollOptions object.
  * @returns {object} rollOptions for `evaluateCheckRoll`.
  */
 export function buildInteractiveRollOptions({

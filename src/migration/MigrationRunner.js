@@ -21,6 +21,7 @@ import { migrateGatheringEconomy } from './migrateGatheringEconomy.js';
 import { migrateGatheringLimitationToggles } from './migrateGatheringLimitationToggles.js';
 import { migrateInvertRecipeItemLink } from './migrateInvertRecipeItemLink.js';
 import { migrateLegacyResolutionModes } from './migrateLegacyResolutionModes.js';
+import { migrateMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { migrateMoveRoutedByIngredientsCheck } from './migrateMoveRoutedByIngredientsCheck.js';
 import { migrateNodeRespawnIntervals } from './migrateNodeRespawnIntervals.js';
 import { migrateNodeRespawnModes } from './migrateNodeRespawnModes.js';
@@ -318,6 +319,22 @@ const MIGRATIONS = [
     // (time requirements ignored) — so the downgrade is lossless.
     downgradeTo: '1.18.0',
     migrate: (data) => migrateDefaultOnTimeRequirements(data.systems),
+  },
+  {
+    version: '1.20.0',
+    label:
+      'Cap the modifier picks of systems already on the playerPicks combination rule at ' +
+      'craftingCheck.maxModifierPicks = 1, the single pick that rule always meant, so the ' +
+      'new generalized cap does not silently widen them to unlimited',
+    // The last release before the cap existed: a world downgraded to it drops the unknown
+    // `maxModifierPicks` key through the allowlist literal in
+    // `_normalizeCheckModifierConfig`, and its `playerPicks` already means "pick one" —
+    // exactly what the dropped cap encoded — so the downgrade is lossless and lands on
+    // that release's own schema.
+    downgradeTo: '1.19.0',
+    // Reads/returns `{ recipes, systems }`: only `systems` is rewritten, and `recipes` is
+    // returned unchanged so the deliberate recipe-level no-op is explicit.
+    migrate: (data) => migrateMaxModifierPicks(data),
   },
   // Future migrations added here in version order
 ];

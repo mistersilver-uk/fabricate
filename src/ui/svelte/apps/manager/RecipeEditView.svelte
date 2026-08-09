@@ -34,6 +34,7 @@
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
   import { evaluateRecipeReadiness, blocksEnable } from './recipe/recipeReadiness.js';
+  import { resolutionModeOptions } from './resolutionModeOptions.js';
 
   let {
     recipe = null,
@@ -69,11 +70,19 @@
     itemTags = [],
     checkTierOptions = [],
     minSuccessTierOptions = [],
-    // Per-recipe crafting-check modifier override (issue 770). Threaded through this
-    // wrapper so the Overview tab receives them — a tab prop skipping this wrapper
-    // silently drops to its default and the control never renders.
+    // Per-recipe crafting-check modifier selection (issue 770, reshaped by issue 1055).
+    // Threaded through this wrapper so the Overview tab receives them — a tab prop
+    // skipping this wrapper silently drops to its default and the control never renders.
     craftingModifierOptions = [],
-    craftingModifierPolicyDefault = 'addAll',
+    // The SYSTEM's combination rule. Not a "default": a recipe cannot override it, and
+    // only `byRecipe` gives the recipe anything to author at all.
+    craftingModifierPolicy = 'addAll',
+    craftingModifierDefaultIds = [],
+    // The system's pick cap (issue 1055). `null`, NOT a number: absence is the
+    // "unlimited" value, and a numeric default here would cap every unasked system.
+    craftingModifierMaxPicks = null,
+    craftingModifierInertCause = '',
+    onOpenChecks = () => {},
     // Category lives on the Overview tab (prototype §5.1). Threaded through this
     // wrapper so the Overview tab receives them (a tab prop skipping this wrapper
     // silently drops to its default and the control never renders).
@@ -376,6 +385,18 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // The resolution-mode banner's copy and icon are NOT re-authored: `resolutionModeOptions.js`
+  // already owns the canonical { value, icon, labelKey, descKey } list that System Settings
+  // and Crafting Settings render, so a second table would drift. The lookup moved here from
+  // RecipeModeBanner when that component was prop-ified (issue 1055) so a second banner —
+  // the Overview tab's inert check-modifier warning — can reuse the same chrome with its own
+  // copy. That prop-ification is now load-bearing for THIS call site regardless: the copy
+  // lives here, so folding it back into the component would re-create the table drift.
+  const modeOption = $derived(
+    resolutionModeOptions.find((option) => option.value === resolutionMode) ||
+      resolutionModeOptions[0]
+  );
+
   // The recipe image is always editable: a recipe can belong to many books & scrolls
   // (recipeIds[] is many-to-many), so it no longer mirrors or locks to a single linked
   // recipe item's image.
@@ -429,7 +450,23 @@
         }}
       />
 
-      <RecipeModeBanner {resolutionMode} onOpenSettings={onOpenCraftingSettings} />
+      <RecipeModeBanner
+        value={modeOption.value}
+        icon={modeOption.icon}
+        kicker={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Kicker', 'Resolution mode')}
+        label={text(modeOption.labelKey, modeOption.fallback)}
+        scope={text(
+          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SetForSystem',
+          'set for this crafting system'
+        )}
+        description={text(modeOption.descKey, modeOption.descFallback)}
+        actionLabel={text('FABRICATE.Admin.Manager.Recipe.ModeBanner.Settings', 'System settings')}
+        actionHint={text(
+          'FABRICATE.Admin.Manager.Recipe.ModeBanner.SettingsHint',
+          'Resolution mode is set for the whole crafting system, not per recipe.'
+        )}
+        onAction={onOpenCraftingSettings}
+      />
 
       <div
         class="manager-editor-tab-panel"
@@ -458,7 +495,11 @@
             {checkTierOptions}
             {minSuccessTierOptions}
             {craftingModifierOptions}
-            {craftingModifierPolicyDefault}
+            {craftingModifierPolicy}
+            {craftingModifierDefaultIds}
+            {craftingModifierMaxPicks}
+            {craftingModifierInertCause}
+            {onOpenChecks}
             {locked}
             {onToggleLocked}
             {multiStepEnabled}

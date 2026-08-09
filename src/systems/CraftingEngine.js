@@ -31,6 +31,7 @@ import {
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCraftingModifierChoice,
+  buildCraftingModifierContext,
   CRAFTING_MOD_TOKEN,
   makeRollDataExpressionEvaluator,
   resolveModifierPolicy,
@@ -4216,7 +4217,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCraftingModifierContext(system, recipe);
     const result = await runFormulaPassFail({
       formula,
       dc,
@@ -4282,7 +4283,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCraftingModifierContext(system, recipe);
     const result = await runFormulaRouted({
       formula,
       dc,
@@ -4334,48 +4335,43 @@ export class CraftingEngine {
   }
 
   /**
-   * Build the `@craftingmod` modifier context (issue 770) from the system's crafting
-   * check catalogue + default policy and the recipe's optional override. Threaded to
-   * the shared check runners, which resolve `@craftingmod` to a scalar against the
-   * crafter's roll data before the formula reaches Foundry's `Roll`. A formula with no
-   * `@craftingmod` token ignores this context entirely (full back-compat).
-   * @private
-   */
-  _buildCraftingModifierContext(system, recipe) {
-    const check = system?.craftingCheck || {};
-    return {
-      catalogue: check.checkModifiers,
-      systemPolicy: check.defaultModifierPolicy,
-      defaultModifierIds: check.defaultModifierIds,
-      recipeModifier: recipe?.craftingModifier ?? null,
-    };
-  }
-
-  /**
-   * Build the deferred interactive `playerPicks` modifier-choice descriptor (issue 770
-   * Phase 2) for an interactive craft. Returns the descriptor ONLY when the effective
-   * modifier policy is `playerPicks` AND this is an interactive roll AND the formula
+   * Build the deferred interactive `playerPicks` modifier-choice descriptor (issues 770,
+   * 1055) for an interactive craft. Returns the descriptor ONLY when the effective
+   * combination rule is `playerPicks` AND this is an interactive roll AND the formula
    * references `@craftingmod` AND at least TWO modifiers are eligible (the two-option
    * rule is enforced by {@link buildCraftingModifierChoice}); otherwise `null`, so every
-   * deterministic-policy and non-interactive craft threads a byte-identical `rollOptions`
+   * other rule and every non-interactive craft threads a byte-identical `rollOptions`
    * bag (no `modifierChoice` key). The descriptor is threaded onto
-   * `rollOptions.modifierChoice` and resolved to a single value inside the roll prompt —
-   * the non-interactive `playerPicks` path keeps resolving `@craftingmod`
-   * deterministically as `highest`.
+   * `rollOptions.modifierChoice`; the player picks UP TO `maxPicks` of its options in
+   * the roll prompt and `evaluateCheckRoll` substitutes their SUM.
+   *
+   * `playerPicks` is the ONLY rule that defers to roll time. `byRecipe` also defers
+   * selection, but to the RECIPE AUTHOR at recipe-edit time, so by the time the engine
+   * rolls, the choice is already made and stored: `resolveEligibleModifierIds` has
+   * narrowed the eligible set to the recipe's picks and capped it, and the deterministic
+   * scalar sums exactly that. Prompting for it would re-ask a question the recipe already
+   * answered, which is why the gate below tests for `playerPicks` specifically rather
+   * than for "some rule defers selection".
+   *
+   * The non-interactive `playerPicks` path resolves `@craftingmod` deterministically as
+   * the BEST LEGAL selection — the sum of the highest `maxModifierPicks` values, which is
+   * `highest` at a cap of 1 — so an API/headless craft matches what an optimally-playing
+   * player would have picked here.
    * @private
    * @returns {{token: string, modifiers: Array<{id: string, label: string, icon: string,
-   *   value: number}>, defaultSelectedId: string}|null}
+   *   value: number}>, maxPicks: number, defaultSelectedIds: string[],
+   *   defaultSelectedId: string}|null}
    */
   _buildInteractiveModifierChoice(formula, craftingModifierContext, craftingActor, interactive) {
     if (interactive !== true) return null;
     // A formula that never references `@craftingmod` has nowhere to spend the picked
-    // modifier, so offering the player a radio would be a meaningless choice (the
-    // deterministic policies silently no-op the same case). Gate on token presence.
+    // modifiers, so offering the player a choice would be meaningless (the
+    // non-selecting rules silently no-op the same case). Gate on token presence.
     if (!String(formula ?? '').includes(CRAFTING_MOD_TOKEN)) return null;
     if (resolveModifierPolicy(craftingModifierContext) !== 'playerPicks') return null;
     // Returns the descriptor, or null when fewer than two modifiers are eligible (a
-    // one-option radio is not a choice — the deterministic `highest` scalar IS the only
-    // possible pick, so the prompt falls through to it);
+    // one-option group is not a choice — the deterministic scalar IS the only possible
+    // pick, so the prompt falls through to it);
     // `buildInteractiveRollOptions` omits the `modifierChoice` key for a falsy value.
     return buildCraftingModifierChoice(
       craftingModifierContext,
@@ -4422,7 +4418,7 @@ export class CraftingEngine {
   ) {
     const progressive = system?.craftingCheck?.progressive || {};
     const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
-    const craftingModifier = this._buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCraftingModifierContext(system, recipe);
     const result = await runFormulaProgressive({
       formula,
       triggers: progressive.checkBreakage?.triggers,

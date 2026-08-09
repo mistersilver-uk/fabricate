@@ -442,6 +442,40 @@ It matches on the trigger "no valid `recipeItemId` and a non-empty `linkedRecipe
 Treat that reverse-ref write as a transitional shim, not canonical output.
 A post-`1.13.0` **preserved alchemy-formula** `linkedRecipeItemUuid` still satisfies the reconciler's trigger; the current, intended behaviour is that the reconciler may re-process such preserved formula links (they are not exempt from the trigger).
 
+### Modifier Pick Cap Migration (`1.20.0`, `downgradeTo: '1.19.0'`, pure, clone-first, idempotent)
+
+Issue 1055 generalizes the crafting-check combination rule.
+`craftingCheck.defaultModifierPolicy` keeps **four** rules (`addAll`/`highest`/`byRecipe`/`playerPicks`), each stating both how the eligible values reduce AND who selects them, and the new `craftingCheck.maxModifierPicks` bounds the two SELECTING rules (`byRecipe`, `playerPicks`), which both SUM what was picked.
+`resolveMaxModifierPicks` reads an ABSENT cap as UNLIMITED.
+The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`) reads and returns both the `craftingSystems` and `recipes` payloads as pure, clone-first data — it mutates only its own clones, never the runner's payload, so even a hypothetical throw would leave the pre-migration checkpoint untouched — and throws no `FatalMigrationError`.
+
+1. **Stamp `craftingCheck.maxModifierPicks = 1` onto pre-existing `playerPicks` systems only.** Before this change `playerPicks` meant "the player picks EXACTLY ONE modifier": the roll prompt was a radio group and the non-interactive fallback was `max(...)`.
+   Every system already on that rule carries no cap, because the field did not exist when it was authored, so without this stamp the upgrade would silently widen each one from "pick one" to "pick everything" and jump its `@craftingmod` from `max(...)` to the full sum.
+   The migration writes back the bound those systems always had, exactly once.
+2. **The other three rules are deliberately left absent, i.e. unlimited.** `addAll` and `highest` do not select at all, so a cap means nothing to them and stamping one would only leak a bound into any later switch to a selecting rule.
+   `byRecipe` ("Recipe picks") is the other selecting rule, but its historical behaviour was NOT single-pick: a recipe already on disk may legitimately have picked several modifiers, and `resolveEligibleModifierIds` TRUNCATES a recipe's pick to the cap, so a stamp of `1` here would silently discard picks the GM authored.
+   Unlimited is the only value that preserves them, and a GM who wants a bound can set one.
+3. **`byRecipe` is NOT mapped or retired, at either level.** It is a first-class combination rule — the recipe author selecting at recipe-edit time, the parallel of the player selecting at roll time — so a persisted `byRecipe` is valid data that must survive untouched.
+4. **The stamp is conditional on purpose.** It fires only where the cap is still unbounded (`resolveMaxModifierPicks` reports `Infinity`), so an authored cap always wins.
+   That is what makes the migration idempotent under re-run without relying on the version gate, and the View Lab depends on it directly: the lab boots the real runner over fixtures that seed no `migrationVersion`, so `lastRunVersion` is `0.0.0` and every migration runs on every lab build — an unconditional write would overwrite an authored cap and corrupt the exact frame that case exists to capture.
+5. **It does not seed a missing `craftingCheck` block.** `checkModifiers` lives inside `craftingCheck`, so a system without that block has no catalogue, no modifiers to pick from and no cap to observe; it also cannot be on `playerPicks`, since the rule is persisted in the very block that is missing.
+   Precedent: the *Progressive Reorder-Flag Retirement Migration* above makes the same call for the same reason — no storage churn for zero observable change.
+6. **The recipe payload is read and returned unchanged, on purpose.** Recipes are the other half of this feature's data, so returning them makes the deliberate no-op explicit rather than leaving a reader to wonder whether they were forgotten; the runner compares each setting's JSON against its pre-pass snapshot before writing, so an unchanged clone persists nothing.
+   In particular a recipe's legacy `craftingModifier.policy` is NOT stripped here: the resolver no longer consults it, so it is inert, and leaving it on disk is what keeps the downgrade below lossless.
+   `Recipe._normalizeCraftingModifier` drops the key on read, so it disappears the next time that recipe is saved (see `data-models/spec.md` requirement 13a).
+7. **Mutated setting key:** `craftingSystems`, and only it.
+8. **Lossless downgrade.** `downgradeTo: '1.19.0'` is lossless: `maxModifierPicks` is a key the pre-change build never knew, and its `_normalizeCheckModifierConfig` is an allowlist literal that never spreads its source, so it silently drops the key on read — and that build's `playerPicks` already means "pick one", which is exactly what the dropped cap encoded.
+   No other field is touched, so a downgraded world lands on that release's own schema and behaviour with no data loss.
+
+**Mirrored on import.** `migrateExportPayload` applies the identical per-system transform (`applyMaxModifierPicks`, shared with the settings-data migration, not a second implementation of it) to an imported bundle, branch-independently — it runs whether or not the payload's envelope `schemaVersion` needed upcasting, because the cap is a new field on an OLD schema version and its absence is orthogonal to the envelope version.
+An export bundle carries exactly one system, so the shared per-system transform is applied directly with no grouping.
+It is idempotent for the same reason as the settings-data migration: an authored cap in the bundle always survives the import, and a bundle's `byRecipe` rule is left exactly as authored at both levels.
+
+**A recipe's picks are never destroyed by a cap.** Lowering `maxModifierPicks` below what a recipe already picked leaves that recipe's stored `craftingModifier.modifierIds` exactly where it was — only how many of them the resolver HONOURS changes, `resolveEligibleModifierIds` keeping the first N in authored order.
+Raising the cap again re-applies the rest immediately, with nothing to re-enter.
+Switching the system away from `byRecipe` likewise leaves every recipe's stored pick intact and simply stops consulting it.
+The recipe editor's picker truncates its own seed to the cap and refuses an add at the cap, but that is a UI affordance layered on top of the resolver's truncation, never the invariant.
+
 ### Catalyst → Tool Migration (`0.6.0`)
 
 The `0.6.0` migration (`src/migration/migrateCatalystsToTools.js`) retires the Catalyst concept by converting recipe-side catalysts into shared library **Tools** referenced by `toolIds`.

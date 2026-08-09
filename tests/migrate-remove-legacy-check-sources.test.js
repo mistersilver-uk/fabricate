@@ -176,7 +176,7 @@ test('runs through MigrationRunner from 1.7.0, strips the fields, and lands at t
 
   await runner.run();
 
-  assert.equal(settings.store.get('migrationVersion'), '1.19.0', 'advances to the new highest version');
+  assert.equal(settings.store.get('migrationVersion'), '1.20.0', 'advances to the new highest version');
   const system = settings.store.get('craftingSystems')[0];
   assert.equal('macroUuid' in system.craftingCheck, false);
   assert.equal('builtIn' in system.salvageCraftingCheck, false);
@@ -209,7 +209,17 @@ test('runner: craftingSystems left untouched (no write) when no deprecated field
 
   await runner.run();
 
-  const setKeys = settings.calls.set.map((c) => c.key);
-  assert.equal(setKeys.includes('craftingSystems'), false, 'no rewrite when already clean');
-  assert.equal(settings.store.get('migrationVersion'), '1.19.0');
+  // Retargeted for issue 1055: the 1.20.0 pass may write `craftingSystems` too, because
+  // it stamps `craftingCheck.maxModifierPicks` on every system already on the
+  // `playerPicks` combination rule. The claim this test makes is about THIS migration, so
+  // it is asserted on the persisted payload's own fields rather than on the shared
+  // setting's write count.
+  const persisted = settings.store.get('craftingSystems')[0];
+  assert.equal(
+    persisted.craftingCheck.simple.macroUuid,
+    'Macro.dc',
+    'a non-deprecated check source is left exactly as authored'
+  );
+  assert.equal(persisted.visibilityMode, 'knowledge', 'no unrelated field is rewritten');
+  assert.equal(settings.store.get('migrationVersion'), '1.20.0');
 });

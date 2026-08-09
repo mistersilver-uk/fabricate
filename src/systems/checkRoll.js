@@ -106,18 +106,73 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
 }
 
 /**
- * Look up an interactive `playerPicks` modifier's numeric value by id, coercing a
- * missing/non-finite value to 0.
- * @param {{modifiers?: Array<{id: string, value: number}>}} modifierChoice
- * @param {string} id
- * @returns {number}
+ * The ids a returned prompt choice ASKS to spend, before any validation.
+ *
+ * Three shapes are accepted, in this precedence, and the order matters:
+ *
+ * 1. `chosenModifierIds` — the multi-pick array the prompt returns today. An EMPTY
+ *    array is an answer ("I picked nothing"), not an absence, so it wins over the
+ *    descriptor default and reduces `@craftingmod` to 0.
+ * 2. `chosenModifierId` — the historical single-pick field. Still honoured so a caller
+ *    or harness that supplies one keeps working rather than silently rolling the
+ *    default; `null`/`undefined` falls through, exactly as the `??` it replaces did.
+ * 3. The descriptor's own pre-selection — the headless-confirm fallback, where the
+ *    prompt confirmed without reporting a selection at all.
+ *
+ * @param {{defaultSelectedIds?: string[], defaultSelectedId?: string}|null} modifierChoice
+ * @param {{chosenModifierIds?: unknown, chosenModifierId?: unknown}|null} choice
+ * @returns {unknown[]}
  */
-function modifierChoiceValue(modifierChoice, id) {
-  const found = (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : []).find(
-    (modifier) => modifier?.id === id
-  );
-  const value = Number(found?.value);
-  return Number.isFinite(value) ? value : 0;
+function requestedModifierIds(modifierChoice, choice) {
+  if (Array.isArray(choice?.chosenModifierIds)) return choice.chosenModifierIds;
+  const single = choice?.chosenModifierId;
+  if (single !== undefined && single !== null) return [single];
+  const defaults = modifierChoice?.defaultSelectedIds;
+  if (Array.isArray(defaults)) return defaults;
+  const fallback = modifierChoice?.defaultSelectedId;
+  return fallback === undefined || fallback === null ? [] : [fallback];
+}
+
+/**
+ * Reduce a returned prompt selection to the modifiers that actually count, the scalar
+ * they SUM to, and their labels.
+ *
+ * The prompt is a UI control, so its cap is not the invariant — this layer re-derives
+ * the legal selection from the descriptor and never trusts what came back:
+ *
+ * - An id the descriptor never OFFERED is discarded rather than valued (an unknown id
+ *   contributed 0 before and contributes nothing now, so a lone unknown id still
+ *   reduces to 0).
+ * - The survivors are taken in ELIGIBLE-SET order and TRUNCATED to `maxPicks`, matching
+ *   how `resolveEligibleModifierIds` bounds a `byRecipe` selection. Ordering by the
+ *   descriptor rather than by the returned array makes the outcome independent of the
+ *   order the prompt happened to report, and truncating (rather than taking the best N)
+ *   keeps an over-large selection from paying MORE than a legal one.
+ * - `maxPicks` absent, or not a positive integer, means 1 — the historical single-pick
+ *   behaviour, so a descriptor built before this field existed cannot silently widen.
+ * - An empty selection sums to 0.
+ *
+ * @param {{modifiers?: Array<{id: string, label?: string, value?: number}>,
+ *   maxPicks?: number, defaultSelectedIds?: string[], defaultSelectedId?: string}|null} modifierChoice
+ * @param {{chosenModifierIds?: unknown, chosenModifierId?: unknown}|null} choice
+ * @returns {{value: number, labels: string[]}}
+ */
+function resolveModifierSelection(modifierChoice, choice) {
+  const offered = Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [];
+  const requested = new Set(requestedModifierIds(modifierChoice, choice));
+  const rawCap = Number(modifierChoice?.maxPicks);
+  const maxPicks = Number.isInteger(rawCap) && rawCap > 0 ? rawCap : 1;
+  const picked = offered
+    .filter((modifier) => typeof modifier?.id === 'string' && requested.has(modifier.id))
+    .slice(0, maxPicks);
+  const value = picked.reduce((sum, modifier) => {
+    const num = Number(modifier?.value);
+    return sum + (Number.isFinite(num) ? num : 0);
+  }, 0);
+  const labels = picked
+    .map((modifier) => modifier?.label)
+    .filter((label) => typeof label === 'string' && label !== '');
+  return { value, labels };
 }
 
 /**
@@ -150,13 +205,17 @@ function modifierChoiceValue(modifierChoice, id) {
  * @param {object} [options.speaker] Chat message speaker.
  * @param {*} [options.dc] The DC surfaced to the prompt (display only).
  * @param {object} [options.craftingModifier] The `@craftingmod` modifier context
- *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`.
- *   Resolved to a scalar and substituted before the formula reaches Foundry's `Roll`.
- * @param {{token: string, modifiers: Array<{id,label,icon,value}>, defaultSelectedId: string}}
- *   [options.modifierChoice] The deferred interactive `playerPicks` descriptor (issue
- *   770 Phase 2). Present only on an interactive `playerPicks` craft; when set, the
- *   `@craftingmod` token is left unresolved until the prompt returns the chosen id, then
- *   that single modifier's value substitutes it. Absent on every other path.
+ *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier,
+ *   maxModifierPicks }`. Resolved to a scalar and substituted before the formula
+ *   reaches Foundry's `Roll`.
+ * @param {{token: string, modifiers: Array<{id,label,icon,value}>, maxPicks: number,
+ *   defaultSelectedIds: string[], defaultSelectedId: string}} [options.modifierChoice]
+ *   The deferred interactive `playerPicks` descriptor (issues 770, 1055). Present only
+ *   on an interactive `playerPicks` craft; when set, the `@craftingmod` token is left
+ *   unresolved until the prompt returns the chosen ids, then the SUM of those modifiers'
+ *   values substitutes it. `playerPicks` is multi-pick: the player selects up to
+ *   `maxPicks`, so a cap of 1 is the historical single-pick behaviour and nothing else
+ *   about this path changes. Absent on every other path.
  * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
  *   resolvedFormula: string|null, cancelled?: boolean}>}
  */
@@ -249,17 +308,18 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     // modifier and the same substituted formula feeds eval AND display (eval == display).
     if (useDeferredChoice) {
       // The `@craftingmod` token MUST be resolved here so it never reaches Foundry's
-      // `Roll` unresolved (Foundry would treat it as 0). Fall back to the pre-selected
-      // default when the prompt confirmed without a selection (headless confirm).
-      const chosenId = choice.chosenModifierId ?? modifierChoice.defaultSelectedId;
-      const value = modifierChoiceValue(modifierChoice, chosenId);
-      effectiveFormula = substituteCraftingModifier(effectiveFormula, value);
+      // `Roll` unresolved (Foundry would treat it as 0). The player may pick UP TO
+      // `maxPicks` modifiers and they SUM; `resolveModifierSelection` owns the whole
+      // reduction, including re-imposing the cap the prompt only *displays* and falling
+      // back to the pre-selection when the prompt confirmed without one (headless).
+      const selection = resolveModifierSelection(modifierChoice, choice);
+      effectiveFormula = substituteCraftingModifier(effectiveFormula, selection.value);
       resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-      // Best-effort: append the chosen modifier label to the chat flavor (e.g.
-      // `… · Herbalism`), riding the existing flavor thread.
-      const chosenLabel = (
-        Array.isArray(modifierChoice.modifiers) ? modifierChoice.modifiers : []
-      ).find((modifier) => modifier?.id === chosenId)?.label;
+      // Best-effort: append the chosen modifier labels to the chat flavor (e.g.
+      // `… · Herbalism, Alchemist's Kit`), riding the existing flavor thread. One
+      // bullet-joined segment however many were picked, so the flavor does not grow a
+      // separator per modifier.
+      const chosenLabel = selection.labels.join(', ');
       // Only join with the bullet when there is an existing flavor; an empty base must
       // not leave an orphan `· ` (production always supplies a flavor, but direct
       // callers/tests may not).

@@ -42,6 +42,7 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
+import { normalizeModifierPolicy, resolveMaxModifierPicks } from './craftingModifierResolver.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -603,13 +604,28 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the crafting check-modifier catalogue + default resolution policy
-   * (issue 770): `checkModifiers` is a named catalogue of `{id,label,icon?,expression}`
-   * entries feeding the `@craftingmod` placeholder; `defaultModifierPolicy` is one of
-   * `addAll`/`highest`/`byRecipe`/`playerPicks` (default `addAll`); `defaultModifierIds` names the
-   * catalogue entries applied by default. Malformed entries are dropped, a bad
-   * expression coerces to an empty string, and a default id naming nothing in the
-   * catalogue is dropped (order + de-dup preserved).
+   * Normalize the crafting check-modifier catalogue, combination rule and pick cap
+   * (issues 770, 1055): `checkModifiers` is a named catalogue of
+   * `{id,label,icon?,expression}` entries feeding the `@craftingmod` placeholder;
+   * `defaultModifierPolicy` is the COMBINATION RULE, one of the four
+   * {@link MODIFIER_POLICIES} — `addAll`/`highest`/`byRecipe`/`playerPicks`, default
+   * `addAll`; `defaultModifierIds` names the catalogue entries applied by default.
+   * Malformed entries are dropped, a bad expression coerces to an empty string, and a
+   * default id naming nothing in the catalogue is dropped (order + de-dup preserved).
+   *
+   * The rule is validated through the resolver's own `normalizeModifierPolicy` rather
+   * than a literal repeated here, so the authoring surface and the engine can never
+   * disagree about which rules exist.
+   *
+   * `maxModifierPicks` — the cap on how many modifiers a SELECTING rule (`byRecipe`,
+   * `playerPicks`) may pick — deliberately **PRESERVES ABSENCE**: only a positive
+   * integer is attached, so `null`, `undefined`, `0`, `2.5` and junk all normalize to the
+   * SAME shape, key absent, exactly as `normalized.icon` is attached only when authored
+   * below. Absence is unlimited, not a defaulting accident: a system that has never been
+   * asked the question must not silently acquire a bound that truncates recipe picks
+   * already on disk ({@link resolveMaxModifierPicks} owns that meaning, and is reused
+   * here so the two cannot drift). The cap is stored system-wide regardless of the
+   * current rule, so flipping between the two selecting rules does not destroy it.
    * @private
    */
   _normalizeCheckModifierConfig(check) {
@@ -638,12 +654,14 @@ export class CraftingSystemManager {
       seenDefaults.add(id);
       return true;
     });
-    const defaultModifierPolicy = ['addAll', 'highest', 'byRecipe', 'playerPicks'].includes(
-      check?.defaultModifierPolicy
-    )
-      ? check.defaultModifierPolicy
-      : 'addAll';
-    return { checkModifiers, defaultModifierPolicy, defaultModifierIds };
+    const defaultModifierPolicy = normalizeModifierPolicy(check?.defaultModifierPolicy) ?? 'addAll';
+    const normalized = { checkModifiers, defaultModifierPolicy, defaultModifierIds };
+    // Absence-preserving: `resolveMaxModifierPicks` reports every unbounded form —
+    // absent, `null`, non-integer, non-positive — as `Infinity`, so only a real positive
+    // integer cap survives as a key and unlimited stays unlimited.
+    const maxModifierPicks = resolveMaxModifierPicks(check);
+    if (Number.isFinite(maxModifierPicks)) normalized.maxModifierPicks = maxModifierPicks;
+    return normalized;
   }
 
   // Simple pass/fail crafting check authored in the Checks editor for simple and
@@ -2209,7 +2227,9 @@ export class CraftingSystemManager {
    * membership that superseded it. Runs un-gated on every `initialize()`, so both halves
    * must be idempotent and must converge on the first pass.
    *
-   * Two halves, deliberately sharing one walk over systems -> definitions -> recipes:
+   * Two reconciliations, deliberately sharing one walk over systems -> definitions ->
+   * recipes (and one `systemsChanged`/`recipesChanged` pair, so one `save()` per setting
+   * covers both — adding a second write here is the issue-970 failure mode below):
    *
    * 1. **Mint and stamp** (pre-existing). A recipe retaining a standalone
    *    `linkedRecipeItemUuid` with no valid `recipeItemId` gets a definition minted from
@@ -2246,6 +2266,7 @@ export class CraftingSystemManager {
       );
 
       const recipes = this.recipeManager.getRecipes({ craftingSystemId: system.id });
+
       for (const recipe of recipes) {
         // Half 2 (issue 978), before the mint-and-stamp read below so a cleared recipe
         // falls straight through: it has no `linkedRecipeItemUuid`, so it is not a
