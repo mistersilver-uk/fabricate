@@ -712,9 +712,10 @@ export class CraftingListingBuilder {
         ? // The `@craftingmod` context (issues 770, 1055): the SAME builder the engine
           // threads to its check runners, not a second literal of the same shape. The
           // display path and the evaluation path must agree on every axis the context
-          // carries — including `recipeModifierAuthority`, which decides whether a
-          // recipe's override is honoured at all — or the listed formula shows a
-          // scalar the roll will not use (`resolution-modes/spec.md` requirement 71).
+          // carries — the combination rule, the system's default eligible set, the
+          // recipe's own picks under `byRecipe`, and the `maxModifierPicks` cap that
+          // bounds them — or the listed formula shows a scalar the roll will not use
+          // (`resolution-modes/spec.md` requirement 71).
           this._resolveCheckFormula(
             rollFormula,
             craftingActor,

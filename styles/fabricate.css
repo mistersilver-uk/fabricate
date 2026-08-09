@@ -19711,6 +19711,70 @@
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
+/* Multi-pick variant (issue 1055). `playerPicks` lets the player take up to
+   `craftingCheck.maxModifierPicks` modifiers, which sum, so above a cap of 1 the group
+   renders as checkboxes. Square control, tick instead of a centre dot; everything else —
+   the row, the hover, the selected wash — is the radio's, so the two variants cannot
+   drift apart visually. */
+.fabricate-roll-prompt__modifier-option:has(input[type='checkbox']:checked) {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-roll-prompt__modifier-option input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--fab-border-strong);
+  border-radius: 3px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Same load-bearing reset as the radio: Foundry core draws the native control's inner
+   chrome via ::before/::after, which `appearance: none` does NOT remove. */
+.fabricate-roll-prompt__modifier-option input[type='checkbox']::before,
+.fabricate-roll-prompt__modifier-option input[type='checkbox']::after {
+  display: none;
+}
+
+.fabricate-roll-prompt__modifier-option input[type='checkbox']:checked {
+  border-color: var(--fab-accent);
+  background-color: var(--fab-accent);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100%;
+}
+
+/* At the cap the unchecked boxes are disabled (`bindModifierPickCap`) rather than
+   silently ignoring clicks; dim the whole row so the state is visible, not just
+   unresponsive. The legend's "Pick up to N" hint says why. */
+.fabricate-roll-prompt__modifier-option:has(input:disabled) {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.fabricate-roll-prompt__modifier-option:has(input:disabled):hover {
+  background: transparent;
+}
+
+/* The cap, stated in the legend beside "Check modifier". Lower-case and un-tracked
+   against the legend's uppercase kicker so it reads as a note on the group rather than a
+   second heading. */
+.fabricate-roll-prompt__modifiers-hint {
+  margin-left: var(--fab-space-2);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--fab-text-muted);
+}
+
 .fabricate-roll-prompt__modifier-icon {
   flex: 0 0 1.1rem;
   text-align: center;

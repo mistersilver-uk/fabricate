@@ -383,6 +383,7 @@
       },
       "RollPrompt": {
         "CheckModifier": "Check modifier",
+        "PickUpTo": "Pick up to {count}",
         "UnnamedModifier": "Unnamed modifier",
         "BulkTitle": "Bulk check",
         "BulkHeading": "One roll setting for {count} items",
