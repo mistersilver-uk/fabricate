@@ -1098,3 +1098,66 @@ describe('recipe image picker no longer reuses the scene-locked visuals', () => 
     );
   });
 });
+
+// Issue 1018. Two DIFFERENT predicates used to share the name `enableBlocked`: the recipe
+// ACTIVATION GATE (`RecipeManager.canActivateRecipe`, projected onto the GM browser rows)
+// and the recipe editor's enable-TOGGLE gate (a readiness forecast). They are
+// INCOMPARABLE — neither bounds the other — so the editor one was renamed to
+// `enableToggleBlocked` and the projection kept the original name.
+//
+// This guard is deliberately TWO-SIDED. "The editor pair contains no `enableBlocked`" is
+// satisfied just as well by deleting the editor predicate, or by renaming the PROJECTION
+// and leaving the editor alone — both of which would re-merge or destroy the distinction
+// while reading green. So the positive half pins BOTH names at BOTH ends.
+describe('the editor enable-toggle gate is named apart from the activation gate (issue 1018)', () => {
+  it('leaves no `enableBlocked` anywhere in the editor pair', () => {
+    // Substring, not word-boundary: `enableToggleBlocked` does not contain `enableBlocked`,
+    // so a bare `includes` cannot false-positive on the new name.
+    assert.equal(
+      editSource.includes('enableBlocked'),
+      false,
+      'RecipeEditView must not reuse the activation gate name for its own predicate'
+    );
+    assert.equal(
+      overviewSource.includes('enableBlocked'),
+      false,
+      'RecipeOverviewTab must not reuse the activation gate name for its own prop'
+    );
+  });
+
+  it('keeps the editor predicate declared and forwarded as `enableToggleBlocked`', () => {
+    // The declaration, not just the identifier: deleting the predicate and leaving a
+    // stray mention would otherwise pass.
+    assert.ok(
+      editSource.includes(
+        'const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues))'
+      ),
+      'RecipeEditView derives enableToggleBlocked from the readiness issues'
+    );
+    assert.ok(
+      editSource.includes('{enableToggleBlocked}'),
+      'RecipeEditView forwards enableToggleBlocked to the Overview tab'
+    );
+    assert.ok(
+      overviewSource.includes('enableToggleBlocked = false,'),
+      'RecipeOverviewTab declares the enableToggleBlocked prop with its off-by-default value'
+    );
+    assert.ok(
+      overviewSource.includes('disabled={saving || enableToggleBlocked}'),
+      'the Overview enable toggle is disabled from enableToggleBlocked'
+    );
+  });
+
+  it('keeps the ACTIVATION gate projected and read as `enableBlocked`', () => {
+    // The other half. Renaming the projection instead of the editor local would satisfy
+    // the negative assertions above while leaving the two concepts merged under one name.
+    assert.ok(
+      storeSource.includes('enableBlocked: _isRecipeEnableBlocked('),
+      'adminStore still projects the activation gate onto GM recipe rows as enableBlocked'
+    );
+    assert.ok(
+      browserInspectorSource.includes('selectedRecipe.enableBlocked'),
+      'the browser inspector pill still reads the projected enableBlocked'
+    );
+  });
+});
