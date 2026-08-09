@@ -136,9 +136,9 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
 | `checkModifiers` | `{id, label, icon?, expression}[]` | `[]` | Named catalogue of check modifiers feeding the `@craftingmod` roll-formula placeholder. Each `expression` is a roll-data fragment evaluated against the crafter (a missing/failed expression contributes `0`, never `NaN`). |
-| `defaultModifierPolicy` | `string` | `"addAll"` | How the system combines its eligible modifiers into `@craftingmod`. `"addAll"` sums them. `"highest"` takes the deterministic `max(...)`. `"playerPicks"` lets the player select one at roll time on an interactive craft, and every other path resolves `"playerPicks"` as `"highest"` instead. An unrecognised value falls back to `"addAll"`. |
-| `defaultModifierIds` | `string[]` | `[]` | Catalogue entry ids applied by default. An id naming no entry in `checkModifiers` is dropped (order and de-duplication preserved). |
-| `recipeModifierAuthority` | `string` | key absent | How much of `defaultModifierPolicy` and `defaultModifierIds` a recipe may override through its own `craftingModifier` (see [Recipe]({% link api/models.md %}#recipe)). One of `"none"` (no recipe override is honoured), `"setOnly"` (a recipe may override its eligible id subset only), or `"setAndRule"` (a recipe may override both). The key is omitted, not defaulted, until a GM (or the `1.20.0` migration) sets it. An absent, `null`, or unrecognised value resolves as `"setAndRule"` at read time, matching pre-issue-1055 behaviour. |
+| `defaultModifierPolicy` | `string` | `"addAll"` | The combination rule: how the eligible modifiers reduce to `@craftingmod`, **and who selects them**. `"addAll"` sums the system's default set and `"highest"` takes its deterministic `max(...)`; neither asks anyone to select. `"byRecipe"` ("Recipe picks") lets the recipe author select at recipe-edit time, and `"playerPicks"` lets the player select at roll time on an interactive craft; both SUM what was picked, and both are bounded by `maxModifierPicks`. A non-interactive `"playerPicks"` craft resolves to the best legal selection (the sum of the highest `maxModifierPicks` values, which is `max(...)` at a cap of `1`). The system owns this field alone — a recipe never overrides it. An unrecognised value falls back to `"addAll"`. |
+| `defaultModifierIds` | `string[]` | `[]` | Catalogue entry ids applied by default. An id naming no entry in `checkModifiers` is dropped (order and de-duplication preserved). Under `"byRecipe"` this is what a recipe inherits until it picks its own; under `"playerPicks"` it is the menu the player chooses from. |
+| `maxModifierPicks` | `number` | key absent | The cap on how many modifiers a selecting rule (`"byRecipe"`, `"playerPicks"`) may pick. Only a positive integer is stored, so `null`, `0`, `2.5`, and junk all normalise to the same shape: key absent. **Absence means unlimited**, resolved as `Infinity`, and is never defaulted — a system that was never asked must not acquire a bound that truncates recipe picks already on disk. Meaningless under `"addAll"`/`"highest"`, but stored system-wide regardless of the current rule. Under `"byRecipe"` it truncates a recipe's resolved picks to the first N in authored order without deleting the rest. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -149,11 +149,15 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 > Gathering never had an ordered result-stage surface, so it has no replacement field.
 
 {: .note }
-> The check-modifier combination policy `"byRecipe"` is retired (issue 1055).
-> It conflated the combination rule with whether a recipe could override it, and the two are now separate.
-> A persisted `"byRecipe"` is translated to `"addAll"` on read, at both `defaultModifierPolicy` and a recipe's own `craftingModifier.policy`.
-> The two reduce identically, because a recipe's eligible-id resolution already preferred its own `modifierIds`.
-> The `1.20.0` migration also rewrites a stored `"byRecipe"` to `"addAll"` and stamps `recipeModifierAuthority` on any system that does not already carry a resolved value, deriving `"setAndRule"` for a system that was delegating before (a persisted `"byRecipe"` policy, or any recipe carrying a `craftingModifier`) and `"none"` otherwise.
+> **Behaviour change (issue 1055).** A recipe's stored `craftingModifier.modifierIds` is now consulted **only** under `defaultModifierPolicy === "byRecipe"`.
+> Before this change the eligible-id resolution preferred a recipe's own set under every rule.
+> Under `"addAll"`, `"highest"`, and `"playerPicks"` a system now resolves its own `defaultModifierIds` for every recipe, whatever any recipe stored; nothing is deleted, and switching the system to `"byRecipe"` applies those picks again.
+> A recipe's legacy `craftingModifier.policy` is never consulted at all — the combination rule is the system's alone — and `Recipe` drops the key on read.
+
+{: .note }
+> The `1.20.0` migration stamps `maxModifierPicks: 1` onto systems already on `"playerPicks"` that carry no cap, because that rule historically meant "pick exactly one" and an absent cap now means unlimited.
+> The other three rules are left unbounded: `"addAll"` and `"highest"` select nothing, and `"byRecipe"` may already have recipes that picked several modifiers, which a stamp of `1` would silently truncate.
+> An authored cap always wins, which makes the migration idempotent, and `migrateExportPayload` applies the identical per-system transform to an imported bundle, branch-independently of the schema-envelope upcast.
 
 The `alchemy` field is present only when `resolutionMode` is `"alchemy"`.
 It carries the alchemy check mode and the discovery/consumption options.

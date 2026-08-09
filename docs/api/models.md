@@ -32,8 +32,7 @@ new Recipe({
   allowPlayerResultReorder, // boolean (default true) -- progressive mode only
   linkedRecipeItemUuid, // string | null
   craftingModifier: {
-    // object | null (default null) -- optional check-modifier override
-    policy, // "addAll" | "highest" | "playerPicks"
+    // object | null (default null) -- the recipe author's check-modifier pick
     modifierIds, // string[]
   },
   visibility: {
@@ -63,16 +62,15 @@ new Recipe({
 
 {: .note }
 
-> `craftingModifier` requests a per-recipe override of the system's check-modifier combination rule and/or its eligible modifier id subset (issue 770, reshaped by issue 1055).
-> `null` (the default) requests no override, and inherits the system's `craftingCheck.defaultModifierPolicy` and `defaultModifierIds`.
-> `policy` keeps only `"addAll"`, `"highest"`, or `"playerPicks"` (a persisted legacy `"byRecipe"` is translated to `"addAll"`).
-> An unrecognised or absent `policy` inherits the system's rule.
-> `modifierIds` is authored or absent, not merely non-empty or empty.
-> An authored empty array (`[]`) is a real override meaning "no eligible modifiers" (`@craftingmod` resolves to `0`), distinct from an absent `modifierIds`, which inherits `defaultModifierIds`.
-> Whichever axis a recipe actually requests, it is honoured only as far as the system's `craftingCheck.recipeModifierAuthority` delegates.
+> `craftingModifier` is the recipe author's pick of the system's check modifiers (issue 770, reshaped by issue 1055).
+> It authors one axis — **which** modifiers apply — and never how they combine: the combination rule is the system's `craftingCheck.defaultModifierPolicy` alone.
 > See [CraftingSystemManager]({% link api/system-manager.md %}#createsystemdata).
-> A stored override the system does not delegate stays on disk unhonoured.
-> Raising the authority level later re-applies it with nothing to re-author.
+> `null` (the default) picks nothing and inherits the system's `defaultModifierIds`.
+> `modifierIds` is authored or absent, not merely non-empty or empty.
+> An authored empty array (`[]`) is a real pick meaning "no eligible modifiers" (`@craftingmod` resolves to `0`), distinct from an absent `modifierIds`, which inherits.
+> A pick is honoured **only** under the system's `"byRecipe"` rule, and is then truncated to `craftingCheck.maxModifierPicks`; under `"addAll"`, `"highest"`, and `"playerPicks"` it stays on disk unread.
+> Neither switching the rule away nor lowering the cap deletes anything, and restoring either applies the picks again with nothing to re-author.
+> A legacy `policy` key from before issue 1055 is dropped by the normaliser, never round-trips through `toJSON()`, and is never consulted wherever it survives unnormalised.
 
 {: .note }
 
