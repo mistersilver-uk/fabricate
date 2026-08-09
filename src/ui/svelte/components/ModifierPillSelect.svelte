@@ -19,6 +19,12 @@
     options = [],
     selectedIds = [],
     disabled = false,
+    // Disables the ADD path alone, leaving every pill removable (issue 1055). Distinct
+    // from `disabled`, which turns the whole control off: a selection that has hit its
+    // cap must stay editable in the one direction that can un-hit it, so a caller that
+    // reached for `disabled` here would strand the GM at the cap with no way down. The
+    // caller states WHY through `describedBy`; this leaf authors no copy.
+    addDisabled = false,
     // Label on the closed menu button (e.g. "Add modifier").
     menuLabel = '',
     // Shown inside the open menu when every option is already selected.
@@ -35,6 +41,11 @@
     // puts a micro-label above a tri-state select, the Checks card an `<h4>` above the
     // whole default-set block — and only its id is needed here.
     labelledBy = '',
+    // The id of a caller-owned element describing a CONSTRAINT on the group — the pick
+    // cap, in the recipe editor. It goes on the group rather than on the menu button
+    // because a `disabled` button is skipped by several screen readers' tab order, so a
+    // description hung off it is exactly the thing a capped user would never hear.
+    describedBy = '',
     onToggle = () => {},
   } = $props();
 
@@ -103,6 +114,23 @@
     );
   });
 
+  // `aria-disabled`, NOT the `disabled` attribute, for the at-cap state. Two reasons, and
+  // the second is a real defect rather than a preference:
+  //
+  //  1. A `disabled` button is removed from the tab order by several screen readers, so a
+  //     capped user would tab straight past the only control that explains the cap.
+  //  2. `focusAfterRemoval` falls back to this button when the removed pill has no
+  //     surviving neighbour. At a cap of 1 that is EVERY removal — and a `disabled`
+  //     button cannot take focus, so `focus()` would silently no-op and drop the keyboard
+  //     user to `<body>`, which is precisely the regression that fallback exists to
+  //     prevent. Staying focusable keeps the landing spot real.
+  //
+  // The trade is that `aria-disabled` does not suppress the click, so the handler must.
+  function openMenu() {
+    if (addDisabled) return;
+    open = !open;
+  }
+
   function add(id) {
     onToggle(id, true);
     open = false;
@@ -132,6 +160,7 @@
   class="manager-field manager-availability-multi"
   role="group"
   aria-labelledby={labelledBy || undefined}
+  aria-describedby={describedBy || undefined}
   data-modifier-pill-select={testId || undefined}
 >
   <div
@@ -144,9 +173,10 @@
       aria-haspopup="listbox"
       aria-expanded={open}
       {disabled}
+      aria-disabled={addDisabled || undefined}
       bind:this={menuButton}
       data-modifier-pill-menu-button
-      onclick={() => (open = !open)}
+      onclick={openMenu}
     >
       <span
         >{menuLabel ||
@@ -221,6 +251,23 @@
 </div>
 
 <style>
+  /* The at-cap menu button. It keeps its box and its focus ring — it is still a real tab
+     stop, deliberately (see `openMenu`) — and only loses the affordance colour and the
+     pointer, so it reads as "unavailable right now" rather than "gone". The global sheet
+     gives `.manager-availability-menu-button` no disabled treatment at all, so this is
+     the state's only visual, and it is scoped here rather than added to the global class
+     because the cap is this call site's concept, not the widget's chrome. */
+  .manager-availability-menu-button[aria-disabled='true'] {
+    color: var(--fab-text-disabled);
+    cursor: default;
+    opacity: 0.55;
+  }
+
+  .manager-availability-menu-button[aria-disabled='true']:hover {
+    border-color: var(--fab-mv2-border);
+    box-shadow: none;
+  }
+
   .manager-modifier-pill-status {
     position: absolute;
     width: 1px;

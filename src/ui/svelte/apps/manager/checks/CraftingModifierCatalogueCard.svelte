@@ -6,29 +6,27 @@
   Alchemy, Herbalism for a DC20 healing salve — each an authored roll-data expression
   (`@abilities.med.mod`).
 
-  The card authors TWO independent axes (issue 1055), which the pre-1055 single "policy"
-  select conflated:
+  The SYSTEM owns every decision this card authors (issue 1055). There is no authority
+  axis and no per-recipe override of the rule: a recipe may be handed the SELECTION, and
+  only when the rule itself says so.
 
-    1. The COMBINATION RULE — how the eligible modifiers reduce to the one number that
-       replaces `@craftingmod`:
-         - Add all:      sum every eligible modifier.
-         - Highest:      the single largest modifier (a deterministic max, not a pool).
-         - Player picks: the player selects exactly one at roll time. The only
-           non-deterministic rule and the only one needing an interactive craft; every
-           other path resolves it as Highest.
-       The retired fourth value `byRecipe` was never a rule at all — it named WHO
-       decides — so it moved onto the authority axis and is now a legacy value the
-       resolver translates.
-    2. The AUTHORITY LEVEL — how much of the above a recipe may decide for itself:
-         - none:       nothing; every recipe inherits both.
-         - setOnly:    the eligible set.
-         - setAndRule: the eligible set and the combination rule.
-       ABSENT (the key omitted) means "not yet stamped" and resolves as `setAndRule`,
-       the pre-1055 behaviour — `resolveRecipeModifierAuthority` owns that, so this card
-       shows the level the engine would actually apply rather than inventing a default.
+  The card authors three things:
 
-  A default eligible set names which catalogue entries apply when a recipe does not
-  override them.
+    1. The COMBINATION RULE (`defaultModifierPolicy`) — who selects the eligible
+       modifiers, and how they reduce to the one number that replaces `@craftingmod`:
+         - Add all:      sum the system's default set. Nobody selects.
+         - Highest:      the single largest of it (a deterministic max, not a pool).
+         - Recipe picks: the RECIPE author selects, at recipe-edit time; the picks sum.
+         - Player picks: the PLAYER selects, at roll time; the picks sum.
+       `MODIFIER_POLICIES` in the resolver is the source of that list and its order;
+       `policyDefersSelection` is the source of which two defer the selection.
+    2. The PICK CAP (`maxModifierPicks`) — how many modifiers the deferred-to party may
+       pick. It bounds the two selecting rules only, and ABSENT means unlimited, which is
+       why the control's empty state is a real value rather than a blank to be defaulted.
+    3. The DEFAULT ELIGIBLE SET (`defaultModifierIds`) — which catalogue entries apply.
+       Under the two non-selecting rules that IS the set; under `byRecipe` it is what a
+       recipe inherits until it picks its own; under `playerPicks` it is the menu the
+       player chooses from.
 
   Sibling of the failure-consumption card, rendered for every crafting sub-tab —
   INCLUDING the ones where the catalogue cannot reach a roll, because a catalogue that
@@ -44,29 +42,32 @@
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ModifierPillSelect from '../../../components/ModifierPillSelect.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
   import RadioCardGroup from '../RadioCardGroup.svelte';
   import RollDataExpressionInput from '../RollDataExpressionInput.svelte';
   import {
     normalizeModifierPolicy,
-    resolveRecipeModifierAuthority,
+    policyDefersSelection,
+    resolveMaxModifierPicks,
   } from '../../../../../systems/craftingModifierResolver.js';
 
   const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
   const DEFAULTS_LABEL_ID = 'manager-crafting-modifier-defaults-label';
+  // The cap hint is the ONLY place "empty means unlimited" is stated, and the Stepper's
+  // blank field cannot state it, so the input takes the hint as its description rather
+  // than leaving a screen-reader user with an unexplained empty number field.
+  const MAX_PICKS_HINT_ID = 'manager-crafting-modifier-max-picks-hint';
 
   let {
     checkModifiers = [],
     defaultModifierPolicy = 'addAll',
     defaultModifierIds = [],
-    // The system's authority level (issue 1055). ABSENT is a real state — "not yet
-    // stamped" — so this prop is deliberately `undefined` by default and the call site
-    // must NOT coerce it: `resolveRecipeModifierAuthority` decides what absence means,
-    // and it must decide the same thing here as it does in the engine.
-    recipeModifierAuthority = undefined,
-    // How many recipes in this system carry a `craftingModifier` override. Lowering the
-    // authority level leaves them on disk and stops honouring them, so the card states
-    // the count beside the control rather than after the fact.
-    affectedRecipeCount = 0,
+    // The cap on how many modifiers a SELECTING rule may pick (issue 1055). ABSENT is a
+    // real value — "unlimited" — so this prop is deliberately `null` by default and no
+    // call site may coerce it to a number: `resolveMaxModifierPicks` decides what absence
+    // means, and it must decide the same thing here as it does in the engine.
+    maxModifierPicks = null,
     // Why the catalogue reaches no roll, or '' when it does: 'noCheck' (this resolution
     // mode rolls no crafting check at all), 'noFormula' (a check slot exists but has no
     // authored roll formula) or 'noPlaceholder' (a formula is authored but never spends
@@ -81,18 +82,17 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // `localize`'s interpolating form, with the same fallback contract as `text` — the
-  // fallback carries the same `{name}` placeholders so an unlocalized build reads
-  // identically to a localized one rather than printing a raw brace.
-  function count(key, fallback, data) {
-    const translated = localize(key, data);
-    if (translated && translated !== key) return translated;
-    return fallback.replace(/\{(\w+)\}/g, (_match, name) => String(data?.[name] ?? ''));
-  }
-
-  // Icon vocabulary for the three combination rules: Add all stacks the whole eligible
-  // set, Highest sorts and takes the top one, Player picks hands the choice to the
-  // player at roll time (the manager's "manual choice" glyph).
+  // Icon vocabulary for the four combination rules: Add all stacks the whole eligible
+  // set, Highest sorts and takes the top one, Recipe picks hands the selection to the
+  // recipe author (a scroll — the document being authored), and Player picks hands it to
+  // the player at roll time (the manager's "manual choice" glyph). Both glyphs are Font
+  // Awesome FREE (`fontAwesomeFreeClassicIcons.js`, generated from FA Free 6.7.2):
+  // Foundry bundles FA Pro, so a Pro glyph would render, but a community package is not
+  // licensed to use one.
+  //
+  // The ORDER mirrors `MODIFIER_POLICIES`, which declares itself to be in
+  // authoring-surface order; the two selecting rules therefore sit adjacent, which is
+  // what the 2x2 grid below reads as a pair.
   const POLICY_OPTIONS = [
     {
       value: 'addAll',
@@ -111,78 +111,63 @@
       descFallback: 'Use only the single largest eligible modifier (a deterministic maximum).',
     },
     {
+      value: 'byRecipe',
+      icon: 'fas fa-scroll',
+      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipe',
+      fallback: 'Recipe picks',
+      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyByRecipeDesc',
+      descFallback:
+        'Each recipe picks which modifiers apply, on its Overview tab; the picks are summed. Recipes that pick nothing use the default set below.',
+    },
+    {
       value: 'playerPicks',
       icon: 'fas fa-hand-pointer',
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicks',
       fallback: 'Player picks',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyPlayerPicksDesc',
       descFallback:
-        'On an interactive craft whose formula uses @craftingmod, the player picks one eligible modifier at roll time (highest pre-selected); other crafts use the highest.',
+        'The player picks from the default set at roll time on an interactive craft whose formula uses @craftingmod; the picks are summed. Other crafts pick the best legal selection.',
     },
   ];
 
-  // Delegation icons: a padlock keeps every decision at the system, a scroll hands the
-  // recipe its own eligible set, and a drafting pen-and-ruler hands it the rule as well.
-  // `fas fa-scroll` was freed by retiring the `byRecipe` RULE, which is the same idea
-  // this axis now carries properly.
-  //
-  // Every glyph here is Font Awesome FREE (`fontAwesomeFreeClassicIcons.js`, generated
-  // from FA Free 6.7.2). Foundry bundles FA Pro, so a Pro glyph would render — but a
-  // community package is not licensed to use one, so the licence, not the rendering, is
-  // what rules it out. `fa-pen-ruler` beats the other Free candidates on the merits too:
-  // it is the only one whose silhouette is not another sheet of paper, so it stays
-  // legible beside `fa-scroll` in a three-up card row, and a drafting instrument reads
-  // as "this recipe may redraw the rule" — exactly the extra power `setAndRule` grants
-  // over `setOnly`. (`file-pen` and `feather-pointed` collide with the scroll's
-  // silhouette and its "a document" reading; `user-pen` says an ACTOR decides, which is
-  // "Player picks" on the other axis; `sliders` says settings, not delegation.)
-  const AUTHORITY_OPTIONS = [
-    {
-      value: 'none',
-      icon: 'fas fa-lock',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityNone',
-      fallback: 'Set by the system',
-      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityNoneDesc',
-      descFallback:
-        'Every recipe uses the default set and the combination rule above. Recipes get no check-modifier control.',
-    },
-    {
-      value: 'setOnly',
-      icon: 'fas fa-scroll',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthoritySetOnly',
-      fallback: 'Recipes choose the set',
-      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthoritySetOnlyDesc',
-      descFallback:
-        'Each recipe may choose which catalogue modifiers are eligible. The combination rule stays system-wide.',
-    },
-    {
-      value: 'setAndRule',
-      icon: 'fas fa-pen-ruler',
-      labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthoritySetAndRule',
-      fallback: 'Recipes choose set and rule',
-      descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthoritySetAndRuleDesc',
-      descFallback:
-        'Each recipe may choose its eligible modifiers and override the combination rule.',
-    },
-  ];
-
-  // The consequence clause per level, so the affected-recipe count reads as a decision
-  // input rather than a bare number. Keyed by the EFFECTIVE level, which is why absence
-  // resolves before this lookup.
-  const AUTHORITY_IMPACT = {
-    none: {
-      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityImpactNone',
-      fallback: 'At this level they stay on the recipe but are not applied.',
-    },
-    setOnly: {
-      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityImpactSetOnly',
+  // The cap means a different thing under each selecting rule — a bound on the RECIPE
+  // AUTHOR at edit time, or a bound on the PLAYER at roll time — so the hint is keyed by
+  // the rule rather than written once and left ambiguous. Only the two rules
+  // `policyDefersSelection` admits can appear here, which is why there is no third entry.
+  const MAX_PICKS_COPY = {
+    byRecipe: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksByRecipe',
       fallback:
-        'At this level their eligible sets apply; any combination-rule override stays on the recipe but is not applied.',
+        'The most modifiers a recipe author may pick for one recipe. Leave it empty for no limit. Lowering it below what a recipe already picked keeps the recipe intact but rolls only the first modifiers it picked, up to this many.',
     },
-    setAndRule: {
-      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityImpactSetAndRule',
-      fallback: 'Lowering the level keeps them on the recipe but stops applying them.',
+    playerPicks: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksPlayerPicks',
+      fallback:
+        'The most modifiers a player may pick at roll time. Leave it empty for no limit. A limit of 1 is the single-pick behaviour: the player chooses one modifier from the default set.',
     },
+  };
+
+  // What the default set IS depends on the rule, and the three readings are materially
+  // different decisions: under `addAll`/`highest` it is the whole eligible set and no one
+  // narrows it; under `byRecipe` it is the fallback a recipe inherits until it picks its
+  // own; under `playerPicks` it is the menu the player chooses from at roll time. One
+  // sentence covering all three would have to say nothing specific about any of them.
+  const DEFAULTS_INTRO_COPY = {
+    byRecipe: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntro',
+      fallback:
+        'Which modifiers apply when a recipe does not pick its own. A recipe can pick its own set on its Overview tab.',
+    },
+    playerPicks: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroPlayerPicks',
+      fallback:
+        'Which modifiers the player chooses from at roll time. Every recipe in this system offers this set.',
+    },
+  };
+
+  const DEFAULTS_INTRO_LOCKED = {
+    key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroLocked',
+    fallback: 'Which modifiers apply. Every recipe in this system uses this set.',
   };
 
   // Why the catalogue reaches no roll. Each cause has its own remedy, so each has its
@@ -208,15 +193,25 @@
   const modifiers = $derived(Array.isArray(checkModifiers) ? checkModifiers : []);
   // Normalized through the resolver's OWN rule vocabulary rather than a local copy of
   // it. The literal `['addAll','highest','byRecipe','playerPicks']` that stood here was
-  // a hand-maintained mirror of `VALID_POLICIES`, and this change narrows that set — a
-  // mirror that has to be edited in lockstep is exactly the drift issue 855 was.
+  // a hand-maintained mirror of `VALID_POLICIES` — a mirror that has to be edited in
+  // lockstep is exactly the drift issue 855 was.
   const selectedPolicy = $derived(normalizeModifierPolicy(defaultModifierPolicy) ?? 'addAll');
-  // The level the ENGINE would apply, so an unstamped system shows `setAndRule` (what it
-  // actually does) instead of a blank group or an invented `none`.
-  const selectedAuthority = $derived(resolveRecipeModifierAuthority({ recipeModifierAuthority }));
-  const overrideCount = $derived(
-    Number.isFinite(affectedRecipeCount) ? Math.max(0, Math.trunc(affectedRecipeCount)) : 0
+  // Whether the selected rule defers the selection to someone else, and therefore whether
+  // the cap means anything at all. Asked of the resolver rather than re-derived from a
+  // local `['byRecipe','playerPicks']` membership test, for the same reason as above.
+  const defersSelection = $derived(policyDefersSelection(selectedPolicy));
+  const maxPicksCopy = $derived(MAX_PICKS_COPY[selectedPolicy] || null);
+  // Routed through the resolver so the field shows the bound the ENGINE would apply: a
+  // stored `0`, `-2` or `"three"` all read as unlimited there, and a field that rendered
+  // them verbatim would report a cap that truncates nothing. `Infinity` → `null` is the
+  // Stepper's unset value, which is what makes "unlimited" a blank field rather than a
+  // magic number the GM has to know.
+  const maxPicksLimit = $derived(resolveMaxModifierPicks({ maxModifierPicks }));
+  const maxPicksValue = $derived(Number.isFinite(maxPicksLimit) ? maxPicksLimit : null);
+  const maxPicksLabel = $derived(
+    text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicks', 'Maximum picks')
   );
+  const defaultsIntro = $derived(DEFAULTS_INTRO_COPY[selectedPolicy] || DEFAULTS_INTRO_LOCKED);
   // Gated on the catalogue being NON-EMPTY as well as on the cause. The notice reports a
   // CATALOGUE that reaches no roll, and an empty catalogue is not one: a fresh crafting
   // system is `simple` + `rollFormula: ''`, so an ungated notice put a permanent warning
@@ -263,8 +258,12 @@
     onChange({ defaultModifierPolicy: policy });
   }
 
-  function selectAuthority(authority) {
-    onChange({ recipeModifierAuthority: authority });
+  // `Stepper` reports a clamped number, or `null` when an `allowUnset` field is cleared.
+  // `null` is persisted VERBATIM rather than being dropped from the patch: absence is the
+  // "unlimited" value, so clearing the field has to be able to REMOVE an existing cap,
+  // and a patch that omitted the key would leave the old bound in place.
+  function selectMaxPicks(next) {
+    onChange({ maxModifierPicks: next });
   }
 
   function toggleDefault(id, checked) {
@@ -389,68 +388,65 @@
   <h4 class="manager-modifier-subheading">
     {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading', 'Combination rule')}
   </h4>
-  <!-- Three columns, not the default two. `--manager-radio-card-columns` is a FIXED
-       track count (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so a
-       three-option group at 2 columns strands one card alone on a second row. The rule
-       group was a clean 2x2 before `byRecipe` retired; both groups are now 3-up, and
-       stacked directly on top of each other, so a single orphan card would have read as
-       two. The manager window is 1280px wide, which clears ~260px per card. Precedent:
-       `ToolBreakageTab.svelte`. -->
+  <!-- TWO columns, so the group is a 2x2. This is explicit maintainer feedback on the
+       three-up layout that stood here: at this much copy per card — a name plus a
+       two-clause sentence naming who selects, when, and how the picks reduce — three
+       columns packs too much text into each card, so the layout drops to two.
+       `--manager-radio-card-columns` is a FIXED track count
+       (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so the count is the layout:
+       four options at 2 columns is a clean 2x2 with no orphan row, and it puts the two
+       non-selecting rules on the top row and the two selecting rules on the bottom one,
+       which is the distinction the pick cap below applies to. -->
   <RadioCardGroup
     legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
     legend="Combination rule"
     options={POLICY_OPTIONS}
     selectedValue={selectedPolicy}
     groupName="crafting-modifier-policy"
-    columns={3}
+    columns={2}
     dataAttr="data-crafting-modifier-policy"
     optionDataAttr="data-crafting-modifier-policy-option"
     onChange={selectPolicy}
   />
 
-  <h4 class="manager-modifier-subheading">
-    {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityHeading', 'Authority level')}
-  </h4>
-  <p class="manager-muted">
-    {text(
-      'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityIntro',
-      'How much of the above each recipe may decide for itself. Which modifiers compete is often recipe-specific even when the rule is not.'
-    )}
-  </p>
-  <RadioCardGroup
-    legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityHeading"
-    legend="Authority level"
-    options={AUTHORITY_OPTIONS}
-    selectedValue={selectedAuthority}
-    groupName="crafting-modifier-authority"
-    columns={3}
-    dataAttr="data-crafting-modifier-authority"
-    optionDataAttr="data-crafting-modifier-authority-option"
-    onChange={selectAuthority}
-  />
-
-  {#if overrideCount > 0}
-    <!-- The downgrade disclosure. Deliberately inline card copy rather than a
-         `confirmDialog`: nothing is deleted and the level is reversible, so a modal
-         would spend the GM's one interruption budget on a change they can undo by
-         clicking the card above. It states the count BEFORE the click, and restates
-         what the currently-selected level is already doing to those recipes. -->
-    <p
-      class="manager-muted manager-modifier-authority-impact"
-      data-crafting-modifier-authority-impact={overrideCount}
-    >
-      {overrideCount === 1
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityAffectedOne',
-            '1 recipe in this system carries a check-modifier override.'
-          )
-        : count(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierAuthorityAffected',
-            '{count} recipes in this system carry check-modifier overrides.',
-            { count: overrideCount }
-          )}
-      {text(AUTHORITY_IMPACT[selectedAuthority].key, AUTHORITY_IMPACT[selectedAuthority].fallback)}
+  {#if defersSelection && maxPicksCopy}
+    <!-- Shown under the two SELECTING rules only, because a cap on a selection nobody
+         makes is a control with no effect. Membership comes from the resolver
+         (`policyDefersSelection`), not from a local list, so this surface cannot drift
+         from the reduction it is bounding. -->
+    <h4 class="manager-modifier-subheading">{maxPicksLabel}</h4>
+    <p class="manager-muted" id={MAX_PICKS_HINT_ID}>
+      {text(maxPicksCopy.key, maxPicksCopy.fallback)}
     </p>
+    <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. It carries no
+         caption span either — the `<h4>` above IS this field's visible label, exactly as
+         the Default modifiers block below is labelled by its own heading, and a second
+         "Maximum picks" directly under the first would be the same words twice. The
+         Stepper's `ariaLabel` repeats that heading verbatim, so the accessible name still
+         starts with the visible one (WCAG 2.5.3). -->
+    <div
+      class="manager-field manager-modifier-max-picks-field"
+      data-crafting-modifier-max-picks={maxPicksValue === null
+        ? 'unlimited'
+        : String(maxPicksValue)}
+    >
+      <Stepper
+        value={maxPicksValue}
+        allowUnset
+        min={1}
+        fill
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksUnlimited',
+          'Unlimited'
+        )}
+        {...stepperLabels(maxPicksLabel)}
+        inputProps={{
+          'data-crafting-modifier-max-picks-input': '',
+          'aria-describedby': MAX_PICKS_HINT_ID,
+        }}
+        onChange={selectMaxPicks}
+      />
+    </div>
   {/if}
 
   {#if modifiers.length > 0}
@@ -458,15 +454,7 @@
       {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsHeading', 'Default modifiers')}
     </h4>
     <p class="manager-muted">
-      {selectedAuthority === 'none'
-        ? text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroLocked',
-            'Which modifiers apply. Every recipe in this system uses this set.'
-          )
-        : text(
-            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntro',
-            'Which modifiers apply when a recipe does not choose its own. A recipe can narrow this set on its Overview tab.'
-          )}
+      {text(defaultsIntro.key, defaultsIntro.fallback)}
     </p>
     <div class="manager-modifier-defaults" data-crafting-modifier-defaults>
       <ModifierPillSelect
@@ -551,9 +539,14 @@
     margin-right: 0.25rem;
   }
 
-  /* Attached to the authority group above it, not floated as a separate remark: the
-     count is an input to the choice, so it must not read as unrelated card copy. */
-  .manager-modifier-authority-impact {
+  /* The cap is a one-to-three-digit field, and the card is a full-width inspector panel,
+     so `fill` alone would stretch a stepper across ~700px for two characters. `Stepper`'s
+     header names this exact case: where the slot has no intrinsic width, cap it in the
+     LAYOUT context rather than dropping `fill` (an unfilled `.fab-stepper` is still a
+     flex item and `align-items: stretch` widens it to the same box anyway). 160px is the
+     width the other four such call sites use. */
+  .manager-modifier-max-picks-field {
+    max-width: 160px;
     margin-top: 0.35rem;
   }
 </style>

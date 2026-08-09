@@ -70,16 +70,17 @@
     itemTags = [],
     checkTierOptions = [],
     minSuccessTierOptions = [],
-    // Per-recipe crafting-check modifier override (issue 770). Threaded through this
-    // wrapper so the Overview tab receives them — a tab prop skipping this wrapper
-    // silently drops to its default and the control never renders.
+    // Per-recipe crafting-check modifier selection (issue 770, reshaped by issue 1055).
+    // Threaded through this wrapper so the Overview tab receives them — a tab prop
+    // skipping this wrapper silently drops to its default and the control never renders.
     craftingModifierOptions = [],
-    craftingModifierPolicyDefault = 'addAll',
+    // The SYSTEM's combination rule. Not a "default": a recipe cannot override it, and
+    // only `byRecipe` gives the recipe anything to author at all.
+    craftingModifierPolicy = 'addAll',
     craftingModifierDefaultIds = [],
-    // The system's check-modifier authority level (issue 1055). NO default: absence is a
-    // real, load-bearing state ("not yet stamped"), and a `= 'none'` here would strip a
-    // delegation the engine still honours from every unstamped system.
-    craftingModifierAuthority = undefined,
+    // The system's pick cap (issue 1055). `null`, NOT a number: absence is the
+    // "unlimited" value, and a numeric default here would cap every unasked system.
+    craftingModifierMaxPicks = null,
     craftingModifierInertCause = '',
     onOpenChecks = () => {},
     // Category lives on the Overview tab (prototype §5.1). Threaded through this
@@ -388,7 +389,9 @@
   // already owns the canonical { value, icon, labelKey, descKey } list that System Settings
   // and Crafting Settings render, so a second table would drift. The lookup moved here from
   // RecipeModeBanner when that component was prop-ified (issue 1055) so a second banner —
-  // the Overview tab's check-modifier summary — can reuse the same chrome with its own copy.
+  // the Overview tab's inert check-modifier warning — can reuse the same chrome with its own
+  // copy. That prop-ification is now load-bearing for THIS call site regardless: the copy
+  // lives here, so folding it back into the component would re-create the table drift.
   const modeOption = $derived(
     resolutionModeOptions.find((option) => option.value === resolutionMode) ||
       resolutionModeOptions[0]
@@ -492,9 +495,9 @@
             {checkTierOptions}
             {minSuccessTierOptions}
             {craftingModifierOptions}
-            {craftingModifierPolicyDefault}
+            {craftingModifierPolicy}
             {craftingModifierDefaultIds}
-            {craftingModifierAuthority}
+            {craftingModifierMaxPicks}
             {craftingModifierInertCause}
             {onOpenChecks}
             {locked}

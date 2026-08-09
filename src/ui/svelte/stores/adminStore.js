@@ -2477,42 +2477,32 @@ function _craftingModifierInertCause(formula) {
 }
 
 /**
- * The recipe-modifier delegation facts the Checks card needs (issue 1055), projected as
- * an extension of the `craftingCheck` allowlist below.
+ * The check-modifier facts the Checks card and the recipe editor need beyond the raw
+ * `craftingCheck` fields (issue 1055), projected as an extension of the allowlist below.
  *
- * `recipeModifierAuthority` is passed through RAW and is deliberately NOT defaulted — no
- * `|| 'setAndRule'`, no `?? 'none'`. Absence is a real fourth state ("not yet stamped"),
- * distinct from all three authored levels, and the authoring card renders it as such. A
- * default here would forge a GM decision that was never made and would make the stamped
- * and unstamped worlds indistinguishable to the UI. The key is always emitted so the
- * shape is fixed; its value is `undefined` when unresolved. What absence MEANS at
- * resolution time is `resolveRecipeModifierAuthority`'s answer (`setAndRule`), and this
- * projection deliberately does not pre-empt it.
+ * `maxModifierPicks` is passed through RAW and is deliberately NOT defaulted — no `|| 1`,
+ * no `?? 0`. Absence is a real value ("unlimited"), distinct from every authored bound,
+ * and both authoring surfaces render it as such. A default here would forge a GM decision
+ * that was never made and would silently truncate recipe picks already on disk. The key is
+ * always emitted so the shape is fixed; its value is `undefined` when unbounded. What
+ * absence MEANS at resolution time is `resolveMaxModifierPicks`'s answer (`Infinity`), and
+ * this projection deliberately does not pre-empt it.
  *
- * The override count is the downgrade disclosure's input — lowering the level leaves
- * stored overrides on disk but stops honouring them, so the card names the population
- * first and then says, in its own per-level sentence, what the selected level does to
- * them. See the count's own comment below for why that sentence split means ONE
- * level-independent count is correct rather than one per level.
+ * "Does this rule defer the selection?" is deliberately NOT projected alongside it. Both
+ * surfaces already receive the normalized rule, and `policyDefersSelection` exists on the
+ * resolver so an authoring surface can ask it directly — which is what the Checks card
+ * does, live against the radio group the GM is clicking. A projected copy would answer
+ * from the last persisted rule and would be the one derivation on this axis capable of
+ * disagreeing with the card that reads it.
  *
  * @param {object} system The selected crafting system.
- * @param {Array<object>} systemRecipes That system's recipes.
  */
-function _buildRecipeModifierAuthorityView(system, systemRecipes) {
-  const inertCause = _craftingModifierInertCause(resolveActiveCraftingCheckFormula(system));
-  const overrides = (Array.isArray(systemRecipes) ? systemRecipes : []).filter(
-    (recipe) => recipe?.craftingModifier && typeof recipe.craftingModifier === 'object'
-  );
+function _buildCraftingModifierRuleView(system) {
   return {
-    recipeModifierAuthority: system?.craftingCheck?.recipeModifierAuthority,
-    modifierFormulaInertCause: inertCause,
-    // How many recipes in this system carry a check-modifier override AT ALL. This is a
-    // standing fact about the system, not a per-level figure: the card's disclosure reads
-    // "N recipes in this system carry a check-modifier override", then adds a separate
-    // per-level sentence saying what the selected authority does to them. So one count is
-    // correct at every level, and a `setOnly`-specific subset would have no sentence to
-    // live in — issue 1055 tried a second count and reverted it for exactly that reason.
-    recipeModifierOverrideCount: overrides.length,
+    modifierFormulaInertCause: _craftingModifierInertCause(
+      resolveActiveCraftingCheckFormula(system)
+    ),
+    maxModifierPicks: system?.craftingCheck?.maxModifierPicks,
   };
 }
 
@@ -2526,8 +2516,7 @@ function _buildSelectedSystemViewData(
   componentTagOptions,
   essenceDefinitions,
   availableScriptMacros,
-  sceneOptions,
-  systemRecipes = []
+  sceneOptions
 ) {
   if (!selectedSystem) return null;
 
@@ -2658,11 +2647,11 @@ function _buildSelectedSystemViewData(
       defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
         ? [...selectedSystem.craftingCheck.defaultModifierIds]
         : [],
-      // The delegation axis and its two supporting derivations (issue 1055). Spread from
-      // a named builder so this allowlist keeps stating what it carries while the giant
-      // literal gains no new branches — see `_buildRecipeModifierAuthorityView` for why
-      // `recipeModifierAuthority` is passed through undefaulted.
-      ..._buildRecipeModifierAuthorityView(selectedSystem, systemRecipes),
+      // The pick cap and the two derivations both authoring surfaces read (issue 1055).
+      // Spread from a named builder so this allowlist keeps stating what it carries while
+      // the giant literal gains no new branches — see `_buildCraftingModifierRuleView` for
+      // why `maxModifierPicks` is passed through undefaulted.
+      ..._buildCraftingModifierRuleView(selectedSystem),
     },
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
@@ -5358,9 +5347,6 @@ export function createAdminStore(services) {
           associatedItemName: associatedItem?.name || null,
         };
       });
-      // Hoisted out of the `_buildEssenceCards` argument list: the modifier-authority
-      // projection needs the same list to count the recipes a downgrade would silence,
-      // and one read serves both.
       const systemRecipes = recipeManager.getRecipes({ craftingSystemId: selectedSystem.id }) || [];
 
       essenceCards = _buildEssenceCards(
@@ -5376,8 +5362,7 @@ export function createAdminStore(services) {
         componentTagOptions,
         essenceDefinitions,
         availableScriptMacros,
-        sceneOptions,
-        systemRecipes
+        sceneOptions
       );
 
       recipeListData = _buildRecipeList(
@@ -5825,19 +5810,11 @@ export function createAdminStore(services) {
     const name = _nextSystemName(systemManager);
     const description =
       'Configure categories, item tags, essences, and crafting behaviour for this system.';
-    // A system authored HERE — through the manager UI, by a GM who is about to be shown
-    // the authority control — starts undelegated (issue 1055). It is stated at this call
-    // site rather than defaulted inside `CraftingSystemManager.createSystem`, which stays
-    // authority-neutral on purpose: the importer (`CompendiumImporter.js:339`) and every
-    // programmatic caller go through that same method and must keep landing on the
-    // unresolved state, so that the migration and the initialize-time fallback can derive
-    // the level from the payload's own recipes instead of inheriting this UI's opinion.
-    // Sniffing the input's key shape inside the manager would conflate the two callers.
-    const system = await systemManager.createSystem({
-      name,
-      description,
-      craftingCheck: { recipeModifierAuthority: 'none' },
-    });
+    // No `craftingCheck` seed (issue 1055). The authority level this used to stamp is
+    // gone, and its replacement — the combination rule — already has a defined default
+    // (`addAll`) that every caller shares, so a UI-only seed here would only be able to
+    // disagree with the manager and the importer about what a new system starts as.
+    const system = await systemManager.createSystem({ name, description });
     selectedSystemId.set(system.id);
     _clearSystemScopedSearches();
     activeTab.set('systems');
@@ -8554,7 +8531,9 @@ export function createAdminStore(services) {
   // then re-defaults (silent data loss). The whole `checkModifiers`/`defaultModifierIds`
   // arrays are REPLACED by `game.settings.set` (array replace, not merge), so removing a
   // catalogue entry persists without any `-=` deletion. Callers pass a partial patch of
-  // { checkModifiers?, defaultModifierPolicy?, defaultModifierIds? }.
+  // { checkModifiers?, defaultModifierPolicy?, defaultModifierIds?, maxModifierPicks? }.
+  // A `maxModifierPicks: null` is a real value in that patch, not an omission: absence
+  // means UNLIMITED, so clearing the cap has to be able to overwrite a stored bound.
   async function saveCraftingCheckModifiers(patch = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);

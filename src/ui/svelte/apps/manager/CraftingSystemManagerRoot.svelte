@@ -7114,9 +7114,7 @@
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
-            craftingRecipeModifierAuthority={selectedSystem?.craftingCheck?.recipeModifierAuthority}
-            craftingModifierOverrideCount={selectedSystem?.craftingCheck
-              ?.recipeModifierOverrideCount || 0}
+            craftingMaxModifierPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==
@@ -7370,10 +7368,9 @@
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
         craftingModifierOptions={selectedSystem?.craftingCheck?.checkModifiers || []}
-        craftingModifierPolicyDefault={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
-          'addAll'}
+        craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
         craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
-        craftingModifierAuthority={selectedSystem?.craftingCheck?.recipeModifierAuthority}
+        craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
         craftingModifierInertCause={recipeCraftingModifierInertCause}
         onOpenChecks={() => setView('checks')}
         categories={selectedSystem?.categories || []}

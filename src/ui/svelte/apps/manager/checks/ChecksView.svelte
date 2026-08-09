@@ -49,21 +49,19 @@
     // crafting check (and mirrors it for salvage); alchemy resolves consumption through its
     // own `consumeOnFail` flag instead, so these toggles are hidden in alchemy mode.
     craftingConsumption = null,
-    // Per-recipe check-modifier catalogue + default policy (issue 770): the crafting-
-    // owned `craftingCheck.checkModifiers` catalogue, `defaultModifierPolicy`, and
-    // `defaultModifierIds`, edited in a card beside the failure-consumption card and
-    // persisted live via `onUpdateCraftingCheckModifiers`. Only shown when the active
-    // crafting check is usable (has an authored roll formula).
+    // The system's check-modifier catalogue and the rules that reduce it (issue 770,
+    // reshaped by issue 1055): the crafting-owned `craftingCheck.checkModifiers`
+    // catalogue, `defaultModifierPolicy`, `defaultModifierIds` and `maxModifierPicks`,
+    // edited in a card beside the failure-consumption card and persisted live via
+    // `onUpdateCraftingCheckModifiers`. Rendered for every crafting sub-tab, including
+    // the ones where the catalogue reaches no roll — that is what `inertCause` reports.
     craftingCheckModifiers = [],
     craftingDefaultModifierPolicy = 'addAll',
     craftingDefaultModifierIds = [],
-    // The system's check-modifier authority level (issue 1055). NO default value: an
-    // absent key means "not yet stamped", the resolver decides what that resolves to,
-    // and a `= 'none'` here would silently revoke delegation the engine still honours.
-    craftingRecipeModifierAuthority = undefined,
-    // How many of the system's recipes carry a `craftingModifier` override, for the
-    // catalogue card's downgrade disclosure.
-    craftingModifierOverrideCount = 0,
+    // The cap on how many modifiers a selecting rule may pick (issue 1055). `null`, NOT a
+    // number: absence is the "unlimited" value, and a numeric default here would impose a
+    // bound the GM never authored on every system that has not been asked.
+    craftingMaxModifierPicks = null,
     // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
     // already honours. Restored as live-persisting toggles below the alchemy check-mode
     // selector. Defaults mirror the manager normalizer (all three ON; learnOnCraft
@@ -334,8 +332,7 @@
     checkModifiers={craftingCheckModifiers}
     defaultModifierPolicy={craftingDefaultModifierPolicy}
     defaultModifierIds={craftingDefaultModifierIds}
-    recipeModifierAuthority={craftingRecipeModifierAuthority}
-    affectedRecipeCount={craftingModifierOverrideCount}
+    maxModifierPicks={craftingMaxModifierPicks}
     inertCause={craftingModifierInertCause}
     onChange={onUpdateCraftingCheckModifiers}
   />
