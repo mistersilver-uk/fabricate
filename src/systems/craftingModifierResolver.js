@@ -3,12 +3,18 @@
  * may be spent, who decides what it reduces to, and how it is substituted.
  *
  * A crafting system may carry a named catalogue of check modifiers on its
- * `craftingCheck` config (`checkModifiers: {id,label,icon?,expression}[]`), a default
+ * `craftingCheck` config (`checkModifiers: {id,label,icon?,expression}[]`), a
  * COMBINATION RULE (`defaultModifierPolicy`) and a default eligible id set
- * (`defaultModifierIds`). A recipe may override the rule and/or the eligible id subset
- * through `Recipe.craftingModifier` — but only as far as the system delegates, which the
- * system states on `craftingCheck.recipeModifierAuthority` (see
- * {@link resolveRecipeModifierAuthority}).
+ * (`defaultModifierIds`). The SYSTEM alone owns both axes: a recipe never overrides the
+ * rule, and never substitutes its own eligible set except where the rule itself says so.
+ *
+ * The rule states WHO selects the eligible modifiers and WHEN. `byRecipe` ("Recipe
+ * picks") defers the selection to the recipe author at recipe-edit time; `playerPicks`
+ * defers it to the player at roll time; `addAll` and `highest` defer it to nobody and
+ * reduce the system's own default set. Both deferring rules are bounded by
+ * `craftingCheck.maxModifierPicks` (see {@link resolveMaxModifierPicks}), and both SUM
+ * what was picked — which is why a bound of 1 reproduces the historical single-pick
+ * behaviour exactly.
  *
  * The catalogue feeds a Fabricate-owned `@craftingmod` formula placeholder, and this
  * module serves the two modes that placeholder resolves through:
@@ -46,74 +52,69 @@ export const CRAFTING_MOD_TOKEN = '@craftingmod';
 const CRAFTING_MOD_TOKEN_RE = /@craftingmod\b/g;
 
 /**
- * The combination rules that may be OFFERED — the authoring surface's option list and
- * the only values a normalizer persists. `byRecipe` is deliberately absent: it
- * conflated the eligible SET with the combination RULE, and the set axis is now
- * `recipeModifierAuthority` (issue 1055).
+ * The combination rules a system may choose, in authoring-surface order. Each states
+ * both how the eligible values reduce to one number AND who selects them:
+ *
+ * - `addAll`      — sum the system's own default set. Nobody selects.
+ * - `highest`     — `max(...)` of the system's own default set. Nobody selects.
+ * - `byRecipe`    — "Recipe picks": the RECIPE author selects, at recipe-edit time.
+ * - `playerPicks` — the PLAYER selects, at roll time.
+ *
+ * `byRecipe` is a first-class rule, not a delegation of authority: the recipe chooses
+ * WHICH modifiers apply, never HOW they combine. Both selecting rules sum what was
+ * picked and are bounded by {@link resolveMaxModifierPicks}.
+ * @type {ReadonlyArray<'addAll'|'highest'|'byRecipe'|'playerPicks'>}
  */
-const VALID_POLICIES = new Set(['addAll', 'highest', 'playerPicks']);
+export const MODIFIER_POLICIES = Object.freeze(['addAll', 'highest', 'byRecipe', 'playerPicks']);
+
+const VALID_POLICIES = new Set(MODIFIER_POLICIES);
 
 /**
- * Retired policy values still readable from persisted data, translated on READ. Kept
- * separate from {@link VALID_POLICIES} because the two answer different questions:
- * what may be offered versus what may be understood.
- *
- * This is the ONE choke point for the translation, so a hand-built context carrying
- * `policy: 'byRecipe'` — an imported payload, an un-migrated world, an internally
- * constructed bag that never passed through `Recipe` — cannot bypass
- * `Recipe._normalizeCraftingModifier`'s own mapping and flip sum→max on a `highest`
- * system. The two mappings are a deliberate PAIR, not a redundancy: `Recipe`
- * pre-translates so this alias is never consulted for a recipe built through the model,
- * and this alias re-translates whatever never reached the model.
- *
- * `byRecipe` maps to `addAll` because that is what it arithmetically did — the eligible
- * id resolution already preferred the recipe's own `modifierIds`, and `byRecipe` summed
- * exactly that set.
+ * The rules under which someone other than the system selects the eligible modifiers,
+ * and therefore the only rules for which `maxModifierPicks` means anything. Exported so
+ * the authoring surfaces ask this module rather than re-deriving the membership test —
+ * the Checks card shows the cap input under exactly these rules, and the recipe editor
+ * offers its picker under `byRecipe`.
+ * @type {ReadonlySet<string>}
  */
-const LEGACY_POLICY_ALIASES = new Map([['byRecipe', 'addAll']]);
+export const SELECTING_MODIFIER_POLICIES = Object.freeze(new Set(['byRecipe', 'playerPicks']));
 
 /**
- * The authority levels a system may delegate to its recipes (issue 1055), in
- * authoring-surface order — least to most delegated.
- *
- * - `none` — recipes inherit both axes; no per-recipe control is offered.
- * - `setOnly` — recipes choose the eligible modifier SET.
- * - `setAndRule` — recipes may also override the combination RULE.
- *
- * ABSENT is a fourth, unpersisted state meaning "not yet stamped", and it is
- * load-bearing; see {@link resolveRecipeModifierAuthority}.
- * @type {ReadonlyArray<'none'|'setOnly'|'setAndRule'>}
- */
-export const RECIPE_MODIFIER_AUTHORITIES = Object.freeze(['none', 'setOnly', 'setAndRule']);
-
-const RECIPE_MODIFIER_AUTHORITY_SET = new Set(RECIPE_MODIFIER_AUTHORITIES);
-
-/**
- * Normalize a combination rule to one of the three offerable rules, translating a
- * retired value through {@link LEGACY_POLICY_ALIASES}; unknown values are null.
+ * Whether a combination rule defers modifier selection to someone other than the system.
  * @param {unknown} policy
- * @returns {'addAll'|'highest'|'playerPicks'|null}
+ * @returns {boolean}
  */
-export function normalizeModifierPolicy(policy) {
-  if (VALID_POLICIES.has(policy)) return policy;
-  return LEGACY_POLICY_ALIASES.get(policy) ?? null;
+export function policyDefersSelection(policy) {
+  return SELECTING_MODIFIER_POLICIES.has(policy);
 }
 
 /**
- * Resolve how much authority over the modifier axes the system delegates to its recipes.
- *
- * An ABSENT (or `null`, or unrecognized) value resolves as `setAndRule` — today's
- * pre-1055 behaviour — so nothing silently loses authority before it is stamped: a
- * client where the initialize-time stamp cannot run, an imported payload, and an
- * internally hand-built context all keep honouring the recipe overrides they honoured
- * before this axis existed. The stamp only ever narrows a system a GM has decided about.
- *
- * @param {{ recipeModifierAuthority?: unknown }|null|undefined} context
- * @returns {'none'|'setOnly'|'setAndRule'}
+ * Normalize a combination rule to one of the four offerable rules; unknown values are
+ * null so the caller can fall back.
+ * @param {unknown} policy
+ * @returns {'addAll'|'highest'|'byRecipe'|'playerPicks'|null}
  */
-export function resolveRecipeModifierAuthority(context) {
-  const authority = context?.recipeModifierAuthority;
-  return RECIPE_MODIFIER_AUTHORITY_SET.has(authority) ? authority : 'setAndRule';
+export function normalizeModifierPolicy(policy) {
+  return VALID_POLICIES.has(policy) ? policy : null;
+}
+
+/**
+ * Resolve the cap on how many modifiers a selecting rule may pick.
+ *
+ * ABSENT (or `null`, or any non-positive/non-integer value) means UNLIMITED, reported as
+ * `Infinity` so every caller can compare against it arithmetically without special-casing
+ * a sentinel. Absence is meaningful rather than a defaulting accident: a system that has
+ * never been asked the question must not silently acquire a bound that truncates recipe
+ * picks already on disk. The `1.20.0` migration stamps `1` onto pre-existing
+ * `playerPicks` systems for exactly that reason — that is where their historical
+ * single-pick behaviour is preserved, not here.
+ *
+ * @param {{ maxModifierPicks?: unknown }|null|undefined} context
+ * @returns {number} A positive integer, or `Infinity` when unbounded.
+ */
+export function resolveMaxModifierPicks(context) {
+  const max = Number(context?.maxModifierPicks);
+  return Number.isInteger(max) && max > 0 ? max : Infinity;
 }
 
 /**
@@ -121,15 +122,14 @@ export function resolveRecipeModifierAuthority(context) {
  * the evaluation path (`CraftingEngine`) and the display path (`CraftingListingBuilder`)
  * resolve through, so a displayed formula can never disagree with the rolled one.
  *
- * `recipeModifierAuthority` is read straight off the persisted `craftingCheck` and is
- * `undefined` when the system has not been stamped; the key is always present on the bag
- * so the shape is fixed, and {@link resolveRecipeModifierAuthority} owns what absence
- * means.
+ * `maxModifierPicks` is read straight off the persisted `craftingCheck` and is
+ * `undefined` when the system has never been asked; the key is always present on the bag
+ * so the shape is fixed, and {@link resolveMaxModifierPicks} owns what absence means.
  *
  * @param {object|null|undefined} system The crafting system.
  * @param {{ craftingModifier?: object|null }|null|undefined} recipe The recipe being crafted or listed.
  * @returns {{ catalogue: Array|undefined, systemPolicy: unknown, defaultModifierIds: Array|undefined,
- *   recipeModifier: object|null, recipeModifierAuthority: 'none'|'setOnly'|'setAndRule'|undefined }}
+ *   recipeModifier: object|null, maxModifierPicks: number|undefined }}
  */
 export function buildCraftingModifierContext(system, recipe) {
   const check = system?.craftingCheck ?? {};
@@ -138,7 +138,7 @@ export function buildCraftingModifierContext(system, recipe) {
     systemPolicy: check.defaultModifierPolicy,
     defaultModifierIds: check.defaultModifierIds,
     recipeModifier: recipe?.craftingModifier ?? null,
-    recipeModifierAuthority: check.recipeModifierAuthority,
+    maxModifierPicks: check.maxModifierPicks,
   };
 }
 
@@ -232,61 +232,67 @@ export function resolveActiveCraftingCheckFormula(system) {
 }
 
 /**
- * Resolve the effective combination rule: the recipe's override wins over the system
- * default, which wins over the `addAll` fallback — but the recipe override is consulted
- * ONLY when the system delegates the rule axis (`setAndRule`).
+ * Resolve the effective combination rule. The SYSTEM decides, full stop: a recipe's
+ * stored `craftingModifier.policy` — which older data may still carry — is never
+ * consulted, because a recipe may choose which modifiers apply but never how they
+ * combine.
  *
  * The invariant lives here rather than at the authoring control, per "A UI control's
- * constraint is never an invariant": a stored override left behind by a GM lowering the
- * authority level stays on disk and stays unhonoured.
+ * constraint is never an invariant": a legacy rule override left on disk stays on disk
+ * and stays unhonoured, and no hand-built context can smuggle one back in.
  *
- * @param {{ systemPolicy?: unknown, recipeModifier?: { policy?: unknown }|null,
- *   recipeModifierAuthority?: unknown }|null|undefined} context
- * @returns {'addAll'|'highest'|'playerPicks'}
+ * @param {{ systemPolicy?: unknown }|null|undefined} context
+ * @returns {'addAll'|'highest'|'byRecipe'|'playerPicks'}
  */
 export function resolveModifierPolicy(context = {}) {
-  const recipePolicy =
-    resolveRecipeModifierAuthority(context) === 'setAndRule'
-      ? normalizeModifierPolicy(context?.recipeModifier?.policy)
-      : null;
-  return recipePolicy ?? normalizeModifierPolicy(context?.systemPolicy) ?? 'addAll';
+  return normalizeModifierPolicy(context?.systemPolicy) ?? 'addAll';
 }
 
 /**
  * Resolve the ordered, de-duplicated, catalogue-validated list of eligible modifier
- * ids. The recipe's id subset (`recipeModifier.modifierIds` is an array) is used when
- * the system delegates the SET axis (`setOnly` or `setAndRule`); otherwise the system
- * `defaultModifierIds`. Unknown ids (not present in the catalogue) are dropped,
- * preserving source order.
+ * ids. Unknown ids (not present in the catalogue) are dropped, preserving source order.
+ *
+ * The recipe's id subset (`recipeModifier.modifierIds` is an array) is the source ONLY
+ * under `byRecipe`, the rule that hands the selection to the recipe author; under every
+ * other rule the system's `defaultModifierIds` is the source and a stored recipe subset
+ * is ignored outright.
+ *
+ * Under `byRecipe` the resolved list is TRUNCATED to {@link resolveMaxModifierPicks},
+ * keeping the first N in authored order. The bound is enforced here and not only at the
+ * picker, per "A UI control's constraint is never an invariant" — a GM who lowers the cap
+ * below what a recipe already picked must not leave that recipe rolling more modifiers
+ * than the system now permits. Under `playerPicks` the list is the full set of OPTIONS
+ * OFFERED and is deliberately not truncated; the cap bounds the player's selection from
+ * it, which {@link buildCraftingModifierChoice} carries.
  *
  * An AUTHORED EMPTY array is an override, not an absence: a recipe carrying
- * `modifierIds: []` under a delegating authority resolves to no eligible modifiers, so
+ * `modifierIds: []` under `byRecipe` resolves to no eligible modifiers, so
  * `@craftingmod` reduces to 0. `Recipe._normalizeCraftingModifier` preserves that shape
  * on the way in, keyed on `Array.isArray` at entry.
  *
- * @param {{ catalogue?: Array, defaultModifierIds?: Array,
- *   recipeModifier?: { modifierIds?: Array }|null, recipeModifierAuthority?: unknown }|null|undefined} context
+ * @param {{ catalogue?: Array, systemPolicy?: unknown, defaultModifierIds?: Array,
+ *   recipeModifier?: { modifierIds?: Array }|null, maxModifierPicks?: unknown }|null|undefined} context
  * @returns {string[]}
  */
 export function resolveEligibleModifierIds(context = {}) {
   const { catalogue = [], defaultModifierIds = [], recipeModifier = null } = context ?? {};
-  const authority = resolveRecipeModifierAuthority(context);
   const known = new Set(
     (Array.isArray(catalogue) ? catalogue : [])
       .map((entry) => (entry && typeof entry === 'object' ? entry.id : null))
       .filter((id) => typeof id === 'string' && id !== '')
   );
-  const recipeSetHonoured =
-    (authority === 'setOnly' || authority === 'setAndRule') &&
-    Array.isArray(recipeModifier?.modifierIds);
-  const source = recipeSetHonoured
+  const recipePicks =
+    resolveModifierPolicy(context) === 'byRecipe' && Array.isArray(recipeModifier?.modifierIds);
+  const source = recipePicks
     ? recipeModifier.modifierIds
     : Array.isArray(defaultModifierIds)
       ? defaultModifierIds
       : [];
+  const limit = recipePicks ? resolveMaxModifierPicks(context) : Infinity;
   const seen = new Set();
   const ids = [];
   for (const id of source) {
+    if (ids.length >= limit) break;
     if (typeof id !== 'string' || !known.has(id) || seen.has(id)) continue;
     seen.add(id);
     ids.push(id);
@@ -300,24 +306,26 @@ export function resolveEligibleModifierIds(context = {}) {
  * Reduction semantics:
  * - `highest`  → the deterministic `max(...)` of the eligible expression values (a
  *   scalar, NOT a keep-highest dice pool).
- * - `addAll`   → the sum of the eligible expression values. A persisted legacy
- *   `byRecipe` reduces here too, via {@link LEGACY_POLICY_ALIASES} — the eligible id
- *   resolution already prefers the recipe's `modifierIds`, so summing that set is
- *   exactly what `byRecipe` did.
- * - `playerPicks` → the DETERMINISTIC (non-interactive / API / headless) fallback,
- *   which resolves identically to `highest`. The interactive per-roll selection is
- *   handled OUT of this scalar path, via {@link buildCraftingModifierChoice} + the
- *   interactive branch of `evaluateCheckRoll`.
+ * - `addAll`   → the sum of the eligible expression values.
+ * - `byRecipe` → the sum of what the RECIPE picked. No special case is needed here:
+ *   {@link resolveEligibleModifierIds} has already narrowed the list to the recipe's
+ *   selection and truncated it to the cap, so summing that list is the whole rule.
+ * - `playerPicks` → the DETERMINISTIC (non-interactive / API / headless) fallback: the
+ *   sum of the BEST LEGAL SELECTION, i.e. the highest `maxModifierPicks` values. At a
+ *   cap of 1 that is exactly `max(...)` — the historical behaviour — and unbounded it is
+ *   the sum, because picking everything is then legal and optimal. The interactive
+ *   per-roll selection is handled OUT of this scalar path, via
+ *   {@link buildCraftingModifierChoice} + the interactive branch of `evaluateCheckRoll`.
  *
  * A missing/failed expression contributes 0 (never NaN). An empty eligible set → 0 —
- * including a recipe's AUTHORED empty set under a delegating authority.
+ * including a recipe's AUTHORED empty set under `byRecipe`.
  *
  * @param {object} context
  * @param {Array} [context.catalogue]
  * @param {unknown} [context.systemPolicy]
  * @param {Array} [context.defaultModifierIds]
- * @param {{ policy?: unknown, modifierIds?: Array }|null} [context.recipeModifier]
- * @param {'none'|'setOnly'|'setAndRule'} [context.recipeModifierAuthority]
+ * @param {{ modifierIds?: Array }|null} [context.recipeModifier]
+ * @param {number} [context.maxModifierPicks]
  * @param {(expression: string|undefined) => number} evaluateExpression Injected
  *   numeric evaluator (roll-data resolution + arithmetic), so the reduction is pure.
  * @returns {number}
@@ -339,21 +347,35 @@ export function resolveCraftingModifierScalar(context = {}, evaluateExpression) 
     return Number.isFinite(num) ? num : 0;
   });
   if (values.length === 0) return 0;
-  // `playerPicks` resolves deterministically as `highest` here — this scalar path is
-  // the non-interactive / API / headless fallback; the interactive per-roll choice is
-  // resolved via buildCraftingModifierChoice + evaluateCheckRoll instead.
-  if (policy === 'highest' || policy === 'playerPicks') return Math.max(...values);
-  // `addAll` sums its eligible set (and a persisted `byRecipe` has already been
-  // translated to `addAll` by `normalizeModifierPolicy`).
+  if (policy === 'highest') return Math.max(...values);
+  if (policy === 'playerPicks') {
+    // The non-interactive fallback stands in for a player who picks optimally: the sum
+    // of the highest N values the cap allows. At N=1 this is `max(...)`, reproducing the
+    // historical single-pick behaviour exactly; unbounded, picking everything is legal
+    // and the sum falls out of the same expression.
+    const limit = resolveMaxModifierPicks(context);
+    if (limit >= values.length) return values.reduce((sum, value) => sum + value, 0);
+    return [...values]
+      .sort((a, b) => b - a)
+      .slice(0, limit)
+      .reduce((sum, value) => sum + value, 0);
+  }
+  // `addAll` sums the system's default set; `byRecipe` sums the recipe's already-narrowed
+  // and already-capped selection.
   return values.reduce((sum, value) => sum + value, 0);
 }
 
 /**
  * Build the interactive `playerPicks` choice descriptor for a modifier context: the
  * eligible modifier set mapped to `{ id, label, icon, value }` (value = the modifier's
- * `expression` evaluated to a finite number, else 0), plus the `defaultSelectedId` —
- * the highest-valued eligible modifier, tie-broken by eligible-set order (the FIRST
- * occurrence among equal-max wins).
+ * `expression` evaluated to a finite number, else 0), the `maxPicks` cap the prompt must
+ * enforce, and the pre-selection.
+ *
+ * The pre-selection is the BEST LEGAL selection — the highest-valued `maxPicks`
+ * modifiers, tie-broken by eligible-set order (the FIRST occurrence among equal values
+ * wins) — so it agrees exactly with the deterministic scalar a non-interactive craft
+ * would have rolled. `defaultSelectedIds` carries it; `defaultSelectedId` remains the
+ * first of them so a single-pick prompt keeps its existing contract unchanged.
  *
  * Returns `null` when FEWER THAN TWO modifiers are eligible, so the caller omits the
  * choice and the formula keeps its deterministic scalar. Zero eligible modifiers is the
@@ -370,7 +392,7 @@ export function resolveCraftingModifierScalar(context = {}, evaluateExpression) 
  * @param {(expression: string|undefined) => number} evaluateExpression Injected
  *   numeric evaluator (roll-data resolution + arithmetic).
  * @returns {{ token: string, modifiers: Array<{id:string,label:string,icon:string,value:number}>,
- *   defaultSelectedId: string }|null}
+ *   maxPicks: number, defaultSelectedIds: string[], defaultSelectedId: string }|null}
  */
 export function buildCraftingModifierChoice(context = {}, evaluateExpression) {
   const catalogue = Array.isArray(context.catalogue) ? context.catalogue : [];
@@ -394,17 +416,25 @@ export function buildCraftingModifierChoice(context = {}, evaluateExpression) {
       value: Number.isFinite(num) ? num : 0,
     };
   });
-  // Default-select the highest-valued modifier; strict `>` keeps the FIRST occurrence
-  // among equal-max (eligible-set order tie-break — iterate in id order).
-  let defaultSelectedId = modifiers[0].id;
-  let bestValue = modifiers[0].value;
-  for (const modifier of modifiers) {
-    if (modifier.value > bestValue) {
-      bestValue = modifier.value;
-      defaultSelectedId = modifier.id;
-    }
-  }
-  return { token: CRAFTING_MOD_TOKEN, modifiers, defaultSelectedId };
+  // Pre-select the best LEGAL selection: the highest-valued `maxPicks` modifiers. The
+  // sort is on a copy carrying each modifier's original index so equal values tie-break
+  // by eligible-set order (first occurrence wins), matching the single-pick behaviour
+  // this generalizes and keeping the pre-selection equal to the deterministic scalar.
+  const cap = resolveMaxModifierPicks(context);
+  const maxPicks = Number.isFinite(cap) ? Math.min(cap, modifiers.length) : modifiers.length;
+  const defaultSelectedIds = modifiers
+    .map((modifier, index) => ({ modifier, index }))
+    .sort((a, b) => b.modifier.value - a.modifier.value || a.index - b.index)
+    .slice(0, maxPicks)
+    .sort((a, b) => a.index - b.index)
+    .map(({ modifier }) => modifier.id);
+  return {
+    token: CRAFTING_MOD_TOKEN,
+    modifiers,
+    maxPicks,
+    defaultSelectedIds,
+    defaultSelectedId: defaultSelectedIds[0],
+  };
 }
 
 /**
