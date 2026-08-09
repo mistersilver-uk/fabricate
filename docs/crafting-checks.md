@@ -58,8 +58,9 @@ Macros and automation that call Fabricate directly keep the original silent beha
 ## Check modifiers
 
 A crafting check's roll formula can add in a named modifier from the crafter through the `@craftingmod` placeholder, the same way it can use `@abilities.str.mod` or any other roll-data path your game system exposes.
-The **Check modifiers** card on the **Crafting check** page defines the catalogue of modifiers a system's checks can draw on.
-The card only appears when the active crafting check has an authored roll formula, the same rule the failure-consumption toggles follow.
+The **Check modifiers** card on the **Crafting check** page defines the catalogue of modifiers a system's checks can draw on, which of them apply by default, how they combine, and how much of that a recipe may decide for itself.
+The card appears on every crafting sub-tab once the catalogue has at least one entry, whether or not the system's active check can use it yet.
+When it cannot, the card explains why instead of hiding, so a modifier you authored is never silently doing nothing with no indication.
 Check modifiers are a crafting-only feature.
 Salvage and gathering checks do not use them.
 
@@ -68,20 +69,27 @@ Salvage and gathering checks do not use them.
 On the **Check modifiers** card, choose **Add modifier** to add an entry.
 Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**, a roll-data path resolved against the crafter, for example `abilities.med.mod`.
 Reference `@craftingmod` in the check's roll formula wherever you want the resolved value to apply.
-A roll formula with no `@craftingmod` placeholder ignores the catalogue entirely.
+
+### When check modifiers do nothing
+
+The catalogue only changes a roll when the system's active crafting check both exists and references `@craftingmod`.
+When it cannot, the **Check modifiers** card names which of these applies instead of showing the catalogue controls:
+
+- The current resolution mode rolls no crafting check at all, so there is nothing for a modifier to add to.
+- The active check has no roll formula authored yet.
+- The active check has a roll formula, but that formula does not reference `@craftingmod`.
+
+Author (or fix) a roll formula that includes `@craftingmod` on the relevant check to make the catalogue count.
 
 ### The default eligible set
 
 Not every modifier in the catalogue has to count on every recipe.
 The **Default modifiers** picker, below the catalogue, sets which modifiers are on by default for the whole system.
-A recipe can override this default set on its own **Overview** tab, under **Check modifiers**.
-Choose **Eligible modifiers** there to pick a different set for that recipe alone, or leave it inheriting the system default.
-The recipe-level **Check modifiers** control only appears when the system has at least one modifier in its catalogue.
+Depending on the **Authority level** below, a recipe may narrow this set for itself on its own **Overview** tab.
 
-### Combining modifiers
+### Combination rule
 
-The **Default combination** setting on the **Check modifiers** card decides how the eligible modifiers combine into `@craftingmod`.
-A recipe can also override the combination on its own **Overview** tab, alongside its eligible-set override.
+The **Combination rule** setting on the **Check modifiers** card decides how the eligible modifiers combine into `@craftingmod`.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -89,15 +97,41 @@ A recipe can also override the combination on its own **Overview** tab, alongsid
 |:------------|:-------------|:------------------------|
 | **Add all** | Sums every eligible modifier. | The recipe rewards stacking every relevant skill or tool bonus at once. |
 | **Highest** | Uses only the single largest eligible modifier, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
-| **By recipe** | Sums whichever modifiers the recipe itself has selected as eligible. | Different recipes in the same system need different modifiers to matter, with no player choice involved. |
 | **Player picks** | The player chooses exactly one eligible modifier at roll time. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+### Letting recipes decide
+
+Below the combination rule, the **Authority level** control on the **Check modifiers** card decides how much of the above a recipe may override for itself, on its own **Overview** tab.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Authority level | What a recipe can do |
+|:-----------------|:----------------------|
+| **Set by the system** | Nothing. Every recipe uses the default eligible set and the combination rule above, and its Overview tab offers no check-modifier control at all. |
+| **Recipes choose the set** | A recipe can pick its own eligible modifiers on its Overview tab. The combination rule still comes from the system. |
+| **Recipes choose set and rule** | A recipe can pick its own eligible modifiers and its own combination rule, both on its Overview tab. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+If you have not touched the **Authority level** control on an existing system, it behaves as **Recipes choose set and rule**, so nothing about your existing recipes' overrides changes until you deliberately lower it.
+
+Lowering the authority level never deletes a recipe's stored override.
+It only stops applying it.
+Whenever one or more of a system's recipes carry a check-modifier override, the **Check modifiers** card states how many, right beside the **Authority level** control, along with what your currently selected level does to them.
+Raise the level again later and those stored choices apply again immediately, with nothing to re-enter.
+
+**If a recipe's Check modifiers control has disappeared from its Overview tab**, this section is almost always why.
+Open the **Crafting check** page for that recipe's system and check the **Authority level** on the **Check modifiers** card.
+At **Set by the system**, no recipe gets a control at all, and the recipe's Overview tab shows a read-only summary of the set it is using instead, with a link back here.
+If the authority level already grants the recipe a control and it is still missing, see [When check modifiers do nothing](#when-check-modifiers-do-nothing) instead.
+The recipe's Overview tab names which of the two applies.
+
 ### Player picks
 
-**Player picks** is the only combination that is not fully decided ahead of the roll.
-It only prompts the player when all of the following are true for that attempt: the roll happens through the interactive dialog described above, the check's roll formula contains `@craftingmod`, the effective combination (the recipe's own override, or otherwise the system default) is **Player picks**, and at least two modifiers are eligible for that recipe.
+**Player picks** is the only combination rule that is not fully decided ahead of the roll.
+It only prompts the player when all of the following are true for that attempt: the roll happens through the interactive dialog described above, the check's roll formula contains `@craftingmod`, the effective combination rule (the recipe's own override, when its system's authority level grants it one, or otherwise the system default) is **Player picks**, and at least two modifiers are eligible for that recipe.
 When any of those is not true, for example a recipe with only one eligible modifier, or a Macro rolling the check directly, the check resolves exactly as **Highest** instead, with no prompt.
 
 When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon, label, and its resolved value.

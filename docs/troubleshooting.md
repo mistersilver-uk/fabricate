@@ -109,6 +109,35 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 
 ---
 
+## Per-Recipe Check Modifier Control Missing
+
+**Symptom:** A recipe's Overview tab used to offer a **Check modifiers** control, letting you pick that recipe's own eligible modifiers or combination rule, and now it does not.
+
+**Likely causes:**
+
+- The system's **Check modifiers** card has its **Authority level** set to **Set by the system**.
+  At this level no recipe gets a control at all, and every recipe uses the system's default eligible set and combination rule.
+- The system's active crafting check cannot use a modifier right now.
+  Either the resolution mode rolls no check at all, the check has no roll formula authored yet, or its formula does not reference `@craftingmod`.
+  A recipe's Overview tab shows a banner naming which of these applies in place of the control.
+
+**What is and is not lost:** Lowering the **Authority level** never deletes a recipe's stored override.
+It only stops applying it, and raising the level again re-applies it immediately with nothing to re-enter.
+
+**Step-by-step checks:**
+
+1. Open the Crafting Admin panel, select the system, go to the **Crafting check** page, and open the **Check modifiers** card.
+2. Check the **Authority level** control.
+   If it is **Set by the system**, choose **Recipes choose the set** or **Recipes choose set and rule** to restore per-recipe control.
+   If one or more recipes carry a stored override, the card states how many, right beside this control.
+3. If the authority level already grants recipes a control, open the recipe's **Overview** tab and read the banner in place of the control.
+   It names whether the system's active check has no roll formula, rolls no check at all for the current resolution mode, or has a formula that does not reference `@craftingmod`.
+4. Fix whichever of those applies on the **Crafting check** page, then return to the recipe's Overview tab.
+
+**See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the catalogue, the combination rule, and the authority level in full.
+
+---
+
 ## Routed Recipe Produces Nothing on a Successful Check
 
 **Symptom:** A recipe that routes by skill-check outcome rolls a success, but no result is produced.

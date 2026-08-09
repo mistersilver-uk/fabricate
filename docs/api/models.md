@@ -31,6 +31,11 @@ new Recipe({
   locked, // boolean (default false)
   allowPlayerResultReorder, // boolean (default true) -- progressive mode only
   linkedRecipeItemUuid, // string | null
+  craftingModifier: {
+    // object | null (default null) -- optional check-modifier override
+    policy, // "addAll" | "highest" | "playerPicks"
+    modifierIds, // string[]
+  },
   visibility: {
     restricted, // boolean (default false)
     allowedUserIds, // string[]
@@ -55,6 +60,19 @@ new Recipe({
 > Only an explicit `false` pins the authored stage order.
 > It is read in progressive mode only, and it replaces the retired system-level `craftingCheck.progressive.allowPlayerReorder`.
 > The salvage equivalent is `component.salvage.allowPlayerResultReorder`.
+
+{: .note }
+
+> `craftingModifier` requests a per-recipe override of the system's check-modifier combination rule and/or its eligible modifier id subset (issue 770, reshaped by issue 1055).
+> `null` (the default) requests no override, and inherits the system's `craftingCheck.defaultModifierPolicy` and `defaultModifierIds`.
+> `policy` keeps only `"addAll"`, `"highest"`, or `"playerPicks"` (a persisted legacy `"byRecipe"` is translated to `"addAll"`).
+> An unrecognised or absent `policy` inherits the system's rule.
+> `modifierIds` is authored or absent, not merely non-empty or empty.
+> An authored empty array (`[]`) is a real override meaning "no eligible modifiers" (`@craftingmod` resolves to `0`), distinct from an absent `modifierIds`, which inherits `defaultModifierIds`.
+> Whichever axis a recipe actually requests, it is honoured only as far as the system's `craftingCheck.recipeModifierAuthority` delegates.
+> See [CraftingSystemManager]({% link api/system-manager.md %}#createsystemdata).
+> A stored override the system does not delegate stays on disk unhonoured.
+> Raising the authority level later re-applies it with nothing to re-author.
 
 {: .note }
 

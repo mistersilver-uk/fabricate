@@ -135,6 +135,10 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
+| `checkModifiers` | `{id, label, icon?, expression}[]` | `[]` | Named catalogue of check modifiers feeding the `@craftingmod` roll-formula placeholder. Each `expression` is a roll-data fragment evaluated against the crafter (a missing/failed expression contributes `0`, never `NaN`). |
+| `defaultModifierPolicy` | `string` | `"addAll"` | How the system combines its eligible modifiers into `@craftingmod`. `"addAll"` sums them. `"highest"` takes the deterministic `max(...)`. `"playerPicks"` lets the player select one at roll time on an interactive craft, and every other path resolves `"playerPicks"` as `"highest"` instead. An unrecognised value falls back to `"addAll"`. |
+| `defaultModifierIds` | `string[]` | `[]` | Catalogue entry ids applied by default. An id naming no entry in `checkModifiers` is dropped (order and de-duplication preserved). |
+| `recipeModifierAuthority` | `string` | key absent | How much of `defaultModifierPolicy` and `defaultModifierIds` a recipe may override through its own `craftingModifier` (see [Recipe]({% link api/models.md %}#recipe)). One of `"none"` (no recipe override is honoured), `"setOnly"` (a recipe may override its eligible id subset only), or `"setAndRule"` (a recipe may override both). The key is omitted, not defaulted, until a GM (or the `1.20.0` migration) sets it. An absent, `null`, or unrecognised value resolves as `"setAndRule"` at read time, matching pre-issue-1055 behaviour. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -143,6 +147,13 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 > The 1.17.0 migration strips it from stored systems.
 > The permission it carried now lives on the recipe as `allowPlayerResultReorder` and on the component as `salvage.allowPlayerResultReorder`, and it defaults to `true` where it previously defaulted to `false`.
 > Gathering never had an ordered result-stage surface, so it has no replacement field.
+
+{: .note }
+> The check-modifier combination policy `"byRecipe"` is retired (issue 1055).
+> It conflated the combination rule with whether a recipe could override it, and the two are now separate.
+> A persisted `"byRecipe"` is translated to `"addAll"` on read, at both `defaultModifierPolicy` and a recipe's own `craftingModifier.policy`.
+> The two reduce identically, because a recipe's eligible-id resolution already preferred its own `modifierIds`.
+> The `1.20.0` migration also rewrites a stored `"byRecipe"` to `"addAll"` and stamps `recipeModifierAuthority` on any system that does not already carry a resolved value, deriving `"setAndRule"` for a system that was delegating before (a persisted `"byRecipe"` policy, or any recipe carrying a `craftingModifier`) and `"none"` otherwise.
 
 The `alchemy` field is present only when `resolutionMode` is `"alchemy"`.
 It carries the alchemy check mode and the discovery/consumption options.
