@@ -71,21 +71,26 @@ const VALID_POLICIES = new Set(MODIFIER_POLICIES);
 
 /**
  * The rules under which someone other than the system selects the eligible modifiers,
- * and therefore the only rules for which `maxModifierPicks` means anything. Exported so
- * the authoring surfaces ask this module rather than re-deriving the membership test —
- * the Checks card shows the cap input under exactly these rules, and the recipe editor
- * offers its picker under `byRecipe`.
- * @type {ReadonlySet<string>}
+ * and therefore the only rules for which `maxModifierPicks` means anything.
+ *
+ * Deliberately NOT exported as a Set: `Object.freeze` does not make a Set immutable (its
+ * contents live in internal slots, so `.add`/`.delete` still work on a frozen one), so
+ * exporting it would advertise an immutability it cannot enforce and let any consumer
+ * mutate the rule membership process-wide. {@link policyDefersSelection} is the whole
+ * public need.
  */
-export const SELECTING_MODIFIER_POLICIES = Object.freeze(new Set(['byRecipe', 'playerPicks']));
+const SELECTING_POLICIES = new Set(['byRecipe', 'playerPicks']);
 
 /**
- * Whether a combination rule defers modifier selection to someone other than the system.
+ * Whether a combination rule defers modifier selection to someone other than the system,
+ * and therefore whether `maxModifierPicks` applies to it. The authoring surfaces ask this
+ * rather than re-deriving the membership test — the Checks card shows the cap input under
+ * exactly these rules, and the recipe editor offers its picker under `byRecipe`.
  * @param {unknown} policy
  * @returns {boolean}
  */
 export function policyDefersSelection(policy) {
-  return SELECTING_MODIFIER_POLICIES.has(policy);
+  return SELECTING_POLICIES.has(policy);
 }
 
 /**
@@ -351,17 +356,23 @@ export function resolveCraftingModifierScalar(context = {}, evaluateExpression) 
   if (policy === 'playerPicks') {
     // The non-interactive fallback stands in for a player who picks optimally: the sum
     // of the highest N values the cap allows. At N=1 this is `max(...)`, reproducing the
-    // historical single-pick behaviour exactly; unbounded, picking everything is legal
-    // and the sum falls out of the same expression.
+    // historical single-pick behaviour exactly; unbounded, every value is legal to pick
+    // and the same expression yields the plain sum.
     const limit = resolveMaxModifierPicks(context);
-    if (limit >= values.length) return values.reduce((sum, value) => sum + value, 0);
-    return [...values]
-      .sort((a, b) => b - a)
-      .slice(0, limit)
-      .reduce((sum, value) => sum + value, 0);
+    if (limit >= values.length) return sumOf(values);
+    return sumOf([...values].sort((a, b) => b - a).slice(0, limit));
   }
   // `addAll` sums the system's default set; `byRecipe` sums the recipe's already-narrowed
   // and already-capped selection.
+  return sumOf(values);
+}
+
+/**
+ * Sum a list of already-coerced finite numbers.
+ * @param {number[]} values
+ * @returns {number}
+ */
+function sumOf(values) {
   return values.reduce((sum, value) => sum + value, 0);
 }
 
