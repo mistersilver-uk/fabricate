@@ -620,6 +620,18 @@
     )
   );
 
+  // Why the system's active crafting check reaches no `@craftingmod`, or '' when it does
+  // reach one. Consumes the inert-cause derivation from the store's `craftingCheck`
+  // projection (issue 1055), which resolves it from the PERSISTED system through the
+  // shared five-mode selector. The recipe editor is not the surface authoring those formulas,
+  // so the Checks-tab drafts are not in play here and the saved state is the truthful
+  // one. Any of the three causes makes a per-recipe override inert, so the Overview
+  // tab replaces its control with a banner naming which; a bare boolean cannot say
+  // which. See ChecksView.svelte's separate derivation for the draft-based consumer.
+  const recipeCraftingModifierInertCause = $derived(
+    selectedSystem?.craftingCheck?.modifierFormulaInertCause || ''
+  );
+
   // Routed-check outcome tiers (active type) offered to the recipe editor's
   // check-mode result-set assignment control as {id, name}. Failure tiers are
   // excluded — a failed check produces no result set to route to.
@@ -7102,6 +7114,7 @@
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
+            craftingMaxModifierPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==
@@ -7355,8 +7368,11 @@
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
         craftingModifierOptions={selectedSystem?.craftingCheck?.checkModifiers || []}
-        craftingModifierPolicyDefault={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
-          'addAll'}
+        craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
+        craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
+        craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
+        craftingModifierInertCause={recipeCraftingModifierInertCause}
+        onOpenChecks={() => setView('checks')}
         categories={selectedSystem?.categories || []}
         onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}

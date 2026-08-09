@@ -31,6 +31,10 @@ new Recipe({
   locked, // boolean (default false)
   allowPlayerResultReorder, // boolean (default true) -- progressive mode only
   linkedRecipeItemUuid, // string | null
+  craftingModifier: {
+    // object | null (default null) -- the recipe author's check-modifier pick
+    modifierIds, // string[]
+  },
   visibility: {
     restricted, // boolean (default false)
     allowedUserIds, // string[]
@@ -55,6 +59,18 @@ new Recipe({
 > Only an explicit `false` pins the authored stage order.
 > It is read in progressive mode only, and it replaces the retired system-level `craftingCheck.progressive.allowPlayerReorder`.
 > The salvage equivalent is `component.salvage.allowPlayerResultReorder`.
+
+{: .note }
+
+> `craftingModifier` is the recipe author's pick of the system's check modifiers (issue 770, reshaped by issue 1055).
+> It authors one axis — **which** modifiers apply — and never how they combine: the combination rule is the system's `craftingCheck.defaultModifierPolicy` alone.
+> See [CraftingSystemManager]({% link api/system-manager.md %}#createsystemdata).
+> `null` (the default) picks nothing and inherits the system's `defaultModifierIds`.
+> `modifierIds` is authored or absent, not merely non-empty or empty.
+> An authored empty array (`[]`) is a real pick meaning "no eligible modifiers" (`@craftingmod` resolves to `0`), distinct from an absent `modifierIds`, which inherits.
+> A pick is honoured **only** under the system's `"byRecipe"` rule, and is then truncated to `craftingCheck.maxModifierPicks`; under `"addAll"`, `"highest"`, and `"playerPicks"` it stays on disk unread.
+> Neither switching the rule away nor lowering the cap deletes anything, and restoring either applies the picks again with nothing to re-author.
+> A legacy `policy` key from before issue 1055 is dropped by the normaliser, never round-trips through `toJSON()`, and is never consulted wherever it survives unnormalised.
 
 {: .note }
 

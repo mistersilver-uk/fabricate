@@ -21,6 +21,9 @@ import {
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+// The capture registry, so the two cases pinned below assert their OWN selectors rather
+// than a copy of them that is free to drift from the case it claims to guard.
+import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -587,6 +590,14 @@ function compileManagerRoot() {
     // Folder-aware import mapping (issue 771): the modal's match-by-name pre-fill leaf.
     // Omitting it HANGS the mounted manager suite (the modal is always in the tree).
     'src/utils/matchFolderVocabulary.js',
+    // The `@craftingmod` ownership module (issues 770, 1055). The root, the Checks
+    // card and the recipe Overview tab all import it — the root to pick the check its
+    // resolution mode actually rolls, the two cards to normalize the combination rule,
+    // ask whether it defers the selection, and resolve what an ABSENT
+    // `maxModifierPicks` means. This list has NO dependency validator, so
+    // omitting it does not fail the suite: every mounted manager test is reported as
+    // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
+    'src/systems/craftingModifierResolver.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -1252,6 +1263,10 @@ function createStore(calls = [], options = {}) {
         ? []
         : [
             {
+              // `recipeOverrides` patches the recipe `openRecipeEditor` opens, so a test
+              // can seed a persisted field (a `craftingModifier` pick, say) without
+              // restating this whole fixture list as its own `options.recipes`.
+              ...options.recipeOverrides,
               id: 'r1',
               name: 'Healing Draught',
               img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
@@ -4366,29 +4381,33 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  // The check-modifier policy group is rendered through the shared RadioCardGroup
-  // primitive (issue 855), and its two hook attributes are a hand-maintained mirror:
+  // The check-modifier RULE group is rendered through the shared RadioCardGroup primitive
+  // (issues 855, 1055), and its hook attributes are a hand-maintained mirror:
   // `scripts/foundry-test-run.mjs` scrolls to `[data-crafting-modifier-policy]` for the
   // smoke frame and `scripts/lib/viewLabCases.js` clicks
-  // `[data-crafting-modifier-policy-option="playerPicks"] input`. Neither producer runs
-  // in `npm test`, so re-plumbing the group through a different primitive could drop
-  // either attribute with no unit failure at all. Pin both here.
-  it('checks view: the modifier policy group keeps its capture-harness hooks and shows an icon per policy (issue 855)', () => {
+  // `[data-crafting-modifier-policy-option="…"] input`. Neither producer runs in
+  // `npm test`, so re-plumbing the group through a different primitive could drop an
+  // attribute with no unit failure at all.
+  //
+  // `byRecipe` is in the list: it is a first-class COMBINATION RULE ("Recipe picks"),
+  // authoring-ordered third so the two non-selecting rules sit on the top row of the 2x2
+  // and the two selecting rules on the bottom one.
+  it('checks view: the modifier rule group keeps its capture-harness hooks and shows an icon per option (issues 855, 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',
       craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'highest',
+      craftingDefaultModifierPolicy: 'byRecipe',
     });
     const group = target.querySelector(
       '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
     );
-    assert.ok(group, 'the policy group still resolves by [data-crafting-modifier-policy]');
+    assert.ok(Boolean(group), 'the group still resolves by [data-crafting-modifier-policy]');
     const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
     assert.deepEqual(
       options.map((option) => option.getAttribute('data-crafting-modifier-policy-option')),
       ['addAll', 'highest', 'byRecipe', 'playerPicks'],
-      'all four policies still carry the per-option hook, in authoring order'
+      'every option carries the per-option hook, in authoring order'
     );
     for (const option of options) {
       const value = option.getAttribute('data-crafting-modifier-policy-option');
@@ -4401,15 +4420,282 @@ describe('CraftingSystemManager mounted behavior', () => {
         `the ${value} card is still driven by a real radio input`
       );
     }
+    assert.equal(
+      target.querySelector('[data-crafting-modifier-policy-option="byRecipe"] input').checked,
+      true,
+      'the passed rule is pinned on the radio-cards'
+    );
+    // The maintainer asked for TWO columns, and the count is the layout: `RadioCardGroup`
+    // uses a FIXED track count (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so
+    // four options at two columns is a clean 2x2 with no orphan row. Read off the custom
+    // property the group actually sets rather than off a computed width, which happy-dom
+    // does not resolve.
+    assert.match(
+      group.querySelector('.manager-resolution-mode-options').getAttribute('style') || '',
+      /--manager-radio-card-columns:\s*2/,
+      'the rule group is a 2x2 grid, not a four-across row'
+    );
   });
 
-  it('checks view: the modifier catalogue card is hidden when the crafting check has no formula (issue 770)', () => {
-    mountChecksView({ resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } });
-    assert.equal(
-      target.querySelector('[data-crafting-modifier-catalogue]'),
-      null,
-      'a formula-less (unusable) check offers no modifier catalogue'
+  // The pick cap (issue 1055). `data-crafting-modifier-max-picks` carries the READING —
+  // `"unlimited"` or the integer as a string — so the View Lab and the smoke harness can
+  // both assert which of the two states is on screen without parsing the input.
+  it('checks view: the pick cap renders only under a SELECTING rule, and states unlimited as a blank field', () => {
+    const props = {
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    };
+    // A cap on a selection nobody makes is a control with no effect, so the two
+    // non-selecting rules do not render it at all.
+    for (const craftingDefaultModifierPolicy of ['addAll', 'highest']) {
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 });
+      assert.ok(
+        !target.querySelector('[data-crafting-modifier-max-picks]'),
+        `${craftingDefaultModifierPolicy} selects nothing, so it shows no cap field`
+      );
+    }
+    for (const craftingDefaultModifierPolicy of ['byRecipe', 'playerPicks']) {
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null });
+      const field = target.querySelector('[data-crafting-modifier-max-picks]');
+      assert.ok(
+        Boolean(field),
+        `${craftingDefaultModifierPolicy} defers the selection, so it caps`
+      );
+      assert.equal(
+        field.getAttribute('data-crafting-modifier-max-picks'),
+        'unlimited',
+        'an absent cap reads as unlimited rather than as a magic number'
+      );
+      const input = field.querySelector('[data-crafting-modifier-max-picks-input]');
+      assert.ok(Boolean(input), 'the Stepper input carries its own hook');
+      assert.equal(input.value, '', 'unlimited is a BLANK field, not a 0 or a 1');
+      assert.match(
+        input.getAttribute('placeholder') || '',
+        /Unlimited/,
+        'and the placeholder is the only place that reading is stated'
+      );
+    }
+  });
+
+  // CLEARING the field is a real edit, and it is the only gesture that can put a system
+  // back to unlimited: absence cannot be reached by clicking anything. Two View Lab cases
+  // depend on it — `manager-checks-crafting-modifiers` and
+  // `manager-recipe-edit-crafting-modifier-custom-set` both empty this Stepper to reach the
+  // no-cap state, because the lab boots every migration over its world and 1.20.0's stamps
+  // a cap of 1 onto any `playerPicks` system that carries none. Nothing drove the emptied
+  // field through this card, so the patch it emits was only ever exercised by a capture run.
+  it('checks view: emptying the pick-cap Stepper patches a null cap, not an omission (issue 1055)', () => {
+    const patches = [];
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'playerPicks',
+      craftingMaxModifierPicks: 3,
+      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+    });
+    const input = target.querySelector('[data-crafting-modifier-max-picks-input]');
+    assert.equal(input.value, '3', 'the authored cap is in the field before it is cleared');
+    input.value = '';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    // `null`, not a missing key: the store spreads this patch onto the persisted check, so
+    // an omitted key would leave the old bound in place and the gesture would do nothing.
+    assert.deepEqual(
+      patches,
+      [{ maxModifierPicks: null }],
+      'clearing the field must overwrite the stored cap with the value that means unlimited'
     );
+  });
+
+  it('checks view: an authored cap is rendered on the hook and in the Stepper', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'playerPicks',
+      craftingMaxModifierPicks: 1,
+    });
+    const field = target.querySelector('[data-crafting-modifier-max-picks]');
+    assert.equal(field.getAttribute('data-crafting-modifier-max-picks'), '1');
+    assert.equal(field.querySelector('[data-crafting-modifier-max-picks-input]').value, '1');
+    // A stored value the ENGINE reads as unlimited must not render as a cap that
+    // truncates nothing: the field routes through `resolveMaxModifierPicks`, so `0` and
+    // `-2` both come back as the blank unlimited state.
+    for (const junk of [0, -2, 2.5]) {
+      mountChecksView({
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: junk,
+      });
+      assert.equal(
+        target
+          .querySelector('[data-crafting-modifier-max-picks]')
+          .getAttribute('data-crafting-modifier-max-picks'),
+        'unlimited',
+        `a stored ${junk} is unlimited to the engine, so the field says so too`
+      );
+    }
+  });
+
+  // Retargeted from "the card is hidden when the check has no formula" (issue 770). The
+  // card is now rendered in that state ON PURPOSE (issue 1055 criterion 10): hiding it
+  // reported nothing about a catalogue that reaches no roll, which is the defect the
+  // card must state rather than conceal. It stamps WHICH of the three causes applies.
+  it('checks view: the modifier catalogue card renders an inert notice naming the cause when the check has no formula (issue 1055)', () => {
+    // A non-empty catalogue is part of the fixture, not incidental: the notice reports a
+    // CATALOGUE that reaches no roll, so an empty one has nothing to warn about and is
+    // deliberately silent (see the `inert` gate in `CraftingModifierCatalogueCard`).
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    });
+    const card = target.querySelector('[data-crafting-modifier-catalogue]');
+    assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
+    const notice = card.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'the inert notice renders');
+    assert.equal(
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noFormula',
+      'and names WHICH cause applies — one boolean cannot carry three remedies'
+    );
+  });
+
+  // The other half of that gate, and the reason it exists: a brand-new system is
+  // `simple` + `rollFormula: ''` with no modifiers, so an ungated notice put a permanent
+  // warning ("These modifiers reach no roll…") directly above the empty state, warning
+  // about nothing on first contact with the tab. The cause is unchanged between the two
+  // mounts — only the catalogue is — so this pins the CATALOGUE as the gate rather than
+  // some incidental difference in the check.
+  it('checks view: an EMPTY catalogue shows no inert notice even when the cause applies (issue 1055)', () => {
+    const props = { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } };
+    mountChecksView({ ...props, craftingCheckModifiers: [] });
+    assert.ok(
+      Boolean(target.querySelector('[data-crafting-modifier-empty]')),
+      'the empty catalogue renders its empty state'
+    );
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'an empty catalogue has no modifiers to warn about, so the notice stays away'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    // Same cause, one modifier: the notice appears and still names the cause.
+    mountChecksView({
+      ...props,
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    });
+    const notice = target.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'one authored modifier is enough to make the notice worth showing');
+    assert.equal(
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noFormula',
+      'and the cause is unchanged by the catalogue gate'
+    );
+  });
+
+  it('checks view: the inert cause discriminates no-check, no-formula and no-placeholder (issue 1055)', () => {
+    // Every case below carries a non-empty catalogue: the notice is gated on one, so an
+    // empty catalogue would make all four assertions read the same silent card.
+    const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
+    for (const { props, cause } of [
+      // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
+      // rollFormula ternary had no case for it and reported the simple slot's formula.
+      {
+        props: {
+          resolutionMode: 'alchemy',
+          alchemyCheckMode: 'none',
+          craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        },
+        cause: 'noCheck',
+      },
+      {
+        props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
+        cause: 'noFormula',
+      },
+      {
+        props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '1d20 + 4' } },
+        cause: 'noPlaceholder',
+      },
+    ]) {
+      mountChecksView({ ...props, craftingCheckModifiers: catalogue });
+      const notice = target.querySelector('[data-crafting-modifier-inert]');
+      assert.ok(Boolean(notice), `${cause}: an inert notice renders`);
+      assert.equal(notice.getAttribute('data-crafting-modifier-inert'), cause);
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+    // …and a live `@craftingmod` formula shows no notice at all.
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: catalogue,
+    });
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'a formula that spends @craftingmod is not inert'
+    );
+  });
+
+  it('checks view: an unstamped system shows the rule the ENGINE would apply, not a blank group (issue 1055)', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      // No `craftingDefaultModifierPolicy` at all — the never-authored state.
+    });
+    const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')].filter(
+      (option) => option.querySelector('input').checked
+    );
+    assert.equal(checked.length, 1, 'exactly one rule is shown as selected');
+    assert.equal(
+      checked[0].getAttribute('data-crafting-modifier-policy-option'),
+      'addAll',
+      'absence resolves as addAll — the rule the engine applies to an unasked system'
+    );
+  });
+
+  // What the default set IS depends on the rule, and the three readings are materially
+  // different decisions — the whole eligible set nobody narrows, the fallback a recipe
+  // inherits until it picks its own, or the menu the player chooses from at roll time.
+  it('checks view: the default-set intro follows the combination rule (issue 1055)', () => {
+    const introText = (craftingDefaultModifierPolicy) => {
+      mountChecksView({
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+        craftingCheckModifiers: [
+          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+        ],
+        craftingDefaultModifierPolicy,
+      });
+      const heading = target.querySelector('#manager-crafting-modifier-defaults-label');
+      const text = heading.nextElementSibling.textContent;
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      return text;
+    };
+    assert.ok(
+      introText('byRecipe').includes('Overview tab'),
+      'under Recipe picks the GM is told where a recipe picks its own set'
+    );
+    assert.ok(
+      introText('playerPicks').includes('roll time'),
+      'under Player picks the default set is the menu offered at roll time'
+    );
+    for (const locked of ['addAll', 'highest']) {
+      assert.ok(
+        !introText(locked).includes('Overview tab'),
+        `at ${locked} nobody narrows the set, so the sentence must not promise a control that is not there`
+      );
+    }
   });
 
   it('the routed editor renders the tier-step row in BOTH tier types', () => {
@@ -5825,6 +6111,227 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.textContent.includes('Edit identity for this recipe.'),
       'learned mode no longer shows the identity-only subtitle'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // The manager root's crafting-modifier WIRING (issue 1055).
+  //
+  // Both ENDS of each wire are already covered — `mountChecksView` mounts ChecksView
+  // directly and `recipe-edit-mounted.test.js` mounts RecipeEditView directly — but
+  // nothing mounted the ROOT against a system carrying a `byRecipe` rule and a
+  // `maxModifierPicks` cap, so both forwards were deletable green. Dropping
+  // `craftingModifierPolicy={…}` from the RecipeEditView call site lets the prop fall to
+  // its `= 'addAll'` default and EVERY recipe loses its picker; dropping
+  // `craftingModifierMaxPicks={…}` lets it fall to `null` and every recipe becomes
+  // unbounded — a cap shipping dead under a green suite. Dropping the ChecksView ones
+  // pins the rule radio at `addAll` and hides the cap field for every system.
+  //
+  // Every case asserts BOTH ends, so a fixture that never reached the surface at all
+  // cannot pass by rendering nothing.
+  const modifierRuleSystemCheck = (defaultModifierPolicy, maxModifierPicks) => ({
+    simple: {
+      rollFormula: '1d20 + @craftingmod',
+      dc: 12,
+      thresholdMode: 'meet',
+      dcMode: 'static',
+      tiers: [],
+    },
+    checkModifiers: [
+      { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+      { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+    ],
+    defaultModifierIds: ['med'],
+    defaultModifierPolicy,
+    ...(maxModifierPicks === undefined ? {} : { maxModifierPicks }),
+  });
+
+  it('root: the Checks card’s rule radio tracks the SYSTEM’s defaultModifierPolicy (issue 1055)', async () => {
+    for (const policy of ['highest', 'byRecipe', 'playerPicks']) {
+      mountManager([], { craftingCheck: modifierRuleSystemCheck(policy) });
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')]
+        .filter((option) => option.querySelector('input').checked)
+        .map((option) => option.getAttribute('data-crafting-modifier-policy-option'));
+      assert.deepEqual(
+        checked,
+        [policy],
+        `the root forwards the system's own rule (${policy}); an unforwarded prop pins every system at addAll`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: the Checks card’s pick cap tracks the SYSTEM’s maxModifierPicks (issue 1055)', async () => {
+    for (const [maxModifierPicks, reading] of [
+      [2, '2'],
+      [undefined, 'unlimited'],
+    ]) {
+      mountManager([], { craftingCheck: modifierRuleSystemCheck('byRecipe', maxModifierPicks) });
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      assert.equal(
+        target
+          .querySelector('[data-crafting-modifier-max-picks]')
+          .getAttribute('data-crafting-modifier-max-picks'),
+        reading,
+        `the root forwards the system's own cap (${String(maxModifierPicks)})`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: only a byRecipe system’s recipe editor offers the modifier picker (issue 1055)', async () => {
+    for (const [policy, picker] of [
+      ['byRecipe', true],
+      ['addAll', false],
+      ['highest', false],
+      ['playerPicks', false],
+    ]) {
+      const editor = await openRecipeEditor([], {
+        craftingCheck: modifierRuleSystemCheck(policy),
+      });
+      assert.equal(
+        Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
+        picker,
+        `rule ${policy}: eligible-modifier picker rendered = ${picker}`
+      );
+      // The rejected design's surfaces are GONE, not merely hidden: no rule select on the
+      // recipe, and no neutral "the system decides" banner on every other rule.
+      assert.ok(
+        !editor.querySelector('.manager-main [data-recipe-crafting-modifier]'),
+        `rule ${policy}: a recipe never authors the combination rule`
+      );
+      assert.ok(
+        !editor.querySelector('.manager-main [data-recipe-modifier-banner]'),
+        `rule ${policy}: the read-only delegation banner is gone`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: the recipe picker’s cap hint tracks the SYSTEM’s maxModifierPicks (issue 1055)', async () => {
+    // Custom set + a cap of 1, so the picker is at its cap and reports `reached`.
+    const editor = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.equal(
+      editor
+        .querySelector('.manager-main [data-recipe-crafting-modifier-cap]')
+        ?.getAttribute('data-recipe-crafting-modifier-cap'),
+      'reached',
+      'the root forwards the cap; an unforwarded prop leaves every recipe unbounded and hides this hint entirely'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // …and an unbounded system states no cap at all.
+    const unbounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.ok(
+      !unbounded.querySelector('.manager-main [data-recipe-crafting-modifier-cap]'),
+      'unlimited states nothing rather than "up to Infinity"'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // The View Lab's own `expectSelector`s, run against the mounted root.
+  //
+  // Two capture cases assert a `:has()` / `:not(:has())` RELATIONSHIP between hooks the
+  // tests above only ever assert one at a time — that the catalogue card CONTAINS both the
+  // restored `byRecipe` card and the cap field's unlimited reading, and that the recipe
+  // picker contains a pill row and NO cap sentence. A selector can fail on the relationship
+  // while every individual hook is present and correct, and the only thing that ran it was
+  // a capture job needing harvested Foundry chrome.
+  //
+  // The selectors are READ FROM THE REGISTRY rather than restated, because a restated copy
+  // is the drift this pins against: it would keep passing after the case it mirrors changed.
+  // The mounted root renders `.fabricate-manager`, so each case's selector runs verbatim.
+  const labCaseSelector = (id) => {
+    const viewCase = VIEW_LAB_CASES.find((entry) => entry.id === id);
+    assert.ok(Boolean(viewCase), `no View Lab case "${id}" — was it renamed?`);
+    assert.equal(typeof viewCase.expectSelector, 'string', `case "${id}" asserts no selector`);
+    return viewCase.expectSelector;
+  };
+
+  it('root: the Checks card satisfies manager-checks-crafting-modifiers’ own selector (issue 1055)', async () => {
+    const selector = labCaseSelector('manager-checks-crafting-modifiers');
+    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks') });
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(selector)),
+      'a selecting rule with no cap must put BOTH the byRecipe option and the unlimited cap ' +
+        'reading inside one [data-crafting-modifier-catalogue] — a cap field rendered as a ' +
+        'SIBLING of the card would satisfy every hook-by-hook assertion above and still fail here'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, and the state the capture job actually hit: the hooks are all
+    // present, the nesting is right, and the cap simply reads a bound instead of unlimited.
+    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks', 1) });
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      !target.querySelector(selector),
+      'a BOUNDED cap must not satisfy the unlimited case, or the frame published under it ' +
+        'would be its bounded sibling'
+    );
+  });
+
+  it('root: the recipe picker satisfies manager-recipe-edit-crafting-modifier-custom-set’s own selector (issue 1055)', async () => {
+    const selector = labCaseSelector('manager-recipe-edit-crafting-modifier-custom-set');
+    const custom = { craftingModifier: { modifierIds: ['med', 'alch'] } };
+    const unbounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      recipeOverrides: custom,
+    });
+    assert.ok(
+      Boolean(unbounded.querySelector(selector)),
+      'a custom set under an unbounded system is a pill row with no cap sentence, which is the ' +
+        'whole difference between this frame and its two capped neighbours'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, and the state the capture job actually hit. The picker and its
+    // pill row are present either way; the standing cap sentence is what the `:not(:has(…))`
+    // half refuses, so a system that acquired a cap nobody authored fails here and only here.
+    const bounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      recipeOverrides: custom,
+    });
+    assert.ok(
+      Boolean(bounded.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
+      'the picker itself still renders, so the failure below is the cap sentence and nothing else'
+    );
+    assert.ok(
+      !bounded.querySelector(selector),
+      'a system carrying a cap states it standing, so this case cannot publish that frame'
     );
   });
 
