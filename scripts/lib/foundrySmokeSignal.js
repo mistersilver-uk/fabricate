@@ -316,11 +316,19 @@ function describeFlag(value) {
  * Quote up to `EVIDENCE_EXCERPT_CAP` entries, or state that the summary carried
  * none. A condition that names a flag and then falls silent is the failure mode
  * this whole diagnostic exists to remove, so the empty case is never empty.
+ *
+ * An entry may itself be multi-line — a step `error` carrying a stack, say — so
+ * every continuation line is indented past the `- ` bullet. Left flush it would
+ * read as a sibling of the condition headings, and anything parsing those
+ * headings back out (the suite's own oracle does) would count it as one.
  */
 function quoteEvidence(entries, emptyNote) {
   if (entries.length === 0) return [`${EVIDENCE_INDENT}${emptyNote}`];
   const shown = entries.slice(0, EVIDENCE_EXCERPT_CAP);
-  const lines = shown.map((entry) => `${EVIDENCE_INDENT}- ${entry}`);
+  const lines = shown.flatMap((entry) => {
+    const [first, ...rest] = String(entry).split('\n');
+    return [`${EVIDENCE_INDENT}- ${first}`, ...rest.map((line) => `${EVIDENCE_INDENT}  ${line}`)];
+  });
   if (entries.length > shown.length) {
     lines.push(`${EVIDENCE_INDENT}(+${entries.length - shown.length} more)`);
   }
@@ -363,8 +371,10 @@ function collectSignalConditions(summary, steps, consoleErrors) {
     conditions.push({
       name: 'degraded',
       value: describeFlag(summary?.degraded),
-      // Exit 0. Say nothing here that describes the run as having failed.
-      note: 'a transient renderer/page teardown was tolerated, so the run exited 0 as a flake rather than a clean pass',
+      // NOT "so the run exited 0": a tolerated teardown co-occurring with a later step
+      // failure is ordinary, and there the harness throws and the process exits non-zero.
+      // The note states what this condition ALONE does, which is true in both cases.
+      note: 'a transient renderer/page teardown was tolerated; this condition alone does not fail a run, it marks a flake rather than a clean pass',
       evidence: quoteEvidence(
         steps.filter((step) => isToleratedTeardownStep(step)).map((step) => formatFailedStep(step)),
         'the summary recorded no tolerated-teardown step for this condition'
@@ -375,8 +385,9 @@ function collectSignalConditions(summary, steps, consoleErrors) {
     conditions.push({
       name: 'rendererCrashed',
       value: describeFlag(summary?.rendererCrashed),
-      // Exit 0 as well: the page `crash` listener flags the run, it does not fail it.
-      note: 'the page reported a renderer crash (canonically an OOM), so the run exited 0 as a flake rather than a clean pass',
+      // Same reservation as `degraded`: the page `crash` listener flags the run, it does
+      // not fail it, but a run carrying this flag may still have failed for another reason.
+      note: 'the page reported a renderer crash (canonically an OOM); this condition alone does not fail a run, it marks a flake rather than a clean pass',
       evidence: [
         `${EVIDENCE_INDENT}the page crash event has no per-step record to quote, so the summary carries no evidence beyond the flag itself`,
       ],
@@ -408,14 +419,26 @@ function describeVerdictCondition(summary, hasSignalConditions) {
   };
 }
 
+// The producing command is named exactly, and it is the SCOPED `screenshots` profile with
+// `--target-labels`, never the bare `npm run test:foundry`. This gate only ever reads a
+// summary that profile wrote (`package.json` binds `test:foundry` to the default/full
+// profile; the documented producer is `test:foundry:screenshots --target-labels=…` ->
+// `collect`). Sending the reader to the full profile would cost them a longer run whose
+// artifact this same function's caller then refuses for a mismatched target-label set —
+// a wrong instruction inside a diagnostic that exists to save twenty-five minutes.
+// The labels are derived on the branch BEFORE detaching, because at the merge base the
+// changed-file set that produces them is empty.
 const ATTRIBUTION_PROCEDURE = [
   "Establishing whether this fault is already present at the pull request's base:",
   '  This gate reads one summary, and one summary carries no evidence of which head',
   '  produced what it recorded, so it cannot tell a fault this branch introduced from',
-  '  one that was already there. To establish that, run the same smoke at the merge',
-  '  base and compare the two summaries:',
+  '  one that was already there. To establish that, re-run at the merge base the SAME',
+  '  scoped smoke that produced this summary — same profile, same target labels, or the',
+  '  two runs are not comparable and this gate refuses the second one as well:',
   '    git merge-base HEAD origin/main',
-  '    git switch --detach <merge-base> && npm run test:foundry',
+  '    npm run --silent screenshots:ui:targets -- --base origin/main',
+  '    git switch --detach <merge-base>',
+  '    npm run test:foundry:screenshots -- --target-labels=<the labels printed above>',
   '    read test-results/summary.json, then git switch -',
   '  As guidance for what to compare first: stepFailures 0 with consoleErrorCount above 0 is',
   '  more often ambient fixture-world noise already present at the base than a change-specific',

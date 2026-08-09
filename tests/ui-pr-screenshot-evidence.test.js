@@ -1442,20 +1442,53 @@ describe('UI PR screenshot evidence', () => {
     }
   });
 
-  // THE GATE-OPENING MUTANT. Weakening `stepFailures !== 0` to `stepFailures > 0` survives
-  // every single-condition fixture above AND the accept-side test below (measured: 83 pass /
-  // 0 fail at c49d8af with the mutant applied). Only a summary MISSING the scalar kills it,
-  // because `undefined > 0` is false — so a stale or truncated summary.json would be accepted
-  // as publishable evidence. `summaryPatch: { key: undefined }` is how the key goes absent:
-  // JSON.stringify drops it.
-  it('refuses a summary whose stepFailures or consoleErrorCount key is absent entirely', () => {
-    for (const key of ['stepFailures', 'consoleErrorCount']) {
+  // THE GATE-OPENING MUTANTS, all of them. Each of the gate's five disjuncts compares with
+  // `!==` so that a summary simply MISSING the key refuses; every weakening to a positive test
+  // — `stepFailures > 0`, `passed === false`, `degraded === true`, `rendererCrashed === true` —
+  // accepts that summary instead and opens the gate to a stale or truncated artifact. The
+  // single-condition fixtures above survive all four (measured), because they set the key to a
+  // present off-nominal value. Only an ABSENT key kills them, so all five keys are covered here
+  // rather than just the two counts. `summaryPatch: { key: undefined }` is how a key goes
+  // absent: JSON.stringify drops it.
+  const ACCEPTING_VALUE = Object.freeze({
+    passed: 'true',
+    stepFailures: '0',
+    consoleErrorCount: '0',
+    degraded: 'false',
+    rendererCrashed: 'false',
+  });
+  it('refuses a summary whose evidence-condition key is absent entirely, for every condition', () => {
+    for (const [key, accepting] of Object.entries(ACCEPTING_VALUE)) {
       refuseWith({ [key]: undefined }, (message) => {
         assert.match(message, new RegExp(`^ {2}${key}: not recorded — `, 'm'));
-        // Never rendered as `0`: a refusal stating an accepting value reads as a gate defect.
-        assert.ok(!message.includes(`${key}: 0`), `${key} must not be reported as 0`);
+        // Never rendered as the value that would have been ACCEPTED: a refusal stating an
+        // accepting value for the condition it just tripped on reads as a gate defect.
+        assert.ok(
+          !message.includes(`${key}: ${accepting}`),
+          `${key} must not be reported as ${accepting}`
+        );
       });
     }
+  });
+
+  // A source-scan drift guard over the predicate itself, because the fixtures above can only
+  // ever cover the conditions someone remembered to write one for. It pins the exact five
+  // comparisons AND that they are what guards the builder call, so a sixth condition, a dropped
+  // disjunct, a weakened operator, or a detached builder all fail here in one assertion.
+  it('gates on exactly five evidence conditions, each a strict !== against its accepting value', () => {
+    const source = readFileSync(new URL('../scripts/ui-pr-screenshot-evidence.mjs', import.meta.url), 'utf8');
+    const guarded = /\n {2}if \(\n([\s\S]*?)\n {2}\) \{\n {4}throw new Error\(explainSmokeSummaryRefusal\(summary\)\);/.exec(source);
+    assert.ok(Boolean(guarded), 'the five-condition predicate must guard the refusal builder');
+    assert.deepEqual(guarded[1].match(/summary\.\w+ !== (?:true|false|0)/g), [
+      'summary.passed !== true',
+      'summary.stepFailures !== 0',
+      'summary.consoleErrorCount !== 0',
+      'summary.degraded !== false',
+      'summary.rendererCrashed !== false',
+    ]);
+    // …and nothing else reads the summary inside that block, so no sixth condition slips in
+    // under a comparison shape the matcher above does not recognise.
+    assert.equal((guarded[1].match(/summary\./g) || []).length, 5);
   });
 
   // The accept side, so the diagnostic cannot be satisfied by refusing everything.

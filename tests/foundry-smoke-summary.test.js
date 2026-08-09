@@ -695,7 +695,17 @@ const namedConditions = (message) =>
 // can compute the expected answer independently of the builder it is testing. Anything looser
 // here (`> 0` for a count, truthiness for a flag) would make the oracle agree with a defective
 // builder instead of catching it.
-const CONDITION_ORDER = ['passed', 'stepFailures', 'consoleErrorCount', 'degraded', 'rendererCrashed'];
+// A keyed lookup, not a chain of ternaries: SonarCloud reports a nested ternary as a new-code
+// smell that ESLint does not flag, and `tests/**` is outside the lint glob but inside Sonar's
+// new-code scope (AGENTS.md's "lint-green yet Sonar-red" trap).
+const CONDITION_TRIPPED = Object.freeze({
+  passed: (summary) => summary.passed !== true,
+  stepFailures: (summary) => summary.stepFailures !== 0,
+  consoleErrorCount: (summary) => summary.consoleErrorCount !== 0,
+  degraded: (summary) => summary.degraded !== false,
+  rendererCrashed: (summary) => summary.rendererCrashed !== false,
+});
+const CONDITION_ORDER = Object.keys(CONDITION_TRIPPED);
 const OFF_NOMINAL = Object.freeze({
   passed: false,
   stepFailures: 3,
@@ -704,17 +714,7 @@ const OFF_NOMINAL = Object.freeze({
   rendererCrashed: true,
 });
 const trippedConditions = (summary) =>
-  CONDITION_ORDER.filter((name) =>
-    name === 'passed'
-      ? summary.passed !== true
-      : name === 'stepFailures'
-        ? summary.stepFailures !== 0
-        : name === 'consoleErrorCount'
-          ? summary.consoleErrorCount !== 0
-          : name === 'degraded'
-            ? summary.degraded !== false
-            : summary.rendererCrashed !== false
-  );
+  CONDITION_ORDER.filter((name) => CONDITION_TRIPPED[name](summary));
 
 // NEVER SILENT, NEVER PARTIAL. Item 8's floor is "at least one condition", but "at least one"
 // permits a first-match-wins builder that emits "the run did not pass" and nothing else on the
@@ -786,12 +786,21 @@ test('explainSmokeSummaryRefusal gives degraded and rendererCrashed their own ev
   const degradedMessage = refusalFor({
     degraded: true,
     steps: [
+      // A SKIPPED step that is NOT a tolerated teardown. The harness pushes exactly this
+      // record (`scripts/foundry-test-run.mjs`'s `acceptLicenseIfPresent`) on every run that
+      // does not hit the license page: `skipped: true`, `passed: true`, and no `error` at all.
+      // It is here because the `degraded` block's use of the shared `isToleratedTeardownStep`
+      // is the deviation that justified sharing the predicate at all — loosened to
+      // `step?.skipped === true` it would quote `license-check: failed` as tolerated-teardown
+      // evidence on a real degraded run, and nothing else in this suite would notice.
+      { step: 'license-check', passed: true, skipped: true },
       { step: 'craft-item-phase', passed: true },
       { step: 'player-journal', passed: true, skipped: true, error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed` },
     ],
   });
   assert.match(degradedMessage, /^ {4}- player-journal: transient page teardown \(skipped\): target closed$/m);
-  assert.ok(!/\bfailed\b/.test(degradedMessage.split('\n\n')[1]), 'a tolerated teardown exits 0 and is not a failed run');
+  assert.ok(!degradedMessage.includes('license-check'), 'a skipped non-teardown step is not tolerated-teardown evidence');
+  assert.ok(!/\bfailed\b/.test(degradedMessage.split('\n\n')[1]), 'a tolerated teardown is not a failed step');
 
   const crashMessage = refusalFor({ rendererCrashed: true });
   assert.match(crashMessage, /^ {2}rendererCrashed: true — /m);
@@ -800,6 +809,33 @@ test('explainSmokeSummaryRefusal gives degraded and rendererCrashed their own ev
   // A `degraded: true` summary whose steps array records no tolerated teardown says so rather
   // than naming a flag and falling silent.
   assert.match(refusalFor({ degraded: true, steps: [] }), /recorded no tolerated-teardown step/);
+});
+
+// Neither flag fails a run BY ITSELF — but "so the run exited 0" is a different, stronger claim
+// and it is conditionally FALSE. A tolerated teardown co-occurring with a later step failure is
+// ordinary (the Phase E tolerate site sits beside steps that can still fail), and there
+// `evaluateSmokeOutcome` throws, `results.passed = false`, and the process exits NON-zero. So
+// each note states what its condition alone does, and no note asserts an exit code.
+test('the degraded and rendererCrashed notes never claim the run exited 0', () => {
+  const alsoFailed = refusalFor({
+    passed: false,
+    stepFailures: 2,
+    degraded: true,
+    rendererCrashed: true,
+    steps: [
+      { step: 'boot-and-join', passed: false, error: 'locator timeout' },
+      { step: 'screenshot-manager', passed: false, error: 'assertion' },
+      { step: 'player-journal', passed: true, skipped: true, error: `${TRANSIENT_TEARDOWN_SKIP_PREFIX}target closed` },
+    ],
+  });
+  // This summary is exactly the shape whose process exit is non-zero.
+  assert.ok(!/exited 0/.test(alsoFailed), 'no note may assert an exit code the summary does not carry');
+  for (const name of ['degraded', 'rendererCrashed']) {
+    assert.match(
+      alsoFailed,
+      new RegExp(`^ {2}${name}: true — .*this condition alone does not fail a run`, 'm')
+    );
+  }
 });
 
 // An early phase abort (`scripts/foundry-test-run.mjs`'s outer catch) writes `passed: false`
@@ -858,6 +894,12 @@ test('explainSmokeSummaryRefusal reports how many console errors were suppressed
     refusalFor({ passed: false, waivedConsoleErrors: ['favicon 404', 'pageerror: minimum resolution'] }),
     /suppressed 2 waived console error\(s\)/
   );
+  // ONE waived error still prints the note. The boundary matters: `waivedCount > 0` weakened to
+  // `> 1` goes silent at exactly one suppression and every other fixture here has two.
+  assert.match(
+    refusalFor({ passed: false, waivedConsoleErrors: ['favicon 404'] }),
+    /suppressed 1 waived console error\(s\)/
+  );
   // An empty or absent array prints no suppression note at all. Matched on the whole phrase:
   // the verdict block's own "un-waived console error" contains "waived console error".
   const suppressionNote = /suppressed \d+ waived console error/;
@@ -873,13 +915,51 @@ test('explainSmokeSummaryRefusal reports how many console errors were suppressed
 test('explainSmokeSummaryRefusal always states the merge-base attribution procedure', () => {
   for (const patch of [{ passed: false }, { stepFailures: 1 }, { rendererCrashed: true }]) {
     const message = refusalFor(patch);
-    assert.match(message, /git merge-base HEAD origin\/main/);
     assert.match(message, /already present at the pull request's base/);
     assert.match(message, /stepFailures 0 with consoleErrorCount above 0/);
     assert.match(message, /guidance/);
     // It must never claim to have performed the comparison it is describing.
     assert.match(message, /reads one summary/);
+
+    // Every line of the procedure, not just the `git merge-base` one. The whole block is the
+    // message's tail, and its line count is asserted so deleting a prose line is caught too:
+    // the one actionable instruction in a diagnostic written to save twenty-five minutes has
+    // to survive an edit that only reads the surviving lines.
+    const procedure = message.split('\n\n').at(-1).split('\n');
+    assert.equal(procedure.length, 14, 'the whole attribution procedure is printed');
+    assert.match(message, /^ {4}git merge-base HEAD origin\/main$/m);
+    assert.match(message, /^ {4}npm run --silent screenshots:ui:targets -- --base origin\/main$/m);
+    assert.match(message, /^ {4}git switch --detach <merge-base>$/m);
+    assert.match(
+      message,
+      /^ {4}npm run test:foundry:screenshots -- --target-labels=<the labels printed above>$/m
+    );
+    assert.match(message, /^ {4}read test-results\/summary\.json, then git switch -$/m);
+
+    // THE PROFILE TRAP. `package.json` binds `test:foundry` to the default/full profile, while
+    // the summary this gate reads is written by the scoped `screenshots` profile with
+    // `--target-labels`. Prescribing the bare command would send the reader down a longer,
+    // non-comparable run whose artifact the target-label check then refuses.
+    assert.ok(
+      !/npm run test:foundry(?!:screenshots)/.test(message),
+      'the full-profile smoke does not produce the summary this gate reads'
+    );
+    assert.match(message, /same profile, same target labels/);
   }
+});
+
+// A step `error` may carry a stack, so an evidence entry may be multi-line. Left flush, its
+// continuation lines would read as siblings of the two-space condition headings — and
+// `namedConditions` above, which is this suite's own oracle for "which conditions were named",
+// parses exactly that shape.
+test('explainSmokeSummaryRefusal indents the continuation lines of a multi-line entry', () => {
+  const message = refusalFor({
+    consoleErrorCount: 1,
+    consoleErrors: ['pageerror: boom\n  degraded: at Object.<anonymous> (foundry.js:1:1)'],
+  });
+  assert.deepEqual(namedConditions(message), ['consoleErrorCount']);
+  assert.match(message, /^ {4}- pageerror: boom$/m);
+  assert.match(message, /^ {8}degraded: at Object\.<anonymous> \(foundry\.js:1:1\)$/m);
 });
 
 // The builder re-derives "which condition tripped" in a different file from the predicate that
