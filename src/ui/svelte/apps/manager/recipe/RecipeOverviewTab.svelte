@@ -43,10 +43,22 @@
     onNameInput = () => {},
     onDescriptionInput = () => {},
     onToggleEnabled = () => {},
-    // True when an enable-blocking validation issue is present while the recipe is
+    // True when an enable-blocking readiness issue is present while the recipe is
     // OFF: the enable toggle is disabled so the GM cannot trigger the hard activation
     // failure (issue 549). The Validation tab lists the reasons.
-    enableBlocked = false,
+    //
+    // This is NOT the recipe activation gate (issue 1018). That one is
+    // `RecipeManager.canActivateRecipe`, projected onto the GM browser rows under its own
+    // name — a different predicate that this one does NOT bound in either direction. The
+    // two are INCOMPARABLE: `enableToggleBlocked === false` does not mean activation would
+    // succeed, and `enableToggleBlocked === true` does not mean it would fail.
+    // It UNDER-reports, because readiness runs no essence-reference,
+    // tag-placeholder, resolution-mode or enabled-essence validation, and its
+    // signature-collision branch cannot fire from here at all (issue 1066). It also
+    // OVER-reports, because `duplicateAlternative` and `duplicateRequirement` disable this
+    // toggle for a recipe `canActivateRecipe` accepts (issue 1067). See the ledger row in
+    // DOMAIN.md.
+    enableToggleBlocked = false,
     onChooseImage = () => {},
     isMultiStep = false,
     // Category lives on Overview (prototype §5.1), authored here rather than in the
@@ -672,15 +684,15 @@
       field="enabled"
       icon="fas fa-power-off"
       title={text('FABRICATE.Admin.Manager.Recipe.EnabledTitle', 'Enabled')}
-      sub={enableBlocked
+      sub={enableToggleBlocked
         ? text(
             'FABRICATE.Admin.Manager.Recipe.EnableBlockedHint',
             'Resolve the issues on the Validation tab before enabling.'
           )
         : text('FABRICATE.Admin.Manager.Recipe.EnabledSub', 'Craftable by players')}
       on={enabled}
-      disabled={saving || enableBlocked}
-      toggleTitle={enableBlocked
+      disabled={saving || enableToggleBlocked}
+      toggleTitle={enableToggleBlocked
         ? text(
             'FABRICATE.Admin.Manager.Recipe.EnableBlockedTooltip',
             'Resolve the issues on the Validation tab before enabling this recipe.'

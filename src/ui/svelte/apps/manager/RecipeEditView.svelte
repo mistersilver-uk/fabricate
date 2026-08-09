@@ -361,7 +361,18 @@
   // While the recipe is OFF, an enable-blocking issue disables the enable toggle so
   // the GM cannot trigger the hard activation failure (issue 549); disabling stays
   // free. Predicted from the same readiness the Validation tab renders.
-  const enableBlocked = $derived(!enabled && blocksEnable(readiness.issues));
+  //
+  // This is NOT the recipe activation gate (issue 1018). That one is
+  // `RecipeManager.canActivateRecipe`, projected onto the GM browser rows under its own
+  // name — a different predicate that this one does NOT bound in either direction. The
+  // two are INCOMPARABLE: `enableToggleBlocked === false` does not mean activation would
+  // succeed, and `enableToggleBlocked === true` does not mean it would fail.
+  // It UNDER-reports, because readiness runs no essence-reference, tag-placeholder,
+  // resolution-mode or enabled-essence validation, and its signature-collision branch
+  // cannot fire from here at all (issue 1066). It also OVER-reports, because
+  // `duplicateAlternative` and `duplicateRequirement` disable this toggle for a recipe
+  // `canActivateRecipe` accepts (issue 1067). See the ledger row in DOMAIN.md.
+  const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
     ingredients: ingredientsCount > 0 ? [{ label: String(ingredientsCount), tone: 'neutral' }] : [],
     results: resultsCount > 0 ? [{ label: String(resultsCount), tone: 'neutral' }] : [],
@@ -487,7 +498,7 @@
             onNameInput={(value) => onUpdateRecipe({ name: value })}
             onDescriptionInput={(value) => onUpdateRecipe({ description: value })}
             {onToggleEnabled}
-            {enableBlocked}
+            {enableToggleBlocked}
             onChooseImage={chooseImage}
             {isMultiStep}
             {categories}
