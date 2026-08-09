@@ -817,6 +817,7 @@ The tolerated window is deliberately minimal, so any earlier teardown fails loud
 A real Fabricate JS error surfaces as a `pageerror`/`console.error` in the independent `consoleErrors[]` gate, not through the teardown path, so a tolerated teardown coincident with any non-waived console error still fails the run.
 The tolerance can therefore only ever mask a post-captures renderer process crash, never a JS regression.
 A persistent `rendererCrashed`/`degraded` pattern across runs is actionable (a systematic tail OOM), not cosmetic.
+When `npm run screenshots:ui` refuses a run on any of these, it prints which of the five evidence conditions tripped, the value each one measured, an excerpt of the failing steps and un-waived console errors behind them, and how to check whether the same fault is already present at your PR's base — read that refusal rather than re-deriving it from `summary.json` by hand.
 
 ### Known drift pattern: Phase D0 selectors
 

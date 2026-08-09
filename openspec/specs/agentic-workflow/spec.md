@@ -572,6 +572,13 @@ Every collected automated view MUST prove successful, non-degraded, exact-run pr
 - **AND** manifest-declared dimensions equal decoded PNG dimensions
 - **AND** view-specific parity, stress-frame, or dimension constraints remain additive and may be stricter than the generic provenance check
 
+#### Scenario: the run summary does not qualify as publishable evidence
+
+- **WHEN** collection refuses a run because its summary reports an unsuccessful, degraded, or renderer-crashed run, or records step failures or un-waived console errors
+- **THEN** the refusal names each condition that disqualified the summary, with the value it measured, rather than the class of fault alone
+- **AND** it quotes a bounded excerpt of the failing steps and the un-waived console errors the summary recorded, and states plainly where the summary recorded no evidence for a condition, or did not record its value at all
+- **AND** it states how to establish whether the same fault is already present at the pull request's base, because a single run's summary carries no evidence of which head caused it
+
 #### Scenario: reaching a named view state
 
 - **WHEN** a captured view requires the application to be on a particular internal route or selection
