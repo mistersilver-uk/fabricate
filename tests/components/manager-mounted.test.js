@@ -21,6 +21,9 @@ import {
 import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+// The capture registry, so the two cases pinned below assert their OWN selectors rather
+// than a copy of them that is free to drift from the case it claims to guard.
+import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -4475,6 +4478,37 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
+  // CLEARING the field is a real edit, and it is the only gesture that can put a system
+  // back to unlimited: absence cannot be reached by clicking anything. Two View Lab cases
+  // depend on it — `manager-checks-crafting-modifiers` and
+  // `manager-recipe-edit-crafting-modifier-custom-set` both empty this Stepper to reach the
+  // no-cap state, because the lab boots every migration over its world and 1.20.0's stamps
+  // a cap of 1 onto any `playerPicks` system that carries none. Nothing drove the emptied
+  // field through this card, so the patch it emits was only ever exercised by a capture run.
+  it('checks view: emptying the pick-cap Stepper patches a null cap, not an omission (issue 1055)', () => {
+    const patches = [];
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'playerPicks',
+      craftingMaxModifierPicks: 3,
+      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+    });
+    const input = target.querySelector('[data-crafting-modifier-max-picks-input]');
+    assert.equal(input.value, '3', 'the authored cap is in the field before it is cleared');
+    input.value = '';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    // `null`, not a missing key: the store spreads this patch onto the persisted check, so
+    // an omitted key would leave the old bound in place and the gesture would do nothing.
+    assert.deepEqual(
+      patches,
+      [{ maxModifierPicks: null }],
+      'clearing the field must overwrite the stored cap with the value that means unlimited'
+    );
+  });
+
   it('checks view: an authored cap is rendered on the hook and in the Stepper', () => {
     mountChecksView({
       resolutionMode: 'simple',
@@ -6214,6 +6248,90 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !unbounded.querySelector('.manager-main [data-recipe-crafting-modifier-cap]'),
       'unlimited states nothing rather than "up to Infinity"'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // The View Lab's own `expectSelector`s, run against the mounted root.
+  //
+  // Two capture cases assert a `:has()` / `:not(:has())` RELATIONSHIP between hooks the
+  // tests above only ever assert one at a time — that the catalogue card CONTAINS both the
+  // restored `byRecipe` card and the cap field's unlimited reading, and that the recipe
+  // picker contains a pill row and NO cap sentence. A selector can fail on the relationship
+  // while every individual hook is present and correct, and the only thing that ran it was
+  // a capture job needing harvested Foundry chrome.
+  //
+  // The selectors are READ FROM THE REGISTRY rather than restated, because a restated copy
+  // is the drift this pins against: it would keep passing after the case it mirrors changed.
+  // The mounted root renders `.fabricate-manager`, so each case's selector runs verbatim.
+  const labCaseSelector = (id) => {
+    const viewCase = VIEW_LAB_CASES.find((entry) => entry.id === id);
+    assert.ok(Boolean(viewCase), `no View Lab case "${id}" — was it renamed?`);
+    assert.equal(typeof viewCase.expectSelector, 'string', `case "${id}" asserts no selector`);
+    return viewCase.expectSelector;
+  };
+
+  it('root: the Checks card satisfies manager-checks-crafting-modifiers’ own selector (issue 1055)', async () => {
+    const selector = labCaseSelector('manager-checks-crafting-modifiers');
+    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks') });
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(selector)),
+      'a selecting rule with no cap must put BOTH the byRecipe option and the unlimited cap ' +
+        'reading inside one [data-crafting-modifier-catalogue] — a cap field rendered as a ' +
+        'SIBLING of the card would satisfy every hook-by-hook assertion above and still fail here'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, and the state the capture job actually hit: the hooks are all
+    // present, the nesting is right, and the cap simply reads a bound instead of unlimited.
+    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks', 1) });
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      !target.querySelector(selector),
+      'a BOUNDED cap must not satisfy the unlimited case, or the frame published under it ' +
+        'would be its bounded sibling'
+    );
+  });
+
+  it('root: the recipe picker satisfies manager-recipe-edit-crafting-modifier-custom-set’s own selector (issue 1055)', async () => {
+    const selector = labCaseSelector('manager-recipe-edit-crafting-modifier-custom-set');
+    const custom = { craftingModifier: { modifierIds: ['med', 'alch'] } };
+    const unbounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      recipeOverrides: custom,
+    });
+    assert.ok(
+      Boolean(unbounded.querySelector(selector)),
+      'a custom set under an unbounded system is a pill row with no cap sentence, which is the ' +
+        'whole difference between this frame and its two capped neighbours'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, and the state the capture job actually hit. The picker and its
+    // pill row are present either way; the standing cap sentence is what the `:not(:has(…))`
+    // half refuses, so a system that acquired a cap nobody authored fails here and only here.
+    const bounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      recipeOverrides: custom,
+    });
+    assert.ok(
+      Boolean(bounded.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
+      'the picker itself still renders, so the failure below is the cap sentence and nothing else'
+    );
+    assert.ok(
+      !bounded.querySelector(selector),
+      'a system carrying a cap states it standing, so this case cannot publish that frame'
     );
   });
 

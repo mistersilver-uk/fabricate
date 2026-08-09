@@ -3026,16 +3026,33 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // — but three with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2) is what
   // makes the frame show a choice rather than a row of interchangeable chips.
   defaultModifierIds: ['hb-mod-medicine', 'hb-mod-nature', 'hb-mod-tools'],
-  // NO `maxModifierPicks` (issue 1055). Absence is the UNLIMITED reading, and it is the one this
-  // world must carry: it is what `manager-checks-crafting-modifiers` photographs as a blank field
-  // with an "Unlimited" placeholder, and the bounded frame beside it is reached by typing into the
-  // same Stepper. Authoring a cap here would make the unlimited state — the state every unasked
-  // world is in — unreachable in every frame.
+  // AN AUTHORED cap, equal to the eligible-set size above so it bounds nothing (issue 1055).
+  // ABSENCE was authored here first — absence is the UNLIMITED reading — and it does not survive
+  // the boot. `labWorld.js` seeds no `migrationVersion`, so `lastRunVersion` is `'0.0.0'` and
+  // `fabricate.initialize()` runs EVERY migration over this world on every lab build. One of them
+  // is 1.20.0's `migrateMaxModifierPicks`, whose whole job is to stamp `maxModifierPicks = 1` onto
+  // exactly this shape — a `playerPicks` system carrying no cap — so that worlds upgrading from
+  // the pre-1055 build keep the single pick that rule used to mean. The lab world declares itself
+  // to be such a world, so it was getting the stamp: the Checks card read `1` where
+  // `manager-checks-crafting-modifiers` asserts `unlimited`, the recipe editor rendered a standing
+  // cap sentence where `manager-recipe-edit-crafting-modifier-custom-set` asserts none, and
+  // `player-crafting-roll-prompt` silently published the historical pick-one RADIO group under a
+  // case whose whole subject is the multi-pick one.
   //
-  // Unlimited also gives the roll prompt its MULTI-pick form: `buildCraftingModifierChoice` clamps
-  // an unbounded cap to the option count, so `maxPicks` is 3 and the fieldset renders as a
-  // checkbox group legended "Pick up to 3" rather than as the historical pick-one radio group.
-  // That is the control this change introduces, so it is the one the frame is evidence for.
+  // That migration is conditional PRECISELY so a fixture can opt out by authoring a cap (read its
+  // header: it names this harness as the reason). This is that opt-out.
+  //
+  // 3 is the option count, so it is unlimited in every observable way:
+  // `buildCraftingModifierChoice` computes `Math.min(cap, modifiers.length)` and lands on the same
+  // `maxPicks: 3` an unbounded cap produces, so the roll prompt still renders the checkbox group
+  // legended "Pick up to 3", and the non-interactive best-legal-selection still sums all three.
+  //
+  // What it does cost is the resting state of the Checks field: the UNLIMITED READING is now
+  // reached by CLEARING the Stepper rather than by leaving it alone, exactly as the bounded
+  // reading is reached by typing into it. `manager-checks-crafting-modifiers` does that, and
+  // `tests/view-lab-world-migration.test.js` fails if a migration ever silently rewrites a lab
+  // system's check block again.
+  maxModifierPicks: 3,
 });
 
 export function buildLabContent() {

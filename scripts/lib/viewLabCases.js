@@ -1072,11 +1072,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     //
     // The system is left UNBOUNDED, so no cap sentence renders and the pill row is the whole cell.
     // The two capped readings are the pair below.
+    //
+    // Unbounded is CLEARED here, not inherited. `lab-herbalism` authors `maxModifierPicks: 3`
+    // because the lab boots every migration over its world and 1.20.0's would otherwise stamp a cap
+    // of 1 onto it (see `PROGRESSIVE_CHECK` in `tests/view-lab/world/labContent.js`), so this case
+    // empties the Stepper to reach the no-cap state — the same tab and the same verb its capped
+    // siblings below use to reach theirs. Without the clear a cap sentence renders and this frame
+    // is one of them rather than the third reading.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
       { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
       { selector: '#recipe-tab-overview' },
@@ -1818,15 +1826,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     // that arrangement is the frame's whole subject. `RadioCardGroup` uses a FIXED track count, so
     // the 2x2 is a decision rather than a reflow, and it is only judgeable from a photograph.
     //
-    // `lab-herbalism` is authored `playerPicks` — a SELECTING rule — and carries no cap, so this
-    // frame is also the one that shows the pick-cap field in its UNLIMITED reading: a blank input
-    // behind an "Unlimited" placeholder. That is the state every unasked world is in, and it is
-    // only legible as a photograph; the bounded reading is the sibling case below.
+    // `lab-herbalism` is authored `playerPicks` — a SELECTING rule — so this frame is also the one
+    // that shows the pick-cap field in its UNLIMITED reading: a blank input behind an "Unlimited"
+    // placeholder. That is the state a system authored on a selecting rule and never asked about a
+    // bound is in, and it is only legible as a photograph; the bounded reading is the sibling case
+    // below.
+    //
+    // It is reached by CLEARING the Stepper rather than by leaving the field alone, and that is a
+    // property of the harness rather than of the rule. The lab seeds no `migrationVersion`, so
+    // `fabricate.initialize()` runs every migration over the world on every build, and 1.20.0's
+    // `migrateMaxModifierPicks` stamps `maxModifierPicks = 1` onto any `playerPicks` system that
+    // carries no cap — which is what this case used to assert `unlimited` against. `lab-herbalism`
+    // now authors a cap the migration leaves alone (`labContent.js`), and emptying the field here
+    // is what puts the control back into the reading this frame is named for.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
+      { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so anchoring the LAST of
       // the things this frame is named for — the default-modifier pill row, below the rule group —
       // puts the whole card in frame with the catalogue rows above it for context.

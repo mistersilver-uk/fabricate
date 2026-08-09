@@ -7514,11 +7514,23 @@ async function main() {
             // seed exists for, never opens.
             defaultModifierPolicy: 'playerPicks',
             defaultModifierIds: ['med', 'herb'],
-            // NO `maxModifierPicks`: absence is UNLIMITED, which is what makes the prompt render
-            // its MULTI-pick checkbox group ("Pick up to 2") rather than the historical pick-one
-            // radio group. That is the control this change introduces, so it is the one the smoke
-            // photographs against a real Foundry. A cap of 1 would reproduce the pre-change frame
-            // and prove nothing new.
+            // `maxModifierPicks: 2` — the size of the eligible set above, so it bounds nothing and
+            // the prompt renders its MULTI-pick checkbox group ("Pick up to 2") rather than the
+            // historical pick-one radio group. That is the control this change introduces, so it
+            // is the one the smoke photographs against a real Foundry; a cap of 1 would reproduce
+            // the pre-change frame and prove nothing new.
+            //
+            // AUTHORED rather than left absent, even though absence is the UNLIMITED reading and
+            // would compute the same `maxPicks`. This seed is replayed into a world that has never
+            // run Fabricate, so `migrationVersion` is unset, `lastRunVersion` is `'0.0.0'` and
+            // `fabricate.initialize()` runs every migration over it — including 1.20.0's
+            // `migrateMaxModifierPicks`, which stamps `maxModifierPicks = 1` onto exactly this
+            // shape (a `playerPicks` system carrying no cap) to preserve the pre-1055 single pick.
+            // Left absent, this seed therefore photographed the pick-one radio group under the
+            // caption above. The stamp is conditional so a fixture can opt out by authoring a cap,
+            // and the View Lab's herbalism system does the same for the same reason
+            // (`tests/view-lab/world/labContent.js`).
+            maxModifierPicks: 2,
             routed: {
               type: 'relative',
               // `1d20 + 20 + @craftingmod` (base total 21-40, plus a small ability mod) always
@@ -7527,9 +7539,10 @@ async function main() {
               // formula reaches Foundry's Roll (issue 770): the SYSTEM's `playerPicks` rule
               // offers the `med` and `herb` modifiers (starter-hero WIS and DEX mods, roughly
               // -1..+3 each), and whatever the player leaves ticked the +20 base absorbs — which
-              // is what makes the choice photographable without making the craft flaky. Unbounded
-              // `playerPicks` SUMS the selection (issue 1055), so the worst case is both mods at
-              // once and the margin still holds. Before #431 the routed check was authored-only (never
+              // is what makes the choice photographable without making the craft flaky.
+              // `playerPicks` SUMS the selection (issue 1055) and the cap above admits the whole
+              // eligible set, so the worst case is both mods at once and the margin still holds.
+              // Before #431 the routed check was authored-only (never
               // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
               // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
               // the routed-check and validation-tab captures still render their authored outcomes.
