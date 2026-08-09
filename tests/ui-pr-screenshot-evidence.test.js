@@ -1426,13 +1426,28 @@ describe('UI PR screenshot evidence', () => {
   // The natural pair `{ passed: false, stepFailures: 2 }` would kill nothing — `passed !==
   // true` short-circuits the disjunction — and `{ passed: true, stepFailures: 1 }` is not a
   // summary the harness can emit. That is the point of it, not a defect in the fixture.
+  //
+  // Every note is pinned to its FULL literal, terminated by `$`. Anchoring on the value and
+  // leaving the note open-ended (`stepFailures: 1 — /m`) pins the half a reader does not need
+  // help with and leaves the explanatory half — the only part carrying the failure semantics —
+  // free: `'one or more phase steps did not pass'` could be replaced with its own negation, or
+  // emptied, and this suite stayed green.
   it('names each disqualifying evidence condition on its own, with the value it measured', () => {
     const cases = [
       [{ passed: false }, /^ {2}passed: false — the run did not record a successful verdict$/m],
-      [{ stepFailures: 1 }, /^ {2}stepFailures: 1 — /m],
-      [{ consoleErrorCount: 4 }, /^ {2}consoleErrorCount: 4 — /m],
-      [{ degraded: true }, /^ {2}degraded: true — /m],
-      [{ rendererCrashed: true }, /^ {2}rendererCrashed: true — /m],
+      [{ stepFailures: 1 }, /^ {2}stepFailures: 1 — one or more phase steps did not pass$/m],
+      [
+        { consoleErrorCount: 4 },
+        /^ {2}consoleErrorCount: 4 — un-waived runtime console errors reached the independent console gate$/m,
+      ],
+      [
+        { degraded: true },
+        /^ {2}degraded: true — a transient renderer\/page teardown was tolerated; this condition alone does not fail a run, it marks a flake rather than a clean pass$/m,
+      ],
+      [
+        { rendererCrashed: true },
+        /^ {2}rendererCrashed: true — the page reported a renderer crash \(canonically an OOM\); this condition alone does not fail a run, it marks a flake rather than a clean pass$/m,
+      ],
     ];
     for (const [summaryPatch, expected] of cases) {
       refuseWith(summaryPatch, (message) => {
@@ -1457,10 +1472,19 @@ describe('UI PR screenshot evidence', () => {
     degraded: 'false',
     rendererCrashed: 'false',
   });
+  // The note an absent key is reported with. A `not recorded` value beside the note for a
+  // RECORDED one asserts as observed exactly what went unobserved — `rendererCrashed: not
+  // recorded — the page reported a renderer crash` claims a crash on a summary carrying no
+  // crash flag — so the note is pinned here in full, at the gate, alongside the value.
+  // `passed` is excluded deliberately: "the run did not record a successful verdict" is true
+  // of an absent verdict as well as a false one, so it keeps its single precise note.
+  const ABSENT_SIGNAL_NOTE =
+    'the summary did not record this signal, so this run cannot be shown to have been clean';
   it('refuses a summary whose evidence-condition key is absent entirely, for every condition', () => {
     for (const [key, accepting] of Object.entries(ACCEPTING_VALUE)) {
       refuseWith({ [key]: undefined }, (message) => {
-        assert.match(message, new RegExp(`^ {2}${key}: not recorded — `, 'm'));
+        const note = key === 'passed' ? 'the run did not record a successful verdict' : ABSENT_SIGNAL_NOTE;
+        assert.match(message, new RegExp(`^ {2}${key}: not recorded — ${note}$`, 'm'));
         // Never rendered as the value that would have been ACCEPTED: a refusal stating an
         // accepting value for the condition it just tripped on reads as a gate defect.
         assert.ok(
@@ -1477,14 +1501,27 @@ describe('UI PR screenshot evidence', () => {
   // disjunct, a weakened operator, or a detached builder all fail here in one assertion.
   it('gates on exactly five evidence conditions, each a strict !== against its accepting value', () => {
     const source = readFileSync(new URL('../scripts/ui-pr-screenshot-evidence.mjs', import.meta.url), 'utf8');
+    // WHEN THIS REGEX STOPS MATCHING — the predicate is hoisted to a named const, extracted to
+    // a helper, or reformatted — RE-ANCHOR IT ON WHEREVER THE THROW WENT. Do NOT relax it to
+    // scan the comparisons alone. The `throw new Error(explainSmokeSummaryRefusal(summary));`
+    // tail is the only half of this test proving the five comparisons guard THE BUILDER CALL
+    // rather than sitting in some unrelated `if` elsewhere in the file; dropping it is the
+    // cheapest way to make this test green again and it leaves a detached builder undetected,
+    // which is the exact defect (a builder nothing reaches) this block exists to catch.
     const guarded = /\n {2}if \(\n([\s\S]*?)\n {2}\) \{\n {4}throw new Error\(explainSmokeSummaryRefusal\(summary\)\);/.exec(source);
     assert.ok(Boolean(guarded), 'the five-condition predicate must guard the refusal builder');
-    assert.deepEqual(guarded[1].match(/summary\.\w+ !== (?:true|false|0)/g), [
-      'summary.passed !== true',
-      'summary.stepFailures !== 0',
+    // Sorted both sides: the SET of comparisons is the contract, their order in the disjunction
+    // is not, and pinning the order turns a harmless reordering into a failure whose cheapest
+    // repair is to edit the expectation — training the reader to edit this test rather than
+    // read it. A comparator is mandatory (`unicorn/require-array-sort-compare`; a bare `.sort()`
+    // is also a new-code BUG to SonarCloud, which scans `tests/**` the lint glob does not).
+    const byName = (a, b) => a.localeCompare(b);
+    assert.deepEqual((guarded[1].match(/summary\.\w+ !== (?:true|false|0)/g) ?? []).sort(byName), [
       'summary.consoleErrorCount !== 0',
       'summary.degraded !== false',
+      'summary.passed !== true',
       'summary.rendererCrashed !== false',
+      'summary.stepFailures !== 0',
     ]);
     // …and nothing else reads the summary inside that block, so no sixth condition slips in
     // under a comparison shape the matcher above does not recognise.

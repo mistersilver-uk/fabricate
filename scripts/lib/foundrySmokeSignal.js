@@ -296,6 +296,18 @@ function asEvidenceArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+/** What a condition's value reads as when the summary carried no measurement for it. */
+const NOT_RECORDED = 'not recorded';
+
+/**
+ * The note a condition carries when its value is `NOT_RECORDED`.
+ *
+ * It states the only thing such a summary supports — that the signal is missing,
+ * which is itself disqualifying — and asserts nothing about what the run did.
+ */
+const ABSENT_SIGNAL_NOTE =
+  'the summary did not record this signal, so this run cannot be shown to have been clean';
+
 /**
  * A count's measured value, or `not recorded`.
  *
@@ -304,12 +316,39 @@ function asEvidenceArray(value) {
  * `0` would print a refusal whose own stated value is an accepting one.
  */
 function describeCount(value) {
-  return Number.isFinite(value) ? String(value) : 'not recorded';
+  return Number.isFinite(value) ? String(value) : NOT_RECORDED;
 }
 
 /** A flag's measured value, or `not recorded` when the summary did not carry a boolean. */
 function describeFlag(value) {
-  return typeof value === 'boolean' ? String(value) : 'not recorded';
+  return typeof value === 'boolean' ? String(value) : NOT_RECORDED;
+}
+
+/**
+ * Build ONE condition block, choosing its note by whether the summary actually
+ * RECORDED a value for the condition.
+ *
+ * `recordedNote` states what a measurement MEANS, so it is true only once there is
+ * a measurement. Pairing it with `not recorded` asserts as observed the very thing
+ * that went unobserved — `rendererCrashed: not recorded — the page reported a
+ * renderer crash (canonically an OOM)` — which is the same defect as a note
+ * asserting an exit code the summary does not carry, one level down. An absent key
+ * still trips the gate's `!==` comparison, so the block is still emitted and the
+ * evidence is unchanged; only the note narrows to what the summary can support.
+ *
+ * @param {string} name
+ * @param {string} value - already rendered by `describeCount`/`describeFlag`
+ * @param {string} recordedNote - the note for a value the summary did record
+ * @param {string[]} evidence
+ * @returns {{ name: string, value: string, note: string, evidence: string[] }}
+ */
+function describeCondition(name, value, recordedNote, evidence) {
+  return {
+    name,
+    value,
+    note: value === NOT_RECORDED ? ABSENT_SIGNAL_NOTE : recordedNote,
+    evidence,
+  };
 }
 
 /**
@@ -346,52 +385,62 @@ function quoteEvidence(entries, emptyNote) {
 function collectSignalConditions(summary, steps, consoleErrors) {
   const conditions = [];
   if (summary?.stepFailures !== 0) {
-    conditions.push({
-      name: 'stepFailures',
-      value: describeCount(summary?.stepFailures),
-      note: 'one or more phase steps did not pass',
-      evidence: quoteEvidence(
-        steps.filter((step) => step?.passed === false).map((step) => formatFailedStep(step)),
-        'the summary recorded no failing step for this condition'
-      ),
-    });
+    conditions.push(
+      describeCondition(
+        'stepFailures',
+        describeCount(summary?.stepFailures),
+        'one or more phase steps did not pass',
+        quoteEvidence(
+          steps.filter((step) => step?.passed === false).map((step) => formatFailedStep(step)),
+          'the summary recorded no failing step for this condition'
+        )
+      )
+    );
   }
   if (summary?.consoleErrorCount !== 0) {
-    conditions.push({
-      name: 'consoleErrorCount',
-      value: describeCount(summary?.consoleErrorCount),
-      note: 'un-waived runtime console errors reached the independent console gate',
-      evidence: quoteEvidence(
-        consoleErrors.map(String),
-        'the summary recorded no un-waived console error for this condition'
-      ),
-    });
+    conditions.push(
+      describeCondition(
+        'consoleErrorCount',
+        describeCount(summary?.consoleErrorCount),
+        'un-waived runtime console errors reached the independent console gate',
+        quoteEvidence(
+          consoleErrors.map(String),
+          'the summary recorded no un-waived console error for this condition'
+        )
+      )
+    );
   }
   if (summary?.degraded !== false) {
-    conditions.push({
-      name: 'degraded',
-      value: describeFlag(summary?.degraded),
-      // NOT "so the run exited 0": a tolerated teardown co-occurring with a later step
-      // failure is ordinary, and there the harness throws and the process exits non-zero.
-      // The note states what this condition ALONE does, which is true in both cases.
-      note: 'a transient renderer/page teardown was tolerated; this condition alone does not fail a run, it marks a flake rather than a clean pass',
-      evidence: quoteEvidence(
-        steps.filter((step) => isToleratedTeardownStep(step)).map((step) => formatFailedStep(step)),
-        'the summary recorded no tolerated-teardown step for this condition'
-      ),
-    });
+    conditions.push(
+      describeCondition(
+        'degraded',
+        describeFlag(summary?.degraded),
+        // NOT "so the run exited 0": a tolerated teardown co-occurring with a later step
+        // failure is ordinary, and there the harness throws and the process exits non-zero.
+        // The note states what this condition ALONE does, which is true in both cases.
+        'a transient renderer/page teardown was tolerated; this condition alone does not fail a run, it marks a flake rather than a clean pass',
+        quoteEvidence(
+          steps
+            .filter((step) => isToleratedTeardownStep(step))
+            .map((step) => formatFailedStep(step)),
+          'the summary recorded no tolerated-teardown step for this condition'
+        )
+      )
+    );
   }
   if (summary?.rendererCrashed !== false) {
-    conditions.push({
-      name: 'rendererCrashed',
-      value: describeFlag(summary?.rendererCrashed),
-      // Same reservation as `degraded`: the page `crash` listener flags the run, it does
-      // not fail it, but a run carrying this flag may still have failed for another reason.
-      note: 'the page reported a renderer crash (canonically an OOM); this condition alone does not fail a run, it marks a flake rather than a clean pass',
-      evidence: [
-        `${EVIDENCE_INDENT}the page crash event has no per-step record to quote, so the summary carries no evidence beyond the flag itself`,
-      ],
-    });
+    conditions.push(
+      describeCondition(
+        'rendererCrashed',
+        describeFlag(summary?.rendererCrashed),
+        // Same reservation as `degraded`: the page `crash` listener flags the run, it does
+        // not fail it, but a run carrying this flag may still have failed for another reason.
+        'the page reported a renderer crash (canonically an OOM); this condition alone does not fail a run, it marks a flake rather than a clean pass',
+        [
+          `${EVIDENCE_INDENT}the page crash event has no per-step record to quote, so the summary carries no evidence beyond the flag itself`,
+        ]
+      )
+    );
   }
   return conditions;
 }
@@ -428,6 +477,14 @@ function describeVerdictCondition(summary, hasSignalConditions) {
 // a wrong instruction inside a diagnostic that exists to save twenty-five minutes.
 // The labels are derived on the branch BEFORE detaching, because at the merge base the
 // changed-file set that produces them is empty.
+// The copy-aside is not housekeeping either: the base run writes `test-results/` in place,
+// so without it the branch artifacts this procedure asks the reader to compare against —
+// the summary AND its captured PNGs — are destroyed by step 5 of the procedure that asks
+// for the comparison, and re-obtaining them costs another twenty-five-minute run.
+// The absent-label caveat covers the normal case for this gate, a pull request that ADDS a
+// view: those labels do not exist at the merge base, `SCREENSHOT_SCOPING_ACTIVE` skips
+// every phase whose labels are all off-target, and the base run then produces a
+// clean-looking summary that says nothing at all about the fault.
 const ATTRIBUTION_PROCEDURE = [
   "Establishing whether this fault is already present at the pull request's base:",
   '  This gate reads one summary, and one summary carries no evidence of which head',
@@ -437,9 +494,13 @@ const ATTRIBUTION_PROCEDURE = [
   '  two runs are not comparable and this gate refuses the second one as well:',
   '    git merge-base HEAD origin/main',
   '    npm run --silent screenshots:ui:targets -- --base origin/main',
+  '    cp -r test-results test-results-branch   # the base run overwrites test-results/ in place',
   '    git switch --detach <merge-base>',
   '    npm run test:foundry:screenshots -- --target-labels=<the labels printed above>',
-  '    read test-results/summary.json, then git switch -',
+  '    compare test-results/summary.json against test-results-branch/summary.json, then git switch -',
+  '  One caveat on reading the base run: a label this branch ADDS does not exist at the merge',
+  '  base, so the base run skips that phase entirely and captures nothing for it. A clean base',
+  '  summary there means the base run never covered the fault, not that the base was clean.',
   '  As guidance for what to compare first: stepFailures 0 with consoleErrorCount above 0 is',
   '  more often ambient fixture-world noise already present at the base than a change-specific',
   '  regression. That is a prior about a class of summary, not a finding about this one.',

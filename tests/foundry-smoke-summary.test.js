@@ -713,6 +713,14 @@ const OFF_NOMINAL = Object.freeze({
   degraded: true,
   rendererCrashed: true,
 });
+// The second sweep: every condition ABSENT rather than present-and-off-nominal. It has to
+// cover all five, not just the two counts, because the oracle above is itself under test here.
+// `OFF_NOMINAL` never makes `passed` anything but `false`, so with the counts-only variant the
+// oracle's own `summary.passed !== true` could be weakened to `=== false` — and `degraded !==
+// false` / `rendererCrashed !== false` to `=== true` — with the whole suite still green.
+// Derived from `CONDITION_ORDER` so a sixth condition cannot be added to the oracle without
+// entering this sweep too.
+const ABSENT = Object.freeze(Object.fromEntries(CONDITION_ORDER.map((name) => [name, undefined])));
 const trippedConditions = (summary) =>
   CONDITION_ORDER.filter((name) => CONDITION_TRIPPED[name](summary));
 
@@ -724,7 +732,7 @@ const trippedConditions = (summary) =>
 // collapse and the `stepFailures !== 0` -> `> 0` weakening (an absent count is `!== 0` but not
 // `> 0`, so a weakened builder would drop it from the named set).
 test('explainSmokeSummaryRefusal names every tripped condition, over all 31 combinations', () => {
-  for (const offNominalValues of [OFF_NOMINAL, { ...OFF_NOMINAL, stepFailures: undefined, consoleErrorCount: undefined }]) {
+  for (const offNominalValues of [OFF_NOMINAL, ABSENT]) {
     for (let mask = 1; mask < 32; mask++) {
       const patch = {};
       CONDITION_ORDER.forEach((name, index) => {
@@ -760,6 +768,39 @@ test('explainSmokeSummaryRefusal renders an absent or non-numeric count as "not 
   assert.match(refusalFor({ passed: undefined }), /^ {2}passed: not recorded — /m);
   assert.match(refusalFor({ degraded: 'yes' }), /^ {2}degraded: not recorded — /m);
   assert.match(refusalFor({ rendererCrashed: 1 }), /^ {2}rendererCrashed: not recorded — /m);
+});
+
+// A `not recorded` VALUE next to a note describing what a RECORDED value means asserts as
+// observed exactly what went unobserved: the shipped message read `rendererCrashed: not
+// recorded — the page reported a renderer crash (canonically an OOM)`, claiming a crash on a
+// summary carrying no crash flag at all. Same defect as a note asserting an exit code the
+// summary does not carry, one level down, so it is pinned the same way — the full note, and
+// the recorded-value note's absence.
+const ABSENT_SIGNAL_NOTE =
+  'the summary did not record this signal, so this run cannot be shown to have been clean';
+const RECORDED_NOTE_FRAGMENT = Object.freeze({
+  stepFailures: 'did not pass',
+  consoleErrorCount: 'reached the independent console gate',
+  degraded: 'teardown was tolerated',
+  rendererCrashed: 'reported a renderer crash',
+});
+test('explainSmokeSummaryRefusal never pairs an unrecorded signal with a measured-value note', () => {
+  for (const [name, recordedFragment] of Object.entries(RECORDED_NOTE_FRAGMENT)) {
+    const message = refusalFor({ [name]: undefined });
+    assert.match(message, new RegExp(`^ {2}${name}: not recorded — ${ABSENT_SIGNAL_NOTE}$`, 'm'));
+    assert.ok(
+      !message.includes(recordedFragment),
+      `${name}: not recorded must not carry a recorded value's note ("${recordedFragment}")`
+    );
+  }
+  // And a RECORDED value still carries the note that says what the measurement means — the
+  // conditional must not have collapsed both branches onto the absent-signal wording.
+  assert.match(refusalFor({ stepFailures: 2 }), /^ {2}stepFailures: 2 — one or more phase steps did not pass$/m);
+  assert.match(refusalFor({ rendererCrashed: true }), /^ {2}rendererCrashed: true — the page reported a renderer crash/m);
+  // `passed` is deliberately NOT routed through the absent-signal note: "the run did not record
+  // a successful verdict" is true of an absent verdict as well as a false one, so narrowing it
+  // would replace a precise statement with a weaker one.
+  assert.match(refusalFor({ passed: undefined }), /^ {2}passed: not recorded — the run did not record a successful verdict$/m);
 });
 
 test('explainSmokeSummaryRefusal quotes the failing steps and the un-waived console errors', () => {
@@ -890,9 +931,12 @@ test('explainSmokeSummaryRefusal survives absent, null, and non-array evidence f
 // `:13279`), not a count — reading it as a number would render `[Object]`-shaped nonsense or
 // silently print nothing.
 test('explainSmokeSummaryRefusal reports how many console errors were suppressed', () => {
+  // Pinned in full, not just up to the count. The clause after the semicolon is the whole
+  // point of the note — it tells the reader these entries are NOT why the gate refused — and
+  // matched on the count alone it can be deleted with this suite still green.
   assert.match(
     refusalFor({ passed: false, waivedConsoleErrors: ['favicon 404', 'pageerror: minimum resolution'] }),
-    /suppressed 2 waived console error\(s\)/
+    /^The run also suppressed 2 waived console error\(s\); a waived entry never disqualifies a run, and each is listed under waivedConsoleErrors in the summary\.$/m
   );
   // ONE waived error still prints the note. The boundary matters: `waivedCount > 0` weakened to
   // `> 1` goes silent at exactly one suppression and every other fixture here has two.
@@ -921,20 +965,45 @@ test('explainSmokeSummaryRefusal always states the merge-base attribution proced
     // It must never claim to have performed the comparison it is describing.
     assert.match(message, /reads one summary/);
 
-    // Every line of the procedure, not just the `git merge-base` one. The whole block is the
-    // message's tail, and its line count is asserted so deleting a prose line is caught too:
-    // the one actionable instruction in a diagnostic written to save twenty-five minutes has
-    // to survive an edit that only reads the surviving lines.
-    const procedure = message.split('\n\n').at(-1).split('\n');
-    assert.equal(procedure.length, 14, 'the whole attribution procedure is printed');
-    assert.match(message, /^ {4}git merge-base HEAD origin\/main$/m);
-    assert.match(message, /^ {4}npm run --silent screenshots:ui:targets -- --base origin\/main$/m);
-    assert.match(message, /^ {4}git switch --detach <merge-base>$/m);
-    assert.match(
-      message,
-      /^ {4}npm run test:foundry:screenshots -- --target-labels=<the labels printed above>$/m
+    // The WHOLE procedure block, not just the `git merge-base` line: the one actionable
+    // instruction in a diagnostic written to save twenty-five minutes has to survive an edit
+    // that only reads the surviving lines.
+    //
+    // Pinned semantically rather than by raw line count. `assert.equal(procedure.length, N)`
+    // catches a deleted line, but it also fails on a cosmetic rewrap — a red on a test whose
+    // subject is not formatting, and one whose cheapest repair is to bump N without reading
+    // what moved. These two assertions instead pin the executable steps exactly, ORDER
+    // INCLUDED (a sequence whose steps commute is not this sequence: the copy-aside below has
+    // to precede the base run that overwrites the directory), and the prose by sentence
+    // against a copy with its wrapping normalized away.
+    const procedure = message.split('\n\n').at(-1);
+    assert.deepEqual(
+      procedure.split('\n').filter((line) => /^ {4}\S/.test(line)),
+      [
+        '    git merge-base HEAD origin/main',
+        '    npm run --silent screenshots:ui:targets -- --base origin/main',
+        '    cp -r test-results test-results-branch   # the base run overwrites test-results/ in place',
+        '    git switch --detach <merge-base>',
+        '    npm run test:foundry:screenshots -- --target-labels=<the labels printed above>',
+        '    compare test-results/summary.json against test-results-branch/summary.json, then git switch -',
+      ],
+      'every executable step of the attribution procedure, in order'
     );
-    assert.match(message, /^ {4}read test-results\/summary\.json, then git switch -$/m);
+    // Wrapping collapsed, so a rewrap passes and a deleted sentence does not.
+    const prose = procedure.replaceAll(/\n {2,}/g, ' ');
+    for (const sentence of [
+      'it cannot tell a fault this branch introduced from one that was already there',
+      're-run at the merge base the SAME scoped smoke that produced this summary',
+      'the two runs are not comparable and this gate refuses the second one as well',
+      // THE ABSENT-LABEL TRAP. A pull request that ADDS a view is the normal case for this
+      // gate, and its new labels do not exist at the merge base, so the scoped base run skips
+      // their phases and returns a clean-looking summary about nothing.
+      'a label this branch ADDS does not exist at the merge base',
+      'the base run never covered the fault, not that the base was clean',
+      'stepFailures 0 with consoleErrorCount above 0',
+    ]) {
+      assert.ok(prose.includes(sentence), `the attribution procedure must state: ${sentence}`);
+    }
 
     // THE PROFILE TRAP. `package.json` binds `test:foundry` to the default/full profile, while
     // the summary this gate reads is written by the scoped `screenshots` profile with
