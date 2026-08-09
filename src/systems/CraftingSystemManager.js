@@ -42,7 +42,7 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
-import { RECIPE_MODIFIER_AUTHORITIES } from './craftingModifierResolver.js';
+import { normalizeModifierPolicy, resolveMaxModifierPicks } from './craftingModifierResolver.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -604,26 +604,28 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Normalize the crafting check-modifier catalogue, combination rule and delegation
-   * level (issues 770, 1055): `checkModifiers` is a named catalogue of
+   * Normalize the crafting check-modifier catalogue, combination rule and pick cap
+   * (issues 770, 1055): `checkModifiers` is a named catalogue of
    * `{id,label,icon?,expression}` entries feeding the `@craftingmod` placeholder;
-   * `defaultModifierPolicy` is the COMBINATION RULE, one of
-   * `addAll`/`highest`/`playerPicks` (default `addAll`; the retired `byRecipe` coerces
-   * to the default here and is translated to `addAll` on read by
-   * `normalizeModifierPolicy`); `defaultModifierIds` names the catalogue entries applied
-   * by default. Malformed entries are dropped, a bad expression coerces to an empty
-   * string, and a default id naming nothing in the catalogue is dropped (order + de-dup
-   * preserved).
+   * `defaultModifierPolicy` is the COMBINATION RULE, one of the four
+   * {@link MODIFIER_POLICIES} — `addAll`/`highest`/`byRecipe`/`playerPicks`, default
+   * `addAll`; `defaultModifierIds` names the catalogue entries applied by default.
+   * Malformed entries are dropped, a bad expression coerces to an empty string, and a
+   * default id naming nothing in the catalogue is dropped (order + de-dup preserved).
    *
-   * `recipeModifierAuthority` — how much of the two modifier axes the system delegates
-   * to its recipes — deliberately **PRESERVES ABSENCE**: an unresolved value omits the
-   * key entirely rather than writing a placeholder, exactly as `normalized.icon` is
-   * attached only when authored below. Absence means "not yet stamped", it resolves as
-   * `setAndRule` (pre-1055 behaviour) at the resolver, and it is what the `1.20.0`
-   * migration and the initialize-time fallback key on to know they still have work to
-   * do. Note the consequence, which the fallback depends on: after this normalizer runs,
-   * the unresolved state on a system is `undefined` — a literal `null` cannot survive
-   * here, so a `=== null` test downstream of normalization is dead code.
+   * The rule is validated through the resolver's own `normalizeModifierPolicy` rather
+   * than a literal repeated here, so the authoring surface and the engine can never
+   * disagree about which rules exist.
+   *
+   * `maxModifierPicks` — the cap on how many modifiers a SELECTING rule (`byRecipe`,
+   * `playerPicks`) may pick — deliberately **PRESERVES ABSENCE**: only a positive
+   * integer is attached, so `null`, `undefined`, `0`, `2.5` and junk all normalize to the
+   * SAME shape, key absent, exactly as `normalized.icon` is attached only when authored
+   * below. Absence is unlimited, not a defaulting accident: a system that has never been
+   * asked the question must not silently acquire a bound that truncates recipe picks
+   * already on disk ({@link resolveMaxModifierPicks} owns that meaning, and is reused
+   * here so the two cannot drift). The cap is stored system-wide regardless of the
+   * current rule, so flipping between the two selecting rules does not destroy it.
    * @private
    */
   _normalizeCheckModifierConfig(check) {
@@ -652,18 +654,13 @@ export class CraftingSystemManager {
       seenDefaults.add(id);
       return true;
     });
-    const defaultModifierPolicy = ['addAll', 'highest', 'playerPicks'].includes(
-      check?.defaultModifierPolicy
-    )
-      ? check.defaultModifierPolicy
-      : 'addAll';
+    const defaultModifierPolicy = normalizeModifierPolicy(check?.defaultModifierPolicy) ?? 'addAll';
     const normalized = { checkModifiers, defaultModifierPolicy, defaultModifierIds };
-    // Absence-preserving: only a recognized level is attached, so `null`, `undefined`
-    // and a junk token all normalize to the SAME shape — key absent — and the stamp
-    // stays reachable.
-    if (RECIPE_MODIFIER_AUTHORITIES.includes(check?.recipeModifierAuthority)) {
-      normalized.recipeModifierAuthority = check.recipeModifierAuthority;
-    }
+    // Absence-preserving: `resolveMaxModifierPicks` reports every unbounded form —
+    // absent, `null`, non-integer, non-positive — as `Infinity`, so only a real positive
+    // integer cap survives as a key and unlimited stays unlimited.
+    const maxModifierPicks = resolveMaxModifierPicks(check);
+    if (Number.isFinite(maxModifierPicks)) normalized.maxModifierPicks = maxModifierPicks;
     return normalized;
   }
 
@@ -2226,78 +2223,13 @@ export class CraftingSystemManager {
   }
 
   /**
-   * Fallback stamp for `craftingCheck.recipeModifierAuthority` (issue 1055) — the
-   * un-versioned safety net under the versioned `1.20.0` migration, for the world where
-   * that migration cannot run or has not yet run on this client.
-   *
-   * It keys ONLY on "does any recipe in this system carry a `craftingModifier`?", and
-   * deliberately NOT on the system's persisted `defaultModifierPolicy === 'byRecipe'`
-   * signal the migration also reads. It cannot: `initialize()` normalizes every system
-   * (`:93-96`) BEFORE the walk that calls this (`:97`), and
-   * `_normalizeCheckModifierConfig` narrows the policy to `addAll`/`highest`/
-   * `playerPicks`, so a persisted `byRecipe` has already been coerced to `addAll` by the
-   * time this runs. Reading it back would only ever see the coerced value.
-   *
-   * The resulting divergence from the migration is accepted and recorded in the change
-   * delta: a legacy `byRecipe` system with NO recipe override is stamped `none` here
-   * where the migration would stamp `setAndRule`. Nothing arithmetic moves — with no
-   * recipe override there is nothing for the delegation to delegate to, so every rolled
-   * formula is identical under either stamp. It revokes a delegation the GM never
-   * exercised rather than changing a roll. Do not "fix" this by re-deriving the policy
-   * signal; there is none left to read.
-   *
-   * A system the `1.20.0` migration deliberately skipped (a NO-SEED decision) does NOT
-   * stay unstamped once this walk runs: `initialize()` normalizes every system
-   * (`:296`, via `_normalizeCraftingCheck`) BEFORE this walk (`:97`), and normalization
-   * always produces a full `craftingCheck` object, so the `!check` guard below never
-   * observes the skipped system's actual pre-normalization shape — this fallback
-   * stamps it anyway on the same in-memory pass. The migration's no-seed decision
-   * therefore does not survive to disk; only its DIVERGENCE from this fallback's
-   * derivation (the paragraph above) is preserved.
-   *
-   * FIRES ON ABSENT **OR** `null`. After `_normalizeCheckModifierConfig` the absent form
-   * is the only one that occurs — that normalizer omits the key rather than writing a
-   * placeholder — so a literal `=== null` test alone would be dead code. The `!== null`
-   * half is kept as correct defensive code for a system that reaches this map without
-   * passing through the normalizer (a future caller, a hand-built fixture), and because
-   * amendment A4 requires absent-OR-`null` to both stamp; only the absent half is
-   * exercised by `tests/crafting-system-modifier-authority-stamp.test.js` today.
-   *
-   * MUTATES IN MEMORY UN-GATED, exactly like the walk that calls it. The derivation reads
-   * only `RecipeManager#getRecipes`, which filters on `category` and `craftingSystemId`
-   * with no visibility filtering, so a player client and the GM derive the identical value
-   * from the identical inputs. Only PERSISTENCE is gated, by the caller's existing
-   * primary-GM tail — and through the caller's existing `save()`, never a second one.
-   *
-   * @param {object} system - one in-memory crafting system, mutated in place.
-   * @param {Array<object>} recipes - that system's recipes.
-   * @returns {boolean} Whether the system was stamped (i.e. needs persisting).
-   * @private
-   */
-  _stampRecipeModifierAuthority(system, recipes) {
-    const check = system?.craftingCheck;
-    // Unreachable on a normalized system (see the JSDoc above) — kept as defensive
-    // code, not as evidence that a no-seed system stays unstamped.
-    if (!check || typeof check !== 'object') return false;
-    const authored = check.recipeModifierAuthority;
-    if (authored !== undefined && authored !== null) return false;
-    // Keyed on the PRESENCE of the override block, not its contents: an override naming
-    // only `modifierIds` is as much a delegation as one naming a rule.
-    const delegated = (Array.isArray(recipes) ? recipes : []).some(
-      (recipe) => recipe?.craftingModifier && typeof recipe.craftingModifier === 'object'
-    );
-    check.recipeModifierAuthority = delegated ? 'setAndRule' : 'none';
-    return true;
-  }
-
-  /**
    * Reconcile a recipe's legacy `recipeItemId` scalar against the many-to-many book
    * membership that superseded it. Runs un-gated on every `initialize()`, so both halves
    * must be idempotent and must converge on the first pass.
    *
-   * Three reconciliations, deliberately sharing one walk over systems -> definitions ->
+   * Two reconciliations, deliberately sharing one walk over systems -> definitions ->
    * recipes (and one `systemsChanged`/`recipesChanged` pair, so one `save()` per setting
-   * covers all three — adding a second write here is the issue-970 failure mode below):
+   * covers both — adding a second write here is the issue-970 failure mode below):
    *
    * 1. **Mint and stamp** (pre-existing). A recipe retaining a standalone
    *    `linkedRecipeItemUuid` with no valid `recipeItemId` gets a definition minted from
@@ -2310,17 +2242,9 @@ export class CraftingSystemManager {
    *    `recipeIds[]`, the scalar is pure noise, and four legacy `src/systems` resolvers
    *    read it AHEAD of an authored `recipe.img` (issue 887).
    *
-   * 3. **Stamp the recipe-modifier authority** (issue 1055). A system whose
-   *    `craftingCheck.recipeModifierAuthority` is still unresolved is stamped from the
-   *    presence of any recipe-level `craftingModifier` — see
-   *    {@link CraftingSystemManager#_stampRecipeModifierAuthority} for why it reads that
-   *    signal and nothing else, and for what it deliberately diverges from in the
-   *    versioned `1.20.0` migration.
-   *
    * Half 2 never fires for the cohort half 1 maintains, and is unreachable in a fully
    * un-migrated system — no definition carries `recipeIds` there, so no recipe is a
-   * member and the scalar is still the membership source. Half 3 is independent of both:
-   * it reads no field either of them writes, so its position in the walk is free.
+   * member and the scalar is still the membership source.
    *
    * @returns {Promise<boolean>} Whether anything was persisted.
    */
@@ -2342,10 +2266,6 @@ export class CraftingSystemManager {
       );
 
       const recipes = this.recipeManager.getRecipes({ craftingSystemId: system.id });
-
-      // Half 3 (issue 1055). Folded onto the shared `systemsChanged` flag rather than
-      // persisted here, so the primary-GM tail below is the only writer.
-      if (this._stampRecipeModifierAuthority(system, recipes)) systemsChanged = true;
 
       for (const recipe of recipes) {
         // Half 2 (issue 978), before the mint-and-stamp read below so a cleared recipe
