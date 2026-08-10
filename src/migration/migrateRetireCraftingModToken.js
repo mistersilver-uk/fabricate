@@ -17,17 +17,18 @@
  * 1. THE INERT GO LIVE. A system with an authored catalogue whose active check formula
  *    never spent the token was INERT. After this migration every such world silently
  *    starts adding those modifiers to every crafting roll. The remedy — stated in the GM
- *    notice — is to clear `defaultModifierIds`, or move to a rule whose set resolves to
- *    0, to preserve the previous total.
+ *    notice, and it names ONE action — is to CLEAR the Default modifiers set
+ *    (`defaultModifierIds`) on those systems to preserve the previous total.
  * 2. SIGN INVERSION AND MULTIPLE-OCCURRENCE COLLAPSE. The retired substitution wrapped the
  *    scalar in parentheses precisely so a negative stayed valid arithmetic, so
  *    `1d20 - <token>` rolled `1d20 - (3)`. The same world now rolls `1d20 + 3[Modifiers]`:
  *    −3 becomes +3, a 2×scalar swing in the crafter's favour. A formula carrying the token
  *    TWICE moves from double-counting to counting once.
  *
- * A TOKEN THAT IS NOT TOP-LEVEL ADDITIVE IS LEFT UNTOUCHED ON DISK AND REPORTED. The rule is
+ * A TOKEN THIS MIGRATION CANNOT LIFT OUT IS LEFT UNTOUCHED ON DISK AND REPORTED. The rule is
  * the PREDICATE `describeRetiredModifierPlaceholder` states — bracket depth 0, an operator
- * run of at most one, and an additive or absent successor — not a list of shapes, and the
+ * run of at most one, that run empty ONLY for a leading token, and an additive or absent
+ * successor — plus the structural residue check below, not a list of shapes, and the
  * reason is ARITHMETIC rather than syntax. An appended `+ N[Modifiers]` term lands at the
  * end of the WHOLE formula, so lifting the token out is only sound where the two positions
  * are interchangeable. `(2 + <token> + 4) * 3` strips to a perfectly VALID `(2 + 4) * 3`
@@ -74,6 +75,7 @@
  */
 
 import {
+  buildCraftingModifierContext,
   resolveActiveCraftingCheckFormula,
   resolveEligibleModifierIds,
 } from '../systems/craftingModifierResolver.js';
@@ -180,12 +182,12 @@ function retireFormulaField(config, key, counts) {
 function countInertActiveCraftingCheck(system) {
   const check = _isPlainObject(system?.craftingCheck) ? system.craftingCheck : null;
   if (!check) return 0;
-  const eligible = resolveEligibleModifierIds({
-    catalogue: check.checkModifiers,
-    systemPolicy: check.defaultModifierPolicy,
-    defaultModifierIds: check.defaultModifierIds,
-    maxModifierPicks: check.maxModifierPicks,
-  });
+  // The context is BUILT by the shared builder, not hand-mirrored: four of its five fields
+  // were being restated here, and a hand-mirrored copy of a bag is how this count would
+  // silently stop matching what the engine resolves. `null` for the recipe is the whole
+  // point of the second argument — no migration can see a recipe's pick, so `byRecipe`
+  // falls back to the system set, which is exactly what the doc below says it counts.
+  const eligible = resolveEligibleModifierIds(buildCraftingModifierContext(system, null));
   if (eligible.length === 0) return 0;
   const active = resolveActiveCraftingCheckFormula(system);
   if (active.slot === null) return 0;
@@ -229,6 +231,127 @@ export function applyRetireCraftingModToken(system) {
   }
 
   return counts;
+}
+
+/**
+ * The four count clauses of the GM notice, in the order a GM reads them:
+ * `[count key, lang key suffix, English fallback]`.
+ *
+ * The count keys are the SAME keys {@link emptyCounts} declares — the table is indexed by
+ * them rather than restating them — so a clause can never report a count that is not the
+ * one it names.
+ */
+const NOTICE_CLAUSES = Object.freeze([
+  Object.freeze([
+    'inert',
+    'Inert',
+    // The remedy names CLEARING THE DEFAULT SET, and nothing else. An earlier draft
+    // offered "choose a combination rule whose set resolves to 0", which names no rule
+    // that does that: every rule reduces the same eligible set, so switching between them
+    // cannot zero it.
+    '{count} check(s) had modifiers that never reached the roll and now apply — to keep the previous total, clear the Default modifiers set on those systems.',
+  ]),
+  Object.freeze([
+    'subtractive',
+    'Subtractive',
+    '{count} formula(s) subtracted the modifier and now add it.',
+  ]),
+  Object.freeze([
+    'repeated',
+    'Repeated',
+    '{count} formula(s) counted it more than once and now count it once.',
+  ]),
+  Object.freeze([
+    'untouched',
+    'Untouched',
+    '{count} formula(s) were left exactly as authored because the placeholder sat where it could not be removed safely; those checks will not roll until you rewrite them.',
+  ]),
+]);
+
+/** The lead sentence's lang key suffix and English fallback. */
+const NOTICE_LEAD_FALLBACK =
+  'Fabricate now adds check modifiers to every crafting-check roll automatically, so the roll-formula placeholder they used to need has been removed from these systems: {systems}.';
+
+const NOTICE_KEY_PREFIX = 'FABRICATE.Migration.RetireCheckModifierPlaceholder.';
+
+/**
+ * Compose the one-time GM notice for this migration: the totals across every reported
+ * system, the systems it affected, the message, and the channel it must go out on.
+ *
+ * LIFTED OUT OF `src/main.js` DELIBERATELY, and the reason is that this arithmetic is the
+ * whole point of the notice. `main.js` cannot be imported by a unit test (module-level
+ * Foundry side effects and a `.css` asset import), so everything it holds is covered by
+ * source-text greps — which can pin a DISPATCH but cannot pin a sum, a clause selection or
+ * a join. Three semantic mutations survived a green suite while this lived there: folding
+ * `subtractive` into the inert count, dropping the lead sentence (and with it the list of
+ * affected systems) from the join, and filtering the system list to empty so the notice
+ * named no system. `buildMigrationRecoveryPrompt` is the same lift for the same reason.
+ *
+ * THE CLAUSES ARE SEPARATE KEYS, JOINED ONLY WHEN NON-ZERO. One sentence carrying all four
+ * counts made the common single-cause world read "…0 formula(s) subtracted the modifier and
+ * now add it. 0 counted it more than once… 0 formula(s) were left exactly as authored —
+ * edit those by hand", which buries the one clause that applies in three that do not.
+ *
+ * SEVERITY IS PER FINDING, not blanket. `untouched` is the only count that leaves a BROKEN
+ * world: those checks do not roll at all until the GM edits them by hand, so that is a
+ * PERMANENT warning. Everything else describes a behaviour change the GM should know about
+ * but need not repair, which is the `info` channel the `0.6.0` catalyst and `0.9.0` realm
+ * notices use. It matters mechanically too: `installFoundryShim` routes `warn` to a console
+ * error that FAILS a View Lab capture, and one failed case fails the whole capture job.
+ *
+ * @param {Array<{ system?: string, inert?: number, subtractive?: number, repeated?: number,
+ *   untouched?: number }>} reported The runner summary's `retiredCraftingModCounts`.
+ * @param {(key: string, data: object) => string|undefined} [format] Localizer seam
+ *   (`game.i18n.format`). Anything falsy falls back to the English copy above, with the
+ *   same interpolation.
+ * @returns {{ totals: { inert: number, subtractive: number, repeated: number, untouched: number },
+ *   systems: string, message: string, severity: 'warn'|'info', permanent: boolean }}
+ */
+export function buildRetiredCraftingModNotice(reported, format) {
+  const entries = Array.isArray(reported) ? reported : [];
+  // `''` rather than `undefined` for the no-localizer case: every consumer below tests the
+  // result for FALSINESS (an unresolved key returns the key, a missing `game.i18n` returns
+  // nothing), so the sentinel only has to be falsy.
+  const localize = typeof format === 'function' ? format : () => '';
+
+  // `MigrationRunner` already coerces the transient report, so this is belt and braces —
+  // but a NaN here would not be caught by the `count <= 0` gate below (every comparison
+  // against NaN is false), so it would render "NaN formula(s)" to the GM as the one visible
+  // output of the whole migration.
+  const totals = emptyCounts();
+  for (const entry of entries) {
+    for (const [countKey] of NOTICE_CLAUSES) {
+      const count = Number(entry?.[countKey]);
+      if (Number.isFinite(count)) totals[countKey] += count;
+    }
+  }
+
+  const systems = entries
+    .map((entry) => String(entry?.system ?? ''))
+    .filter((name) => name !== '')
+    .join(', ');
+
+  const lead =
+    localize(`${NOTICE_KEY_PREFIX}Lead`, { systems }) ||
+    NOTICE_LEAD_FALLBACK.replace('{systems}', systems);
+
+  const clauses = NOTICE_CLAUSES.map(([countKey, langKey, fallback]) => {
+    const count = totals[countKey];
+    if (count <= 0) return null;
+    return (
+      localize(`${NOTICE_KEY_PREFIX}${langKey}`, { count }) ||
+      fallback.replace('{count}', String(count))
+    );
+  }).filter(Boolean);
+
+  const permanent = totals.untouched > 0;
+  return {
+    totals,
+    systems,
+    message: [lead, ...clauses].join(' '),
+    severity: permanent ? 'warn' : 'info',
+    permanent,
+  };
 }
 
 /** The GM-facing name of a system, falling back to its id and then to a stable label. */

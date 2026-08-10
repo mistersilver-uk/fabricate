@@ -90,6 +90,7 @@ import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
+import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import {
   ActorInventoryCoinSpender,
@@ -1000,54 +1001,21 @@ class Fabricate {
     // `game.users?.activeGM?.id === game.user?.id`, so exactly one client in a multi-GM
     // world posts this and an assistant GM (who holds `isGM`) never does.
     //
-    // THE CLAUSES ARE SEPARATE KEYS, JOINED ONLY WHEN NON-ZERO. One sentence carrying all
-    // four counts made the common single-cause world read "…0 formula(s) subtracted the
-    // modifier and now add it. 0 counted it more than once… 0 formula(s) were left exactly
-    // as authored — edit those by hand", which buries the one clause that applies in three
-    // that do not and invites the GM to skim the whole thing.
+    // THE COMPOSITION IS NOT HERE. Totals, clause selection, the systems list and the
+    // severity all live in `buildRetiredCraftingModNotice`, because nothing in this file
+    // can be executed by a unit test and a source-text grep can pin a DISPATCH but never a
+    // SUM — three semantic mutations to that arithmetic survived a green suite while it
+    // lived inline. What remains here is the Foundry edge: the GM gate, the localizer, and
+    // which notification channel the composed severity selects.
     const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
       ? summary.retiredCraftingModCounts : [];
     if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
-      const totals = retiredCraftingModCounts.reduce((sum, entry) => ({
-        inert: sum.inert + Number(entry?.inert || 0),
-        subtractive: sum.subtractive + Number(entry?.subtractive || 0),
-        repeated: sum.repeated + Number(entry?.repeated || 0),
-        untouched: sum.untouched + Number(entry?.untouched || 0)
-      }), { inert: 0, subtractive: 0, repeated: 0, untouched: 0 });
-      const systemList = retiredCraftingModCounts
-        .map((entry) => String(entry?.system ?? ''))
-        .filter((name) => name !== '')
-        .join(', ');
-      const clause = (key, fallback, count) => {
-        if (count <= 0) return null;
-        return game.i18n?.format?.(`FABRICATE.Migration.RetireCheckModifierPlaceholder.${key}`, { count })
-          || fallback.replace('{count}', String(count));
-      };
-      const lead = game.i18n?.format?.('FABRICATE.Migration.RetireCheckModifierPlaceholder.Lead', { systems: systemList })
-        || `Fabricate now adds check modifiers to every crafting-check roll automatically, so the roll-formula placeholder they used to need has been removed from these systems: ${systemList}.`;
-      const clauses = [
-        // The remedy names CLEARING THE DEFAULT SET, and nothing else. An earlier draft
-        // offered "choose a combination rule whose set resolves to 0", which names no rule
-        // that does that: every rule reduces the same eligible set, so switching between
-        // them cannot zero it.
-        clause('Inert', '{count} check(s) had modifiers that never reached the roll and now apply — to keep the previous total, clear the Default modifiers set on those systems.', totals.inert),
-        clause('Subtractive', '{count} formula(s) subtracted the modifier and now add it.', totals.subtractive),
-        clause('Repeated', '{count} formula(s) counted it more than once and now count it once.', totals.repeated),
-        clause('Untouched', '{count} formula(s) were left exactly as authored because the placeholder sat where it could not be removed safely; those checks will not roll until you rewrite them.', totals.untouched)
-      ].filter(Boolean);
-      const message = [lead, ...clauses].join(' ');
-      // SEVERITY IS PER FINDING, not blanket. `untouched` is the only count that leaves a
-      // BROKEN world: those checks do not roll at all until the GM edits them by hand, so
-      // that is a PERMANENT warning — the rule `configureItemStackQuantityPath` states
-      // above, and this is strictly more actionable than the misconfiguration it was
-      // written for, because the remedy is a specific formula on a named system.
-      // Everything else describes a behaviour change the GM should know about but need not
-      // repair, which is the `info` channel the 0.6.0 catalyst and 0.9.0 realm notices this
-      // block follows already use. It also matters mechanically: `installFoundryShim`
-      // routes `warn` to a console error that FAILS a View Lab capture, and one failed
-      // case fails the whole capture job.
-      if (totals.untouched > 0) ui.notifications?.warn?.(message, { permanent: true });
-      else ui.notifications?.info?.(message);
+      const notice = buildRetiredCraftingModNotice(
+        retiredCraftingModCounts,
+        (key, data) => game.i18n?.format?.(key, data)
+      );
+      if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
+      else ui.notifications?.info?.(notice.message);
     }
   }
 

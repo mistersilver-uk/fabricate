@@ -168,9 +168,10 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
       'update this count only if the number of such bases genuinely changes. The 39th is ' +
       '`MANAGER_COLOR_TOKEN_KEY_PREFIX` in `src/ui/svelte/util/managerColorTokens.js` (issue ' +
       '1036), the shared base the eight colour-token labels are localized under. The 40th is ' +
-      '`FABRICATE.Migration.RetireCheckModifierPlaceholder` in `src/main.js` (issue 1094), the ' +
-      'base its four per-cause notice clauses are localized under — the clauses are separate ' +
-      'keys so the notice can join only the non-zero ones rather than reporting three zeros.'
+      '`FABRICATE.Migration.RetireCheckModifierPlaceholder` in ' +
+      '`src/migration/migrateRetireCraftingModToken.js` (issue 1094), the base its four ' +
+      'per-cause notice clauses are localized under — the clauses are separate keys so the ' +
+      'notice can join only the non-zero ones rather than reporting three zeros.'
   );
 });
 
