@@ -109,7 +109,7 @@ Derived per worktree by `scripts/lib/foundryRunIdentity.js`; override only to pi
 | Variable | Default | Description |
 |---|---|---|
 | `FOUNDRY_SMOKE_PROFILE` | `full` | Walk profile for the full smoke — `full`, `rc`, `ci` or `screenshots`. `--profile=<id>` sets it. Ignored by the narrow version arm. |
-| `FOUNDRY_RUN_TIMEOUT_MS` | profile-derived (a flat 360000 for `--check=version`) | Wall-clock budget for the run phase, so a CI job timeout can never preempt teardown and artifact upload. |
+| `FOUNDRY_RUN_TIMEOUT_MS` | profile-derived | Wall-clock budget for the run phase, so a CI job timeout can never preempt teardown and artifact upload. **A check that declares its own budget wins over this** — `--check=version` is always 360000. That reverses the usual precedence on purpose: this variable's documented use is to *enlarge* the long walk's budget (`FOUNDRY_RUN_TIMEOUT_MS=1500000`), so in a shell where it is exported the one-minute version arm would otherwise silently inherit 25 minutes and a hang would stop looking like a hang. Every run prints the budget it chose and where it came from. |
 | `FOUNDRY_SKIP_BUILD` | unset | Set to `1` to skip the `npm run build` step `foundry-test.mjs` performs before `up`. CI builds in its own cached step. A stale `dist/` silently tests old code, so only skip when you have just built. |
 | `FOUNDRY_SMOKE_THEMES` | unset | Set to `1` (or pass `--themes`) to regenerate the two 7-theme screenshot sweeps, which are off by default because the 14 frames are unasserted and unmapped. |
 | `FOUNDRY_SCREENSHOT_TARGET_LABELS` | empty | CSV of smoke screenshot labels to scope the `screenshots` profile to (issue 826). `--target-labels=<csv>` sets it; empty captures the full catalogue. |

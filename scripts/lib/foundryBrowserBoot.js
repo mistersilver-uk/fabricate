@@ -236,8 +236,16 @@ export async function dismissFirstRunDialogs(page, { reporter = DEFAULT_REPORTER
  * every click, so a perfectly correct selector still times out with Playwright's "element is
  * visible, enabled and stable" message — which reads as a missing control rather than a blocked
  * one. `suppressFoundryTours` seeds `core.tourProgress` pre-boot and normally prevents this
- * entirely; this is the reactive backstop for a context that was not seeded, and it is cheap enough
- * to call unconditionally.
+ * entirely; this is the reactive backstop for the setup-side tours that seeding does not reach, and
+ * it is cheap enough to call unconditionally.
+ *
+ * WHAT IT MUST NOT REMOVE, LEARNED THE EXPENSIVE WAY. An earlier version also deleted `#tooltip`,
+ * copied from a throwaway probe where it was harmless. It is not harmless: `#tooltip` is
+ * Foundry-owned infrastructure that `TooltipManager` holds a live reference to, and pulling it out
+ * of the DOM made `TooltipManager.deactivate` throw `Cannot read properties of null (reading
+ * 'classList')` — twice, from `SetupTour._postStep`, on the first V13 run that took the setup path.
+ * The tooltip is `pointer-events: none` and blocks nothing, so removing it bought exactly nothing
+ * and cost two `pageerror`s. Only genuinely click-swallowing overlays belong in the sweep.
  *
  * @param {object} page Playwright page.
  * @returns {Promise<string[]>} What was cleared, for diagnostics.
@@ -248,13 +256,15 @@ export async function clearBlockingOverlays(page) {
     try {
       const tour = globalThis.foundry?.nue?.Tour;
       if (tour?.activeTour) {
+        // Preferred over any DOM surgery: `exit()` unwinds the tour's own state, so nothing is left
+        // holding a reference to an element that no longer exists.
         tour.activeTour.exit();
         removed.push('activeTour.exit()');
       }
     } catch {
       // Fall through to the DOM sweep: an exiting tour must never stop the boot.
     }
-    for (const selector of ['.tour-overlay', '.tour.active', '#tooltip']) {
+    for (const selector of ['.tour-overlay', '.tour.active']) {
       for (const element of document.querySelectorAll(selector)) {
         element.remove();
         removed.push(selector);
@@ -531,6 +541,11 @@ export async function joinWorldSession(page, options = {}) {
  * Assumes the page is already authenticated and heading for `/setup`; the caller decides whether the
  * world is already running (in which case Foundry never shows `/setup` at all).
  *
+ * This body is the full smoke's own launch block, moved verbatim. It deliberately does NOT sweep the
+ * DOM with {@link clearBlockingOverlays}: the smoke has never needed to, and adding a step here
+ * would change the behaviour of a harness this extraction is supposed to leave untouched. A caller
+ * that wants that backstop calls it itself before this — the version arm does.
+ *
  * @param {object} page Playwright page.
  * @param {{
  *   worldId: string,
@@ -543,7 +558,6 @@ export async function launchWorld(page, { worldId, foundryUrl, reporter = DEFAUL
 
   // Dismiss first-run dialogs (telemetry, tours) that overlay the setup page
   await dismissFirstRunDialogs(page, { reporter });
-  await clearBlockingOverlays(page);
 
   await reporter.screenshot(page, 'setup-ready');
   reporter.recordStep({ step: 'setup-ready', passed: true });

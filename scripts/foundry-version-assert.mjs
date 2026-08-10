@@ -12,7 +12,10 @@
  * broken on V13?", which is the question that actually goes unanswered between releases.
  *
  * WHAT IT ASSERTS, AND WHY THOSE. Every check below is either a NON-VACUITY control or a shape that
- * the two supported generations are known to implement differently:
+ * the two supported generations are known to implement differently. EVERY ONE OF THEM IS A CHECK
+ * SOME BUILD COULD FAIL — an observation no verdict rests on is reported under `reportedOnly`
+ * instead, because a check that cannot fail is worse than no check: it buys confidence it has not
+ * earned, and it inflates the pass count that a reader uses to judge coverage.
  *
  *   core-build          The container really is running the arm's Foundry. Without this a mis-set
  *                       FOUNDRY_IMAGE silently tests 14 twice and reports it as a V13 pass — which
@@ -23,12 +26,14 @@
  *                       updateSetting/createSetting, canvasReady, getSceneControlButtons,
  *                       renderTileHUD/renderTokenHUD, preCreateRegionBehavior, chatMessage). One
  *                       check, the broadest coverage in the arm.
- *   compendium-namespace `foundry.documents.collections.CompendiumCollection` resolves, and the
- *                       report says whether it came from the namespaced path or the bare global.
+ *   compendium-directory The PRECONDITION for the next check: the Compendium Directory rendered a
+ *                       row for an Item pack and a row for a non-Item pack. Separate so a sidebar
+ *                       that never rendered fails under a name that points at the sidebar.
  *   compendium-context  Fabricate's Compendium Directory entry is contributed in the MODERN
- *                       `{label, icon, visible, onClick}` shape AND its `visible()` returns true for
- *                       a really-rendered Item pack row — which is what pins `data-pack` against the
- *                       DOM the running generation actually emits.
+ *                       `{label, icon, visible, onClick}` shape, its `visible()` returns true for a
+ *                       really-rendered Item pack row — which pins `data-pack` against the DOM the
+ *                       running generation actually emits — and false for a non-Item row, without
+ *                       which a `visible` returning a constant true would read as a pass.
  *   settings-round-trip A Fabricate WORLD setting survives set → get → restore.
  *   region-subtype      `fabricate.interactable`, the one sub-type `module.json` declares, is
  *                       registered in `game.documentTypes` and carries a data model.
@@ -42,6 +47,9 @@
  *                       `src/ui/interactableSceneControl.js` exists to dodge a V13 double-icon bug,
  *                       so this asserts the mechanism rather than trusting the comment.
  *   app-renders         The Crafting System Manager opens and mounts. Cheapest broad UI signal.
+ *
+ * Reported only: which path `CompendiumCollection` resolves from. Both supported builds expose the
+ * namespaced path AND the bare global, so any assertion over it would pass by construction.
  *
  * WHAT IT DELIBERATELY DOES NOT DO. It never touches the canvas, creates no placeables, and adds no
  * console-error waiver keyed on a render-flag queue name. `Canvas##activateTicker` builds
@@ -96,6 +104,14 @@ const WAIVED_CONSOLE_ERRORS = [/favicon/i];
 
 /** A Fabricate WORLD setting with a constrained value set, used for the round-trip probe. */
 const ROUND_TRIP_SETTING = Object.freeze({ namespace: 'fabricate', key: 'theme' });
+
+/**
+ * How long the Compendium Directory gets to render the pack rows `compendium-context` needs.
+ *
+ * Generous, because exceeding it is a real finding rather than a slow machine: the sidebar renders
+ * during boot and the arm has already waited for `game.fabricate.ready` before asking.
+ */
+const COMPENDIUM_DIRECTORY_TIMEOUT_MS = 30_000;
 
 function log(message) {
   process.stdout.write(message);
@@ -174,6 +190,14 @@ async function bootToReadyWorld(page) {
 
   const path = getPathname(page.url());
   if (path !== '/join' && path !== '/game') {
+    // Foundry's NUE starts a setup tour whose full-viewport `.tour-overlay` intercepts every click,
+    // so a perfectly correct selector times out as "element is visible, enabled and stable" — which
+    // reads as a missing control rather than a blocked one. The sweep lives HERE and not inside
+    // `launchWorld`, because that function is the full smoke's own launch block moved verbatim and
+    // must stay that way; the smoke has never needed the sweep.
+    await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 30_000 });
+    const cleared = await clearBlockingOverlays(page);
+    if (cleared.length > 0) log(`Cleared blocking setup overlays: ${cleared.join(', ')}\n`);
     await launchWorld(page, { worldId: WORLD_ID, foundryUrl: FOUNDRY_URL, reporter });
   }
 
@@ -207,6 +231,63 @@ async function bootToReadyWorld(page) {
 }
 
 /**
+ * Wait for the Compendium Directory to render the two pack rows the context-menu probe needs.
+ *
+ * WHY THIS IS ITS OWN STEP, WITH ITS OWN RESULT. `compendium-context` exercises Fabricate's
+ * `visible()` against a really-rendered row, so it needs a row of each kind to exist. Reading the DOM
+ * without waiting made a slow, unrendered or still-populating sidebar report `compendium-context:
+ * FAIL` — i.e. "Fabricate is broken on V13" — and the arm's entire value is that a red result is
+ * believable. `game.fabricate.ready` is the only gate before this, and that is a Fabricate signal,
+ * not a sidebar-render one.
+ *
+ * So the precondition is waited for explicitly and reported under its OWN name: a directory that
+ * never renders fails as `compendium-directory`, which sends the reader to the sidebar rather than
+ * to `buildCompendiumImportContextOption`.
+ *
+ * A collapsed folder is not a problem — Foundry keeps every entry in the DOM and hides it with CSS,
+ * and `visible()` reads `target.dataset.pack`, so DOM presence is exactly the right requirement.
+ *
+ * @param {object} page Playwright page.
+ * @returns {Promise<{ready: boolean, rows: number, itemPackRows: number, nonItemPackRows: number}>}
+ */
+async function awaitCompendiumDirectory(page) {
+  // Force a render rather than hoping one has already happened: the sidebar renders during boot,
+  // but nothing the arm has waited on so far actually promises it finished.
+  await page.evaluate(() => globalThis.ui?.compendium?.render?.(true)).catch(() => {});
+
+  const hasBothPackKinds = () => {
+    const kinds = [...document.querySelectorAll('[data-pack]')]
+      .map((row) => globalThis.game?.packs?.get(row.dataset.pack)?.documentName)
+      .filter(Boolean);
+    return kinds.includes('Item') && kinds.some((kind) => kind !== 'Item');
+  };
+
+  let ready = true;
+  try {
+    await page.waitForFunction(hasBothPackKinds, null, {
+      timeout: COMPENDIUM_DIRECTORY_TIMEOUT_MS,
+      polling: 'raf',
+    });
+  } catch {
+    // Fall through: the census below reports what WAS there, which is the useful half of a timeout.
+    ready = false;
+  }
+
+  const census = await page.evaluate(() => {
+    const kinds = [...document.querySelectorAll('[data-pack]')].map(
+      (row) => globalThis.game?.packs?.get(row.dataset.pack)?.documentName ?? null
+    );
+    return {
+      rows: kinds.length,
+      itemPackRows: kinds.filter((kind) => kind === 'Item').length,
+      nonItemPackRows: kinds.filter((kind) => kind && kind !== 'Item').length,
+    };
+  });
+
+  return { ready, ...census };
+}
+
+/**
  * Read every version-sensitive shape in ONE page evaluation, returning plain data.
  *
  * Observation happens in the page; every verdict is reached in Node, below. That split is what makes
@@ -218,8 +299,20 @@ async function bootToReadyWorld(page) {
 async function observeVersionSensitiveShapes(page) {
   return page.evaluate(
     async ({ settingNamespace, settingKey }) => {
-      const namespaced = globalThis.foundry?.documents?.collections?.CompendiumCollection ?? null;
-      const bareGlobal = globalThis.CompendiumCollection ?? null;
+      // Reported, NOT asserted. Both supported builds expose both paths, so a check on either would
+      // be pass-by-construction — and a check that cannot fail is worse than no check, because it
+      // buys confidence it has not earned. Recorded so a future build that moves the class shows the
+      // move in the run record; the spine assertions and the console-error gate are what would
+      // actually go red if Fabricate could no longer reach it.
+      const compendiumCollectionPaths = [
+        [
+          'foundry.documents.collections',
+          globalThis.foundry?.documents?.collections?.CompendiumCollection,
+        ],
+        ['globalThis', globalThis.CompendiumCollection],
+      ];
+      const resolvedPath =
+        compendiumCollectionPaths.find(([, value]) => typeof value === 'function') ?? null;
 
       // The context-menu entry, contributed exactly the way core contributes it, then exercised
       // against a really-rendered Item pack row so `data-pack` is pinned to this build's DOM.
@@ -271,13 +364,10 @@ async function observeVersionSensitiveShapes(page) {
           recipeManager: typeof globalThis.game?.fabricate?.getRecipeManager === 'function',
         },
         compendiumCollection: {
-          namespaced: typeof namespaced === 'function',
-          bareGlobal: typeof bareGlobal === 'function',
-          resolvedFrom: namespaced
-            ? 'foundry.documents.collections'
-            : bareGlobal
-              ? 'globalThis'
-              : null,
+          availablePaths: compendiumCollectionPaths
+            .filter(([, value]) => typeof value === 'function')
+            .map(([path]) => path),
+          resolvedFrom: resolvedPath?.[0] ?? null,
         },
         compendiumContext: {
           entryCount: entries.length,
@@ -364,9 +454,10 @@ async function observeManagerRender(page) {
  *
  * @param {object} observation
  * @param {object} managerRender
+ * @param {{ready: boolean, rows: number, itemPackRows: number, nonItemPackRows: number}} directory
  * @returns {Array<{ id: string, passed: boolean, detail: unknown }>}
  */
-function evaluateAssertions(observation, managerRender) {
+function evaluateAssertions(observation, managerRender, directory) {
   const context = observation.compendiumContext;
   const roundTrip = observation.settingsRoundTrip;
   return [
@@ -386,19 +477,26 @@ function evaluateAssertions(observation, managerRender) {
       detail: observation.fabricate,
     },
     {
-      id: 'compendium-namespace',
-      passed:
-        observation.compendiumCollection.namespaced || observation.compendiumCollection.bareGlobal,
-      detail: observation.compendiumCollection,
+      // The PRECONDITION for compendium-context, named separately so its failure sends the reader
+      // to the sidebar rather than to Fabricate's `visible()`.
+      id: 'compendium-directory',
+      passed: directory.ready,
+      detail: directory.ready
+        ? directory
+        : {
+            ...directory,
+            why: `the Compendium Directory did not render both an Item pack row and a non-Item pack row within ${COMPENDIUM_DIRECTORY_TIMEOUT_MS}ms — compendium-context could not be exercised, and this is a sidebar problem, not a Fabricate one`,
+          },
     },
     {
       id: 'compendium-context',
       passed:
+        directory.ready &&
         context.found &&
         context.modernShape &&
         context.visibleForItemPack === true &&
         context.visibleForNonItemPack === false,
-      detail: context,
+      detail: directory.ready ? context : { blockedBy: 'compendium-directory', ...context },
     },
     {
       id: 'settings-round-trip',
@@ -457,12 +555,16 @@ async function main() {
 
   /** @type {Array<{ id: string, passed: boolean, detail: unknown }>} */
   let assertions = [];
+  /** Observed, reported, and NOT asserted — see `compendiumCollection` in the page evaluation. */
+  let reportedOnly = null;
   let failure = null;
   try {
     await bootToReadyWorld(page);
+    const directory = await awaitCompendiumDirectory(page);
     const observation = await observeVersionSensitiveShapes(page);
     const managerRender = await observeManagerRender(page);
-    assertions = evaluateAssertions(observation, managerRender);
+    assertions = evaluateAssertions(observation, managerRender, directory);
+    reportedOnly = { compendiumCollection: observation.compendiumCollection };
   } catch (error) {
     failure = error?.message ?? String(error);
     await page
@@ -485,6 +587,9 @@ async function main() {
     passed,
     failure,
     assertions,
+    // Compatibility observations that no verdict rests on. Kept OUT of `assertions` so the pass
+    // count means what it says: every entry there is a check some build could fail.
+    reportedOnly,
     pageErrors: captured.pageErrors,
     consoleErrors: captured.consoleErrors,
     waivedConsoleErrors: captured.waived,
@@ -504,6 +609,7 @@ async function main() {
   await browser.close().catch(() => {});
 
   if (assertions.length > 0) log(`${formatAssertionTable(assertions)}\n`);
+  if (reportedOnly) log(`  ----  reported only        ${JSON.stringify(reportedOnly)}\n`);
   if (failure) log(`Boot failure: ${failure}\n`);
   for (const error of captured.pageErrors) log(`pageerror: ${error}\n`);
   for (const error of captured.consoleErrors) log(`console error: ${error}\n`);

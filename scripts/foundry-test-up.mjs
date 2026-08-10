@@ -431,10 +431,21 @@ export async function runFoundryLauncher({
     });
   });
 
-  // Wait for health check (max 120 seconds)
+  // Wait for health check.
+  //
+  // `unhealthy` is NOT terminal, and treating it as terminal is what an arm switch exposed
+  // (issue #1088). Docker flips to `unhealthy` after `retries` consecutive failures and flips
+  // straight back on the next passing probe, so it reports "not answering yet", not "broken". A
+  // switch between arms installs a different dnd5e release, and Foundry then migrates package data
+  // on the world's first launch — a one-off that runs past the compose healthcheck's grace and made
+  // `npm run test:foundry:v13` abort on a container that was serving 200s seconds later. So the poll
+  // now runs to its own deadline and only the DEADLINE fails the run; a seen-unhealthy is reported
+  // for diagnosis. The deadline is generous for the same reason: the slow case is a legitimate
+  // first-launch migration, not a hang.
   await timed('health-poll', async () => {
     process.stdout.write('Waiting for Foundry to become healthy...\n');
-    const deadline = Date.now() + 120_000;
+    const deadline = Date.now() + 300_000;
+    let sawUnhealthy = false;
     while (Date.now() < deadline) {
       const result = spawnSync('docker', [
         'inspect',
@@ -444,13 +455,20 @@ export async function runFoundryLauncher({
 
       const status = (result.stdout ?? '').trim();
       if (status === 'healthy') {
+        if (sawUnhealthy) {
+          process.stdout.write(
+            'Foundry reported unhealthy earlier and then recovered — usually a first-launch ' +
+            'package migration after a game-system change.\n'
+          );
+        }
         process.stdout.write('Foundry is healthy and ready.\n');
         return;
       }
-      if (status === 'unhealthy') {
-        process.stderr.write('Container reported unhealthy. Check logs:\n');
-        compose('logs --tail 50');
-        process.exit(1);
+      if (status === 'unhealthy' && !sawUnhealthy) {
+        sawUnhealthy = true;
+        process.stdout.write(
+          'Container reports unhealthy; still waiting (Docker clears this on the next passing probe).\n'
+        );
       }
 
       // Sleep 5 seconds

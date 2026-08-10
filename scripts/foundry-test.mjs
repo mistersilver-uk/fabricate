@@ -160,13 +160,16 @@ async function main() {
     if (check) checkName = check[1];
   }
 
-  const selectedCheck = CHECKS[checkName];
-  if (!selectedCheck) {
+  // `Object.hasOwn`, not a bare index: `CHECKS.constructor` is a truthy inherited Object, so an
+  // index would sail past this guard and die much later inside `join()` with
+  // "Path must be a string". Mirrors normalizeSmokeArmName in scripts/lib/foundrySmokeArms.js.
+  if (!Object.hasOwn(CHECKS, checkName)) {
     process.stderr.write(
       `Unknown --check=${checkName}; expected one of ${Object.keys(CHECKS).join(', ')}.\n`
     );
     process.exit(2);
   }
+  const selectedCheck = CHECKS[checkName];
 
   // Pin the per-worktree container identity + host port/URL for every child phase.
   await exportRunIdentity();
@@ -210,12 +213,24 @@ async function main() {
   // longer needs a manual override to avoid a SIGTERM mid-finalization. An
   // explicit FOUNDRY_RUN_TIMEOUT_MS (e.g. CI's pin) still wins, and the budget
   // stays well under the job cap so teardown + upload always run.
+  //
+  // A check that declares its OWN budget wins over FOUNDRY_RUN_TIMEOUT_MS, which is the reverse of
+  // the usual precedence and deliberate. That variable's documented use is to ENLARGE the long
+  // walk's budget (`FOUNDRY_RUN_TIMEOUT_MS=1500000`), so in a shell where it is exported the narrow
+  // version arm would silently inherit 25 minutes — and a hang would stop looking like a hang, which
+  // is the one thing a one-minute check exists to make obvious. The chosen budget and where it came
+  // from are printed either way, so no run has to guess which rule applied.
   process.stdout.write('=== foundry-test: RUN ===\n');
+  let budgetSource;
+  if (selectedCheck.timeoutMs !== null) budgetSource = `--check=${checkName}`;
+  else if (process.env.FOUNDRY_RUN_TIMEOUT_MS) budgetSource = 'FOUNDRY_RUN_TIMEOUT_MS';
+  else budgetSource = `smoke profile ${resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE)}`;
   const runTimeoutMs = Number(
-    process.env.FOUNDRY_RUN_TIMEOUT_MS ??
-      selectedCheck.timeoutMs ??
+    selectedCheck.timeoutMs ??
+      process.env.FOUNDRY_RUN_TIMEOUT_MS ??
       defaultRunTimeoutMs(resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE))
   );
+  process.stdout.write(`Run budget: ${runTimeoutMs}ms (from ${budgetSource})\n`);
   const runCode = runScript(run, [], runTimeoutMs);
 
   // Step 3: Tear down regardless of test result
