@@ -42,9 +42,16 @@
  *   flat-region escape (`elevation === bottom`) admits it. `undefined`/`NaN` is
  *   exactly what the real defect submits (issue 999).
  *   Present ⇒ only a finite elevation inside the band is admitted (see
- *   {@link admitsElevation}), and `top` here is INCLUSIVE, where Foundry's `top`
- *   is exclusive unless the region sets `topInclusive`.
- *   Do not read this fake as a model of Foundry's own elevation-band semantics.
+ *   {@link admitsElevation}), and `top` here is INCLUSIVE, unconditionally.
+ *   That matches Foundry V13.351, where `top` is always inclusive and there is
+ *   no `topInclusive` field at all, but diverges from Foundry V14.365, where
+ *   `top` is exclusive unless the region sets `topInclusive` (see AGENTS.md's
+ *   FoundryVTT Notes).
+ *   Do not read this fake as a model of Foundry's own elevation-band semantics:
+ *   it happens to agree with V13 and silently diverge from V14, which is MORE
+ *   misleading than a simplification that matched neither build, because a
+ *   reader targeting V13 could reasonably conclude this fake models core
+ *   faithfully and generalise from it.
  * @returns {object}
  */
 export function rectRegion({
@@ -76,9 +83,12 @@ export function rectRegion({
 
 /**
  * Whether a band admits an elevation; a non-finite elevation is never admitted.
- * `top` is treated as INCLUSIVE here, where Foundry's is exclusive unless the
- * region sets `topInclusive` — another respect in which this is a simplified
- * fake, not a model of Foundry's band semantics.
+ * `top` is treated as INCLUSIVE here, unconditionally — matching Foundry
+ * V13.351 (`top` is always inclusive, no `topInclusive` field) but diverging
+ * from Foundry V14.365 (`top` is exclusive unless `topInclusive` is set).
+ * Not a model of Foundry's band semantics on V14: this fake agrees with V13
+ * and disagrees with V14, which is a more misleading kind of simplified than
+ * one that matched neither build.
  */
 function admitsElevation(band, elevation) {
   const value = Number(elevation);

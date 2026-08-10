@@ -1688,7 +1688,8 @@ There is no multi-step gathering state in this phase.
 
 ### Award Item Stacking
 
-A fresh award may stack onto an existing owned quantity item only through the list-aware Component Item Matching resolver named in the data-models spec, supplied the awarding system's resolved component set and system id.
+A fresh award may stack onto an existing owned item carrying a value at the configured stack-quantity path, only through the list-aware Component Item Matching resolver named in the data-models spec, supplied the awarding system's resolved component set and system id.
+The stack-quantity path is tested for presence, not numericality: a stored non-numeric value still counts as stackable, so a system that stores the count as a string does not silently stop stacking.
 An award must never be folded into an owned item that resolves to a different component than the award source.
 The award source may be a resolved Foundry Item or a bare component; an Item's identity is resolved through the resolver, a bare component's identity is itself, and never a source Item's Foundry document `.id`.
 A candidate is skipped only when both the source and the candidate resolve to components and those components differ; if either does not resolve, stacking falls back to shared raw source references exactly as today.
@@ -1758,7 +1759,7 @@ The old `*Region*` helper names (`getRegionStore`, `setPartyRegionOverride`, `cl
 The GM mutators reject non-GM callers, and `revealRealmForActor` validates the realm belongs to the referenced crafting system before writing.
 3b.
 Fabricate exposes a **player-safe selectable-actor listing API** for the unified-window Actor selection bar.
-For the calling user it returns the **player-character** actors — the actor type(s) a system designates as player characters — that the user owns (non-GM) or all such actors (GM), as redaction-safe display records of the form `{ id, uuid, name, img }` and no other actor internals. "Player character" is a CONCEPT; the current dnd5e/pf2e implementation is the predicate `isPlayerCharacterActor` (`actor.type === 'character'`), which is the documented seam for future per-system extension and must not be treated as universal truth (differing player-character types are a known limitation).
+For the calling user it returns the **player-character** actors — the actor type(s) a system designates as player characters — that the user owns (non-GM) or all such actors (GM), as redaction-safe display records of the form `{ id, uuid, name, img }` and no other actor internals. "Player character" is a CONCEPT whose actor-type set is GM-configurable per world through the predicate `isPlayerCharacterActor`: `'character'` always counts, and a GM may add further actor types the active game system declares (`resolvePlayerCharacterTypes()`) through a settings-menu picker.
 This selection predicate combines ownership (player owns / GM sees all) AND the player-character concept; it is **distinct from gathering attempt authorization** and must not reuse, modify, or narrow the ownership-based attempt-authorization predicate.
 An owned non-player-character actor therefore remains attempt-authorized but does not appear in this list, and the API must not leak GM-only actor state.
 3c.

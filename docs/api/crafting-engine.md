@@ -57,9 +57,14 @@ When `craft()` is called, the engine:
 9. **Creates results.**
    Creates new items on the crafting actor.
 10. **Applies property macros.**
-    If enabled, runs property macros on created items.
+    When `system.features.propertyMacros` is `true`, first runs each contributing, **enabled** essence's own `propertyMacroUuid` macro (in `essenceDefinitions` order), then the result's own `propertyMacroUuid` macro, applying each returned property change to the created item as it is returned.
+    Requires `system.features.essences` for the per-essence half.
+    A macro whose return cannot be applied, or an essence macro whose own body throws, is skipped in isolation, leaving every other essence macro and the result's own macro unaffected.
+    Only a script Macro runs; a non-script or unresolvable `propertyMacroUuid` is skipped silently.
+    See [Essences]({% link essences.md %}#the-essence-property-macro).
 11. **Transfers effects.**
-    If `system.features.essences`, `system.features.effectTransfer`, and `recipe.transferEffects` are all `true`, collects active effects from the `sourceItemUuid` of each contributing essence definition and copies them to the result item.
+    If `system.features.essences`, `system.features.effectTransfer`, and `recipe.transferEffects` are all `true`, collects active effects from the `sourceItemUuid` of each contributing, **enabled** essence definition and copies them to the result item.
+    A disabled essence's active effects are never collected.
     See [Effect Transfer]({% link effect-transfer.md %}).
 
 {: .note }

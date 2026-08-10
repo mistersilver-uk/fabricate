@@ -41,6 +41,8 @@ game.fabricate.getCraftingEngine()          // Execute crafting
 game.fabricate.getCraftingSystemManager()   // System and component CRUD
 game.fabricate.getCraftingRunManager()      // Multi-step run management
 game.fabricate.salvageComponent({ actorId, systemId, componentId, interactive }) // Salvage one owned component
+game.fabricate.salvageComponents({ actorId, targets, interactive, onProgress }) // Salvage many owned components in one run
+game.fabricate.destroyComponents({ actorId, targets, onProgress }) // Permanently destroy many owned components in one run
 game.fabricate.getGatheringEnvironmentStore() // Gathering environment persistence
 game.fabricate.getGatheringRunManager()     // Gathering run persistence
 game.fabricate.getGatheringGateAndCheckEvaluator() // Gathering gate/check evaluation
@@ -258,6 +260,88 @@ Do not thread a result order into this call.
 For a progressive salvage, the engine captures the player's standing order (`salvage:<componentId>` in `fabricate.progressiveResultOrder`) onto the run record when the run starts, and reads it back at award time.
 A caller that wants a different order writes that setting first and lets the capture happen.
 
+### Bulk Salvage & Destroy Runtime Facade
+
+`salvageComponents({ actorId, targets, interactive, onProgress })` salvages many owned components in one gesture, and `destroyComponents({ actorId, targets, onProgress })` permanently destroys many owned components (whole stacks) in one gesture.
+Both back the player Inventory tab's bulk panel and are the supported entry points for macros and integrations that need to act on several components at once.
+
+```javascript
+Hooks.once('fabricate.ready', async () => {
+  const actorId = game.user.character?.id;
+  const systemId = game.fabricate.listCraftingSystems()[0]?.id;
+  const targets = [
+    { systemId, componentId: 'iron-ore' },
+    { systemId, componentId: 'oak-branch' }
+  ];
+
+  const outcome = await game.fabricate.salvageComponents({ actorId, targets });
+  if (outcome.cancelled) {
+    console.log('The batch roll prompt was dismissed; nothing ran.');
+  } else {
+    for (const item of outcome.items) {
+      console.log(`${item.name}: ${item.outcome}`);
+    }
+  }
+});
+```
+
+**Neither facade takes an actor UUID, at any nesting level.**
+Each entry in `targets` may carry its own `actorId`, falling back to the call's own `actorId` when omitted, and either way that id is resolved through the same ownership gate `salvageComponent` uses.
+A target whose actor cannot be resolved is never retargeted onto a different actor and never thrown as an exception.
+It becomes a row in the returned `items[]` carrying `outcome: 'notPermitted'`, and every other target in the same call still runs.
+
+`targets` is `Array<{ actorId?: string, systemId: string, componentId: string }>`, in the order the caller wants them run.
+A single call accepts at most 25 targets.
+A target beyond that limit is refused before anything runs, reported as `outcome: 'skipped'` with `skipReason: 'bulkLimit'`.
+
+`interactive` defaults to `true` for `salvageComponents`, unlike `salvageComponent`'s default of `false`, because this facade exists for a player gesture rather than automation.
+It opens at most ONE roll prompt for the whole batch, setting a single situational bonus, roll mode, and advantage choice that is applied to every roll in the run.
+Every target still rolls its own check against its own crafting system.
+If the player dismisses that prompt, the call returns `{ cancelled: true, items: [], counts: {...}, posted: false }` immediately.
+Nothing was queued, consumed, or rolled.
+`destroyComponents` opens no prompt at all.
+The caller owns the confirmation, and this facade executes against the snapshot the confirmation named.
+
+`onProgress`, when supplied, is called `(completed, total)` after each target resolves.
+`total` counts only the targets the gate accepted, so a run containing a `notPermitted` row finishes below the caller's own `targets.length`.
+A listener that throws is caught and logged, and it never breaks the run.
+
+#### salvageComponents Outcomes
+
+`salvageComponents` returns `{ cancelled, items, counts, posted }`.
+Each row of `items` carries `{ actorId, actorName, systemId, componentId, name, img, outcome, skipReason, rollValue, tierStep, message, results, consumed, tools }`, in the caller's own target order.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Outcome | Meaning |
+|:--------|:--------|
+| `succeeded` | The check succeeded, or none was required. Usually this creates result items, but a `routed`/`progressive` success tier authored with no results succeeds and awards nothing, so read `results.length` rather than the outcome alone to know what arrived. |
+| `failed` | The check failed outright: a rolled failure tier, or a total that matches no authored range. Not enough units and a required tool unavailable are the pre-check failure reasons. A success tier that awarded nothing is `succeeded`, never `failed`. |
+| `waiting` | The component has a time requirement, so a run started and awarded nothing yet. |
+| `misconfigured` | The mode requires a roll formula the GM has not authored. |
+| `skipped` | Refused before the engine was called; see `skipReason` below. |
+| `notPermitted` | The target named no actor this call could resolve. |
+| `error` | The engine call threw; `message` carries the error text. |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+A `skipped` row also carries a `skipReason`: `unknownSystem`, `featureDisabled` (the system's Salvage feature is off), `unknownComponent`, `salvageDisabled` (the component itself is not salvageable), `duplicate` (the same actor, system, and component appeared twice in `targets`), or `bulkLimit`.
+
+`counts` tallies every outcome above, plus `total`.
+`posted` is `true` only when at least one attempted (non-`skipped`) component's crafting system has its **Chat output** feature on, regardless of whether that component's own row succeeded.
+When none does, no aggregate chat card is posted at all, never an empty one.
+A subject that qualifies is folded into the ONE aggregated result card together with every other qualifying subject from the same run, never one card per component.
+
+#### destroyComponents Outcomes
+
+`destroyComponents` returns `{ items, unitsDeleted, documentsDeleted }`.
+Each row of `items` carries `{ actorId, actorName, systemId, componentId, name, img, outcome, skipReason, requested, unitsDeleted, documentsDeleted, staleIds, items, vetoed }`.
+`outcome` is `succeeded` (at least one unit was deleted), `failed` (units were found but none could be deleted), `skipped` (`skipReason` of `unknownSystem`, `unknownComponent`, or `depleted`), or `notPermitted` (the target named no resolvable actor).
+
+Destroy removes the component's WHOLE stack on the target actor, with no quantity control.
+It is deliberately not gated on the system's Salvage feature or the component's own salvage setup, since deleting an owned item is something a player could already do from the Foundry sheet.
+It posts no chat card, because a result card reports what an activity produced, and destroying produces nothing.
+
 ### Actor Selection
 
 These methods back the unified Fabricate window's actor-selection bar and persist the remembered gathering actor:
@@ -273,7 +357,7 @@ Hooks.once('fabricate.ready', () => {
 });
 ```
 
-- `listSelectableActors()` returns the current user's selectable **player characters** (`actor.type === 'character'`), owned actors for players, all for GMs.
+- `listSelectableActors()` returns the current user's selectable **player characters** (the GM-configured actor types that count as player characters, always including `'character'`), owned actors for players, all for GMs.
   Each record is redaction-safe display data containing only `{ id, uuid, name, img }`.
   No other actor internals are exposed.
   This selection list is narrower than gathering attempt authorization.

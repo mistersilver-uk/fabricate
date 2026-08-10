@@ -551,23 +551,30 @@ function pickTerminalIdentity(data = {}) {
 
 function normalizeRunItems(items) {
   if (!Array.isArray(items)) return [];
-  return items
-    .filter((item) => item && typeof item === 'object')
-    .map((item) => {
-      const entry = {
-        actorUuid: stringOrNull(item.actorUuid),
-        itemUuid: stringOrNull(item.itemUuid),
-        quantity: positiveNumberOrDefault(item.quantity, 1),
-      };
-      // Preserve the display name/image (when present) so the journal can list
-      // gathered items; absent for legacy/lean records.
-      const name = stringOrNull(item.name);
-      const img = stringOrNull(item.img);
-      if (name) entry.name = name;
-      if (img) entry.img = img;
-      return entry;
-    })
-    .filter((item) => item.actorUuid && item.itemUuid);
+  return (
+    items
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const entry = {
+          actorUuid: stringOrNull(item.actorUuid),
+          itemUuid: stringOrNull(item.itemUuid),
+          quantity: positiveNumberOrDefault(item.quantity, 1),
+        };
+        // Preserve the display name/image (when present) so the journal can list
+        // gathered items; absent for legacy/lean records.
+        const componentId = stringOrNull(item.componentId);
+        const name = stringOrNull(item.name);
+        const img = stringOrNull(item.img);
+        if (componentId) entry.componentId = componentId;
+        if (name) entry.name = name;
+        if (img) entry.img = img;
+        return entry;
+      })
+      // Mirrors the engine's normalizeRunItems: a planned award has no uuid until its
+      // document exists, so `componentId` is an equally valid identity. A uuid-only
+      // filter silently emptied the journal for component-sourced awards.
+      .filter((item) => item.actorUuid && (item.itemUuid || item.componentId))
+  );
 }
 
 function normalizeStatus(status, terminal) {

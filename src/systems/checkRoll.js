@@ -9,9 +9,25 @@
  */
 
 import { evaluateCheckBreakageCondition } from '../toolBreakageRuntime.js';
-import { applyD20Advantage, hasPlainD20 } from '../utils/craftingCheckExpression.js';
+import {
+  applyD20Advantage,
+  hasPlainD20,
+  stripRetiredModifierPlaceholder,
+} from '../utils/craftingCheckExpression.js';
 
-import { applyCraftingModifier, substituteCraftingModifier } from './craftingModifierResolver.js';
+import { applyCraftingModifier } from './craftingModifierResolver.js';
+import { appendCheckModifierTerm, CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
+
+/**
+ * The deferred `playerPicks` slot the roll prompt renders in place of a number.
+ *
+ * It is a TRAILING term (`1d20 + 3 + (modifier)[Modifiers]`) rather than an inline
+ * placeholder, matching where the resolved term actually lands (issue 1094). A specific
+ * number would misrepresent a non-default pick, and `cleanHTML` strips inline handlers
+ * so a live-updating preview is not available; the per-option chips carry each option's
+ * value.
+ */
+const DEFERRED_MODIFIER_SLOT = `(modifier)[${CHECK_MODIFIER_TERM_LABEL}]`;
 
 /**
  * Summarise an evaluated Roll's dice as
@@ -106,18 +122,73 @@ export function resolveForcedOutcome(triggers, { total, value, diceGroups } = {}
 }
 
 /**
- * Look up an interactive `playerPicks` modifier's numeric value by id, coercing a
- * missing/non-finite value to 0.
- * @param {{modifiers?: Array<{id: string, value: number}>}} modifierChoice
- * @param {string} id
- * @returns {number}
+ * The ids a returned prompt choice ASKS to spend, before any validation.
+ *
+ * Three shapes are accepted, in this precedence, and the order matters:
+ *
+ * 1. `chosenModifierIds` — the multi-pick array the prompt returns today. An EMPTY
+ *    array is an answer ("I picked nothing"), not an absence, so it wins over the
+ *    descriptor default and appends no modifier term at all.
+ * 2. `chosenModifierId` — the historical single-pick field. Still honoured so a caller
+ *    or harness that supplies one keeps working rather than silently rolling the
+ *    default; `null`/`undefined` falls through, exactly as the `??` it replaces did.
+ * 3. The descriptor's own pre-selection — the headless-confirm fallback, where the
+ *    prompt confirmed without reporting a selection at all.
+ *
+ * @param {{defaultSelectedIds?: string[], defaultSelectedId?: string}|null} modifierChoice
+ * @param {{chosenModifierIds?: unknown, chosenModifierId?: unknown}|null} choice
+ * @returns {unknown[]}
  */
-function modifierChoiceValue(modifierChoice, id) {
-  const found = (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : []).find(
-    (modifier) => modifier?.id === id
-  );
-  const value = Number(found?.value);
-  return Number.isFinite(value) ? value : 0;
+function requestedModifierIds(modifierChoice, choice) {
+  if (Array.isArray(choice?.chosenModifierIds)) return choice.chosenModifierIds;
+  const single = choice?.chosenModifierId;
+  if (single !== undefined && single !== null) return [single];
+  const defaults = modifierChoice?.defaultSelectedIds;
+  if (Array.isArray(defaults)) return defaults;
+  const fallback = modifierChoice?.defaultSelectedId;
+  return fallback === undefined || fallback === null ? [] : [fallback];
+}
+
+/**
+ * Reduce a returned prompt selection to the modifiers that actually count, the scalar
+ * they SUM to, and their labels.
+ *
+ * The prompt is a UI control, so its cap is not the invariant — this layer re-derives
+ * the legal selection from the descriptor and never trusts what came back:
+ *
+ * - An id the descriptor never OFFERED is discarded rather than valued (an unknown id
+ *   contributed 0 before and contributes nothing now, so a lone unknown id still
+ *   reduces to 0).
+ * - The survivors are taken in ELIGIBLE-SET order and TRUNCATED to `maxPicks`, matching
+ *   how `resolveEligibleModifierIds` bounds a `byRecipe` selection. Ordering by the
+ *   descriptor rather than by the returned array makes the outcome independent of the
+ *   order the prompt happened to report, and truncating (rather than taking the best N)
+ *   keeps an over-large selection from paying MORE than a legal one.
+ * - `maxPicks` absent, or not a positive integer, means 1 — the historical single-pick
+ *   behaviour, so a descriptor built before this field existed cannot silently widen.
+ * - An empty selection sums to 0.
+ *
+ * @param {{modifiers?: Array<{id: string, label?: string, value?: number}>,
+ *   maxPicks?: number, defaultSelectedIds?: string[], defaultSelectedId?: string}|null} modifierChoice
+ * @param {{chosenModifierIds?: unknown, chosenModifierId?: unknown}|null} choice
+ * @returns {{value: number, labels: string[]}}
+ */
+function resolveModifierSelection(modifierChoice, choice) {
+  const offered = Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [];
+  const requested = new Set(requestedModifierIds(modifierChoice, choice));
+  const rawCap = Number(modifierChoice?.maxPicks);
+  const maxPicks = Number.isInteger(rawCap) && rawCap > 0 ? rawCap : 1;
+  const picked = offered
+    .filter((modifier) => typeof modifier?.id === 'string' && requested.has(modifier.id))
+    .slice(0, maxPicks);
+  const value = picked.reduce((sum, modifier) => {
+    const num = Number(modifier?.value);
+    return sum + (Number.isFinite(num) ? num : 0);
+  }, 0);
+  const labels = picked
+    .map((modifier) => modifier?.label)
+    .filter((label) => typeof label === 'string' && label !== '');
+  return { value, labels };
 }
 
 /**
@@ -138,43 +209,69 @@ function modifierChoiceValue(modifierChoice, id) {
  * @param {(args: {formula: string, resolvedFormula: string|null, dc: *, label: *})
  *   => Promise<{confirmed?: boolean, bonus?: string|null, rollMode?: string}>}
  *   [options.prompt] The confirm dialog (see `promptCheckRoll`).
+ * @param {{bonus?: string|null, rollMode?: string, advantage?: string}|null}
+ *   [options.rollDecision] A PRE-RESOLVED roll decision (issue 859 bulk salvage):
+ *   `promptCheckRoll`'s return shape MINUS `confirmed`. When present on an interactive
+ *   roll it is used as the player's `choice` and NO dialog is shown, so one answer can
+ *   drive N rolls. Everything downstream of the choice is identical to a prompted roll
+ *   (the check-modifier append, advantage transform, the `Roll.validate` net,
+ *   `effectiveRollMode`). Absent on every single-item path.
  * @param {string} [options.rollMode] The effective chat roll mode.
  * @param {string} [options.flavor] Chat message flavor / dialog label.
  * @param {object} [options.speaker] Chat message speaker.
  * @param {*} [options.dc] The DC surfaced to the prompt (display only).
- * @param {object} [options.craftingModifier] The `@craftingmod` modifier context
- *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`.
- *   Resolved to a scalar and substituted before the formula reaches Foundry's `Roll`.
- * @param {{token: string, modifiers: Array<{id,label,icon,value}>, defaultSelectedId: string}}
- *   [options.modifierChoice] The deferred interactive `playerPicks` descriptor (issue
- *   770 Phase 2). Present only on an interactive `playerPicks` craft; when set, the
- *   `@craftingmod` token is left unresolved until the prompt returns the chosen id, then
- *   that single modifier's value substitutes it. Absent on every other path.
+ * @param {object} [options.craftingModifier] The check-modifier context
+ *   (issue 770): `{ catalogue, systemPolicy, defaultModifierIds, recipeModifier,
+ *   maxModifierPicks }`. Resolved to a scalar and APPENDED as one `+ N[Modifiers]` term
+ *   before the formula reaches Foundry's `Roll`.
+ * @param {{modifiers: Array<{id,label,icon,value}>, maxPicks: number,
+ *   defaultSelectedIds: string[], defaultSelectedId: string}} [options.modifierChoice]
+ *   The deferred interactive `playerPicks` descriptor (issues 770, 1055). Present only
+ *   on an interactive `playerPicks` craft; when set, NO modifier term is appended until
+ *   the prompt returns the chosen ids, and then the SUM of those modifiers' values is.
+ *   `playerPicks` is multi-pick: the player selects up to `maxPicks`, so a cap of 1 is
+ *   the historical single-pick behaviour and nothing else about this path changes.
+ *   Absent on every other path.
  * @returns {Promise<{engine: boolean, total: number, diceGroups: Array<object>,
  *   resolvedFormula: string|null, cancelled?: boolean}>}
  */
 export async function evaluateCheckRoll(formula, actor, options = {}) {
   if (typeof globalThis.Roll !== 'function')
     return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
+  // The retirement shim runs UNCONDITIONALLY at the head (issue 1094), so a token that
+  // survived the `1.21.0` migration — hand-edited, imported, or seeded by a fixture —
+  // can never reach Foundry's `Roll` and can never double-count against the appended
+  // term below. It is TOTAL: what comes back is a formula `Roll.validate` accepts or
+  // `''`, never a dangling operator.
+  const authoredFormula = stripRetiredModifierPlaceholder(String(formula));
+  // A formula the shim emptied is NOT a check. The usability readers
+  // (`resolveActiveCraftingCheckFormula`, `resolveSalvageCheck`) report it as
+  // "no formula", and `_runCraftingCheck` now gates all five of its runner decisions on
+  // that same POST-SHIM `checkUsable`, so this is a BACKSTOP rather than the only guard:
+  // it keeps `new Roll('')` — which throws, and would surface as a rolled and therefore
+  // CONSUMING failure — unreachable from any caller that reaches this function by another
+  // route (a hand-built config, a runner called directly). Reported as "no engine", the
+  // shape every runner already treats as non-blocking.
+  if (authoredFormula.trim() === '')
+    return { engine: false, total: 0, diceGroups: [], resolvedFormula: null };
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  // Interactive `playerPicks` (issue 770 Phase 2): the `@craftingmod` value depends on
-  // a selection made INSIDE the prompt, so it cannot be pre-resolved here. When a
-  // deferred `modifierChoice` descriptor is present AND this is an interactive prompt
-  // roll, leave the token in place and substitute the chosen value after the prompt
-  // returns. Every other path (all Phase-1 policies, and non-interactive `playerPicks`)
-  // pre-resolves `@craftingmod` to a deterministic scalar, exactly as before.
+  // Interactive `playerPicks` (issue 770 Phase 2): the modifier value depends on a
+  // selection made INSIDE the prompt, so it cannot be pre-resolved here. When a deferred
+  // `modifierChoice` descriptor is present AND this is an interactive prompt roll, append
+  // nothing yet and append the chosen value after the prompt returns. Every other path
+  // (all Phase-1 policies, and non-interactive `playerPicks`) appends the deterministic
+  // scalar, exactly as before.
   const modifierChoice = options?.modifierChoice;
   const useDeferredChoice =
     Boolean(modifierChoice) &&
     options?.interactive === true &&
     typeof options.prompt === 'function';
-  // Resolve the Fabricate-owned `@craftingmod` placeholder (issue 770) to a scalar
-  // and substitute it BEFORE anything downstream reads the formula, so the dialog,
-  // roll, and journal all agree (eval == display). A formula without `@craftingmod`
-  // (or no modifier context) is returned unchanged — full single-formula back-compat.
+  // Append the resolved check-modifier scalar (issues 770, 1094) BEFORE anything
+  // downstream reads the formula, so the dialog, roll, and journal all agree
+  // (eval == display). A zero scalar — or no modifier context at all — appends nothing.
   const baseFormula = useDeferredChoice
-    ? String(formula)
-    : applyCraftingModifier(String(formula), actor, options?.craftingModifier);
+    ? authoredFormula
+    : applyCraftingModifier(authoredFormula, actor, options?.craftingModifier);
   // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
   // can show the actual modifiers, not the authored `@abilities…` placeholders.
   // Recomputed from the COMBINED formula below when a valid situational bonus is
@@ -185,53 +282,75 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   let effectiveRollMode = options?.rollMode;
   let effectiveFlavor = options?.flavor;
 
-  // Interactive roll (opt-in): confirm with the player and optionally append a
-  // situational modifier before rolling. A cancelled prompt short-circuits with
-  // `cancelled: true` so the runner can abort with zero mutation.
-  if (options?.interactive && typeof options.prompt === 'function') {
-    // For a deferred modifier choice the `@craftingmod` value is the player's radio
-    // pick, which isn't known until the dialog resolves. Show the modifier slot as a
-    // neutral `(modifier)` placeholder rather than a static default number — a specific
-    // number would misrepresent a non-default pick (and cleanHTML strips inline
-    // handlers, so a live-updating preview is not available). Other `@` placeholders
-    // still resolve to numbers; the per-radio value chips carry each option's value.
-    const promptFormula = useDeferredChoice
-      ? effectiveFormula.replaceAll(/@craftingmod\b/g, '(modifier)')
-      : effectiveFormula;
-    const promptResolved = useDeferredChoice
-      ? resolveCheckFormulaDisplay(promptFormula, actor)
-      : resolved;
-    const choice = await options.prompt({
-      formula: promptFormula,
-      resolvedFormula: promptResolved?.display ?? null,
-      dc: options.dc,
-      label: options.flavor,
-      name: options.name,
-      activity: options.activity,
-      img: options.img,
-      modifierChoice,
-      // Advantage/Disadvantage are offered only for a plain-d20 check.
-      allowAdvantage: hasPlainD20(effectiveFormula),
-    });
+  // A PRE-RESOLVED decision (issue 859): one prompt answer applied to every roll of a
+  // bulk run. It stands in for the dialog's return value, so the whole block below —
+  // and only that block — has two ways to obtain a `choice`.
+  const preResolved = options?.rollDecision ?? null;
+
+  // Interactive roll (opt-in): confirm with the player (or reuse a pre-resolved
+  // decision) and optionally append a situational modifier before rolling. A cancelled
+  // prompt short-circuits with `cancelled: true` so the runner can abort with zero
+  // mutation.
+  //
+  // The `Boolean(preResolved) ||` half is load-bearing: without it a decision supplied
+  // with no `prompt` is silently discarded and the BASE formula rolls — the bulk run's
+  // situational bonus, advantage and roll mode all vanish with no error.
+  if (
+    options?.interactive === true &&
+    (Boolean(preResolved) || typeof options.prompt === 'function')
+  ) {
+    // Prompt-only work, so it lives in the prompt arm and is never computed for a
+    // pre-resolved roll (which shows no dialog and needs no display formula).
+    const askPlayer = async () => {
+      // For a deferred modifier choice the modifier value is the player's pick, which
+      // isn't known until the dialog resolves. Show the slot as a neutral TRAILING
+      // `+ (modifier)[Modifiers]` term — the same position the resolved term takes —
+      // rather than a static default number a non-default pick would contradict. Other
+      // `@` placeholders still resolve to numbers; the per-option value chips carry each
+      // option's value.
+      const promptFormula = useDeferredChoice
+        ? `${effectiveFormula} + ${DEFERRED_MODIFIER_SLOT}`
+        : effectiveFormula;
+      const promptResolved = useDeferredChoice
+        ? resolveCheckFormulaDisplay(promptFormula, actor)
+        : resolved;
+      return options.prompt({
+        formula: promptFormula,
+        resolvedFormula: promptResolved?.display ?? null,
+        dc: options.dc,
+        label: options.flavor,
+        name: options.name,
+        activity: options.activity,
+        img: options.img,
+        modifierChoice,
+        // Advantage/Disadvantage are offered only for a plain-d20 check.
+        allowAdvantage: hasPlainD20(effectiveFormula),
+      });
+    };
+    const choice = preResolved ?? (await askPlayer());
+    // LOAD-BEARING `=== false`: a pre-resolved `rollDecision` carries NO `confirmed`
+    // key (it is `promptCheckRoll`'s shape minus that flag), so tightening this to
+    // `!choice.confirmed` would turn every bulk roll into a cancellation.
     if (!choice || choice.confirmed === false) {
       return { engine: true, cancelled: true, total: 0, diceGroups: [], resolvedFormula: null };
     }
-    // Resolve the player's `@craftingmod` selection FIRST — before the advantage
-    // transform and situational-bonus append — so those compose on top of the chosen
-    // modifier and the same substituted formula feeds eval AND display (eval == display).
+    // Resolve the player's modifier selection FIRST — before the advantage transform and
+    // situational-bonus append — so those compose on top of the chosen modifier and the
+    // same appended formula feeds eval AND display (eval == display).
     if (useDeferredChoice) {
-      // The `@craftingmod` token MUST be resolved here so it never reaches Foundry's
-      // `Roll` unresolved (Foundry would treat it as 0). Fall back to the pre-selected
-      // default when the prompt confirmed without a selection (headless confirm).
-      const chosenId = choice.chosenModifierId ?? modifierChoice.defaultSelectedId;
-      const value = modifierChoiceValue(modifierChoice, chosenId);
-      effectiveFormula = substituteCraftingModifier(effectiveFormula, value);
+      // The player may pick UP TO `maxPicks` modifiers and they SUM;
+      // `resolveModifierSelection` owns the whole reduction, including re-imposing the
+      // cap the prompt only *displays* and falling back to the pre-selection when the
+      // prompt confirmed without one (headless). A zero sum appends nothing, which is
+      // the same formula an empty pick would have rolled before.
+      const selection = resolveModifierSelection(modifierChoice, choice);
+      effectiveFormula = appendCheckModifierTerm(effectiveFormula, { value: selection.value });
       resolved = resolveCheckFormulaDisplay(effectiveFormula, actor);
-      // Best-effort: append the chosen modifier label to the chat flavor (e.g.
-      // `… · Herbalism`), riding the existing flavor thread.
-      const chosenLabel = (
-        Array.isArray(modifierChoice.modifiers) ? modifierChoice.modifiers : []
-      ).find((modifier) => modifier?.id === chosenId)?.label;
+      // Best-effort: append the chosen modifier labels to the chat flavor (e.g.
+      // `… · Herbalism, Alchemist's Kit`), riding the existing flavor thread. One
+      // bullet-joined segment however many were picked, so the flavor does not grow a
+      // separator per modifier.
+      const chosenLabel = selection.labels.join(', ');
       // Only join with the bullet when there is an existing flavor; an empty base must
       // not leave an orphan `· ` (production always supplies a flavor, but direct
       // callers/tests may not).
@@ -255,8 +374,13 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
       // unavailable (headless/tests), fall through — the runner's try/catch is the
       // backstop there.
       const combined = `${effectiveFormula} + (${bonus})`;
-      const validate = globalThis.Roll?.validate;
-      if (typeof validate === 'function' && validate(combined) === false) {
+      // `Roll.validate` is a STATIC that does `new this(formula)` internally, so it MUST
+      // be invoked as a method. Detaching it (`const validate = Roll.validate`) leaves
+      // `this` undefined, `new this(...)` throws inside Foundry's own try/catch, and it
+      // returns false for EVERY formula — which silently dropped the situational bonus
+      // from every roll, whole number and dice expression alike.
+      const RollClass = globalThis.Roll;
+      if (typeof RollClass?.validate === 'function' && RollClass.validate(combined) === false) {
         console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
       } else {
         effectiveFormula = combined;
@@ -311,25 +435,28 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
  * or a non-numeric substitution) — `missing: 'NaN'` makes those detectable, since
  * Foundry would otherwise silently leave or zero an unmatched key.
  *
- * The optional `craftingModifier` context (issue 770) resolves the Fabricate-owned
- * `@craftingmod` placeholder to a scalar FIRST — using the SAME pure resolver the
- * eval path uses — so the displayed formula equals what evaluates (eval == display).
+ * The optional `craftingModifier` context (issue 770) resolves the eligible check
+ * modifiers to a scalar and APPENDS it FIRST — using the SAME pure resolver the eval
+ * path uses — so the displayed formula equals what evaluates (eval == display).
  *
  * @param {string} formula
  * @param {object|null} actor
- * @param {object|null} [craftingModifier] The `@craftingmod` modifier context
+ * @param {object|null} [craftingModifier] The check-modifier context
  *   (`{ catalogue, systemPolicy, defaultModifierIds, recipeModifier }`); omit for
- *   salvage/gathering or a formula with no `@craftingmod` token.
+ *   salvage/gathering, or wherever no modifier term should be appended.
  * @returns {{ display: string, resolved: boolean }|null}
  */
 export function resolveCheckFormulaDisplay(formula, actor, craftingModifier = null) {
   if (typeof formula !== 'string' || formula.trim() === '') return null;
   const Roll = globalThis.Roll;
   if (typeof Roll?.replaceFormulaData !== 'function') return null;
+  // The retirement shim runs unconditionally here too (issue 1094), so a display can
+  // never render a token the roll path has already stripped — and a formula that strips
+  // to empty reports "no formula" rather than a dangling operator.
+  const authored = stripRetiredModifierPlaceholder(String(formula), Roll);
+  if (authored.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  // Substitute `@craftingmod` before Foundry's placeholder pass — Foundry would treat
-  // an unresolved `@craftingmod` as 0 and silently swallow it.
-  const substituted = applyCraftingModifier(String(formula), actor, craftingModifier, Roll);
+  const substituted = applyCraftingModifier(authored, actor, craftingModifier, Roll);
   const display = Roll.replaceFormulaData(substituted, rollData, {
     missing: 'NaN',
     warn: false,
@@ -339,6 +466,54 @@ export function resolveCheckFormulaDisplay(formula, actor, craftingModifier = nu
     !/@/.test(display) &&
     (typeof Roll.validate !== 'function' || Roll.validate(display) === true);
   return { display, resolved };
+}
+
+/**
+ * Reduce a free-text situational bonus to a NUMBER.
+ *
+ * The d100 gathering path folds a flat modifier into every percentile throw
+ * (`GatheringRichStateService#resolveD100Attempt`), so unlike {@link evaluateCheckRoll} —
+ * which appends the raw bonus to the formula and lets Foundry's `Roll` evaluate it — it
+ * needs a scalar and cannot take a formula string.
+ *
+ * The roll prompt's bonus field is deliberately free text, so a player may enter `3`,
+ * `1d4`, `2 + 1` or `@prof`. A plain number is used as-is (no dice engine needed, so the
+ * headless path is unchanged); anything else is rolled through Foundry. Never returns NaN
+ * — a malformed entry degrades to 0 rather than throwing mid-attempt, mirroring the safety
+ * net in {@link evaluateCheckRoll}.
+ *
+ * @param {string|number|null|undefined} bonus The raw situational bonus.
+ * @param {object|null} [actor] Actor supplying roll data for `@` placeholders.
+ * @returns {Promise<number>} The bonus as a finite number (0 when absent or unusable).
+ */
+export async function evaluateSituationalBonus(bonus, actor = null) {
+  const text = typeof bonus === 'string' ? bonus.trim() : bonus;
+  if ([null, undefined, ''].includes(text)) return 0;
+  // A plain number needs no dice engine — this keeps the common case (and the headless
+  // path, where `Roll` may be absent or a minimal stub) behaving exactly as before.
+  const direct = Number(text);
+  if (Number.isFinite(direct)) return direct;
+  const RollClass = globalThis.Roll;
+  if (typeof RollClass !== 'function') return 0;
+  const formula = String(text);
+  // Called as a METHOD, not detached — see the note in `evaluateCheckRoll`.
+  if (typeof RollClass.validate === 'function' && RollClass.validate(formula) === false) {
+    console.warn('Fabricate | Ignoring invalid situational bonus', bonus);
+    return 0;
+  }
+  try {
+    const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
+    // `allowInteractive: false` keeps a client configured for manual fulfilment from
+    // surfacing a roll resolver mid-attempt (the same footgun the check roll avoids).
+    const rolled = await new RollClass(formula, rollData).evaluate({
+      allowInteractive: false,
+    });
+    const total = Number(rolled?.total);
+    return Number.isFinite(total) ? total : 0;
+  } catch (error) {
+    console.warn('Fabricate | Ignoring invalid situational bonus', bonus, error);
+    return 0;
+  }
 }
 
 /**

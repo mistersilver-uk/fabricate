@@ -96,12 +96,16 @@ export class Recipe {
       typeof data.minSuccessOutcomeId === 'string' && data.minSuccessOutcomeId.trim()
         ? data.minSuccessOutcomeId.trim()
         : null;
-    // Optional per-recipe crafting-check modifier override (issue 770). Absent → the
-    // recipe inherits the system's default policy + default eligible modifier ids.
-    // Present → overrides the policy and/or the eligible id subset resolved into the
-    // `@craftingmod` formula placeholder. Unknown catalogue ids are dropped at
-    // resolution time (the resolver validates against the system catalogue), so this
-    // normalizer only shape-guards; a malformed value becomes null (inherit).
+    // The recipe author's PICK of crafting-check modifiers (issues 770, 1055), honoured
+    // only under the system's `byRecipe` ("Recipe picks") combination rule. Absent → the
+    // recipe inherits the system's default eligible modifier ids. Present → names the
+    // eligible id subset reduced to the scalar appended to the check roll. It carries
+    // NO rule: a recipe chooses WHICH modifiers apply, never HOW they combine, so the
+    // combination rule is the system's alone and is never persisted here. Unknown
+    // catalogue ids are dropped at resolution time (the resolver validates against the
+    // system catalogue, and truncates the pick to `craftingCheck.maxModifierPicks`), so
+    // this normalizer only shape-guards; a malformed value becomes null (inherit), while
+    // an AUTHORED empty id array is preserved and means "no modifiers", not "inherit".
     this.craftingModifier = this._normalizeCraftingModifier(data.craftingModifier);
     this.currencyCost = this._normalizeCurrencyCost(data.currencyCost);
     this.teaser = this._normalizeTeaser(data.teaser);
@@ -125,35 +129,51 @@ export class Recipe {
   }
 
   /**
-   * Normalize the optional per-recipe crafting-check modifier override (issue 770) to
-   * `{ policy?, modifierIds? } | null`. A non-object, or an object that carries neither
-   * a known policy nor a non-empty `modifierIds` array, normalizes to `null` (inherit
-   * the system default). `policy` keeps only the four known values (`addAll`,
-   * `highest`, `byRecipe`, `playerPicks`); an unknown/absent policy is dropped. `modifierIds` keeps
-   * only non-empty string ids, de-duplicated in order; catalogue membership is NOT
-   * checked here (the resolver drops unknown ids against the live system catalogue).
+   * Normalize the recipe author's crafting-check modifier pick (issues 770, 1055) to
+   * `{ modifierIds } | null`.
+   *
+   * A non-object, or an object carrying no `modifierIds` ARRAY, normalizes to `null`
+   * (inherit the system's default eligible set).
+   *
+   * **A rule is never persisted here.** Older data may carry a `policy` key from the era
+   * when a recipe could override the system's combination rule; it is DROPPED on the way
+   * in, so it cannot round-trip back out through `toJSON`. The system owns the rule
+   * outright — `resolveModifierPolicy` (`craftingModifierResolver.js`) reads only
+   * `craftingCheck.defaultModifierPolicy` — and dropping the key here keeps the stored
+   * shape from implying an override the resolver would never honour.
+   *
+   * `modifierIds` is keyed on `Array.isArray(input.modifierIds)` **at the point of
+   * entry**: an authored array is an authored array, so an authored EMPTY set survives
+   * as `{ modifierIds: [] }` and contributes 0 to the check roll, distinct from an absent
+   * one which inherits. That is deliberately NOT keyed on the post-filter length —
+   * `{ modifierIds: [123, ''] }`, whose junk the filter below removes, is still an
+   * authored array and must resolve as an authored empty set. Keying on the filtered
+   * length would flip malformed import data from *inherit* to *none*, which is the
+   * unsafe direction.
+   *
+   * Kept ids are non-empty strings, de-duplicated in order; catalogue membership is NOT
+   * checked here (the resolver drops unknown ids against the live system catalogue, and
+   * truncates the survivors to `craftingCheck.maxModifierPicks`).
+   *
    * @param {unknown} craftingModifier
-   * @returns {{ policy?: string, modifierIds?: string[] } | null}
+   * @returns {{ modifierIds: string[] } | null}
    * @private
    */
   _normalizeCraftingModifier(craftingModifier) {
     if (!craftingModifier || typeof craftingModifier !== 'object') return null;
-    const validPolicies = ['addAll', 'highest', 'byRecipe', 'playerPicks'];
-    const policy = validPolicies.includes(craftingModifier.policy) ? craftingModifier.policy : null;
+    // The authored-ness of the set is decided HERE, before any filtering.
+    const authoredIds = Array.isArray(craftingModifier.modifierIds);
+    // No authored id set → nothing picked, so inherit. A legacy `policy` alongside is not
+    // a reason to keep the block: it is not honoured, so a block holding only a policy
+    // carries no information.
+    if (!authoredIds) return null;
     const seen = new Set();
-    const modifierIds = (
-      Array.isArray(craftingModifier.modifierIds) ? craftingModifier.modifierIds : []
-    ).filter((id) => {
+    const modifierIds = craftingModifier.modifierIds.filter((id) => {
       if (typeof id !== 'string' || id.trim() === '' || seen.has(id)) return false;
       seen.add(id);
       return true;
     });
-    // Neither a policy override nor an id subset → nothing to override, so inherit.
-    if (!policy && modifierIds.length === 0) return null;
-    const normalized = {};
-    if (policy) normalized.policy = policy;
-    if (modifierIds.length > 0) normalized.modifierIds = modifierIds;
-    return normalized;
+    return { modifierIds };
   }
 
   /**

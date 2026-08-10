@@ -102,15 +102,18 @@ test('the runner applies 1.19.0 and bumps the migration version', async () => {
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.19.0');
+  assert.equal(store.get('migrationVersion'), '1.21.0');
   assert.ok(!('enabled' in store.get('craftingSystems')[0].requirements.time));
 });
 
 test('1.19.0 is version-gated — a later deliberate opt-out is NOT flipped back on', async () => {
-  // The gate is the whole point: once the world is at 1.19.0, a GM who turns the new toggle
-  // OFF (persisting a deliberate `false` under 714) must keep it off across reloads.
+  // The gate is the whole point: once the world is at or past 1.19.0, a GM who turns the
+  // new toggle OFF (persisting a deliberate `false` under 714) must keep it off across
+  // reloads. The seed tracks the CURRENT highest version — seeding an older one would
+  // leave a later migration unapplied, so `result.ran` would be 1 and the assertion below
+  // would be measuring "the later migration ran", not "the 1.19.0 gate held".
   const store = new Map([
-    ['migrationVersion', '1.19.0'],
+    ['migrationVersion', '1.21.0'],
     ['craftingSystems', [{ id: 'sys', requirements: { time: { enabled: false } } }]],
   ]);
   const runner = new MigrationRunner({

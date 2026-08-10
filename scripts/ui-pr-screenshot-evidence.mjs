@@ -4,6 +4,13 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
+// The refusal diagnostic lives beside `evaluateSmokeOutcome` in the lib, NOT here (issue
+// #1019). Two reasons, both structural: the producer and this consumer then share one
+// `formatFailedStep`, so the gate quotes a failing step exactly as the harness's own throw
+// does; and this file is in `KNOWN_UNGATED_SCRIPTS`, outside both the `lint` and the
+// `format:check` globs, while `scripts/lib/foundrySmokeSignal.js` is inside both.
+import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 
@@ -433,6 +440,14 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/,
+      // Issue 1036: the simple-mode editor and the shared drop primitive it was converted
+      // onto. The smoke walk never switches the DC source, so its frame shows this editor's
+      // STATIC branch — the dynamic branch's macro card is photographed by the View Lab case
+      // `manager-checks-crafting-dynamic-dc`, which is the criterion-14 before/after subject.
+      // Naming them here is what makes a change to either republish the frame that DOES
+      // exist, rather than publishing nothing at all for this screen.
+      /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
     ],
   },
   {
@@ -477,10 +492,37 @@ export const VIEW_RECIPES = Object.freeze([
     ],
   },
   {
+    // The GM Essence Studio (issue 1036). Its eight components live under `essences/` — the
+    // BROWSER's directory — and its pure models under `src/utils/`, and NONE of them was
+    // reachable by the shipped pattern: `/apps\/manager\/Essence/` is case-SENSITIVE, so a
+    // redesign confined to the new lowercase directory would have published no essence frame
+    // at all while `check-screenshots` still armed on the `src/ui/**` change.
+    //
+    // The frame set is deliberately wide. The library's list and its 1000px wrap, the
+    // disabled-and-in-use inspector, the grid presentation, the active bulk selection and the
+    // editor's three tabs are seven genuinely different screens, and the delta requires each
+    // of them to have evidence rather than to be represented by the two the smoke walk
+    // happens to reach.
     id: 'manager-essences',
     label: 'Manager essences',
-    smokeLabels: ['manager-essences-normal', 'manager-essences-stacked', 'manager-essence-edit-first-state'],
-    matches: [/^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/, /^src\/ui\/svelte\/util\/essenceIcons\.js$/],
+    //
+    // Only the THREE labels the smoke harness actually emits appear here; this list is the
+    // scoped SMOKE capture's target set, and every entry is checked against
+    // `scripts/foundry-test-run.mjs`. The five further essence screens the redesign needs
+    // evidence for — the disabled-and-in-use inspector, the grid, the active bulk selection
+    // and the editor's On-craft and Validation tabs — are View Lab cases, which the `capture`
+    // CI job publishes from its own registry on every push.
+    smokeLabels: [
+      'manager-essences-normal',
+      'manager-essences-stacked',
+      'manager-essence-edit-first-state',
+    ],
+    matches: [
+      /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/essences\//,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
+      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+    ],
   },
   {
     id: 'manager-environments',
@@ -1369,6 +1411,11 @@ function validateScreenshotRunEvidence({ sourceRoot, views, headSha }) {
     join(sourceRoot, 'screenshot-manifest.json'),
     'screenshot manifest'
   );
+  // The five evidence conditions. `!==` and not `> 0`/truthiness on purpose: a summary
+  // MISSING `stepFailures` entirely (a stale or truncated artifact) must refuse, and `>
+  // 0` would accept it and open the gate. `explainSmokeSummaryRefusal` re-derives which
+  // of the five tripped, using these same comparisons, and its own suite asserts the
+  // named set equals the tripped set over all 31 combinations.
   if (
     summary.passed !== true ||
     summary.stepFailures !== 0 ||
@@ -1376,7 +1423,7 @@ function validateScreenshotRunEvidence({ sourceRoot, views, headSha }) {
     summary.degraded !== false ||
     summary.rendererCrashed !== false
   ) {
-    throw new Error('Screenshot evidence comes from a failed or degraded smoke summary');
+    throw new Error(explainSmokeSummaryRefusal(summary));
   }
   const summaryRun = summary.screenshotRun || {};
   if (!summaryRun.runId || summaryRun.runId !== manifest.runId) {

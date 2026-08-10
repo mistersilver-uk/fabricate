@@ -163,9 +163,15 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    38,
-    'expected 38 legitimate namespace bases to resolve to an object — ' +
-      'update this count only if the number of such bases genuinely changes'
+    40,
+    'expected 40 legitimate namespace bases to resolve to an object — ' +
+      'update this count only if the number of such bases genuinely changes. The 39th is ' +
+      '`MANAGER_COLOR_TOKEN_KEY_PREFIX` in `src/ui/svelte/util/managerColorTokens.js` (issue ' +
+      '1036), the shared base the eight colour-token labels are localized under. The 40th is ' +
+      '`FABRICATE.Migration.RetireCheckModifierPlaceholder` in ' +
+      '`src/migration/migrateRetireCraftingModToken.js` (issue 1094), the base its four ' +
+      'per-cause notice clauses are localized under — the clauses are separate keys so the ' +
+      'notice can join only the non-zero ones rather than reporting three zeros.'
   );
 });
 

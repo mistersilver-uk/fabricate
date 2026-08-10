@@ -18,11 +18,15 @@ const harness = createMountedComponentHarness({
   rawModules: [
     'src/gatheringImageDefaults.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/fontAwesomeFreeClassicIcons.js',
     'src/ui/svelte/util/dropUtils.js',
+    // The shared colour-token constant + its localized labels (issue 1036). Both colour
+    // components import it, and both are compiled below.
+    'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -31,6 +35,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
+    'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/components/ManagerColorPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',

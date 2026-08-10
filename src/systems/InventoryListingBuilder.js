@@ -66,6 +66,11 @@ import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.
 import { matchRecipeItemDefinition } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisites } from './characterPrerequisites.js';
+import { readStackQuantity } from './itemStackQuantity.js';
+// The ONE salvage `(mode, checkUsable)` derivation, shared with `CraftingEngine` so the
+// player's panel and the engine that rolls for it cannot disagree. A pure, Foundry-free
+// leaf, so it adds no transitive edge.
+import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
@@ -100,16 +105,6 @@ function actorKey(actor) {
 function finiteOrNull(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
-}
-
-/**
- * The per-item stack size, defaulting a missing/invalid/non-positive count to 1
- * (a present item is at least one). Mirrors the engine's `item.system.quantity`
- * read but never collapses a genuine larger stack.
- */
-function itemStackQuantity(item) {
-  const raw = Number(item?.system?.quantity);
-  return Number.isFinite(raw) && raw > 0 ? raw : 1;
 }
 
 /**
@@ -599,7 +594,7 @@ export class InventoryListingBuilder {
       for (const item of items) {
         const entity = match(item);
         if (!entity?.id) continue;
-        const qty = itemStackQuantity(item);
+        const qty = readStackQuantity(item);
         let entry = owned.get(entity.id);
         if (!entry) {
           entry = { [entityKey]: entity, sources: new Map(), item, documents: [] };
@@ -888,6 +883,10 @@ export class InventoryListingBuilder {
         name: stringOrEmpty(def?.name) || stringOrEmpty(essenceId),
         img: null,
         icon: stringOrNull(def?.icon),
+        // The essence's chosen palette token (a bare `--fab-tag-*` key, or null when unset)
+        // so the player tile can tint its glyph to the essence colour, mirroring the
+        // manager Medallion. Unset stays null → the card falls back to the accent.
+        colorToken: stringOrNull(def?.colorToken),
         tags: [],
         tier: null,
         isEssenceSource: true,
@@ -1183,18 +1182,19 @@ export class InventoryListingBuilder {
     // untouched — this is a viewer projection, not a config mutation.
     if (hiddenEntityIds.has(component?.id)) return null;
 
-    const check = system?.salvageCraftingCheck ?? {};
-    // The mode the ENGINE dispatches on. `_runSalvageCraftingCheck` reads this and the
-    // authored formula; `check.enabled` is never consulted anywhere on the salvage path.
-    const mode = ['simple', 'routed', 'progressive'].includes(system?.salvageResolutionMode)
-      ? system.salvageResolutionMode
-      : 'simple';
-    const config = check[mode] ?? null;
-    // A check is USABLE iff its mode's roll formula is authored. That is the only gate —
-    // so "no check" and "pass/fail" are not two modes, they are one `simple` mode read at
-    // two usability states, and the body dispatches on the PAIR (mode, checkUsable).
-    const rollFormula = typeof config?.rollFormula === 'string' ? config.rollFormula.trim() : '';
-    const checkUsable = rollFormula.length > 0;
+    // The mode the ENGINE dispatches on, and whether its check is usable, from the ONE
+    // shared derivation both sides now read (issue 859). `_runSalvageCraftingCheck`
+    // resolves the same pair from the same helper, so the panel can no longer disagree
+    // with the engine about whether a check will roll. `salvageCraftingCheck.enabled` is
+    // never consulted anywhere on the salvage path.
+    //
+    // A check is USABLE iff its mode's roll formula is authored and non-empty. That is
+    // the only gate — so "no check" and "pass/fail" are not two modes, they are one
+    // `simple` mode read at two usability states, and the body dispatches on the PAIR
+    // (mode, checkUsable). An unsupported mode token still reads as `simple` here (a
+    // projection has nothing better to render); only the MUTATING engine path treats it
+    // as misconfigured.
+    const { mode, config, checkUsable } = resolveSalvageCheck(system);
     // Simple mode admits exactly one SUCCESS group (issue 764). A stored-but-not-yet-
     // re-normalized legacy config with more than one success group is misconfigured: the
     // engine awards `slice(0, 1)`, so the surplus is silently ignored. The GM sees this
@@ -1753,7 +1753,7 @@ export class InventoryListingBuilder {
 
   /**
    * Join a component's `{ essenceId: perUnitQty }` map to the system's essence
-   * definitions for name/icon display. Skips ids with no definition or a
+   * definitions for name/icon/colour display. Skips ids with no definition or a
    * non-positive quantity.
    * @private
    */
@@ -1767,6 +1767,10 @@ export class InventoryListingBuilder {
         id: stringOrNull(essenceId),
         name: stringOrEmpty(def.name) || stringOrEmpty(essenceId),
         icon: stringOrNull(def.icon),
+        // Issue 1036: the essence's own colour token, shaped exactly like the synthetic
+        // essence-source row's `colorToken`, so a carrying component's pip tints to it
+        // instead of the fixed `--fab-text` glyph.
+        colorToken: stringOrNull(def?.colorToken),
         quantity,
       });
     }

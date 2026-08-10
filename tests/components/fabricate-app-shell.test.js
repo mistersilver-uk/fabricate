@@ -110,8 +110,8 @@ describe('FabricateAppRoot shell', () => {
     const effectBody = rootSource.slice(effectIdx, effectIdx + 400);
     assert.ok(
       effectBody.includes('services?.crafting?.load?.(true)') &&
-        effectBody.includes('services?.inventory?.load?.(true)'),
-      'inventory change should quietly reload the crafting and inventory stores'
+        effectBody.includes('services?.inventory?.reloadOnDocumentChange?.()'),
+      'inventory change should quietly reload the crafting store and refresh the inventory listing through its bulk-run guard'
     );
   });
 
@@ -122,10 +122,34 @@ describe('FabricateAppRoot shell', () => {
     );
     const effectIdx = rootSource.indexOf('subscribeCraftingDataChange(');
     const effectBody = rootSource.slice(effectIdx, effectIdx + 400);
-    for (const store of ['craftingSources', 'crafting', 'inventory', 'journal']) {
+    // `inventory` is deliberately absent from this list: its listing refresh is the
+    // guarded one asserted by the bulk-run-guard case below, not a bare `load(true)`.
+    for (const store of ['craftingSources', 'crafting', 'journal']) {
       assert.ok(
         effectBody.includes(`services?.${store}?.load?.(true)`),
         `data change should quietly reload the ${store} store`
+      );
+    }
+  });
+
+  it('routes EVERY shell-driven inventory reload through the store bulk-run guard', () => {
+    // `inventoryStore.reloadOnDocumentChange` drops a hook-driven listing reload while a
+    // bulk salvage/destroy run is in flight (issue 859), leaving the run's own terminal
+    // reload to pick it up. It is worth nothing unless the SHELL actually calls it: the
+    // store's own suite drives the guard directly, so it stays green while every real
+    // caller bypasses it. This is that missing half of the pin.
+    assert.ok(
+      !/services\?\.inventory\?\.load\?\.\(/.test(rootSource),
+      'the shell must never call the inventory store load seam directly — a direct load rebuilds the listing under an open bulk panel roughly once per queued row'
+    );
+    for (const hook of ['subscribeInventoryChange(', 'subscribeCraftingDataChange(']) {
+      const start = rootSource.indexOf(hook);
+      assert.ok(start >= 0, `the shell should subscribe via ${hook}`);
+      assert.ok(
+        rootSource
+          .slice(start, start + 400)
+          .includes('services?.inventory?.reloadOnDocumentChange?.()'),
+        `${hook.slice(0, -1)} should refresh the inventory listing through the guard`
       );
     }
   });

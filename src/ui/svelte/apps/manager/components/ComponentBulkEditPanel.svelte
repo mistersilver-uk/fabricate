@@ -72,6 +72,10 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { getComponentCategoryLabel } from '../../../../../utils/componentCategories.js';
+  // The add-new offer projection (issue 1036). The `essenceDefinitions` PROP stays
+  // unfiltered — the warning count reads the selection's authored values against it — and
+  // only the staging grid narrows.
+  import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import {
     bulkDraftHasChanges,
     countComponentsChangingEssences,
@@ -123,8 +127,15 @@
 
   // Declaration order is the system's own vocabulary order, as the editor's grid and the
   // prototype both show it — no re-sort, so the two essence surfaces read the same.
+  // The staged map is a WHOLE-MAP replacement, so this grid is simultaneously the offer
+  // and the only place a staged value can be edited back down: a disabled essence is
+  // withheld from the offer, but one already carrying a staged quantity stays visible so
+  // the GM can clear it (issue 1036).
   const essenceCards = $derived(
-    (Array.isArray(essenceDefinitions) ? essenceDefinitions : []).map((definition) => ({
+    visibleEssenceOptions(
+      Array.isArray(essenceDefinitions) ? essenceDefinitions : [],
+      (definition) => Number(stagedEssences[definition?.id]) > 0
+    ).map((definition) => ({
       id: definition.id,
       name: definition.name || definition.id,
       icon: String(definition.icon || '').trim(),

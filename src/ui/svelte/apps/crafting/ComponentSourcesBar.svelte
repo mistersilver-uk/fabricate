@@ -268,7 +268,11 @@
   }
 
   /* The remove control is a centered overlay covering the avatar; on hover/focus a
-     "×" appears over the (dimmed) image. Hidden otherwise so the row stays calm. */
+     "×" appears over the (dimmed) image. Hidden otherwise so the row stays calm.
+     Foundry's global `button` rule pins height/min-height to --button-size, which
+     overconstrains an inset-0 absolute box (the used `bottom` is discarded), leaving
+     a short overlay pinned to the top and the "×" above centre; height:auto +
+     min-height:0 hand sizing back to `inset`. */
   .crafting-source-remove {
     box-sizing: border-box;
     position: absolute;
@@ -276,6 +280,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    height: auto;
+    min-height: 0;
     padding: 0;
     border: none;
     border-radius: 8px;

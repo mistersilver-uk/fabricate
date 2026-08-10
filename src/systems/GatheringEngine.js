@@ -10,7 +10,7 @@ import {
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
-import { runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
@@ -43,6 +43,7 @@ import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIdsForSystem } from './gatheringRealmDiscovery.js';
 import { isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
+import { readStoredStackQuantity } from './itemStackQuantity.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
@@ -2962,6 +2963,33 @@ export class GatheringEngine {
     const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
       firstOnly: false,
     });
+    // A success tier that matches NO group routes nowhere. This used to report
+    // `succeeded` with an empty result set, which spent the node and the stamina and
+    // awarded nothing — the routed twin of the d100 miss in issue 1027, but a content
+    // BUG rather than a legitimate roll.
+    //
+    // Gathering routes by NAME (crafting routes by tier id), so this is not only an
+    // authoring omission: renaming a tier on the SYSTEM silently unroutes every task
+    // whose groups were named for the old tier, and every routed gather from then on
+    // succeeds and awards nothing. Reporting it as misconfigured surfaces the drift on
+    // the first roll and — because `_resolveImmediateAttempt` turns a misconfigured
+    // outcome into a blocked start before `_commitRichAttempt` — costs the player
+    // nothing.
+    //
+    // A group that EXISTS and is empty is deliberate authoring ("this tier succeeds and
+    // awards nothing") and is left alone: it matches by name, so it never reaches here,
+    // and it renders the explicit nothing-found card from issue 1027.
+    if (matched.length === 0) {
+      return misconfiguredOutcome({
+        code: 'ROUTED_TIER_UNROUTED',
+        checkResult,
+        diagnostic: {
+          code: 'ROUTED_TIER_UNROUTED',
+          messageKey: 'FABRICATE.Gathering.Diagnostics.RoutedTierUnrouted',
+          message: `Gathering success tier "${outcomeName}" has no result group of that name on task "${task?.name || task?.id || 'unnamed'}"`,
+        },
+      });
+    }
     return normalizeTerminalOutcome({
       status: 'succeeded',
       outcome: outcomeName,
@@ -3015,8 +3043,11 @@ export class GatheringEngine {
       if (!choice || choice.confirmed === false) {
         return { status: 'cancelled', resultGroups: [], checkResult: null };
       }
-      const parsedBonus = Number(choice.bonus);
-      extraModifier = Number.isFinite(parsedBonus) ? parsedBonus : 0;
+      // The bonus field is free text, so `Number(...)` alone silently turned a dice
+      // expression ("2d20", "1d4 + 1") into NaN and then 0. Reduce it to a scalar —
+      // rolling it when it is not already a plain number — because each percentile
+      // throw takes a flat numeric modifier, not a formula.
+      extraModifier = await evaluateSituationalBonus(choice.bonus, actor);
     }
 
     const resolved = await this.richState.resolveD100Attempt({
@@ -3470,15 +3501,25 @@ export class GatheringEngine {
 
       const components = normalizeList(createdResults).map((entry) => {
         const itemUuid = stringOrNull(entry?.itemUuid);
-        const componentId = stringOrNull(itemsByUuid.get(itemUuid)?.componentId);
+        // Prefer the identity the award itself carries. Falling back to the
+        // uuid→componentId join alone left component-sourced awards (which have no uuid
+        // before their document exists) with nothing to look up, so they rendered as a
+        // bare uuid or an empty name.
+        const componentId =
+          stringOrNull(entry?.componentId) || stringOrNull(itemsByUuid.get(itemUuid)?.componentId);
         const component = componentId ? componentsById.get(componentId) : null;
         const resolvedDoc = component ? null : resolveItemDoc(itemUuid);
         return {
           name:
-            stringOrEmpty(component?.name) || stringOrEmpty(resolvedDoc?.name) || itemUuid || '',
+            stringOrEmpty(component?.name) ||
+            stringOrEmpty(resolvedDoc?.name) ||
+            stringOrEmpty(entry?.name) ||
+            itemUuid ||
+            '',
           img:
             stringOrNull(component?.img) ||
             stringOrNull(resolvedDoc?.img) ||
+            stringOrNull(entry?.img) ||
             'icons/svg/item-bag.svg',
           quantity: Number(entry?.quantity) || 1,
         };
@@ -4327,28 +4368,43 @@ function hasRichGatheringData(environment, task) {
 }
 
 function normalizeRunItems(items, { actor = null } = {}) {
-  return normalizeList(items)
-    .filter((item) => item && typeof item === 'object')
-    .map((item) => {
-      const source = item.item && typeof item.item === 'object' ? item.item : item;
-      const actorUuid =
-        stringOrNull(item.actorUuid) || stringOrNull(item.actor?.uuid) || stringOrNull(actor?.uuid);
-      const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
-      const quantity = Number(item.quantity ?? source.system?.quantity ?? 1);
-      const entry = {
-        actorUuid,
-        itemUuid,
-        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-      };
-      // Carry name/img (when known) so the run journal can list the gathered items,
-      // not just a count — the awarded item document is in hand here.
-      const name = stringOrNull(item.name) || stringOrNull(source.name);
-      const img = stringOrNull(item.img) || stringOrNull(source.img);
-      if (name) entry.name = name;
-      if (img) entry.img = img;
-      return entry;
-    })
-    .filter((item) => item.actorUuid && item.itemUuid);
+  return (
+    normalizeList(items)
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const source = item.item && typeof item.item === 'object' ? item.item : item;
+        const actorUuid =
+          stringOrNull(item.actorUuid) ||
+          stringOrNull(item.actor?.uuid) ||
+          stringOrNull(actor?.uuid);
+        const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
+        const componentId = stringOrNull(item.componentId);
+        // Only the SOURCE term is a stack read; `item.quantity` is the run entry's own
+        // awarded amount and is preferred whenever it is present.
+        const quantity = Number(
+          item.quantity ?? readStoredStackQuantity(source, { absentDefault: 1 })
+        );
+        const entry = {
+          actorUuid,
+          itemUuid,
+          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+        };
+        if (componentId) entry.componentId = componentId;
+        // Carry name/img (when known) so the run journal can list the gathered items,
+        // not just a count — the awarded item document is in hand here.
+        const name = stringOrNull(item.name) || stringOrNull(source.name);
+        const img = stringOrNull(item.img) || stringOrNull(source.img);
+        if (name) entry.name = name;
+        if (img) entry.img = img;
+        return entry;
+      })
+      // A ref needs SOME identity, but not necessarily a uuid. Planned awards are built
+      // before their documents exist, so a result resolving to a bare component has no
+      // uuid yet and a uuid-only filter discarded it — emptying the chat card and the run
+      // journal for a gather that really did award items. `componentId` is that missing
+      // pre-creation identity.
+      .filter((item) => item.actorUuid && (item.itemUuid || item.componentId))
+  );
 }
 
 function normalizeOutcomeText(value) {

@@ -141,6 +141,108 @@ describe('actorBarStore', () => {
     assert.deepEqual(calls.setSelectedActorId, [], 'no re-persist on the guarded second load');
   });
 
+  // --- refreshSelectableActors (issue 1024) ---------------------------------
+  //
+  // The GM ticks a second player-character actor type mid-session. Every open bar must
+  // re-project WITHOUT resetting the one-shot `loaded` latch, which exists to stop a
+  // later `$effect` run clobbering a deliberate pick.
+
+  it('refresh seeds and persists the first entry when the selection is empty', () => {
+    // THE reported scenario: the player owns only a `robot`, so the bar loaded empty
+    // and nothing was selected. A naive "re-seed only when the current pick is GONE"
+    // guard short-circuits on the falsy id and leaves a populated but unselected bar.
+    const overrides = { actors: [], seededId: '' };
+    const { services, calls } = makeServices(overrides);
+    const store = createActorBarStore({ services });
+
+    store.loadSelectableActors();
+    flushSync();
+    assert.equal(store.selectedActorId, '', 'starts with nothing selectable');
+    assert.deepEqual(calls.setSelectedActorId, []);
+
+    overrides.actors = ACTORS;
+    store.refreshSelectableActors();
+    flushSync();
+
+    assert.equal(store.selectableActors.length, 2, 'the list re-projects');
+    assert.equal(store.selectedActorId, 'a1', 'an empty selection seeds the first entry');
+    assert.deepEqual(calls.setSelectedActorId, ['a1'], 'and persists it exactly once');
+  });
+
+  it('refresh leaves a still-present pick untouched and un-re-persisted', () => {
+    const overrides = { actors: ACTORS, seededId: 'a2' };
+    const { services, calls } = makeServices(overrides);
+    const store = createActorBarStore({ services });
+    store.loadSelectableActors();
+    flushSync();
+    calls.setSelectedActorId.length = 0;
+
+    store.refreshSelectableActors();
+    flushSync();
+
+    assert.equal(store.selectedActorId, 'a2', 'a valid pick survives the refresh');
+    assert.deepEqual(calls.setSelectedActorId, [], 'and is not re-persisted');
+  });
+
+  it('refresh re-seeds when the current pick vanished from the list', () => {
+    const overrides = { actors: ACTORS, seededId: 'a2' };
+    const { services, calls } = makeServices(overrides);
+    const store = createActorBarStore({ services });
+    store.loadSelectableActors();
+    flushSync();
+    calls.setSelectedActorId.length = 0;
+
+    // The GM UN-ticked the type `a2` belonged to.
+    overrides.actors = [ACTORS[0]];
+    store.refreshSelectableActors();
+    flushSync();
+
+    assert.equal(store.selectedActorId, 'a1', 're-seeds to the first remaining entry');
+    assert.deepEqual(calls.setSelectedActorId, ['a1'], 'through selectActor, so it persists');
+  });
+
+  it('refresh does not throw, index, or persist when the list becomes empty', () => {
+    const overrides = { actors: ACTORS, seededId: 'a1' };
+    const { services, calls } = makeServices(overrides);
+    const store = createActorBarStore({ services });
+    store.loadSelectableActors();
+    flushSync();
+    calls.setSelectedActorId.length = 0;
+
+    overrides.actors = [];
+    assert.doesNotThrow(() => {
+      store.refreshSelectableActors();
+      flushSync();
+    });
+
+    assert.equal(store.selectableActors.length, 0);
+    assert.deepEqual(calls.setSelectedActorId, [], 'nothing persisted on an empty list');
+    assert.equal(store.selectedActor, null, 'the derived selection resolves to nothing');
+  });
+
+  it('refresh neither consults nor resets the `loaded` latch', () => {
+    const overrides = { actors: ACTORS, seededId: '' };
+    const { services, calls } = makeServices(overrides);
+    const store = createActorBarStore({ services });
+
+    store.loadSelectableActors();
+    flushSync();
+    store.selectActor('a2');
+    flushSync();
+    calls.setSelectedActorId.length = 0;
+
+    store.refreshSelectableActors();
+    flushSync();
+    assert.equal(store.loaded, true, 'the latch is still set after a refresh');
+
+    // If the refresh had cleared the latch, this load would re-seed to a1 and clobber
+    // the deliberate pick — the exact regression the latch exists to prevent.
+    store.loadSelectableActors();
+    flushSync();
+    assert.equal(store.selectedActorId, 'a2', 'the deliberate pick survives');
+    assert.deepEqual(calls.setSelectedActorId, [], 'and nothing was re-persisted');
+  });
+
   it('setStaminaPool stores the active pool and clears to null', () => {
     const { services } = makeServices({ actors: ACTORS });
     const store = createActorBarStore({ services });

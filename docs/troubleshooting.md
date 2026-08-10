@@ -109,6 +109,43 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 
 ---
 
+## Per-Recipe Check Modifier Control Missing
+
+**Symptom:** A recipe's Overview tab offers no **Eligible modifiers** control, so you cannot choose which check modifiers that recipe uses.
+
+**Likely causes:**
+
+- The system's **Combination rule** is not **Recipe picks**.
+  That is the one rule that hands the selection to the recipe author, so it is the only rule under which the control appears.
+  Under **Add all**, **Highest**, and **Player picks** the system decides, and the tab shows nothing rather than a control the system would ignore.
+- The system has no check modifiers in its catalogue yet, so there is nothing to pick from.
+- The system's active crafting check cannot use a modifier right now.
+  Either the resolution mode rolls no check at all, or the check has no roll formula authored yet.
+  Under **Recipe picks** the recipe's Overview tab shows a banner naming which of these applies in place of the control.
+
+**Related symptom:** The control is there, but the **Add modifier** button is greyed out.
+The recipe has reached the system's **Maximum picks**.
+Raise that limit, or clear it entirely for no limit, on the **Check modifiers** card.
+
+**What is and is not lost:** Switching a system away from **Recipe picks**, or lowering **Maximum picks**, never deletes what a recipe picked.
+The picks stay stored and stop being applied, and restoring the rule or the limit applies them again immediately with nothing to re-enter.
+A lowered limit rolls only the first few picks, up to the limit, and keeps the rest.
+
+**Step-by-step checks:**
+
+1. Open the Crafting Admin panel, select the system, go to the **Crafting check** page, and open the **Check modifiers** card.
+2. Confirm the catalogue has at least one modifier.
+   If it is empty, choose **Add modifier** and author one.
+3. Check the **Combination rule**.
+   If it is anything other than **Recipe picks**, that is why no recipe has a control; choose **Recipe picks** to hand the selection to your recipes.
+4. If the rule is already **Recipe picks**, open the recipe's **Overview** tab and read the banner in place of the control.
+   It names whether the system's active check has no roll formula, or rolls no check at all for the current resolution mode.
+5. Fix whichever of those applies on the **Crafting check** page, then return to the recipe's Overview tab.
+
+**See also:** [Check modifiers]({% link crafting-checks.md %}#check-modifiers) covers the catalogue, the four combination rules, and the pick limit in full.
+
+---
+
 ## Routed Recipe Produces Nothing on a Successful Check
 
 **Symptom:** A recipe that routes by skill-check outcome rolls a success, but no result is produced.
@@ -254,6 +291,68 @@ Additional causes:
 6. Is the salvage feature enabled on the crafting system?
 
 **See also:** [Salvage]({% link salvage.md %}) covers salvage configuration, salvage resolution modes, and salvage crafting checks.
+
+---
+
+## Character Missing From the Character Bar or Rosters
+
+**Symptom:** A player's character does not appear in the character-selection bar at the top of the unified Fabricate window, in the GM's gathering stamina roster, in the Access or Knowledge rosters in the Crafting Admin panel, or in the party member picker.
+The player owns the actor, and it is otherwise a normal player character for the game system.
+
+**Likely cause:**
+
+- Fabricate only recognises certain actor types as player characters.
+  By default, only the "Character" actor type counts.
+- Some game systems use more than one actor type for a player character.
+  For example, a game system might use one actor type for an ordinary character sheet and a separate actor type for a robot or vehicle sheet.
+  Fabricate does not know about an additional type until a GM adds it.
+
+**Step-by-step checks:**
+
+1. Open Foundry's **Game Settings**, choose **Configure Settings**, and open the **Fabricate** module settings.
+2. Find **Player Character Actor Types** and click **Choose Actor Types**.
+3. Confirm the missing actor's type is ticked in the list.
+   "Character" is always ticked and cannot be unticked.
+4. Click **Save**.
+   The change takes effect for every connected player immediately, without a reload.
+
+**What this setting does and does not change:** Adding an actor type here only changes which actors are offered in the character bar, the gathering stamina roster, the Access and Knowledge rosters, and the party member picker.
+It does not change who is allowed to attempt a craft or a gathering task.
+That always depends on who owns or controls the actor.
+An actor of an unconfigured type remains fully usable for crafting and gathering.
+It is simply not offered as a choice in those four lists.
+
+**See also:** [Gathering Environments]({% link gathering-environments.md %}#actor-selection-bar) covers the character bar from the player's side.
+
+---
+
+## Crafting, Salvage, or Alchemy Deletes a Whole Stack Instead of Reducing It
+
+**Symptom:** Crafting, salvage, or an alchemy attempt consumes an entire stack of an ingredient or component at once instead of reducing it by the amount actually used.
+Using one unit from a stack of twenty destroys all twenty.
+
+**Likely cause:**
+
+Fabricate reads and writes how many units are in an item's stack through a single game-system-specific field, configured as the **Item Stack Quantity Field** setting.
+Fabricate already ships a working default for most game systems, matching the same field the system itself displays as an item's quantity, so this rarely needs to change.
+If the field is set to point at something other than the number of units itself, Fabricate can no longer tell how large a stack is.
+It then treats every stack as though it holds only one unit and deletes the whole item the moment any amount is consumed.
+
+**Step-by-step checks:**
+
+1. Open Foundry's **Game Settings**, choose **Configure Settings**, and open the **Fabricate** module settings.
+2. Find **Item Stack Quantity Field**.
+   Its hint text names the field your game system is expected to use.
+3. Confirm the configured value matches that expected field, unless you know your game system stores stack counts somewhere else.
+   Fabricate ships a correct default for most systems and documents a small number of known exceptions.
+4. Make sure the field points at the number of units itself, not at a section, table, or category the number happens to live inside.
+   Pointing at a container instead of the number is the most common way this setting is misconfigured, and it produces exactly the destructive symptom described above.
+5. If Fabricate detects a problem, it posts a standing warning naming how many of your world's items resolve a usable number at the configured field, compared with your system's expected field, and stating plainly that crafting, salvage, and alchemy will delete whole stacks until the field is corrected.
+   Follow the warning back to **Item Stack Quantity Field** in the Fabricate module settings and correct it there.
+   That check only looks at your world's **Items** directory, so a world that keeps everything in compendia and on character sheets is never warned even when the field is wrong.
+   Silence is not a clean bill of health: if stacks are being destroyed, work through the checks above rather than waiting for a warning.
+
+**See also:** [Recipe Appears Uncraftable Despite Owning Recipe Item or Components](#recipe-appears-uncraftable-despite-owning-recipe-item-or-components) covers a related but different craftability problem.
 
 ---
 

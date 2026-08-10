@@ -545,12 +545,23 @@ export function installFoundryShim(world) {
   // Nothing renders the returned document — the chat log is Foundry's, not Fabricate's, and is one
   // of the disclosed gaps — so this is a sink with a realistic shape, not a stub pretending to be a
   // chat log.
+  //
+  // `createChatMessage` is hoisted out of the literal instead of `createDocuments` calling
+  // `globalThis.ChatMessage.create`, because that self-reference made the property's type
+  // circular: the object was still being inferred at the point it referred to itself, so the
+  // callback's return type resolved to nothing and Sonar read the `.map` as a callback with no
+  // return AND the `Promise.all` as an aggregator over non-thenables (S3796, a BLOCKER, plus
+  // S4123). Both were artefacts of the cycle, not of the behaviour. Naming the function breaks it
+  // and the two entry points stay one implementation.
+  const createChatMessage = async (spec = {}) =>
+    makeDocument({ ...spec, _id: `lab-chat-${chatMessageSequence++}` }, 'ChatMessage');
+
   globalThis.ChatMessage = {
     async create(data = {}) {
-      return makeDocument({ ...data, _id: `lab-chat-${chatMessageSequence++}` }, 'ChatMessage');
+      return createChatMessage(data);
     },
     async createDocuments(specs = []) {
-      return Promise.all(specs.map((spec) => globalThis.ChatMessage.create(spec)));
+      return Promise.all(specs.map((spec) => createChatMessage(spec)));
     },
     getSpeaker(options = {}) {
       return { alias: options.actor?.name ?? 'Fabricate', actor: options.actor?.id ?? null };

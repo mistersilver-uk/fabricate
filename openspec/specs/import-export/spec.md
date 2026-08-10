@@ -54,6 +54,8 @@ The `runtimeStateIncluded: false` marker MUST stay honest with this boundary.
 Import MUST accept exports of any prior `schemaVersion` by upcasting through a migration before validation.
 A legacy export carries no `schemaVersion` and is treated as schema `1`.
 The migration MUST be idempotent: migrating an already-current payload is a no-op, and migrating a migrated payload equals migrating it once.
+A payload's `craftingCheck.maxModifierPicks` MUST be derived by `migrateExportPayload` from the payload's own system, by the same per-system transform the world-side `1.20.0` settings migration applies (stamp `1` onto a system on the `playerPicks` combination rule that carries no usable cap, and leave every other rule — `byRecipe` included — unbounded), and this derivation MUST run **branch-independently** of the schema-envelope upcast: a bundle already at the current `schemaVersion` still needs it, because the cap is a field added on an OLD schema version and its absence is orthogonal to the envelope version.
+An authored cap in the bundle MUST survive the import, which is what makes the derivation idempotent.
 
 ### GM gating
 
@@ -129,6 +131,9 @@ Terminating the progress indicator on failure MUST NOT suppress, wrap, or alter 
 ### Round-trip integrity
 
 For supported authoring data, a single-store keep-mode `export → import → export` MUST be equivalent modulo the volatile envelope fields `exportedAt` and `fabricateVersion`.
+`craftingCheck.maxModifierPicks` MUST round-trip through `export → import → export` under keep mode, and an ABSENT cap MUST stay absent for every rule the derivation above does not stamp — absence is the "unlimited" value, so writing a bound where the source had none would truncate recipe picks the bundle carries.
+A recipe's `craftingModifier.modifierIds` MUST round-trip, including an AUTHORED EMPTY array, which is distinct from an absent one.
+A legacy recipe-level `craftingModifier.policy` in a source bundle is inert and is not required to round-trip: `Recipe._normalizeCraftingModifier` drops it on read (see `data-models/spec.md` requirement 13a), and no resolver consults it.
 
 ## Out of Scope
 

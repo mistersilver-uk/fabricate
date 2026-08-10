@@ -33,6 +33,8 @@ const browser = createMountedComponentHarness({
     // componentBrowserModel imports the shared category totals; omitting it HANGS this
     // suite (`# cancelled`) rather than failing it.
     'src/utils/browserGroupCounts.js',
+    // ... and, since issue 1036, the shared page-window model too. Same consequence.
+    'src/utils/browserPagination.js',
     // The pure bulk selection + staging model (issue 772). The view imports it for the
     // selection helpers and its toolbar reads the description it returns.
     'src/utils/componentBulkEditModel.js',

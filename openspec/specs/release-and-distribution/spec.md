@@ -117,7 +117,10 @@ A derivable path is not a private one: a private channel's sources target MUST N
 Each private channel MUST derive its tester URLs from its own secret.
 A publish MUST NOT write any target belonging to a channel it was not asked to publish.
 A channel that declares tester targets but has no secret configured MUST fail the publish rather than write a guessable path.
-A cohort's URL is immutable once distributed: rotating a channel's secret 404s every distributed manifest URL, Foundry suppresses that error, and the client is shown only an offer to rewrite its manifest to the public registry — so rotation is a cohort migration, never hygiene.
+A cohort's URL is immutable once distributed: rotating a channel's secret is a cohort migration, never hygiene.
+Publishing MUST NOT remove a target it has already published for a tester group.
+A target superseded by rotation keeps serving its last pre-rotation manifest, so no update is ever offered to its cohort and no error is surfaced — the cohort silently stops receiving updates rather than failing.
+Secret rotation MUST NOT be relied on as a lockout, because every artefact published to a superseded target stays reachable to anyone holding its URL.
 A manifest a cohort holds MUST remain readable to that cohort: privacy is enforced on the archive and on URL secrecy, never by making a distributed manifest unreachable, because an unreachable manifest is not a lockout but an offer to defect to the public registry.
 
 #### Scenario: an anonymous request for a private channel's artefacts

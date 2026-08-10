@@ -21,6 +21,7 @@
  */
 
 import { categoryTotalOf } from './browserGroupCounts.js';
+import { paginateRows } from './browserPagination.js';
 import { GENERAL_COMPONENT_CATEGORY, normalizeComponentCategory } from './componentCategories.js';
 
 /** @typedef {'name' | 'category' | 'essences' | 'salvage'} ComponentSortKey */
@@ -313,19 +314,6 @@ export function describeActiveComponentFilters(filters = {}) {
  * @returns {{components: object[], pageIndex: number, pageCount: number, totalCount: number, rangeStart: number, rangeEnd: number}}
  */
 export function paginateComponents(components, options = {}) {
-  const rows = Array.isArray(components) ? components : [];
-  const pageSize = Math.max(1, numeric(options.pageSize, COMPONENT_DEFAULT_PAGE_SIZE));
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const pageIndex = Math.min(Math.max(0, numeric(options.pageIndex)), pageCount - 1);
-  const start = pageIndex * pageSize;
-  const page = rows.slice(start, start + pageSize);
-
-  return {
-    components: page,
-    pageIndex,
-    pageCount,
-    totalCount: rows.length,
-    rangeStart: page.length === 0 ? 0 : start + 1,
-    rangeEnd: page.length === 0 ? 0 : start + page.length,
-  };
+  const { rows, ...window } = paginateRows(components, options, COMPONENT_DEFAULT_PAGE_SIZE);
+  return { components: rows, ...window };
 }

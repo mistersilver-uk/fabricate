@@ -41,7 +41,13 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: npm ci
+      # `--ignore-scripts` per Sonar S6505: a dependency's install/postinstall script would otherwise
+      # run arbitrary code with this job's token and (for the OIDC callers) its AWS credentials. Every
+      # other workflow already installs this way; this shared preamble was the last bare `npm ci`.
+      # Nothing here needs a lifecycle script: package.json declares no pre/post-install or prepare
+      # hook, and the two callers that need browsers (beta.yml, release.yml) already follow this
+      # action with an explicit `./node_modules/.bin/playwright install chromium --with-deps`.
+      run: npm ci --ignore-scripts
 
     - name: Configure AWS credentials via OIDC
       # SHA-pinned per Sonar S7637. aws-role/aws-region come from the caller (see the note above);

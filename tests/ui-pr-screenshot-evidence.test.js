@@ -1342,8 +1342,18 @@ describe('UI PR screenshot evidence', () => {
   it('rejects failed, degraded, mismatched, stale, and wrong-target ordinary runs', () => {
     const changedFiles = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
     const cases = [
-      [changedFileEvidenceFixtures(changedFiles, { summaryPatch: { passed: false } }), /failed or degraded/],
-      [changedFileEvidenceFixtures(changedFiles, { summaryPatch: { degraded: true } }), /failed or degraded/],
+      // The refusal names the condition that tripped and the value it measured (issue
+      // #1019). It deliberately no longer contains the old "failed or degraded smoke
+      // summary" literal: keeping that substring alive would have made back-compat with a
+      // test literal into back-compat with the ten-word message the change exists to remove.
+      [
+        changedFileEvidenceFixtures(changedFiles, { summaryPatch: { passed: false } }),
+        /^ {2}passed: false — /m,
+      ],
+      [
+        changedFileEvidenceFixtures(changedFiles, { summaryPatch: { degraded: true } }),
+        /^ {2}degraded: true — /m,
+      ],
       [
         changedFileEvidenceFixtures(changedFiles, { manifestPatch: { runId: 'another-run' } }),
         /one run identity/,
@@ -1376,6 +1386,228 @@ describe('UI PR screenshot evidence', () => {
         }), message);
       });
     }
+  });
+
+  // ── The refusal diagnostic at the call site (issue #1019) ────────────────
+  //
+  // Direct-call tests of `explainSmokeSummaryRefusal` live in
+  // `tests/foundry-smoke-summary.test.js`. These exercise the gate itself, because a
+  // builder that is never reached is a builder whose absence no test can detect: the
+  // mutation that established the need for this block replaced the whole throw with
+  // `new Error('MUTANT …')` and this suite still returned 83 pass / 0 fail.
+  const EVIDENCE_CHANGED_FILES = ['src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte'];
+
+  // One shared driver over the existing `summaryPatch` extension point, which spreads last
+  // and reaches both fixture factories. Table-driven rather than a dozen copied blocks:
+  // SonarCloud Automatic Analysis ignores `sonar.cpd.exclusions`, so near-identical
+  // `tests/**` fixtures count against the new-code duplication gate exactly like `src/`.
+  const refuseWith = (summaryPatch, assertMessage) => {
+    withScreenshotFixtures(
+      changedFileEvidenceFixtures(EVIDENCE_CHANGED_FILES, { summaryPatch }),
+      (root) => {
+        assert.throws(
+          () => collectScreenshotEvidence({
+            changedFiles: EVIDENCE_CHANGED_FILES,
+            prNumber: 456,
+            root,
+            headSha: 'abc1234',
+          }),
+          (error) => {
+            assertMessage(error.message);
+            return true;
+          }
+        );
+      }
+    );
+  };
+
+  // Each fixture sets EXACTLY ONE field off-nominal, with the other four at their accepting
+  // values, so removing that disjunct from the gate's predicate flips this test to FAIL.
+  // The natural pair `{ passed: false, stepFailures: 2 }` would kill nothing — `passed !==
+  // true` short-circuits the disjunction — and `{ passed: true, stepFailures: 1 }` is not a
+  // summary the harness can emit. That is the point of it, not a defect in the fixture.
+  //
+  // Every note is pinned to its FULL literal, terminated by `$`. Anchoring on the value and
+  // leaving the note open-ended (`stepFailures: 1 — /m`) pins the half a reader does not need
+  // help with and leaves the explanatory half — the only part carrying the failure semantics —
+  // free: `'one or more phase steps did not pass'` could be replaced with its own negation, or
+  // emptied, and this suite stayed green.
+  it('names each disqualifying evidence condition on its own, with the value it measured', () => {
+    const cases = [
+      [{ passed: false }, /^ {2}passed: false — the run did not record a successful verdict$/m],
+      [{ stepFailures: 1 }, /^ {2}stepFailures: 1 — one or more phase steps did not pass$/m],
+      [
+        { consoleErrorCount: 4 },
+        /^ {2}consoleErrorCount: 4 — un-waived runtime console errors reached the independent console gate$/m,
+      ],
+      [
+        { degraded: true },
+        /^ {2}degraded: true — a transient renderer\/page teardown was tolerated; this condition alone does not fail a run, it marks a flake rather than a clean pass$/m,
+      ],
+      [
+        { rendererCrashed: true },
+        /^ {2}rendererCrashed: true — the page reported a renderer crash \(canonically an OOM\); this condition alone does not fail a run, it marks a flake rather than a clean pass$/m,
+      ],
+    ];
+    for (const [summaryPatch, expected] of cases) {
+      refuseWith(summaryPatch, (message) => {
+        assert.match(message, expected);
+        assert.match(message, /^Disqualifying evidence conditions \(1 of 5\):$/m);
+      });
+    }
+  });
+
+  // THE GATE-OPENING MUTANTS, all of them. Each of the gate's five disjuncts compares with
+  // `!==` so that a summary simply MISSING the key refuses; every weakening to a positive test
+  // — `stepFailures > 0`, `passed === false`, `degraded === true`, `rendererCrashed === true` —
+  // accepts that summary instead and opens the gate to a stale or truncated artifact. The
+  // single-condition fixtures above survive all four (measured), because they set the key to a
+  // present off-nominal value. Only an ABSENT key kills them, so all five keys are covered here
+  // rather than just the two counts. `summaryPatch: { key: undefined }` is how a key goes
+  // absent: JSON.stringify drops it.
+  const ACCEPTING_VALUE = Object.freeze({
+    passed: 'true',
+    stepFailures: '0',
+    consoleErrorCount: '0',
+    degraded: 'false',
+    rendererCrashed: 'false',
+  });
+  // The note an absent key is reported with. A `not recorded` value beside the note for a
+  // RECORDED one asserts as observed exactly what went unobserved — `rendererCrashed: not
+  // recorded — the page reported a renderer crash` claims a crash on a summary carrying no
+  // crash flag — so the note is pinned here in full, at the gate, alongside the value.
+  // `passed` is excluded deliberately: "the run did not record a successful verdict" is true
+  // of an absent verdict as well as a false one, so it keeps its single precise note.
+  const ABSENT_SIGNAL_NOTE =
+    'the summary did not record this signal, so this run cannot be shown to have been clean';
+  it('refuses a summary whose evidence-condition key is absent entirely, for every condition', () => {
+    for (const [key, accepting] of Object.entries(ACCEPTING_VALUE)) {
+      refuseWith({ [key]: undefined }, (message) => {
+        const note = key === 'passed' ? 'the run did not record a successful verdict' : ABSENT_SIGNAL_NOTE;
+        assert.match(message, new RegExp(`^ {2}${key}: not recorded — ${note}$`, 'm'));
+        // Never rendered as the value that would have been ACCEPTED: a refusal stating an
+        // accepting value for the condition it just tripped on reads as a gate defect.
+        assert.ok(
+          !message.includes(`${key}: ${accepting}`),
+          `${key} must not be reported as ${accepting}`
+        );
+      });
+    }
+  });
+
+  // A source-scan drift guard over the predicate itself, because the fixtures above can only
+  // ever cover the conditions someone remembered to write one for. It pins the exact five
+  // comparisons AND that they are what guards the builder call, so a sixth condition, a dropped
+  // disjunct, a weakened operator, or a detached builder all fail here in one assertion.
+  it('gates on exactly five evidence conditions, each a strict !== against its accepting value', () => {
+    const source = readFileSync(new URL('../scripts/ui-pr-screenshot-evidence.mjs', import.meta.url), 'utf8');
+    // WHEN THIS REGEX STOPS MATCHING — the predicate is hoisted to a named const, extracted to
+    // a helper, or reformatted — RE-ANCHOR IT ON WHEREVER THE THROW WENT. Do NOT relax it to
+    // scan the comparisons alone. The `throw new Error(explainSmokeSummaryRefusal(summary));`
+    // tail is the only half of this test proving the five comparisons guard THE BUILDER CALL
+    // rather than sitting in some unrelated `if` elsewhere in the file; dropping it is the
+    // cheapest way to make this test green again and it leaves a detached builder undetected,
+    // which is the exact defect (a builder nothing reaches) this block exists to catch.
+    const guarded = /\n {2}if \(\n([\s\S]*?)\n {2}\) \{\n {4}throw new Error\(explainSmokeSummaryRefusal\(summary\)\);/.exec(source);
+    assert.ok(Boolean(guarded), 'the five-condition predicate must guard the refusal builder');
+    // Sorted both sides: the SET of comparisons is the contract, their order in the disjunction
+    // is not, and pinning the order turns a harmless reordering into a failure whose cheapest
+    // repair is to edit the expectation — training the reader to edit this test rather than
+    // read it. A comparator is mandatory (`unicorn/require-array-sort-compare`; a bare `.sort()`
+    // is also a new-code BUG to SonarCloud, which scans `tests/**` the lint glob does not).
+    const byName = (a, b) => a.localeCompare(b);
+    assert.deepEqual((guarded[1].match(/summary\.\w+ !== (?:true|false|0)/g) ?? []).sort(byName), [
+      'summary.consoleErrorCount !== 0',
+      'summary.degraded !== false',
+      'summary.passed !== true',
+      'summary.rendererCrashed !== false',
+      'summary.stepFailures !== 0',
+    ]);
+    // …and nothing else reads the summary inside that block, so no sixth condition slips in
+    // under a comparison shape the matcher above does not recognise.
+    assert.equal((guarded[1].match(/summary\./g) || []).length, 5);
+  });
+
+  // The accept side, so the diagnostic cannot be satisfied by refusing everything.
+  it('still accepts a run whose steps all passed and whose console errors are empty', () => {
+    withScreenshotFixtures(
+      changedFileEvidenceFixtures(EVIDENCE_CHANGED_FILES, {
+        summaryPatch: {
+          steps: [
+            { step: 'boot-and-join', passed: true },
+            { step: 'screenshot-manager', passed: true },
+          ],
+          consoleErrors: [],
+        },
+      }),
+      (root) => {
+        const result = collectScreenshotEvidence({
+          changedFiles: EVIDENCE_CHANGED_FILES,
+          prNumber: 456,
+          root,
+          headSha: 'abc1234',
+        });
+        assert.equal(result.copied.length, 1);
+      }
+    );
+  });
+
+  // The incident from issue #1019, replayed. A first-match-wins builder would emit "the run
+  // did not pass" and nothing else here — the exact class-of-fault message this change exists
+  // to remove — and ship green, so both tripped conditions must be named.
+  it('replays the reported incident: names both tripped conditions and quotes every error', () => {
+    const interfaceError = "pageerror: Cannot read properties of undefined (reading 'INTERFACE')";
+    refuseWith(
+      {
+        passed: false,
+        stepFailures: 0,
+        consoleErrorCount: 3,
+        consoleErrors: [interfaceError, interfaceError, interfaceError],
+      },
+      (message) => {
+        assert.match(message, /^Disqualifying evidence conditions \(2 of 5\):$/m);
+        assert.match(message, /^ {2}passed: false — /m);
+        assert.match(message, /^ {2}consoleErrorCount: 3 — /m);
+        assert.equal(message.split('\n').filter((line) => line.includes('INTERFACE')).length, 3);
+        // The attribution procedure and the already-present-at-base prior.
+        assert.match(message, /git merge-base HEAD origin\/main/);
+        assert.match(message, /already present at the pull request's base/);
+        assert.match(message, /stepFailures 0 with consoleErrorCount above 0/);
+        // It never claims to have performed the comparison it describes.
+        assert.match(message, /reads one summary/);
+      }
+    );
+  });
+
+  it('names all five conditions when a summary trips all five', () => {
+    refuseWith(
+      {
+        passed: false,
+        stepFailures: 2,
+        consoleErrorCount: 1,
+        degraded: true,
+        rendererCrashed: true,
+      },
+      (message) => {
+        assert.match(message, /^Disqualifying evidence conditions \(5 of 5\):$/m);
+        for (const name of ['passed', 'stepFailures', 'consoleErrorCount', 'degraded', 'rendererCrashed']) {
+          assert.match(message, new RegExp(`^ {2}${name}: `, 'm'));
+        }
+      }
+    );
+  });
+
+  // `collect` prints this through `console.error(error.message)` with no `::error::`
+  // annotation, which is what makes a multi-line message safe. An annotation would collapse
+  // it to the first line in a GitHub log and silently undo the whole change.
+  it('emits a multi-line refusal carrying no workflow-command annotation', () => {
+    refuseWith({ passed: false }, (message) => {
+      assert.ok(message.split('\n').length > 5, 'the refusal is multi-line');
+      assert.ok(!message.includes('::error'), 'no ::error:: annotation');
+      assert.ok(!message.includes('::warning'), 'no ::warning:: annotation');
+    });
+    const source = readFileSync(new URL('../scripts/ui-pr-screenshot-evidence.mjs', import.meta.url), 'utf8');
+    assert.match(source, /console\.error\(error\.message\)/);
   });
 
   it('rejects an ordinary capture without binding or truthful PNG dimensions', () => {
@@ -1522,7 +1754,7 @@ describe('UI PR screenshot evidence', () => {
       [
         toolStudioEvidenceFixtures({ summaryPatch: { passed: false } }),
         'abc1234',
-        /failed or degraded smoke summary/,
+        /^ {2}passed: false — the run did not record a successful verdict$/m,
       ],
       [toolStudioEvidenceFixtures({ headSha: 'stale123' }), 'abc1234', /stale for the requested PR head SHA/],
       [

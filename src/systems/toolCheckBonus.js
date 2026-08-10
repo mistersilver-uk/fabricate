@@ -181,3 +181,64 @@ export function appendToolBonusTerms(formula, terms) {
   }
   return result;
 }
+
+/**
+ * The check-modifier term's flavour label: a FIXED ASCII literal, deliberately NOT
+ * localized (issue 1094).
+ *
+ * This is a correctness constraint, not an i18n oversight. The label lands inside a
+ * roll formula, and `parsePlainDiceGroups` (`src/utils/craftingCheckExpression.js`)
+ * splits on flavour brackets and whitespace, so a localized label containing a
+ * `\d*d\d+` token would be tokenized as a phantom crit-eligible die group — and that
+ * same tokenizer backs `hasPlainD20` and `applyD20Advantage`, so the damage would
+ * reach the advantage transform as well as the crit classifier.
+ */
+export const CHECK_MODIFIER_TERM_LABEL = 'Modifiers';
+
+/**
+ * Whether a value can be emitted as a dice-grammar `Constant`.
+ *
+ * `appendToolBonusTerms` stringifies through `Math.abs(value)` with no numeric
+ * formatting, and the grammar's `Constant = _ [0-9]+ ("." [0-9]+)?` has NO exponent
+ * production. A scalar that stringifies to exponent notation — `1e-7`, `1e+21` —
+ * would emit `+ 1e-7[Modifiers]`, which parses as `StringTerm("1e")` minus
+ * `NumericTerm(7[Modifiers])` and THROWS at evaluate because `allowStrings` defaults
+ * false. A non-finite value is refused for the same reason (`Infinity` / `NaN` are
+ * not `Constant`s either).
+ *
+ * The term is SKIPPED rather than clamped or rounded: a check modifier is the GM's
+ * arithmetic, and silently substituting a different number would be worse than
+ * contributing nothing.
+ */
+function isDecimalSafeTermValue(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return false;
+  return !String(Math.abs(numeric)).includes('e');
+}
+
+/**
+ * Append a resolved check-modifier scalar to a roll formula as ONE flavoured term
+ * (`1d20 + 3[Modifiers]`, `1d20 - 2[Modifiers]`), the way tool bonuses append (issue
+ * 1094, retiring the roll-formula placeholder they used to need).
+ *
+ * It DELEGATES to {@link appendToolBonusTerms} rather than re-implementing the emit,
+ * so the sign split (`Constant` is unsigned, so `+ -3[Modifiers]` would not parse but
+ * `- 3[Modifiers]` does), the `[label]` bracketing, `sanitizeTermLabel`'s control-
+ * character and bracket stripping, and the zero-skip stay ONE implementation. A
+ * second appender would drift.
+ *
+ * Ordering, unchanged by this function: tool bonuses append first, then this term,
+ * then the advantage transform, then the situational bonus.
+ *
+ * @param {string} formula
+ * @param {{ value?: unknown, label?: string }} [term]
+ * @returns {string} The formula with the term appended, or the trimmed formula
+ *   unchanged when the value is zero, non-finite, or not decimal-safe.
+ */
+export function appendCheckModifierTerm(
+  formula,
+  { value, label = CHECK_MODIFIER_TERM_LABEL } = {}
+) {
+  const terms = isDecimalSafeTermValue(value) ? [{ value: Number(value), label }] : [];
+  return appendToolBonusTerms(formula, terms);
+}

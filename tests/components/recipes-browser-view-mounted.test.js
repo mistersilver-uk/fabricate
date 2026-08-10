@@ -29,6 +29,8 @@ const RECIPE_RAW_MODULES = [
   // recipeBrowserModel imports the shared category totals (issue 676); omitting it here
   // HANGS this suite (`# cancelled`) rather than failing it.
   'src/utils/browserGroupCounts.js',
+  // ... and, since issue 1036, the shared page-window model too. Same consequence.
+  'src/utils/browserPagination.js',
   // The pure bulk selection + staging model (issue 1010). The browser imports it for the
   // four selection helpers and the toolbar reads the description it returns.
   'src/utils/recipeBulkEditModel.js',

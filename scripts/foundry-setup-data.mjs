@@ -12,10 +12,12 @@
  * the Docker container.
  */
 
-import { mkdirSync, cpSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+
+import { deriveWorldManifest, resolveSmokeArmFromEnv } from './lib/foundrySmokeArms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -40,7 +42,36 @@ function manifestVersion(manifestPath) {
   }
 }
 
+/**
+ * Stamp the copied world manifest for the arm being booted.
+ *
+ * The committed fixture at `.foundry-e2e/worlds/fabricate-smoke-ci/world.json` targets the DEFAULT
+ * arm, and `tests/view-lab-chrome-version-lock.test.js` holds it to the compose pin. A second
+ * committed fixture for the second arm would be a second source of truth that drifts silently — and
+ * the drift presents as a two-minute launch timeout, not as anything mentioning versions. So the
+ * runtime copy is stamped here instead: `coreVersion`, `systemVersion` and `compatibility` follow the
+ * arm. For the default arm the derivation is the identity function, which
+ * `tests/foundry-smoke-arms.test.js` asserts against the committed file.
+ *
+ * @param {string} worldDest The world directory inside the runtime data directory.
+ * @param {ReturnType<typeof resolveSmokeArmFromEnv>} arm
+ */
+function stampWorldManifestForArm(worldDest, arm) {
+  const manifestPath = join(worldDest, 'world.json');
+  if (!existsSync(manifestPath)) return;
+  const base = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const derived = deriveWorldManifest(base, arm);
+  writeFileSync(manifestPath, `${JSON.stringify(derived, null, 2)}\n`);
+  process.stdout.write(
+    `Stamped smoke world for arm ${arm.id}: coreVersion ${derived.coreVersion}, ` +
+      `systemVersion ${derived.systemVersion}, compatibility ${derived.compatibility.minimum}/` +
+      `${derived.compatibility.verified}\n`
+  );
+}
+
 function main() {
+  const arm = resolveSmokeArmFromEnv();
+
   // Create the base directory structure Foundry expects
   for (const sub of ['modules', 'worlds', 'systems']) {
     mkdirSync(join(DATA_DIR, sub), { recursive: true });
@@ -82,6 +113,7 @@ function main() {
     }
     cpSync(worldSrc, worldDest, { recursive: true });
     process.stdout.write('Copied smoke world: fabricate-smoke-ci\n');
+    stampWorldManifestForArm(worldDest, arm);
   }
 
   // Copy each downloaded game system.

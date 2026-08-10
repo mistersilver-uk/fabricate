@@ -224,7 +224,12 @@ const FIXTURE = `
               <button type="button" class="fab-bulk-book-unstage"><i class="fas fa-xmark"></i></button>
             </li>
           </ul>
-          <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
+          <!-- Apply is wrapped in its sticky dock (issue 1015). The wrapper is part of the
+               shipped markup, so it is mirrored here: a fixture that kept Apply as a direct
+               child of the panel would go on measuring a box the product no longer renders. -->
+          <div class="fab-bulk-edit-dock">
+            <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 3 recipes</span></button>
+          </div>
         </section>
       </div>
     </section>

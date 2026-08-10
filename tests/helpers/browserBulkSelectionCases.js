@@ -33,8 +33,11 @@
  * @property {() => object} createBrowserState the studio's browser-state factory.
  * @property {(count: number) => object[]} makeFlatRows one category, ids from `flatId`.
  * @property {(index: number) => string} flatId the id of the nth flat row (1-based).
- * @property {() => object[]} makeGroupedRows two categories, four rows.
- * @property {{collapseHeader: string, hiddenIds: string[], visibleIds: string[]}} grouped
+ * @property {() => object[]} [makeGroupedRows] two categories, four rows. OPTIONAL: a studio
+ *   with no grouping axis (the Essence Studio — essences have no category vocabulary, and
+ *   its status axis is a three-way FILTER, which is a different control and a different
+ *   question) omits it, and the collapsed-group case is replaced by its flat equivalent.
+ * @property {{collapseHeader: string, hiddenIds: string[], visibleIds: string[]}} [grouped]
  * @property {(rows: object[], extra?: object) => object} props the full mount props.
  * @property {{scope: string, count: number, why: string}} rowControls the row's own
  *   button cluster: the selection control must not join it, because the Foundry smoke walk
@@ -111,7 +114,32 @@ export function describeBrowserBulkSelection(studio) {
       assert.equal(selectionCountText(root), '', 'the readout disappears with an empty selection');
     });
 
+    // A studio with no grouping has no way to render FEWER rows than the page holds, so the
+    // case degrades to its flat form rather than being skipped: the page box still has to
+    // act on exactly the rendered rows and no more, and that is what is asserted. Stating it
+    // as one branch of one case rather than as a second `it()` keeps the contract single —
+    // a studio cannot silently answer neither.
     it('toggles ONLY the rendered rows from the page box, leaving a collapsed group alone', async () => {
+      if (!studio.grouped) {
+        const flat = await mountFlat(3);
+        const flatIds = [1, 2, 3].map((index) => studio.flatId(index));
+        const flatBox = flat.querySelector(pageBoxSelector);
+
+        flatBox.click();
+        flushSync();
+        assert.deepEqual(
+          bulkSelectedIds(flat).sort(compareIds),
+          [...flatIds].sort(compareIds),
+          'the page control reaches every rendered row'
+        );
+        assert.equal(flatBox.checked, true);
+
+        flatBox.click();
+        flushSync();
+        assert.deepEqual(bulkSelectedIds(flat), [], 'clicking again clears them');
+        return;
+      }
+
       const root = await harness.mount(studio.props(studio.makeGroupedRows()));
 
       // Collapse one category through its REAL header button, so its rows stop rendering.

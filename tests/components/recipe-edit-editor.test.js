@@ -398,19 +398,103 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
     'utf8'
   );
 
+  // Retargeted for issue 1055: the banner is now FULLY PROP-DRIVEN, so a second instance
+  // (the Overview tab's check-modifier summary) can reuse the chrome without forking the
+  // component. The canonical option table therefore moved UP to the resolution-mode call
+  // site — `RecipeEditView` — and the pin moved with it. The invariant it protects is
+  // unchanged: exactly one such table exists in the tree.
   it('reuses the canonical resolution-mode option list rather than re-authoring one', () => {
     assert.ok(
-      bannerSource.includes("import { resolutionModeOptions } from '../resolutionModeOptions.js'"),
-      'reads the canonical { value, icon, labelKey, descKey } list'
+      editSource.includes("import { resolutionModeOptions } from './resolutionModeOptions.js'"),
+      'the resolution-mode call site reads the canonical { value, icon, labelKey, descKey } list'
+    );
+    assert.equal(
+      /import\s*\{[^}]*resolutionModeOptions/.test(bannerSource),
+      false,
+      'the banner itself no longer imports the mode table — it authors no copy at all now'
     );
     assert.equal(bannerSource.includes('MODE_INFO'), false, 'no second, drifting copy of the table');
   });
 
   it('states that the mode is SYSTEM-level and routes to Crafting Settings', () => {
     assert.ok(bannerSource.includes('data-recipe-mode-banner-settings'), 'a settings deep-link');
-    assert.ok(bannerSource.includes('ModeBanner.SettingsHint'), 'says the mode is system-wide');
+    // Retargeted (issue 1055): `ModeBanner.SettingsHint` names the RESOLUTION MODE, which
+    // is the wrong sentence on the modifier banner, so it became an `actionHint` prop
+    // supplied per call site. It must still reach the shipped resolution-mode banner.
+    assert.ok(
+      editSource.includes('ModeBanner.SettingsHint'),
+      'the resolution-mode call site still says the mode is system-wide'
+    );
+    assert.ok(
+      bannerSource.includes('actionHint'),
+      'the hint is a per-call-site prop — a hardcoded one mislabels the second instance'
+    );
+    assert.equal(
+      bannerSource.includes('ModeBanner.'),
+      false,
+      'the banner hardcodes none of the resolution-mode copy'
+    );
     // A per-recipe resolution mode does not exist; the banner must not offer one.
     assert.equal(bannerSource.includes('onChange'), false, 'no per-recipe mode control');
+  });
+
+  // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the
+  // reported VALUE, so a shared hook would resolve to whichever rendered first, and the
+  // two value spaces (`simple`/`progressive`/… vs `noCheck`/`noFormula`/…) are disjoint.
+  //
+  // The prop-ification stays load-bearing after the redesign dropped the neutral
+  // delegation banner: the inert warning's copy lives at ITS call site, so folding the
+  // lookup back into the component would re-create the mode-table drift it was extracted
+  // to prevent.
+  it('takes its capture hook as a prop so two banners on one tab cannot collide', () => {
+    assert.ok(bannerSource.includes('dataAttr'), 'the container hook is a prop');
+    assert.ok(bannerSource.includes('actionDataAttr'), 'so is the action chip hook');
+    assert.ok(
+      bannerSource.includes("dataAttr = 'data-recipe-mode-banner'"),
+      'defaulting to the shipped resolution-mode hooks, so that call site restates nothing'
+    );
+    const overviewSourceLocal = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte'),
+      'utf8'
+    );
+    for (const attr of ['data-recipe-modifier-inert', 'data-recipe-modifier-inert-checks']) {
+      assert.ok(overviewSourceLocal.includes(attr), `the Overview tab passes its own ${attr}`);
+      assert.equal(
+        bannerSource.includes(attr),
+        false,
+        `${attr} belongs to the call site, not the component`
+      );
+    }
+    // The rejected design's neutral "the system decides" banner is GONE, not merely
+    // unrendered: no hook for it survives on either side.
+    for (const retired of ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner=']) {
+      assert.equal(
+        overviewSourceLocal.includes(retired),
+        false,
+        `${retired} is not emitted anywhere on the Overview tab`
+      );
+    }
+  });
+
+  // Visual differentiation was promised by the design and is delivered as COLOUR ONLY:
+  // two stacked banners of identical geometry read as duplicated chrome otherwise, and
+  // changing the geometry would move the tab's layout depending on system config.
+  it('differentiates a second banner by tone without moving its geometry', () => {
+    assert.ok(bannerSource.includes("tone = 'info'"), 'tone defaults to the primary reading');
+    for (const toneClass of ['is-neutral', 'is-warning']) {
+      assert.ok(bannerSource.includes(toneClass), `${toneClass} is a real tone`);
+    }
+    const toneBlock = bannerSource.slice(
+      bannerSource.indexOf('.manager-recipe-mode-banner.is-neutral')
+    );
+    const firstRule = toneBlock.slice(0, toneBlock.indexOf('}'));
+    for (const geometry of ['padding', 'width', 'height', 'gap', 'font-size']) {
+      assert.equal(
+        firstRule.includes(`${geometry}:`),
+        false,
+        `tone must not change ${geometry} — the two banners stay the same shape`
+      );
+    }
   });
 
   it('is rendered by the editor shell below the tab strip so the tabs stay attached to the header (§4.2)', () => {
@@ -1095,6 +1179,69 @@ describe('recipe image picker no longer reuses the scene-locked visuals', () => 
       css.includes('is-recipe-item-linked'),
       false,
       'the recipe-item locked-picker class is removed from the stylesheet'
+    );
+  });
+});
+
+// Issue 1018. Two DIFFERENT predicates used to share the name `enableBlocked`: the recipe
+// ACTIVATION GATE (`RecipeManager.canActivateRecipe`, projected onto the GM browser rows)
+// and the recipe editor's enable-TOGGLE gate (a readiness forecast). They are
+// INCOMPARABLE — neither bounds the other — so the editor one was renamed to
+// `enableToggleBlocked` and the projection kept the original name.
+//
+// This guard is deliberately TWO-SIDED. "The editor pair contains no `enableBlocked`" is
+// satisfied just as well by deleting the editor predicate, or by renaming the PROJECTION
+// and leaving the editor alone — both of which would re-merge or destroy the distinction
+// while reading green. So the positive half pins BOTH names at BOTH ends.
+describe('the editor enable-toggle gate is named apart from the activation gate (issue 1018)', () => {
+  it('leaves no `enableBlocked` anywhere in the editor pair', () => {
+    // Substring, not word-boundary: `enableToggleBlocked` does not contain `enableBlocked`,
+    // so a bare `includes` cannot false-positive on the new name.
+    assert.equal(
+      editSource.includes('enableBlocked'),
+      false,
+      'RecipeEditView must not reuse the activation gate name for its own predicate'
+    );
+    assert.equal(
+      overviewSource.includes('enableBlocked'),
+      false,
+      'RecipeOverviewTab must not reuse the activation gate name for its own prop'
+    );
+  });
+
+  it('keeps the editor predicate declared and forwarded as `enableToggleBlocked`', () => {
+    // The declaration, not just the identifier: deleting the predicate and leaving a
+    // stray mention would otherwise pass.
+    assert.ok(
+      editSource.includes(
+        'const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues))'
+      ),
+      'RecipeEditView derives enableToggleBlocked from the readiness issues'
+    );
+    assert.ok(
+      editSource.includes('{enableToggleBlocked}'),
+      'RecipeEditView forwards enableToggleBlocked to the Overview tab'
+    );
+    assert.ok(
+      overviewSource.includes('enableToggleBlocked = false,'),
+      'RecipeOverviewTab declares the enableToggleBlocked prop with its off-by-default value'
+    );
+    assert.ok(
+      overviewSource.includes('disabled={saving || enableToggleBlocked}'),
+      'the Overview enable toggle is disabled from enableToggleBlocked'
+    );
+  });
+
+  it('keeps the ACTIVATION gate projected and read as `enableBlocked`', () => {
+    // The other half. Renaming the projection instead of the editor local would satisfy
+    // the negative assertions above while leaving the two concepts merged under one name.
+    assert.ok(
+      storeSource.includes('enableBlocked: _isRecipeEnableBlocked('),
+      'adminStore still projects the activation gate onto GM recipe rows as enableBlocked'
+    );
+    assert.ok(
+      browserInspectorSource.includes('selectedRecipe.enableBlocked'),
+      'the browser inspector pill still reads the projected enableBlocked'
     );
   });
 });

@@ -425,3 +425,253 @@ test('salvage routed: the SUCCESS path threads the runtime tier-step evidence in
   );
   assert.ok(chatMessages[0].content.includes('FABRICATE.Chat.TierStepUp'), 'the up key');
 });
+
+// ── The PRE-RESOLVED roll decision (issue 859) ──────────────────────────────
+//
+// `rollDecision` is `promptCheckRoll`'s return shape MINUS `confirmed`, so
+// `evaluateCheckRoll` treats it as a pre-resolved `choice` and runs the identical
+// downstream code (the check-modifier append, `applyD20Advantage`, the `Roll.validate`
+// net, `effectiveRollMode`). One prompt answer therefore drives N rolls of a bulk run.
+//
+// It is attached by `CraftingEngine._salvageRollOptions` — NOT by
+// `buildInteractiveRollOptions`, which is shared with the crafting and gathering paths
+// and wires no pre-resolved-roll support at all. That one helper is a single gate serving
+// all three salvage runners, so a fourth runner cannot ship without it.
+
+/** Record the formula every `new Roll(...)` is constructed with, and its chat post. */
+function stubRecordingRoll(total) {
+  const seen = { formulas: [], messages: [] };
+  globalThis.Roll = class {
+    constructor(formula) {
+      seen.formulas.push(formula);
+    }
+    async evaluate() {
+      return {
+        total,
+        dice: [{ number: 1, faces: 20, total, results: [{ result: total, active: true }] }],
+        toMessage: async (data, options) => {
+          seen.messages.push({ data, options });
+          return { id: 'msg-1' };
+        },
+      };
+    }
+  };
+  globalThis.ChatMessage = { create: async () => ({ id: 'msg' }), getSpeaker: () => ({}) };
+  return seen;
+}
+
+/**
+ * Run one salvage check, capturing every `rollOptions` bag the runners built.
+ *
+ * `prompt` is replaced with a RECORDING stub rather than left as the real
+ * `promptCheckRoll`, so "the prompt is not invoked" is an assertion about a call count
+ * rather than about the absence of a dialog nothing would have opened headlessly anyway.
+ */
+async function runWithDecision(engine, system, component, options = {}) {
+  const bags = [];
+  const promptCalls = [];
+  const build = engine._salvageRollOptions.bind(engine);
+  engine._salvageRollOptions = (args) => {
+    const bag = build(args);
+    if (options.dropPrompt === true) delete bag.prompt;
+    else {
+      bag.prompt = async (promptArgs) => {
+        promptCalls.push(promptArgs);
+        return { confirmed: true, bonus: null, rollMode: undefined, advantage: 'normal' };
+      };
+    }
+    bags.push(bag);
+    return bag;
+  };
+  const result = await engine._runSalvageCraftingCheck(component, system, ACTOR, {
+    interactive: options.interactive ?? true,
+    toolItems: [],
+    rollDecision: options.rollDecision ?? null,
+  });
+  return { result, bags, promptCalls };
+}
+
+const DECISION = { bonus: '3', rollMode: 'blindroll', advantage: 'advantage' };
+
+const MODE_FIXTURES = [
+  { mode: 'simple', check: { simple: { rollFormula: '1d20', dc: 5, thresholdMode: 'meet' } } },
+  {
+    mode: 'routed',
+    check: {
+      routed: {
+        type: 'relative',
+        rollFormula: '1d20',
+        dc: 15,
+        thresholdMode: 'meet',
+        relativeOutcomes: ROUTED_RELATIVE,
+      },
+    },
+  },
+  { mode: 'progressive', check: { progressive: { rollFormula: '1d20', awardMode: 'equal' } } },
+];
+
+for (const fixture of MODE_FIXTURES) {
+  test(`salvage ${fixture.mode}: a rollDecision reaches the roll options and no prompt opens`, async () => {
+    const engine = makeEngine();
+    stubRecordingRoll(16);
+    const { bags, promptCalls } = await runWithDecision(
+      engine,
+      sys(fixture.check, fixture.mode),
+      {},
+      { rollDecision: DECISION }
+    );
+
+    assert.equal(bags.length, 1, `the ${fixture.mode} runner built exactly one bag`);
+    assert.equal(bags[0].rollDecision, DECISION, 'the SAME object, not a clone');
+    assert.deepEqual(promptCalls, [], 'no dialog is opened for a pre-resolved roll');
+  });
+
+  test(`salvage ${fixture.mode}: with NO decision the bag is byte-identical and the prompt runs`, async () => {
+    // Acceptance 11 — the single-item path is unchanged. The decision is attached only
+    // when truthy, so a bag built without one carries no stray key at all.
+    const engine = makeEngine();
+    stubRecordingRoll(16);
+    const { bags, promptCalls } = await runWithDecision(
+      engine,
+      sys(fixture.check, fixture.mode),
+      {}
+    );
+
+    assert.equal('rollDecision' in bags[0], false, 'no stray key on the single-item path');
+    assert.equal(promptCalls.length, 1, 'and the player is still asked');
+  });
+}
+
+test('the no-decision bag is DEEP-EQUAL to what it was before the seam existed', async () => {
+  // A key-presence check alone would pass against a bag carrying `rollDecision: null`.
+  // This pins the whole shape, so an added key of any spelling reds.
+  const engine = makeEngine();
+  stubRecordingRoll(16);
+  const { bags } = await runWithDecision(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),
+    { name: 'Iron Ore', img: 'icons/ore.webp' },
+    { dropPrompt: true }
+  );
+
+  assert.deepEqual(Object.keys(bags[0]).sort(), [
+    'activity',
+    'dc',
+    'flavor',
+    'img',
+    'interactive',
+    'name',
+    'rollMode',
+    'speaker',
+  ]);
+});
+
+test('a decision applies the bonus and the advantage transform to the rolled formula', async () => {
+  const engine = makeEngine();
+  const seen = stubRecordingRoll(16);
+  await runWithDecision(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),
+    {},
+    {
+      rollDecision: DECISION,
+    }
+  );
+
+  assert.equal(
+    seen.formulas.at(-1),
+    '2d20kh1 + (3)',
+    'advantage first, then the situational bonus on top of the pool'
+  );
+});
+
+test("a decision's roll mode reaches the chat post", async () => {
+  const engine = makeEngine();
+  const seen = stubRecordingRoll(16);
+  await runWithDecision(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),
+    {},
+    {
+      rollDecision: DECISION,
+    }
+  );
+
+  assert.equal(seen.messages.at(-1)?.options?.rollMode, 'blindroll');
+});
+
+test('a decision supplied with NO prompt still applies bonus, advantage and roll mode', async () => {
+  // The load-bearing half of `evaluateCheckRoll`'s predicate:
+  // `interactive === true && (Boolean(preResolved) || typeof options.prompt === 'function')`.
+  // Without the `Boolean(preResolved) ||` half, a decision supplied without a prompt is
+  // silently discarded and the BASE formula rolls — the bulk run's bonus, advantage and
+  // roll mode all vanish with no error anywhere.
+  const engine = makeEngine();
+  const seen = stubRecordingRoll(16);
+  const { result } = await runWithDecision(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),
+    {},
+    { rollDecision: DECISION, dropPrompt: true }
+  );
+
+  assert.equal(seen.formulas.at(-1), '2d20kh1 + (3)');
+  assert.equal(seen.messages.at(-1)?.options?.rollMode, 'blindroll');
+  assert.equal(result.success, true);
+});
+
+test('a decision is NEVER read as a cancellation', async () => {
+  // `rollDecision` carries no `confirmed` key, and the evaluator's early exit is
+  // `choice.confirmed === false`. A future tightening to `!choice.confirmed` would turn
+  // EVERY bulk roll into a cancellation — twenty-five silent no-ops per gesture.
+  const engine = makeEngine();
+  stubRecordingRoll(18);
+  const decision = { bonus: null, rollMode: undefined, advantage: 'normal' };
+  assert.equal('confirmed' in decision, false, 'the shape under test carries no flag');
+
+  const { result } = await runWithDecision(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 5, thresholdMode: 'meet' } }, 'simple'),
+    {},
+    { rollDecision: decision, dropPrompt: true }
+  );
+
+  assert.equal(result.cancelled, undefined, 'not a cancellation');
+  assert.equal(result.success, true, 'it rolled, and it passed');
+  assert.equal(result.value, 18);
+});
+
+test('an explicit confirmed:false in a decision STILL cancels', async () => {
+  // The guard is not weakened for pre-resolved decisions: it is `=== false`, so a caller
+  // that does hand over a dismissal is still honoured.
+  const engine = makeEngine();
+  stubRecordingRoll(18);
+  const { result } = await runWithDecision(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),
+    {},
+    { rollDecision: { confirmed: false, bonus: null, advantage: 'normal' }, dropPrompt: true }
+  );
+
+  assert.equal(result.cancelled, true);
+});
+
+test('a decision is ignored entirely on a NON-interactive roll', async () => {
+  // The gate is `interactive === true` first. Automation and macros stay silent and
+  // unmodified even if a decision is handed in.
+  const engine = makeEngine();
+  const seen = stubRecordingRoll(16);
+  await runWithDecision(
+    engine,
+    sys({ simple: { rollFormula: '1d20', dc: 5 } }, 'simple'),
+    {},
+    {
+      rollDecision: DECISION,
+      interactive: false,
+      dropPrompt: true,
+    }
+  );
+
+  assert.equal(seen.formulas.at(-1), '1d20', 'the base formula, untouched');
+  assert.deepEqual(seen.messages, [], 'and nothing is posted to chat');
+});

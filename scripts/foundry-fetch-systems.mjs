@@ -6,8 +6,17 @@
  *
  * Usage: node scripts/foundry-fetch-systems.mjs
  *
- * Each entry in SYSTEMS defines a system ID, version, and the GitHub
- * release URL for its zip archive. Add new systems here as needed.
+ * The system list is NOT a constant here any more: it belongs to the selected smoke arm
+ * (`FOUNDRY_SMOKE_ARM`, resolved by scripts/lib/foundrySmokeArms.js), because the pin is
+ * generation-specific — dnd5e 5.3.3 declares `verified: "14"` and 5.2.5 declares `verified: "13"`,
+ * and an unverified system is one of the two things that can put a blocking modal in front of the
+ * smoke's world launch.
+ *
+ * `.foundry-e2e/systems/<id>` holds exactly ONE version — the arm's — because
+ * `scripts/foundry-setup-data.mjs` copies every directory it finds there into the container's data
+ * directory, so two versions side by side would install two systems. Previously-fetched versions are
+ * kept under `.foundry-e2e/systems-cache/<id>@<version>/` instead, so switching arms is a local copy
+ * rather than a repeat 50 MB download.
  */
 
 import {
@@ -25,20 +34,15 @@ import { fileURLToPath } from 'node:url';
 import { pipeline } from 'node:stream/promises';
 import { execFileSync } from 'node:child_process';
 
+import { resolveSmokeArmFromEnv } from './lib/foundrySmokeArms.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const SYSTEMS_DIR = join(ROOT, '.foundry-e2e', 'systems');
+const SYSTEMS_CACHE_DIR = join(ROOT, '.foundry-e2e', 'systems-cache');
 
-// dnd5e 5.3.3 is the first release that declares `verified: "14"`; 5.2.5 declared `verified: "13"`,
-// which Foundry 14 loads but flags as unverified — and an unverified system is one of the two
-// things that can put a blocking modal in front of the smoke's world launch.
-const SYSTEMS = [
-  {
-    id: 'dnd5e',
-    version: '5.3.3',
-    url: 'https://github.com/foundryvtt/dnd5e/releases/download/release-5.3.3/dnd5e-release-5.3.3.zip',
-  },
-];
+const ARM = resolveSmokeArmFromEnv();
+const SYSTEMS = ARM.systems;
 
 /** Where `unzip` lives on the platforms this runs on. Fixed paths, never `$PATH`. */
 const UNZIP_PATHS = Object.freeze(['/usr/bin/unzip', '/bin/unzip', '/usr/local/bin/unzip']);
@@ -103,6 +107,45 @@ function swapIntoPlace(from, to) {
   }
 }
 
+/**
+ * Retain a fetched release under `.foundry-e2e/systems-cache/<id>@<version>/`.
+ *
+ * The active install directory can only ever hold one version (setup-data copies whatever it finds),
+ * so switching smoke arms would otherwise re-download the other generation's release every time.
+ *
+ * @param {string} id
+ * @param {string} version
+ * @param {string} source Directory holding the extracted release.
+ */
+function retainInCache(id, version, source) {
+  // An unreadable manifest yields a null version; caching under "id@null" would be a copy nothing
+  // can ever match, so treat it as not worth keeping.
+  if (!version) return;
+  const cached = join(SYSTEMS_CACHE_DIR, `${id}@${version}`);
+  if (existsSync(join(cached, 'system.json'))) return;
+  mkdirSync(SYSTEMS_CACHE_DIR, { recursive: true });
+  rmSync(cached, { recursive: true, force: true });
+  cpSync(source, cached, { recursive: true });
+  process.stdout.write(`Cached ${id}@${version} for arm switches.\n`);
+}
+
+/**
+ * Install a previously-fetched release from the cache, if it is there.
+ *
+ * @param {string} id
+ * @param {string} version
+ * @param {string} dest Active install directory.
+ * @returns {boolean} True when the cache satisfied the request.
+ */
+function installFromCache(id, version, dest) {
+  const cached = join(SYSTEMS_CACHE_DIR, `${id}@${version}`);
+  if (readInstalledVersion(join(cached, 'system.json')) !== version) return false;
+  rmSync(dest, { recursive: true, force: true });
+  cpSync(cached, dest, { recursive: true });
+  process.stdout.write(`System ${id}@${version} restored from the local cache.\n`);
+  return true;
+}
+
 async function fetchSystem({ id, version, url }) {
   const dest = join(SYSTEMS_DIR, id);
   const manifest = join(dest, 'system.json');
@@ -115,12 +158,17 @@ async function fetchSystem({ id, version, url }) {
     const installed = readInstalledVersion(manifest);
     if (installed === version) {
       process.stdout.write(`System ${id}@${version} already present, skipping.\n`);
+      retainInCache(id, version, dest);
       return;
     }
     process.stdout.write(
-      `System ${id}@${installed ?? 'unknown'} is present but ${version} is pinned; re-downloading.\n`
+      `System ${id}@${installed ?? 'unknown'} is present but ${version} is pinned; replacing.\n`
     );
+    // Keep the outgoing version so switching back to the other arm costs a copy, not a download.
+    retainInCache(id, installed, dest);
   }
+
+  if (installFromCache(id, version, dest)) return;
 
   process.stdout.write(`Downloading ${id}@${version}...\n`);
 
@@ -183,11 +231,14 @@ async function fetchSystem({ id, version, url }) {
     rmSync(tmpZip, { force: true });
   }
 
+  retainInCache(id, version, dest);
   process.stdout.write(`System ${id}@${version} installed to ${dest}\n`);
 }
 
 async function main() {
   mkdirSync(SYSTEMS_DIR, { recursive: true });
+  const pinnedSystems = SYSTEMS.map((system) => `${system.id}@${system.version}`).join(', ');
+  process.stdout.write(`Smoke arm ${ARM.id} (Foundry ${ARM.foundryVersion}): ${pinnedSystems}\n`);
 
   for (const system of SYSTEMS) {
     await fetchSystem(system);

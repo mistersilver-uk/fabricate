@@ -999,7 +999,7 @@
   .fab-bulk-book-pick-meta {
     min-width: 0;
     overflow: hidden;
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     font-size: 0.62rem;
     line-height: 1.3;
     text-overflow: ellipsis;
@@ -1021,7 +1021,7 @@
     border: none;
     border-radius: 5px;
     background: transparent;
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     font-size: 0.68rem;
     cursor: pointer;
   }
@@ -1075,7 +1075,7 @@
   .fab-bulk-book-unstage:disabled {
     border-color: var(--fab-border);
     background: transparent;
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     opacity: 0.55;
     cursor: default;
   }
@@ -1145,7 +1145,7 @@
   }
 
   .fab-bulk-book-staged-count {
-    color: var(--fab-text-subtle);
+    color: var(--fab-mv2-text-muted);
     font-size: 0.58rem;
     line-height: 1.3;
   }

@@ -157,17 +157,36 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
 
-    // Per-recipe check-modifier catalogue (issue 770). A crafting-owned named
-    // catalogue (NOT gathering's characterModifiers — a different aggregate) feeding
-    // the `@craftingmod` roll-formula placeholder. Each `expression` is a roll-data
+    // Per-recipe check-modifier catalogue (issues 770, 1055). A crafting-owned named
+    // catalogue (NOT gathering's characterModifiers — a different aggregate) appended
+    // to the check roll automatically. Each `expression` is a roll-data
     // fragment evaluated against the crafter (missing/failed → 0). Absent = empty
-    // catalogue + addAll policy = a no-op for a single-formula check (back-compat).
+    // catalogue + addAll rule = a scalar of 0, which appends no term at all.
     checkModifiers?: { id: string, label: string, icon?: string, expression: string }[], // default []
-    // An unrecognized value falls back to "addAll" HERE (system level only); a bad
-    // recipe-level policy instead inherits this one. playerPicks resolves as highest
-    // whenever the deferred pick-one prompt is not offered (resolution-modes/spec.md).
+    // The COMBINATION RULE, owned by the SYSTEM alone (issue 1055). It states BOTH how
+    // the eligible values reduce to one number AND who selects them:
+    //   addAll      — sum the system's own default set. Nobody selects.
+    //   highest     — max(...) of the system's own default set. Nobody selects.
+    //   byRecipe    — "Recipe picks": the RECIPE author selects, at recipe-edit time.
+    //   playerPicks — the PLAYER selects, at roll time.
+    // `byRecipe` is a first-class rule, NOT a delegation of authority: a recipe chooses
+    // WHICH modifiers apply, never HOW they combine. Both selecting rules SUM what was
+    // picked and are bounded by `maxModifierPicks` below. An unrecognized value falls
+    // back to "addAll"; a recipe never overrides this field. `playerPicks` resolves
+    // deterministically to the best legal selection whenever the roll-time prompt is not
+    // offered (resolution-modes/spec.md).
     defaultModifierPolicy?: "addAll" | "highest" | "byRecipe" | "playerPicks",  // default "addAll"
     defaultModifierIds?: string[],  // default []; catalogue entries applied by default
+    // The cap on how many modifiers a SELECTING rule (`byRecipe`, `playerPicks`) may
+    // pick; meaningless under `addAll`/`highest`, and stored system-wide regardless of
+    // the current rule so flipping between the two selecting rules does not destroy it.
+    // PRESERVES ABSENCE — only a positive integer is attached, so `null`, `0`, `2.5` and
+    // junk all normalize to the SAME shape, key absent. Absence means UNLIMITED
+    // (`Infinity`), resolved at `resolveMaxModifierPicks` (`craftingModifierResolver.js`)
+    // and never defaulted at this shape: a system never asked the question must not
+    // silently acquire a bound that truncates recipe picks already on disk. See
+    // resolution-modes/spec.md §Check Source and the `1.20.0` migration below.
+    maxModifierPicks?: number,  // positive integer; default: key absent = unlimited
   },
 
   // Shared check sub-object shapes, reused by craftingCheck / salvageCraftingCheck /
@@ -463,7 +482,10 @@ CraftingSystem = {
     `craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
 
 30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
-    A check is **usable** IFF its resolution mode carries an authored `rollFormula` (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
+    A check is **usable** IFF its resolution mode carries an authored `rollFormula` that SURVIVES the retired-placeholder shim (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
+    The post-shim reading is the whole rule and not a refinement of it (issue 1094): a stored `@craftingmod` IS authored and is NOT usable, because `stripRetiredModifierPlaceholder` reduces it to `''`, and so is any formula whose placement of that placeholder the shim refuses (`1d20 * @craftingmod`, `max(@craftingmod, 2)`, `(2 + @craftingmod + 4) * 3`).
+    `resolveActiveCraftingCheckFormula` and `resolveSalvageCheck` apply the shim BEFORE their emptiness test, `checksReadiness` derives `hasRollFormula` from the same post-shim value, and `CraftingEngine._runCraftingCheck` gates every runner on `checkUsable` rather than on a raw `rollFormula` — so readiness, the inert-cause projection, the recipe editor and the engine cannot disagree about whether a check works.
+    Check-modifier CONTRIBUTION is independent of the formula's text: the resolved scalar is APPENDED as one `+ N[Modifiers]` term, so a usable formula always carries it and no placeholder is authored, spent or forgotten.
     The historical `checkSource` discriminator (with its `"builtIn"` value) and the `builtIn: { ability, skill, dc, advantage }` game-system adapter sub-object are **NOT** part of the model: that adapter, together with the macro-as-check-source fields (`macroUuid`, `successMacroUuid`, `failureMacroUuid`), was removed in the 1.8.0 migration (`migrateRemoveLegacyCheckSources`).
     Normalization never emits `checkSource` or `builtIn`, and any persisted values are stripped on migration.
     The distinct `craftingCheck.simple.macroUuid` (the optional dynamic-DC macro) is a separate, retained feature and is not a check source.
@@ -638,6 +660,8 @@ EssenceDefinition = {
   icon: string,
   colorToken?: string | null, // a `--fab-tag-*` palette key, or null for the accent default
   description?: string,
+  enabled: boolean, // default true; gates essence-carried BEHAVIOUR, never essence arithmetic
+  propertyMacroUuid?: string | null, // a script Macro run against every result this essence contributes to
   sourceComponentId?: string | null,
   sourceItemUuid?: string | null, // compatibility alias; may contain a legacy component id
   associatedSystemItemId?: string | null, // compatibility alias for sourceComponentId
@@ -654,6 +678,24 @@ EssenceDefinition = {
    It has **no** `customColor` sibling — the palette is the whole vocabulary, because a free hex cannot be guaranteed legible against all seven themes.
    Normalization emits it in **both** branches of essence-definition normalization (the object branch and the legacy id-string branch), so a definition never reaches a surface with the field absent.
    A `null` or unrecognized token renders as the theme accent, which is what every essence renders as today, so no migration is required.
+6. `enabled` defaults to **true** and is emitted in **both** branches of essence-definition normalization, as `colorToken` is.
+   The object branch reads `entry.enabled !== false`; the legacy id-string branch emits `true`.
+   No migration is required and adding one would be wrong: essence-definition normalization is a whitelist rebuild that has never emitted the key, so no stored definition carries one and an absent key already reads as enabled.
+   The same holds across export, import, copy-import and the export-payload migration, none of which can write a spurious `false`.
+7. `enabled` gates essence-carried **behaviour**, never essence **arithmetic**.
+   A disabled essence still matches, accumulates and is consumed exactly as before, because a mid-session toggle must not change what an already-held item is worth.
+   It carries nothing onto a crafted result: neither its property macro nor its active-effect transfer runs.
+   A disabled essence is soft-disabled and fully reversible — nothing is deleted, and every stored reference is preserved and still rendered.
+8. A disabled essence MUST NOT be removed from the valid-essence-id set threaded into component normalization, and MUST NOT be filtered out of the component-essence or recipe-essence option sets.
+   Three separate whitelist rebuilds are driven by those sets — component essence-quantity normalization, the component editor's update projection, and the component bulk edit's staged essence map — and each would silently destroy authored quantities for a disabled essence.
+   Only the ADD-NEW offer list withholds a disabled essence; a disabled essence that already carries a positive quantity, or is already referenced, is rendered with a disabled marker and stays editable and clearable.
+9. `propertyMacroUuid` is the GM-authored per-essence property macro.
+   It shares its name and its meaning with `Result.propertyMacroUuid` — a macro that rewrites crafted item data before creation — and runs under the same `features.propertyMacros` gate, additionally gated on `features.essences`.
+   Normalization applies a document-UUID **shape** check and stores `null` for anything else; it deliberately does not require a `Macro.` prefix, because legacy four-segment compendium uuids still resolve and a stricter test would reject a usable macro.
+   The editor's drop handler and the essence editor's validation surface refuse a macro whose own type is not `script` at authoring time.
+   That check is repeated at craft time as a backstop, because `command` is a required string on a `chat` macro too and `type` defaults to `chat`, so an imported system or a hand-edited world setting can carry a `propertyMacroUuid` that never passed through the drop handler at all.
+   At craft time an unresolvable uuid, or one that resolves to a Macro whose own type is not `script`, is logged and skipped silently.
+10. Both new fields survive export, import and copy-import unchanged, and the import reference resolver collects `propertyMacroUuid` as a macro reference owned by the essence.
 
 ## RecipeItemDefinition
 
@@ -836,7 +878,7 @@ Represent one curated item entry available to recipes and salvage operations.
    Explicit `fabricate.essences` item flags remain a compatibility override for that item.
    The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
    The separate name fallback some callers apply after the resolver returns null is not part of this matcher and is unchanged here.
-   That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine._findComponentItems`.
+   That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine.findComponentItems` (the private `_findComponentItems` spelling survives only as a thin delegate for existing callers).
    Closing that name path is deferred to issue 557.
 7. `salvage.outcomeRouting` is only meaningful when `salvageResolutionMode` is `"routed"`.
    In routed salvage mode it keys on the salvage check's outcome-tier NAMES (`salvageCraftingCheck.routed.{relativeOutcomes,fixedOutcomes}` for the active `type`) — the same source the per-component routing editor offers and the runtime routes by — NOT the legacy flat `salvageCraftingCheck.outcomes` list.
@@ -878,6 +920,14 @@ Represent one curated item entry available to recipes and salvage operations.
     An axis is written only when the caller supplies it; supplying an empty essence map or a zero difficulty is an instruction to CLEAR that value, not an absent instruction, and a removal-only call is a real edit rather than a no-op.
     Every written component is re-normalized under the owning system's essence and salvage context, exactly as a single-component write is, so an essence outside the system's definitions cannot be introduced and the salvage invariants of this data model continue to hold.
     The bulk axes never carry salvage: salvage is only ever touched by that shared normalization, never edited by this write.
+17. **Bulk destroy** deletes every contributing document of the named component **on the target actor** — whole stacks — and never reads `salvage.ingredientQuantity`.
+    It is not gated on `salvage.enabled` or on `CraftingSystem.features.salvage`: destroying is not a salvage outcome, and a row blocked for salvage is often exactly the row a player wants gone.
+    Whole stacks are the unit because that is what destroying a thing means and the gesture carries no quantity control; salvage's one-unit-at-a-time rule comes from the GM-authored `ingredientQuantity`, for which destroy has no analogue.
+    Document resolution uses the **same Component Item Matching resolver salvage uses** (see the `### Component Item Matching` section below), including the case-sensitive name fallback requirement 6 records — a destroy that matched more broadly than salvage would delete documents the player was shown as belonging to a different component.
+    The reported unit count derives from the documents the delete **actually removed**, never from the ids requested, because a `preDeleteItem` veto drops individual ids silently while the rest of the batch deletes; a vetoed document is reported to the player rather than counted as destroyed.
+    Stack quantities are read through the configured stack-quantity accessor and captured **before** deleting, since a deleted document's name, image and stack size are unreadable afterwards.
+18. **Bulk salvage** consumes `salvage.ingredientQuantity` per selected row exactly as a single salvage does.
+    There is no per-row quantity in the bulk gesture: each queued row is one `salvage()` call at the component's authored `ingredientQuantity`.
 
 ## Recipe
 
@@ -926,14 +976,25 @@ Recipe = {
   // check; ignored otherwise. Semantics in resolution-modes/spec.md.
   minSuccessOutcomeId?: string | null,
 
-  // Optional per-recipe crafting-check modifier override (issue 770). Absent (null) =
-  // inherit the system's `craftingCheck.defaultModifierPolicy` + `defaultModifierIds`.
-  // Present = override the policy and/or the eligible id subset resolved into the
-  // `@craftingmod` placeholder (unknown ids dropped at resolution against the live
-  // catalogue). `byRecipe` at recipe level means "use exactly this recipe's modifierIds".
-  // The normalizer drops a malformed value to null and a policy-less + id-less object to
-  // null (nothing to override). Semantics in resolution-modes/spec.md §Check Source.
-  craftingModifier?: { policy?: "addAll" | "highest" | "byRecipe" | "playerPicks", modifierIds?: string[] } | null,
+  // The recipe author's PICK of crafting-check modifiers (issues 770, 1055). Absent
+  // (null) = picked nothing; inherit the system's `defaultModifierIds`. Present = names
+  // the eligible id subset reduced to the scalar appended to the check roll (unknown ids
+  // dropped at resolution against the live catalogue, and the survivors truncated to
+  // `craftingCheck.maxModifierPicks`). It is honoured ONLY under the system's `byRecipe`
+  // ("Recipe picks") combination rule; under `addAll`, `highest` and `playerPicks` a
+  // stored pick sits here and is not consulted at all.
+  // IT CARRIES NO RULE. A recipe chooses WHICH modifiers apply, never HOW they combine,
+  // so the combination rule is the system's alone. Older data may carry a `policy` key
+  // from the era when a recipe could override it; `Recipe._normalizeCraftingModifier`
+  // DROPS it on the way in, so it cannot round-trip back out through `toJSON`, and
+  // `resolveModifierPolicy` never reads it wherever it survives unnormalized on disk.
+  // `modifierIds` is keyed on `Array.isArray` AT THE POINT OF ENTRY, not on the
+  // filtered array's length: an authored `[]` is preserved as an authored EMPTY set
+  // (0 eligible modifiers, so nothing is appended), distinct from an absent `modifierIds`,
+  // which inherits. The normalizer drops a malformed value, and an object carrying no
+  // authored `modifierIds` array, to null (nothing picked). Semantics in
+  // resolution-modes/spec.md §Check Source.
+  craftingModifier?: { modifierIds?: string[] } | null,
 
   // Per-recipe access grants for the `restricted` visibility mode (issue 511, PR-B).
   // Which specific player-characters and players may see/read this recipe. Each is a
@@ -1015,12 +1076,17 @@ Recipe = {
 13. `minSuccessOutcomeId` is an optional reference to a fixed-type routed check's success outcome tier id (semantics in `resolution-modes/spec.md`); it defaults to `null`.
     It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
     An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
-    13a. `craftingModifier` is an optional per-recipe crafting-check modifier override (issue 770): `{ policy?, modifierIds? } | null`, defaulting to `null` (inherit the system default policy + `defaultModifierIds`).
-    The normalizer keeps only a known `policy` (`addAll`/`highest`/`byRecipe`/`playerPicks`) and a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object with neither a valid policy nor a non-empty id list, round-trips to `null`.
-    An unrecognized policy is dropped at BOTH levels but to DIFFERENT defaults, and the two must not be conflated.
-    At recipe level (`Recipe._normalizeCraftingModifier`, the normalizer this requirement governs) an unrecognized `policy` becomes `null`, and a null recipe policy means _inherit the system's effective policy_ — which may be `highest`, `byRecipe` or `playerPicks`, not necessarily `addAll` — so a recipe carrying a bad policy plus a valid `modifierIds` list still resolves under the system's `defaultModifierPolicy` over its own id subset.
-    Only at system level (`craftingCheck.defaultModifierPolicy`, normalized by `CraftingSystemManager._normalizeCheckModifierConfig`) does an unrecognized policy fall back to `addAll`, because there is no further level to inherit from.
-    `playerPicks` needs no new per-recipe fields (the eligible-set model is unchanged; the policy only changes how the eligible set combines at roll time).
+    13a. `craftingModifier` is the recipe author's optional PICK of crafting-check modifiers (issues 770, 1055): `{ modifierIds? } | null`, defaulting to `null` (picked nothing; inherit the system's `defaultModifierIds`).
+    It authors ONE axis — WHICH modifiers apply — and never the combination rule; the rule is the system's `craftingCheck.defaultModifierPolicy` alone, and the pick is honoured only under that field's `byRecipe` ("Recipe picks") value.
+    The normalizer keeps a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object carrying no AUTHORED `modifierIds` array, round-trips to `null`.
+    A legacy `policy` key — persisted when a recipe could still override the rule — is DROPPED by the normalizer, so it never round-trips out through `toJSON()`, and an object carrying only a `policy` normalizes to `null` because it holds no pick.
+    That drop is a normalizer-level erasure, not a migration: the `1.20.0` migration deliberately leaves the raw key on disk (see `destructive-changes-and-migrations/spec.md`), and it is inert either way because `resolveModifierPolicy` reads only the system field.
+    `modifierIds` authoredness is keyed on `Array.isArray(input.modifierIds)` AT THE POINT OF ENTRY, before de-duplication/filtering — so an authored `[]`, or an authored array whose only entries are malformed (e.g. `[123, '']`), still round-trips as `{ modifierIds: [] }` (an authored EMPTY set: 0 eligible modifiers, so nothing is appended to the roll), never collapsing to `null` (inherit).
+    Keying on the filtered length instead would flip malformed import data from _inherit_ to _no modifiers_, which is the unsafe direction.
+    Whether the pick is actually honoured — rather than merely stored — is decided at the resolver, not by this normalizer: under any rule other than `byRecipe` it is ignored outright, and under `byRecipe` it is truncated to `craftingCheck.maxModifierPicks`.
+    See resolution-modes/spec.md §Check Source.
+    An unrecognized `defaultModifierPolicy` falls back to `addAll` at system level (`CraftingSystemManager._normalizeCheckModifierConfig`), which is the only level a rule exists at.
+    Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `byRecipe` reuses this same `modifierIds` list.
     Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
@@ -1324,7 +1390,7 @@ An essence option satisfies its ingredient group by consuming essence-carrying i
    The default resolver is **flag-only** (`fabricate.essences` item flag), so the no-probe `canBeCraftedWith`/display path stays byte-for-byte the legacy behaviour; callers (`RecipeManager`, `CraftingEngine`, the per-slot selector) bind a **component-aware** resolver that also credits component-defined essences — an intentional capability increase over the old flag-only per-set gate.
 2. Consumption reads the shared `remaining` map and commits through `_commitItemPlan` (keyed by `uuid || id`), so an item already claimed by a component/tag group in the same set is not recounted toward the essence group (anti-double-consume).
 3. Consumption is **unit-granular**: an indivisible item may over-consume past `amount` (e.g. one item worth 3 essence to meet `amount: 2`), acceptable and symmetric with tag/component options.
-4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and `system.quantity`-summed in standard craft, mirroring the existing documented divergence between the two matchers.
+4. Accounting is per-unit occurrence in alchemy (the submitted multiset) and summed over the configured stack-quantity path in standard craft, mirroring the existing documented divergence between the two matchers.
    The two paths **agree** that essence requirements share units with each other: alchemy pools the whole submission across every essence requirement, and standard craft resolves an ingredient set's essence options as one joint block (clause 5).
    They still **differ** on whether a unit already claimed by a component/tag requirement contributes its essences: alchemy credits it, standard craft does not, because clause 2's `remaining`/`_commitItemPlan` ledger has already spent that unit.
 5. Every `match.type === "essence"` option in one ingredient set forms a single **essence block**, resolved as one backtrackable node placed last — after every component/tag group has claimed from `remaining`.
@@ -1340,7 +1406,7 @@ An essence option satisfies its ingredient group by consuming essence-carrying i
    A craft submitted with a player allocation that does not fund the block is therefore **refused with the missing-materials message** rather than consuming its partial plan (`CraftingEngine._allocationShortfallMessage`), mirroring the `optionOverrides` rule in `recipes-and-steps` that an insufficient override blocks the craft rather than being silently redirected; the default path, which gates on the allocator's own suggestion, is unchanged.
    The resolved allocation is returned on `selection.essenceAllocation`, so a surface displaying it is displaying exactly what the craft consumes.
 7. The block contributes **at most one consumption-plan entry per item key**, whose `quantity` is the number of units the block draws from that item, committed once through `_commitItemPlan` after every component/tag group has claimed.
-   A component/tag group MAY still contribute its own entry for the same item key: those draws are disjoint and compose correctly under the engine's live `system.quantity` read.
+   A component/tag group MAY still contribute its own entry for the same item key: those draws are disjoint and compose correctly under the engine's live read of the configured stack-quantity path.
    Two entries for the same _shared_ unit do not compose, and on Foundry V13/V14 the second delete throws mid-consumption rather than silently overspending, so the block never emits a second entry for an item key it already claims.
 8. Every essence requirement's reported quantity comes from a **per essence id** partition of what the block delivers: for each essence id, the requirements naming that id settle in author order, each taking `min(need, remaining delivered of that id)`.
    A requirement is missing exactly when its take is less than its `need`, and its reported quantity is that take — an essence amount in the same unit as `need`, never the ledger total of matching items held.
@@ -1666,6 +1732,7 @@ CraftingRunStepState = {
     selectedIngredientSetId: string | null,
     currencySpends: Array<{ unit: string, amount: number }>, // SETTLED spends only
     resolvedEssences: object,
+    essenceEnabled: Record<string, boolean>, // COMPLETE map over every resolvedEssences key
     consumedSummary: Array<{
       itemUuid: string | null, actorUuid: string | null, quantity: number,
       name: string | null, img: string | null, componentId: string | null,
@@ -1741,6 +1808,11 @@ CraftingRunStepState = {
 6. `failureReason` is required when `status` is `failed`.
 7. `preparedConsumption.currencySpends` records what was actually deducted, never what was intended.
    It is the sole input to the cancel reversal's refund, so a spend that did not settle must not appear in it; an empty array is the correct record for a step whose currency deduction settled nothing.
+8. `preparedConsumption.essenceEnabled` records each contributing essence's `enabled` state as it stood at START, and the FINISH phase evaluates the essence behaviour gate from it rather than from the live definitions.
+   Evaluating at FINISH would let a mid-run GM toggle change the outcome of a craft whose inputs are already consumed.
+   It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
+   An ABSENT map — a run armed before the field existed — reads as all-enabled.
+   A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
 
 ## Actor Flags
 
@@ -2375,13 +2447,24 @@ Input context must include:
 - `result`
 - `step`
 
+An essence property macro (`EssenceDefinition.propertyMacroUuid`, see `recipes-and-steps/spec.md` _Essence Property Macros_) receives two further context members the result's own property macro does not:
+
+- `essence` — the resolved `EssenceDefinition` whose macro is running.
+- `essenceQuantity` — that essence's resolved quantity for this craft or salvage result, taken from `resolvedEssences[essence.id]`.
+
+Without these two members a macro shared across essences could not tell which essence invoked it, making the archetypal "+1 damage per unit of Fire" macro impossible to author.
+
 Return shape:
 
 ```js
 { [propertyPath: string]: any }
 ```
 
-Returned values are merged into created item data before document creation.
+Each returned path is applied with `foundry.utils.setProperty`, immediately after that macro returns.
+Returns are never spread-merged into one map first, because the returns are string paths and a subtree return is not order-equivalent to a leaf return under a merge.
+Two macros writing the same path is supported, resolves last-writer-wins, and is not an error.
+A path that cannot be written (for example because an intermediate segment is `null` or a primitive) is logged and skipped.
+For the essence property macro loop specifically, that failure is isolated to the essence whose macro produced the unwritable path: every other essence's macro, and the result's own macro, still runs and still applies.
 
 ### Success Macro Contract (Removed in 1.8.0)
 

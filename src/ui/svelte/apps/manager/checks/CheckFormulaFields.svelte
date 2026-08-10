@@ -12,6 +12,8 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
     rollFormula = '',
@@ -27,13 +29,11 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function numeric(rawValue) {
-    if (rawValue === '' || rawValue === '-') return 0;
-    const parsed = Number(rawValue);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  }
-
   const comparison = $derived(thresholdMode === 'exceed' ? 'exceed' : 'meet');
+
+  // Visible field label, stepper accessible name, and the `{label}` slot in the shared
+  // `Decrease {label}` / `Increase {label}` adjunct strings — one string, three readers.
+  const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.Dc', 'DC'));
 </script>
 
 <div class="manager-checks-formula-row">
@@ -47,15 +47,25 @@
     />
   </label>
   {#if showDc}
-    <label class="manager-field manager-checks-threshold-field">
-      <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.Dc', 'DC')}</span>
-      <input
-        type="number"
-        data-check-dc
+    <!-- A `<div>`, not the `<label>` it was: see the NAMING contract in `Stepper.svelte`. -->
+    <div class="manager-field manager-checks-threshold-field">
+      <span>{dcLabel}</span>
+      <!-- `fill` rather than the inline default (D2): this is a 120px flex slot on an
+           `align-items: flex-end` row beside a 36px formula field and a 36px comparison
+           select, so an inline 102x28 island would change the control's width, height,
+           border and fill relative to its siblings.
+
+           `min={0}`: a check DC below zero is not a DC, and the bare input this replaced
+           had no live `−` button that could reach -1 from 0 in a single click. -->
+      <Stepper
+        fill
+        min={0}
         value={dc ?? 15}
-        oninput={(event) => onChange({ dc: numeric(event.currentTarget.value) })}
+        {...stepperLabels(dcLabel)}
+        inputProps={{ 'data-check-dc': '' }}
+        onChange={(next) => onChange({ dc: next })}
       />
-    </label>
+    </div>
     <label class="manager-field manager-checks-threshold-mode">
       <span
         >{text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}</span

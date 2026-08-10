@@ -217,7 +217,29 @@ const FIXTURE = `
             <i class="fas fa-dice-d20"></i>
             <span class="manager-component-bulk-dc-copy" data-m="bulk-dc-copy">Set every selected component to</span>
           </div>
-          <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+          <!-- Apply is wrapped in its sticky dock (issue 1015). The wrapper is part of the
+               shipped markup, so it is mirrored here: a fixture that kept Apply as a direct
+               child of the panel would go on measuring a box the product no longer renders. -->
+          <div class="fab-bulk-edit-dock">
+            <button type="button" class="manager-button fab-bulk-edit-apply" data-m="bulk-apply"><i class="fas fa-check-double"></i><span>Apply to 2 components</span></button>
+          </div>
+          <!--
+            THE OTHER HALF OF THE SWAP, rendered as a SIBLING of the dock rather than inside
+            it. The two buttons never coexist in the product — this one is the browser
+            inspector's primary action and Apply replaces it the moment a box is ticked —
+            but the swap only reads as one slot if they share a geometry, so both must be
+            measurable in the same cascade context to compare them at all. Inside the dock
+            it would inherit the dock's box and the comparison would be circular.
+
+            The pair is asserted as a RELATIONSHIP below, not as two constants, because the
+            two sides get their geometry from DIFFERENT mechanisms: this one from the global
+            rule at styles/fabricate.css (.manager-button.manager-recipe-browser-inspector-edit,
+            .manager-button.manager-component-browser-inspector-edit) and Apply from
+            BulkEditPanelShell.svelte's scoped block. A source-substring pin on either file
+            cannot see a cascade change that moves one RENDERED value while both sources sit
+            unchanged, which is the drift that desynchronises the slot.
+          -->
+          <button type="button" class="manager-button manager-component-browser-inspector-edit" data-m="inspector-edit"><span>Edit component</span></button>
         </section>
       </div>
 
@@ -467,27 +489,63 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
     );
     assert.equal(rootPx, 16, 'html root font-size is the 16px rem anchor');
 
+    // `minHeight` rides along with `fontSize` because the rail's bottom slot is pinned as a
+    // RELATIONSHIP below, and a font-size alone cannot state that two buttons share a box.
     const measured = await p.evaluate(() => {
       const out = {};
       document.querySelectorAll('[data-m]').forEach((el) => {
-        out[el.getAttribute('data-m')] = parseFloat(getComputedStyle(el).fontSize);
+        const style = getComputedStyle(el);
+        out[el.getAttribute('data-m')] = {
+          fontSize: parseFloat(style.fontSize),
+          minHeight: style.minHeight,
+        };
       });
       return out;
     });
 
     for (const [role, expected] of Object.entries(EXPECTED)) {
       assert.equal(
-        measured[role],
+        measured[role]?.fontSize,
         expected,
-        `${role} should compute to ${expected}px (measured ${measured[role]}px)`
+        `${role} should compute to ${expected}px (measured ${measured[role]?.fontSize}px)`
       );
     }
 
     // Every studio role except the deliberate baseline must be free of the bleed.
-    for (const [role, px] of Object.entries(measured)) {
+    for (const [role, box] of Object.entries(measured)) {
       if (role === 'bleed-baseline') continue;
-      assert.notEqual(px, 14, `${role} is at the Foundry 14px app base — its rule stopped applying`);
+      assert.notEqual(
+        box.fontSize,
+        14,
+        `${role} is at the Foundry 14px app base — its rule stopped applying`
+      );
     }
+
+    // ── THE RAIL'S BOTTOM SLOT (issue 1015) ──────────────────────────────────────────
+    // Apply and the browser inspector's Edit SWAP PLACES in that slot, so the swap must
+    // neither resize nor re-type it. Asserted as an equality between the two RENDERED
+    // boxes rather than as two independent constants: the values come from different
+    // mechanisms (a global rule in styles/fabricate.css vs BulkEditPanelShell.svelte's
+    // scoped block), so only a comparison can catch a cascade change that moves one side.
+    // Wrapping Apply in the sticky dock is exactly such a change, which is why it is
+    // pinned here rather than assumed.
+    assert.equal(
+      measured['bulk-apply'].minHeight,
+      measured['inspector-edit'].minHeight,
+      `the bulk Apply button and the browser inspector's Edit button share the rail's bottom slot and must have an equal min-height (Apply ${measured['bulk-apply'].minHeight}, Edit ${measured['inspector-edit'].minHeight})`
+    );
+    assert.equal(
+      measured['bulk-apply'].fontSize,
+      measured['inspector-edit'].fontSize,
+      `the bulk Apply button and the browser inspector's Edit button share the rail's bottom slot and must have an equal font-size (Apply ${measured['bulk-apply'].fontSize}px, Edit ${measured['inspector-edit'].fontSize}px)`
+    );
+    // Anti-vacuity: an equality between two roles that both fell back to the same inherited
+    // value would pass while proving nothing, so the shared box must be a real declared one.
+    assert.notEqual(
+      measured['bulk-apply'].minHeight,
+      'auto',
+      'the shared bottom-slot min-height must be a declared length, not the initial `auto`'
+    );
   } finally {
     await browser.close();
   }

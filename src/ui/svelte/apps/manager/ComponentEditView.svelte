@@ -4,6 +4,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from './SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
   // The shared essence quantity card (issue 772). It lives under `components/` — the
@@ -18,6 +19,11 @@
     normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
   import { clampComponentEssenceQuantity } from '../../util/componentEditor.js';
+  // The add-new offer projection (issue 1036). The DRAFT stays unfiltered — it is the sole
+  // source `buildComponentEditorUpdates` rebuilds `updates.essences` from — and only what
+  // this grid RENDERS is narrowed, so a disabled essence disappears from the offer while
+  // one that already carries a quantity stays visible and clearable.
+  import { visibleEssenceOptions } from '../../../../utils/essenceValidation.js';
   import {
     SALVAGE_DC_CUSTOM,
     buildSalvageDcOptions,
@@ -74,6 +80,16 @@
   let tagDraft = $state([]);
   let categoryDraft = $state(GENERAL_COMPONENT_CATEGORY);
   let essenceDraft = $state([]);
+  // The rendered subset (issue 1036): every ENABLED essence, plus any disabled one this
+  // component already carries a positive quantity of. `essenceDraft` itself stays whole —
+  // it is what `buildComponentEditorUpdates` rebuilds `updates.essences` from, so
+  // narrowing it would delete a disabled essence's authored quantity on the next save.
+  const offeredEssences = $derived(
+    visibleEssenceOptions(
+      essenceDraft,
+      (option) => clampComponentEssenceQuantity(option?.quantity) > 0
+    )
+  );
   // Deep clone of component.salvage so edits never mutate the upstream card. Only
   // the authoring fields (resultGroups, outcomeRouting, dcOverride) are edited
   // here; the remaining salvage fields (enabled, ingredientQuantity, toolIds, …)
@@ -184,6 +200,9 @@
       id: option.id,
       name: option.name,
       icon: option.icon,
+      // Carried through the clone or the offer filter below could never see it, and every
+      // disabled essence would be offered as if enabled (issue 1036).
+      enabled: option.enabled !== false,
       quantity: clampComponentEssenceQuantity(option.quantity),
     }));
   }
@@ -656,14 +675,12 @@
     setSalvage({ outcomeRouting: next });
   }
 
-  function setSalvageDcOverride(rawValue) {
-    const trimmed = String(rawValue ?? '').trim();
-    if (trimmed === '') {
-      setSalvage({ dcOverride: null });
-      return;
-    }
-    const numeric = Number(trimmed);
-    setSalvage({ dcOverride: Number.isFinite(numeric) ? numeric : null });
+  // `Stepper` reports a clamped NUMBER, or `null` when an `allowUnset` field is
+  // cleared, so the string-parsing half of this adapter is gone. The `null` fold
+  // stays: `null` is the persisted "inherit the system salvage DC" value, which is
+  // exactly what clearing the field now sends.
+  function setSalvageDcOverride(next) {
+    setSalvage({ dcOverride: Number.isFinite(next) ? next : null });
   }
 
   function salvageComponentName(componentId) {
@@ -954,7 +971,7 @@
         </div>
         {#if essenceDraft.length > 0}
           <div class="manager-component-essence-grid">
-            {#each essenceDraft as option (option.id)}
+            {#each offeredEssences as option (option.id)}
               <!-- The card is the shared `EssenceQuantityCard` (issue 772). It was
                      hand-rolled here — a `manager-icon-button` −, a raw
                      `<input type="number">` and a + — and the bulk-edit panel renders the
@@ -1634,20 +1651,35 @@
               {/each}
             </select>
             {#if salvageDcShowCustomInput}
-              <input
-                type="number"
-                step="1"
-                class="manager-input"
-                value={salvageDraft.dcOverride === null || salvageDraft.dcOverride === undefined
-                  ? ''
-                  : salvageDraft.dcOverride}
-                aria-label={text(
-                  'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
-                  'Custom salvage DC'
-                )}
-                data-salvage-dc-custom
-                oninput={(event) => setSalvageDcOverride(event.currentTarget.value)}
+              <!-- `allowUnset`: a cleared field is not zero here, it is "inherit the
+                   system salvage check DC" — the same `dcOverride: null` the preset
+                   select writes for its default option.
+
+                   `min={0}`: a salvage DC below zero is not a DC, and an unset field
+                   steps from `min ?? 0`, so without it one click of `−` on the blank
+                   field commits -1. The bare input this replaced had no `min` either,
+                   but it also had no live decrement button.
+
+                   `fill` needs a slot, and this one is supplied by the
+                   `[data-salvage-dc-override] .fab-stepper` cap in the global sheet. The
+                   field is a `.manager-field` (a `flex-direction: column` box) whose
+                   other child is a full-width preset `<select>`, so the cap sits on the
+                   stepper rather than on the field. -->
+              <Stepper
+                value={salvageDraft.dcOverride}
+                allowUnset
+                step={1}
+                min={0}
+                fill
                 disabled={saving}
+                {...stepperLabels(
+                  text(
+                    'FABRICATE.Admin.Manager.Component.SalvageEditor.DcCustomLabel',
+                    'Custom salvage DC'
+                  )
+                )}
+                inputProps={{ 'data-salvage-dc-custom': '' }}
+                onChange={setSalvageDcOverride}
               />
             {/if}
             <!-- Kept by decision 7 (it replaced the hard-coded tier list, not this

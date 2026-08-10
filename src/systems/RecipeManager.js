@@ -19,6 +19,7 @@ import {
 import { evaluatePrerequisite } from './characterPrerequisites.js';
 import { buildCurrencyAffordProbe, getCurrencyRequirementConfig } from './currencyAffordance.js';
 import { formatCurrencyRequirement, normalizeCurrencyUnit } from './currencyProfile.js';
+import { readStackQuantity } from './itemStackQuantity.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
 import { RecipePersistenceError } from './RecipePersistenceError.js';
 import { SignatureValidator } from './SignatureValidator.js';
@@ -1135,7 +1136,7 @@ export class RecipeManager {
       ...this._resolveIngredientVisual(recipe, chosenOption, context.availableItems, consumedItem),
       ...base,
       need: Number(chosenOption?.quantity || 1),
-      have: matching.reduce((sum, item) => sum + (item.system?.quantity || 1), 0),
+      have: matching.reduce((sum, item) => sum + readStackQuantity(item), 0),
       satisfied: true,
     };
   }
@@ -1377,7 +1378,7 @@ export class RecipeManager {
     const matchingItems = availableItems.filter((item) =>
       this.ingredientMatchesItem(recipe, option, item)
     );
-    const have = matchingItems.reduce((sum, item) => sum + (item.system?.quantity || 1), 0);
+    const have = matchingItems.reduce((sum, item) => sum + readStackQuantity(item), 0);
     const need = Number(option?.quantity || 1);
     const choice = {
       optionIndex,
@@ -1413,7 +1414,7 @@ export class RecipeManager {
         itemId: item.uuid || item.id,
         name: item.name ?? '',
         img: item.img ?? null,
-        have: Number(item.system?.quantity || 1),
+        have: readStackQuantity(item),
       }));
   }
 
@@ -1579,8 +1580,9 @@ export class RecipeManager {
    *
    * Every quantity here comes from the RESOLVER's own ledger. In particular
    * `carriers[].ownedUnits` is the units left AFTER the set's non-essence plan has
-   * claimed: no surface re-reads `item.system.quantity`, which is game-system-specific,
-   * can be absent or `NaN`, and would offer the player units the craft cannot spend.
+   * claimed: no surface re-reads the item's raw stack quantity, which lives at a
+   * game-system-specific configured path, can be absent or `NaN`, and would offer the
+   * player units the craft cannot spend.
    *
    * @param {Recipe} recipe
    * @param {IngredientSet} ingredientSet
@@ -2382,6 +2384,11 @@ export class RecipeManager {
     const signatureValidation = this._validateSignatures(recipe);
     errors.push(...signatureValidation.errors);
     issues.push(...(signatureValidation.issues || []));
+    // A DISABLED essence blocks activation only (issue 1036) — never persistence. See
+    // `_validateEnabledEssenceReferences` for why that placement is load-bearing.
+    const disabledEssenceValidation = this._validateEnabledEssenceReferences(recipe);
+    errors.push(...disabledEssenceValidation.errors);
+    issues.push(...disabledEssenceValidation.issues);
 
     return {
       valid: errors.length === 0,
@@ -2500,34 +2507,96 @@ export class RecipeManager {
    * @returns {{valid: boolean, errors: string[]}}
    * @private
    */
-  _validateEssenceReferences(recipe) {
+  /**
+   * The crafting system whose essence definitions a recipe's essence references are
+   * validated against, or `null` when essences do not apply at all.
+   *
+   * Shared by {@link RecipeManager#_validateEssenceReferences} (persistence) and
+   * {@link RecipeManager#_validateEnabledEssenceReferences} (activation) so the two can
+   * never disagree about when the `features.essences` master switch takes them out of
+   * play — the activation blocker being subordinate to that switch is the contract, not
+   * an accident.
+   * @param {object} recipe
+   * @returns {object|null}
+   * @private
+   */
+  _resolveEssenceValidationSystem(recipe) {
     const systemId = recipe?.craftingSystemId;
-    if (!systemId) {
-      return { valid: true, errors: [], issues: [] };
-    }
+    if (!systemId) return null;
 
     const systemManager = game.fabricate?.getCraftingSystemManager?.();
     const system = systemManager?.getSystem(systemId);
-    if (!system) {
-      return { valid: true, errors: [], issues: [] };
-    }
+    if (!system) return null;
 
     const features = system.features || {};
     const essencesEnabled = features.essences === true || system.enableEssences === true;
-    if (!essencesEnabled) {
+    return essencesEnabled ? system : null;
+  }
+
+  /**
+   * Every essence reference a recipe makes, in validation order.
+   *
+   * Walks recipe-level AND step-level ingredient sets, and within each set BOTH the legacy
+   * per-set `essences` map (back-compat read) and first-class essence group OPTIONS (issue
+   * 649) — in that order — so a dangling or disabled reference in a group option is seen
+   * exactly as one in the legacy map is. One walk serves both essence validators; a second
+   * copy is how the two would start covering different reference shapes.
+   *
+   * @param {object} recipe
+   * @returns {{setLabel: string, essenceId: string, quantity: unknown}[]}
+   * @private
+   */
+  _collectEssenceReferences(recipe) {
+    const allSets = [
+      ...(recipe?.ingredientSets || []),
+      ...(recipe?.steps || []).flatMap((step) => step?.ingredientSets || []),
+    ];
+    const references = [];
+    for (const [setIndex, set] of allSets.entries()) {
+      const setLabel =
+        typeof set?.name === 'string' && set.name.trim() ? set.name.trim() : String(setIndex + 1);
+      for (const [essenceId, quantity] of Object.entries(set.essences || {})) {
+        references.push({ setLabel, essenceId, quantity });
+      }
+      for (const group of set.ingredientGroups || []) {
+        for (const option of group?.options || []) {
+          if (option?.match?.type !== 'essence') continue;
+          references.push({
+            setLabel,
+            essenceId: String(option.match.essenceId || '').trim(),
+            quantity: option.match.amount,
+          });
+        }
+      }
+    }
+    return references;
+  }
+
+  /**
+   * An essence's display NAME from the system's definitions (issue 595) so a message
+   * never surfaces the raw essence id. An UNKNOWN essence has no definition and therefore
+   * no name, so its message omits it entirely.
+   * @param {object[]} definitions
+   * @returns {Map<string, string>}
+   * @private
+   */
+  _essenceNameMap(definitions) {
+    return new Map(
+      definitions
+        .filter((def) => typeof def?.name === 'string' && def.name.trim())
+        .map((def) => [def.id, def.name.trim()])
+    );
+  }
+
+  _validateEssenceReferences(recipe) {
+    const system = this._resolveEssenceValidationSystem(recipe);
+    if (!system) {
       return { valid: true, errors: [], issues: [] };
     }
 
     const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
     const validEssenceIds = new Set(definitions.map((def) => def.id));
-    // Resolve an essence's display NAME from the system's definitions (issue 595) so
-    // a message never surfaces the raw essence id. An UNKNOWN essence has no
-    // definition and therefore no name, so its message omits it entirely.
-    const essenceNames = new Map(
-      definitions
-        .filter((def) => typeof def?.name === 'string' && def.name.trim())
-        .map((def) => [def.id, def.name.trim()])
-    );
+    const essenceNames = this._essenceNameMap(definitions);
 
     const issues = [];
 
@@ -2545,41 +2614,82 @@ export class RecipeManager {
       );
     };
 
-    // Walk recipe-level AND step-level ingredient sets, validating BOTH the legacy
-    // per-set essences map (back-compat read) AND first-class essence group OPTIONS
-    // (issue 649) so a dangling essence reference in a group option still raises
-    // `ingredientSetUnknownEssence` on enable.
-    const allSets = [
-      ...(recipe.ingredientSets || []),
-      ...(recipe.steps || []).flatMap((step) => step?.ingredientSets || []),
-    ];
-    for (const [setIndex, set] of allSets.entries()) {
-      const setLabel =
-        typeof set?.name === 'string' && set.name.trim() ? set.name.trim() : String(setIndex + 1);
-      for (const [essenceId, qty] of Object.entries(set.essences || {})) {
-        if (!validEssenceIds.has(essenceId)) {
-          issues.push(buildRecipeActivationIssue('ingredientSetUnknownEssence', { set: setLabel }));
-        }
-        const num = Number(qty);
-        if (!Number.isFinite(num) || num <= 0) {
-          pushBadQuantity(setLabel, essenceId);
-        }
+    for (const { setLabel, essenceId, quantity } of this._collectEssenceReferences(recipe)) {
+      if (!validEssenceIds.has(essenceId)) {
+        issues.push(buildRecipeActivationIssue('ingredientSetUnknownEssence', { set: setLabel }));
       }
-      for (const group of set.ingredientGroups || []) {
-        for (const option of group?.options || []) {
-          if (option?.match?.type !== 'essence') continue;
-          const essenceId = String(option.match.essenceId || '').trim();
-          if (!validEssenceIds.has(essenceId)) {
-            issues.push(
-              buildRecipeActivationIssue('ingredientSetUnknownEssence', { set: setLabel })
-            );
-          }
-          const num = Number(option.match.amount);
-          if (!Number.isFinite(num) || num <= 0) {
-            pushBadQuantity(setLabel, essenceId);
-          }
-        }
+      const num = Number(quantity);
+      if (!Number.isFinite(num) || num <= 0) {
+        pushBadQuantity(setLabel, essenceId);
       }
+    }
+
+    return {
+      valid: issues.length === 0,
+      errors: issues.map((issue) => issue.message),
+      issues,
+    };
+  }
+
+  /**
+   * ACTIVATION-only blocker: a recipe may not be ENABLED while it requires a DISABLED
+   * essence (issue 1036).
+   *
+   * **This deliberately does NOT run at persistence level, and that placement is
+   * load-bearing.** {@link RecipeManager#_validateEssenceReferences} feeds
+   * {@link RecipeManager#_validateRecipeForPersistence}, whose issues `updateRecipe`
+   * THROWS on as a `RecipePersistenceError`, and `allowIncomplete` relaxes only
+   * `requireComplete`, which that function never reads. A persistence-level blocker would
+   * therefore abort `CraftingSystemManager.deleteEssence` mid-cascade: that method
+   * rewrites every referencing recipe through `updateRecipe(..., { allowIncomplete: true })`
+   * BEFORE `await this.save()`, so a recipe still naming a SECOND disabled essence would
+   * throw with `essenceDefinitions` and the component essence maps already mutated in
+   * memory, some recipes written, and nothing persisted. The bulk `deleteEssences`
+   * multiplies that exposure over a whole selection.
+   *
+   * A recipe may therefore still be SAVED while it requires a disabled essence; it may not
+   * be ENABLED. Disabling an essence does not retro-disable an already-enabled recipe —
+   * the activation gate fires only on a `false -> true` transition — and re-enabling the
+   * essence clears the issue without touching recipe state.
+   *
+   * @param {object} recipe
+   * @returns {{valid: boolean, errors: string[], issues: object[]}}
+   * @private
+   */
+  _validateEnabledEssenceReferences(recipe) {
+    const system = this._resolveEssenceValidationSystem(recipe);
+    if (!system) {
+      return { valid: true, errors: [], issues: [] };
+    }
+
+    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    // Only a DEFINED essence can be disabled; an unknown id is `_validateEssenceReferences`'s
+    // business and is already reported there, so it is not reported twice here.
+    const disabled = new Map(
+      definitions
+        .filter((def) => def?.enabled === false)
+        .map((def) => [def.id, String(def.name || def.id)])
+    );
+    if (disabled.size === 0) {
+      return { valid: true, errors: [], issues: [] };
+    }
+
+    const issues = [];
+    const reported = new Set();
+    for (const { setLabel, essenceId } of this._collectEssenceReferences(recipe)) {
+      const essenceName = disabled.get(essenceId);
+      if (!essenceName) continue;
+      // One issue per (set, essence) pair: a set naming the same essence in both its
+      // legacy map and a group option is ONE authoring fact, not two.
+      const signature = JSON.stringify([setLabel, essenceId]);
+      if (reported.has(signature)) continue;
+      reported.add(signature);
+      issues.push(
+        buildRecipeActivationIssue('ingredientSetDisabledEssence', {
+          set: setLabel,
+          essence: essenceName,
+        })
+      );
     }
 
     return {

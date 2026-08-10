@@ -17,6 +17,9 @@ const repoRoot = resolve(__dirname, '../..');
 
 const RAW_MODULES = [
   'src/ui/svelte/util/foundryBridge.js',
+  // The add-new essence offer projection (issue 1036). The three ingredient components
+  // below import it to withhold a DISABLED essence from their add controls.
+  'src/utils/essenceValidation.js',
   'src/ui/svelte/util/dropUtils.js',
   'src/ui/svelte/actions/dragDrop.js',
   // recipeImageIcons re-exports DEFAULT_RECIPE_IMAGE from the Recipe model
@@ -36,9 +39,13 @@ const RAW_MODULES = [
   // IngredientSet imports the shared essence allocator (issue 917); the harness's
   // dependency validator throws a named "add it to rawModules" error without it.
   'src/utils/essenceAllocation.js',
+  // …and, since issue 1024, the canonical stack-quantity accessor plus its own two
+  // dependencies (the shared path walker and the per-system preset table).
+  'src/systems/itemStackQuantity.js',
+  'src/config/stackQuantityPathPresets.js',
+  'src/utils/objectPath.js',
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
-  'src/systems/toolCheckBonus.js',
   'src/utils/recipeCategories.js',
   'src/utils/routedOutcomeKeywords.js',
   'src/config/flags.js',
@@ -54,6 +61,18 @@ const RAW_MODULES = [
   // before, and a missing raw module HANGS the suite (`# cancelled`) instead of
   // failing it.
   'src/ui/svelte/apps/manager/resolutionModeOptions.js',
+  // The Overview tab asks the resolver what an absent `maxModifierPicks` means before
+  // deciding whether to state a pick cap at all (issue 1055), and RecipeEditView imports
+  // the same module. This harness DOES validate its dependency graph, so omitting it
+  // throws a named "add it to rawModules" error rather than hanging — unlike the manager
+  // harness, whose inline list has no validator.
+  'src/systems/craftingModifierResolver.js',
+  // …and issue 1094 gave that resolver its first two imports: it appends the resolved
+  // scalar through `toolCheckBonus.js` and reads the retirement shim from
+  // `craftingCheckExpression.js`. Both are import-free leaves, so these two entries close
+  // the graph the validator walks.
+  'src/systems/toolCheckBonus.js',
+  'src/utils/craftingCheckExpression.js',
   // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
@@ -482,44 +501,38 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('threads the per-recipe crafting-modifier override through RecipeEditView to the Overview tab (issue 770)', async () => {
-    // The catalogue options + default policy are RecipeEditView wrapper props; a tab
+  it('threads the per-recipe crafting-modifier PICK through RecipeEditView to the Overview tab (issues 770, 1055)', async () => {
+    // The catalogue options + the system's rule are RecipeEditView wrapper props; a tab
     // prop the wrapper fails to forward silently drops to its default and never renders.
     // Mount THROUGH the wrapper so a missing forward fails here.
+    //
+    // Retargeted for issue 1055: a recipe persists a PICK and nothing else. There is no
+    // rule select on this tab at all — a recipe chooses WHICH modifiers apply, never HOW
+    // they combine — and the picker exists only under the system's `byRecipe` rule.
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
-        recipe: { ...RECIPE, craftingModifier: { policy: 'byRecipe', modifierIds: ['med'] } },
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
         onUpdateRecipe: (patch) => patches.push(patch),
         craftingModifierOptions: [
           { id: 'med', label: 'Medicine' },
           { id: 'alch', label: 'Alchemy' },
         ],
-        craftingModifierPolicyDefault: 'highest',
+        craftingModifierPolicy: 'byRecipe',
       })
     );
-    const field = target.querySelector('[data-recipe-crafting-modifier]');
     assert.ok(
-      field,
-      'the crafting-modifier override control renders when the wrapper forwards options'
+      !target.querySelector('[data-recipe-crafting-modifier]'),
+      'the rejected design’s per-recipe RULE select is gone, not hidden'
     );
-    const select = field.querySelector('[data-recipe-field="craftingModifierPolicy"]');
-    assert.equal(select.value, 'byRecipe', 'reflects the recipe override policy');
-    assert.deepEqual(
-      [...select.querySelectorAll('option')].map((o) => o.value),
-      ['', 'addAll', 'highest', 'byRecipe', 'playerPicks']
+    assert.ok(
+      !target.querySelector('[data-recipe-field="craftingModifierPolicy"]'),
+      'and so is its field hook'
     );
-    // The Phase-2 "Player picks" override round-trips through the wrapper (issue 770 P2).
-    select.value = 'playerPicks';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushRender();
-    assert.deepEqual(patches.at(-1), {
-      craftingModifier: { policy: 'playerPicks', modifierIds: ['med'] },
-    });
     // The per-modifier picker shows the catalogue as cancellable pills, with the
     // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
-    assert.ok(picker, 'the eligible-modifier picker shows for an active override');
+    assert.ok(picker, 'the eligible-modifier picker shows under the byRecipe rule');
     assert.ok(
       picker.querySelector('[data-modifier-pill="med"]'),
       'the selected modifier renders as a pill'
@@ -529,35 +542,397 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'an unselected modifier is not a pill'
     );
-    // Opening the menu and picking alch stages the combined set.
+    // Opening the menu and picking alch stages the combined set. The patch carries the
+    // ids ALONE — no rule rides along.
     picker.querySelector('[data-modifier-pill-menu-button]').click();
     await flushRender();
     picker.querySelector('[data-modifier-pill-option="alch"]').click();
     await flushRender();
     assert.deepEqual(patches.at(-1), {
-      craftingModifier: { policy: 'byRecipe', modifierIds: ['med', 'alch'] },
+      craftingModifier: { modifierIds: ['med', 'alch'] },
     });
-    // Removing the (only pre-selected) pill leaves a policy-only override. The control
-    // is controlled, so each toggle acts on the original `['med']` prop.
+    // Removing the LAST pill posts an AUTHORED EMPTY set, not a dropped key (issue 1055
+    // defect 3): emptying the row used to mean "inherit", so a GM could not express
+    // "this recipe gets no check modifiers". The control is controlled, so each toggle
+    // acts on the original `['med']` prop.
     picker.querySelector('[data-modifier-pill-remove="med"]').click();
     await flushRender();
-    assert.deepEqual(patches.at(-1), { craftingModifier: { policy: 'byRecipe' } });
-    // Switching the policy select back to "inherit" clears the whole override.
-    select.value = '';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushRender();
-    assert.deepEqual(patches.at(-1), { craftingModifier: null });
+    assert.deepEqual(patches.at(-1), {
+      craftingModifier: { modifierIds: [] },
+    });
     editHarness.remount();
   });
 
-  it('hides the crafting-modifier override when the system has no catalogue (issue 770)', async () => {
-    const target = await editHarness.mount(identityProps({ craftingModifierOptions: [] }));
-    assert.equal(
-      target.querySelector('[data-recipe-crafting-modifier]'),
-      null,
-      'no catalogue → no override control'
+  // The whole point of the rule axis: the SYSTEM decides whether this recipe authors
+  // anything at all. Mounted through the wrapper, because the rule and the cap are
+  // wrapper props and an unforwarded one silently drops to its default.
+  const ruleProps = (overrides = {}) =>
+    identityProps({
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+      craftingModifierOptions: [
+        { id: 'med', label: 'Medicine' },
+        { id: 'alch', label: 'Alchemy' },
+      ],
+      craftingModifierDefaultIds: ['med', 'alch'],
+      craftingModifierPolicy: 'byRecipe',
+      ...overrides,
+    });
+
+  it('renders the modifier picker under byRecipe ONLY, and no banner under the rest (issue 1055)', async () => {
+    for (const [policy, picker] of [
+      ['byRecipe', true],
+      ['addAll', false],
+      ['highest', false],
+      ['playerPicks', false],
+      // The prop's own default, which is what an unforwarded wrapper prop lands on.
+      [undefined, false],
+    ]) {
+      const target = await editHarness.mount(ruleProps({ craftingModifierPolicy: policy }));
+      assert.equal(
+        Boolean(target.querySelector('[data-recipe-crafting-modifier-picker]')),
+        picker,
+        `rule ${String(policy)}: picker cell rendered = ${picker}`
+      );
+      assert.ok(
+        !target.querySelector('[data-recipe-crafting-modifier]'),
+        `rule ${String(policy)}: a recipe never authors the combination rule`
+      );
+      // The rejected design put a neutral "the system decides" banner on every recipe of
+      // every system that never delegated. It is gone: under a non-`byRecipe` rule this
+      // tab renders NOTHING about check modifiers rather than a standing notice.
+      assert.ok(
+        !target.querySelector('[data-recipe-modifier-banner]'),
+        `rule ${String(policy)}: the read-only delegation banner is gone`
+      );
+      assert.ok(
+        !target.querySelector('[data-recipe-modifier-banner-checks]'),
+        `rule ${String(policy)}: …and so is its Checks-tab action hook`
+      );
+      editHarness.remount();
+    }
+  });
+
+  it('replaces the modifier controls with the inert banner naming the cause (issue 1055 criterion 10)', async () => {
+    for (const cause of ['noCheck', 'noFormula']) {
+      const target = await editHarness.mount(
+        ruleProps({
+          craftingModifierInertCause: cause,
+        })
+      );
+      const banner = target.querySelector('[data-recipe-modifier-inert]');
+      assert.ok(Boolean(banner), `${cause}: the inert banner renders`);
+      assert.equal(
+        banner.getAttribute('data-recipe-modifier-inert'),
+        cause,
+        'the banner stamps WHICH cause applies — one boolean cannot say'
+      );
+      assert.ok(
+        !target.querySelector('[data-recipe-crafting-modifier-picker]'),
+        `${cause}: an inert catalogue offers no per-recipe control`
+      );
+      // This is the tab's ONLY check-modifier banner now, and it earns the interruption:
+      // the system's rule DID hand the pick to this recipe, and the check it will roll
+      // rolls no check at all, so the picks would reach no roll.
+      assert.ok(
+        !target.querySelector('[data-recipe-modifier-banner]'),
+        `${cause}: the retired neutral summary banner does not co-render with it`
+      );
+      editHarness.remount();
+    }
+    // …and under a rule that does not defer, an inert catalogue says nothing at all:
+    // there are no picks to warn about.
+    const quiet = await editHarness.mount(
+      ruleProps({ craftingModifierPolicy: 'addAll', craftingModifierInertCause: 'noFormula' })
+    );
+    assert.ok(
+      !quiet.querySelector('[data-recipe-modifier-inert]'),
+      'a rule the recipe cannot author has no warning to give it'
     );
     editHarness.remount();
+  });
+
+  it('writes the tri-state eligible-set select: inherit drops the key, none authors an empty set (issue 1055)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      ruleProps({
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+        onUpdateRecipe: (patch) => patches.push(patch),
+      })
+    );
+    const setSelect = target.querySelector('[data-recipe-field="craftingModifierSet"]');
+    assert.ok(Boolean(setSelect), 'the tri-state select lives INSIDE the picker cell');
+    assert.deepEqual(
+      [...setSelect.querySelectorAll('option')].map((option) => option.value),
+      ['inherit', 'custom', 'none']
+    );
+    assert.equal(setSelect.value, 'custom', 'a non-empty authored set reads back as Custom set');
+
+    setSelect.value = 'none';
+    setSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: { modifierIds: [] } },
+      'No modifiers authors an EMPTY array — nothing is added to the roll, not inherit'
+    );
+
+    setSelect.value = 'inherit';
+    setSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: null },
+      'Inherit drops the key entirely, which is the only way back to the system default'
+    );
+    editHarness.remount();
+  });
+
+  it('reads an AUTHORED EMPTY set back as "No modifiers", never as inherit (issue 1055)', async () => {
+    const target = await editHarness.mount(
+      ruleProps({
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
+      })
+    );
+    const setSelect = target.querySelector('[data-recipe-field="craftingModifierSet"]');
+    assert.equal(setSelect.value, 'none', 'Array.isArray, not length, discriminates the tri-state');
+    assert.ok(
+      !target.querySelector('[data-recipe-crafting-modifier-inherited]'),
+      'an authored empty set is not "inheriting the system default set"'
+    );
+    editHarness.remount();
+  });
+
+  // The "Custom set, nothing picked yet" pin (issue 1055).
+  //
+  // That state writes `{ modifierIds: [] }` — the same persisted bytes as "No modifiers"
+  // — so read purely, picking Custom set snapped straight back to No modifiers on the
+  // ordinary system this exists to serve: a catalogue with an EMPTY default set, where
+  // the seed comes back empty. A local pin decides which of the two identical shapes was
+  // meant, and it is released by any other pick and by a DIFFERENT recipe arriving.
+  //
+  // Every assertion below reads the select AFTER a prop change that genuinely moves the
+  // derived value, so Svelte has to write the DOM either way: with the pin the select
+  // lands on `custom`, without it on `none`. Re-asserting a value the test itself typed,
+  // with no such move in between, would pass under both.
+  const emptyDefaultSetProps = (overrides = {}) =>
+    ruleProps({
+      craftingModifierDefaultIds: [],
+      recipe: { ...RECIPE, craftingModifier: null },
+      ...overrides,
+    });
+
+  /** Pick an option on the tri-state select the way a GM does, and report the patch. */
+  async function pickModifierSetMode(target, mode) {
+    const select = target.querySelector('[data-recipe-field="craftingModifierSet"]');
+    select.value = mode;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushRender();
+  }
+
+  it('holds "Custom set" when the seeded set comes back empty (issue 1055)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      emptyDefaultSetProps({ onUpdateRecipe: (patch) => patches.push(patch) })
+    );
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'inherit',
+      'pre-condition: a recipe with no override inherits'
+    );
+
+    await pickModifierSetMode(target, 'custom');
+    assert.deepEqual(
+      patches.at(-1),
+      { craftingModifier: { modifierIds: [] } },
+      'with nothing to seed from, Custom set writes the authored empty array'
+    );
+
+    // Feed the patch back exactly as the root's draft does. THIS is the read-back that
+    // used to snap to "No modifiers": the derived mode moves off `inherit` either way,
+    // so the select is rewritten and the assertion cannot pass on the typed value.
+    await editHarness.setProps({ recipe: { ...RECIPE, ...patches.at(-1) } });
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'custom',
+      'the control must not reject the GM’s choice by snapping back to No modifiers'
+    );
+    assert.ok(
+      Boolean(target.querySelector('[data-modifier-pill-select="recipe-crafting-modifier"]')),
+      'and the pill row is offered, so there is somewhere to pick the custom set'
+    );
+    editHarness.remount();
+  });
+
+  it('releases the "Custom set" pin when the GM picks another option (issue 1055)', async () => {
+    for (const [released, expected] of [
+      // No modifiers is the sharp one: it writes the SAME shape the pin is holding, so
+      // only the release tells the two readings apart.
+      ['none', { craftingModifier: { modifierIds: [] } }],
+      ['inherit', { craftingModifier: null }],
+    ]) {
+      const patches = [];
+      const target = await editHarness.mount(
+        emptyDefaultSetProps({ onUpdateRecipe: (patch) => patches.push(patch) })
+      );
+      await pickModifierSetMode(target, 'custom');
+      await editHarness.setProps({ recipe: { ...RECIPE, ...patches.at(-1) } });
+
+      await pickModifierSetMode(target, released);
+      assert.deepEqual(patches.at(-1), expected, `${released} writes its own persisted shape`);
+      // Park the recipe on a NON-empty set, then land it back on the authored empty set
+      // — the one shape the pin masks. Both assertions are load-bearing: a still-held pin
+      // leaves the derived mode on `custom` throughout, Svelte skips both DOM writes, and
+      // the select is left showing whatever this test last typed.
+      await editHarness.setProps({
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+      });
+      assert.equal(
+        target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+        'custom',
+        `picking ${released} left the select stale — it was never rewritten, so the pin is still held`
+      );
+      await editHarness.setProps({
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: [] } },
+      });
+      assert.equal(
+        target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+        'none',
+        `picking ${released} drops the pin, so an empty authored set reads as No modifiers again`
+      );
+      editHarness.remount();
+    }
+  });
+
+  it('releases the "Custom set" pin when a DIFFERENT recipe arrives (issue 1055)', async () => {
+    const patches = [];
+    const target = await editHarness.mount(
+      emptyDefaultSetProps({ onUpdateRecipe: (patch) => patches.push(patch) })
+    );
+    await pickModifierSetMode(target, 'custom');
+    await editHarness.setProps({ recipe: { ...RECIPE, ...patches.at(-1) } });
+
+    // The pin survives a same-recipe patch: `patchRecipeDraft` replaces the whole
+    // `recipe` object on every keystroke, so tracking object identity alone would clear
+    // the pin on the component's own write.
+    await editHarness.setProps({
+      recipe: { ...RECIPE, name: 'Renamed mid-edit', craftingModifier: { modifierIds: [] } },
+    });
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'custom',
+      'a same-id draft patch must not clear the pin — every patch is a new object'
+    );
+
+    await editHarness.setProps({
+      recipe: { ...RECIPE, id: 'r2', craftingModifier: { modifierIds: [] } },
+    });
+    assert.equal(
+      target.querySelector('[data-recipe-field="craftingModifierSet"]').value,
+      'none',
+      'a different recipe gets its own reading, not the previous one’s local intent'
+    );
+    editHarness.remount();
+  });
+
+  it('names the inherited default set under Inherit rather than saying "inheriting" (issue 1055)', async () => {
+    const target = await editHarness.mount(
+      ruleProps({
+        recipe: { ...RECIPE, craftingModifier: null },
+      })
+    );
+    const inherited = target.querySelector('[data-recipe-crafting-modifier-inherited]');
+    assert.ok(Boolean(inherited), 'Inherit hides the pill row and names the set instead');
+    assert.ok(
+      inherited.textContent.includes('Medicine') && inherited.textContent.includes('Alchemy'),
+      'the inherited names come from the system default id list'
+    );
+    assert.ok(
+      !target.querySelector('[data-modifier-pill-select="recipe-crafting-modifier"]'),
+      'there is nothing to author under Inherit, so no pill row renders'
+    );
+    editHarness.remount();
+  });
+
+  it('hides the crafting-modifier picker when the system has no catalogue (issue 770)', async () => {
+    const target = await editHarness.mount(
+      identityProps({ craftingModifierPolicy: 'byRecipe', craftingModifierOptions: [] })
+    );
+    assert.ok(
+      !target.querySelector('[data-recipe-crafting-modifier-picker]'),
+      'no catalogue → nothing to pick from, so no picker'
+    );
+    editHarness.remount();
+  });
+
+  // The pick cap is a SYSTEM fact this recipe cannot change, so it is stated STANDING —
+  // not only once the GM hits it and the menu button has already gone dead.
+  // `data-recipe-crafting-modifier-cap` carries which of the two readings is on screen.
+  it('states the pick cap standing, and marks it reached at the bound (issue 1055)', async () => {
+    // THREE catalogue entries, so "at the cap" is distinguishable from "everything is
+    // already selected" — with a two-entry catalogue and a cap of two the pill menu is
+    // dead for the other reason and the assertion would prove nothing.
+    const CAP_CATALOGUE = [
+      { id: 'med', label: 'Medicine' },
+      { id: 'alch', label: 'Alchemy' },
+      { id: 'herb', label: 'Herbalism' },
+    ];
+    const capOf = async (overrides) => {
+      const target = await editHarness.mount(
+        ruleProps({ craftingModifierOptions: CAP_CATALOGUE, ...overrides })
+      );
+      const hint = target.querySelector('[data-recipe-crafting-modifier-cap]');
+      const reading = hint?.getAttribute('data-recipe-crafting-modifier-cap') ?? null;
+      const text = hint?.textContent ?? '';
+      // `ModifierPillSelect` marks the add button with `aria-disabled`, not `disabled`:
+      // it is a `<button>` that must stay focusable so a keyboard user can still reach
+      // the explanation the hint carries.
+      const addDisabled =
+        target.querySelector('[data-modifier-pill-menu-button]')?.getAttribute('aria-disabled') ===
+        'true';
+      editHarness.remount();
+      return { reading, text, addDisabled };
+    };
+
+    const below = await capOf({
+      craftingModifierMaxPicks: 2,
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.equal(below.reading, 'available', 'one pick of two is below the cap');
+    assert.ok(below.text.includes('2'), 'the bound is stated as a number the GM can read');
+    assert.equal(below.addDisabled, false, 'and there is still room, so Add is live');
+
+    const at = await capOf({
+      craftingModifierMaxPicks: 2,
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'alch'] } },
+    });
+    assert.equal(at.reading, 'reached', 'two picks of two is AT the cap');
+    assert.equal(at.addDisabled, true, 'the Add menu goes dead at the bound');
+
+    // A cap of exactly 1 gets its own sentence rather than "up to 1 modifiers".
+    const one = await capOf({
+      craftingModifierMaxPicks: 1,
+      recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.equal(one.reading, 'reached');
+    assert.ok(
+      !/up to 1\b/i.test(one.text),
+      'the singular reading is its own sentence, not a pluralized "up to 1 modifiers"'
+    );
+
+    // UNLIMITED states nothing at all: "up to Infinity" is not a sentence, and a hint
+    // that bounded nothing would be noise on every recipe of every unbounded system.
+    for (const craftingModifierMaxPicks of [null, undefined, 0, -1]) {
+      const unbounded = await capOf({
+        craftingModifierMaxPicks,
+        recipe: { ...RECIPE, craftingModifier: { modifierIds: ['med', 'alch'] } },
+      });
+      assert.equal(
+        unbounded.reading,
+        null,
+        `${String(craftingModifierMaxPicks)} is unlimited to the engine, so no cap is stated`
+      );
+      assert.equal(unbounded.addDisabled, false, '…and nothing is at a bound');
+    }
   });
 
   it('renders the identity inputs in Overview and no recipe-item card', async () => {
@@ -3498,6 +3873,149 @@ describe('RecipeEditView (mounted)', () => {
       options[0].match.componentId,
       'cmp-water',
       'the surviving alternative is the one not removed'
+    );
+    editHarness.remount();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Issue 1036, criteria 2 and 18 — the add-new offer withholds a DISABLED essence
+  // from the three recipe-side controls, while the `essenceOptions` PROP stays whole.
+  //
+  // Every assertion here carries its negative control, because a filter that filters
+  // nothing passes the positive half of all three.
+  // ---------------------------------------------------------------------------
+
+  // `ess-life` disabled, `ess-water` enabled. Declaration order matters: the disabled one
+  // is FIRST, which is what makes the `firstEssence` default selection provable.
+  const MIXED_ESSENCE_OPTIONS = Object.freeze([
+    Object.freeze({ id: 'ess-life', name: 'Life', icon: 'fas fa-heart', enabled: false }),
+    Object.freeze({ id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: true }),
+  ]);
+
+  it('1036/18: the alternative-essence default selection SKIPS a disabled essence', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      { props: { componentOptions: COMPONENT_OPTIONS, essenceOptions: MIXED_ESSENCE_OPTIONS } }
+    );
+
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]')
+      .click();
+    await flushRender();
+
+    const options = patches.at(-1).ingredientSets[0].ingredientGroups[0].options;
+    // Without the filter this would author a requirement on a DISABLED essence, which the
+    // activation validator then refuses — the recipe would be born unenableable.
+    assert.equal(options.at(-1).match.essenceId, 'ess-water');
+    editHarness.remount();
+  });
+
+  it('1036/18 negative control: with both enabled, the default is the FIRST essence', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-herb' } },
+        { quantity: 1, match: { type: 'component', componentId: 'cmp-water' } },
+      ],
+      { props: { componentOptions: COMPONENT_OPTIONS, essenceOptions: ESSENCE_OPTIONS } }
+    );
+
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-add="alternative-essence"]')
+      .click();
+    await flushRender();
+
+    // `ess-life` is first in `ESSENCE_OPTIONS` too, so this proves the test above measured
+    // the FILTER rather than an unrelated change of ordering.
+    assert.equal(
+      patches.at(-1).ingredientSets[0].ingredientGroups[0].options.at(-1).match.essenceId,
+      'ess-life'
+    );
+    editHarness.remount();
+  });
+
+  it('1036/18: the set-level essence picker withholds a disabled essence, and offers an enabled one', async () => {
+    const { target } = await mountIngredientGroups([], {
+      props: { essenceOptions: MIXED_ESSENCE_OPTIONS },
+    });
+    target.querySelector('[data-recipe-set-id="set-1"] .manager-recipe-essence-trigger').click();
+    await flushRender();
+
+    const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>
+      option.textContent.trim()
+    );
+    assert.ok(
+      offered.some((label) => /Water/.test(label)),
+      'negative control: the ENABLED essence IS offered, so the picker is not simply empty'
+    );
+    assert.ok(!offered.some((label) => /Life/.test(label)), 'the disabled essence is withheld');
+    editHarness.remount();
+  });
+
+  it('1036/2: an ALREADY-AUTHORED disabled essence stays resolved, editable and offered back to itself', async () => {
+    const { target, patches } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-life', amount: 2 } }],
+      { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
+    );
+
+    // The PROP boundary: `RecipeIngredientOption` resolves its display through the
+    // unfiltered `essenceOptions`, so an authored requirement on a disabled essence reads
+    // back by NAME. Filtering the prop would render it as an unresolved "Pick essence".
+    const trigger = target.querySelector(
+      '[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger'
+    );
+    assert.match(trigger.textContent, /Life/, 'the authored disabled essence still names itself');
+
+    // And it is still CLEARABLE: the option can be removed outright.
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] [data-recipe-remove="alternative"]')
+      .click();
+    await flushRender();
+    assert.equal(patches.length, 1, 'removing the authored requirement still works');
+    editHarness.remount();
+  });
+
+  it('1036/18: the per-option picker withholds a disabled essence unless it is the CURRENT choice', async () => {
+    const { target } = await mountSingleGroup(
+      [{ quantity: 1, match: { type: 'essence', essenceId: 'ess-water', amount: 1 } }],
+      { props: { essenceOptions: MIXED_ESSENCE_OPTIONS } }
+    );
+    target
+      .querySelector('[data-recipe-group-id="grp-1"] .manager-recipe-essence-trigger')
+      .click();
+    await flushRender();
+
+    const offered = [...document.querySelectorAll('.manager-travel-option')].map((option) =>
+      option.textContent.trim()
+    );
+    assert.ok(
+      offered.some((label) => /Water/.test(label)),
+      'negative control: the enabled essence IS offered'
+    );
+    assert.ok(
+      !offered.some((label) => /Life/.test(label)),
+      'a disabled essence that is NOT the current choice is withheld'
+    );
+    editHarness.remount();
+  });
+
+  it('1036/2: the essence match TYPE survives a system whose essences are all disabled', async () => {
+    const allDisabled = [
+      { id: 'ess-life', name: 'Life', icon: 'fas fa-heart', enabled: false },
+      { id: 'ess-water', name: 'Water', icon: 'fas fa-droplet', enabled: false },
+    ];
+    const { target } = await mountIngredientGroups([], { props: { essenceOptions: allDisabled } });
+
+    // `hasEssences` reads the UNFILTERED prop deliberately. Gating it on the offer would
+    // remove essence requirements entirely from such a system — including the ability to
+    // see and clear the ones it already has.
+    assert.ok(
+      Boolean(
+        target.querySelector('[data-recipe-set-id="set-1"] [data-recipe-add="essence-requirement"]')
+      ),
+      'the set-level essence add still renders'
     );
     editHarness.remount();
   });

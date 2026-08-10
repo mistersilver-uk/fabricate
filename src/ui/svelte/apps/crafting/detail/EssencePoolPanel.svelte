@@ -20,6 +20,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { normalizeEssenceIcon } from '../../../util/essenceIcons.js';
+  import { essenceTintToken } from '../../../util/essenceTint.js';
   import CraftingThumb from '../CraftingThumb.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
@@ -48,10 +49,16 @@
     new Map(requirements.map((requirement) => [requirement.essenceId, requirement]))
   );
 
+  // The essence's own colour, folded through the shared sanitiser rather than interpolated
+  // raw: `colorToken` reaches here from world data, and it is being spliced into a `style`
+  // string. Everything else in the player app already spends the colour through this fold.
+  function tintTokenOf(requirement) {
+    return essenceTintToken(requirement?.colorToken);
+  }
+
   function tintOf(requirement) {
-    return requirement?.colorToken
-      ? `--fab-chip-color: var(--fab-tag-${requirement.colorToken})`
-      : '';
+    const token = tintTokenOf(requirement);
+    return token ? `--fab-chip-color: var(--fab-tag-${token})` : '';
   }
 
   function meterState(requirement) {
@@ -101,9 +108,11 @@
         {@const state = meterState(requirement)}
         <div
           class={`essence-pool-meter is-${state}`}
+          class:has-tint={Boolean(tintTokenOf(requirement))}
           style={tintOf(requirement)}
           data-essence-meter={requirement.essenceId}
           data-essence-meter-state={state}
+          data-essence-meter-tint={tintTokenOf(requirement) || undefined}
         >
           <div class="essence-pool-meter-head">
             <span class="essence-pool-meter-badge">
@@ -225,35 +234,32 @@
     gap: var(--fab-space-2);
   }
 
-  /* The one shipped tinted-surface idiom (EnvironmentCard / GatheringDetail /
-     GatheringEventDetail / Chip): 16% fill over the surface the card sits on, 50%
-     border, tint on the GLYPH only. The rail renders inside .fabricate-app cards, so
-     it mixes against --fab-surface-raised rather than theme root. */
+  /* The meter box is NEUTRAL by default and carries the ESSENCE's colour when it has one.
+     It never carries state.
+
+     It used to: `met` painted the box in the success family and `short` in the danger
+     family. That made the box a second, louder answer to a question the head already
+     answers precisely — the `6/6` ratio beside the name, and the colour-coded requirement
+     tiles above the panel, both state exactly where each requirement stands. A green box
+     only restated it, and it cost the box the one thing it alone could say: WHICH essence
+     this meter is. With two requirements in a shared pool, both boxes went green together
+     and became indistinguishable at a glance. */
   .essence-pool-meter {
     flex: 1 1 180px;
     min-width: 0;
     padding: 9px 11px;
-    border: 1px solid color-mix(in srgb, var(--fab-chip-color, var(--fab-accent)) 50%, transparent);
+    border: 1px solid var(--fab-border);
     border-radius: 9px;
-    background: color-mix(
-      in srgb,
-      var(--fab-chip-color, var(--fab-accent)) 16%,
-      var(--fab-surface-raised)
-    );
+    background: var(--fab-surface-raised);
   }
 
-  /* All three states of the published slot-state matrix are declared, so none of them
-     is an implicit default a later edit can silently retune. `partial` is the authored
-     tint of the base rule above; `met` and `short` replace it with the success and
-     danger families, so zero-delivered reads as an error rather than as a short bar. */
-  .essence-pool-meter.is-met {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-  }
-
-  .essence-pool-meter.is-short {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
+  /* The shipped tinted-surface idiom (EnvironmentCard / GatheringDetail /
+     GatheringEventDetail / Chip): 16% fill over the surface the card sits on, 50%
+     border, tint on the GLYPH only. The rail renders inside .fabricate-app cards, so
+     it mixes against --fab-surface-raised rather than theme root. */
+  .essence-pool-meter.has-tint {
+    border-color: color-mix(in srgb, var(--fab-chip-color) 50%, transparent);
+    background: color-mix(in srgb, var(--fab-chip-color) 16%, var(--fab-surface-raised));
   }
 
   .essence-pool-meter-head {
@@ -323,6 +329,25 @@
 
   .essence-pool-meter.is-short .essence-pool-bar-fill {
     background: var(--fab-danger);
+  }
+
+  /* A COLOURED essence keeps its own colour in every state, so the bar you fill reads as the
+     same essence as the pip you filled it from. Without this the bar tracked the essence
+     while `partial` and then flipped to green the moment it was satisfied — the one moment
+     the player is looking at it — so the colour that identified it was dropped exactly when
+     it mattered.
+
+     Losing the green does not lose the STATE: the ratio beside the name reads `5/5`, the
+     fill reaches full width, and `data-essence-meter-state` still says `met`. The state was
+     always carried by those three; the fill colour only reinforced it. (`is-short` is
+     `delivered === 0`, so its danger fill renders at 0% width and was never visible.)
+
+     An essence with NO colour is untouched and keeps the success/danger palette it has
+     today — which the lab world exercises, since its `air` essence declares no colour. */
+  .essence-pool-meter.has-tint.is-met .essence-pool-bar-fill,
+  .essence-pool-meter.has-tint.is-partial .essence-pool-bar-fill,
+  .essence-pool-meter.has-tint.is-short .essence-pool-bar-fill {
+    background: var(--fab-chip-color);
   }
 
   @media (prefers-reduced-motion: reduce) {

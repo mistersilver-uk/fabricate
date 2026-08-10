@@ -55,6 +55,10 @@ describe('Fabricate theme management', () => {
     assert.deepEqual(configurableKeys, [
       SETTING_KEYS.EXPERIMENTAL_FEATURES,
       SETTING_KEYS.INTERACTION_PROMPT_POSITION,
+      // Issue 1024: free text, deliberately — the design refuses to auto-append a
+      // `.value` leaf and the set of real per-system paths is open-ended, so a
+      // `choices` dropdown would be wrong.
+      SETTING_KEYS.ITEM_STACK_QUANTITY_PATH,
       SETTING_KEYS.THEME
     ].sort());
 

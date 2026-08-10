@@ -23,6 +23,8 @@ const harness = createMountedComponentHarness({
     // craftingImageDefaults (issue 544).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    // The essence colour fold, reached through the embedded player inventory detail.
+    'src/ui/svelte/util/essenceTint.js',
     // NOTE: the progressive order/threshold leaves are deliberately NOT listed.
     // `ProgressiveStageList.svelte` imports neither (only `foundryBridge`); their real
     // importer is `inventoryStore.svelte.js`, which no mounted suite loads.

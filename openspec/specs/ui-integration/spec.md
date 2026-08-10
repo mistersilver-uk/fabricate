@@ -96,6 +96,26 @@ Two live non-conformances are recorded here rather than left to be discovered, b
 - `tests/components/mounted-harness-primitive-allowlist.test.js` requires every `SHARED_PRIMITIVES` entry to be reachable from `src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte`, so the allowlist that encodes "this is a shared primitive" is structurally manager-scoped in exactly the way this rule is not.
   Only its second test carries that assumption; the fix is to widen it to a declared root set rather than one root.
 
+#### Right-inspector actions
+
+Every GM studio's right-hand inspector ends in a stack of verbs for the selected entity — Duplicate, Edit, Delete, Copy source UUID, Unlink.
+That is one meaning, so those controls render through one shared primitive, and it is the POINT OF ARRIVAL: a new studio's inspector MUST import it rather than declaring a fourth treatment.
+
+The primitive takes the Tool Studio's editor-header buttons as its base, because that is the refined treatment: a label a notch below body text, the compact control height, a 6px radius, and an icon before the label.
+It is not a variant of the manager's general-purpose button class, since that class's tone modifiers are declared in the global sheet at a specificity a scoped primitive block cannot beat, which would leave the primitive's own tones losing to it.
+It therefore carries the Foundry `<button>` reset itself and states its appearance in its own scoped block.
+
+Tone is a fixed vocabulary and each member has a meaning:
+
+- `primary` is the ACCENT, never the success family, and there is at most one per rail — it is the rail's loudest control.
+  A studio that paints its primary in success has coloured "edit" as "confirm".
+- `danger` is danger text on the panel surface: destructive, and never louder than the primary.
+- `warning` is amber, for a verb that BREAKS A LINK rather than destroying a record — unlinking a source is not deleting one.
+- the default is the quiet panel-surface treatment.
+
+Recorded non-conformance: the recipe, component, Tool Studio, and Tags & Categories inspectors still render their own treatments and are the declared conversion backlog.
+The essence inspector is converted; a primitive that coexists with unconverted duplicates has added a variant rather than removed one, so the remainder is a debt with an owner rather than an accepted state.
+
 #### No-state messages
 
 Every manager "nothing here" message renders through one shared no-state primitive, in one of three treatments.
@@ -151,6 +171,45 @@ The primitive takes two optional PER-OPTION fields alongside the existing icon (
 `neutral` IS that plain active tile and declares no tint of its own; it exists so a three-way good/neutral/bad control can name every segment rather than leaving the middle one's intent implicit.
 `disabled` is carried onto the segment's radio INPUT rather than only onto a class, because the control's change handler guards only "the chosen value differs" and a dimmed-but-live segment would still emit a change; a disabled segment also suppresses the hover recolour, or it still reads as choosable.
 Each rendered control takes a radio group name unique per CONTROL, since a host that renders two of them in one card would otherwise have the browser treat both radio sets as one group.
+
+The primitive also takes an OPT-IN per-control icon-only variant (issue 1036) for an axis whose options are self-evident as glyphs, such as a list/grid presentation toggle.
+It renders the same DOM as the labelled variant and differs only in CSS: the segment becomes a compact square tile and its label is CLIPPED out of view, never dropped and never removed from the accessibility tree, because the `<label>` IS the radio's accessible name and an icon-only track whose segments are anonymous to a screen reader is not an acceptable rendering.
+The variant additionally titles each tile with that same label, which is the pointer equivalent of the name the clipped text already gives assistive technology; the labelled variant adds no such tooltip, since it would only repeat words already on screen.
+Because the markup is unchanged, a per-option test or capture hook still resolves to the enclosing `<label>` in both variants — the click target a screenshot step depends on.
+
+#### Numeric entry
+
+Every editable numeric field in the manager and in the interactable and component editors renders through one shared stepper primitive — a typeable `type="number"` input with `−`/`+` adjuncts, a clamp, and no native spinner — EXCEPT the documented non-conformances recorded below.
+The exception clause is not optional decoration: two such fields exist today, so a rule stated absolutely would be falsified the moment it was written.
+The Recipe Studio duration-unit requirement is an INSTANCE of this rule rather than a local exception of its own.
+A bare `type="number"` with no adjuncts is a second numeric-entry design and is not an acceptable rendering: it inherits Foundry's host chrome, offers the browser's drawn arrows as its only pointer affordance, and shares neither the clamp nor the commit path.
+
+The primitive is the point of arrival, so a hand-rolled `−`/`+` pair around a bare input does not satisfy this either, however closely it copies the shape.
+A caller passes hooks and attributes through the primitive's attribute spread and behaviour through its change callback; a `disabled` state is the primitive's own top-level concern, because the adjuncts read it and a spread-only disable would leave them live on a control the caller believes is off.
+
+**Unset numeric values.**
+A numeric field whose domain admits "unset" — a DC override that inherits the system value, an unbounded modifier bound, an absent task node count, an absent max override — renders BLANK rather than zero, persists absence rather than `0`, and still offers its `−`/`+` adjuncts, which step from the field's lower bound.
+Neither adjunct is disabled while the field is unset, because nothing is at a bound when there is no value.
+A field whose blank rendering is merely cosmetic for zero is NOT such a field: `0` is its real persisted value, so it shows `0`.
+The distinction is a domain fact and is decided per field from what the model stores, never from how the old control happened to look.
+
+**Native spinner suppression.**
+A numeric field's native spinner is suppressed IF AND ONLY IF the field carries another pointer-driven stepping affordance — the stepper's `−`/`+` adjuncts, or a sibling range track in the same control bound to the same value.
+A field with neither keeps its spinner, because the arrows are then the ONLY pointer path to its value and hiding them would leave the field keyboard-only.
+Suppression is therefore never expressed as a blanket `input[type="number"]` rule: every suppression names the specific control it applies to.
+
+Two live non-conformances are recorded here rather than left to be discovered, because a rule whose exceptions are unwritten is a rule nobody can rely on.
+
+- `src/ui/svelte/components/ChanceSlider.svelte` keeps a bare number input paired with its range track, and is a non-conformance to the FIRST rule only.
+  Its range track is already a pointer-driven stepping affordance for the same value, so adding adjuncts would make three pointer paths to one number, and its `%` affix is absolutely positioned exactly where the `+` adjunct would land.
+  It therefore keeps its own keydown handler, which is what preserves keyboard stepping there, and its spinner IS suppressed by a rule scoped to that control — the `iff` above reached through the range track rather than through adjuncts.
+- `src/ui/svelte/apps/manager/SystemEditView.svelte`'s currency sub-unit amount keeps a bare number input AND its native spinner.
+  It sits inside a bordered, filled currency chip with its own minimum height, and a bordered filled stepper inside a bordered filled chip widens every wrapping chip; a chip is not a form row.
+  Keeping its spinner is the correct `iff` outcome rather than a lapse, since it has no other pointer affordance at all.
+
+One known limitation is recorded with them.
+An interactable's own node-pool `max` cannot express absence today, because `src/systems/gatheringNodeConfig.js` normalizes it to `0` on every write.
+That field therefore renders `0` rather than blank and is treated as cosmetic-zero; making it genuinely nullable is a behaviour change to the node config, not a control substitution, and is out of scope for a control-substitution refactor.
 
 ## Responsive Product UI
 
@@ -414,7 +473,11 @@ Each trigger pairs an expressive dice-matching condition with three effects (iss
 - **The tier-step effect gets its OWN row inside the trigger card**, below the outcome/break row rather than as a third field in it: at the pinned 1280x820 manager geometry the outcome control and the break pill already spend most of the trigger card's width, and a four-segment control plus an operand does not fit what is left.
   The row renders on **routed** check editors only (there are no tiers to step on a simple or progressive check) and is explicitly **not** gated on tool-breakage authority the way the break pill is — stepping is not a breakage concept.
   This is a control that routed **gathering** checks and **fixed**-type routed checks have never had: the retired toggle was relative crafting/salvage only, so those screens gain an effect they previously could not author at all.
-- The row carries a four-segment `SegmentedControl` (No step / Step up / Step down / Target tier) and a **stable operand slot** at one pinned width whose contents swap by mode — a `min="1"` number input for `up`/`down`, a tier `<select>` for `target`, and an inert disabled placeholder for `none` — so changing mode never moves the control out from under the GM's pointer in a wrapping row.
+- The row carries a four-segment `SegmentedControl` (No step / Step up / Step down / Target tier) and a **stable operand slot** at one pinned width whose contents swap by mode — a shared stepper clamped at a minimum of 1 for `up`/`down`, a tier `<select>` for `target`, and an inert disabled placeholder for `none` — so changing mode never moves the control out from under the GM's pointer in a wrapping row.
+  The stepper FILLS the pinned slot rather than sizing to its own content, and that direction is the requirement: the 160px pin and the no-movement guarantee are unchanged, so the primitive is made to fill the existing slot rather than the slot being re-measured to the primitive.
+  The guarantee that holds across a mode swap is POSITION and BOX SIZE: each mode renders one box of the same width and height in the same place, so nothing under the GM's pointer moves and no row rewraps.
+  It is deliberately not a claim about the operand's whole appearance — the stepper keeps its own 8px radius and soft surface fill where the `<select>` and the inert placeholder render at 6px on the manager's field background, because a layout-context rule may take a SIZE from its slot but must not restyle the primitive's border, radius or fill (see line 88).
+  A stepper sized to its content would break the size half outright, standing as a narrower and shorter island beside a `<select>` and a placeholder that both still render at the pinned width.
   Every rendered `SegmentedControl` takes a radio `name` unique per CONTROL, not per trigger: a trigger card renders two of them, and a shared group name would make choosing a tier-step mode uncheck the outcome radio.
 - **The `target` select never displays a tier it has not persisted.**
   `tierId` defaults to `null` and a `<select>` whose value matches no option renders its FIRST option as selected, so the select carries a disabled placeholder option ("Choose a tier…") selected while `tierId` is `null`, and renders a dangling id as an appended disabled "Missing tier" option plus an invalid-field treatment on the operand slot.
@@ -640,17 +703,62 @@ Capabilities:
 
 - Browse, create, edit, duplicate when supported, and delete essence definitions.
 - Set a FontAwesome icon for an essence (or fall-back to the default, `fas fa-mortar-pestle`)
-- Set an optional colour for an essence, chosen from the shared token palette through the manager's existing colour picker with custom hex entry disabled.
+- Set an optional colour for an essence, chosen from the shared token palette with custom hex entry disabled.
   The palette is the whole vocabulary because a free hex cannot be guaranteed legible across all seven themes; leaving the colour unset is a first-class state that renders the essence in the theme accent.
+  The editor renders that palette INLINE and offers an explicit No-colour cell, so unset is reachable from the palette itself rather than only through a separate Clear control.
+  Colour names are localized under the shared `FABRICATE.Admin.Manager.Colour.Token.*` namespace, because the same palette also serves the environments biome picker and the character-modifier picker.
 - Set optional source component identity by picker/drag-drop only when effect transfer is enabled.
   The source component may in turn expose a source item UUID.
+- Set an optional essence property macro by dropping a Macro, only when `features.propertyMacros === true`.
+  The drop is refused when the macro's own type is not `script`, and the refusal is reported on the editing surface.
 - In Manager, the Essences left-nav item is a real route, not a disabled placeholder, whenever the selected system has `features.essences === true`.
 - Manager shows component usage evidence for essence definitions and shows source-link state only when `features.effectTransfer === true`.
-- Manager does not allow inline editing on the browse essences page; the row Edit action opens a dedicated edit essence view.
+- Manager states component usage and recipe usage as two SEPARATE counts, because they answer different questions: components CARRY an essence and recipes REQUIRE it, and deleting the essence strips it from every carrier and rewrites every referencing recipe.
+- Manager does not allow inline editing on the browse essences page, with one exception.
+  The row's enable/disable toggle is a distinct localized named hit target, mirroring the Tools Tab's row switch; activating it neither selects the row nor opens the editor.
+  Every other row edit still opens the dedicated edit essence view.
+- An essence's colour is carried by its tinted medallion and by every chip that spells the essence's own name, and is NOT restated as a colour-token display name anywhere it stands beside such a tile.
+  A maintained display name per theme colour is upkeep with no reader on a row, a grid card, an inspector hero, or a live-preview identity block.
+  The editor's palette caption is the one exception and keeps its name: there the name labels the swatch the GM is choosing, and the No-colour cell has no tile to speak for it.
+- The essence library offers a list and a grid presentation of the same rows.
+  The grid card carries the same state vocabulary as the list row — the Disabled marker, the capability markers and the usage counts — because a presentation toggle must not silently remove state.
+  In the grid card the capability markers sit in a header row beside the medallion rather than beside the usage counts, so the icon and what it can do read together; in the list row they stay in the trailing cluster and are NOT moved.
+  Row actions are list-only; grid selection routes through the inspector.
+- The grid card lays out as a FIXED vertical stack — a header pairing the medallion with the capability markers, then the name, then the description, then the usage counts — and every growable part states its own ceiling so the same element lands at the same vertical offset in every card and every card in a row is the same height.
+  The name truncates to one line with an ellipsis and keeps its full text as a title; the description keeps a fixed line clamp AND reserves that height even when it is shorter, so the usage counts beneath it are always at the same offset; and neither the name row nor the capability run wraps.
+  That equality is also structural rather than incidental: the grid stretches its cards, and the card carries NO margin, because Foundry core gives every `<li>` a bottom margin and exempts the last child, and a stretched grid sizes an item's margin box to its row — so the last card in the list would otherwise silently take its siblings' margin as extra height.
+  Equal height within a row does not cover a name that wraps, because every card in that row grows with it, which is why the name and description are bounded above.
+- An essence's linked active-effect source and linked property macro are presented exactly as the Tool Studio presents a linked Item: ONE card, carrying the linked document's image, its name, an instructional sub-line, and its actions as a grouped icon pair.
+  The card is itself the drop target, so no second drop prompt renders beneath it — a card and a zone side by side state the same affordance twice.
+  A sub-line states what the GM can do with the card; it never restates the card's own title or the raw uuid, which is what a copy-uuid action is for.
+  The essence source's UNLINKED state keeps the drop-or-pick control, because an essence source is an in-system managed component and the pick half is the only route to that list.
+  The presentation toggle renders through the shared segmented control's icon-only variant, because a list glyph and a grid glyph ARE the two layouts, while the status filter beside it keeps its words.
+- A browser row that leads with the 40px medallion states selection as the accent ring alone and drops the inset left bar, which would otherwise bite into the medallion; the essence row is one of them, and on its grid card a left bar is not even the correct axis.
+- A browser that supports bulk selection states the ticked-row treatment through the one shared rule every such browser joins, so the state looks identical in every studio.
+  A studio that writes the ticked class without joining that rule renders a ticked row indistinguishable from an unticked one, which is a defect rather than an omission.
+- The essence library's search, filters, sort, presentation and page position survive a round trip through the essence editor.
 - Manager essence icon editing uses a pop-over icon picker instead of requiring raw icon class entry.
+  The editor's icon control is one column: the preview tile fills that column's width and the picker and its reset sit inside the same edge, so no control overhangs the tile it belongs to.
+  The tile's glyph is sized for the tile rather than inheriting the shared row-medallion glyph size, which reads as a speck at editor scale.
 - Manager hides source columns, source filters, source inspector sections, source warnings, and source edit controls unless `features.effectTransfer === true`.
-- Manager prevents essence deletion while one or more managed components reference that essence with a positive quantity.
+  The essence editor's On-craft tab gates its Active effect source section on `features.effectTransfer` and its property macro section on `features.propertyMacros`.
+  With BOTH off the tab renders an explanatory empty state naming the two settings, never an empty tab.
+- A disabled essence's On-craft sections and behaviour list render the SUPPRESSION rather than omitting the behaviour.
+  Each configured section keeps its linked card and states that nothing it carries reaches a crafted result, because suppression is a state on the section rather than a removal.
+- Manager allows essence deletion regardless of component usage: deletion is WARNED, not BLOCKED, because the cascade strips the essence from every carrying component and rewrites every referencing recipe.
+  No delete is refused, and no set member is skipped, on account of the components carrying the essence, and the browser row shows the component count plainly with no delete-blocked marker.
+  Both delete forms state their impact before the GM commits.
+  The single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten.
+- A set delete states its impact before it is armed, and recomputes it when the selection changes.
+  The statement reports how many essence definitions will be deleted, how many components carry one or more of the SELECTED essences, and how many recipes will be rewritten.
+  The component number is counted over the whole selection as a DISTINCT-carrier union: a component carrying two selected essences counts once, because the cascade strips it in one pass, so the copy says "one or more of the selected essences" rather than a per-essence sum.
+  The two carrier numbers are counts of DISTINCT carriers, so neither exceeds what the cascade will touch.
+- The set delete uses the two-step armed confirmation rather than a modal dialog.
+  This is a deliberate exception to the reserved-for-bulk-actions dialog rule, taken on an explicit maintainer decision, and it is paired with the impact statement above.
 - Manager source-state language is `linked`, `missing`, `stale`, and `none`; stale source evidence must remain readable until the GM clears or repairs it.
+- A disabled essence is withheld from every ADD-NEW offer list and from nothing else.
+  Wherever it is already referenced — a component quantity, a recipe ingredient option — it stays rendered, marked, and clearable, because the surface that authored a value must remain the surface that can remove it.
+  Residual, recorded: the component bulk-edit panel's essences axis is a whole-map replacement, so applying that axis over a selection still rewrites every carrier's map from the staged grid.
 
 ### Tools Tab
 
@@ -1266,6 +1374,85 @@ A locked recipe stays **visible** to players but only a GM can craft it, a disti
 The lock write path is **never gated**, in either direction, in explicit contrast with the enable toggle: a GM locks a recipe precisely while it is unfinished, so an enable-blocking validation issue must not also block locking it.
 The change persists immediately (like `enabled`), outside the recipe draft's Save.
 
+### Recipe crafting-check modifier control (issue 1055)
+
+The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `byRecipe` ("Recipe picks") combination rule, and only when the system carries a non-empty `checkModifiers` catalogue.
+`byRecipe` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
+Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `byRecipe`.
+
+Under `byRecipe` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
+
+1. **Inert banner** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
+The third cause, `noPlaceholder`, is REMOVED together with the roll-formula placeholder it named: the resolved scalar is appended to whatever the GM authored, so "a formula is authored but never references it" is not a reachable state.
+`noCheck` and `noFormula` remain, and their copy states the real remaining cause **without naming any placeholder**, because a GM told to reference one would be told to do something that does nothing.
+The control gains no new state.
+   The control is replaced entirely — nothing authored here could change a roll — and the banner names which cause applies from the recipe's point of view (distinct copy from the Checks card's equivalent notice).
+   The banner wins the priority order precisely BECAUSE the rule delegates here: the system asked this recipe to pick, and its picks would reach no roll.
+2. **Controls** — the grid renders a picker cell for the eligible-id subset.
+   There is **no combination-rule select**: a recipe chooses WHICH modifiers apply, never HOW they combine.
+
+The per-recipe select-row grid's worst case is **three** cells — Category, the picker cell, and _at most one_ of Check tier / Minimum success tier — because the picker cell hosts its own tri-state select (**Inherit system default** / **Custom set** / **No modifiers**) rather than adding a further grid cell.
+Check tier and Minimum success tier are mutually exclusive by construction and never render together: `resolveRecipeFixedOutcomeTierOptions` offers a minimum tier only for `routedByCheck` + `fixed`, while `resolveRecipeCheckTierOptions` under that same mode offers tiers only when the routed type is **not** `fixed`.
+Selecting **Custom set** seeds the pill row from the recipe's own eligible ids (falling back to the system default set, so "customize" starts from what the recipe was inheriting), TRUNCATED to `craftingCheck.maxModifierPicks` so the seed never shows picks the engine would not roll; selecting **No modifiers** writes an authored empty `modifierIds` array (nothing is appended to that recipe's check roll); selecting **Inherit system default** drops the `modifierIds` key.
+Clearing the LAST selected pill under **Custom set** posts an authored empty array (`{ modifierIds: [] }`), never `null` — posting `null` would silently become _Inherit_, which is the pre-1055 defect this control replaces (a GM could not express "this recipe gets no check modifiers" at all).
+Under **Inherit system default** the pill row is replaced by a read-only line naming the inherited set through the active language's list formatting (or stating that the system default set is empty, so no check modifier applies to this recipe).
+
+**Pick cap disclosure.** When the system's cap is bounded, the picker states it in words beneath the pills ("This system lets a recipe pick one check modifier." at a cap of 1, otherwise "…up to N check modifiers."), and adds an at-cap clause once the recipe has picked that many.
+An unbounded (absent) cap renders no sentence at all, because there is nothing to disclose.
+The add-menu button is disabled at the cap and an add is refused a second time in the toggle handler, which is what holds when the cap is lowered on the Checks tab while this editor is open — but neither is the invariant: `resolveEligibleModifierIds` truncates on read, so a cap lowered below what a recipe already picked is honoured whatever is on disk, and the recipe's stored picks survive intact.
+
+A legacy `craftingModifier.policy` left on disk by a pre-1055 world is CARRIED FORWARD untouched by every writer on this tab.
+This surface no longer authors a rule and must not silently delete one either — dropping a key while editing a neighbouring one is data loss disguised as a set edit — and the key is inert regardless, because the resolver never reads it.
+
+The inert banner reuses the resolution-mode banner's chrome (`RecipeModeBanner`, prop-ified with a `tone` and a `dataAttr` name so it can render alongside its sibling on one tab without colliding) rather than inventing a second visual language for "this is set elsewhere".
+It renders full-bleed below the grid, replacing the control the grid would otherwise hold, rather than squeezing into a single grid cell.
+
+**Five-mode active-check-formula table.** WHICH `craftingCheck` sub-config the active resolution mode actually rolls — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`craftingModifierResolver.js`), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to that sub-config:
+
+| Resolution mode       | Check config                 | Notes                                                        |
+|------------------------|-------------------------------|---------------------------------------------------------------|
+| `simple`               | `craftingCheck.simple`        | optional                                                       |
+| `routedByIngredients`  | `craftingCheck.simple`        | optional; shares the simple slot                               |
+| `routedByCheck`        | `craftingCheck.routed`        | required                                                       |
+| `progressive`          | `craftingCheck.progressive`   | required                                                       |
+| `alchemy`              | per `alchemy.checkMode`       | `none` → no check, `simple` → `simple`, `tiered` → `routed`   |
+
+A catalogue can be inert for TWO DISTINCT reasons this selector distinguishes rather than collapsing into one boolean: the mode rolls no check slot at all (`noCheck`), or a slot exists but carries no authored roll formula (`noFormula`) — each renders its own remedy-specific copy, both on this tab and on the Checks card.
+The third cause is REMOVED with the placeholder, together with the remedy-specific copy it drove on both surfaces.
+The selector reports `rollFormula` and `checkUsable` POST-shim, so a stored formula whose only content was the retired placeholder reports `noFormula` rather than reporting usable.
+**Checks tab — Validation, the retired-placeholder readiness split.** `checksReadiness.js` derives `hasRollFormula` from the POST-shim formula, not the raw field, so the Validation tab cannot tick "Has a roll formula" green for a check `checkUsable` reports as unusable — the invariant `resolution-modes/spec.md` states, on the one surface a GM consults to find out whether a check works.
+A typed retired placeholder raises one of TWO mutually exclusive issues, and the split is on the STRIP OUTCOME `planRetiredPlaceholderStrip` reports — the same decider `checkUsable` and the `1.21.0` migration reduce — never on the placement classifier alone, because the two disagree and the tab and the migration would then give the GM opposite instructions about one formula:
+
+- `retiredPlaceholderInFormula` (**warning**) when the shim STRIPS the placement.
+The removal is lossless, so whatever the GM authored around the placeholder still rolls and the modifiers still apply; only what they believe about WHY is wrong, and the copy says the placeholder is ignored and removed before the roll and to delete it.
+- `retiredPlaceholderBreaksFormula` (**critical**) when the shim REFUSES the placement — every non-additive placement, AND every additive one whose residue would be structurally incomplete (`1d20 * -@craftingmod`, `1d20 - @craftingmod -`, `@craftingmod +`, all of which the placement classifier calls additive).
+The WHOLE formula is discarded and the check does not roll at all, so the copy says it must be rewritten by hand — echoing the migration notice's untouched-count sentence, which is what this GM already read.
+Telling them to "delete the placeholder" would be actively wrong: deleting it out of `1d20 * @craftingmod` leaves a dangling `1d20 *`, and out of `max(@craftingmod, 2)` leaves `max(, 2)`.
+
+A placeholder-ONLY formula (`@craftingmod`) is the one place the warning copy's "the check still rolls" is not literally true: it is STRIPPED — losslessly, to nothing — so it takes the warning, and the separate `hasRollFormula` tick is what reports that there is now no formula to roll.
+The two issues are about the placeholder; the tick is about the formula, and they are not merged, because "delete the placeholder" and "author a formula" are different instructions.
+The critical case is asserted over the shared refusal corpus rather than a sampled list, because a hand-picked list of non-additive shapes is exactly what let a classifier-driven split ship.
+
+Both predicates also inspect the legacy `routed.rollExpression` alias, and that branch is DEFENSIVE, not load-bearing — it is described that way because describing it as load-bearing was wrong.
+`rollExpression` is a READ alias that both `CraftingSystemManager._normalizeRoutedCraftingCheck` and the manager root's `cloneRoutedCheck` fold into `rollFormula`, and neither emits the key, so no draft this tab is ever handed carries a live one; the `1.21.0` migration sweeps the alias because it reads the raw SETTING, which is a different input.
+It is kept here because `evaluateCheckReadiness` is a pure evaluator over a plain check object with no normalizer of its own, and a placeholder reaching it through the alias must not be the one thing the tab stays silent about.
+Both strings NAME `@craftingmod` explicitly rather than saying "a retired placeholder", which is unidentifiable in a formula carrying several `@` tokens.
+That is not in tension with the inert-cause copy: those two strings must not name a placeholder because they would be telling a GM to ADD one, and there is none to add.
+
+The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
+
+**Checks tab — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
+It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Add all**, **Highest**, **Recipe picks** (`byRecipe`), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
+`MODIFIER_POLICIES` is the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, because a hand-maintained mirror of the rule vocabulary is exactly the drift issue 855 was.
+
+Beneath it, a **Maximum picks** stepper authors `maxModifierPicks`.
+It renders **only** under a rule `policyDefersSelection` admits (`byRecipe`, `playerPicks`), asked of the resolver live against the radio group the GM is clicking rather than re-derived from a local membership test or projected from the last persisted rule.
+Its **empty field is a real value — unlimited — not a blank to be defaulted**: the value shown is `resolveMaxModifierPicks`'s answer rendered back (`Infinity` → empty), so a stored `0`, `-2` or `"three"` displays as unlimited exactly as the engine treats it, and clearing the field persists `maxModifierPicks: null` VERBATIM rather than omitting the key, because omitting it would leave the old bound in place.
+An accompanying hint states "empty means no limit" and is the input's accessible description, since a blank number field cannot state it; the hint is keyed by rule, because the cap bounds the RECIPE AUTHOR at edit time under `byRecipe` and the PLAYER at roll time under `playerPicks`, and one sentence covering both would say nothing specific about either.
+
+The **Default modifiers** intro copy is keyed by rule for the same reason, in three readings: under `addAll`/`highest` the default set IS the eligible set and nobody narrows it ("Which modifiers apply.
+Every recipe in this system uses this set."); under `byRecipe` it is the fallback a recipe inherits until it picks its own; under `playerPicks` it is the menu the player chooses from at roll time.
+
 ### Tools tab
 
 The recipe editor's Tools tab authors Tool references only.
@@ -1520,12 +1707,67 @@ Stated as its own section, a sibling of §Craft Execution, because the outcome s
 - **`cancelled` is distinct from `success: false`.**
   A dismissed roll prompt returns `{ success: false, cancelled: true, results: null }` with **guaranteed zero mutation** — no component consumed, no tool breakage — and discards a run created by that call.
   It is a user's choice, not a failure, and MUST NOT be reported as an error.
-- There is a **third** outcome: a component with a time requirement returns `success` with **null results**.
+- There is a **third** outcome: a component with a time requirement returns `success` with **null results** and an explicit **`waiting: true`** flag.
   The run has STARTED and awarded nothing.
-  Treating `success` as "done" would show a success state for a run that gave the player nothing.
+  Treating `success` as "done" would show a success state for a run that gave the player nothing, and the flag exists so no caller has to re-derive that from `results == null` — which is also what a no-result success looks like.
+  The flag is additive and `success` is unchanged, and it is present only when a salvage run manager is available to arm the time gate: a runless salvage carrying a `timeRequirement` never returns `waiting`.
 - A misconfigured required check (routed or progressive with no authored roll formula) returns `{ success: false, misconfigured: true }` with zero mutation and a GM-config message.
   Like a dismissed roll prompt, it **discards a run created by that call**, so a misconfigured abort never leaves a persisted `inProgress` salvage run; a reused pre-existing run is left untouched.
+  The **salvage-configuration validation abort carries the same `misconfigured: true` discriminator**, and it is the branch that actually fires in a wired world: validation runs before the check does, so a GM-side config error (an unsupported salvage mode, a routed success tier routing nowhere, a `simple` mode with two success groups) never reaches the check's own misconfigured return.
+  Without the flag there, a caller reads a broken config as a rolled failure and tells the player "nothing recovered" about a config only their GM can fix.
 - The UI passes `interactive: true`; the default `false` keeps macros and automation silent (see the path-agnostic §Interactive Roll Prompt for the shared contract).
+
+### Bulk Salvage Execution
+
+One player gesture, N salvage attempts, one aggregated card.
+The engine seam behind the Inventory tab's bulk panel, stated beside §Salvage Execution for the same reason that section is stated at all: the outcome semantics are the engine's, not the presentation's.
+
+- Bulk salvage runs through the `salvageComponents` facade seam, which takes an **`actorId` per target** and never an actor uuid at any nesting level.
+  The facade derives the uuid the service receives.
+  `BulkSalvageService` performs no ownership check and `CraftingEngine.salvage` performs none either, so the facade's per-target actor resolution is the **only** ownership gate on this path.
+  There is deliberately **no persisted-selection fallback**: a bulk run may span actors, so falling back to the last-selected actor would silently retarget a row whose own actor did not resolve, salvaging the wrong character's items with no error anywhere.
+  A row naming no resolvable actor is refused as `notPermitted`, never redirected, and one refused row costs the player none of the others.
+- Execution is **strictly sequential**, never concurrent.
+  Tool breakage at item _k_ must be visible at item _k+1_; stack depletion is shared between rows resolving to the same owned documents; and each salvage run record is a read-modify-write actor `setFlag` with no compare-and-set anywhere in the run store.
+  Safety against double-consumption comes from that sequencing plus each `salvage()` call's own availability check, which re-derives the owned documents at call time — **not** from the caller handing over a disjoint document set.
+  A duplicate target is therefore reported rather than silently executed twice.
+- The outcome vocabulary is `succeeded | failed | waiting | misconfigured | skipped | notPermitted | cancelled | error`, where `notPermitted` is the facade's own outcome and the rest are the service's.
+  One item's failure never aborts the run: a thrown call becomes an `error` row and the run continues.
+- Targets are classified **before** the engine is called, with a first-match `skipReason` of `bulkLimit`, `unknownSystem`, `featureDisabled`, `unknownComponent`, `salvageDisabled`, `duplicate`.
+  That pre-flight is advisory only and the engine stays authoritative, so a target that passes it can still fail for a reason only the engine can see (not enough units, an unavailable tool, a time gate).
+- The roll prompt is opened **once** for the whole run, and only when at least one runnable target has a usable check.
+  A dismissed prompt returns `{ cancelled: true, items: [] }` **before the first `salvage()` call**, so zero mutation on cancel is structural rather than a rollback.
+- A selection is bounded at **25 targets**, enforced at **selection** time so bulk salvage and bulk destroy inherit one bound.
+  A cap applied to the salvage service alone would let a 40-row selection salvage 25 and destroy all 40, which puts the unbounded behaviour on the destructive path.
+  The service keeps its own `bulkLimit` refusal as a defensive backstop that the selection bound makes unreachable through the UI.
+- A run may push older entries out of the 50-entry salvage history; the history is a convenience log, not an audit record.
+- A bulk row acts on the **selected** participation when its card is the inspected one, and on the primary otherwise — the same acting-participation rule §Player Salvage Surface states for a single salvage.
+- The listing is **not** reloaded from document hooks while a run is in flight.
+  Each item's own item CRUD would otherwise reload the listing under the open panel roughly once per item, since the change subscription's trailing debounce coalesces nothing across items that each take a roll, a message create and up to three flag writes.
+  Suppression is a **drop**, not a defer, and is implemented by reading the flag at fire time inside the handler — never by unsubscribing and re-subscribing, since the subscription is registered once for the app's lifetime.
+  That makes the terminal reload load-bearing, so clearing the flag, running **one** terminal full reload and removing the progress notification are a **single exit-path obligation** discharged on every path including a throw; a flag left set would make the inventory permanently deaf for that session with no error.
+
+_Stated residual:_ three config-shaped engine branches — `CraftingSystem.features.salvage` off, `Component.salvage.enabled` off, and an unknown system — return a bare `success: false` and therefore classify as `failed` rather than `skipped`.
+The service's pre-flight classifies exactly these three as `skipped` before the engine is reached, and the blocked-reason vocabulary puts `salvageDisabled` ahead of the misconfigured reasons, so in the designed flow those branches are unreachable and the player correctly reads "Skipped".
+They are reachable only when a GM toggles the feature between the listing snapshot and the call, which yields the wrong word for a correct non-outcome, with zero mutation, self-correcting on the reload the run already performs.
+Stretching `misconfigured` to cover them would put "tell your GM" on a deliberate GM decision.
+
+### Bulk Destroy
+
+Permanently deleting the selected components, as a peer of bulk salvage rather than an outcome of it.
+
+- Bulk destroy runs through the `destroyComponents` facade seam under the same gate as §Bulk Salvage Execution — an `actorId` per target, never a uuid, no persisted-selection fallback, and an unresolvable actor refused as `notPermitted` rather than retargeted.
+- It deletes **whole stacks** on the **target actor** only.
+  That is what destroying a thing means; the gesture carries no quantity control; and salvage's one-unit-at-a-time rule comes from the GM-authored `salvage.ingredientQuantity`, for which destroy has no analogue and which destroy never reads.
+  A listing row's sources may span actors while the document matcher takes one actor, so the count the panel shows and the count the confirmation names are the **target actor's** units (see `data-models` requirement 17).
+- It is **not** gated on `CraftingSystem.features.salvage` or a component's `salvage.enabled`, and it posts **no chat card**.
+  A player can already delete their own owned Items from the Foundry sheet, so this adds ergonomics rather than capability, and a blocked-for-salvage row is often exactly the row a player wants gone; a result card reports what an activity produced, and this produces nothing.
+- It reports the units **actually deleted**, derived from the documents the delete returned rather than from the ids requested.
+  A `preDeleteItem` hook returning false drops individual ids silently while the rest of the batch deletes, so a vetoed row is **reported to the player rather than counted as destroyed**.
+  A stale id — one whose document went away between the panel snapshot and the confirm — is a distinct story from a veto and is reported as such: it was never submitted, so no hook refused it.
+- The confirmation names **both** the row count and the unit count, so the whole-stack rule is legible before the fact.
+  The target set is resolved **once, before the dialog opens**, and the facade executes against that snapshot without re-prompting; the listing reloads on world-time, scene and source changes, any of which can fire while the modal stands.
+- An active run referencing destroyed documents is **not** cleaned up — run maintenance prunes deleted _content_, not deleted _documents_ — so such a run fails when it resumes.
 
 ### Interactive Roll Prompt (path-agnostic)
 
@@ -1533,12 +1775,30 @@ A check-bearing execution accepts a per-call `interactive` flag (default `false`
 When `true`, the shared system-agnostic dialog (`src/ui/svelte/apps/crafting/rollPrompt.js`, `promptCheckRoll`/`buildInteractiveRollOptions`) prompts the player to roll; a dismissed prompt yields `{ success: false, cancelled: true, results: null }` with guaranteed zero mutation, distinct from `success: false`.
 This is the PR #497 per-call-flag decision, consumed uniformly by the crafting store, salvage (inventory) store, alchemy store, gathering view, and the Journal Trigger Next Step path; `CraftingEngine.craft` discards any phantom run created by a cancelled interactive call.
 
-- **Crafting-only "Check modifier" pick-one group.**
-When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one **radio** per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
-The highest-valued option is pre-checked, and the confirmed choice returns the checked radio's id as `chosenModifierId` (falling back to the descriptor's `defaultSelectedId` when the field is absent, as on the headless no-`DialogV2` path).
-It is a pick-one control (radios, never checkboxes), so the player selects exactly one modifier and cannot sum a subset.
-This group is only the presentation of the crafting-check `playerPicks` modifier policy: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the pick substitutes `@craftingmod` are normative in `resolution-modes/spec.md` §Check Source, not here.
-Only crafting ever supplies `modifierChoice`; salvage and gathering never author `@craftingmod` and never pass it, so their dialog is unchanged, as is a crafting roll under any other modifier policy — no `modifierChoice`, no fieldset.
+- **Crafting-only "Check modifier" group.**
+When — and only when — the caller supplies `rollOptions.modifierChoice`, the dialog renders one extra control between the formula block and the situational-bonus input: a fieldset legended "Check modifier" holding one input per eligible modifier, each showing that modifier's icon, its label, and a signed value chip (`+3` / `0` / `-2`).
+The **input type follows the descriptor's `maxPicks`**, which is clamped into `[1, options.length]`: at 1 it is the pick-one **radio** group it has always been, and above 1 it is a **checkbox** group whose legend states the bound in words ("Pick up to 3").
+The two are not interchangeable — a radio group that permitted several picks and a checkbox group that permitted one would each lie about the control — so the type is chosen from the bound rather than fixed.
+The best legal selection is pre-checked, and the confirmed choice returns the checked ids as `chosenModifierIds` (falling back to the descriptor's `defaultSelectedIds` when the field is absent, as on the headless no-`DialogV2` path; a legacy single `chosenModifierId` is still honoured).
+Above 1, the dialog disables the unchecked inputs once `maxPicks` are ticked and releases them again when one is cleared.
+That is a UI affordance only: `evaluateCheckRoll` re-imposes the same cap on the returned selection, since a UI control's constraint is never the invariant.
+A descriptor carrying no usable `maxPicks` renders — and is reduced as — a single pick, so a descriptor built before the field existed cannot silently widen.
+This group is only the presentation of the crafting-check `playerPicks` combination rule: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the picks SUM into the appended modifier term are normative in `resolution-modes/spec.md` §Check Source, not here.
+Only crafting ever supplies `modifierChoice`; salvage and gathering pass no modifier context and never pass it, so their dialog is unchanged, as is a crafting roll under any other combination rule — including `byRecipe`, whose selection was already made at recipe-edit time — so no `modifierChoice`, no fieldset.
+The dialog's formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
+- **Pre-resolved roll decisions.**
+A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).
+The evaluator then treats it as an already-answered choice and **never opens the modal**, running the identical downstream code: the check-modifier append, the advantage transform, the situational-bonus append, the formula-validity net and the effective roll mode.
+With no decision supplied every existing path builds a byte-identical options bag, so single-item salvage, crafting, alchemy and gathering are unchanged.
+A decision carries **no `confirmed` key** and MUST NOT be read as a cancellation; only an explicit `confirmed === false` is one.
+A decision supplied without a prompt function must still apply, or the base formula rolls and the player's answer is silently discarded.
+Only the salvage runners attach a decision today — one gate (`CraftingEngine._salvageRollOptions`) serving all three salvage check paths, so a fourth salvage runner cannot ship without it — because putting the attachment in the shared prompt module would advertise pre-resolved-roll support the crafting and gathering paths do not wire.
+- **The bulk prompt.**
+A bulk run answers **one** prompt whose answer applies to every roll in the batch, and the dialog's own note says so.
+It shows **no formula and no DC** — a batch has no single subject — and instead shows a subject strip of thumbnails with an overflow count, the situational-bonus input and the roll-mode picker.
+Advantage is offered only when **every** usable-check subject's **authored** formula carries a plain `1d20`, computed from the crafting system rather than from the listing projection, which carries no formula at all.
+It is all-or-nothing across those subjects: offering advantage only some rolls could honour would be a lie about the rest of the batch.
+The prompt is not shown at all when no selected item has a usable check, and dismissal returns the same not-confirmed shape the single-item prompt returns.
 
 ### Result Chat Cards
 
@@ -1548,6 +1808,20 @@ Only crafting ever supplies `modifierChoice`; salvage and gathering never author
 - The card is posted only on resolved success or rolled failure — never on cancelled, misconfigured, or time-gated outcomes.
 - Posting is gated by `features.chatOutput` (default on); `ChatMessage.create` failures are non-fatal (logged only), so a chat error never aborts the craft/salvage.
 - Gathering posts its own result card under the same `features.chatOutput` toggle.
+- **A bulk salvage run posts ONE aggregate card**, and the per-item cards are suppressed.
+  Suppression is a `salvage()` option gating **both** poster call sites — the rolled-failure path and the success path — because a missed thread would post the aggregate card plus one stray per-item card for every failed row.
+  The card carries N subjects, each with its own roll value, tier step, outcome and message, plus recovered / consumed / broken-tool lists aggregated by name, and it reuses the shared card markup atoms rather than a second copy of them.
+  A subject appears iff **its own** system's `features.chatOutput` is true, and nothing is posted at all when no subject qualifies — not an empty card.
+  Per-roll dice posts are deliberately **not** suppressed, since they are the Dice So Nice trigger, so N items produce N dice messages plus one aggregate card.
+  A subject's roll total, tier step and broken-tool evidence reach the card only through the salvage **run record**, so a runless call correctly contributes no tool section and no tier step; the raw roll total is preferred over the top-level value for the same reason the single card prefers it, and because the top-level value is threaded only on the success return.
+- **Message visibility is applied to the message data BEFORE creation.**
+  A message's legacy roll-mode CREATE OPTION is honoured only for a message carrying rolls, and the aggregate card carries none — so passing the option to `create` maps nothing and posts a blind run's whole result table publicly.
+  **One capability probe selects the applier AND the token vocabulary together**, because the two Foundry generations have disjoint vocabularies and crossing them fails in both directions: a legacy token handed to the newer applier throws, and a newer token handed to the older applier silently posts public.
+  The translation reuses core's own legacy map so the card cannot drift from the dice messages beside it, and a token with **no** entry in that map is passed through **unchanged** rather than defaulted — defaulting to public would silently downgrade a client default outside the legacy vocabulary, which is the exact leak this edge exists to close.
+  The **speaker is set before** visibility is applied, because the in-character branch reads it unguarded.
+  It is the single target's actor for a one-actor run and an explicit alias naming the acting user for a multi-actor run, never inferred — an inferred speaker falls through to the controlled tokens on the canvas, so a GM with an unrelated NPC selected would have the card attributed to that NPC.
+  A blind run's card is whispered **and** blind, so its own author sees hidden content; that is correct, the in-panel report is their feedback channel, and the blind flag must not be dropped to "fix" it.
+  The card is created with **`author`**, not the legacy `user` key the single-salvage poster still passes.
 
 ### Deferred (this iteration)
 
@@ -1767,9 +2041,10 @@ The "DC N" value is `component.difficulty`, which the GM authors via the stepper
   `suggested` allocation.
 - `carriers[].ownedUnits` is the units remaining AFTER the set's non-essence
   consumption plan has claimed, derived from the resolver's own ledger.
-  No UI or helper re-reads `item.system.quantity` to compute it: that field is
-  game-system-specific and can be absent or `NaN`, and a raw stack count would
-  offer the player units the craft cannot spend.
+  No UI or helper re-reads the item's stack count at the configured
+  stack-quantity path to compute it: that field is game-system-specific and can
+  be absent or `NaN`, and a raw stack count would offer the player units the
+  craft cannot spend.
 - `requirements[].delivered` and `requirements[].owned` are named apart
   deliberately.
   `delivered` is the essence amount the resolved allocation supplies to that
@@ -2075,11 +2350,13 @@ The player's route to salvage.
   Each participation salvages against **its own** contributing documents, so the depleted / "None remaining" / disabled-action basis is the selected participation's **own** owned quantity, not the card's cross-system union (a system-B salvage on a divergent-roles card cannot consume documents system B does not back).
   The panel **names the acting system** when the card spans more than one.
   The progressive stage-order preference is keyed per **`(systemId, componentId)`** (`salvage:<systemId>:<componentId>`): component ids are not globally unique (copy-import preserves them), so a component-id-only key collided across systems the moment the collapse surfaced two participations of one card, and the store's write key must match the engine's capture key exactly or the captured order silently reads empty.
+  That key is captured when a reorder is **scheduled**, not re-derived when the debounced write flushes.
+  A selection change between the gesture and the commit would otherwise write the reordered stages under a key naming a **different** participation, silently — the player reorders one card's stages and another card's preference moves.
 - An **`Info | Salvage`** control appears when the item is salvageable — **including when it is broken**, since brokenness does not gate salvageability.
   When the item is not salvageable, **no tab bar renders at all**: a hidden tab reads as "this isn't salvageable", which is wrong and unfixable by the player.
 - The body dispatches on the pair **`(mode, checkUsable)`** against **`system.salvageCraftingCheck`** — salvage's own check block, NOT `system.craftingCheck`, which is the recipe block.
   Both normally exist and are normally authored, so reading the wrong one renders plausibly while showing the player a formula and a DC the engine will never use.
-- A check is **usable** iff its mode's roll formula is authored; that is the only gate the engine applies.
+- A check is **usable** iff its mode's roll formula is authored and **non-blank**; that is the only gate the engine applies, and the panel and the engine now derive it from one shared resolver rather than each testing the formula their own way (see `resolution-modes/spec.md` §Check Source).
   "No check" and "pass/fail" are therefore **one `simple` mode at two usability states**, not two modes.
 - A routed or progressive salvage with **no authored formula** renders a GM-config state, not its authored tiers or stages: the engine aborts such an attempt with zero mutation, so showing the contract would put it under an action that always fails.
 - **Simple multi-group misconfigured state.** A stored-but-not-yet-re-normalized `simple`-mode component with more than one success result group is misconfigured (the engine only ever awards the first group).
@@ -2110,6 +2387,23 @@ The player's route to salvage.
   The "Salvage again" inline reset is the dismissal gesture the "until dismissed" rule alludes to.
 - **Rolled-total summary.** The read-only post-roll summary appends the rolled total in mono ("with a roll of N"), omitted when `rollValue` is null for a no-check salvage.
 - **Post-roll reconciliation.** The routed body marks the matched tier with a "Your roll" pill from `salvageRun.checkResult.data.outcomeId`, and the store threads `awardedComponentIds` from `salvageRun.createdResults` for per-stage recovered state; both are null/empty on a runless (no-check) salvage.
+- **Bulk selection unit.**
+  The bulk gesture's unit is the **acting participation**, one unit per row, with no per-row quantity control; a run may span crafting systems and source actors (see §Bulk Salvage Execution).
+  Brokenness does **not** block a row from a bulk queue — brokenness is about usability, not salvageability (see §Inventory Tab), and the prototype's "repair before salvaging" would block something Fabricate permits while naming a remedy Fabricate has no action for.
+  A broken but salvageable row therefore stays in the **queue**, carrying its own danger treatment beside its **certainty** chip (Guaranteed / Possible).
+  Certainty, not resolution mode: `simple` / `routed` / `progressive` is authoring vocabulary a player surface never uses, and the queue row already derives certainty from the row's own yield preview.
+  The blocked-reason set and its first-match precedence are `essence`, `recipeItem`, `salvageDisabled`, the three `misconfiguredReason` values (`simpleMultiGroup` / `routedNoFormula` / `progressiveNoFormula`), `toolsUnavailable`, `depleted`.
+  These are the already-normative ids rather than a second vocabulary, and a `toolsUnavailable` row names the missing tools.
+- **Bulk yield preview.**
+  The preview is a **best case of one unit per row**, computed from each entry's **own** salvage projection and never from the inspected card's stage order, which is scoped to one participation.
+  A no-check `simple` row's results are **guaranteed**; a checked `simple` row's same results are **possible**.
+  A `routed` row's quantity is the maximum over **success** outcomes only.
+  A routed **failure** outcome awards nothing at all: `salvage()` returns at its rolled-failure branch — consuming per the failure policy and posting the failure card — _before_ result groups are resolved, and result-group resolution is that branch's only call site.
+  The per-outcome result list the panel reads is a **display projection, not an award**, so a `success: false` tier contributes 0 and so does a success tier with no `outcomeRouting` entry.
+  The guaranteed floor is therefore **0** whenever any authored tier is a failure tier — routed salvage clamps a below-lowest total to the lowest tier, making a failing lowest tier reachable — and **0 in general for `routed + fixed`**, where a total outside every authored range matches nothing.
+  "Always something, more on a success" is authored as **two success tiers**, which this rule handles.
+  A `progressive` row contributes one per stage, always **possible** and never guaranteed, omitting entirely any stage whose threshold is unreachable at every budget; a component all of whose stages are unreachable is still salvageable and simply contributes no preview rows.
+  Aggregate quantities and guaranteed floors are summed **independently per component name**, because two rows can yield the same component at different certainties and the "up to" affix is only correct under independent sums.
 
 ### Run Guardrails
 
@@ -2130,7 +2424,7 @@ It is opened from the `Gathering` header action in the Items directory and must 
 
 - The unified window selects the gathering actor through a shared **Actor selection top bar** rendered above all tabs (see _Unified Window Actor Selection Top Bar_), rather than only a per-tab header control.
 - The bar's selectable list is restricted to **player characters** — the actor type(s) a system designates as player characters, owned for non-GM users, all for GMs.
-  The current dnd5e/pf2e implementation of that concept is `actor.type === 'character'` (the predicate `isPlayerCharacterActor`); other player-character types are a known limitation.
+  The predicate is `isPlayerCharacterActor`, and the type set is GM-configurable: `'character'` always counts, and a GM may add further actor types the active game system declares through a settings-menu picker (`resolvePlayerCharacterTypes()`).
   This restriction is a selection-list concern only and does not change which actors are authorized to make a gathering attempt.
 - The top header/bar shows the selected actor and, when enabled, gathering stamina current/max values plus regeneration or adjustment affordances where permitted.
 - Persist the last selected actor in `fabricate.lastGatheringActor`.

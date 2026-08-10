@@ -4,10 +4,12 @@
   Split into two columns: members (2/3) on the left and the travel marker (1/3)
   on the right.
 
-  - Members: an inline searchable list of `character` actors (excluding current
-    members) to add, then the member rows (portrait, name, a move-to-party
-    popover, and a remove button). Adding routes through onAddMember, which the
-    store implements as add-or-confirm-move.
+  - Members: an inline searchable list of PLAYER-CHARACTER actors (excluding
+    current members) to add, then the member rows (portrait, name, a move-to-party
+    popover, and a remove button). Membership comes from the projected
+    `isPlayerCharacter` flag the manager app computes from the GM-configured actor
+    types — this component never classifies actors itself. Adding routes through
+    onAddMember, which the store implements as add-or-confirm-move.
   - Travel marker: a drop zone that accepts any dragged actor to set/replace the
     marker (shows the actor portrait when set). Right-click or the Clear button
     removes the linkage.
@@ -40,9 +42,12 @@
   }
 
   const memberUuids = $derived(new Set((party?.memberCards || []).map((member) => member.uuid)));
+  // STRICT positive test on the projected flag (issue 1024). `!== false` would make
+  // every pre-projection fixture pass, trip no gate, contain no literal — and admit
+  // every NPC in the world into the party picker.
   const addableOptions = $derived(
     actorOptions
-      .filter((actor) => actor.type === 'character' && !memberUuids.has(actor.uuid))
+      .filter((actor) => actor.isPlayerCharacter === true && !memberUuids.has(actor.uuid))
       .map((actor) => ({
         id: actor.uuid,
         label: actor.name,
@@ -54,7 +59,7 @@
     addableOptions.length === 0
       ? text(
           'FABRICATE.Admin.Manager.Travel.Members.NoActors',
-          'No character actors exist in this world yet.'
+          'No player-character actors are available to add. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if a character is missing.'
         )
       : text(
           'FABRICATE.Admin.Manager.Travel.Members.NoAddMatches',

@@ -108,3 +108,51 @@ test('routes every label through the localize function', () => {
     assert.ok(seen.includes(`FABRICATE.Chat.${key}`), `localize asked for FABRICATE.Chat.${key}`);
   }
 });
+
+// A d100 gather whose only drop row misses its threshold still reports success, because
+// d100 status is decided by EVENTS, not by drops. Before this the card dropped the empty
+// results section and rendered a bare "Gathering Successful" header — a spent node, no
+// items, and no explanation, which is indistinguishable from the module being broken.
+test('a SUCCESS that awarded nothing says so instead of rendering a bare header', () => {
+  const content = buildGatheringChatContent(fullModel({ components: [] }));
+  assert.ok(
+    content.includes('FABRICATE.Chat.GatherComponents'),
+    'the results heading is kept, not dropped'
+  );
+  assert.ok(content.includes('FABRICATE.Chat.GatherNothing'), 'the empty-state line is rendered');
+  assert.ok(content.includes('fabricate-gather-chat__empty'), 'empty-state paragraph class');
+});
+
+test('a SUCCESS that awarded nothing is styled apart from a full success', () => {
+  const content = buildGatheringChatContent(fullModel({ components: [] }));
+  assert.ok(content.includes('fabricate-gather-chat--empty'), 'distinct empty modifier');
+  assert.ok(!content.includes('fabricate-gather-chat--success'), 'not the full-success modifier');
+  assert.ok(
+    content.includes('FABRICATE.Chat.GatherSuccess'),
+    'the title still reports success — the CHECK did succeed'
+  );
+});
+
+test('the empty-results line is a SUCCESS-only rule (a failure omits the section)', () => {
+  const content = buildGatheringChatContent(fullModel({ status: 'failed', components: [] }));
+  assert.ok(!content.includes('FABRICATE.Chat.GatherNothing'), 'no empty-state line on failure');
+  assert.ok(
+    !content.includes('FABRICATE.Chat.GatherComponents'),
+    'a failed gather still omits the results section entirely — it explains itself'
+  );
+});
+
+test('the empty-state key is routed through localize', () => {
+  const seen = [];
+  buildGatheringChatContent(fullModel({ components: [] }), (key) => { seen.push(key); return `loc:${key}`; });
+  assert.ok(seen.includes('FABRICATE.Chat.GatherNothing'), 'localize asked for the empty-state key');
+});
+
+test('an empty-results success escapes its localized text', () => {
+  const content = buildGatheringChatContent(
+    fullModel({ components: [] }),
+    (key) => (key === 'FABRICATE.Chat.GatherNothing' ? '<b>none</b>' : key)
+  );
+  assert.ok(!content.includes('<b>none</b>'), 'raw markup from a translation is not injected');
+  assert.ok(content.includes('&lt;b&gt;none&lt;/b&gt;'), 'translated text is escaped');
+});

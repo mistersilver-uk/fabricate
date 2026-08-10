@@ -8,7 +8,12 @@ import { createCraftingSourcesStore } from './svelte/stores/craftingSourcesStore
 import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
 import { createAlchemyStore } from './svelte/stores/alchemyStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
-import { notifyWarn, localize } from './svelte/util/foundryBridge.js';
+import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge.js';
+// The V13/V14 progress-notification reporter (issue 859) — see its own docblock
+// and `AGENTS.md`'s "V13 progress notifications" note. Pure plumbing (no Foundry
+// import beyond what it itself guards), reused rather than re-authored so the
+// bulk salvage/destroy progress toast cannot drift from the compendium import's.
+import { createDefaultProgressReporter } from '../systems/CompendiumImporter.js';
 
 const VALID_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
@@ -215,6 +220,22 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // so the facade's `_resolveCraftingSources` gate — the only ownership check on
       // this path — is not bypassed.
       salvageComponent: (opts = {}) => game?.fabricate?.salvageComponent?.(opts) ?? null,
+      // Bulk salvage/destroy (issue 859) — the Inventory tab's bulk panel. Both
+      // route through `game.fabricate`, degrading to null (never throwing) while
+      // that facade is unimplemented or absent, exactly like every other seam here.
+      salvageComponents: (opts = {}) => game?.fabricate?.salvageComponents?.(opts) ?? null,
+      destroyComponents: (opts = {}) => game?.fabricate?.destroyComponents?.(opts) ?? null,
+      // The player app has no confirm-dialog seam today; `confirmDialog` is a thin
+      // wrapper the manager app already exposes identically (`confirmDialog:
+      // (options) => confirmDialog(options)`, `SvelteCraftingSystemManagerApp.svelte.js`) —
+      // bulk destroy's consequence sentence cannot fit a button label, so the
+      // caller composes full `DialogV2.confirm` copy and this seam is a pure
+      // pass-through.
+      confirmDialog: (options) => confirmDialog(options),
+      // A FRESH stateful reporter per bulk run (issue 859) — never a shared
+      // singleton, or a second run would update the first run's already-dismissed
+      // toast (see `createDefaultProgressReporter`'s own docblock).
+      createProgressReporter: () => createDefaultProgressReporter(),
       // Fresh per-set craftability for an in-session ingredient-option override
       // (issue 552). Synchronous so the store's `selectedCraftability` $derived can
       // read it without an async round-trip; returns null when the facade is absent.
@@ -368,6 +389,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this.updateProps({ showAlchemy, activeTab: this._activeTab });
   }
 
+  /**
+   * Re-project the actor-selection bar after the GM changed which actor types count
+   * as player characters (issue 1024).
+   *
+   * The bar seeds ONCE at load, so without this a player whose only owned actor just
+   * became a player character keeps an empty bar until reload — which is the reported
+   * bug's second half.
+   */
+  _refreshSelectableActors() {
+    this._services?.actorBar?.refreshSelectableActors?.();
+  }
+
   _onRender(context, options) {
     super._onRender(context, options);
     this._registerHooks();
@@ -379,7 +412,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
     this._hookIds = {
       systems: Hooks.on('fabricate.craftingSystemsChanged', () => this._refreshAlchemy()),
-      recipes: Hooks.on('fabricate.recipesChanged', () => this._refreshAlchemy())
+      recipes: Hooks.on('fabricate.recipesChanged', () => this._refreshAlchemy()),
+      playerCharacterTypes: Hooks.on('fabricate.playerCharacterTypesChanged', () =>
+        this._refreshSelectableActors()
+      )
     };
   }
 
@@ -389,6 +425,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
     Hooks.off('fabricate.craftingSystemsChanged', this._hookIds.systems);
     Hooks.off('fabricate.recipesChanged', this._hookIds.recipes);
+    Hooks.off('fabricate.playerCharacterTypesChanged', this._hookIds.playerCharacterTypes);
     this._hookIds = null;
   }
 

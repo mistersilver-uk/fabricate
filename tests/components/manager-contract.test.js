@@ -12,6 +12,12 @@ const essenceBrowserPath = resolve(
   'src/ui/svelte/apps/manager/EssenceBrowserView.svelte'
 );
 const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte');
+// The GM Essence Studio's own components (issue 1036). They sit under `essences/` — the
+// BROWSER's directory, which the screenshot evidence map globs for the essence views — and
+// every one of them joins `managerSource` below. A `!managerSource.includes(...)` assertion
+// over markup that MOVED into one of these goes vacuous rather than red, which is why the
+// join has to move in lockstep with the extraction.
+const essenceStudioDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/essences');
 const tagsCategoriesPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'
@@ -97,8 +103,24 @@ const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
+// The reward and event limit counts are one shared component (issue 1050), so the marker the
+// root used to carry twice is emitted there from its `rule` prop.
+const gatheringRuleLimitStepperSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte'),
+  'utf8'
+);
 const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
+// The paginated rows/columns are the shared studio-library shelf now, so the `<ul>` and its
+// `role="list"` are rendered there rather than in each browser view.
+const libraryShelfSource = readFileSync(
+  resolve(repoRoot, 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte'),
+  'utf8'
+);
 const essenceEditSource = readFileSync(essenceEditPath, 'utf8');
+const essenceStudioSources = readdirSync(essenceStudioDir)
+  .filter((entry) => entry.endsWith('.svelte') || entry.endsWith('.js'))
+  .map((entry) => readFileSync(resolve(essenceStudioDir, entry), 'utf8'));
+const essenceStudioSource = essenceStudioSources.join('\n');
 const tagsCategoriesSource = readFileSync(tagsCategoriesPath, 'utf8');
 const systemEditSource = readFileSync(systemEditPath, 'utf8');
 const craftingSettingsSource = readFileSync(craftingSettingsPath, 'utf8');
@@ -131,6 +153,7 @@ const managerSource = [
   recipeBrowserInspectorSource,
   essenceBrowserSource,
   essenceEditSource,
+  essenceStudioSource,
   tagsCategoriesSource,
   systemEditSource,
   craftingSettingsSource,
@@ -973,7 +996,9 @@ describe('CraftingSystemManager source contract', () => {
       'General is already available as the base category.'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.Title, 'Essences');
-    assert.equal(lang.FABRICATE.Admin.Manager.Essence.Library, 'Essence browser');
+    // `Essence.Library` / `Essence.LibraryHint` / `Essence.Kicker` are RETIRED with the
+    // duplicate page header the browser used to render above the shell's own (issue 1036).
+    // The route title is `Essence.Title`, which the shell owns and which is asserted above.
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditTitle, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditBreadcrumb, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, 'Create essence');
@@ -1871,28 +1896,51 @@ describe('CraftingSystemManager source contract', () => {
       !essenceBrowserSource.includes('manager-essence-action-band'),
       'browser should not duplicate the route-header create action'
     );
+    // The SOURCE COLUMN is retired with the table (issue 1036). It reported one bit — is
+    // there an image — in a column of its own; the row now carries an `Effects` capability
+    // pill instead, and the retained needs-attention filter is what finds a BROKEN link.
     assert.ok(
-      !essenceBrowserSource.includes("text('FABRICATE.Admin.Manager.Essence.SourceLinked'"),
-      'browser should not render linked-source badges'
+      !essenceBrowserSource.includes('manager-essence-source-cell-image'),
+      'the source column and its image cell are retired with the table head'
     );
     assert.ok(
-      essenceBrowserSource.includes('manager-essence-source-cell-image'),
-      'browser source column should render resolved source images'
+      essenceBrowserSource.includes('data-essence-source-filter'),
+      'but the source-state filter is RETAINED: a broken source link is otherwise unfindable'
+    );
+    // Browser state is LIFTED to the root, which is criterion 12: search, filters, sort,
+    // presentation and page all survive the editor round-trip.
+    assert.ok(
+      essenceBrowserSource.includes('browserState = $bindable(null)'),
+      'the browser binds its view-state rather than owning it'
     );
     assert.ok(
-      essenceBrowserSource.includes('FABRICATE.Admin.Manager.Essence.SourceNoneShort'),
-      'browser source column should render compact None copy when unresolved'
+      rootSource.includes('bind:browserState={essenceBrowserState}'),
+      'and the root is what holds it across the round-trip'
+    );
+    // A card row has no columns, so the rows are a real `<ul role="list">` of `<li>` cards
+    // and the `role="columnheader"` head is gone with the table it labelled. Pinned on the
+    // RENDERED attribute (`role="list"`) rather than on the absence of `role="table"`,
+    // which both files' own comments legitimately mention in prose.
+    assert.ok(
+      libraryShelfSource.includes('role="list"'),
+      'the row list is a real list, not a table with no columns'
+    );
+    assert.ok(
+      !essenceBrowserSource.includes('role="columnheader"'),
+      'and it has no column headers left to label'
     );
   });
 
   it('uses shared manager essence picker controls on the dedicated edit route', () => {
     assert.ok(
-      essenceEditSource.includes("import IconPicker from '../../components/IconPicker.svelte';"),
+      essenceStudioSource.includes(
+        "import IconPicker from '../../../components/IconPicker.svelte';"
+      ),
       'edit route should use the shared IconPicker'
     );
     assert.ok(
-      essenceEditSource.includes(
-        "import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';"
+      essenceStudioSource.includes(
+        "import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';"
       ),
       'edit route should use the shared source selector'
     );
@@ -1920,25 +1968,39 @@ describe('CraftingSystemManager source contract', () => {
       !essenceEditSource.includes('IconClassHint'),
       'edit route should not expose raw icon class copy'
     );
+    // The Save button now lives in the SHARED `ComponentEditorHeader`, which submits by id
+    // through its `formId` prop. Both halves of that pairing still have to survive
+    // verbatim — drop either and Save silently stops working, with no test to catch it —
+    // so the pairing is asserted at both ends rather than at the literal attribute.
     assert.ok(
-      rootSource.includes('form="manager-essence-edit-form"'),
+      rootSource.includes('formId="manager-essence-edit-form"'),
       'root header should own the primary save action for the edit form'
     );
     assert.ok(
-      !rootSource.includes('data-essence-action="edit"'),
-      'inspector should not duplicate browse row edit actions'
+      rootSource.includes('saveAttr="data-essence-edit-save"'),
+      'and it wears this studio own hooks rather than the component studio ones'
+    );
+    // Edit, Duplicate and Delete are the INSPECTOR's, and the inspector is now an extracted
+    // component under `essences/` rather than ~200 lines inlined in the root. The row keeps
+    // the pencil alone; the assertions therefore move to the studio source, and asserting
+    // their ABSENCE from the root proves the extraction happened rather than being copied.
+    assert.ok(
+      !rootSource.includes('data-essence-action='),
+      'the root no longer inlines any essence inspector action'
+    );
+    for (const action of ['edit', 'duplicate', 'delete', 'copy-source', 'unlink-source']) {
+      assert.ok(
+        essenceStudioSource.includes(`data-essence-action="${action}"`),
+        `the extracted inspector exposes the ${action} action`
+      );
+    }
+    assert.ok(
+      rootSource.includes('<EssenceBrowserInspector'),
+      'and the root renders it as a component'
     );
     assert.ok(
-      !rootSource.includes('data-essence-action="delete"'),
-      'inspector should not duplicate browse row delete actions'
-    );
-    assert.ok(
-      rootSource.includes('data-essence-action="copy-source"'),
-      'inspector should expose source UUID copy through the source action row'
-    );
-    assert.ok(
-      rootSource.includes('data-essence-action="unlink-source"'),
-      'inspector should expose source unlink through the source action row'
+      rootSource.includes('<EssenceBulkEditPanel'),
+      'with the bulk panel replacing it while a selection exists'
     );
     assert.ok(
       rootSource.includes(
@@ -1946,9 +2008,47 @@ describe('CraftingSystemManager source contract', () => {
       ),
       'inspector source changes should use updateEssence'
     );
+    // Criterion 23's four route-wiring items, pinned at the chokepoint rather than at a
+    // control: the same-view skip the other guards already have, the store's `cancel` half,
+    // and the `deleteEssence` boolean the root now consumes.
+    // The skip compares the ESSENCE, not only the view token. `essence-edit` is a "same
+    // token, different subject" route: `editEssence` early-returns on an unchanged id, so
+    // every call reaching the guard from inside the editor is a switch to a DIFFERENT
+    // essence, which a token-only skip waved through with the draft unsaved and no prompt.
+    assert.ok(
+      rootSource.includes(
+        "if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)"
+      ),
+      'the essence route guard skips a same-ESSENCE exit, as the tools and system guards do'
+    );
+    assert.ok(
+      !rootSource.includes(
+        "if (activeView !== 'essence-edit' || nextView === 'essence-edit') return true;"
+      ),
+      'and the token-only form is gone, not merely shadowed'
+    );
+    assert.ok(
+      rootSource.includes("confirmRouteExit('essence-edit', essenceId)"),
+      'and `editEssence` supplies the target id, or the comparison can never be true'
+    );
+    assert.ok(
+      rootSource.includes('store.cancelEssenceDraft?.()'),
+      'and the discard branch reaches the store half of Cancel'
+    );
     assert.ok(
       rootSource.includes('importSingleManagedItemFromDrop'),
       'inspector source drops should reuse the managed-item import seam'
+    );
+    // The armed BULK delete is a deliberate deviation from the `AGENTS.md` carve-out, under
+    // the maintainer's binding decision for this action. The SINGLE delete keeps the
+    // store-owned `confirmDialog`, so the two idioms do not collide on one screen.
+    assert.ok(
+      essenceStudioSource.includes('<ArmedDangerButton'),
+      'the bulk delete arms rather than opening a dialog'
+    );
+    assert.ok(
+      essenceStudioSource.includes('data-essence-bulk-impact'),
+      'and states its impact before it is armed'
     );
     assert.ok(
       !essenceEditSource.includes('game.'),
@@ -2272,13 +2372,21 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('manager-rule-copy'),
       'root should render rule descriptions beside inspector icons'
     );
+    // The two limits are one shared component now (issue 1050), so the marker they were
+    // asserted through lives there and is driven by the `rule` prop. Both halves are pinned:
+    // the root still renders one of each, and the component still emits the marker from the
+    // prop — so a root that stopped rendering a limit, or a component that stopped marking
+    // it, fails here rather than one covering for the other.
+    for (const rule of ['rewardLimit', 'eventLimit']) {
+      assert.match(
+        rootSource,
+        new RegExp(String.raw`<GatheringRuleLimitStepper\s+rule="${rule}"`),
+        `root should render the ${rule} stepper`
+      );
+    }
     assert.ok(
-      rootSource.includes('data-gathering-rule-stepper="rewardLimit"'),
-      'root should render the reward limit stepper'
-    );
-    assert.ok(
-      rootSource.includes('data-gathering-rule-stepper="eventLimit"'),
-      'root should render the event limit stepper'
+      gatheringRuleLimitStepperSource.includes('data-gathering-rule-stepper={rule}'),
+      'the shared limit stepper marks itself with the rules field it edits'
     );
     assert.ok(
       rootSource.includes('FABRICATE.Admin.Manager.Environment.Rules.EventHighestRankedDrop'),
@@ -3018,9 +3126,33 @@ describe('CraftingSystemManager source contract', () => {
     }
 
     // The roster is player characters only — the same predicate the Access roster uses.
+    //
+    // ANTI-PIN (issue 1024). The old assertion pinned the exact
+    // `game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'`
+    // reach-around this change deletes. Replacing it with a positive
+    // `includes('isPlayerCharacterActor(actor)')` would be a tautology that survives a
+    // WRONG import — so instead assert the hardcoded literal is ABSENT (provably red
+    // before this change, at both the Access and Knowledge rosters) plus the import.
+    assert.equal(
+      appSource.includes("actor?.type === 'character'"),
+      false,
+      'the manager app must not re-hardcode the dnd5e/pf2e player-character actor type'
+    );
+    assert.equal(
+      appSource.includes("actor.type === 'character'"),
+      false,
+      'nor the unchained spelling of it'
+    );
+    assert.equal(
+      appSource.includes('game.fabricate?.isPlayerCharacterActor'),
+      false,
+      'the predicate is not published on game.fabricate, so no site may reach for it there'
+    );
     assert.ok(
-      appSource.includes('game.fabricate?.isPlayerCharacterActor?.(actor)'),
-      'the Knowledge roster reuses the shared player-character predicate'
+      appSource.includes(
+        "import { isPlayerCharacterActor } from '../config/playerCharacterTypes.js';"
+      ),
+      'the manager app imports the shared, GM-configurable player-character predicate'
     );
   });
 

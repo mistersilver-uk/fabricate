@@ -57,9 +57,13 @@ Macros and automation that call Fabricate directly keep the original silent beha
 
 ## Check modifiers
 
-A crafting check's roll formula can add in a named modifier from the crafter through the `@craftingmod` placeholder, the same way it can use `@abilities.str.mod` or any other roll-data path your game system exposes.
-The **Check modifiers** card on the **Crafting check** page defines the catalogue of modifiers a system's checks can draw on.
-The card only appears when the active crafting check has an authored roll formula, the same rule the failure-consumption toggles follow.
+A crafting check can add in named modifiers read from the crafter — a Medicine bonus, a Herbalism kit — without you writing anything into the roll formula.
+Fabricate resolves the eligible modifiers to one number and adds it to the roll as a single flavoured term, so a roll of `1d20 + 2` with a `+3` modifier is rolled and reported as `1d20 + 2 + 3[Modifiers]`.
+The **Check modifiers** card on the **Crafting check** page defines the catalogue of modifiers a system's checks can draw on, which of them apply by default, and how they combine.
+Everything on that card is a system-level decision.
+A recipe never overrides it; the most a recipe can do is pick which modifiers apply, and only when the system's combination rule asks it to.
+The card appears on every crafting sub-tab once the catalogue has at least one entry, whether or not the system's active check can use it yet.
+When it cannot, the card explains why instead of hiding, so a modifier you authored is never silently doing nothing with no indication.
 Check modifiers are a crafting-only feature.
 Salvage and gathering checks do not use them.
 
@@ -67,42 +71,118 @@ Salvage and gathering checks do not use them.
 
 On the **Check modifiers** card, choose **Add modifier** to add an entry.
 Each entry has an **Icon**, a **Label** such as Medicine or Herbalism, and an **Expression**, a roll-data path resolved against the crafter, for example `abilities.med.mod`.
-Reference `@craftingmod` in the check's roll formula wherever you want the resolved value to apply.
-A roll formula with no `@craftingmod` placeholder ignores the catalogue entirely.
+There is nothing to add to the roll formula: an entry that is eligible applies automatically.
 
-### The default eligible set
+### Upgrading from a version before 1.21.0
 
-Not every modifier in the catalogue has to count on every recipe.
-The **Default modifiers** picker, below the catalogue, sets which modifiers are on by default for the whole system.
-A recipe can override this default set on its own **Overview** tab, under **Check modifiers**.
-Choose **Eligible modifiers** there to pick a different set for that recipe alone, or leave it inheriting the system default.
-The recipe-level **Check modifiers** control only appears when the system has at least one modifier in its catalogue.
+Check modifiers used to reach the roll only if you ALSO typed a Fabricate-specific placeholder into the check's roll formula.
+That placeholder is retired.
+On first load after upgrading, Fabricate removes it from every stored crafting, salvage and gathering roll formula, and posts a one-time notice to the GM naming the systems it changed.
 
-### Combining modifiers
+Three things are worth knowing before you upgrade.
 
-The **Default combination** setting on the **Check modifiers** card decides how the eligible modifiers combine into `@craftingmod`.
-A recipe can also override the combination on its own **Overview** tab, alongside its eligible-set override.
+- **A catalogue you authored but never referenced now applies.** If you built a catalogue and deliberately never spent the placeholder, those modifiers were doing nothing and now add to every crafting roll.
+To keep the previous total, clear the **Default modifiers** set on that system, or choose a combination rule whose set resolves to 0.
+- **A formula that SUBTRACTED the placeholder now adds it.** A check written as `1d20 - <placeholder>` rolled `1d20 - 3` with a `+3` modifier; it now rolls `1d20 + 3[Modifiers]`.
+A formula that spent the placeholder twice counted it twice and now counts it once.
+- **A placeholder written somewhere it cannot simply be removed is left alone and reported.** If you wrote it inside a multiplication, a function argument such as `max(...)`, a dice count, or its own parentheses, Fabricate cannot guess what you meant, so it leaves the formula exactly as you authored it, names the system in the upgrade notice, and treats that check as having no roll formula until you edit it.
+The Validation tab also flags any formula still containing the retired placeholder, so a placeholder typed after the upgrade is never removed silently.
+
+Downgrading back to 1.20.0 loses no data — your formulas and catalogues are intact — but that version resolves check modifiers only through the placeholder it no longer finds, so they stop contributing until you type it back in by hand.
+
+### When check modifiers do nothing
+
+The catalogue only changes a roll when the system's active crafting check actually rolls something.
+When it cannot, the **Check modifiers** card keeps its controls but adds a notice naming which of these applies:
+
+- The current resolution mode rolls no crafting check at all, so there is nothing for a modifier to add to.
+- The active check has no roll formula authored yet.
+
+Author (or fix) a roll formula on the relevant check to make the catalogue count.
+
+### Combination rule
+
+The **Combination rule** setting on the **Check modifiers** card decides how the eligible modifiers combine into the one number added to the roll.
+It also decides **who chooses them, and when**.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Combination | What it does | When you would want it |
-|:------------|:-------------|:------------------------|
-| **Add all** | Sums every eligible modifier. | The recipe rewards stacking every relevant skill or tool bonus at once. |
-| **Highest** | Uses only the single largest eligible modifier, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
-| **By recipe** | Sums whichever modifiers the recipe itself has selected as eligible. | Different recipes in the same system need different modifiers to matter, with no player choice involved. |
-| **Player picks** | The player chooses exactly one eligible modifier at roll time. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
+| Combination rule | Who chooses | What it does | When you would want it |
+|:-----------------|:------------|:-------------|:------------------------|
+| **Add all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
+| **Highest** | Nobody. The system's default set applies as it stands. | Uses only the single largest modifier in the default set, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
+| **Recipe picks** | You do, per recipe, on that recipe's **Overview** tab. | Sums the modifiers that recipe picked. | Different recipes in one system draw on different skills, and you want to decide that once, while authoring the recipe. |
+| **Player picks** | The player does, at roll time. | Sums the modifiers the player picked. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+The combination rule is always the system's.
+Neither a recipe nor a player can change it, and neither can pick modifiers under a rule that does not ask them to.
+Choosing **Recipe picks** or **Player picks** hands out the *selection*, never the rule.
+
+### The default eligible set
+
+The **Default modifiers** picker, below the catalogue, sets which modifiers are on by default for the whole system.
+What that set means depends on the combination rule, and the card's own wording changes with it:
+
+- Under **Add all** and **Highest** it is simply the set that applies, to every recipe in the system.
+- Under **Recipe picks** it is what a recipe uses until it picks its own on its **Overview** tab.
+- Under **Player picks** it is the menu the player chooses from at roll time.
+
+### Maximum picks
+
+Under **Recipe picks** and **Player picks**, the **Maximum picks** field caps how many modifiers the chooser may take.
+It appears only under those two rules, because the other two have nobody to cap.
+
+**Leave it empty for no limit.**
+An empty field is a real setting, not an unanswered question: it means the recipe author, or the player, may take every eligible modifier.
+Set it to **1** to get a single pick, which is the classic "choose one skill" behaviour.
+
+Whichever rule is in force, the picks are **summed**.
+A cap of 1 therefore behaves exactly like picking one modifier and using its value alone.
+
+Lowering the cap never deletes a recipe's picks.
+A recipe that already picked more modifiers than the new cap allows keeps all of them stored, and rolls only the first few, up to the cap.
+Raise the cap again and the rest count once more, with nothing to re-enter.
+
+{: .note }
+> **If you are upgrading an existing world:** systems already set to **Player picks** are given a **Maximum picks** of **1**, which is the single pick that rule always meant, so nothing about them changes.
+> Systems on the other three rules are left with no limit.
+> Systems previously set to **Recipe picks** keep every modifier their recipes had picked.
+
+### Recipe picks
+
+Under **Recipe picks**, each recipe's **Overview** tab gains an **Eligible modifiers** control with three choices:
+
+- **Inherit system default** uses the system's **Default modifiers** set.
+This is what a recipe does until you change it, and the tab names the set it is inheriting.
+- **Custom set** lets the recipe pick its own modifiers, up to **Maximum picks**.
+It starts from whatever the recipe was already using, so customising begins from the inherited set rather than from nothing.
+- **No modifiers** means exactly that: nothing is added to that recipe's check roll.
+It is a deliberate choice, distinct from inheriting an empty set.
+
+The picks are summed at roll time, and nothing is asked of the player.
+
+**If a recipe's Eligible modifiers control is not on its Overview tab**, this section is almost always why.
+The control appears only when the system's combination rule is **Recipe picks** and the system has at least one check modifier in its catalogue.
+Under **Add all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
+Open the **Crafting check** page for that recipe's system and look at the **Combination rule** on the **Check modifiers** card.
+If the rule is already **Recipe picks** and the control is still missing, the recipe's Overview tab shows a banner in its place naming one of the two causes in [When check modifiers do nothing](#when-check-modifiers-do-nothing).
+
+Switching the system away from **Recipe picks** does not delete anything a recipe picked.
+The picks stay stored and simply stop being consulted; switch back and they apply again immediately.
+
 ### Player picks
 
-**Player picks** is the only combination that is not fully decided ahead of the roll.
-It only prompts the player when all of the following are true for that attempt: the roll happens through the interactive dialog described above, the check's roll formula contains `@craftingmod`, the effective combination (the recipe's own override, or otherwise the system default) is **Player picks**, and at least two modifiers are eligible for that recipe.
-When any of those is not true, for example a recipe with only one eligible modifier, or a Macro rolling the check directly, the check resolves exactly as **Highest** instead, with no prompt.
+**Player picks** is the only combination rule that is not decided until the dice are about to be rolled.
+It only prompts the player when all of the following are true for that attempt: the roll happens through the interactive dialog described above, the active check has a roll formula, the system's combination rule is **Player picks**, and at least two modifiers are eligible.
+When any of those is not true, for example a system with only one eligible modifier, or a Macro rolling the check directly, the check resolves without a prompt to the best selection the player could legally have made.
 
 When the player is prompted, the roll dialog adds a **Check modifier** choice below the formula, listing each eligible modifier by icon, label, and its resolved value.
-The highest-valued modifier is pre-selected, so a player who just clicks **Roll** without changing the selection gets the same result as **Highest** would have given.
-Because the chosen value is not known until the player picks it, the formula preview shows **(modifier)** in that spot instead of a number, until the player confirms a choice.
+With a **Maximum picks** of 1 it is a one-of list; above 1 it is a tick list whose heading says how many may be ticked, and further ticks are refused once the cap is reached.
+The best allowed selection is pre-chosen — the highest-valued modifiers the cap permits — so a player who just clicks **Roll** without changing anything gets the same result an unprompted craft would have produced.
+Because the chosen value is not known until the player picks it, the formula preview ends in a neutral `+ (modifier)[Modifiers]` term instead of a number, until the player confirms.
+The chat card names the modifiers that were picked.
 
 ## How a routed check is rolled
 

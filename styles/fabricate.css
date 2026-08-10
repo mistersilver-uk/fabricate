@@ -1342,10 +1342,33 @@
   Scope + specificity are deliberate:
    - Text-entry types only. `checkbox`/`radio`/`range` are real controls (segmented
      toggles, the visibility allow-list) and must keep their native/scoped rendering,
-     so they are excluded. `number` is excluded because every number input in the
-     manager is a Stepper whose look is owned by that component's scoped `<style>`;
-     `search` is excluded because every search field is a themed `.manager-search`
-     pill. Both would be clobbered by a blanket rule.
+     so they are excluded. `number` is excluded because the numeric control that HAS a
+     considered look — the shared `Stepper` primitive — owns it in its own block and a
+     blanket rule would clobber it; `search` is excluded because every search field is a
+     themed `.manager-search` pill.
+
+     As of issue 1050 the `number` carve-out is nearly total: every editable numeric field
+     in the manager and the interactable/component editors is a `Stepper`, and the
+     `.manager-rule-stepper` pair this comment used to name alongside it is gone, folded
+     onto the primitive. Exactly TWO bare `type="number"` fields remain in `src/ui/svelte`,
+     both deliberate and both recorded in the non-reuse register:
+
+       R1  `components/ChanceSlider.svelte` — keeps its bare input because its sibling
+           `type="range"` track already gives a pointer a way to step the value, and its
+           own `handleNumberKeydown` keeps the keyboard one. Its spinner IS suppressed,
+           by the scoped rule at `.manager-drop-rate-percent`.
+       R2  `apps/manager/SystemEditView.svelte`'s currency sub-unit amount — a bare field
+           inside a bordered `.manager-availability-pill.is-currency` chip, which is not a
+           form row and cannot hold a Stepper without widening every wrapping chip. It
+           KEEPS its native spinner.
+
+     The rule that governs both, and the acceptance criterion for the whole migration: a
+     numeric field's native spinner is suppressed IF AND ONLY IF the field carries another
+     pointer-driven stepping affordance — the Stepper's −/+ adjuncts, or a sibling range
+     track in the same control. A field with neither keeps its spinner, because the arrows
+     are then its ONLY pointer path to the value. That is why R2's spinner stays and why no
+     blanket `input[type="number"]` suppression may be added here;
+     `tests/components/stepper-spinner.test.js` fails one that is.
    - Declared HERE, early, at `.fabricate-manager <element>[type]` (0,2,1) — enough to
      beat Foundry core, low enough that any later per-control class rule overrides it
      by source order. So the search pill, the steppers, etc. all still win.
@@ -1916,8 +1939,13 @@
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
+/* Toolbar, then the LIST which takes the slack, then the pager (issue 1036). The shipped
+   template was `auto auto minmax(0, 1fr)`, which was correct while this route rendered a
+   page header, a toolbar and a table; the header moved into the shell and a pager arrived,
+   so the same three tracks would put the slack on the PAGER and pin the list to an
+   implicit `auto` row. */
 .fabricate-manager[data-manager-view="essences"] .manager-main {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 /* Drop zone, filter toolbar, then the TABLE which takes the slack. Named explicitly
@@ -1956,8 +1984,11 @@
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+/* Tab strip, then the scrolling tab body (issue 1036). One track was right while the
+   editor was a single flat card; the tabbed editor has two children and a single `1fr`
+   would stretch the strip. */
 .fabricate-manager[data-manager-view="essence-edit"] .manager-main {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-main,
@@ -2026,27 +2057,34 @@
   min-width: 0;
 }
 
+/* The numeric tracks are 102px, not the 84/72/96px they were pinned at before issue 1050.
+   That is the shared `Stepper`'s own natural width — 54px of fixed chrome (two 22px
+   adjuncts, 2x2px gap, 2x2px padding, 2x1px border) plus its 48px input. The `fill`
+   variant carries `min-width: 0`, so there is no compression cliff below it; 102px is the
+   DESIGN minimum, the width at which the typeable field is as wide as an unfilled stepper,
+   not a hard limit. If a rendered frame overflows, narrow the fixed Start/End pair first —
+   they are the least-used columns. */
 .fabricate-manager .manager-checks-outcome-table.is-relative {
-  grid-template-columns: minmax(140px, 1fr) 84px 104px 124px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 104px 124px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed {
-  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 124px 40px;
+  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 124px 40px;
 }
 
 /* checkDriven authority drops the per-outcome break-tools column (tool breakage is
    authored via the CheckBreakage editor instead). */
 .fabricate-manager .manager-checks-outcome-table.is-relative.is-no-break {
-  grid-template-columns: minmax(140px, 1fr) 84px 104px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 104px 40px;
 }
 
 .fabricate-manager .manager-checks-outcome-table.is-fixed.is-no-break {
-  grid-template-columns: minmax(130px, 1fr) 72px 72px 104px 40px;
+  grid-template-columns: minmax(130px, 1fr) 102px 102px 104px 40px;
 }
 
 /* Simple-check recipe tiers: Name + DC + remove. */
 .fabricate-manager .manager-checks-outcome-table.is-tier {
-  grid-template-columns: minmax(140px, 1fr) 96px 40px;
+  grid-template-columns: minmax(140px, 1fr) 102px 40px;
 }
 
 /* Unified per-check trigger editor (issue 419 recombine). Each trigger is a
@@ -2293,7 +2331,13 @@
   border-color: var(--fab-mv2-danger);
 }
 
-.fabricate-manager .manager-checks-outcome-row input {
+/* `:not(.fab-stepper-input)` — same collision, same reason as the `.manager-field` rule at
+   :7854, on the outcome rows the checks editors build by hand. This rule is
+   `.fabricate-manager .manager-checks-outcome-row input` at (0,3,0), which out-specifies the
+   Stepper's own scoped `.fab-stepper-input` chrome, so a migrated DC / Start / End field
+   would be re-bordered and stretched to a 36px box INSIDE the stepper's own bordered box.
+   The stepper takes the row's 36px on its WRAPPER instead, via the `fill` variant. */
+.fabricate-manager .manager-checks-outcome-row input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
   height: 36px;
@@ -3683,17 +3727,13 @@
   min-width: 0;
 }
 
+/* The essence library's list container (issue 1036). The `--fab-mv2-essence-grid` column
+   template and its `.has-no-source` variant are RETIRED with the table head they served:
+   the row is a flex card that wraps, so a `grid-template-columns` on it would place
+   nothing. `min-width: 0` stays — the container is a grid child of the route shell and
+   without it a long essence name pushes the whole column wider than its track. */
 .fabricate-manager .manager-essences-table {
-  --fab-mv2-essence-grid: minmax(0, 1.55fr) minmax(64px, 0.32fr) minmax(92px, 0.42fr) 92px;
-
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
   min-width: 0;
-}
-
-.fabricate-manager .manager-essences-table.has-no-source {
-  --fab-mv2-essence-grid: minmax(0, 1.7fr) minmax(92px, 0.46fr) 92px;
 }
 
 .fabricate-manager .manager-table-head,
@@ -4225,22 +4265,43 @@
    below rather than re-deriving a second, drifting filter bar. Its selects carried NO
    font-size rule at all and were rendering at Foundry's 14px `.application` base — a
    live bleed, because the Component Studio's own bleed patch covers `.manager-search
-   input` and `.manager-toolbar .manager-button`, but not `select`. */
+   input` and `.manager-toolbar .manager-button`, but not `select`.
+
+   The essence library (issue 1036) is the THIRD studio on this bar and joins it for the
+   same reason. It had re-derived the bar in its own scoped `<style>`, which looked
+   equivalent and was not, in two ways a source read cannot show:
+
+    - a SCOPED rule cannot reach `BulkSelectionToolbar`'s root. That primitive renders
+      `<div class="{rowClass} is-selection">` in ITS OWN template, so the essence view's
+      scoped `.manager-essence-filter-row` never applied to it — the selection row had no
+      `display: flex`, no `width: 100%` and no hairline, its `Clear` action's
+      `margin-left: auto` was inert, and `.manager-toolbar`'s `align-items: center` (which
+      the scoped block did not override) centred the whole row in the panel. The row class
+      a shared primitive WEARS therefore has to be authored here, beside the two studios
+      whose rows it already joins;
+    - nothing gave the essence toolbar's `select` elements the Fabricate select treatment
+      or the shared control font, so the source and sort dropdowns rendered with Foundry
+      core's own chrome at the 14px `.application` base — full-width, taller than the
+      controls beside them, and wrapping the one filter row into three. */
 .fabricate-manager .manager-recipe-toolbar .manager-search input,
 .fabricate-manager .manager-recipe-toolbar select,
 .fabricate-manager .manager-component-toolbar .manager-search input,
-.fabricate-manager .manager-component-toolbar select {
+.fabricate-manager .manager-component-toolbar select,
+.fabricate-manager .manager-essence-toolbar .manager-search input,
+.fabricate-manager .manager-essence-toolbar select {
   font-size: var(--fab-recipe-control-font);
 }
 
 /* The search field takes the selects' 9px radius rather than the shared 6px, so the bar
    does not mix two corner radii across adjacent controls. */
-.fabricate-manager .manager-component-toolbar .manager-search input {
+.fabricate-manager .manager-component-toolbar .manager-search input,
+.fabricate-manager .manager-essence-toolbar .manager-search input {
   border-radius: 9px;
 }
 
 .fabricate-manager .manager-recipe-filter-row,
-.fabricate-manager .manager-component-filter-row {
+.fabricate-manager .manager-component-filter-row,
+.fabricate-manager .manager-essence-filter-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-2);
@@ -4250,7 +4311,8 @@
 }
 
 .fabricate-manager .manager-recipe-filter-row.is-secondary,
-.fabricate-manager .manager-component-filter-row.is-secondary {
+.fabricate-manager .manager-component-filter-row.is-secondary,
+.fabricate-manager .manager-essence-filter-row.is-secondary {
   gap: var(--fab-space-3);
 }
 
@@ -4273,9 +4335,12 @@
    render the one shared `BulkSelectionToolbar` — its `rowClass` prop is what selects which
    half of this selector applies. (This block used to say the recipe toolbar "has no
    selection row at all"; issue 1010 gave it one, so that reason is retired rather than
-   left standing as a false claim.) */
+   left standing as a false claim.) The essence library joins it for issue 1036: it renders
+   the same primitive, and a `rowClass` naming a row this sheet does not author leaves that
+   primitive's root with no row at all. */
 .fabricate-manager .manager-recipe-filter-row.is-selection,
-.fabricate-manager .manager-component-filter-row.is-selection {
+.fabricate-manager .manager-component-filter-row.is-selection,
+.fabricate-manager .manager-essence-filter-row.is-selection {
   gap: var(--fab-space-2);
   padding-top: var(--fab-space-2);
   border-top: 1px solid var(--fab-mv2-border);
@@ -4287,7 +4352,8 @@
    they rendered with before (issue 643). The two-class-plus-element selector (0,2,1)
    outranks Foundry core's aggressive `select` rules. */
 .fabricate-manager .manager-recipe-toolbar select,
-.fabricate-manager .manager-component-toolbar select {
+.fabricate-manager .manager-component-toolbar select,
+.fabricate-manager .manager-essence-toolbar select {
   height: 34px;
   padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
@@ -4302,7 +4368,8 @@
    sentence case reads as a form, not a bar. */
 .fabricate-manager .manager-recipe-category-filter,
 .fabricate-manager .manager-component-category-filter,
-.fabricate-manager .manager-component-essence-filter {
+.fabricate-manager .manager-component-essence-filter,
+.fabricate-manager .manager-essence-source-filter {
   flex: 0 0 auto;
   min-width: 0;
   max-width: 180px;
@@ -4311,7 +4378,8 @@
 
 /* A row-two field: its uppercase micro-label, then its control. */
 .fabricate-manager .manager-recipe-filter-field,
-.fabricate-manager .manager-component-filter-field {
+.fabricate-manager .manager-component-filter-field,
+.fabricate-manager .manager-essence-filter-field {
   display: flex;
   gap: var(--fab-space-2);
   align-items: center;
@@ -4325,7 +4393,8 @@
   free to fold, and in the flagship frame it did.
 */
 .fabricate-manager .manager-recipe-filter-label,
-.fabricate-manager .manager-component-filter-label {
+.fabricate-manager .manager-component-filter-label,
+.fabricate-manager .manager-essence-filter-label {
   flex: 0 0 auto;
   color: var(--fab-text-subtle);
   font-size: 0.55rem;
@@ -4583,7 +4652,8 @@
 }
 
 .fabricate-manager .manager-recipe-stat-grid,
-.fabricate-manager .manager-component-stat-grid {
+.fabricate-manager .manager-component-stat-grid,
+.fabricate-manager .manager-essence-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fab-space-2);
@@ -4591,7 +4661,8 @@
 }
 
 .fabricate-manager .manager-recipe-stat,
-.fabricate-manager .manager-component-stat {
+.fabricate-manager .manager-component-stat,
+.fabricate-manager .manager-essence-stat {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
@@ -4605,7 +4676,8 @@
 /* The stat VALUE is a name-scale number: serif, per the typographic contract, with
    tabular figures so a 9 -> 10 change cannot reflow the tile. */
 .fabricate-manager .manager-recipe-stat-value,
-.fabricate-manager .manager-component-stat-value {
+.fabricate-manager .manager-component-stat-value,
+.fabricate-manager .manager-essence-stat-value {
   overflow: hidden;
   color: var(--fab-mv2-text);
   font-family: var(--fab-font-serif);
@@ -4632,7 +4704,8 @@
 }
 
 .fabricate-manager .manager-recipe-stat-label,
-.fabricate-manager .manager-component-stat-label {
+.fabricate-manager .manager-component-stat-label,
+.fabricate-manager .manager-essence-stat-label {
   color: var(--fab-text-subtle);
   font-size: 0.62rem;
   font-weight: 600;
@@ -5046,23 +5119,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-essence-table-head,
-.fabricate-manager .manager-essence-row {
-  display: grid;
-  grid-template-columns: var(--fab-mv2-essence-grid);
-  gap: var(--fab-space-2);
-  align-items: center;
-  align-content: center;
-  min-width: 0;
-}
-
 .fabricate-manager .manager-component-row > *,
 .fabricate-manager .manager-environment-table-head > *,
 .fabricate-manager .manager-environment-row > *,
 .fabricate-manager .manager-gathering-task-table-head > *,
-.fabricate-manager .manager-gathering-task-row > *,
-.fabricate-manager .manager-essence-table-head > *,
-.fabricate-manager .manager-essence-row > * {
+.fabricate-manager .manager-gathering-task-row > * {
   min-width: 0;
 }
 
@@ -5312,6 +5373,42 @@
   color: var(--fab-mv2-text);
 }
 
+/* ── THE FOUNDRY `<li>` MARGIN LEAK, AND WHY IT ONLY SHOWS ON THE GRID CARD ──────────
+   Foundry V13/V14 core (`css/foundry2.css`, inside `@layer`) declares:
+
+     ul li, ol li          { margin-bottom: 0.25rem; }
+     ul li:last-child, ol li:last-child { margin-bottom: 0; }
+
+   and neutralises it only for AppV1 (`body.game .app ul li { margin: unset }`). The manager
+   is an ApplicationV2 (`.application`), so that neutraliser never reaches it and every
+   manager browser row that is an `<li>` — recipe, component and essence — carries an extra
+   4px below itself. In a single-column LIST that reads as a slightly roomier gap and nothing
+   more, which is why it survived unnoticed.
+
+   On the essence GRID it is a real defect. `align-items: stretch` sizes an item's MARGIN
+   box to the grid row, so the last card in the list — the only one Foundry exempts — takes
+   the 4px its siblings spend on margin as extra BORDER-box height. That is exactly the
+   `Water` card the maintainer read off `manager-essences-grid.png`: one card in a row of
+   three, 4px taller than its neighbours, with its footer 4px lower, and no content
+   difference to explain it. Equal height was never guaranteed here — it was true of any row
+   that happened not to contain the last card.
+
+   Zeroing the margin on the CARD is what makes it structural: with no margins at all,
+   stretch equalises the border boxes and a row of cards is identical regardless of content
+   or position. `tests/components/essence-grid-card-height.test.js` measures that in
+   Chromium against the real Foundry rule.
+
+   Deliberately scoped to the CARD and not to `.manager-essence-row` at large: the list
+   presentation shares its 12px rendered pitch with the recipe and component libraries, and
+   silently tightening one studio's list to 8px would re-type a surface this change is not
+   photographing. The leak on those rows is recorded for a follow-up, not fixed here.
+
+   It lives in the GLOBAL sheet because it must beat Foundry's host CSS, which is one of the
+   two standing exceptions to the co-located-primitive-CSS rule. */
+.fabricate-manager .manager-essence-row.is-card {
+  margin: 0;
+}
+
 .fabricate-manager .manager-recipe-row:hover,
 .fabricate-manager .manager-component-row:hover,
 .fabricate-manager .manager-environment-row:hover,
@@ -5342,11 +5439,21 @@
 
 /* The component row joins the recipe row's opt-out (issue 676): it now leads with the
    same 40px Medallion, so the inset bar bit into it in exactly the way the recipe row
-   documents. The environment / gathering-task / essence rows keep the bar — they are
-   untouched by this change and re-skinning them here would re-type three surfaces it
-   never visited. */
+   documents.
+
+   The ESSENCE row joined for issue 1036, and the reason is the precondition this comment
+   already states rather than a new one: that redesign gave the row the same 40px
+   `Medallion` lead, so the bar started biting into it too — and the essence row is the
+   only one here that also renders as a GRID CARD, where an inset LEFT bar on a tile is
+   not even the right axis. It was left behind only because issue 676 predated the
+   medallion, so "untouched by this change" had been true of it until now.
+
+   The environment and gathering-task rows still keep the bar. They lead differently and
+   nothing about them moved, so re-skinning them here would re-type two surfaces this
+   change never visited — the same restraint issue 676 exercised toward the essence row. */
 .fabricate-manager .manager-recipe-row.is-selected,
-.fabricate-manager .manager-component-row.is-selected {
+.fabricate-manager .manager-component-row.is-selected,
+.fabricate-manager .manager-essence-row.is-selected {
   box-shadow: none;
 }
 
@@ -5356,15 +5463,23 @@
    accent ring over the ACTIVE surface, which sits one step forward of the selected row's
    soft surface. A row can be both.
 
-   The two multi-select browsers JOIN one selector here rather than authoring a block each:
-   the state means one thing and must look identical in both studios, and a second block
-   would be the per-studio variant the shared-primitive rule refuses.
+   The three multi-select browsers JOIN one selector here rather than authoring a block
+   each: the state means one thing and must look identical in every studio, and a second
+   block would be the per-studio variant the shared-primitive rule refuses.
+
+   The ESSENCE library joined for issue 1036, and its absence was a live defect rather
+   than a missing nicety. `EssenceRow.svelte` already wrote `class:is-bulk-selected`, so
+   the class was on the element and NOTHING matched it: a ticked essence row was
+   indistinguishable from an unticked one except for the checkbox itself, in the one
+   studio whose bulk panel can also delete what is ticked. A dead class is worse than an
+   absent one, because it reads as covered.
 
    It stays its OWN block, never folded into the `.is-selected` joins above: those are
    pinned by exact selector string in `tests/components/manager-layout.test.js`, and
-   appending to them would also give four other browser rows a state none of them has. */
+   appending to them would also give three other browser rows a state none of them has. */
 .fabricate-manager .manager-component-row.is-bulk-selected,
-.fabricate-manager .manager-recipe-row.is-bulk-selected {
+.fabricate-manager .manager-recipe-row.is-bulk-selected,
+.fabricate-manager .manager-essence-row.is-bulk-selected {
   border-color: var(--fab-accent-border);
   background: var(--fab-surface-active);
 }
@@ -5400,7 +5515,8 @@
 .fabricate-manager .manager-recipe-identity:focus,
 .fabricate-manager .manager-component-identity:focus,
 .fabricate-manager .manager-environment-identity:focus,
-.fabricate-manager .manager-gathering-task-identity:focus {
+.fabricate-manager .manager-gathering-task-identity:focus,
+.fabricate-manager .manager-essence-identity:focus {
   outline: none;
   box-shadow: none;
 }
@@ -5411,7 +5527,8 @@
 .fabricate-manager .manager-recipe-identity:focus-visible,
 .fabricate-manager .manager-component-identity:focus-visible,
 .fabricate-manager .manager-environment-identity:focus-visible,
-.fabricate-manager .manager-gathering-task-identity:focus-visible {
+.fabricate-manager .manager-gathering-task-identity:focus-visible,
+.fabricate-manager .manager-essence-identity:focus-visible {
   outline: 2px solid var(--fab-mv2-accent);
   outline-offset: 3px;
   border-radius: 6px;
@@ -5538,10 +5655,21 @@
   cursor: default;
 }
 
+/* The five row identity buttons share ONE reset, so each row surface can be a real
+   `<button>` without restating Foundry's overrides — see CONTRIBUTING.md "Instance 1 —
+   button layout".
+   `height: auto` is part of that rule and belongs HERE rather than on the one variant that
+   currently needs it: Foundry pins a fixed `height` on every `button`, used height resolves
+   to `max(height, min-height)`, and the four row-shaped identities escape it only because
+   their content never grows past the 46px `min-height` masking it. The essence grid CARD is
+   a stacked ~150px variant of the same button, so without this it would clip and the
+   cluster below would overlap the description. A no-op for the four short siblings and the
+   hazard removed for every future tall one. */
 .fabricate-manager .manager-recipe-identity,
 .fabricate-manager .manager-component-identity,
 .fabricate-manager .manager-environment-identity,
-.fabricate-manager .manager-gathering-task-identity {
+.fabricate-manager .manager-gathering-task-identity,
+.fabricate-manager .manager-essence-identity {
   appearance: none;
   -webkit-appearance: none;
   display: grid;
@@ -5550,6 +5678,7 @@
   align-items: center;
   width: 100%;
   min-width: 0;
+  height: auto;
   min-height: 46px;
   padding: 0;
   border: 0;
@@ -5557,6 +5686,30 @@
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+/* The shared GRID CARD body re-stacks that reset (`LibraryCard.svelte`). The reset above
+   makes every identity button a two-column grid, which is right for a LIST row and wrong
+   for a card, whose body is a vertical stack.
+
+   It lives HERE, immediately after the reset, because that ORDER is what makes it win.
+   Svelte appends a scope class to the first scoped selector in a rule, so the primitive's
+   own `.fab-library-card-body` compiles to a two-class compound — (0,2,0), the SAME
+   specificity as `.fabricate-manager .manager-<studio>-identity`, not lower. Equal
+   specificity means the tie breaks on source order, and the order of a component's
+   injected styles against this sheet is not something either file controls. Declaring the
+   override in this sheet, after the reset, is what removes that dependency: within one
+   stylesheet the later rule always wins.
+
+   The primitive keeps the same declarations in its own block so the card still stacks if
+   it is ever rendered outside `.fabricate-manager`. The two carry identical values, so
+   whichever wins between THEM is immaterial. */
+.fabricate-manager .fab-library-card-body {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--fab-space-2);
 }
 
 /* Inside the flex card row the identity is the ONLY shrinkable cell (the control
@@ -6192,47 +6345,22 @@
   grid-column: 1 / -1;
 }
 
-.fabricate-manager .manager-essence-identity {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: var(--fab-space-2);
-  align-items: center;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-essence-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  color: var(--fab-mv2-accent);
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-manager .manager-essence-source-cell {
-  justify-self: start;
-}
-
-.fabricate-manager .manager-essence-source-cell-image {
-  display: block;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-dark-20);
-  object-fit: cover;
-}
-
-.fabricate-manager .manager-essence-row {
-  cursor: pointer;
-}
+/* `.manager-essence-icon` and the two `.manager-essence-source-cell*` rules are RETIRED
+   with the table (issue 1036): the row's tile is the shared `Medallion`, which carries the
+   essence's own colour, and the source COLUMN is gone — a broken link is now reported by
+   the capability pill itself (a non-`linked` source tones it, swaps its glyph for a broken
+   link and titles it: see `essenceCapabilityPills`) plus the retained needs-attention
+   filter, rather than by an image in a column of its own.
+   `.manager-essence-identity`'s own grid template is retired too: it
+   joins the shared identity-button reset above, at that reset's 46px tile track. */
 
 .fabricate-manager .manager-essence-edit-main {
+  gap: var(--fab-space-2);
   min-height: 0;
-  overflow: auto;
+
+  /* The TAB BODY scrolls, not the whole route: a scrolling route would carry the tab strip
+     off the top of the panel. */
+  overflow: hidden;
 }
 
 .fabricate-manager .manager-essence-edit-view {
@@ -6244,32 +6372,29 @@
   overflow: auto;
 }
 
+/* The icon column WIDENED from 156px to 176px (issue 1036, maintainer round 2). 156px was
+   sized for the picker trigger alone and left the trigger plus its icon-only reset at ~154px
+   — technically inside the track, but flush against it, and beside a 96px tile it read as a
+   small tile with a gap. The tile is a fixed 124px SQUARE (issue 1036, maintainer round 3),
+   so the track is narrowed to that same 124px: the icon column IS the tile's width and the
+   picker beneath shrinks to fit under it rather than the old 176px track leaving the square
+   tile with a ragged gap to its right. The reset no longer shares this row at all — it is a
+   hover/focus overlay on the tile itself (later maintainer feedback), scoped in
+   `EssenceIdentityTab.svelte`. */
 .fabricate-manager .manager-essence-edit-grid {
   display: grid;
-  grid-template-columns: var(--fab-mv2-essence-icon-column, 156px) minmax(0, 1fr);
+  grid-template-columns: var(--fab-mv2-essence-icon-column, 124px) minmax(0, 1fr);
   gap: var(--fab-space-3);
   min-width: 0;
 }
 
-.fabricate-manager .manager-essence-icon-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  min-width: 0;
-}
-
-.fabricate-manager .manager-essence-icon-preview {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 8px;
-  color: var(--fab-mv2-accent);
-  background: var(--fab-overlay-light-06);
-  font-size: 3rem;
-}
+/* `.manager-essence-icon-panel` is RETIRED here and authored once, scoped, in
+   `EssenceIdentityTab.svelte` — its only consumer, which already declared the same block
+   plus an `align-items` the global lacked. Two rules at equal specificity for one element
+   is a cascade coin-toss, so the surviving copy carries the global's `min-width: 0` too.
+   `.manager-essence-icon-preview` and the three `.manager-essence-icon-copy` rules are
+   retired outright: the Identity tab renders the shared `Medallion` and `IconPicker`, so
+   nothing emits those classes at all. */
 
 .fabricate-manager .manager-essence-field-label {
   color: var(--fab-mv2-text-muted);
@@ -6278,32 +6403,26 @@
   line-height: 1.2;
 }
 
-.fabricate-manager .manager-essence-icon-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2xs);
-  min-width: 0;
-}
+/* ONE ROW under the tile, not a stack (issue 1036 fidelity pass). The prototype's icon
+   control is a tile plus a single `Change` affordance; this shipped as a grid of two
+   FULL-WIDTH controls — a picker trigger that reads as a bare dropdown, and a second
+   full-width `Clear icon` button under it — which is three stacked elements where the
+   design composes one.
 
-.fabricate-manager .manager-essence-icon-copy strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--fab-mv2-text);
-  font-size: 0.84rem;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+   Later maintainer feedback moved the reset OFF this row entirely, onto a hover/focus
+   overlay on the tile above, so this row now lays out the picker alone. `flex-wrap` and
+   `min-width: 0` survive unchanged: the picker's own label can still need to wrap under the
+   square tile's narrowed 124px column, even with nothing beside it any more. */
 .fabricate-manager .manager-essence-icon-actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--fab-space-chip);
+  align-items: center;
   min-width: 0;
 }
 
-.fabricate-manager .manager-essence-icon-actions .manager-button {
-  width: 100%;
-  justify-content: center;
+.fabricate-manager .manager-essence-icon-actions .essence-icon-picker {
+  flex: 1 1 auto;
 }
 
 .fabricate-manager .manager-essence-core-fields {
@@ -6317,7 +6436,6 @@
   min-height: 122px;
 }
 
-.fabricate-manager .manager-essence-icon-copy small,
 .fabricate-manager .manager-form-warning {
   color: var(--fab-mv2-text-muted);
   font-size: 0.76rem;
@@ -6339,9 +6457,16 @@
   min-width: 0;
 }
 
+/* TWO tracks, not three (issue 1036, maintainer round 2). The third reserved a 34px cell for
+   an inline clear button, and the ONE surface that rendered one — the editor's On-craft tab —
+   now renders the Tool Studio's `ItemDropZone` card instead, whose grouped actions are the
+   primitive's own. The browser inspector is the only consumer left and it has always
+   overridden the third track away, so the base stated a geometry nothing used and the
+   override existed only to cancel it. The `.manager-essence-inspector-source-summary` rule
+   is retired with it; the class stays on the element as the hook mounted tests select. */
 .fabricate-manager .manager-essence-source-summary {
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 34px;
+  grid-template-columns: 54px minmax(0, 1fr);
   gap: var(--fab-space-2);
   align-items: center;
   min-width: 0;
@@ -6349,11 +6474,6 @@
   border: 1px solid var(--fab-mv2-border);
   border-radius: 8px;
   background: var(--fab-overlay-dark-14);
-}
-
-.fabricate-manager .manager-essence-inspector-source-summary {
-  grid-template-columns: 54px minmax(0, 1fr);
-  align-items: center;
 }
 
 .fabricate-manager .manager-essence-inspector-source-actions {
@@ -6364,17 +6484,13 @@
   margin-top: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-essence-inspector-source-actions .manager-button {
-  width: 100%;
-  max-width: 100%;
-  white-space: nowrap;
-}
-
-.fabricate-manager .manager-essence-inspector-source-actions .manager-button span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* The two `.manager-button` child rules that used to sit here are RETIRED (issue 1036,
+   maintainer round 2). Copy source UUID and Unlink Source now render through
+   `InspectorActionButton`, which owns `width: 100%` and the single-line ellipsis label in
+   its own scoped block, so restating them here would be the global sheet re-deriving a
+   primitive's appearance — and they would have matched nothing anyway. The grid ABOVE
+   stays: placing two controls side by side in this card is a layout-context rule the
+   component cannot reach. */
 
 .fabricate-manager .manager-essence-source-thumb {
   display: inline-grid;
@@ -12128,6 +12244,39 @@
   text-align: center;
 }
 
+/*
+  NO native spinner on the ChanceSlider's number half (issue 1050, register entry R1).
+
+  This is the one field in the tree that earns spinner suppression WITHOUT the shared
+  `Stepper`'s −/+ adjuncts, and the reason is the sibling it ships with: the same control
+  renders a `type="range"` track bound to the same value, so a pointer already has a
+  stepping affordance here. The drawn arrows would be a THIRD path to one number. That is
+  the same `iff` the rest of this change applies — a spinner is suppressed only where
+  another pointer-driven stepping affordance exists — reached by a different affordance.
+
+  Keyboard stepping is NOT lost, which is what separates this from the regression the spinner
+  fix (issue 1036) refused to ship: `handleNumberKeydown` handles Up/Down itself (the component
+  intercepts them to commit through its own clamp), so removing the drawn buttons removes
+  drawn buttons only. `SystemEditView`'s currency sub-unit amount (register entry R2) is the
+  contrasting case and deliberately KEEPS its spinner: it is a bare field in a chip with no
+  range track and no adjuncts, so the arrows are its only pointer path.
+
+  Scoped to `.manager-drop-rate-percent` — the wrapper ChanceSlider puts around its number
+  input — rather than to `input[type="number"]`, so it cannot reach R2 or any future bare
+  field. `tests/components/stepper-spinner.test.js` asserts exactly that: a spinner rule
+  whose selector names no specific control fails the gate.
+
+  It also sits directly under the geometry rule above because the `%` affix is absolutely
+  positioned at `right: 6px` over the padding this reserves; the spinner used to draw
+  underneath it.
+*/
+.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-outer-spin-button,
+.fabricate-manager .manager-drop-rate-percent input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .fabricate-manager .manager-gathering-task-edit-view .manager-drop-rate-percent input:is([type="text"], [type="number"]) {
   min-height: 28px;
   padding: var(--fab-space-1) var(--fab-space-4) var(--fab-space-1) var(--fab-space-2xs);
@@ -13104,11 +13253,18 @@
   font-weight: 400;
 }
 
-.fabricate-manager .manager-rule-field select,
-.fabricate-manager .manager-rule-stepper input {
+/* The `<select>` alone. This was a two-selector rule that also painted
+   `.manager-rule-stepper input` — the reward/event limit fields, which were a hand-rolled
+   −/+ pair around a bare `type="number"`. They are the shared `Stepper` now (issue 1050),
+   which brings its own borderless chrome and takes the 36px on its WRAPPER via `fill`, so
+   the input half of this rule would have re-bordered and re-sized a control INSIDE the
+   stepper's own bordered box. The `padding` that used to sit in its own follow-up rule is
+   folded in here rather than left as a duplicate selector. */
+.fabricate-manager .manager-rule-field select {
   width: 100%;
   min-width: 0;
   height: 36px;
+  padding: 0 var(--fab-space-2);
   border: 1px solid var(--fab-mv2-border);
   border-radius: 6px;
   color: var(--fab-mv2-text);
@@ -13116,22 +13272,28 @@
   font-weight: 400;
 }
 
-.fabricate-manager .manager-rule-field select {
-  padding: 0 var(--fab-space-2);
-}
+/* PLACEMENT only, now that the control itself is the shared `Stepper`. The limit field is a
+   SIBLING of its `.manager-rule-row` inside the flex `.manager-rules-stack`, not a child of
+   it, so `padding-left` is what lines it up under the description column: the row's icon
+   track is 34px plus its 8px gap. (The old rule also carried `grid-column: 2`, which never
+   did anything here — the parent is flex — and a `34px minmax(0, 1fr) 34px` template for
+   the three hand-rolled children that no longer exist.)
 
+   `max-width` is the other half of the placement, and it is not cosmetic. This block gave
+   the field no width at all, so the filled stepper inside it resolved `width: 100%` against
+   the whole rules stack and rendered a limit field several hundred pixels wide with its −
+   and + an inch apart. Dropping `fill` would NOT have fixed that on the sibling cases in
+   `.manager-field` — an unfilled `.fab-stepper` is a flex item with `width: auto`, so
+   `align-items: stretch` widens it to exactly the same box, just 8px shorter and with a
+   48px input marooned in the middle of it — so the cap is applied here too, for one
+   remedy across all four sites. 160px is the pinned operand slot's width (:2150), which is
+   what the `fill` variant was measured against; it leaves a 106px typeable field, wider
+   than the 48px an unfilled stepper offers. Capping a SIZE from the layout context is
+   permitted; restyling the primitive's font, border, radius or fill is not. */
 .fabricate-manager .manager-rule-stepper {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
-  gap: var(--fab-space-chip);
   padding-left: 42px;
   min-width: 0;
-}
-
-.fabricate-manager .manager-rule-stepper input {
-  padding: 0 var(--fab-space-2);
-  text-align: center;
+  max-width: 160px;
 }
 
 /* Recipe Visibility card: List mode and Knowledge-based are inline subheading
@@ -13559,11 +13721,15 @@
     align-items: stretch;
   }
 
+  /* The essence row LEAVES both of these joins (issue 1036). `align-items: stretch` is a
+     live flex property, so it would stretch the medallion and the whole control cluster to
+     full card height; and `grid-template-columns` places nothing on a flex row. Its
+     replacement narrow behaviour — identity on line one, cluster wrapped right onto line
+     two — is authored in `EssenceRow.svelte`'s own scoped block and photographed. */
   .fabricate-manager .manager-component-row,
   .fabricate-manager .manager-environment-row,
   .fabricate-manager .manager-gathering-task-row,
-  .fabricate-manager .manager-gathering-task-drop-row,
-  .fabricate-manager .manager-essence-row {
+  .fabricate-manager .manager-gathering-task-drop-row {
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     align-items: stretch;
@@ -13573,8 +13739,7 @@
   .fabricate-manager .manager-component-row > *,
   .fabricate-manager .manager-environment-row > *,
   .fabricate-manager .manager-gathering-task-row > *,
-  .fabricate-manager .manager-gathering-task-drop-row > *,
-  .fabricate-manager .manager-essence-row > * {
+  .fabricate-manager .manager-gathering-task-drop-row > * {
     min-width: 0;
   }
 
@@ -14197,7 +14362,13 @@
   color: var(--fab-mv2-accent);
 }
 
+/* `align-items: end` bottom-aligns the two fields, so the migrated Break-below stepper
+   has to stand exactly as tall as the sibling Formula text input (34px, see the
+   `.manager-recipe-field input` rule below) or the pair reads as two control heights.
+   Taking a SIZE from the layout context is what `--fab-stepper-fill-height` is for. */
 .fabricate-manager .manager-tool-inline-fields {
+  --fab-stepper-fill-height: 34px;
+
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--fab-space-3);
@@ -14663,8 +14834,15 @@
   line-height: 1.4;
 }
 
-.fabricate-manager .manager-tool-breakage-method > .manager-recipe-field input,
-.fabricate-manager .manager-tool-inline-fields .manager-recipe-field input {
+/* `:not(.fab-stepper-input)` on BOTH selectors — same collision, same reason as :7854. At
+   (0,3,1) this out-specifies the Stepper's own scoped chrome, so the tool breakage threshold
+   would be re-bordered and stretched to 34px inside the stepper's own bordered box. The
+   guard has to go on each selector in the list rather than on the list: the OTHER selector
+   still carries the sibling formula TEXT input, which is not a stepper and must keep this
+   rule. Note that dropping the `manager-recipe-name-input` class does not help here — the
+   rule keys on `.manager-recipe-field input`, not on that class. */
+.fabricate-manager .manager-tool-breakage-method > .manager-recipe-field input:not(.fab-stepper-input),
+.fabricate-manager .manager-tool-inline-fields .manager-recipe-field input:not(.fab-stepper-input) {
   width: 100%;
   min-width: 0;
   height: 34px;
@@ -15182,6 +15360,20 @@
 .fabricate-manager .manager-component-identity-strip.is-drop-active .manager-component-source-drop-target {
   border-color: var(--fab-accent);
   color: var(--fab-mv2-accent);
+}
+
+/* The custom salvage DC is the only numeric control in this block; its siblings are a
+   full-width preset `<select>` and a manage-presets button, so the cap goes on the stepper
+   rather than on the `.manager-field` around it (issue 1050).
+
+   A cap, not a dropped `fill`. `.manager-field` is `display: flex; flex-direction: column`,
+   so an unfilled `.fab-stepper` — a flex item with `width: auto` — is widened to exactly
+   the same box by `align-items: stretch` (measured at 600/600px), just 8px shorter and with
+   a 48px input marooned inside a stretched border. 160px is the width the `fill` variant was
+   measured against and leaves a 106px typeable field. Taking a SIZE from the layout context
+   is permitted; restyling the primitive's font, border, radius or fill is not. */
+.fabricate-manager [data-salvage-dc-override] .fab-stepper {
+  max-width: 160px;
 }
 
 /* The salvage panel's heading IS its control row (issue 676): mode pill · divider ·
@@ -16092,6 +16284,16 @@
   margin-top: var(--fab-space-2);
 }
 
+/* Alchemy Simple's two fixed slots (success + reserved failure) are siblings in a
+   plain wrapper, so without this they stack flush and the failure card reads as
+   part of the success card. Match the multi-set list's spacing. */
+.fabricate-manager .manager-recipe-result-set-alchemy-simple {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  margin-top: var(--fab-space-2);
+}
+
 
 .fabricate-manager .manager-environment-composition {
   display: flex;
@@ -16590,8 +16792,11 @@
   --fab-env-comp-grid: minmax(0, 1fr) 72px 132px 72px;
 }
 
+/* The weight track is 158px, not 112px: it holds a Stepper (102px — 54px of chrome
+   around its 48px input) plus the 6px chip gap plus the ~50px selection-share readout.
+   At 112px the readout wrapped and the control overflowed its track. */
 .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-  --fab-env-comp-grid: minmax(0, 1fr) 112px 72px 132px 72px;
+  --fab-env-comp-grid: minmax(0, 1fr) 158px 72px 132px 72px;
 }
 
 .fabricate-manager .manager-environment-comp-band {
@@ -16781,8 +16986,16 @@
   min-width: 0;
 }
 
+/* The weight cell holds a FILLED Stepper, so the slot is pinned here rather than on the
+   control: `fill` makes the stepper `width: 100%` of this item, and an `auto` basis would
+   collapse it to its 54px of chrome (its input is `flex: 1 1 0; min-width: 0`). 102px is
+   the primitive's natural width. `--fab-stepper-fill-height` keeps the row at the 28px
+   the bare input had instead of the 36px default — taking a SIZE from the layout context
+   is allowed, unlike restyling the primitive's border, background or type. */
 .fabricate-manager .manager-environment-comp-weight-field {
-  flex: 0 0 auto;
+  --fab-stepper-fill-height: 28px;
+
+  flex: 0 0 102px;
   margin: 0;
 }
 
@@ -16791,16 +17004,9 @@
   color: var(--fab-mv2-text-muted);
 }
 
-.fabricate-manager .manager-environment-comp-weight-field input {
-  width: 42px;
-  height: 28px;
-  padding: var(--fab-space-2xs) var(--fab-space-1);
-  border: 1px solid var(--fab-mv2-border);
-  border-radius: 4px;
-  background: var(--fab-mv2-surface-1);
-  color: var(--fab-mv2-text);
-  font: inherit;
-}
+/* The bare-input box treatment that used to live here is deleted, not guarded: the
+   weight field is a Stepper now, which brings its own chrome, and a `.fab-stepper-input`
+   left inside this rule would be re-bordered and re-sized inside the stepper's own box. */
 
 .fabricate-manager .manager-environment-comp-weight-percent {
   min-width: 0;
@@ -17301,8 +17507,11 @@
     --fab-env-comp-grid: minmax(0, 1fr) 64px 110px 72px;
   }
 
+  /* The weight track does NOT narrow with the container: 102px is the stepper's natural
+     width and the selection-share readout still has to fit beside it. Only the name
+     column gives, which is what `minmax(0, 1fr)` on track 1 is there for. */
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"][data-composition-selection="blind"] {
-    --fab-env-comp-grid: minmax(0, 1fr) 100px 64px 110px 72px;
+    --fab-env-comp-grid: minmax(0, 1fr) 158px 64px 110px 72px;
   }
 
 }
@@ -17344,6 +17553,29 @@
 .fabricate-gather-chat--failure,
 .fabricate-craft-chat--failure {
   border-left-color: var(--fab-danger);
+}
+
+/* NO `.fabricate-craft-chat--mixed` rule, deliberately (issue 859). The aggregated bulk
+   salvage card emits that modifier when some items succeeded and some did not, and the
+   base rule above already paints `--fab-accent-strong` — neutral, neither the green of
+   an unqualified success nor the red of an unqualified failure — which is exactly what
+   "some worked, some did not" should read as. A dedicated rule was considered and
+   declined: the only colour it could add is a third ramp for a state whose whole meaning
+   is "not one of the other two". Recorded here because a reader searching this block for
+   `--mixed` would otherwise find nothing and assume an omission. */
+
+/* A gather whose check SUCCEEDED but whose drop rows all missed. Neither green nor
+   red: the attempt worked, it just yielded nothing, and the card has to say so rather
+   than render an empty body that reads as a broken module. */
+.fabricate-gather-chat--empty {
+  border-left-color: var(--fab-warning);
+}
+
+.fabricate-gather-chat__empty {
+  margin: 0;
+  color: var(--fab-text-muted);
+  font-size: 0.9em;
+  font-style: italic;
 }
 
 .fabricate-gather-chat__header,
@@ -19489,6 +19721,70 @@
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
+/* Multi-pick variant (issue 1055). `playerPicks` lets the player take up to
+   `craftingCheck.maxModifierPicks` modifiers, which sum, so above a cap of 1 the group
+   renders as checkboxes. Square control, tick instead of a centre dot; everything else —
+   the row, the hover, the selected wash — is the radio's, so the two variants cannot
+   drift apart visually. */
+.fabricate-roll-prompt__modifier-option:has(input[type='checkbox']:checked) {
+  border-color: var(--fab-accent);
+  background: var(--fab-accent-soft);
+}
+
+.fabricate-roll-prompt__modifier-option input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--fab-border-strong);
+  border-radius: 3px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Same load-bearing reset as the radio: Foundry core draws the native control's inner
+   chrome via ::before/::after, which `appearance: none` does NOT remove. */
+.fabricate-roll-prompt__modifier-option input[type='checkbox']::before,
+.fabricate-roll-prompt__modifier-option input[type='checkbox']::after {
+  display: none;
+}
+
+.fabricate-roll-prompt__modifier-option input[type='checkbox']:checked {
+  border-color: var(--fab-accent);
+  background-color: var(--fab-accent);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100%;
+}
+
+/* At the cap the unchecked boxes are disabled (`bindModifierPickCap`) rather than
+   silently ignoring clicks; dim the whole row so the state is visible, not just
+   unresponsive. The legend's "Pick up to N" hint says why. */
+.fabricate-roll-prompt__modifier-option:has(input:disabled) {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.fabricate-roll-prompt__modifier-option:has(input:disabled):hover {
+  background: transparent;
+}
+
+/* The cap, stated in the legend beside "Check modifier". Lower-case and un-tracked
+   against the legend's uppercase kicker so it reads as a note on the group rather than a
+   second heading. */
+.fabricate-roll-prompt__modifiers-hint {
+  margin-left: var(--fab-space-2);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--fab-text-muted);
+}
+
 .fabricate-roll-prompt__modifier-icon {
   flex: 0 0 1.1rem;
   text-align: center;
@@ -19499,6 +19795,63 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Bulk check prompt (`promptBulkCheckRoll`, issue 859). One answer for a whole batch,
+   so the body drops the formula and the DC — a batch has no single subject — and
+   replaces them with a subject strip and a note saying the answer lands on every roll.
+
+   These rules live HERE rather than in a scoped `<style>` block because the dialog body
+   is an HTML STRING handed to DialogV2, which renders outside every Svelte component's
+   scope: a scoped selector would compile to a `.svelte-xxxx` attribute no element in the
+   dialog carries. They reuse the `.fabricate-roll-prompt` root so the die row, the
+   heading, the bonus input, the picker and the footer buttons are already painted, and
+   only the three genuinely new leaves are added. Tokens only; every selector namespaced. */
+.fabricate-roll-prompt__subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fab-space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+/* Fixed 30px squares, matching the row-thumb size the bulk panel uses, so the dialog
+   and the panel behind it show the queue at one scale. `flex: 0 0 auto` because a
+   wrapped strip must not stretch its last row's thumbs to fill the line. */
+.fabricate-roll-prompt__subject {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--fab-border);
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--fab-bg-1);
+}
+
+/* The "+K more" overflow chip. Same pill treatment as the DC / modifier-value chips
+   (comma-joined there rather than duplicated here only because those two share a
+   background this one deliberately does not — it sits ON the strip, not in a panel). */
+.fabricate-roll-prompt__subjects-more {
+  flex: 0 0 auto;
+  padding: var(--fab-space-2xs) var(--fab-space-2);
+  border: 1px solid var(--fab-border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--fab-text-muted);
+  background: var(--fab-overlay-light-06);
+}
+
+/* The note sits BELOW the picker, because it describes what the two controls above it
+   will do — the player reads it after seeing the fields it is about, not before. */
+.fabricate-roll-prompt__bulk-note {
+  margin: 0;
+  font-size: 0.8rem;
+  font-style: italic;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--fab-text-muted);
 }
 
 /* Footer buttons: three equal Advantage/Normal/Disadvantage (or a single Roll),

@@ -1,3 +1,5 @@
+import { getByPath } from '../utils/objectPath.js';
+
 function defaultRandomID() {
   return (
     globalThis.foundry?.utils?.randomID?.() ??
@@ -172,15 +174,6 @@ function integerGcd(a, b) {
 
 function integerLcm(a, b) {
   return Math.abs(Math.trunc(a * b)) / integerGcd(a, b);
-}
-
-function getByPath(object, path) {
-  if (!object || !path) return;
-  const foundryGetter = globalThis.foundry?.utils?.getProperty;
-  if (typeof foundryGetter === 'function') return foundryGetter(object, path);
-  return String(path)
-    .split('.')
-    .reduce((value, key) => value?.[key], object);
 }
 
 function buildUnitMap(units) {

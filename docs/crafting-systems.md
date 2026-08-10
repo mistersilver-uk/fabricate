@@ -115,7 +115,7 @@ Most optional features are off by default and must be explicitly enabled by a GM
 |:--------------------|:--------|:----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Salvage             | On      | Enable component salvage, its check configuration, and the player Salvage tab in the Inventory inspector. Turning it off preserves whatever salvage you have already authored |
 | Essences            | Off     | Enable the essences system for abstract ingredient properties                                                                                             |
-| Property macros     | Off     | Allow result items to have their properties set by a macro                                                                                                |
+| Property macros     | Off     | Allow result items to have their properties set by a macro. With essences also enabled, each contributing essence can carry its own property macro too   |
 | Effect transfer     | Off     | Transfer active effects from essence source items to crafted results                                                                                      |
 | Multi-step recipes  | Off     | Allow recipes with multiple sequential steps. Turning it off keeps any multi-step recipes you have authored and collapses each one into a single combined action that produces its final results, until you turn it back on |
 | Gathering           | Off     | Show the Environments tab for authoring gathering locations and tasks. Any enabled system also exposes the player Gathering action in the Items Directory |

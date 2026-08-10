@@ -211,3 +211,116 @@ test('780: the stack/existing.update branch stamps NO roles leaf (create-only)',
   );
   assert.equal(existing.flags, undefined, 'the stacked item is never stamped with a roles map');
 });
+
+// ---------------------------------------------------------------------------
+// The award seam must never drop a result in silence.
+//
+// A gathering attempt that reports success and then quietly awards nothing is
+// indistinguishable from a broken module: the node and stamina are already spent and
+// nobody is told why. Two silent drops lived here — an `itemUuid` branch with no
+// component fallback (the sibling `registeredItemUuid` branch has always had one), and
+// a bare `continue` for anything that failed to resolve.
+// ---------------------------------------------------------------------------
+
+test('an itemUuid that fails to resolve FALLS BACK to the row component instead of vanishing', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  // The uuid resolves to nothing — a deleted item, or one this client cannot see.
+  globalThis.fromUuidSync = () => null;
+
+  const actor = capturingActor();
+  const resultGroups = [
+    { results: [{ itemUuid: 'Item.gone', componentId: SOURCELESS_COMPONENT.id, quantity: 2 }] },
+  ];
+  const created = await createGatheringResultCreator(managerWith(system)).create({
+    actor,
+    system,
+    resultGroups,
+  });
+
+  assert.equal(actor.captured.length, 1, 'the award is still created via the component fallback');
+  assert.equal(actor.captured[0].name, SOURCELESS_COMPONENT.name, 'it is the component award');
+  assert.equal(created.length, 1, 'and it is reported back to the caller');
+});
+
+test('a uuid-fallback award STAMPS identity — it really is that managed component', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+
+  const actor = capturingActor();
+  const resultGroups = [
+    { results: [{ itemUuid: 'Item.gone', componentId: SOURCELESS_COMPONENT.id, quantity: 1 }] },
+  ];
+  await createGatheringResultCreator(managerWith(system)).create({ actor, system, resultGroups });
+
+  // The old gate read `!result.itemUuid` off the ROW, so a row that fell back to its
+  // component would have skipped the stamp. The gate is now how the award RESOLVED.
+  assert.equal(
+    actor.captured[0].flags?.fabricate?.fabricate?.roles?.[SYSTEM_ID]?.componentId,
+    SOURCELESS_COMPONENT.id,
+    'a component-resolved award stamps its identity even when the row also named a uuid'
+  );
+});
+
+test('plan reports an unresolvable result as a DIAGNOSTIC, not a short list', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+
+  const planned = await createGatheringResultCreator(managerWith(system)).plan({
+    actor: capturingActor(),
+    system,
+    resultGroups: [{ results: [{ itemUuid: 'Item.gone', quantity: 1 }] }],
+  });
+
+  assert.ok(Array.isArray(planned?.diagnostics), 'plan returns diagnostics');
+  assert.equal(planned.diagnostics.length, 1);
+  assert.equal(planned.diagnostics[0].code, 'RESULT_SOURCE_UNRESOLVED');
+  assert.ok(
+    planned.diagnostics[0].message.includes('Item.gone'),
+    'the diagnostic names the unresolved reference'
+  );
+});
+
+test('create REFUSES a partial award when a result cannot be resolved', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = (uuid) =>
+    uuid === REGISTERED_COMPONENT.registeredItemUuid ? REGISTERED_SOURCE_ITEM : null;
+
+  const actor = capturingActor();
+  const resultGroups = [
+    {
+      results: [
+        { componentId: REGISTERED_COMPONENT.id, quantity: 1 },
+        { itemUuid: 'Item.gone', quantity: 1 },
+      ],
+    },
+  ];
+
+  await assert.rejects(
+    () => createGatheringResultCreator(managerWith(system)).create({ actor, system, resultGroups }),
+    (error) => error.code === 'RESULT_SOURCE_UNRESOLVED',
+    'the whole award is refused'
+  );
+  assert.equal(
+    actor.captured.length,
+    0,
+    'NOTHING is created — a half-granted gather is worse than a loud refusal'
+  );
+});
+
+test('a planned component award carries componentId so it survives to the card and journal', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+
+  const planned = await createGatheringResultCreator(managerWith(system)).plan({
+    actor: capturingActor(),
+    system,
+    resultGroups: [{ results: [{ componentId: SOURCELESS_COMPONENT.id, quantity: 3 }] }],
+  });
+
+  assert.equal(planned.length, 1, 'the planned award is not discarded');
+  // A component award has NO uuid before its document exists. Identity by uuid alone is
+  // what emptied the chat card and run journal for exactly this shape of award.
+  assert.equal(planned[0].itemUuid, null, 'no uuid yet — the document does not exist');
+  assert.equal(planned[0].componentId, SOURCELESS_COMPONENT.id, 'componentId is the identity');
+  assert.equal(planned[0].quantity, 3);
+});

@@ -135,6 +135,10 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 | `consumption.breakToolsOnFail` | `boolean` | `false` | Break Tools when the crafting check fails (renamed from the legacy `consumeCatalystsOnFail`, which is still read as a fallback). |
 | `progressive.awardMode` | `string` | `"equal"` | Progressive award mode: `"equal"`, `"exceed"`, or `"partial"`. |
 | `outcomes` | `string[]` | `["fail","pass"]` | Named outcome labels used for routed check routing. |
+| `checkModifiers` | `{id, label, icon?, expression}[]` | `[]` | Named catalogue of check modifiers added to the crafting-check roll automatically, as a single flavoured `+ N[Modifiers]` term. Each `expression` is a roll-data fragment evaluated against the crafter (a missing/failed expression contributes `0`, never `NaN`). |
+| `defaultModifierPolicy` | `string` | `"addAll"` | The combination rule: how the eligible modifiers reduce to the one number added to the roll, **and who selects them**. `"addAll"` sums the system's default set and `"highest"` takes its deterministic `max(...)`; neither asks anyone to select. `"byRecipe"` ("Recipe picks") lets the recipe author select at recipe-edit time, and `"playerPicks"` lets the player select at roll time on an interactive craft; both SUM what was picked, and both are bounded by `maxModifierPicks`. A non-interactive `"playerPicks"` craft resolves to the best legal selection (the sum of the highest `maxModifierPicks` values, which is `max(...)` at a cap of `1`). The system owns this field alone — a recipe never overrides it. An unrecognised value falls back to `"addAll"`. |
+| `defaultModifierIds` | `string[]` | `[]` | Catalogue entry ids applied by default. An id naming no entry in `checkModifiers` is dropped (order and de-duplication preserved). Under `"byRecipe"` this is what a recipe inherits until it picks its own; under `"playerPicks"` it is the menu the player chooses from. |
+| `maxModifierPicks` | `number` | key absent | The cap on how many modifiers a selecting rule (`"byRecipe"`, `"playerPicks"`) may pick. Only a positive integer is stored, so `null`, `0`, `2.5`, and junk all normalise to the same shape: key absent. **Absence means unlimited**, resolved as `Infinity`, and is never defaulted — a system that was never asked must not acquire a bound that truncates recipe picks already on disk. Meaningless under `"addAll"`/`"highest"`, but stored system-wide regardless of the current rule. Under `"byRecipe"` it truncates a recipe's resolved picks to the first N in authored order without deleting the rest. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
@@ -143,6 +147,17 @@ It controls how skill/ability checks gate recipe outcomes in routed-by-check and
 > The 1.17.0 migration strips it from stored systems.
 > The permission it carried now lives on the recipe as `allowPlayerResultReorder` and on the component as `salvage.allowPlayerResultReorder`, and it defaults to `true` where it previously defaulted to `false`.
 > Gathering never had an ordered result-stage surface, so it has no replacement field.
+
+{: .note }
+> **Behaviour change (issue 1055).** A recipe's stored `craftingModifier.modifierIds` is now consulted **only** under `defaultModifierPolicy === "byRecipe"`.
+> Before this change the eligible-id resolution preferred a recipe's own set under every rule.
+> Under `"addAll"`, `"highest"`, and `"playerPicks"` a system now resolves its own `defaultModifierIds` for every recipe, whatever any recipe stored; nothing is deleted, and switching the system to `"byRecipe"` applies those picks again.
+> A recipe's legacy `craftingModifier.policy` is never consulted at all — the combination rule is the system's alone — and `Recipe` drops the key on read.
+
+{: .note }
+> The `1.20.0` migration stamps `maxModifierPicks: 1` onto systems already on `"playerPicks"` that carry no cap, because that rule historically meant "pick exactly one" and an absent cap now means unlimited.
+> The other three rules are left unbounded: `"addAll"` and `"highest"` select nothing, and `"byRecipe"` may already have recipes that picked several modifiers, which a stamp of `1` would silently truncate.
+> An authored cap always wins, which makes the migration idempotent, and `migrateExportPayload` applies the identical per-system transform to an imported bundle, branch-independently of the schema-envelope upcast.
 
 The `alchemy` field is present only when `resolutionMode` is `"alchemy"`.
 It carries the alchemy check mode and the discovery/consumption options.
@@ -523,6 +538,9 @@ Each returned object has the following shape:
 | `name` | `string` | Display name |
 | `description` | `string` | Flavour text (may be empty) |
 | `icon` | `string` | FontAwesome class string. Always a non-empty string, and defaults to `fas fa-mortar-pestle`. |
+| `colorToken` | `string\|null` | Palette key for the essence's colour, or `null` for the theme accent default |
+| `enabled` | `boolean` | Default `true`. Gates essence-carried *behaviour* only, never essence arithmetic: a disabled essence still matches, accumulates, and is consumed, but neither its effect transfer nor its property macro runs. See [Essences]({% link essences.md %}#enabling-and-disabling-an-essence). |
+| `propertyMacroUuid` | `string\|null` | UUID of a script Macro run against every result this essence contributes to, before that item is created. Requires `features.propertyMacros` and `features.essences`. See [Essences]({% link essences.md %}#the-essence-property-macro). |
 | `sourceItemUuid` | `string\|null` | Authoritative field. The `componentId` of the component linked to this essence, or `null`. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->

@@ -60,6 +60,13 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+  // THE right-inspector action button (issue 1036, maintainer round 2), extracted from the
+  // Tool Studio's editor-header treatment and declared the point of arrival for every
+  // studio's inspector actions. It is deliberately here BEFORE the sweep that converts the
+  // recipe, component and Tool Studio inspectors: each conversion drops it into another
+  // mounted tree, and this is the guard that turns the resulting omission into a failure
+  // instead of a hung suite.
+  'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
 ];
 
 // `import X from './Y.svelte'` — the only form the mount harnesses' temp tree resolves.
@@ -70,6 +77,12 @@ const WRITE_COMPILED = /writeCompiledSvelte\(\s*([^)]*?)\s*\)/g;
 const COMPILED_MODULES = /compiledModules\s*:\s*\[([\s\S]*?)\]/g;
 // A template-literal compile inside a loop: writeCompiledSvelte(`prefix/${part}.svelte`).
 const TEMPLATE_COMPILE = /^`([^`$]*)\$\{(\w+)\}([^`]*)`$/;
+// The SAME compile loop with no template at all — `writeCompiledSvelte(component)` over a
+// list of whole paths (`environment-composition-list-mounted`). Without this the argument is
+// a bare identifier, `literalsIn` finds no quoted path in it, and the suite reads as
+// compiling NOTHING — so every primitive its tree renders passes vacuously. That is not
+// hypothetical: this guard reported clean while that suite hung on a missing `Stepper`.
+const BARE_LOOP_COMPILE = /^(\w+)$/;
 // Deliberately path-SHAPED rather than `'([^']+)'`. These lists are heavily commented and the
 // comments contain apostrophes ("the manager's ONE chip"), which desynchronise naive quote
 // pairing and make it read prose as module paths. Requiring no whitespace inside the quotes
@@ -104,18 +117,31 @@ function compiledPathsOf(suite) {
     ...[...suite.matchAll(COMPILED_MODULES)].map(([, body]) => body),
   ];
 
+  // The list a `for (const <variable> of …)` compile loop iterates, inline or by const name.
+  const loopMembers = (variable) => {
+    const binding = new RegExp(
+      `for\\s*\\(\\s*const\\s+${variable}\\s+of\\s+(\\[[^\\]]*\\]|\\w+)\\s*\\)`
+    ).exec(suite);
+    if (!binding) return null;
+    return literalsIn(binding[1].startsWith('[') ? binding[1] : (arrays.get(binding[1]) ?? ''));
+  };
+
   for (const region of regions) {
     const template = TEMPLATE_COMPILE.exec(region.trim());
     if (template) {
       // A compile loop. The iterated list is either inline — `for (const part of ['A','B'])`
       // — or a named const, and both forms are in use in the same suite.
       const [, prefix, variable, suffix] = template;
-      const binding = new RegExp(
-        `for\\s*\\(\\s*const\\s+${variable}\\s+of\\s+(\\[[^\\]]*\\]|\\w+)\\s*\\)`
-      ).exec(suite);
-      if (!binding) continue;
-      const source = binding[1].startsWith('[') ? binding[1] : (arrays.get(binding[1]) ?? '');
-      for (const member of literalsIn(source)) declared.push(`${prefix}${member}${suffix}`);
+      const members = loopMembers(variable);
+      if (!members) continue;
+      for (const member of members) declared.push(`${prefix}${member}${suffix}`);
+      continue;
+    }
+
+    const bare = BARE_LOOP_COMPILE.exec(region.trim());
+    if (bare) {
+      // The same loop with whole paths and no template around the variable.
+      for (const member of loopMembers(bare[1]) ?? []) declared.push(member);
       continue;
     }
 
@@ -192,6 +218,36 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
     gaps,
     [],
     `a missing entry HANGS the suite (# cancelled), it does not fail it:\n- ${gaps.join('\n- ')}`
+  );
+});
+
+test('every inspected suite resolves at least one real component, so none passes vacuously', () => {
+  // The RATCHET on the guard above, and it is the missing half rather than a nicety. A suite
+  // whose declaration form `compiledPathsOf` cannot read contributes an EMPTY set: `named` is
+  // then empty, `required` is empty, and the suite reports clean while hanging on a missing
+  // component. That is not hypothetical — it is exactly how the `BARE_LOOP_COMPILE` defect
+  // survived, and disabling that branch today still leaves the suite above green.
+  //
+  // So: a suite that compiles something must resolve at least one path that is a real tracked
+  // `.svelte` file. Suites built on `createMountedComponentHarness` are exempt because its own
+  // `validateMountedComponentDependencies` throws in `before()` naming the missing module, which
+  // is a loud failure rather than a silent gap.
+  const unreadable = [];
+  for (const suitePath of repoPathsUnder('tests', '.test.js')) {
+    const suite = readRepoFile(suitePath);
+    if (!suite.includes('writeCompiledSvelte') && !suite.includes('compiledModules')) continue;
+    if (suite.includes('createMountedComponentHarness')) continue;
+
+    const compiled = new Set(compiledPathsOf(suite));
+    if (!componentPaths.some((path) => compiled.has(path))) unreadable.push(suitePath);
+  }
+
+  assert.deepEqual(
+    unreadable,
+    [],
+    'these suites compile components the parser cannot read, so the guard above holds over an '
+      + 'empty set for them and reports clean whatever they render:\n- '
+      + unreadable.join('\n- ')
   );
 });
 

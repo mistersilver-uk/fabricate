@@ -51,7 +51,14 @@ jobs:
     # with, so running it would produce a guaranteed red that its author cannot clear.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Raised from 25 (issue 1055). The full registry had crept to within seconds of the old
+    # ceiling — the last run under it finished in 24m37s — so the next case to land tipped the
+    # job into a CANCELLED conclusion at 25m12s, before its publish step. That reads as a
+    # capture failure while actually being a capacity one, which is the expensive kind of red:
+    # it points the reader at the frames rather than at the clock. A capture is also
+    # self-limiting in a way a hung test is not (it renders a finite, declared case list), so a
+    # generous ceiling costs nothing on the happy path and buys room for the registry to grow.
+    timeout-minutes: 40
     # Declared at JOB level as well as workflow level (SonarCloud S8264): a job that writes to a PR
     # should state the write it needs where the write happens.
     permissions:

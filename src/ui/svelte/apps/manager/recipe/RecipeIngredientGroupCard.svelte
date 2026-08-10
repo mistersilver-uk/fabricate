@@ -25,6 +25,12 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  // The add-new offer projection (issue 1036). The `essenceOptions` PROP stays unfiltered
+  // — `RecipeIngredientOption` resolves an already-authored option's display through it,
+  // and `hasEssences` gates the whole essence match TYPE on it, so filtering the prop
+  // would render authored options unresolved and remove essence requirements entirely
+  // from a system whose essences are all disabled.
+  import { selectableEssenceOptions } from '../../../../../utils/essenceValidation.js';
   import RecipeIngredientOption from './RecipeIngredientOption.svelte';
   import SearchablePopover from '../SearchablePopover.svelte';
 
@@ -132,7 +138,12 @@
   // configured essence so their amount input is usable at once.
   function appendAlternative(type) {
     if (type === 'essence') {
-      const firstEssence = (essenceOptions || [])[0]?.id || '';
+      // The DEFAULT selection is part of the offer: without this filter, adding an essence
+      // alternative to a system whose first essence happens to be disabled would author a
+      // requirement on a disabled essence, which then BLOCKS the recipe's activation. An
+      // empty string is the correct answer for an all-disabled system — the picker opens
+      // unchosen rather than pre-committed.
+      const firstEssence = selectableEssenceOptions(essenceOptions)[0]?.id || '';
       onChange({
         ...group,
         options: [

@@ -30,12 +30,16 @@ import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGa
 import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
 import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
+import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
 import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
 import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
+import { BulkSalvageService } from './systems/BulkSalvageService.js';
+import { BulkDestroyService } from './systems/BulkDestroyService.js';
+import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
 import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
@@ -78,11 +82,15 @@ import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from '
 import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { setFabricateFlag } from './config/flags.js';
+import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
+import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
+import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MigrationRunner } from './migration/MigrationRunner.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
+import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
 import {
   ActorInventoryCoinSpender,
@@ -184,24 +192,6 @@ const getGatheringSelectableActors = createGatheringSelectableActorsGetter({
 });
 
 /**
- * The current dnd5e/pf2e implementation of the **player-character concept**.
- *
- * "Player character" is a concept: the actor type(s) a system designates as
- * player characters. This predicate is the documented seam for future
- * per-system extension/configuration. `'character'` is the dnd5e/pf2e actor
- * type and is NOT asserted as a universal truth — systems whose player-character
- * actor type differs are a known limitation of this iteration (their PCs will not
- * appear in the actor-selection bar), and re-pointing this predicate is the
- * intended extension point.
- *
- * @param {Actor} actor Candidate actor.
- * @returns {boolean} True when the actor is a player character.
- */
-function isPlayerCharacterActor(actor) {
-  return actor?.type === 'character';
-}
-
-/**
  * Selection predicate for the actor-selection top bar.
  *
  * Combines the ownership rule reused for gathering attempt authorization
@@ -224,6 +214,83 @@ const getBarSelectableActors = createGatheringSelectableActorsGetter({
   getCurrentUser: () => game.user,
   isSelectable: (actor, viewer) => isSelectableBarActor({ actor, viewer })
 });
+
+/**
+ * Push the configured item stack-quantity path into the accessor, then optionally probe
+ * it against the world's items and warn the GM when it looks wrong (issue 1024).
+ *
+ * ORDER IS LOAD-BEARING: the re-configure happens BEFORE the probe. Without that, a GM
+ * editing the path mid-session would get a notification reporting counts for the NEW
+ * path while every engine read and write continued on the OLD one until reload — an
+ * advisory asserting a state that is not live, which is worse than no advisory at all
+ * for a setting whose entire justification is data-loss avoidance.
+ *
+ * The re-configure is UNGATED (the engine path has to be live on every client), while
+ * the notification is GM-only: a permanent toast about a misconfiguration is actionable
+ * for the GM who just saved it and pure noise for a player who cannot change it.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.notify=false] Whether to run the probe and notify.
+ * @returns {string} The path now in force.
+ */
+function applyItemStackQuantityPathSetting({ notify = false } = {}) {
+  let stored = null;
+  try {
+    stored = getSetting(SETTING_KEYS.ITEM_STACK_QUANTITY_PATH);
+  } catch {
+    // Unregistered or unreadable: `configureItemStackQuantityPath` keeps the current
+    // path rather than storing a falsy one, and never throws.
+  }
+  const path = configureItemStackQuantityPath(stored);
+  if (!notify || game.user?.isGM !== true) return path;
+
+  // `game.items` only. This is a bounded, synchronous, read-only scan of the world item
+  // directory — it resolves nothing and rewrites nothing.
+  //
+  // That scope is a REAL LIMIT, not just an implementation note: a world whose items all
+  // live in compendia and on actor sheets yields `total === 0`, verdict `'no-items'`, and
+  // no warning at all — while every craft, salvage and alchemy consume on those same
+  // actor-owned items is destroying stacks. A `'no-items'` verdict is SILENCE, never a
+  // clean bill of health. Widening the scan to actors and packs would make module startup
+  // walk the whole world, which is why it is not done here.
+  //
+  // The suggested correction is the ACTIVE SYSTEM's preset, not the built-in default. On
+  // tormenta20 those differ, and passing the built-in would print "system.quantity" as
+  // "your game system's usual field" on the one system this whole feature exists for —
+  // contradicting the setting's own hint, which is formatted from the same preset.
+  const report = probeStackQuantityPath(game.items ?? [], {
+    path,
+    defaultPath: stackQuantityPathPresetFor(game.system?.id),
+  });
+  const message = describeStackQuantityProbe(report);
+  // PERMANENT: subject to the scope caveat above, this notification is the remaining
+  // defence against a typo'd path destroying stacks. The object-valued write guard cannot
+  // see the failure, because all four consume sites take `item.delete()` INSTEAD of
+  // `item.update(...)`.
+  if (message) ui.notifications?.warn?.(message, { permanent: true });
+  return path;
+}
+
+/**
+ * The GM-facing advisory for a stack-quantity probe result, or `null` when healthy.
+ *
+ * The DECISION — which of the three strings applies, and with what data — belongs to
+ * `stackQuantityAdvisory` in the accessor module, where it is a pure function and can be
+ * tested against a report. This wrapper is only the i18n edge, because the accessor module
+ * never touches `game`.
+ *
+ * The chosen string names the CONSEQUENCE in plain language, not just the counts. A GM
+ * reading "0 of 412" has no reason to connect it to inventory destruction and may
+ * reasonably read it as "nothing has this field yet — fine, I just set it up".
+ *
+ * @param {object} report A `probeStackQuantityPath` report.
+ * @returns {string|null} The notification text, or `null`.
+ */
+function describeStackQuantityProbe(report) {
+  const advisory = stackQuantityAdvisory(report);
+  if (!advisory) return null;
+  return game.i18n?.format?.(advisory.key, advisory.data) ?? advisory.key;
+}
 
 function getGatheringRunViewer({ run } = {}) {
   const userId = run?.userId;
@@ -460,6 +527,12 @@ class Fabricate {
     // Lazily-built player-facing inventory listing projector (player Inventory
     // tab). Constructed on first read once the managers exist.
     this._inventoryListingBuilder = null;
+    // Lazily-built bulk salvage / bulk destroy collaborators (issue 859), cached
+    // exactly like the listing builders above. Deliberately NOT exported onto
+    // `game.fabricate`: `salvageComponents` and `destroyComponents` are the only
+    // supported entry points, because they are where the per-target ownership gate is.
+    this._bulkSalvageService = null;
+    this._bulkDestroyService = null;
     this.itemPilesIntegration = null;
     this.actorInventoryCoinSpender = null;
     this.actorPropertyCoinSpender = null;
@@ -492,6 +565,12 @@ class Fabricate {
     // Register settings
     this.registerSettings();
     applyCurrentFabricateTheme(getSetting, SETTING_KEYS.THEME);
+    // Push the configured item stack-quantity path into the accessor BEFORE anything
+    // reads or writes a stack. It has to precede `_runMigrations()` because a migration
+    // may touch owned items, and it has to follow `registerSettings()` because the key
+    // is not readable until it is registered. There is no MIGRATIONS entry for this
+    // key: it is brand new, so no prior stored value exists to migrate.
+    applyItemStackQuantityPathSetting();
     // Run data migrations before managers load persisted data
     await this._runMigrations();
     // Create managers
@@ -914,6 +993,29 @@ class Fabricate {
         recipes: recipeList,
       }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
       ui.notifications?.warn?.(message);
+    }
+
+    // One-time GM-facing notice: the 1.21.0 migration retired the check-modifier
+    // roll-formula placeholder, and its consequences are behaviour changes rather than
+    // no-ops. PRIMARY-GM ONLY, not merely GM-only: `_runMigrations` returns early unless
+    // `game.users?.activeGM?.id === game.user?.id`, so exactly one client in a multi-GM
+    // world posts this and an assistant GM (who holds `isGM`) never does.
+    //
+    // THE COMPOSITION IS NOT HERE. Totals, clause selection, the systems list and the
+    // severity all live in `buildRetiredCraftingModNotice`, because nothing in this file
+    // can be executed by a unit test and a source-text grep can pin a DISPATCH but never a
+    // SUM — three semantic mutations to that arithmetic survived a green suite while it
+    // lived inline. What remains here is the Foundry edge: the GM gate, the localizer, and
+    // which notification channel the composed severity selects.
+    const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
+      ? summary.retiredCraftingModCounts : [];
+    if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
+      const notice = buildRetiredCraftingModNotice(
+        retiredCraftingModCounts,
+        (key, data) => game.i18n?.format?.(key, data)
+      );
+      if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
+      else ui.notifications?.info?.(notice.message);
     }
   }
 
@@ -1659,6 +1761,332 @@ class Fabricate {
   }
 
   /**
+   * Lazily build (and cache) the {@link BulkSalvageService} behind
+   * {@link Fabricate#salvageComponents} (issue 859). Mirrors
+   * {@link Fabricate#_getCraftingListingBuilder}: every collaborator the service needs
+   * is injected here, so the service itself reaches no Foundry global and stays
+   * unit-testable against plain objects.
+   *
+   * Safe to cache because every collaborator below is read off `this` at CALL time and
+   * none is captured at construction time. That — not immutability — is what makes the
+   * cache sound: `this.craftingEngine` is assigned twice (`null` in the constructor, then
+   * the real engine in `initialize()`), so a service that had captured the field's value
+   * instead of the receiver could hold `null` forever.
+   * {@link Fabricate#_getBulkDestroyService} states the same rule for the same reason.
+   *
+   * @returns {BulkSalvageService}
+   * @private
+   */
+  _getBulkSalvageService() {
+    if (this._bulkSalvageService) return this._bulkSalvageService;
+    this._bulkSalvageService = new BulkSalvageService({
+      salvage: (actorUuid, systemId, componentId, options) =>
+        this.craftingEngine.salvage(actorUuid, systemId, componentId, options),
+      getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
+      promptRollDecision: promptBulkCheckRoll,
+      postChatMessage: (message) => this._postBulkSalvageChatMessage(message),
+      // Key-only, matching every card module's `localize` contract; the aggregate card
+      // substitutes its own counts.
+      localize: (key) => game.i18n?.localize?.(key) ?? key
+    });
+    return this._bulkSalvageService;
+  }
+
+  /**
+   * Lazily build (and cache) the {@link BulkDestroyService} behind
+   * {@link Fabricate#destroyComponents} (issue 859).
+   *
+   * @returns {BulkDestroyService}
+   * @private
+   */
+  _getBulkDestroyService() {
+    if (this._bulkDestroyService) return this._bulkDestroyService;
+    this._bulkDestroyService = new BulkDestroyService({
+      getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
+      // Destroy MUST resolve documents through the identical matcher salvage uses,
+      // including its case-SENSITIVE name fallback: a destroy that matched more broadly
+      // than salvage would delete things the player was shown as a different component.
+      // Read off `this.craftingEngine` at CALL time, not at construction time, because
+      // this service is cached and the engine is assigned during `initialize()` — the
+      // constructor leaves the field `null`.
+      findComponentItems: (actor, component, system) =>
+        this.craftingEngine.findComponentItems(actor, component, system),
+      // Must RETURN the deleted documents: the service derives `unitsDeleted` from what
+      // came back, never from what it asked for, because a `preDeleteItem` hook can veto
+      // individual ids silently while the rest of the batch deletes.
+      deleteItems: (actor, itemIds) => actor.deleteEmbeddedDocuments('Item', itemIds)
+    });
+    return this._bulkDestroyService;
+  }
+
+  /**
+   * Post the ONE aggregated bulk-salvage chat card: speaker → visibility → create.
+   *
+   * ## The order of the three steps is load-bearing
+   *
+   * 1. **Speaker first**, because `ChatMessage.applyMode`'s `ic` branch reads
+   *    `chatData.speaker.actor` unguarded — a visibility pass over speaker-less data
+   *    throws for a player whose client default is In-Character.
+   * 2. **Visibility before `create`**, because the legacy `rollMode` CREATE OPTION is
+   *    honoured only for a message carrying rolls and this card carries none. See
+   *    {@link module:src/systems/bulkChatVisibility.applyBulkChatVisibility}, which owns
+   *    the V13/V14 probe and vocabulary.
+   * 3. **`create` last**, with `author` — the V14 schema defines `author` and has no
+   *    `user` field and no shim, so the `user` key the single-salvage poster still
+   *    passes is silently discarded there and works only by defaulting.
+   *
+   * ## Why the speaker is built rather than inferred
+   *
+   * `ChatMessage.getSpeaker()` with no actor falls through to the CONTROLLED TOKENS on
+   * the canvas, so a GM running a bulk salvage with an unrelated NPC selected would have
+   * the card attributed to that NPC. A one-actor run therefore names its actor
+   * explicitly, and a multi-actor run — which has no single speaker to name — builds the
+   * same shape `_getSpeakerFromUser` produces, with an explicit alias, so the card speaks
+   * as the acting user rather than as whatever happened to be selected.
+   *
+   * @param {object} message
+   * @param {string} message.content The card markup (already built and escaped).
+   * @param {string|null} message.rollMode The LEGACY token the player chose, or null when
+   *   nothing prompted — in which case the client's own `core.rollMode` decides. Never
+   *   reads `core.messageMode`: `ClientSettings#assertSetting` throws for an unregistered
+   *   key on V13, and `??` does not catch a throw.
+   * @param {string|null} message.actorUuid Set only for a single-actor run.
+   * @param {string[]} [message.actorNames] The acting actors, used for the alias.
+   * @returns {Promise<object|undefined>} The created message.
+   * @private
+   */
+  async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {
+    // `globalThis.` rather than the bare global `fromUuid` this file uses elsewhere:
+    // optional chaining does not rescue an UNDECLARED identifier, so a bare
+    // `fromUuidSync?.()` would still throw a ReferenceError under a harness that has not
+    // installed it, and this poster must never be the thing that costs a completed run
+    // its report.
+    const actor = actorUuid ? (globalThis.fromUuidSync?.(actorUuid) ?? null) : null;
+    const alias = actorNames.filter(Boolean).join(', ') || game.user?.name || '';
+    const speaker = actor
+      ? ChatMessage.getSpeaker({ actor })
+      : { scene: game.scenes?.current?.id ?? null, actor: null, token: null, alias };
+
+    const chatData = { author: game.user?.id, speaker, content };
+    applyBulkChatVisibility(chatData, rollMode || game.settings?.get?.('core', 'rollMode'));
+    return await ChatMessage.create(chatData);
+  }
+
+  /**
+   * Gate a bulk target list, resolving ONE actor per row.
+   *
+   * ## `target.actorId ?? actorId`, and nothing else
+   *
+   * There is deliberately no `?? this.getSelectedCraftingActorId()` tail here, unlike
+   * {@link Fabricate#_resolveCraftingSources}. A bulk run may span actors, so a
+   * persisted-selection fallback would silently RETARGET a row whose own actor did not
+   * resolve onto whichever actor the player last selected — salvaging or destroying the
+   * wrong character's items with no error anywhere. A row that names no resolvable actor
+   * is refused, never redirected.
+   *
+   * @param {Array<object>} targets
+   * @param {string|null} actorId The run-level default for rows that name no actor.
+   * @returns {Array<{target: object, actor: Actor|null}>} Input order, preserved.
+   * @private
+   */
+  _gateBulkTargets(targets, actorId) {
+    return (targets || []).filter(Boolean).map((target) => ({
+      target,
+      actor: this._resolveCraftingActor(target.actorId ?? actorId)
+    }));
+  }
+
+  /**
+   * Weave a service's result rows back into the caller's ORIGINAL target order,
+   * substituting a refusal row wherever the gate resolved no actor.
+   *
+   * Order is preserved end to end because the in-panel report and the chat card line up
+   * with the queue the player committed; a run that reordered its own rows would make
+   * "the third one failed" unreadable.
+   *
+   * @param {Array<{target: object, actor: Actor|null}>} gated
+   * @param {Array<object>} ranItems The service's rows, in gated-and-runnable order.
+   * @param {(target: object) => object} buildRefusedRow
+   * @returns {Array<object>}
+   * @private
+   */
+  _mergeBulkRows(gated, ranItems, buildRefusedRow) {
+    const rows = [];
+    let next = 0;
+    for (const entry of gated) {
+      if (entry.actor && next < ranItems.length) {
+        rows.push(ranItems[next]);
+        next += 1;
+      } else {
+        rows.push(buildRefusedRow(entry.target));
+      }
+    }
+    return rows;
+  }
+
+  /**
+   * The identity fields every refusal row carries. The component's name and image are
+   * resolved from the crafting system so a refused row still READS as the thing the
+   * player selected, rather than as a blank line they cannot connect to anything.
+   *
+   * @param {object} target
+   * @returns {object}
+   * @private
+   */
+  _buildNotPermittedRow(target) {
+    const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
+    const component =
+      (system?.components || []).find((entry) => entry?.id === target?.componentId) ?? null;
+    return {
+      actorId: target?.actorId ?? null,
+      actorName: '',
+      systemId: target?.systemId ?? null,
+      componentId: target?.componentId ?? null,
+      name: component?.name || '',
+      img: component?.img || '',
+      // The facade's own outcome, added to the service vocabulary rather than folded
+      // into `skipped`: "you may not act on this actor" and "this row was not runnable"
+      // are different answers and the panel gives them different chips.
+      outcome: 'notPermitted',
+      skipReason: null
+    };
+  }
+
+  /**
+   * Salvage MANY owned components in one gesture (issue 859) — the seam behind the
+   * player Inventory tab's bulk panel.
+   *
+   * TAKES AN `actorId` PER TARGET, NEVER AN `actorUuid`, AT ANY NESTING LEVEL.
+   * `CraftingEngine.salvage` performs no ownership check of its own and
+   * `BulkSalvageService` performs none either — it receives a facade-derived uuid — so
+   * the per-target `_resolveCraftingActor` below is the ONLY gate on this path. It
+   * resolves through `game.actors` (world actors only), which closes two Foundry paths
+   * for free and is stated so a future "just accept a uuid" change knows what it would
+   * open: a compendium-backed actor can never be a target, and an unlinked token actor
+   * is not in `game.actors` either.
+   *
+   * An unresolvable actor becomes an `outcome: 'notPermitted'` ROW. It never throws and
+   * never retargets, so one refused row costs the player none of the others.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The run-level actor id, used for any target
+   *   that names none of its own.
+   * @param {Array<{actorId?: string, systemId: string, componentId: string}>}
+   *   [options.targets] The queue, in the order the player committed it.
+   * @param {boolean} [options.interactive] When true the run opens ONE roll prompt and
+   *   applies the player's answer to every roll. Defaults true — this facade exists for
+   *   a player gesture, unlike the automation-facing {@link Fabricate#salvageComponent}.
+   * @param {Function} [options.onProgress] Called `(completed, total)` after each target
+   *   resolves, so a caller can render determinate progress for a run that is knowable
+   *   precisely because it is sequential. OPTIONAL, and a listener that throws never
+   *   costs the run — see the service's own `reportBulkProgress`.
+   *
+   *   STATED LIMIT: `total` counts the rows the SERVICE was given, which is this call's
+   *   targets MINUS any the gate refused. A run containing a `notPermitted` row
+   *   therefore finishes below the caller's own denominator rather than reporting a
+   *   refusal as work; the caller owns its terminal state either way.
+   * @returns {Promise<{cancelled: boolean, items: object[], counts: object,
+   *   posted: boolean}>} Plain models only, in the caller's target order.
+   */
+  async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {
+    this._requireReady();
+    const gated = this._gateBulkTargets(targets, actorId);
+    const runnable = gated.filter((entry) => entry.actor);
+
+    const result = await this._getBulkSalvageService().run({
+      targets: runnable.map(({ target, actor }) => ({
+        actorUuid: actor.uuid,
+        actorId: actor.id,
+        actorName: actor.name,
+        systemId: target.systemId,
+        componentId: target.componentId
+      })),
+      interactive,
+      onProgress
+    });
+    // A dismissed prompt returns before the first engine call, so nothing ran and there
+    // is no per-row story to tell — pass the service's zero-mutation shape straight
+    // through rather than reporting refusals for a run the player cancelled.
+    if (result.cancelled) return result;
+
+    const items = this._mergeBulkRows(gated, result.items, (target) => ({
+      ...this._buildNotPermittedRow(target),
+      rollValue: null,
+      tierStep: null,
+      message: '',
+      results: [],
+      consumed: [],
+      tools: []
+    }));
+    return {
+      cancelled: false,
+      items,
+      counts: {
+        ...result.counts,
+        total: items.length,
+        notPermitted: items.length - result.items.length
+      },
+      posted: result.posted
+    };
+  }
+
+  /**
+   * Permanently destroy MANY owned components in one gesture (issue 859).
+   *
+   * Same gate as {@link Fabricate#salvageComponents} — an `actorId` per target, never a
+   * uuid, no persisted-selection fallback, an unresolvable actor refused as
+   * `notPermitted` rather than retargeted — and the same order-preserving merge.
+   *
+   * Destroy deletes WHOLE STACKS on the target actor and is deliberately NOT gated on
+   * `features.salvage` or a component's `salvage.enabled`: a player can already delete
+   * their own owned Items from the Foundry sheet, so this adds ergonomics, not
+   * capability, and a blocked-for-salvage row is often exactly the row they want gone.
+   * There is no chat card — a result card reports what an activity produced.
+   *
+   * The caller owns the confirmation. This facade executes against the snapshot the
+   * confirmation named and does not re-prompt.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The run-level actor id.
+   * @param {Array<{actorId?: string, systemId: string, componentId: string}>}
+   *   [options.targets]
+   * @param {Function} [options.onProgress] Called `(completed, total)` after each target
+   *   is destroyed, under the same optional-and-cannot-break-the-run contract — and the
+   *   same stated limit about refused rows — as {@link Fabricate#salvageComponents}.
+   * @returns {Promise<{items: object[], unitsDeleted: number, documentsDeleted: number}>}
+   */
+  async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
+    this._requireReady();
+    const gated = this._gateBulkTargets(targets, actorId);
+    const runnable = gated.filter((entry) => entry.actor);
+
+    const result = await this._getBulkDestroyService().run({
+      targets: runnable.map(({ target, actor }) => ({
+        // The RESOLVED document, not an id: the service's matcher and delete both need
+        // the actor itself, and re-resolving it there would be a second gate to keep
+        // honest. Resolution and the ownership decision stay in one place.
+        actor,
+        actorId: actor.id,
+        actorName: actor.name,
+        systemId: target.systemId,
+        componentId: target.componentId
+      })),
+      onProgress
+    });
+
+    const items = this._mergeBulkRows(gated, result.items, (target) => ({
+      ...this._buildNotPermittedRow(target),
+      requested: 0,
+      unitsDeleted: 0,
+      documentsDeleted: 0,
+      staleIds: 0,
+      items: [],
+      vetoed: []
+    }));
+    return { items, unitsDeleted: result.unitsDeleted, documentsDeleted: result.documentsDeleted };
+  }
+
+  /**
    * Re-evaluate the craftability of ONE ingredient set with in-session per-group
    * option overrides applied (issue 552). Backs the crafting store's
    * `selectedCraftability` recompute when the player picks a non-default option, so
@@ -2221,10 +2649,12 @@ class Fabricate {
     const systemId = options.systemId;
     const service = this.gatheringRichStateService;
     if (!service || !systemId) return [];
-    // Characters only — exclude NPCs (and other non-character actor types). A
-    // character with no rolled pool yet reports max: null (the panel offers Roll).
+    // Player characters only, per the CONFIGURED player-character actor types
+    // (issue 1024) — so a Fallout `robot` appears here once the GM ticks it, and a
+    // dnd5e `npc` never does. A player character with no rolled pool yet reports
+    // max: null (the panel offers Roll).
     return Array.from(game.actors?.contents ?? [])
-      .filter(actor => actor?.type === 'character')
+      .filter(actor => isPlayerCharacterActor(actor))
       .map(actor => {
         const stamina = service.getActorStamina(actor, systemId);
         return { actorId: actor.id, name: actor.name, img: actor.img, ...stamina };
@@ -2868,6 +3298,14 @@ Hooks.once('ready', async () => {
   // and self-clears once the GM has run Repair Item Data.
   notifyUnresolvedItemDescriptions();
 
+  // Issue 1024: GM-only advisory for a stack-quantity path that resolves nothing (or
+  // reads on the prepared document but is absent from `_source`, so every write is
+  // silently discarded by the system's schema cleaner). The path itself was already
+  // configured during `initialize()`; this re-applies it and adds the world scan, which
+  // needs `game.items` populated. Same call as the setting listener uses, so startup and
+  // mid-session edits report identically.
+  applyItemStackQuantityPathSetting({ notify: true });
+
   // Wire the canvas Interactable foundation (region-first: drop interception
   // that spawns a Scene Region + `fabricate.interactable` behaviour + linked
   // marker, the region-enter presence prompt, the controlToken re-trigger, and
@@ -2967,22 +3405,59 @@ Hooks.once('ready', async () => {
   // gather decrement and the world-time respawn write it — so reacting to that
   // setting change covers depletion AND recharge. canvasReady does the initial sync
   // to the current node state when a scene loads. Active-GM-gated inside the sync.
-  Hooks.on('updateSetting', (setting) => {
-    const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
-    if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
-      void runInteractableMarkerSync();
+  //
+  // The handler takes the `Setting` DOCUMENT ONLY. `createSetting` emits
+  // `(doc, options, userId)` and `updateSetting` emits `(doc, change, options, userId)`,
+  // so a handler written as `(setting, changed) => …` would receive `options` in
+  // `changed` on the create leg.
+  // The whole body is wrapped in try/catch, but NOT because a throw here would kill the
+  // `updateSetting` broadcast — `Hooks.#call` wraps every listener in its own try/catch
+  // and routes a throw to `Hooks.onError` (byte-identical in 13.351 and 14.361), so the
+  // remaining listeners still run. That "a throw escapes and kills the broadcast" hazard
+  // is real for a `SettingConfig.onChange` callback, which runs inside `doc._onUpdate`
+  // ahead of `Hooks.callAll` — and it is documented where it applies, beside the two
+  // `onChange`-free registrations in `settings.js`.
+  //
+  // What this try/catch buys is a Fabricate-owned failure signal. Without it the error
+  // surfaces as a core `Hooks.onError` line naming this handler (a named `const`, so the
+  // line is not anonymous), with no clue which of the four branches below failed or
+  // which setting triggered it.
+  const handleFabricateSettingDocumentChange = (setting) => {
+    try {
+      const key = setting?.key ?? `${setting?.namespace ?? ''}.${setting?.id ?? ''}`;
+      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.GATHERING_ENVIRONMENTS}`) {
+        void runInteractableMarkerSync();
+      }
+      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.ITEM_STACK_QUANTITY_PATH}`) {
+        // Re-configure, THEN probe. The setting is runtime-mutable, and a startup-only
+        // probe would separate the advisory from the typo by an arbitrary amount of
+        // destroyed inventory.
+        applyItemStackQuantityPathSetting({ notify: true });
+      }
+      // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
+      // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
+      // client when the replicated world setting lands, so reload the stale in-memory
+      // manager here and re-emit the local change hook so open player apps refresh.
+      handleFabricateSettingChange(key, {
+        craftingSystemManager: fabricate.craftingSystemManager,
+        recipeManager: fabricate.recipeManager,
+        gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
+        callAll: (hook, payload) => Hooks.callAll(hook, payload),
+      });
+    } catch (error) {
+      console.error('Fabricate | Failed to handle a Fabricate setting change', error);
     }
-    // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
-    // `Hooks.callAll`s fired only on the GM's client. `updateSetting` fires on every
-    // client when the replicated world setting lands, so reload the stale in-memory
-    // manager here and re-emit the local change hook so open player apps refresh.
-    handleFabricateSettingChange(key, {
-      craftingSystemManager: fabricate.craftingSystemManager,
-      recipeManager: fabricate.recipeManager,
-      gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
-      callAll: (hook, payload) => Hooks.callAll(hook, payload),
-    });
-  });
+  };
+  Hooks.on('updateSetting', handleFabricateSettingDocumentChange);
+  // The FIRST EVER write to a world setting is a CREATE, not an update (issue 1024).
+  // `ClientSettings#set` calls `current.update(...)` only when a `Setting` document
+  // already exists; `get()` synthesises a detached document with no `_id` when nothing
+  // is stored. So a GM ticking a new player-character actor type for the first time
+  // emits `createSetting` and never `updateSetting`, and without this line the change
+  // propagates to nobody until reload. Wiring it at the shared handler also closes the
+  // same latent first-write hole for the `craftingSystems`, `recipes`, and
+  // `gatheringEnvironments` branches.
+  Hooks.on('createSetting', handleFabricateSettingDocumentChange);
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
   });

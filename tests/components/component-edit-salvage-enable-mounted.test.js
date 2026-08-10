@@ -15,6 +15,10 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  COMPONENT_EDIT_VIEW_COMPILED_MODULES,
+  COMPONENT_EDIT_VIEW_RAW_MODULES,
+} from '../helpers/componentEditViewModules.js';
 
 function flushRender() {
   return new Promise((done) => setTimeout(done, 0));
@@ -26,40 +30,8 @@ const repoRoot = resolve(__dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-salvage-enable-',
-  rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
-    'src/ui/svelte/util/componentEditor.js',
-    'src/utils/componentCategories.js',
-    'src/ui/svelte/apps/manager/component/salvageDcPresets.js',
-    // The salvage mode pill's label source (issue 676) — it already carries 'Routed by
-    // check' for the persisted 'routed' token. Import-free leaf.
-    'src/ui/svelte/apps/manager/resolutionModeOptions.js',
-    'src/ui/svelte/actions/dismissOnOutsideClick.js',
-    // The identity strip's drop target + its portaled overflow menu.
-    'src/ui/svelte/actions/dragDrop.js',
-    'src/ui/svelte/actions/portal.js',
-    'src/ui/svelte/util/iconPickerPopover.js',
-  ],
-  // A `.svelte` the tree RENDERS but this list omits does not fail — it HANGS, and is
-  // reported as `# cancelled`, never `# fail`.
-  compiledModules: [
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
-    // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
-    // The salvage result quantity + the progressive DC are the shared Stepper (issue
-    // 676). Import-free leaf, so it needs no `rawModules` entry.
-    'src/ui/svelte/components/Stepper.svelte',
-    // The shared essence quantity card (issue 772). `ComponentEditView` renders it after
-    // the extraction, so it is in this tree's static import closure regardless of props.
-    'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
-    'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte',
-    'src/ui/svelte/apps/manager/ComponentEditView.svelte',
-  ],
+  rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
+  compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
 
@@ -389,6 +361,34 @@ describe('ComponentEditView — salvage enablement (issue 676)', () => {
     await flushRender();
 
     assert.equal(drafts.at(-1).updates.salvage.dcOverride, 14, 'the off-tier DC rode through untouched');
+    harness.remount();
+  });
+
+  it('clearing the custom DC persists null, not 0 (issue 1050, D1a)', async () => {
+    // The genuine-absence half of D1a, at a CALL SITE rather than in the primitive. What
+    // ships otherwise proves only that the stepper EMITS `null` when an `allowUnset` field
+    // is cleared (`stepper-unset-fill.test.js`) and that this call site passes `allowUnset`
+    // (`stepper-call-site-contract.test.js`). Neither can see the handler in between:
+    // changing `setSalvageDcOverride`'s `: null` to `: 0` is format-clean, lint-clean and
+    // survives every other suite, while silently turning "inherit the system salvage DC"
+    // into a hard DC of zero that no salvage roll can fail.
+    //
+    // `null` and `0` are both falsy and both render as an empty-ish field, so only reading
+    // the emitted patch distinguishes them.
+    const { drafts, props: mountProps } = track({
+      component: { salvage: { enabled: true, resultGroups: RESULT_GROUPS, dcOverride: 14 } },
+    });
+    const target = await harness.mount(mountProps);
+
+    const custom = target.querySelector('[data-salvage-dc-custom]');
+    assert.equal(custom.value, '14', 'the custom field starts at the persisted override');
+    custom.value = '';
+    custom.dispatchEvent(new target.ownerDocument.defaultView.Event('input', { bubbles: true }));
+    await flushRender();
+
+    const { dcOverride } = drafts.at(-1).updates.salvage;
+    assert.equal(dcOverride, null, 'a cleared override persists absence');
+    assert.notEqual(dcOverride, 0, 'and absence is not zero — a DC of 0 is a check nobody fails');
     harness.remount();
   });
 

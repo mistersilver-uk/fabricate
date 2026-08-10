@@ -12,6 +12,8 @@
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
+import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
+import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
 
 /**
@@ -31,6 +33,55 @@ function upcastLegacyTools(migrated) {
 }
 
 /**
+ * Stamp `craftingCheck.maxModifierPicks = 1` onto an imported bundle whose system is on
+ * the `playerPicks` combination rule and carries no cap (issue 1055), mirroring the
+ * world-side 1.20.0 migration so an imported system behaves exactly like a migrated one
+ * rather than silently arriving unbounded. An export bundle carries exactly one system, so
+ * the shared per-system transform is applied directly with no grouping.
+ *
+ * THIS MUST STAY BRANCH-INDEPENDENT, exactly like `upcastLegacyTools` above and for the
+ * same reason: `migrateExportPayload` returns early once `payload.schemaVersion` is already
+ * current, and every bundle written by the shipping build carries the current schema. A
+ * derivation reachable only from the legacy branch would therefore never run on a real
+ * bundle. The cap is a NEW field on an OLD schema version, so its absence is orthogonal to
+ * the envelope version and both branches must apply it.
+ *
+ * A bundle's `byRecipe` rule is left exactly as authored at both levels — it is a
+ * first-class combination rule, not a legacy token — and so is an authored cap, which
+ * makes this idempotent.
+ * @private
+ */
+function deriveMaxModifierPicks(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  applyMaxModifierPicks(system);
+}
+
+/**
+ * Strip the retired check-modifier placeholder from an imported bundle's stored roll
+ * formulas (issue 1094), mirroring the world-side 1.21.0 migration so an imported system
+ * behaves exactly like a migrated one rather than arriving with a token that does nothing
+ * and misleads the GM reading the field. An export bundle carries exactly one system, so
+ * the shared per-system transform is applied directly with no grouping.
+ *
+ * BRANCH-INDEPENDENT for the same reason as its two siblings above: `migrateExportPayload`
+ * returns early once `payload.schemaVersion` is already current, and every bundle written
+ * by the shipping build carries the current schema, so a derivation reachable only from
+ * the legacy branch would never run on a real bundle. The placeholder is an OLD field on
+ * a CURRENT schema version, so its presence is orthogonal to the envelope version.
+ *
+ * The per-system counts are discarded here on purpose: the GM notice reports what a WORLD
+ * migration changed under the GM's feet, whereas an import is an act the GM just performed
+ * against a bundle they chose. Idempotent — a second pass finds no token.
+ * @private
+ */
+function retireCraftingModToken(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  applyRetireCraftingModToken(system);
+}
+
+/**
  * @param {*} payload - Parsed export JSON of any prior schema
  * @returns {object} Upcast payload at the current schema version
  */
@@ -39,12 +90,14 @@ export function migrateExportPayload(payload) {
     return payload;
   }
 
-  // Already current — no-op for the schema envelope, but still upcast legacy tools (a
-  // schema-2 export can predate #561's first-class tool fields). Clone so callers never
-  // alias the input.
+  // Already current — no-op for the schema envelope, but still run every field-level
+  // upcast, because a schema-2 export can predate #561's first-class tool fields or
+  // #1055's modifier pick cap. Clone so callers never alias the input.
   if (payload.schemaVersion === FABRICATE_EXPORT_SCHEMA_VERSION) {
     const current = structuredClone(payload);
     upcastLegacyTools(current);
+    deriveMaxModifierPicks(current);
+    retireCraftingModToken(current);
     return current;
   }
 
@@ -75,6 +128,8 @@ export function migrateExportPayload(payload) {
   }
 
   upcastLegacyTools(migrated);
+  deriveMaxModifierPicks(migrated);
+  retireCraftingModToken(migrated);
 
   return migrated;
 }

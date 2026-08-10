@@ -18,8 +18,12 @@ import {
   TOOL_DISPLAY_PRECEDENCE_CASES,
   TOOL_PRECEDENCE_MANAGED_ITEMS,
 } from '../helpers/toolDisplayPrecedenceCases.js';
+import { dispatchDrop, dispatchRejectedDrops } from '../helpers/dropPayloads.js';
 import { get, writable } from 'svelte/store';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
+// The capture registry, so the two cases pinned below assert their OWN selectors rather
+// than a copy of them that is free to drift from the case it claims to guard.
+import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const sharedComponentNames = [
@@ -130,12 +134,47 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EssenceEditView.svelte');
+  // The GM Essence Studio's eight components (issue 1036). They live under `essences/` —
+  // the BROWSER's directory, which the screenshot evidence map globs for the essence views.
+  // The root imports the inspector, the bulk panel and the behaviour preview STATICALLY, and
+  // the two views import the rest, so every one of them is in this root's static module
+  // graph regardless of `{#if}`. An omission HANGS every mounted manager test as
+  // `# cancelled`; it does not fail one. Add nothing speculative — an unreachable entry is
+  // silently inert.
+  for (const essenceComponent of [
+    'EssenceRow',
+    'EssenceBrowserInspector',
+    'EssenceBulkEditPanel',
+    'EssenceBehaviorPreview',
+    'EssenceEditorTabs',
+    'EssenceIdentityTab',
+    'EssenceOnCraftTab',
+    'EssenceValidationTab',
+  ]) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/essences/${essenceComponent}.svelte`);
+  }
+  // The shared studio-library primitives (`library/`). `EssenceBrowserView` imports the shelf
+  // and `EssenceRow` imports the card, both statically, so they are in this root's module
+  // graph; omitting either HANGS every mounted manager test as `# cancelled`. Every studio
+  // that gains a grid will reach the same two files.
+  for (const libraryComponent of ['LibraryCard', 'LibraryShelf']) {
+    writeCompiledSvelte(`src/ui/svelte/apps/manager/library/${libraryComponent}.svelte`);
+  }
+  // The behaviour preview's "How players see it" card (issue 1036, round 3) mounts the REAL
+  // player InventoryItemCard for the essence tile AND the fake carrying component. It is a
+  // static import of EssenceBehaviorPreview, so it is in this root's module graph; omitting
+  // it HANGS every mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/inventory/InventoryItemCard.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ChecklistCardRow.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/EditorValidationSurface.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ItemDropZone.svelte');
+  // THE right-inspector action button (issue 1036, maintainer round 2). The essence browser
+  // inspector imports it statically, so it is in this root's static module graph; omitting it
+  // HANGS every mounted manager test as `# cancelled`, it does not fail one.
+  writeCompiledSvelte('src/ui/svelte/apps/manager/InspectorActionButton.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RollDataExpressionInput.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte');
@@ -348,6 +387,14 @@ function compileManagerRoot() {
   // categories, component categories, item tags — issue 676).
   writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyPanel.svelte');
   for (const environmentComponent of [
+    // The character-modifier Min / Max pair, extracted out of the root (issue 1050) because
+    // the drop scope and the event scope shipped the same markup twice. The ROOT imports it
+    // statically, so it is in this tree's module graph whichever view is showing, and an
+    // omission HANGS every mounted manager test as `# cancelled` rather than failing one.
+    'CharacterModifierBoundsRow',
+    // The reward / event limit count under a `limitedDrops` rule row (issue 1050). The root
+    // imports it statically, so an omission HANGS this suite as `# cancelled`.
+    'GatheringRuleLimitStepper',
     'EnvironmentEditorTabs',
     'EnvironmentOverviewTab',
     'EnvironmentTasksTab',
@@ -400,7 +447,22 @@ function compileManagerRoot() {
     'recipeCurrency.js',
     'systemDisambiguation.js',
     'craftingImageDefaults.js',
+    // The essence colour fold (issue 1036), shared by the player card's tile and pips and by
+    // the inventory inspector's tile and essence chips. `InventoryItemCard` is compiled into
+    // this tree for the editor's "How players see it" preview and imports it statically, so
+    // omitting it HANGS this suite as `# cancelled` rather than naming the missing file.
+    'essenceTint.js',
     'recipeItemPreviewRow.js',
+    // The essence editor's "How players see it" preview builds its two synthetic tiles with this
+    // pure helper (issue 1036, round 3); it imports only craftingImageDefaults (already
+    // listed). This suite has NO dependency validator, so an omission HANGS it (# cancelled).
+    'essencePreviewRow.js',
+    // The manager's ONE colour vocabulary (issue 1036). `ManagerColorPopover` and
+    // `ManagerColorPicker` both import it for the eight localized preset labels, and both
+    // are compiled into this tree through `sharedComponentNames`. This suite hand-rolls its
+    // temp tree with NO dependency validator, so omitting a raw module HANGS the whole
+    // suite as `# cancelled` rather than naming the missing file.
+    'managerColorTokens.js',
   ]) {
     const utilDestination = join(tempRoot, `src/ui/svelte/util/${utilPath}`);
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -414,6 +476,12 @@ function compileManagerRoot() {
   // single low-layer source of truth), so copy that module and its transitive
   // model/util/config dependencies verbatim.
   for (const rawPath of [
+    // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
+    // (issue 1050). It sits beside the primitive under `components/` rather than in the
+    // `util/` loop above, and every migrated call site in this tree imports it — the
+    // character-modifier bounds row, the check editors, the task editor, the economy view.
+    // This suite has NO dependency validator, so omitting it HANGS it as `# cancelled`.
+    'src/ui/svelte/components/stepperLabels.js',
     'src/models/Recipe.js',
     'src/models/Ingredient.js',
     'src/models/IngredientSet.js',
@@ -421,6 +489,12 @@ function compileManagerRoot() {
     // hand-rolled with no validator, so omitting a transitive raw module HANGS this
     // suite as `# cancelled` rather than failing it.
     'src/utils/essenceAllocation.js',
+    // IngredientSet seeds its remaining-quantity ledger through the canonical
+    // stack-quantity accessor (issue 1024), which pulls in the shared path walker and
+    // the per-system preset table. Same rule as above: omit one and the suite hangs.
+    'src/systems/itemStackQuantity.js',
+    'src/config/stackQuantityPathPresets.js',
+    'src/utils/objectPath.js',
     'src/models/IngredientGroup.js',
     'src/models/Result.js',
     'src/models/Tool.js',
@@ -447,6 +521,17 @@ function compileManagerRoot() {
     // module. This suite hand-rolls its temp tree and has NO dependency validator, so
     // omitting it hangs silently rather than naming the missing file.
     'src/utils/bulkSelectionModel.js',
+    // The add-new essence OFFER projection (issue 1036). ComponentEditView, the component
+    // bulk-edit panel and all three recipe ingredient components import it to withhold a
+    // DISABLED essence from their add controls, so it is a STATIC import of this mounted
+    // tree. Same rule as its neighbours: this suite hand-rolls its temp tree with no
+    // dependency validator, so omitting it HANGS the whole suite as `# cancelled`.
+    'src/utils/essenceValidation.js',
+    // The shared macro-name resolver (issue 1036), lifted out of SimpleCraftingCheckEditor
+    // so the essence editor's property-macro card resolves names the same way. That editor
+    // is in this mounted tree, so omitting this entry HANGS the WHOLE suite as
+    // `# cancelled 225` — which is exactly what it did before this line existed.
+    'src/utils/macroReference.js',
     // The recipe browser's bulk selection + staging model (issue 1010). RecipesBrowserView
     // imports it for the selection helpers, so it is a STATIC import of the mounted tree.
     // Omitting it kills this suite in its `before` hook, which `node --test` reports as
@@ -455,9 +540,21 @@ function compileManagerRoot() {
     // The recipe library's pure list model (filter / sort / paginate / group + the
     // per-row derivations). Imported by RecipesBrowserView (issue 643).
     'src/utils/recipeBrowserModel.js',
+    // The essence library's pure list model and its bulk-edit staging model (issue 1036) —
+    // the third studio's pair, imported by `EssenceBrowserView` AND by the root, which
+    // lifts the browser state and owns the staged bulk draft. Same rule as their two
+    // siblings above: this suite hand-rolls its temp tree with no dependency validator, so
+    // omitting either HANGS the whole suite as `# cancelled` rather than naming the file.
+    'src/utils/essenceBrowserModel.js',
+    'src/utils/essenceBulkEditModel.js',
     // The category totals both browser models group with (issue 676). Imported by BOTH
     // of the two above, so omitting it HANGS every mounted manager test.
     'src/utils/browserGroupCounts.js',
+    // The shared page-window model (issue 1036) — the second leaf BOTH browser models
+    // above now import, extracted so the third studio's pager is not a third copy of the
+    // same arithmetic. Its sibling `browserGroupCounts.js` documents the consequence of
+    // omitting it: the suite HANGS as `# cancelled` rather than naming the missing file.
+    'src/utils/browserPagination.js',
     'src/utils/routedOutcomeKeywords.js',
     'src/utils/craftingCheckExpression.js',
     // foundryBridge imports the shared rich-text-to-plain-text normalizer when it
@@ -469,6 +566,9 @@ function compileManagerRoot() {
     'src/systems/characterPrerequisites.js',
     'src/systems/toolCheckBonus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
+    // The Essence Studio's presentation adapter (issue 1036) — the sibling of the line
+    // above, and imported by five of the eight components registered in the compile loop.
+    'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     // The Knowledge surface's pure projection (issue 785). `adminStore` imports it
     // too, but it lands here because the compiled Knowledge components import it
     // directly; it is a dependency-free leaf, so this single entry suffices.
@@ -490,6 +590,14 @@ function compileManagerRoot() {
     // Folder-aware import mapping (issue 771): the modal's match-by-name pre-fill leaf.
     // Omitting it HANGS the mounted manager suite (the modal is always in the tree).
     'src/utils/matchFolderVocabulary.js',
+    // The check-modifier ownership module (issues 770, 1055, 1094). The root, the Checks
+    // card and the recipe Overview tab all import it — the root to pick the check its
+    // resolution mode actually rolls, the two cards to normalize the combination rule,
+    // ask whether it defers the selection, and resolve what an ABSENT
+    // `maxModifierPicks` means. This list has NO dependency validator, so
+    // omitting it does not fail the suite: every mounted manager test is reported as
+    // `# cancelled` behind one `ERR_MODULE_NOT_FOUND` hook failure.
+    'src/systems/craftingModifierResolver.js',
   ]) {
     const rawDestination = join(tempRoot, rawPath);
     mkdirSync(dirname(rawDestination), { recursive: true });
@@ -652,6 +760,11 @@ function createStore(calls = [], options = {}) {
   const selectedFeatures = options.selectedFeatures || {
     essences: true,
     effectTransfer: true,
+    // The essence property-macro gate (issue 1036). It defaults to FALSE in the real
+    // normalizer, so it is set explicitly here: without it the On-craft tab renders its
+    // both-off empty state and the Macro capability pill never appears, which would make
+    // every macro assertion in this file pass vacuously.
+    propertyMacros: true,
     itemTags: true,
     gathering: true,
     recipeCategories: true,
@@ -1067,11 +1180,22 @@ function createStore(calls = [], options = {}) {
         associatedItemName: 'Iron Ore',
         sourceName: 'Iron Ore',
         sourceState: 'linked',
+        // Issue 1036. `earth` is the ENABLED, fully-configured essence: a colour, a linked
+        // source, a property macro, and both usage axes non-zero. Its `componentUsageCount`
+        // (1) and `recipeUsageCount` (2) DIFFER on purpose — an impact statement that
+        // derived one from the other would pass against equal numbers.
+        enabled: true,
+        colorToken: 'rose',
+        propertyMacroUuid: 'Macro.earth-infusion',
+        hasEffectTransfer: true,
+        hasPropertyMacro: true,
+        recipeUsageCount: 2,
+        recipeUsageIds: ['r1', 'r2'],
+        deleteRewritesRecipes: true,
         componentUsageCount: 1,
         componentUsageItems: [
           { id: 'c1', name: 'Iron Ore', img: 'icons/commodities/metal/ore-chunk-grey.webp' },
         ],
-        deleteBlocked: true,
       },
       {
         id: 'water',
@@ -1085,9 +1209,19 @@ function createStore(calls = [], options = {}) {
         associatedItemName: null,
         sourceName: '',
         sourceState: 'none',
+        // The DISABLED, unconfigured counterpart — no colour, no source, no macro. It carries
+        // one recipe, which `earth` also carries, so the bulk impact's recipe UNION (2) is
+        // smaller than the per-essence SUM (3).
+        enabled: false,
+        colorToken: null,
+        propertyMacroUuid: null,
+        hasEffectTransfer: false,
+        hasPropertyMacro: false,
+        recipeUsageCount: 1,
+        recipeUsageIds: ['r2'],
+        deleteRewritesRecipes: true,
         componentUsageCount: 0,
         componentUsageItems: [],
-        deleteBlocked: false,
       },
     ],
     smithing: [],
@@ -1129,6 +1263,10 @@ function createStore(calls = [], options = {}) {
         ? []
         : [
             {
+              // `recipeOverrides` patches the recipe `openRecipeEditor` opens, so a test
+              // can seed a persisted field (a `craftingModifier` pick, say) without
+              // restating this whole fixture list as its own `options.recipes`.
+              ...options.recipeOverrides,
               id: 'r1',
               name: 'Healing Draught',
               img: 'icons/consumables/potions/potion-bottle-corked-red.webp',
@@ -1642,17 +1780,56 @@ function createStore(calls = [], options = {}) {
     // four-parameter stub records a call that looks identical whether the argument is
     // threaded or silently dropped — which is exactly how the value went missing once
     // already. Recording it is what makes the assertion below able to fail.
-    addEssence: (name, description, icon, sourceComponentId, colorToken) => {
-      calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken]);
+    //
+    // SIX arguments as of issue 1036: the sixth is the options bag carrying `enabled` and
+    // `propertyMacroUuid`, both of which the editor can author BEFORE the first save. A
+    // five-parameter stub records a call that looks identical whether they are threaded or
+    // silently dropped — which is exactly how `colorToken` went missing once already.
+    addEssence: (name, description, icon, sourceComponentId, colorToken, extra) => {
+      calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken, extra]);
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
       return options.addEssenceResult ?? true;
+    },
+    // The four essence actions issue 1036 adds beside the two above. Each is reached
+    // OPTIONAL-CHAINED from the root, so an absent export no-ops silently — these stubs are
+    // what make the wiring detectable at all.
+    duplicateEssence: (id) => {
+      calls.push(['duplicateEssence', id]);
+      return options.duplicateEssenceResult ?? `${id}-copy`;
+    },
+    setEssenceEnabled: (id, enabled) => {
+      calls.push(['setEssenceEnabled', id, enabled]);
+      return { updated: true, invalidatedRecipes: 0 };
+    },
+    applyEssenceBulkEdit: (essenceIds, edit) => {
+      const ids = [...(essenceIds || [])];
+      calls.push(['applyEssenceBulkEdit', ids, edit]);
+      if (Object.hasOwn(options, 'applyEssenceBulkEditResult')) {
+        return options.applyEssenceBulkEditResult;
+      }
+      return { updated: ids.length, essenceIds: ids };
+    },
+    deleteEssences: (essenceIds) => {
+      const ids = [...(essenceIds || [])];
+      calls.push(['deleteEssences', ids]);
+      return options.deleteEssencesResult ?? { deleted: ids.length, blocked: [], recipesUpdated: 2 };
+    },
+    cancelEssenceDraft: () => {
+      calls.push(['cancelEssenceDraft']);
+      return true;
     },
     updateEssence: (id, updates) => {
       calls.push(['updateEssence', id, updates]);
       if (options.updateEssenceReject) return Promise.reject(new Error('update failed'));
       return options.updateEssenceResult ?? true;
     },
-    removeEssence: (id) => calls.push(['removeEssence', id]),
+    // Renamed from `removeEssence` in issue 1036 so the singular delete pairs with the
+    // new `deleteEssences` set delete. The store now returns a boolean rather than
+    // `undefined`, which is what lets a caller tell a cancelled confirm from a write.
+    deleteEssence: (id) => {
+      calls.push(['deleteEssence', id]);
+      return true;
+    },
     addCategory: (value, icon) => {
       calls.push(['addCategory', value, icon]);
       if (options.addCategoryReject) return Promise.reject(new Error('add category failed'));
@@ -4061,7 +4238,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const patches = [];
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
       craftingDefaultModifierPolicy: 'highest',
       craftingDefaultModifierIds: ['med'],
@@ -4204,29 +4381,33 @@ describe('CraftingSystemManager mounted behavior', () => {
     }
   });
 
-  // The check-modifier policy group is rendered through the shared RadioCardGroup
-  // primitive (issue 855), and its two hook attributes are a hand-maintained mirror:
+  // The check-modifier RULE group is rendered through the shared RadioCardGroup primitive
+  // (issues 855, 1055), and its hook attributes are a hand-maintained mirror:
   // `scripts/foundry-test-run.mjs` scrolls to `[data-crafting-modifier-policy]` for the
   // smoke frame and `scripts/lib/viewLabCases.js` clicks
-  // `[data-crafting-modifier-policy-option="playerPicks"] input`. Neither producer runs
-  // in `npm test`, so re-plumbing the group through a different primitive could drop
-  // either attribute with no unit failure at all. Pin both here.
-  it('checks view: the modifier policy group keeps its capture-harness hooks and shows an icon per policy (issue 855)', () => {
+  // `[data-crafting-modifier-policy-option="…"] input`. Neither producer runs in
+  // `npm test`, so re-plumbing the group through a different primitive could drop an
+  // attribute with no unit failure at all.
+  //
+  // `byRecipe` is in the list: it is a first-class COMBINATION RULE ("Recipe picks"),
+  // authoring-ordered third so the two non-selecting rules sit on the top row of the 2x2
+  // and the two selecting rules on the bottom one.
+  it('checks view: the modifier rule group keeps its capture-harness hooks and shows an icon per option (issues 855, 1055)', () => {
     mountChecksView({
       resolutionMode: 'simple',
-      craftingCheckSimple: { rollFormula: '1d20 + @craftingmod' },
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
       craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
-      craftingDefaultModifierPolicy: 'highest',
+      craftingDefaultModifierPolicy: 'byRecipe',
     });
     const group = target.querySelector(
       '[data-crafting-modifier-catalogue] [data-crafting-modifier-policy]'
     );
-    assert.ok(group, 'the policy group still resolves by [data-crafting-modifier-policy]');
+    assert.ok(Boolean(group), 'the group still resolves by [data-crafting-modifier-policy]');
     const options = [...group.querySelectorAll('[data-crafting-modifier-policy-option]')];
     assert.deepEqual(
       options.map((option) => option.getAttribute('data-crafting-modifier-policy-option')),
       ['addAll', 'highest', 'byRecipe', 'playerPicks'],
-      'all four policies still carry the per-option hook, in authoring order'
+      'every option carries the per-option hook, in authoring order'
     );
     for (const option of options) {
       const value = option.getAttribute('data-crafting-modifier-policy-option');
@@ -4239,15 +4420,284 @@ describe('CraftingSystemManager mounted behavior', () => {
         `the ${value} card is still driven by a real radio input`
       );
     }
+    assert.equal(
+      target.querySelector('[data-crafting-modifier-policy-option="byRecipe"] input').checked,
+      true,
+      'the passed rule is pinned on the radio-cards'
+    );
+    // The maintainer asked for TWO columns, and the count is the layout: `RadioCardGroup`
+    // uses a FIXED track count (`repeat(var(…), minmax(0, 1fr))`), never `auto-fit`, so
+    // four options at two columns is a clean 2x2 with no orphan row. Read off the custom
+    // property the group actually sets rather than off a computed width, which happy-dom
+    // does not resolve.
+    assert.match(
+      group.querySelector('.manager-resolution-mode-options').getAttribute('style') || '',
+      /--manager-radio-card-columns:\s*2/,
+      'the rule group is a 2x2 grid, not a four-across row'
+    );
   });
 
-  it('checks view: the modifier catalogue card is hidden when the crafting check has no formula (issue 770)', () => {
-    mountChecksView({ resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } });
-    assert.equal(
-      target.querySelector('[data-crafting-modifier-catalogue]'),
-      null,
-      'a formula-less (unusable) check offers no modifier catalogue'
+  // The pick cap (issue 1055). `data-crafting-modifier-max-picks` carries the READING —
+  // `"unlimited"` or the integer as a string — so the View Lab and the smoke harness can
+  // both assert which of the two states is on screen without parsing the input.
+  it('checks view: the pick cap renders only under a SELECTING rule, and states unlimited as a blank field', () => {
+    const props = {
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    };
+    // A cap on a selection nobody makes is a control with no effect, so the two
+    // non-selecting rules do not render it at all.
+    for (const craftingDefaultModifierPolicy of ['addAll', 'highest']) {
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: 2 });
+      assert.ok(
+        !target.querySelector('[data-crafting-modifier-max-picks]'),
+        `${craftingDefaultModifierPolicy} selects nothing, so it shows no cap field`
+      );
+    }
+    for (const craftingDefaultModifierPolicy of ['byRecipe', 'playerPicks']) {
+      mountChecksView({ ...props, craftingDefaultModifierPolicy, craftingMaxModifierPicks: null });
+      const field = target.querySelector('[data-crafting-modifier-max-picks]');
+      assert.ok(
+        Boolean(field),
+        `${craftingDefaultModifierPolicy} defers the selection, so it caps`
+      );
+      assert.equal(
+        field.getAttribute('data-crafting-modifier-max-picks'),
+        'unlimited',
+        'an absent cap reads as unlimited rather than as a magic number'
+      );
+      const input = field.querySelector('[data-crafting-modifier-max-picks-input]');
+      assert.ok(Boolean(input), 'the Stepper input carries its own hook');
+      assert.equal(input.value, '', 'unlimited is a BLANK field, not a 0 or a 1');
+      assert.match(
+        input.getAttribute('placeholder') || '',
+        /Unlimited/,
+        'and the placeholder is the only place that reading is stated'
+      );
+    }
+  });
+
+  // CLEARING the field is a real edit, and it is the only gesture that can put a system
+  // back to unlimited: absence cannot be reached by clicking anything. Two View Lab cases
+  // depend on it — `manager-checks-crafting-modifiers` and
+  // `manager-recipe-edit-crafting-modifier-custom-set` both empty this Stepper to reach the
+  // no-cap state, because the lab boots every migration over its world and 1.20.0's stamps
+  // a cap of 1 onto any `playerPicks` system that carries none. Nothing drove the emptied
+  // field through this card, so the patch it emits was only ever exercised by a capture run.
+  it('checks view: emptying the pick-cap Stepper patches a null cap, not an omission (issue 1055)', () => {
+    const patches = [];
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'playerPicks',
+      craftingMaxModifierPicks: 3,
+      onUpdateCraftingCheckModifiers: (patch) => patches.push(patch),
+    });
+    const input = target.querySelector('[data-crafting-modifier-max-picks-input]');
+    assert.equal(input.value, '3', 'the authored cap is in the field before it is cleared');
+    input.value = '';
+    input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    // `null`, not a missing key: the store spreads this patch onto the persisted check, so
+    // an omitted key would leave the old bound in place and the gesture would do nothing.
+    assert.deepEqual(
+      patches,
+      [{ maxModifierPicks: null }],
+      'clearing the field must overwrite the stored cap with the value that means unlimited'
     );
+  });
+
+  it('checks view: an authored cap is rendered on the hook and in the Stepper', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      craftingDefaultModifierPolicy: 'playerPicks',
+      craftingMaxModifierPicks: 1,
+    });
+    const field = target.querySelector('[data-crafting-modifier-max-picks]');
+    assert.equal(field.getAttribute('data-crafting-modifier-max-picks'), '1');
+    assert.equal(field.querySelector('[data-crafting-modifier-max-picks-input]').value, '1');
+    // A stored value the ENGINE reads as unlimited must not render as a cap that
+    // truncates nothing: the field routes through `resolveMaxModifierPicks`, so `0` and
+    // `-2` both come back as the blank unlimited state.
+    for (const junk of [0, -2, 2.5]) {
+      mountChecksView({
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+        craftingDefaultModifierPolicy: 'playerPicks',
+        craftingMaxModifierPicks: junk,
+      });
+      assert.equal(
+        target
+          .querySelector('[data-crafting-modifier-max-picks]')
+          .getAttribute('data-crafting-modifier-max-picks'),
+        'unlimited',
+        `a stored ${junk} is unlimited to the engine, so the field says so too`
+      );
+    }
+  });
+
+  // Retargeted from "the card is hidden when the check has no formula" (issue 770). The
+  // card is now rendered in that state ON PURPOSE (issue 1055 criterion 10): hiding it
+  // reported nothing about a catalogue that reaches no roll, which is the defect the
+  // card must state rather than conceal. It stamps WHICH of the three causes applies.
+  it('checks view: the modifier catalogue card renders an inert notice naming the cause when the check has no formula (issue 1055)', () => {
+    // A non-empty catalogue is part of the fixture, not incidental: the notice reports a
+    // CATALOGUE that reaches no roll, so an empty one has nothing to warn about and is
+    // deliberately silent (see the `inert` gate in `CraftingModifierCatalogueCard`).
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    });
+    const card = target.querySelector('[data-crafting-modifier-catalogue]');
+    assert.ok(Boolean(card), 'a formula-less check still shows the catalogue, with a warning');
+    const notice = card.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'the inert notice renders');
+    assert.equal(
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noFormula',
+      'and names WHICH cause applies — one boolean cannot carry three remedies'
+    );
+  });
+
+  // The other half of that gate, and the reason it exists: a brand-new system is
+  // `simple` + `rollFormula: ''` with no modifiers, so an ungated notice put a permanent
+  // warning ("These modifiers reach no roll…") directly above the empty state, warning
+  // about nothing on first contact with the tab. The cause is unchanged between the two
+  // mounts — only the catalogue is — so this pins the CATALOGUE as the gate rather than
+  // some incidental difference in the check.
+  it('checks view: an EMPTY catalogue shows no inert notice even when the cause applies (issue 1055)', () => {
+    const props = { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '' } };
+    mountChecksView({ ...props, craftingCheckModifiers: [] });
+    assert.ok(
+      Boolean(target.querySelector('[data-crafting-modifier-empty]')),
+      'the empty catalogue renders its empty state'
+    );
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'an empty catalogue has no modifiers to warn about, so the notice stays away'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    // Same cause, one modifier: the notice appears and still names the cause.
+    mountChecksView({
+      ...props,
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+    });
+    const notice = target.querySelector('[data-crafting-modifier-inert]');
+    assert.ok(Boolean(notice), 'one authored modifier is enough to make the notice worth showing');
+    assert.equal(
+      notice.getAttribute('data-crafting-modifier-inert'),
+      'noFormula',
+      'and the cause is unchanged by the catalogue gate'
+    );
+  });
+
+  // Issue 1094 retired the THIRD cause. `noPlaceholder` — "a formula is authored but
+  // never spends the check-modifier placeholder" — is not merely unreachable, it is not a
+  // value this surface can produce: the resolved scalar is appended to whatever the GM
+  // authored. The negative half below is what pins that, and it FAILS against the
+  // pre-change component, which rendered a `noPlaceholder` notice for exactly that input.
+  it('checks view: the inert cause discriminates no-check from no-formula (issues 1055, 1094)', () => {
+    // Every case below carries a non-empty catalogue: the notice is gated on one, so an
+    // empty catalogue would make all the assertions read the same silent card.
+    const catalogue = [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }];
+    for (const { props, cause } of [
+      // Alchemy at checkMode `none` rolls no crafting check at all. The pre-1055 local
+      // rollFormula ternary had no case for it and reported the simple slot's formula.
+      {
+        props: {
+          resolutionMode: 'alchemy',
+          alchemyCheckMode: 'none',
+          craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        },
+        cause: 'noCheck',
+      },
+      {
+        props: { resolutionMode: 'simple', craftingCheckSimple: { rollFormula: '  ' } },
+        cause: 'noFormula',
+      },
+    ]) {
+      mountChecksView({ ...props, craftingCheckModifiers: catalogue });
+      const notice = target.querySelector('[data-crafting-modifier-inert]');
+      assert.ok(Boolean(notice), `${cause}: an inert notice renders`);
+      assert.equal(notice.getAttribute('data-crafting-modifier-inert'), cause);
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+    }
+    // …and an ORDINARY authored formula — the exact input that used to raise
+    // `noPlaceholder` — shows no notice at all.
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
+      craftingCheckModifiers: catalogue,
+    });
+    assert.ok(
+      !target.querySelector('[data-crafting-modifier-inert]'),
+      'an authored formula is never inert: the modifiers are appended to it'
+    );
+  });
+
+  it('checks view: an unstamped system shows the rule the ENGINE would apply, not a blank group (issue 1055)', () => {
+    mountChecksView({
+      resolutionMode: 'simple',
+      craftingCheckSimple: { rollFormula: '1d20 + 4' },
+      craftingCheckModifiers: [{ id: 'med', label: 'Medicine', expression: '@abilities.med.mod' }],
+      // No `craftingDefaultModifierPolicy` at all — the never-authored state.
+    });
+    const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')].filter(
+      (option) => option.querySelector('input').checked
+    );
+    assert.equal(checked.length, 1, 'exactly one rule is shown as selected');
+    assert.equal(
+      checked[0].getAttribute('data-crafting-modifier-policy-option'),
+      'addAll',
+      'absence resolves as addAll — the rule the engine applies to an unasked system'
+    );
+  });
+
+  // What the default set IS depends on the rule, and the three readings are materially
+  // different decisions — the whole eligible set nobody narrows, the fallback a recipe
+  // inherits until it picks its own, or the menu the player chooses from at roll time.
+  it('checks view: the default-set intro follows the combination rule (issue 1055)', () => {
+    const introText = (craftingDefaultModifierPolicy) => {
+      mountChecksView({
+        resolutionMode: 'simple',
+        craftingCheckSimple: { rollFormula: '1d20 + 4' },
+        craftingCheckModifiers: [
+          { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+        ],
+        craftingDefaultModifierPolicy,
+      });
+      const heading = target.querySelector('#manager-crafting-modifier-defaults-label');
+      const text = heading.nextElementSibling.textContent;
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      return text;
+    };
+    assert.ok(
+      introText('byRecipe').includes('Overview tab'),
+      'under Recipe picks the GM is told where a recipe picks its own set'
+    );
+    assert.ok(
+      introText('playerPicks').includes('roll time'),
+      'under Player picks the default set is the menu offered at roll time'
+    );
+    for (const locked of ['addAll', 'highest']) {
+      assert.ok(
+        !introText(locked).includes('Overview tab'),
+        `at ${locked} nobody narrows the set, so the sentence must not promise a control that is not there`
+      );
+    }
   });
 
   it('the routed editor renders the tier-step row in BOTH tier types', () => {
@@ -5663,6 +6113,227 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(
       !target.textContent.includes('Edit identity for this recipe.'),
       'learned mode no longer shows the identity-only subtitle'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // The manager root's crafting-modifier WIRING (issue 1055).
+  //
+  // Both ENDS of each wire are already covered — `mountChecksView` mounts ChecksView
+  // directly and `recipe-edit-mounted.test.js` mounts RecipeEditView directly — but
+  // nothing mounted the ROOT against a system carrying a `byRecipe` rule and a
+  // `maxModifierPicks` cap, so both forwards were deletable green. Dropping
+  // `craftingModifierPolicy={…}` from the RecipeEditView call site lets the prop fall to
+  // its `= 'addAll'` default and EVERY recipe loses its picker; dropping
+  // `craftingModifierMaxPicks={…}` lets it fall to `null` and every recipe becomes
+  // unbounded — a cap shipping dead under a green suite. Dropping the ChecksView ones
+  // pins the rule radio at `addAll` and hides the cap field for every system.
+  //
+  // Every case asserts BOTH ends, so a fixture that never reached the surface at all
+  // cannot pass by rendering nothing.
+  const modifierRuleSystemCheck = (defaultModifierPolicy, maxModifierPicks) => ({
+    simple: {
+      rollFormula: '1d20 + 4',
+      dc: 12,
+      thresholdMode: 'meet',
+      dcMode: 'static',
+      tiers: [],
+    },
+    checkModifiers: [
+      { id: 'med', label: 'Medicine', expression: '@abilities.med.mod' },
+      { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+    ],
+    defaultModifierIds: ['med'],
+    defaultModifierPolicy,
+    ...(maxModifierPicks === undefined ? {} : { maxModifierPicks }),
+  });
+
+  it('root: the Checks card’s rule radio tracks the SYSTEM’s defaultModifierPolicy (issue 1055)', async () => {
+    for (const policy of ['highest', 'byRecipe', 'playerPicks']) {
+      mountManager([], { craftingCheck: modifierRuleSystemCheck(policy) });
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      const checked = [...target.querySelectorAll('[data-crafting-modifier-policy-option]')]
+        .filter((option) => option.querySelector('input').checked)
+        .map((option) => option.getAttribute('data-crafting-modifier-policy-option'));
+      assert.deepEqual(
+        checked,
+        [policy],
+        `the root forwards the system's own rule (${policy}); an unforwarded prop pins every system at addAll`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: the Checks card’s pick cap tracks the SYSTEM’s maxModifierPicks (issue 1055)', async () => {
+    for (const [maxModifierPicks, reading] of [
+      [2, '2'],
+      [undefined, 'unlimited'],
+    ]) {
+      mountManager([], { craftingCheck: modifierRuleSystemCheck('byRecipe', maxModifierPicks) });
+      navButton('Checks').click();
+      await tick();
+      flushSync();
+      assert.equal(
+        target
+          .querySelector('[data-crafting-modifier-max-picks]')
+          .getAttribute('data-crafting-modifier-max-picks'),
+        reading,
+        `the root forwards the system's own cap (${String(maxModifierPicks)})`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: only a byRecipe system’s recipe editor offers the modifier picker (issue 1055)', async () => {
+    for (const [policy, picker] of [
+      ['byRecipe', true],
+      ['addAll', false],
+      ['highest', false],
+      ['playerPicks', false],
+    ]) {
+      const editor = await openRecipeEditor([], {
+        craftingCheck: modifierRuleSystemCheck(policy),
+      });
+      assert.equal(
+        Boolean(editor.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
+        picker,
+        `rule ${policy}: eligible-modifier picker rendered = ${picker}`
+      );
+      // The rejected design's surfaces are GONE, not merely hidden: no rule select on the
+      // recipe, and no neutral "the system decides" banner on every other rule.
+      assert.ok(
+        !editor.querySelector('.manager-main [data-recipe-crafting-modifier]'),
+        `rule ${policy}: a recipe never authors the combination rule`
+      );
+      assert.ok(
+        !editor.querySelector('.manager-main [data-recipe-modifier-banner]'),
+        `rule ${policy}: the read-only delegation banner is gone`
+      );
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+      target = null;
+    }
+  });
+
+  it('root: the recipe picker’s cap hint tracks the SYSTEM’s maxModifierPicks (issue 1055)', async () => {
+    // Custom set + a cap of 1, so the picker is at its cap and reports `reached`.
+    const editor = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.equal(
+      editor
+        .querySelector('.manager-main [data-recipe-crafting-modifier-cap]')
+        ?.getAttribute('data-recipe-crafting-modifier-cap'),
+      'reached',
+      'the root forwards the cap; an unforwarded prop leaves every recipe unbounded and hides this hint entirely'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // …and an unbounded system states no cap at all.
+    const unbounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      recipeOverrides: { craftingModifier: { modifierIds: ['med'] } },
+    });
+    assert.ok(
+      !unbounded.querySelector('.manager-main [data-recipe-crafting-modifier-cap]'),
+      'unlimited states nothing rather than "up to Infinity"'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // The View Lab's own `expectSelector`s, run against the mounted root.
+  //
+  // Two capture cases assert a `:has()` / `:not(:has())` RELATIONSHIP between hooks the
+  // tests above only ever assert one at a time — that the catalogue card CONTAINS both the
+  // restored `byRecipe` card and the cap field's unlimited reading, and that the recipe
+  // picker contains a pill row and NO cap sentence. A selector can fail on the relationship
+  // while every individual hook is present and correct, and the only thing that ran it was
+  // a capture job needing harvested Foundry chrome.
+  //
+  // The selectors are READ FROM THE REGISTRY rather than restated, because a restated copy
+  // is the drift this pins against: it would keep passing after the case it mirrors changed.
+  // The mounted root renders `.fabricate-manager`, so each case's selector runs verbatim.
+  const labCaseSelector = (id) => {
+    const viewCase = VIEW_LAB_CASES.find((entry) => entry.id === id);
+    assert.ok(Boolean(viewCase), `no View Lab case "${id}" — was it renamed?`);
+    assert.equal(typeof viewCase.expectSelector, 'string', `case "${id}" asserts no selector`);
+    return viewCase.expectSelector;
+  };
+
+  it('root: the Checks card satisfies manager-checks-crafting-modifiers’ own selector (issue 1055)', async () => {
+    const selector = labCaseSelector('manager-checks-crafting-modifiers');
+    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks') });
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      Boolean(target.querySelector(selector)),
+      'a selecting rule with no cap must put BOTH the byRecipe option and the unlimited cap ' +
+        'reading inside one [data-crafting-modifier-catalogue] — a cap field rendered as a ' +
+        'SIBLING of the card would satisfy every hook-by-hook assertion above and still fail here'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, and the state the capture job actually hit: the hooks are all
+    // present, the nesting is right, and the cap simply reads a bound instead of unlimited.
+    mountManager([], { craftingCheck: modifierRuleSystemCheck('playerPicks', 1) });
+    navButton('Checks').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      !target.querySelector(selector),
+      'a BOUNDED cap must not satisfy the unlimited case, or the frame published under it ' +
+        'would be its bounded sibling'
+    );
+  });
+
+  it('root: the recipe picker satisfies manager-recipe-edit-crafting-modifier-custom-set’s own selector (issue 1055)', async () => {
+    const selector = labCaseSelector('manager-recipe-edit-crafting-modifier-custom-set');
+    const custom = { craftingModifier: { modifierIds: ['med', 'alch'] } };
+    const unbounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe'),
+      recipeOverrides: custom,
+    });
+    assert.ok(
+      Boolean(unbounded.querySelector(selector)),
+      'a custom set under an unbounded system is a pill row with no cap sentence, which is the ' +
+        'whole difference between this frame and its two capped neighbours'
+    );
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    target = null;
+
+    // The negative control, and the state the capture job actually hit. The picker and its
+    // pill row are present either way; the standing cap sentence is what the `:not(:has(…))`
+    // half refuses, so a system that acquired a cap nobody authored fails here and only here.
+    const bounded = await openRecipeEditor([], {
+      craftingCheck: modifierRuleSystemCheck('byRecipe', 1),
+      recipeOverrides: custom,
+    });
+    assert.ok(
+      Boolean(bounded.querySelector('.manager-main [data-recipe-crafting-modifier-picker]')),
+      'the picker itself still renders, so the failure below is the cap sentence and nothing else'
+    );
+    assert.ok(
+      !bounded.querySelector(selector),
+      'a system carrying a cap states it standing, so this case cannot publish that frame'
     );
   });
 
@@ -8003,23 +8674,59 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
-    assert.ok(target.textContent.includes('Essence browser'));
     assert.equal(target.querySelectorAll('.manager-essence-row').length, 2);
     assert.ok(target.textContent.includes('Earth'));
     assert.equal(target.querySelector('.manager-essence-action-band'), null);
-    assert.equal(target.textContent.includes('Linked source'), false);
-    const linkedSourceImage = target.querySelector(
-      '[data-essence-id="earth"] .manager-essence-source-cell-image'
+
+    // The DISABLED essence is marked in words, not by dimming alone, and its capability
+    // pills are absent because it has neither a source nor a macro — the ENABLED row is
+    // the negative control that the pills render at all.
+    const waterRow = target.querySelector('.manager-essence-row[data-essence-id="water"]');
+    const earthRow = target.querySelector('.manager-essence-row[data-essence-id="earth"]');
+    assert.equal(waterRow.dataset.essenceEnabled, 'false');
+    assert.equal(earthRow.dataset.essenceEnabled, 'true');
+    assert.ok(waterRow.textContent.includes('Disabled'), 'a disabled row says so in words');
+    assert.deepEqual(
+      [...earthRow.querySelectorAll('[data-essence-capability]')].map(
+        (pill) => pill.dataset.essenceCapability
+      ),
+      ['effects', 'macro'],
+      'a configured essence shows both capability pills'
     );
-    assert.ok(linkedSourceImage, 'linked essence Source column should render image evidence');
-    assert.equal(linkedSourceImage.title, 'Iron Ore');
-    assert.equal(linkedSourceImage.getAttribute('aria-label'), 'Iron Ore');
+    assert.equal(
+      waterRow.querySelectorAll('[data-essence-capability]').length,
+      0,
+      'and an unconfigured one shows neither'
+    );
+    // The two usage numbers are DIFFERENT questions and both are reported.
     assert.ok(
-      target
-        .querySelector('[data-essence-id="water"] .manager-essence-source-cell')
-        .textContent.includes('None')
+      earthRow.querySelector('[data-essence-usage-components]').textContent.includes('1'),
+      'the row states how many components carry the essence'
     );
-    assert.ok(target.textContent.includes('Deletion blocked'));
+    assert.ok(
+      earthRow.querySelector('[data-essence-usage-recipes]').textContent.includes('2'),
+      'and, separately, how many recipes require it'
+    );
+
+    // The FIRST `.manager-icon-button` in the row must remain the Edit pencil: the View Lab
+    // case `manager-essence-edit-first-state` navigates by exactly that selector.
+    assert.equal(
+      earthRow.querySelector('.manager-icon-button').getAttribute('data-essence-edit'),
+      'earth',
+      'the first icon button in a row is still the Edit pencil'
+    );
+
+    // The row toggle routes through the ONE manager write, not through updateEssence.
+    waterRow.querySelector('[data-essence-toggle="water"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      calls.some(
+        (call) => call[0] === 'setEssenceEnabled' && call[1] === 'water' && call[2] === true
+      ),
+      'the row switch enables through setEssenceEnabled'
+    );
+
     assert.equal(target.querySelectorAll('.manager-essence-usage-item').length, 1);
     assert.equal(target.querySelector('.manager-essence-usage-item').title, 'Iron Ore');
     target.querySelector('.manager-essence-usage-item').click();
@@ -8044,21 +8751,20 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-essence-edit-row').length, 0);
     assert.equal(target.querySelectorAll('#manager-essence-create-name').length, 0);
 
-    target.querySelector('[data-essence-id="water"]').click();
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-essence-id="water"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Clear current.'));
 
-    assert.equal(
-      target.querySelector('[data-essence-action="edit"]'),
-      null,
-      'essence inspector should not duplicate row Edit actions'
+    // The inspector now OWNS Edit, Duplicate and Delete — the row keeps only the pencil.
+    assert.ok(
+      target.querySelector('[data-essence-browser-inspector]'),
+      'the selected-essence inspector is an extracted component'
     );
-    assert.equal(
-      target.querySelector('[data-essence-action="delete"]'),
-      null,
-      'essence inspector should not duplicate row Delete actions'
+    assert.ok(
+      target.querySelector('[data-essence-action="duplicate"]'),
+      'the inspector offers Duplicate'
     );
     assert.ok(
       target.querySelector('[data-essence-section="usage"]'),
@@ -8070,13 +8776,25 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       'unlinked selected essence should expose a source drop zone'
     );
+    // The retained stat cards report the two counts separately.
+    assert.equal(
+      target.querySelector('[data-essence-stat="recipes"] strong').textContent.trim(),
+      '1'
+    );
     const essenceHeroRow = target.querySelector('.manager-inspector-title-row.is-hero-large');
     assert.ok(essenceHeroRow, 'essence inspector should use the prominent hero title row');
+
+    target.querySelector('[data-essence-action="duplicate"]').click();
+    await tick();
+    flushSync();
     assert.ok(
-      essenceHeroRow.querySelector('.manager-inspector-icon.is-hero-large'),
-      'essence inspector hero should render the icon at hero-large size'
+      calls.some((call) => call[0] === 'duplicateEssence' && call[1] === 'water'),
+      'Duplicate reaches the store'
     );
 
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
+    await tick();
+    flushSync();
     const inspectorDropEvent = new Event('drop', { bubbles: true, cancelable: true });
     Object.defineProperty(inspectorDropEvent, 'dataTransfer', {
       value: { getData: () => JSON.stringify({ type: 'Item', uuid: 'Item.glass-vial' }) },
@@ -8094,7 +8812,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       )
     );
 
-    target.querySelector('[data-essence-id="earth"]').click();
+    target.querySelector('[data-essence-id="earth"] .manager-essence-identity').click();
     await tick();
     flushSync();
     const inspectorSourceSummary = target.querySelector(
@@ -8114,13 +8832,6 @@ describe('CraftingSystemManager mounted behavior', () => {
         .querySelector('.manager-essence-source-copy')
         .textContent.includes('Iron Ore'),
       'linked selected essence should keep the source name readable'
-    );
-    assert.equal(
-      inspectorSourceSummary
-        .querySelector('.manager-essence-source-copy')
-        .textContent.includes('c1'),
-      false,
-      'linked selected essence should not print UUID evidence under the item name'
     );
     const inspectorSourceActions = target.querySelector(
       '[data-essence-section="source"] .manager-essence-inspector-source-actions'
@@ -8145,9 +8856,22 @@ describe('CraftingSystemManager mounted behavior', () => {
     const unlinkSourceAction = inspectorSourceActions.querySelector(
       '[data-essence-action="unlink-source"]'
     );
+    // The AMBER survives the extraction (issue 1036, maintainer round 2). Both source
+    // actions now render through `InspectorActionButton`, the shared right-inspector button,
+    // and the modifier moved with them: `.manager-button.is-warning-action` was the global
+    // sheet's, `is-warning` is the primitive's own tone. Unlinking breaks a reference and
+    // destroys nothing, so it must not land in the danger family on the way across.
     assert.ok(
-      unlinkSourceAction.classList.contains('is-warning-action'),
-      'unlink source should use the amber warning action style'
+      unlinkSourceAction.classList.contains('fab-inspector-action'),
+      'unlink source should render through the shared right-inspector button'
+    );
+    assert.ok(
+      unlinkSourceAction.classList.contains('is-warning'),
+      'and keep the amber warning tone rather than becoming destructive'
+    );
+    assert.ok(
+      copySourceAction.classList.contains('fab-inspector-action'),
+      'as should its copy-uuid partner'
     );
     unlinkSourceAction.click();
     await tick();
@@ -8159,10 +8883,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       )
     );
 
+    // The RETAINED source-state filter, reachable only with source UI on.
     const sourceFilter = target.querySelector('[aria-label="Filter essences by source state"]');
     sourceFilter.value = 'none';
     sourceFilter.dispatchEvent(new Event('change', { bubbles: true }));
-    sourceFilter.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
     assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
@@ -8179,36 +8903,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.ok(target.textContent.includes('Edit essence'));
     assert.ok(!target.textContent.includes('Essence editor'));
-    assert.ok(
-      !target.querySelector('.manager-essence-edit-view .manager-action-group'),
-      'identity card should not duplicate route save/cancel actions'
-    );
     assert.equal(target.textContent.includes('Basic information'), false);
     assert.equal(target.textContent.includes('Essence ID'), false);
     assert.ok(
       !target.querySelector('.manager-inspector [aria-label="Edit Water"]'),
       'inspector should not show an edit action while already editing'
     );
+    // The editor opens on IDENTITY and the shell's rail carries the live preview.
+    assert.equal(target.querySelector('[data-essence-tab-panel]').dataset.essenceTabPanel, 'identity');
+    assert.ok(
+      target.querySelector('.manager-inspector [data-essence-behavior-preview]'),
+      'the editor rail is the live behaviour preview'
+    );
     assert.ok(
       target.querySelector('.essence-icon-picker-trigger'),
       'edit route should use the shared icon picker trigger'
     );
     assert.equal(target.querySelector('.essence-icon-picker-trigger').title, 'Change icon');
-    assert.ok(target.textContent.includes('Clear icon'));
+    // The icon RESET is an icon-only overlay control on the tile itself now (maintainer
+    // feedback), not a control beside the picker, so its label is its accessible name and
+    // its tooltip rather than visible text. Asserted on the control, which is what a GM
+    // operates, plus the structural claim that it lives on the tile rather than in the
+    // picker's row.
+    const iconResetButton = target.querySelector('[data-essence-icon-reset]');
+    assert.equal(iconResetButton.getAttribute('aria-label'), 'Clear icon');
+    assert.equal(iconResetButton.title, 'Clear icon');
     assert.ok(
-      target.querySelector('.essence-source-trigger'),
-      'effect-transfer systems should show source picker controls'
+      iconResetButton.closest('.manager-essence-icon-tile'),
+      'the reset overlays the icon tile rather than sitting in the picker row'
     );
     assert.ok(
-      target.querySelector('.manager-essence-source-summary'),
-      'edit route should show selected source summary inside the form'
-    );
-    assert.ok(
-      target.querySelector('.manager-essence-source-drop-zone .essence-source-trigger'),
-      'edit route should show a full-width source drop/pick target'
+      !target.querySelector('.manager-essence-icon-actions [data-essence-icon-reset]'),
+      'and the actions row beside the picker no longer carries a second reset control'
     );
     assert.equal(
-      target.querySelector('.manager-header-actions .manager-button.is-primary').disabled,
+      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       true
     );
 
@@ -8217,10 +8946,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Rain');
     assert.equal(
-      target.querySelector('.manager-header-actions .manager-button.is-primary').disabled,
+      target
+        .querySelector('[data-essence-preview-tile] .inventory-card-name')
+        .textContent.trim(),
+      'Rain',
+      'the live preview follows the draft'
+    );
+    assert.equal(
+      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       false
+    );
+
+    // The On-craft tab carries the source picker; Identity does not.
+    assert.ok(!target.querySelector('.essence-source-trigger'), 'Identity has no source picker');
+    target.querySelector('[data-essence-tab="oncraft"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('.manager-essence-source-drop-zone .essence-source-trigger'),
+      'the On-craft tab shows a full-width source drop/pick target'
     );
     target.querySelector('.essence-source-trigger').click();
     await tick();
@@ -8228,10 +8973,37 @@ describe('CraftingSystemManager mounted behavior', () => {
     document.querySelector('.essence-source-picker-option[title="Glass Vial"]').click();
     await tick();
     flushSync();
+    // ONE card once linked (issue 1036, maintainer round 2), and it is the shared
+    // `ItemDropZone` the Tool Studio's LINKED ITEM renders — not a hand-rolled summary with
+    // a second drop zone still sitting under it. Asserting the zone's ABSENCE is the half
+    // that pins the maintainer's actual complaint: the card and the zone said the same
+    // thing twice.
+    const linkedSource = target.querySelector('[data-item-drop-zone="essence-source"]');
+    assert.ok(linkedSource, 'the linked source renders through the shared item drop zone');
+    assert.ok(linkedSource.textContent.includes('Glass Vial'), 'naming the linked component');
     assert.ok(
-      target.querySelector('.manager-essence-source-summary').textContent.includes('Glass Vial')
+      linkedSource.textContent.includes('Drop another Item here to replace the linked source.'),
+      'and instructing the GM, where it used to restate the raw uuid'
     );
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    assert.equal(
+      target.querySelector('.manager-essence-source-drop-zone'),
+      null,
+      'and no second drop zone renders beneath it'
+    );
+    // The Tool Studio's grouped icon pair, not one square clear button. `Glass Vial` (c2)
+    // carries no `originItemUuid`, so the pair is correctly one here: copy-uuid renders only
+    // when there IS a uuid to copy, which is the drop zone's own `onCopy`-is-null contract
+    // and is honest in a way a permanently inert copy button would not be. What matters is
+    // that both are the primitive's rounded icon buttons in its own right-aligned group.
+    const linkedActions = linkedSource.querySelectorAll(
+      '.manager-item-drop-zone-actions .manager-icon-button'
+    );
+    assert.equal(linkedActions.length, 1, 'a source with no uuid offers unlink alone');
+    assert.ok(
+      linkedActions[0].querySelector('.fa-link-slash'),
+      'and it is the unlink glyph, in the grouped icon treatment'
+    );
+    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
     await tick();
     flushSync();
     assert.ok(
@@ -8245,13 +9017,26 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
 
-    target.querySelector('[data-essence-id="water"] [aria-label="Delete Water"]').click();
-    assert.ok(calls.some((call) => call[0] === 'removeEssence' && call[1] === 'water'));
+    // The DELETE lives in the inspector now, and is WARNED, not blocked (maintainer round):
+    // it fires for a carried essence too, with an impact note stating the cascade's reach.
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-action="delete"]').click();
+    await tick();
+    flushSync();
+    assert.ok(calls.some((call) => call[0] === 'deleteEssence' && call[1] === 'water'));
+    target.querySelector('[data-essence-id="earth"] .manager-essence-identity').click();
     await tick();
     flushSync();
     assert.equal(
-      target.querySelector('[data-essence-id="earth"] [aria-label="Delete Earth"]').disabled,
-      true
+      target.querySelector('[data-essence-action="delete"]').disabled,
+      false,
+      'a carried essence is still deletable — the delete is warned, not blocked'
+    );
+    assert.ok(
+      target.querySelector('[data-essence-delete-impact]'),
+      'and an impact note states how far the cascade reaches'
     );
 
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
@@ -8259,11 +9044,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
     assert.equal(
-      target.querySelector('.manager-inspector-name').textContent.trim(),
+      target
+        .querySelector('[data-essence-preview-tile] .inventory-card-name')
+        .textContent.trim(),
       'New essence draft'
     );
     assert.equal(
-      target.querySelector('.manager-header-actions .manager-button.is-primary').disabled,
+      target.querySelector('.manager-header-actions [data-essence-edit-save]').disabled,
       true
     );
     const createName = target.querySelector('#manager-essence-edit-name');
@@ -8271,50 +9058,257 @@ describe('CraftingSystemManager mounted behavior', () => {
     createName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    assert.equal(target.querySelector('.manager-inspector-name').textContent.trim(), 'Air');
-
-    // A new draft has NO authored colour, and the control must say so. `colorToken`
-    // normalizes an absent value onto `sage`, so an unguarded picker painted a Sage
-    // swatch and marked Sage selected directly above copy reading "No colour — this
-    // essence renders in the theme accent".
-    const colourTrigger = target.querySelector(
-      '[data-manager-essence-colour] .manager-color-picker-trigger'
-    );
-    assert.ok(colourTrigger.classList.contains('is-unset'), 'an unauthored colour reads unset');
-    assert.ok(
-      !/--fab-tag-/.test(colourTrigger.getAttribute('style')),
-      'and the trigger paints a neutral swatch, not a palette colour'
-    );
-
-    // The palette is the WHOLE vocabulary for an essence colour (there is no custom
-    // hex), so picking a preset is the only authoring path there is.
-    colourTrigger.click();
-    await tick();
-    flushSync();
     assert.equal(
-      document.querySelectorAll('[data-manager-color-token].is-selected').length,
+      target
+        .querySelector('[data-essence-preview-tile] .inventory-card-name')
+        .textContent.trim(),
+      'Air'
+    );
+
+    // A new draft has NO authored colour, and the INLINE palette must say so rather than
+    // marking Sage: `colorToken` normalizes an absent value onto `sage`, so an unguarded
+    // palette marked Sage selected directly above copy reading "No colour".
+    assert.equal(
+      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
+        .essenceColourState,
+      'none'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-manager-essence-colour] [data-manager-color-token].is-selected')
+        .length,
       0,
       'no preset claims to be the current choice while none is authored'
     );
-    document.querySelector('[data-manager-color-token="rose"]').click();
+    assert.ok(
+      target.querySelector('[data-manager-essence-colour] [data-manager-color-none]')
+        .classList.contains('is-selected'),
+      'the No-colour cell is the one marked, and it is the only route back to unset'
+    );
+    target.querySelector('[data-manager-essence-colour] [data-manager-color-token="rose"]').click();
     await tick();
     flushSync();
-    assert.ok(
-      !target
-        .querySelector('[data-manager-essence-colour] .manager-color-picker-trigger')
-        .classList.contains('is-unset'),
+    assert.equal(
+      target.querySelector('[data-manager-essence-colour] [data-essence-colour-state]').dataset
+        .essenceColourState,
+      'rose',
       'authoring a colour ends the unset state'
     );
+    // No colour-NAME copy (maintainer feedback): the caption states Authored/Unset without
+    // ever naming the swatch, unlike the palette cell itself, which still carries "Rose" as
+    // its own accessible name/title (shared `managerColorTokens.js` vocabulary, untouched).
+    assert.equal(
+      target
+        .querySelector('[data-manager-essence-colour] [data-essence-colour-state]')
+        .textContent.includes('Rose'),
+      false,
+      'the caption never renders the colour name as visible text'
+    );
 
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    // The Enabled row is the shared ToggleCard, and a new essence can be created disabled.
+    target.querySelector('[data-recipe-field="essence-enabled"]').click();
+    await tick();
+    flushSync();
+
+    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
     await tick();
     flushSync();
     const addCall = calls.find((call) => call[0] === 'addEssence' && call[1] === 'Air');
     assert.ok(addCall, 'the create call reached the store');
-    // FIVE positional arguments, and the fifth is the authored colour. A four-argument
-    // assertion passes identically whether the colour is threaded or dropped.
-    assert.equal(addCall.length, 6, 'addEssence is called with all five arguments');
+    // SEVEN recorded entries: the verb plus six arguments. The fifth argument is the
+    // authored colour and the sixth is the options bag issue 1036 added — an assertion
+    // that stopped at five passes identically whether either is threaded or dropped.
+    assert.equal(addCall.length, 7, 'addEssence is called with all six arguments');
     assert.equal(addCall[5], 'rose', 'the GM-authored colour survives the create call');
+    assert.equal(
+      addCall[6].enabled,
+      false,
+      'and so does an Enabled switch the GM turned off before the first save'
+    );
+  });
+
+  it('keeps essence library search, filter and page state across an editor round-trip', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+
+    // Search AND the status segmented control, both narrowing to one row.
+    const search = target.querySelector('[aria-label="Search essences"]');
+    search.value = 'Water';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
+
+    target.querySelector('[data-essence-view-option="grid"] input').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.manager-essences-table').dataset.essenceView, 'grid');
+    // The grid card carries its actions in a divided footer now (issue 1036, maintainer
+    // round): the edit pencil and the enable toggle live on the card, matching the prototype.
+    assert.ok(
+      target.querySelector('[data-essence-id="water"] [data-essence-edit]'),
+      'a grid card carries the edit pencil in its footer'
+    );
+
+    target.querySelector('[data-essence-id="water"] .manager-essence-identity').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-action="edit"]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essence-edit');
+
+    target.querySelector('.manager-header-actions [data-essence-edit-back]').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'essences');
+
+    // The whole round trip unmounted the browser. Every control is where the GM left it.
+    assert.equal(
+      target.querySelector('[aria-label="Search essences"]').value,
+      'Water',
+      'the search term survives the editor round-trip'
+    );
+    assert.equal(target.querySelectorAll('.manager-essence-row').length, 1);
+    assert.equal(
+      target.querySelector('.manager-essences-table').dataset.essenceView,
+      'grid',
+      'and so does the list/grid presentation'
+    );
+    assert.ok(
+      calls.some((call) => call[0] === 'cancelEssenceDraft'),
+      'Back republishes the persisted projections through the store'
+    );
+  });
+
+  it('states the bulk delete impact before arming, deletes every member, and needs two clicks', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+
+    // One ticked box is already a bulk edit, and the panel replaces the inspector.
+    target.querySelector('[data-essence-select="water"]').click();
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-essence-bulk-panel]'), 'the bulk panel replaces the inspector');
+    assert.ok(
+      !target.querySelector('[data-essence-browser-inspector]'),
+      'and the single-essence inspector is gone while a selection exists'
+    );
+
+    const impactText = (row) =>
+      target.querySelector(`[data-essence-bulk-impact-row="${row}"]`).textContent.trim();
+    assert.ok(impactText('essences').startsWith('1'), '1 deletable essence');
+    assert.ok(impactText('components').startsWith('0'), 'carried by no components');
+    assert.ok(impactText('recipes').startsWith('1'), 'and rewriting 1 recipe');
+    assert.match(
+      impactText('components'),
+      /selected essences/,
+      'and the line says WHICH set it counts, since it counts the whole selection'
+    );
+    assert.ok(
+      !target.querySelector('[data-essence-bulk-blocked]'),
+      'no member is ever blocked — deletion is warned, not blocked'
+    );
+
+    // Adding the COMPONENT-CARRIED essence changes all three numbers, and the recipe number
+    // is a UNION rather than a sum: `earth` names r1+r2 and `water` names r2, so 2, not 3.
+    target.querySelector('[data-essence-select="earth"]').click();
+    await tick();
+    flushSync();
+    assert.ok(impactText('essences').startsWith('2'), 'the carried member is deletable too');
+    assert.ok(impactText('recipes').startsWith('2'), 'r1 and r2, unioned rather than summed');
+    assert.ok(
+      impactText('components').startsWith('1'),
+      'and its CARRIER is reported as impact, unioned over the whole selection'
+    );
+    assert.ok(
+      !target.querySelector('[data-essence-bulk-blocked]'),
+      'still nothing is blocked — the carried essence deletes like any other'
+    );
+
+    const deleteButton = target.querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger');
+    assert.ok(deleteButton, 'the bulk delete is a real button, armed rather than dialogged');
+    deleteButton.click();
+    await tick();
+    flushSync();
+    assert.equal(
+      calls.some((call) => call[0] === 'deleteEssences'),
+      false,
+      'the FIRST click only arms — nothing is written'
+    );
+    target
+      .querySelector('[data-essence-bulk-delete-card] .manager-button.is-danger')
+      .click();
+    await tick();
+    await tick();
+    flushSync();
+    const deleteCall = calls.find((call) => call[0] === 'deleteEssences');
+    assert.ok(deleteCall, 'the SECOND click performs the delete');
+    assert.deepEqual(
+      [...deleteCall[1]].sort(),
+      ['earth', 'water'],
+      'and it deletes EVERY selected member, carried or not'
+    );
+  });
+
+  it('applies a staged essence bulk edit with falsy-but-real axes', async () => {
+    const calls = [];
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(Component, {
+      target,
+      props: { store: createStore(calls), services: { openCurrentAdmin: () => {} } },
+    });
+    flushSync();
+
+    navButton('Essences').click();
+    await tick();
+    flushSync();
+    target.querySelector('[data-essence-select="water"]').click();
+    await tick();
+    flushSync();
+
+    // Apply is inert until something is staged.
+    assert.equal(target.querySelector('[data-essence-bulk-apply]').disabled, true);
+
+    // Clear colour and Disable are BOTH falsy-but-real staged edits. A truthiness-gated
+    // projection would emit neither.
+    target.querySelector('[data-essence-bulk-colour] [data-manager-color-none]').click();
+    target.querySelector('[data-essence-bulk-status-option="disable"] input').click();
+    await tick();
+    flushSync();
+    assert.equal(target.querySelector('[data-essence-bulk-apply]').disabled, false);
+
+    target.querySelector('[data-essence-bulk-apply]').click();
+    await tick();
+    await tick();
+    flushSync();
+    const applyCall = calls.find((call) => call[0] === 'applyEssenceBulkEdit');
+    assert.ok(applyCall, 'Apply reaches the set-apply store action');
+    assert.deepEqual(applyCall[1], ['water']);
+    assert.ok(Object.hasOwn(applyCall[2], 'colorToken'), 'Clear colour is a PRESENT key');
+    assert.equal(applyCall[2].colorToken, null);
+    assert.equal(applyCall[2].enabled, false, 'and Disable is a present false');
+    assert.equal(Object.hasOwn(applyCall[2], 'icon'), false, 'an unstaged axis is never sent');
   });
 
   it('hides manager essence source UI when effect transfer is disabled', async () => {
@@ -8328,6 +9322,7 @@ describe('CraftingSystemManager mounted behavior', () => {
           selectedFeatures: {
             essences: true,
             effectTransfer: false,
+            propertyMacros: false,
             itemTags: true,
             gathering: true,
             recipeCategories: true,
@@ -8343,35 +9338,58 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.equal(target.querySelector('[aria-label="Filter essences by source state"]'), null);
-    assert.equal(
-      target.querySelector('.manager-essences-table').classList.contains('has-no-source'),
-      true
-    );
     assert.equal(target.textContent.includes('Linked source'), false);
     assert.equal(target.textContent.includes('Source evidence'), false);
+    // The capability pills are GATED by the feature, not merely by the card's own fields:
+    // `earth` carries both, and neither renders.
+    assert.equal(
+      target.querySelectorAll('[data-essence-capability]').length,
+      0,
+      'a gated-off capability shows no pill'
+    );
 
     target.querySelector('[data-essence-id="water"] [aria-label="Edit Water"]').click();
     await tick();
     flushSync();
-
-    assert.equal(target.querySelector('.essence-source-trigger'), null);
-    assert.equal(target.querySelector('.manager-essence-source-summary'), null);
-    assert.equal(target.querySelector('.manager-essence-source-drop-zone'), null);
+    assert.ok(!target.querySelector('.essence-source-trigger'), 'no source picker');
+    assert.ok(!target.querySelector('.manager-essence-source-summary'), 'no source summary');
+    assert.ok(!target.querySelector('.manager-essence-source-drop-zone'), 'no source drop zone');
     assert.equal(target.textContent.includes('Source unresolved'), false);
     assert.equal(target.textContent.includes('source linkage'), false);
 
+    // With BOTH gates off the On-craft tab explains itself rather than rendering empty.
+    target.querySelector('[data-essence-tab="oncraft"]').click();
+    await tick();
+    flushSync();
+    assert.ok(
+      target.querySelector('[data-essence-on-craft-empty]'),
+      'both gates off renders an explanatory empty state, not an empty tab'
+    );
+    assert.ok(
+      !target.querySelector('[data-essence-section="macro"]'),
+      'and no macro card at all'
+    );
+
+    target.querySelector('[data-essence-tab="identity"]').click();
+    await tick();
+    flushSync();
     const editName = target.querySelector('#manager-essence-edit-name');
     editName.value = 'Rain';
     editName.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
     flushSync();
-    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    target.querySelector('.manager-header-actions [data-essence-edit-save]').click();
     await tick();
     flushSync();
 
     const updateCall = calls.find((call) => call[0] === 'updateEssence');
     assert.ok(updateCall, 'identity save should delegate an essence update');
     assert.equal(Object.prototype.hasOwnProperty.call(updateCall[2], 'sourceComponentId'), false);
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(updateCall[2], 'propertyMacroUuid'),
+      false,
+      'a gated-off macro axis is never written'
+    );
   });
 
   it('protects dirty essence edit drafts when leaving the route', async () => {
@@ -11512,14 +12530,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.equal(target.querySelector('[data-tool-result-count]').textContent.trim(), '1 tool');
     assert.equal(createCard.querySelector('summary, select, button'), null);
-    const drop = new Event('drop', { bubbles: true, cancelable: true });
-    Object.defineProperty(drop, 'dataTransfer', {
-      value: { getData: () => JSON.stringify({ type: 'Item', uuid: worldItem.uuid }) },
-    });
-    createCard.dispatchEvent(drop);
+    dispatchDrop(createCard, { type: 'Item', uuid: worldItem.uuid });
     await tick();
     flushSync();
     assert.deepEqual(dropped, [{ type: 'Item', uuid: worldItem.uuid }]);
+
+    // Issue 1036/7, at THIS call site: `ItemDropZone`'s guard now reads
+    // `resolveDropUuid(data)` rather than `data.uuid`, so the document-type check is what
+    // keeps a non-Item out of the Tool creation surface. Asserted per call site, because
+    // the criterion is about the SITES rather than about the primitive in isolation.
+    dispatchRejectedDrops(createCard);
+    await tick();
+    flushSync();
+    assert.equal(dropped.length, 1, 'the tool create zone still refuses every non-Item payload');
 
     target.querySelector('.manager-tools-enabled-toggle').click();
     target.querySelector('.manager-tools-library-actions .manager-icon-button').click();

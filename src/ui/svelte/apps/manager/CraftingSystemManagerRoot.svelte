@@ -1,6 +1,8 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
+  import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
@@ -47,6 +49,11 @@
     describeRecipeCheckTierAxis,
     toBulkRecipeEdit,
   } from '../../../../utils/recipeBulkEditModel.js';
+  import { createEssenceBrowserState } from '../../../../utils/essenceBrowserModel.js';
+  import {
+    createEssenceBulkDraft,
+    toBulkEssenceEdit,
+  } from '../../../../utils/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
@@ -59,13 +66,18 @@
   import EnvironmentsBrowserView from './EnvironmentsBrowserView.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
+  // The essence library's rail halves and the editor's live preview (issue 1036), extracted
+  // out of this file. `essences/` is the BROWSER's directory, which the screenshot evidence
+  // map globs for the essence views.
+  import EssenceBrowserInspector from './essences/EssenceBrowserInspector.svelte';
+  import EssenceBulkEditPanel from './essences/EssenceBulkEditPanel.svelte';
+  import EssenceBehaviorPreview from './essences/EssenceBehaviorPreview.svelte';
   import GatheringTaskEditView from './GatheringTaskEditView.svelte';
   import GatheringEventEditView from './GatheringEventEditView.svelte';
   import RealmNameField from './RealmNameField.svelte';
   import ToolEditView from './ToolEditView.svelte';
   import ToolsBrowserView from './ToolsBrowserView.svelte';
   import ToolBrowserInspector from './tools/ToolBrowserInspector.svelte';
-  import EssenceSourceSelector from '../../components/EssenceSourceSelector.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeBrowserInspector from './recipes/RecipeBrowserInspector.svelte';
   // The recipe library's bulk edit panel (issue 1010) — the sibling of the above, and
@@ -165,6 +177,23 @@
   // selection itself lives on the lifted `recipeBrowserState`.
   let recipeBulkDraft = $state(createRecipeBulkDraft());
   let recipeBulkApplying = $state(false);
+  // The essence library's lifted view-state (issue 1036) — the third and last studio to get
+  // one, and the fix for criterion 12. Search, status, source, sort, view mode, page and
+  // the bulk selection all lived inside `EssenceBrowserView`, so opening an essence
+  // unmounted the browser and coming back reset every one of them.
+  let essenceBrowserState = $state(createEssenceBrowserState());
+  // The staged-but-unwritten essence bulk edit, owned HERE for the reason its two siblings
+  // are: the panel is unmounted the moment the selection empties, so a panel-owned draft
+  // would be destroyed by the very transition that is supposed to DISCARD it.
+  let essenceBulkDraft = $state(createEssenceBulkDraft());
+  let essenceBulkApplying = $state(false);
+  let essenceBulkDeleting = $state(false);
+  // The bulk delete's ARMED latch (the maintainer's binding decision for this action). It
+  // is a single boolean rather than a token map because exactly one bulk delete exists on
+  // the screen at a time; `ArmedDangerButton` still reports its own Escape and blur
+  // disarms, and the selection changing disarms it too — an arm is a statement about a
+  // specific set, so it must not survive that set changing.
+  let essenceBulkDeleteArmed = $state(false);
   let activeGatheringTab = $state('environments');
   let activeTravelTab = $state('parties');
   let gatheringMenuExpanded = $state(false);
@@ -424,6 +453,11 @@
   // gate only decides whether the unimplemented Graph placeholder is advertised.
   const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
+  // The essence property-macro gate (issue 1036). `features.propertyMacros` defaults to
+  // FALSE, and it gates the editor's Macro section, the row's Macro capability pill and the
+  // preview's macro row — the same way `effectTransfer` gates the source half. With both
+  // off the On-craft tab renders an explanatory empty state rather than an empty tab.
+  const showEssencePropertyMacroUi = $derived(selectedSystem?.features?.propertyMacros === true);
   const currentView = $derived(
     normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences)
   );
@@ -584,6 +618,18 @@
       selectedSystem?.craftingCheck,
       selectedSystem?.resolutionMode
     )
+  );
+
+  // Why the system's active crafting check applies no check modifiers, or '' when it
+  // does. Consumes the inert-cause derivation from the store's `craftingCheck`
+  // projection (issue 1055), which resolves it from the PERSISTED system through the
+  // shared five-mode selector. The recipe editor is not the surface authoring those formulas,
+  // so the Checks-tab drafts are not in play here and the saved state is the truthful
+  // one. Either cause makes a per-recipe override inert, so the Overview tab replaces
+  // its control with a banner naming which; a bare boolean cannot say which. See
+  // ChecksView.svelte's separate derivation for the draft-based consumer.
+  const recipeCraftingModifierInertCause = $derived(
+    selectedSystem?.craftingCheck?.modifierFormulaInertCause || ''
   );
 
   // Routed-check outcome tiers (active type) offered to the recipe editor's
@@ -1534,6 +1580,33 @@
   const canSaveEssenceEdit = $derived(
     essenceEditDirty === true && essenceEditDraft?.validName === true && essenceEditSaving !== true
   );
+  // ── The essence bulk selection (issue 1036) ──────────────────────────────────────
+  // Read straight off the LIFTED browser state, which `EssenceBrowserView` binds: the
+  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
+  // prop or a second copy of the truth. The Component and Recipe Studio blocks are twins.
+  const essenceBulkSelectedIds = $derived(essenceBrowserState.bulkSelectedEssenceIds ?? new Set());
+  const essenceBulkSelectionCount = $derived(essenceBulkSelectedIds.size);
+  // The PROJECTED rows, not the ids: the delete-impact statement unions carrier IDENTITIES
+  // (`componentUsageItems` and `recipeUsageIds`), which live on the projection, and a sum of
+  // per-essence counts would over-report every shared carrier.
+  const essenceBulkSelectedRows = $derived(
+    essenceCards.filter((essence) => essenceBulkSelectedIds.has(essence.id))
+  );
+  // Discard the staged draft when the selection empties — a clear, a system switch, a prune
+  // that removed the last id, or a successful apply — and DISARM the delete whenever the
+  // selection changes at all. An arm is a statement about a SPECIFIC set: once the set
+  // moves, the impact sentence the GM read before arming is no longer the impact of
+  // confirming, so the second click must not still be a confirmation.
+  //
+  // It reads the SET, not its size. The browser assigns a NEW `Set` on every mutation, so
+  // the set identity is what "changes at all" actually means; a size dependency cannot see
+  // a same-size swap, and every control happening to change the size today is a property of
+  // the current controls rather than of this rule.
+  $effect(() => {
+    const selectedIds = essenceBulkSelectedIds;
+    if (selectedIds.size === 0) essenceBulkDraft = createEssenceBulkDraft();
+    essenceBulkDeleteArmed = false;
+  });
   const canSaveComponentEdit = $derived(
     componentEditCombinedDirty === true && componentEditSaving !== true
   );
@@ -2196,11 +2269,6 @@
     store.updateGatheringConditions?.({ [kind]: value, systemId: selectedSystemId });
   }
 
-  function adjustGatheringRuleLimit(field, delta) {
-    const current = Number(selectedGatheringRules?.[field] || 1);
-    updateSelectedGatheringRules({ [field]: Math.max(1, Math.floor(current + delta)) });
-  }
-
   function formatCount(keySingular, fallbackSingular, keyPlural, fallbackPlural, count) {
     const key = count === 1 ? keySingular : keyPlural;
     const fallback = count === 1 ? fallbackSingular : fallbackPlural;
@@ -2753,8 +2821,15 @@
       const result = await saveEssenceEdit(essenceEditDraft.id || null, essenceEditDraft.updates);
       return result !== false;
     }
+    // DISCARD. `store.cancelEssenceDraft` (issue 1036, criterion 23) is the store's half:
+    // it writes NOTHING and republishes the persisted projections, so the browser and the
+    // inspector show what is actually stored rather than whatever the abandoned draft last
+    // rendered. It exists for the same reason `cancelEnvironmentDraft` and
+    // `cancelToolsDraft` do — the guard's discard branch and the editor's Back button must
+    // reach ONE function rather than each re-deriving what cancelling means.
     essenceEditDirty = false;
     essenceEditDraft = null;
+    store.cancelEssenceDraft?.();
     return true;
   }
 
@@ -2868,8 +2943,26 @@
     return finishEnvironmentRouteExit(confirmed);
   }
 
-  function confirmEssenceRouteExit(_nextView) {
+  // The SAME-VIEW SKIP (issue 1036, criterion 23), comparing the ESSENCE and not only the
+  // view token. This guard ignored its argument, unlike the recipe, component, recipe-item
+  // and system guards, so re-entering the essence editor from the essence editor raised a
+  // discard prompt for a navigation that never leaves the route. `SCOPE_BROWSER_BY_VIEW`
+  // already maps `essence-edit` to `essences`, so skipping is safe: this is not the
+  // `environment-edit` hazard, whose scope key differs.
+  //
+  // But `essence-edit` is a "same token, different subject" route, exactly like `tool-edit`
+  // and `system-edit`, and both of those learned it the hard way. `editEssence` already
+  // early-returns on an unchanged id, so EVERY call that reaches this guard from inside the
+  // editor is a switch to a different essence — or `createEssenceDraft`, which switches to
+  // no essence at all — and a bare `nextView === 'essence-edit'` skip returned `true` for
+  // all of them, after which `editEssence` clears `essenceEditDraft` with the draft
+  // unsaved, no prompt, and `store.cancelEssenceDraft()` never called.
+  // `confirmToolsRouteExit` compares ids for this reason; so does
+  // `confirmSystemDetailsScopeChange`.
+  function confirmEssenceRouteExit(nextView, nextEssenceId = '') {
     if (activeView !== 'essence-edit') return true;
+    if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)
+      return true;
     if (essenceEditDirty !== true) return true;
     const confirmed = store.confirmDiscardDirtyEssenceDraft?.() ?? false;
     if (isPromise(confirmed)) return confirmed.then(finishEssenceRouteExit);
@@ -2929,12 +3022,15 @@
     return finishGatheringTaskRouteExit(confirmed);
   }
 
-  function confirmRouteExit(nextView) {
+  // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
+  // routes whose view token does not change when the subject does. Only the essence guard
+  // reads it today; every other caller keeps its one-argument shape.
+  function confirmRouteExit(nextView, nextRouteId = '') {
     const environmentConfirmed = confirmEnvironmentRouteExit(nextView);
     if (isPromise(environmentConfirmed)) {
       return environmentConfirmed.then((value) => {
         if (value === false) return false;
-        const essenceResult = confirmEssenceRouteExit(nextView);
+        const essenceResult = confirmEssenceRouteExit(nextView, nextRouteId);
         if (isPromise(essenceResult)) {
           return essenceResult.then((essenceValue) =>
             essenceValue === false ? false : continueRouteExitAfterEssence(nextView)
@@ -2944,7 +3040,7 @@
       });
     }
     if (environmentConfirmed === false) return false;
-    const essenceResult = confirmEssenceRouteExit(nextView);
+    const essenceResult = confirmEssenceRouteExit(nextView, nextRouteId);
     if (isPromise(essenceResult)) {
       return essenceResult.then((value) =>
         value === false ? false : continueRouteExitAfterEssence(nextView)
@@ -3545,7 +3641,10 @@
   function editEssence(essenceId = selectedEssence?.id) {
     if (!essenceId || !canShowEssences) return;
     if (currentView === 'essence-edit' && essenceId === selectedEssenceId) return;
-    afterTruthyResult(confirmRouteExit('essence-edit'), () => {
+    // The target id is what lets the essence guard tell "re-entering this editor" from
+    // "switching to a different essence"; without it the guard would skip the discard
+    // prompt for the switch.
+    afterTruthyResult(confirmRouteExit('essence-edit', essenceId), () => {
       selectedEssenceId = essenceId;
       essenceEditDirty = false;
       essenceEditDraft = null;
@@ -4016,7 +4115,18 @@
             showEssenceSourceUi ? updates.sourceComponentId || null : null,
             // The authored colour (issue 917) has to travel with the create call too, or a
             // new essence loses the colour the GM picked before its first save.
-            updates.colorToken || null
+            updates.colorToken || null,
+            // …and so do the two fields issue 1036 added, for exactly the same reason: the
+            // editor can author both BEFORE the first save, so a create call that dropped
+            // them would silently discard an Enabled switch the GM turned off and a macro
+            // they had already dropped. Presence-gated on `Object.hasOwn` downstream, so
+            // `enabled: false` and a null macro are real instructions rather than absences.
+            {
+              enabled: updates.enabled !== false,
+              ...(showEssencePropertyMacroUi
+                ? { propertyMacroUuid: updates.propertyMacroUuid || null }
+                : {}),
+            }
           );
       if (result === false) return false;
       essenceEditDirty = false;
@@ -4032,6 +4142,10 @@
 
   function cancelEssenceEdit() {
     afterTruthyResult(confirmRouteExit('essences'), () => {
+      // A CLEAN draft never reaches `finishEssenceRouteExit`, so its `cancelEssenceDraft`
+      // call does not run for it. Calling it here too means Back always republishes the
+      // persisted projections, whichever branch the guard took.
+      store.cancelEssenceDraft?.();
       activeView = canShowEssences ? 'essences' : 'systems';
     });
   }
@@ -4043,9 +4157,11 @@
 
   function removeEssence(essenceId = selectedEssence?.id) {
     if (!essenceId) return;
-    const essence = essenceCards.find((card) => card.id === essenceId);
-    if (essence?.deleteBlocked) return;
-    store.removeEssence?.(essenceId);
+    // `deleteEssence` (issue 1036) — the store's singular delete, renamed from
+    // `removeEssence` so it pairs with the new `deleteEssences` set delete. It returns a
+    // boolean and owns the impact-aware confirm dialog: the delete is warned, not blocked,
+    // so there is no component-usage guard to gate this call on.
+    store.deleteEssence?.(essenceId);
   }
 
   function importEssenceSourceDrop(data) {
@@ -4069,6 +4185,97 @@
 
   function unlinkSelectedEssenceSource() {
     return updateSelectedEssenceSource(null);
+  }
+
+  // ── Essence library actions (issue 1036) ─────────────────────────────────────────
+
+  // The row's enable switch. It routes through the store's `setEssenceEnabled`, which is
+  // ONE manager write and which REPORTS how many already-enabled recipes the disable just
+  // invalidated — disabling does not retro-disable a recipe, so without that count the
+  // consequence would be invisible until someone tried to re-enable one.
+  function toggleEssenceEnabled(essenceId, enabled) {
+    if (!essenceId) return;
+    store.setEssenceEnabled?.(essenceId, enabled === true);
+  }
+
+  async function duplicateSelectedEssence(essenceId = selectedEssence?.id) {
+    if (!essenceId) return false;
+    const nextId = await store.duplicateEssence?.(essenceId);
+    if (!nextId) return false;
+    // Select the COPY. A duplicate the GM cannot see is indistinguishable from one that
+    // was not made, and the copy is what they are about to edit.
+    selectedEssenceId = nextId;
+    return true;
+  }
+
+  // ── Essence bulk edit (issue 1036) ───────────────────────────────────────────────
+  // The panel stages into a draft this root owns; NOTHING is written until Apply, and the
+  // model's helpers are immutable, so the panel hands back a NEW draft rather than mutating
+  // this one. An in-place call would compile, run, and silently do nothing.
+  function stageEssenceBulkDraft(next) {
+    essenceBulkDraft = next || createEssenceBulkDraft();
+  }
+
+  function clearEssenceBulkSelection() {
+    essenceBrowserState.bulkSelectedEssenceIds = new Set();
+  }
+
+  async function applyEssenceBulkEdit() {
+    if (essenceBulkApplying) return false;
+    const ids = essenceBulkSelectedIds;
+    if (ids.size === 0) return false;
+    // An unstaged axis is never sent. Two of the projected keys are FALSY BUT REAL —
+    // `colorToken: null` (Clear colour) and `enabled: false` (Disable) — so the write
+    // primitive tests key PRESENCE rather than truthiness, and this projection is what
+    // gives it something to test.
+    const edit = toBulkEssenceEdit(essenceBulkDraft);
+    if (Object.keys(edit).length === 0) return false;
+    essenceBulkApplying = true;
+    try {
+      const result = await store.applyEssenceBulkEdit?.(ids, edit);
+      if (!result) return false;
+      clearEssenceBulkSelection();
+      notifyInfo(
+        result.updated === 1
+          ? text('FABRICATE.Admin.Manager.Essence.BulkEdit.AppliedOne', 'Updated 1 essence.')
+          : text(
+              'FABRICATE.Admin.Manager.Essence.BulkEdit.Applied',
+              'Updated {count} essences.'
+            ).replace('{count}', result.updated)
+      );
+      return true;
+    } finally {
+      essenceBulkApplying = false;
+    }
+  }
+
+  // The ARMED bulk delete's confirm step. The impact statement is rendered by the panel
+  // from the same rows; this only performs the write and reports what happened. The delete
+  // is warned, not blocked, so every selected essence is deleted and nothing is skipped.
+  async function deleteSelectedEssences(ids) {
+    if (essenceBulkDeleting) return false;
+    const targets = Array.isArray(ids) ? ids : [];
+    if (targets.length === 0) return false;
+    essenceBulkDeleting = true;
+    try {
+      const result = await store.deleteEssences?.(targets);
+      if (!result) return false;
+      essenceBulkDeleteArmed = false;
+      clearEssenceBulkSelection();
+      notifyInfo(essenceBulkDeletedMessage(result));
+      return true;
+    } finally {
+      essenceBulkDeleting = false;
+    }
+  }
+
+  function essenceBulkDeletedMessage(result) {
+    return text(
+      'FABRICATE.Admin.Manager.Essence.BulkEdit.Deleted',
+      'Deleted {count} essence(s) and rewrote {recipes} recipe(s).'
+    )
+      .replace('{count}', Number(result?.deleted) || 0)
+      .replace('{recipes}', Number(result?.recipesUpdated) || 0);
   }
 
   function selectEnvironment(environmentId = selectedEnvironment?.id) {
@@ -4985,10 +5192,6 @@
     const uuid = selectedEssenceSourceUuid();
     if (!uuid) return;
     services?.onCopySourceUuid?.(uuid);
-  }
-
-  function componentImage(item) {
-    return item?.img || 'icons/svg/item-bag.svg';
   }
 
   const INSPECTOR_DESCRIPTION_LIMIT = 160;
@@ -6096,30 +6299,25 @@
               <span>{text('FABRICATE.Admin.Manager.Essence.Create', 'Create essence')}</span>
             </button>
           {:else if currentView === 'essence-edit'}
-            {#if essenceEditDirty}
-              <Chip tone="warning">{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip>
-            {/if}
-            <button
-              type="button"
-              class="manager-button"
-              onclick={cancelEssenceEdit}
-              disabled={essenceEditSaving}
-            >
-              <i class="fas fa-times" aria-hidden="true"></i>
-              <span>{text('FABRICATE.Admin.Manager.Essence.Cancel', 'Cancel')}</span>
-            </button>
-            <button
-              type="submit"
-              form="manager-essence-edit-form"
-              class="manager-button is-primary"
-              disabled={!canSaveEssenceEdit}
-            >
-              <i
-                class={essenceEditSaving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}
-                aria-hidden="true"
-              ></i>
-              <span>{essenceEditSaveLabel()}</span>
-            </button>
+            <!-- The SHARED editor header (issue 1036), wearing this studio's own three data
+                 hooks. Its own note said "extract when a second studio wants it"; this is
+                 that studio, and the extraction is a parameterization rather than a fork.
+                 For the control inventory the shipped sibling wins over the prototype —
+                 Back rather than Cancel, and a dirty-only chip rather than a persistent
+                 "All changes saved" indicator — because seven editors share it. -->
+            <ComponentEditorHeader
+              dirty={essenceEditDirty}
+              saving={essenceEditSaving}
+              canSave={canSaveEssenceEdit}
+              formId="manager-essence-edit-form"
+              dirtyAttr="data-essence-edit-dirty"
+              backAttr="data-essence-edit-back"
+              saveAttr="data-essence-edit-save"
+              dirtyLabel={text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}
+              backLabel={text('FABRICATE.Admin.Manager.Essence.Back', 'Back')}
+              saveLabel={essenceEditSaveLabel()}
+              onBack={cancelEssenceEdit}
+            />
           {:else if currentView === 'environments' && activeGatheringTab === 'tasks'}
             <button
               type="button"
@@ -6916,6 +7114,7 @@
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
+            craftingMaxModifierPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==
@@ -7042,16 +7241,20 @@
       <EssenceBrowserView
         {essenceCards}
         showSourceUi={showEssenceSourceUi}
+        showPropertyMacroUi={showEssencePropertyMacroUi}
         selectedEssenceId={selectedEssence?.id || selectedEssenceId}
+        {selectedSystemId}
         onSelectEssence={selectEssence}
         onEditEssence={editEssence}
-        onRemoveEssence={removeEssence}
+        onToggleEssenceEnabled={toggleEssenceEnabled}
+        bind:browserState={essenceBrowserState}
       />
     {:else if currentView === 'essence-edit' && selectedSystem}
       <EssenceEditView
         essence={selectedEssenceId ? selectedEssenceStrict : null}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         showSourceUi={showEssenceSourceUi}
+        showPropertyMacroUi={showEssencePropertyMacroUi}
         saving={essenceEditSaving}
         onSave={saveEssenceEdit}
         onDirtyChange={(dirty) => {
@@ -7059,6 +7262,7 @@
         }}
         onDraftChange={handleEssenceDraftChange}
         onImportSourceDrop={importEssenceSourceDrop}
+        onCopySourceUuid={(uuid) => copyComponentSource(uuid)}
       />
     {:else if currentView === 'tags' && selectedSystem}
       <TagsCategoriesView
@@ -7164,8 +7368,11 @@
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
         craftingModifierOptions={selectedSystem?.craftingCheck?.checkModifiers || []}
-        craftingModifierPolicyDefault={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
-          'addAll'}
+        craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
+        craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
+        craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
+        craftingModifierInertCause={recipeCraftingModifierInertCause}
+        onOpenChecks={() => setView('checks')}
         categories={selectedSystem?.categories || []}
         onSetCategory={handleSetRecipeCategory}
         routingProvider={recipeRoutingProvider}
@@ -8051,56 +8258,16 @@
                                   <i class="fas fa-trash" aria-hidden="true"></i>
                                 </button>
                               </header>
-                              <div class="manager-character-modifier-row-bounds">
-                                <label class="manager-field">
-                                  <span
-                                    >{text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
-                                      'Min'
-                                    )}</span
-                                  >
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={ref.min ?? ''}
-                                    oninput={(event) =>
-                                      onUpdateDropCharacterModifier(
-                                        selectedGatheringDrop.id,
-                                        ref.id,
-                                        {
-                                          min:
-                                            event.currentTarget.value === ''
-                                              ? null
-                                              : Number(event.currentTarget.value),
-                                        }
-                                      )}
-                                  />
-                                </label>
-                                <label class="manager-field">
-                                  <span
-                                    >{text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
-                                      'Max'
-                                    )}</span
-                                  >
-                                  <input
-                                    type="number"
-                                    step="1"
-                                    value={ref.max ?? ''}
-                                    oninput={(event) =>
-                                      onUpdateDropCharacterModifier(
-                                        selectedGatheringDrop.id,
-                                        ref.id,
-                                        {
-                                          max:
-                                            event.currentTarget.value === ''
-                                              ? null
-                                              : Number(event.currentTarget.value),
-                                        }
-                                      )}
-                                  />
-                                </label>
-                              </div>
+                              <CharacterModifierBoundsRow
+                                min={ref.min}
+                                max={ref.max}
+                                onChange={(patch) =>
+                                  onUpdateDropCharacterModifier(
+                                    selectedGatheringDrop.id,
+                                    ref.id,
+                                    patch
+                                  )}
+                              />
                               <div class="manager-character-modifier-override-row">
                                 <button
                                   type="button"
@@ -8491,48 +8658,11 @@
                               <i class="fas fa-trash" aria-hidden="true"></i>
                             </button>
                           </header>
-                          <div class="manager-character-modifier-row-bounds">
-                            <label class="manager-field">
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Min',
-                                  'Min'
-                                )}</span
-                              >
-                              <input
-                                type="number"
-                                step="1"
-                                value={ref.min ?? ''}
-                                oninput={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    min:
-                                      event.currentTarget.value === ''
-                                        ? null
-                                        : Number(event.currentTarget.value),
-                                  })}
-                              />
-                            </label>
-                            <label class="manager-field">
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Max',
-                                  'Max'
-                                )}</span
-                              >
-                              <input
-                                type="number"
-                                step="1"
-                                value={ref.max ?? ''}
-                                oninput={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    max:
-                                      event.currentTarget.value === ''
-                                        ? null
-                                        : Number(event.currentTarget.value),
-                                  })}
-                              />
-                            </label>
-                          </div>
+                          <CharacterModifierBoundsRow
+                            min={ref.min}
+                            max={ref.max}
+                            onChange={(patch) => onUpdateEventCharacterModifier(ref.id, patch)}
+                          />
                           <div class="manager-character-modifier-override-row">
                             <button
                               type="button"
@@ -8835,42 +8965,11 @@
                   </span>
                 </div>
                 {#if selectedGatheringRules.rewardSelectionMode === 'limitedDrops'}
-                  <div class="manager-rule-stepper" data-gathering-rule-stepper="rewardLimit">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseRewardLimit',
-                        'Decrease reward limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('rewardLimit', -1)}
-                      ><i class="fas fa-minus" aria-hidden="true"></i></button
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={selectedGatheringRules.rewardLimit}
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.RewardLimit',
-                        'Reward limit'
-                      )}
-                      oninput={(event) =>
-                        updateSelectedGatheringRules({
-                          rewardLimit: Number(event.target.value || 1),
-                        })}
-                    />
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseRewardLimit',
-                        'Increase reward limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('rewardLimit', 1)}
-                      ><i class="fas fa-plus" aria-hidden="true"></i></button
-                    >
-                  </div>
+                  <GatheringRuleLimitStepper
+                    rule="rewardLimit"
+                    value={selectedGatheringRules.rewardLimit}
+                    onChange={(rewardLimit) => updateSelectedGatheringRules({ rewardLimit })}
+                  />
                 {/if}
 
                 <div class="manager-rule-row">
@@ -8958,42 +9057,11 @@
                   </span>
                 </div>
                 {#if selectedGatheringRules.eventSelectionMode === 'limitedDrops'}
-                  <div class="manager-rule-stepper" data-gathering-rule-stepper="eventLimit">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.DecreaseEventLimit',
-                        'Decrease event limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('eventLimit', -1)}
-                      ><i class="fas fa-minus" aria-hidden="true"></i></button
-                    >
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={selectedGatheringRules.eventLimit}
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.EventLimit',
-                        'Event limit'
-                      )}
-                      oninput={(event) =>
-                        updateSelectedGatheringRules({
-                          eventLimit: Number(event.target.value || 1),
-                        })}
-                    />
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.Rules.IncreaseEventLimit',
-                        'Increase event limit'
-                      )}
-                      onclick={() => adjustGatheringRuleLimit('eventLimit', 1)}
-                      ><i class="fas fa-plus" aria-hidden="true"></i></button
-                    >
-                  </div>
+                  <GatheringRuleLimitStepper
+                    rule="eventLimit"
+                    value={selectedGatheringRules.eventLimit}
+                    onChange={(eventLimit) => updateSelectedGatheringRules({ eventLimit })}
+                  />
                 {/if}
 
                 <div class="manager-rule-row">
@@ -9914,191 +9982,59 @@
             />
           {/if}
         {:else if currentView === 'essences' || currentView === 'essence-edit'}
-          {#if selectedEssenceForInspector}
-            <section class="manager-inspector-card">
-              <div class="manager-inspector-title-row is-hero-large">
-                <span class="manager-inspector-icon is-hero-large" aria-hidden="true">
-                  <i class={selectedEssenceForInspector.icon || 'fas fa-mortar-pestle'}></i>
-                </span>
-                <div class="manager-inspector-copy">
-                  <p class="manager-kicker">
-                    {text('FABRICATE.Admin.Manager.Essence.Selected', 'Selected essence')}
-                  </p>
-                  <h2 class="manager-inspector-name" title={selectedEssenceForInspector.name}>
-                    {selectedEssenceForInspector.name}
-                  </h2>
-                  <div class="manager-chip-row">
-                    {#if selectedEssenceForInspector.deleteBlocked}
-                      <Chip tone="warning"
-                        >{text(
-                          'FABRICATE.Admin.Manager.Essence.DeleteBlockedShort',
-                          'In use'
-                        )}</Chip
-                      >
-                    {/if}
-                  </div>
-                </div>
-              </div>
-              <p class="manager-muted">
-                {truncateDescription(selectedEssenceForInspector.description) ||
-                  text(
-                    'FABRICATE.Admin.Manager.NoDescriptionAdded',
-                    'No description has been added.'
-                  )}
-              </p>
-            </section>
+          <!--
+          Three mutually exclusive rail states, in priority order (issue 1036):
 
-            {#if currentView === 'essence-edit' && (essenceEditDirty || essenceEditSaving)}
-              <section class="manager-inspector-card">
-                <h3 class="manager-card-title">
-                  {text('FABRICATE.Admin.Manager.Essence.DraftState', 'Draft state')}
-                </h3>
-                <div class="manager-feature-list">
-                  {#if essenceEditDirty}
-                    <Chip tone="warning"
-                      >{text('FABRICATE.Admin.Manager.Essence.Dirty', 'Unsaved')}</Chip
-                    >
-                  {/if}
-                  {#if essenceEditSaving}
-                    <Chip>{text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...')}</Chip>
-                  {/if}
-                </div>
-              </section>
-            {/if}
+           1. the EDITOR's live preview, which is where the prototype's 330px panel sits —
+              the shell already owns this column, so the editor does not grow a second one;
+           2. the BULK EDIT panel, which REPLACES the single-essence inspector for as long
+              as the selection is non-empty, at the same `> 0` threshold the Component and
+              Recipe Studios use;
+           3. `EssenceBrowserInspector`, extracted out of ~200 lines that used to be inlined
+              here.
 
-            {#if showEssenceSourceUi && currentView !== 'essence-edit'}
-              <section class="manager-inspector-card" data-essence-section="source">
-                <div class="manager-edit-card-heading">
-                  <h3 class="manager-card-title">
-                    {text('FABRICATE.Admin.Manager.Essence.Source', 'Source')}
-                  </h3>
-                </div>
-                {#if selectedEssenceForInspector.associatedItem}
-                  <div
-                    class="manager-essence-source-summary manager-essence-inspector-source-summary"
-                  >
-                    <img
-                      class="manager-essence-source-thumb"
-                      src={selectedEssenceForInspector.associatedItem.img ||
-                        'icons/svg/item-bag.svg'}
-                      alt=""
-                    />
-                    <div class="manager-essence-source-copy">
-                      <strong
-                        >{selectedEssenceForInspector.associatedItem.name ||
-                          selectedEssenceForInspector.sourceName}</strong
-                      >
-                    </div>
-                  </div>
-                  <div class="manager-essence-inspector-source-actions">
-                    <button
-                      type="button"
-                      class="manager-button"
-                      data-essence-action="copy-source"
-                      title={selectedEssenceSourceUuid() ||
-                        text(
-                          'FABRICATE.Admin.Manager.Essence.SourceNoUuid',
-                          'This component has no source item UUID.'
-                        )}
-                      disabled={!selectedEssenceSourceUuid()}
-                      onclick={copySelectedEssenceSource}
-                    >
-                      <i class="fas fa-copy" aria-hidden="true"></i>
-                      <span
-                        >{text(
-                          'FABRICATE.Admin.Manager.Essence.CopySource',
-                          'Copy source UUID'
-                        )}</span
-                      >
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-button is-warning-action"
-                      data-essence-action="unlink-source"
-                      onclick={unlinkSelectedEssenceSource}
-                    >
-                      <i class="fas fa-unlink" aria-hidden="true"></i>
-                      <span
-                        >{text(
-                          'FABRICATE.Admin.Manager.Essence.UnlinkSource',
-                          'Unlink Source'
-                        )}</span
-                      >
-                    </button>
-                  </div>
-                {:else}
-                  <div
-                    class="manager-essence-source-drop-zone manager-essence-inspector-source-drop-zone"
-                  >
-                    <EssenceSourceSelector
-                      value={null}
-                      items={selectedSystem?.managedItemOptions || []}
-                      onDrop={handleInspectorEssenceSourceDrop}
-                      onSelect={handleInspectorEssenceSourceSelect}
-                      onClear={() => updateSelectedEssenceSource(null)}
-                    />
-                  </div>
-                {/if}
-              </section>
-            {/if}
-
-            <section class="manager-inspector-card" data-essence-section="usage">
-              <h3 class="manager-card-title">
-                {text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}
-              </h3>
-              <div class="manager-requirements-list">
-                <div class="manager-requirement-row">
-                  <span>{text('FABRICATE.Admin.Manager.Essence.Usage', 'Usage')}</span>
-                  <strong
-                    >{text(
-                      'FABRICATE.Admin.Manager.Essence.ComponentUsageCount',
-                      '{count} components'
-                    ).replace(
-                      '{count}',
-                      selectedEssenceForInspector.componentUsageCount || 0
-                    )}</strong
-                  >
-                </div>
-              </div>
-              {#if Array.isArray(selectedEssenceForInspector.componentUsageItems) && selectedEssenceForInspector.componentUsageItems.length > 0}
-                <div
-                  class="manager-essence-usage-grid"
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Essence.ComponentUsageGrid',
-                    'Components using this essence'
-                  )}
-                >
-                  {#each selectedEssenceForInspector.componentUsageItems as component (component.id)}
-                    <button
-                      type="button"
-                      class="manager-essence-usage-item"
-                      title={component.name}
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Component.EditNamed',
-                        'Edit {name}'
-                      ).replace('{name}', component.name)}
-                      onclick={() => editComponent(component.id)}
-                    >
-                      <img src={componentImage(component)} alt="" />
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </section>
-
-            {#if selectedEssenceForInspector.deleteBlocked}
-              <section class="manager-inspector-card">
-                <h3 class="manager-card-title">
-                  {text('FABRICATE.Admin.Manager.Essence.UsageBlockedTitle', 'Deletion blocked')}
-                </h3>
-                <p class="manager-muted">
-                  {text(
-                    'FABRICATE.Admin.Manager.Essence.UsageBlockedHint',
-                    'Remove this essence from components before deleting the definition.'
-                  )}
-                </p>
-              </section>
-            {/if}
+          The setup card and the no-selection empty state are unchanged and still last.
+        -->
+          {#if currentView === 'essence-edit' && essenceEditDraft}
+            <EssenceBehaviorPreview
+              essence={essenceEditDraft}
+              effectTransferEnabled={showEssenceSourceUi}
+              propertyMacrosEnabled={showEssencePropertyMacroUi}
+              sourceName={essenceEditDraft.sourceName || ''}
+              macroName={essenceEditDraft.macroName || ''}
+              sampleComponentName={essenceEditDraft.componentUsageItems?.[0]?.name || ''}
+            />
+          {:else if currentView === 'essences' && essenceBulkSelectionCount > 0}
+            <EssenceBulkEditPanel
+              count={essenceBulkSelectionCount}
+              selectedRows={essenceBulkSelectedRows}
+              draft={essenceBulkDraft}
+              applying={essenceBulkApplying}
+              deleting={essenceBulkDeleting}
+              deleteArmed={essenceBulkDeleteArmed}
+              onDraftChange={(next) => stageEssenceBulkDraft(next)}
+              onClearSelection={() => clearEssenceBulkSelection()}
+              onApply={() => applyEssenceBulkEdit()}
+              onArmDelete={() => (essenceBulkDeleteArmed = true)}
+              onDisarmDelete={() => (essenceBulkDeleteArmed = false)}
+              onDelete={(ids) => deleteSelectedEssences(ids)}
+            />
+          {:else if selectedEssenceForInspector}
+            <EssenceBrowserInspector
+              essence={selectedEssenceForInspector}
+              showSourceUi={showEssenceSourceUi}
+              showPropertyMacroUi={showEssencePropertyMacroUi}
+              managedItemOptions={selectedSystem?.managedItemOptions || []}
+              sourceUuid={selectedEssenceSourceUuid()}
+              onEdit={(id) => editEssence(id)}
+              onDuplicate={(id) => duplicateSelectedEssence(id)}
+              onDelete={(id) => removeEssence(id)}
+              onEditComponent={(id) => editComponent(id)}
+              onCopySource={copySelectedEssenceSource}
+              onUnlinkSource={unlinkSelectedEssenceSource}
+              onSourceDrop={handleInspectorEssenceSourceDrop}
+              onSourceSelect={handleInspectorEssenceSourceSelect}
+            />
           {:else if currentView === 'essences' && essenceCards.length === 0}
             <section
               class="manager-setup-card"

@@ -30,6 +30,8 @@
   import { localize } from '../util/foundryBridge.js';
   import { describeVisualStatus, describeActivationGate } from '../../interactableConfigView.js';
   import { buildSystemLabelMap, systemDisplayLabel } from '../util/systemDisambiguation.js';
+  import Stepper from '../components/Stepper.svelte';
+  import { stepperLabels } from '../components/stepperLabels.js';
 
   let { services = null } = $props();
 
@@ -555,20 +557,38 @@
             <span class="fab-ic-fact-muted">{scopedNode.current} / {scopedNode.max}</span>
           </p>
 
-          <label class="fab-ic-field">
+          <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`.
+
+               NO `allowUnset`, even though the bare input this replaces rendered blank
+               for 0. Absence cannot survive the write path: every scoped-node patch goes
+               through `normalizeNodeConfig`, which hard-codes `max: max ?? 0`, so
+               `onChange(null)` would silently persist 0 while the field claimed to have
+               cleared the pool. It is cosmetic-zero and shows `0`.
+
+               The commit moment also moves from `change` to `input`, matching every other
+               migrated field; the persisted value is identical.
+
+               `fill` needs a slot to fill, and `.fab-ic-field` is a `flex-direction:
+               column` box with no declared width, so the slot is supplied by
+               `.fab-ic-node-count-field`'s `max-width` below. See the note there for why
+               dropping `fill` would not have been the fix. -->
+          <div class="fab-ic-field fab-ic-node-count-field">
             <span class="fab-ic-field-label"
               >{text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')}</span
             >
-            <input
-              type="number"
-              min="0"
-              step="1"
-              placeholder="—"
-              value={scopedNode.max > 0 ? scopedNode.max : ''}
-              onchange={(e) => setNodeCount(e.currentTarget.value)}
-              data-interactable-node-count
+            <Stepper
+              value={scopedNode.max}
+              min={0}
+              step={1}
+              fill
+              density="comfortable"
+              {...stepperLabels(
+                text('FABRICATE.Admin.Manager.Economy.TaskNodeCount', 'Node count')
+              )}
+              inputProps={{ 'data-interactable-node-count': '' }}
+              onChange={(next) => setNodeCount(next)}
             />
-          </label>
+          </div>
 
           <label class="fab-ic-field">
             <span class="fab-ic-field-label"
@@ -916,6 +936,20 @@
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
+  }
+
+  /* The one `.fab-ic-field` holding a numeric stepper rather than a `<select>` or a
+     toggle. A `<select>` wants the card's full width; a three-digit node count does not,
+     and without a cap the filled stepper resolved `width: 100%` against the whole config
+     card and stood its − and + at opposite ends of it.
+
+     A cap, not a dropped `fill`: this is a `flex-direction: column` parent, so an unfilled
+     `.fab-stepper` (a flex item with `width: auto`) is stretched to exactly the same box
+     by `align-items: stretch` — measured at 600/600px — while losing the 36px height that
+     matches the selects above it and leaving its 48px input marooned mid-border. 160px is
+     the width the `fill` variant was measured against and leaves a 106px typeable field. */
+  .fab-ic-node-count-field {
+    max-width: 160px;
   }
 
   .fab-ic-field-label {

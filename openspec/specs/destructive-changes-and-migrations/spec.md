@@ -64,6 +64,28 @@ Deleting a vocabulary entry that records still reference is a confirmed destruct
    A placeholder emptied by the strip is persisted as an incomplete ingredient rather than left naming the deleted tag.
 5. Nothing is left dangling: no recipe or component retains a `category` or tag value that no longer exists in the system vocabulary.
 
+### Delete Essence Definition
+
+Deleting an essence is a confirmed destructive record rewrite across components and recipes, not a silent orphaning.
+It has both a single-essence and a SET form, and the two perform the same cascade.
+
+1. Require explicit GM confirmation.
+   Deletion is WARNED, not BLOCKED: component usage never refuses a delete, because the cascade strips the essence from every carrying component, so neither the single delete nor a set member is ever excluded or skipped on account of the components carrying it.
+   Both forms state their impact before the GM commits: the single delete's confirmation states how many components the essence is removed from and how many recipes are rewritten, and the set delete states, before it is armed, how many essences will be deleted, how many components carry them, and how many recipes will be rewritten.
+   Both carrier numbers are counted over DISTINCT carriers, never summed per essence: the cascade rewrites each referencing recipe once for the whole selection and strips every deleted essence from a carrying component in one pass, so a component or recipe naming two selected essences is one carrier, not two.
+2. The essence is removed from `essenceDefinitions` and from the derived `essences` id array.
+3. Every component still carrying the essence has that quantity stripped, so no component is left naming a deleted essence.
+4. Every recipe referencing the essence — through either the legacy per-set essences map or a first-class essence ingredient option, at recipe level or step level — is rewritten to drop it.
+   A group left with no options is dropped, and a set left with no ingredient groups, ingredients or essences is dropped.
+5. A recipe left with no ingredient sets, or with no results, is clamped to disabled.
+6. Each rewritten recipe is re-saved as an INCOMPLETE authoring shell (`allowIncomplete`), because a recipe stripped of its only requirement is deliberately persisted rather than deleted.
+7. The rewrites run BEFORE the crafting-system write.
+   That ordering is only safe because the disabled-essence blocker is an ACTIVATION-only validation and never a persistence one: a persistence-level blocker would abort the cascade partway through, with the essence definitions and component essence maps already mutated in memory and nothing persisted.
+8. The set form issues exactly ONE crafting-systems write and ONE recipes write for the whole operation, computing each recipe's union rewrite once, so a recipe referencing two deleted essences is written once rather than twice.
+9. A single summary notification is emitted, never one per rewritten recipe.
+10. Alchemy signature uniqueness is reconciled once after the cascade, because stripping essences collapses signatures and can create collisions that did not exist before.
+11. No run clean-up applies: a crafting run records component ingredients and a resolved-essence snapshot, neither of which is invalidated by the definition's removal.
+
 ### Disable Multi-step Feature
 
 Disabling `features.multiStepRecipes` is a **non-destructive collapse**, not a destructive migration and not an information-hiding gate.
@@ -419,6 +441,90 @@ The surviving init-time reconciler `_migrateLegacyRecipeItems` (`src/systems/Cra
 It matches on the trigger "no valid `recipeItemId` and a non-empty `linkedRecipeItemUuid`", generating or reusing a definition, silently deriving fallback metadata for an unresolved UUID (no migration warning), and — transitionally — still writing the retired reverse ref `recipe.recipeItemId = definition.id`.
 Treat that reverse-ref write as a transitional shim, not canonical output.
 A post-`1.13.0` **preserved alchemy-formula** `linkedRecipeItemUuid` still satisfies the reconciler's trigger; the current, intended behaviour is that the reconciler may re-process such preserved formula links (they are not exempt from the trigger).
+
+### Modifier Pick Cap Migration (`1.20.0`, `downgradeTo: '1.19.0'`, pure, clone-first, idempotent)
+
+Issue 1055 generalizes the crafting-check combination rule.
+`craftingCheck.defaultModifierPolicy` keeps **four** rules (`addAll`/`highest`/`byRecipe`/`playerPicks`), each stating both how the eligible values reduce AND who selects them, and the new `craftingCheck.maxModifierPicks` bounds the two SELECTING rules (`byRecipe`, `playerPicks`), which both SUM what was picked.
+`resolveMaxModifierPicks` reads an ABSENT cap as UNLIMITED.
+The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`) reads and returns both the `craftingSystems` and `recipes` payloads as pure, clone-first data — it mutates only its own clones, never the runner's payload, so even a hypothetical throw would leave the pre-migration checkpoint untouched — and throws no `FatalMigrationError`.
+
+1. **Stamp `craftingCheck.maxModifierPicks = 1` onto pre-existing `playerPicks` systems only.** Before this change `playerPicks` meant "the player picks EXACTLY ONE modifier": the roll prompt was a radio group and the non-interactive fallback was `max(...)`.
+   Every system already on that rule carries no cap, because the field did not exist when it was authored, so without this stamp the upgrade would silently widen each one from "pick one" to "pick everything" and jump its check-modifier scalar from `max(...)` to the full sum.
+   The migration writes back the bound those systems always had, exactly once.
+2. **The other three rules are deliberately left absent, i.e. unlimited.** `addAll` and `highest` do not select at all, so a cap means nothing to them and stamping one would only leak a bound into any later switch to a selecting rule.
+   `byRecipe` ("Recipe picks") is the other selecting rule, but its historical behaviour was NOT single-pick: a recipe already on disk may legitimately have picked several modifiers, and `resolveEligibleModifierIds` TRUNCATES a recipe's pick to the cap, so a stamp of `1` here would silently discard picks the GM authored.
+   Unlimited is the only value that preserves them, and a GM who wants a bound can set one.
+3. **`byRecipe` is NOT mapped or retired, at either level.** It is a first-class combination rule — the recipe author selecting at recipe-edit time, the parallel of the player selecting at roll time — so a persisted `byRecipe` is valid data that must survive untouched.
+4. **The stamp is conditional on purpose.** It fires only where the cap is still unbounded (`resolveMaxModifierPicks` reports `Infinity`), so an authored cap always wins.
+   That is what makes the migration idempotent under re-run without relying on the version gate, and the View Lab depends on it directly: the lab boots the real runner over fixtures that seed no `migrationVersion`, so `lastRunVersion` is `0.0.0` and every migration runs on every lab build — an unconditional write would overwrite an authored cap and corrupt the exact frame that case exists to capture.
+5. **It does not seed a missing `craftingCheck` block.** `checkModifiers` lives inside `craftingCheck`, so a system without that block has no catalogue, no modifiers to pick from and no cap to observe; it also cannot be on `playerPicks`, since the rule is persisted in the very block that is missing.
+   Precedent: the *Progressive Reorder-Flag Retirement Migration* above makes the same call for the same reason — no storage churn for zero observable change.
+6. **The recipe payload is read and returned unchanged, on purpose.** Recipes are the other half of this feature's data, so returning them makes the deliberate no-op explicit rather than leaving a reader to wonder whether they were forgotten; the runner compares each setting's JSON against its pre-pass snapshot before writing, so an unchanged clone persists nothing.
+   In particular a recipe's legacy `craftingModifier.policy` is NOT stripped here: the resolver no longer consults it, so it is inert, and leaving it on disk is what keeps the downgrade below lossless.
+   `Recipe._normalizeCraftingModifier` drops the key on read, so it disappears the next time that recipe is saved (see `data-models/spec.md` requirement 13a).
+7. **Mutated setting key:** `craftingSystems`, and only it.
+8. **Lossless downgrade.** `downgradeTo: '1.19.0'` is lossless: `maxModifierPicks` is a key the pre-change build never knew, and its `_normalizeCheckModifierConfig` is an allowlist literal that never spreads its source, so it silently drops the key on read — and that build's `playerPicks` already means "pick one", which is exactly what the dropped cap encoded.
+   No other field is touched, so a downgraded world lands on that release's own schema and behaviour with no data loss.
+
+**Mirrored on import.** `migrateExportPayload` applies the identical per-system transform (`applyMaxModifierPicks`, shared with the settings-data migration, not a second implementation of it) to an imported bundle, branch-independently — it runs whether or not the payload's envelope `schemaVersion` needed upcasting, because the cap is a new field on an OLD schema version and its absence is orthogonal to the envelope version.
+An export bundle carries exactly one system, so the shared per-system transform is applied directly with no grouping.
+It is idempotent for the same reason as the settings-data migration: an authored cap in the bundle always survives the import, and a bundle's `byRecipe` rule is left exactly as authored at both levels.
+
+**A recipe's picks are never destroyed by a cap.** Lowering `maxModifierPicks` below what a recipe already picked leaves that recipe's stored `craftingModifier.modifierIds` exactly where it was — only how many of them the resolver HONOURS changes, `resolveEligibleModifierIds` keeping the first N in authored order.
+Raising the cap again re-applies the rest immediately, with nothing to re-enter.
+Switching the system away from `byRecipe` likewise leaves every recipe's stored pick intact and simply stops consulting it.
+The recipe editor's picker truncates its own seed to the cap and refuses an add at the cap, but that is a UI affordance layered on top of the resolver's truncation, never the invariant.
+
+### Check-Modifier Placeholder Retirement Migration (`1.21.0`, `downgradeTo: '1.20.0'`, pure, clone-first, idempotent)
+
+Issue 1094 retires the Fabricate-owned `@craftingmod` roll-formula placeholder.
+The resolved check-modifier scalar is now APPENDED to the check roll as one flavoured `+ N[Modifiers]` term, exactly the way `appendToolBonusTerms` appends tool bonuses, so a GM authors no placeholder and cannot forget one.
+The `1.21.0` settings-data migration (`src/migration/migrateRetireCraftingModToken.js`) reads and returns the `craftingSystems` payload as pure, clone-first data — it mutates only its own clones, never the runner's payload — and throws no `FatalMigrationError`.
+
+1. **Strip the placeholder from every stored roll formula.** `craftingCheck.{simple,routed,progressive}.rollFormula`, `salvageCraftingCheck.{simple,routed,progressive}.rollFormula` and `gatheringCraftingCheck.{progressive,routed}.rollFormula`, plus the legacy `routed.rollExpression` read alias, which is still consulted as a fallback and would otherwise keep the placeholder reachable.
+The token is removed together with its PRECEDING additive operator; a LEADING token is removed ALONE, KEEPING the operator that follows it, because that operator carries the sign of the next term and `Expression` admits a leading `Additive` (`grammar.pegjs:17`, `:89`) — so `<token> - 2` becomes `- 2` and preserves the total the retired substitution produced, where dropping the operator too would silently double the modifier.
+The word-boundary match leaves a hypothetical `@craftingmodifier` untouched.
+2. **Salvage and gathering are swept DEFENSIVELY.** Neither ever authored the placeholder and neither passes a modifier context to its runner, so stripping changes no total there — but an imported bundle can carry one, a survivor would be stripped by the runtime shim anyway, and leaving it on disk would only mislead a GM reading the field.
+3. **A placement that is not TOP-LEVEL ADDITIVE is left UNTOUCHED on disk and REPORTED.**
+A placement is **ADDITIVE** — and therefore liftable out of the formula and re-appended as a trailing term — IFF all FOUR hold: it sits at **bracket depth 0**; the run of additive operators immediately before it is **at most one**; that run is **empty only when the placeholder is LEADING**, so the nearest non-whitespace character BEFORE it is **absent or a single `+`/`-`**; and the nearest non-whitespace character AFTER it is **absent or `+`/`-`**.
+The predecessor clause is not a restatement of the run-length one and omitting it made this predicate FALSE: `1d20 * @craftingmod` has an EMPTY additive run before the placeholder (`*` is not an additive operator), so a three-clause reading calls it ADDITIVE — two lines from where its dangling residue is named as refused.
+An empty run after a preceding term means that term binds the placeholder multiplicatively or opens a group.
+**Every other placement is REFUSED**, including an additive placement NESTED inside a parenthetical, a function argument, a pool or a dice count.
+The reason is ARITHMETIC, not syntax, and stating it as syntax was wrong: the appended `+ N[Modifiers]` term lands at the END of the WHOLE formula, so lifting the placeholder out is sound only where the two positions are interchangeable.
+Some refused residues do fail to parse (a dangling `1d20 *`, an empty `()`), but others parse perfectly and are simply WRONG — `(1d20 + @craftingmod) * 2` strips to `(1d20 ) * 2`, halving a modifier that was being scaled, and `(2 + @craftingmod + 4) * 3` goes from 27 to 21 at a scalar of 3 with no notice at all.
+The interior cases are why the test is a depth scan rather than an inspection of the two adjacent characters: an interior placement has `+` on both sides and no adjacent bracket to notice.
+The multiplicative, function-argument, dice-count and lone-parenthetical contexts named in earlier drafts are EXAMPLES of this predicate, not the rule itself.
+Some of those residues throw in the dice grammar, but **`max(, 2)` does not**: `FunctionTerm`'s head is `Expression?`, so it parses with ZERO argument terms, `Math.max()` yields `-Infinity`, and `Roll#total`'s `Number(this._total) || 0` lets that through — so `Roll.validate` ACCEPTS it and a rule that guessed would hand that world a permanent, silent automatic failure on every craft.
+A **structural** residue check runs before any dice engine is consulted, so a residue that ends in a binary operator is refused on this path too; the migration passes no engine, so that check is the only guard on what it writes.
+The decision is therefore POSITIONAL and STRUCTURAL, and it is ONE decider — `planRetiredPlaceholderStrip` — shared by the migration, the runtime shim and the Checks Validation tab, so no two of them can disagree about a placement.
+It is not the placement classifier alone: `describeRetiredModifierPlaceholder` answers only the first half (is this placement additive), and a formula such as `1d20 - @craftingmod -` or `@craftingmod +` is ADDITIVE by that classifier yet REFUSED by the decider, because its residue would be structurally incomplete.
+A surface that asked the classifier where usability was decided by the decider would give the GM the opposite instruction on exactly those formulas.
+The shim answers `''` for a refused formula so the usability readers report `noFormula`, and the migration's job is to TELL THE GM rather than to repair.
+4. **TWO BEHAVIOUR CHANGES are recorded here as behaviour changes, not no-ops.**
+   - **The inert go live.** A system with an authored catalogue whose active check formula never spent the placeholder was INERT — that is exactly why the `noPlaceholder` inert cause and its two notice surfaces existed.
+After this migration every such world starts adding those modifiers to every crafting roll.
+   - **Sign inversion and multiple-occurrence collapse.** The retired `substituteCraftingModifier` substituted `(${value})`, parenthesised precisely so a negative stayed valid arithmetic, so `1d20 - @craftingmod` rolled `1d20 - (3)`.
+The same world now rolls `1d20 + 3[Modifiers]`: −3 becomes +3, a 2×scalar swing in the crafter's favour.
+A formula carrying the placeholder twice moves from double-counting to counting once.
+5. **The migration counts and tells the GM.** Per system it counts formulas that were inert for want of the placeholder (scoped to the ACTIVE check slot, and gated on the RESOLVED ELIGIBLE SET being non-empty — `resolveEligibleModifierIds`, not merely a non-empty catalogue, because ids absent from the catalogue are dropped and a system whose set already resolves to nothing has had nothing start applying, so counting it would state a change that did not happen and prescribe a remedy already in force), formulas that placed it subtractively, formulas that carried it more than once, and formulas left UNTOUCHED — which is every formula the decider REFUSES, both the non-additive placements and the additive ones whose residue would be structurally incomplete.
+Those counts ride a transient `data._retiredCraftingModCounts` field that `MigrationRunner.run()` captures and `delete`s before any settings write — a migration cannot add a summary key by returning it, because the pass loop spread-merges a returned value into the DATA payload — and reach the one-time GM notice channel in `src/main.js`, fired only when a count is non-zero and following the shape of the `0.6.0` catalyst and `0.9.0` realm notices.
+The notice's COMPOSITION is not in `src/main.js`: `buildRetiredCraftingModNotice` (in the migration module, beside the counts it reports) owns the totals, the systems list, the clause selection, the join and the severity, and `src/main.js` keeps only the Foundry edge — the GM gate, the localizer, and which notification channel the composed severity selects.
+The lift is not cosmetic: `src/main.js` cannot be imported by a unit test, so everything it holds is covered by source-text greps, which can pin a dispatch but not a sum — three semantic mutations to that arithmetic survived a green suite while it lived inline.
+`_runMigrations` is gated on `game.users?.activeGM?.id !== game.user?.id`, so the notice is **primary-GM-only**: exactly one client in a multi-GM world posts it, and an assistant GM (who holds `isGM`) never does.
+**The remedy is spelled out in the notice text, and it names ONE action:** a GM who authored a catalogue and deliberately never spent the placeholder must CLEAR the Default modifiers set (`defaultModifierIds`) on those systems to preserve the previous total.
+An earlier draft also offered "move to a rule whose set resolves to 0", which names no rule that does that — every combination rule reduces the same eligible set, so switching between them cannot zero it — and that clause is gone from both the notice copy and this entry.
+6. **It does not seed a missing check block**, the same call the `1.20.0` and Progressive Reorder-Flag migrations make for the same reason: a block that does not exist carries no formula, so there is no storage churn to spend for zero observable change.
+7. **Mutated setting key:** `craftingSystems`, and only it.
+8. **Idempotent.** A second pass finds no placeholder and changes nothing, including on a formula left untouched for a non-additive placement — which is reported again, because it is still on disk exactly as authored, and rewritten never.
+9. **The downgrade is DATA-lossless but BEHAVIOUR-lossy, and this is stated rather than glossed.** A world downgraded to `1.20.0` finds its formulas intact and its catalogue intact — nothing was deleted but a placeholder that release no longer needs — yet that build resolves check modifiers ONLY through the placeholder it now lacks, so they stop contributing to any roll until a GM types it back into each formula by hand.
+No previous entry in this registry carries that shape of caveat, and it **must not** be described as "lands on that release's own schema".
+
+**Mirrored on import.** `migrateExportPayload` applies the identical per-system transform (`applyRetireCraftingModToken`, shared with the settings-data migration, not a second implementation of it) to an imported bundle, branch-independently — it runs whether or not the payload's envelope `schemaVersion` needed upcasting, because the placeholder is an OLD field on a CURRENT schema version and its presence is orthogonal to the envelope version.
+The per-system counts are discarded there on purpose: the GM notice reports what a WORLD migration changed under the GM's feet, whereas an import is an act the GM just performed against a bundle they chose.
+
+**The runtime shim is the fail-safe, not a second migration.** `stripRetiredModifierPlaceholder` (`src/utils/craftingCheckExpression.js`) removes any placeholder that survives — hand-edited, imported, or seeded by a fixture — at the head of `evaluateCheckRoll` and `resolveCheckFormulaDisplay`, and inside `resolveActiveCraftingCheckFormula` and `resolveSalvageCheck` BEFORE their emptiness test.
+Its rule is normative in `resolution-modes/spec.md` §Check Source.
 
 ### Catalyst → Tool Migration (`0.6.0`)
 

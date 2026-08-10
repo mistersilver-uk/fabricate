@@ -27,10 +27,49 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { isGatheringActorSelectableByUser } from '../../src/config/preferencesCleanup.js';
 import { AlchemyListingBuilder } from '../../src/systems/AlchemyListingBuilder.js';
 import { resolveAlchemySubmissions } from '../../src/utils/alchemySubmissions.js';
+
+/**
+ * `src/main.js` as text, read once. Every owner-gate suite pins its faithful copy above
+ * against this, because the module itself cannot be imported under `node --test`.
+ *
+ * @type {string}
+ */
+export const MAIN_SOURCE = readFileSync(resolve(import.meta.dirname, '../../src/main.js'), 'utf8');
+
+/**
+ * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
+ *
+ * Bounding is the point. The alchemy suite's `MAIN_SOURCE.slice(indexOf(...))` runs to
+ * the end of the file, which is harmless for a "must CONTAIN" assertion and permanently
+ * red for a "must NOT contain" one — every helper the rest of the class legitimately
+ * uses is inside an unbounded slice. Single-sourcing the strategy here is also what
+ * stops the unbounded form being the pattern the next author copies.
+ *
+ * The bound is the first line that is exactly two-space-indented `}`, which is a class
+ * member's closing brace in this file's formatting. Every deeper brace is indented
+ * further, so a nested arrow, object literal or `try` block cannot end the slice early.
+ *
+ * @param {string} signature The method signature exactly as authored, INCLUDING its
+ *   opening brace — e.g. `_gateBulkTargets(targets, actorId) {`. Passing a bare name
+ *   would match a call site as readily as the declaration.
+ * @param {string} [source]
+ * @returns {string} The method's own text, closing brace included.
+ * @throws {Error} When the signature is not found, or has no closing brace — either
+ *   means the pin is now vacuous, which must fail loudly rather than assert on ''.
+ */
+export function mainMethodSource(signature, source = MAIN_SOURCE) {
+  const start = source.indexOf(signature);
+  if (start < 0) throw new Error(`main.js declares no \`${signature}\``);
+  const end = source.indexOf('\n  }\n', start);
+  if (end < 0) throw new Error(`\`${signature}\` has no member-level closing brace`);
+  return source.slice(start, end + '\n  }'.length);
+}
 
 /** Minimal `foundry.utils` shim the builder's flag reads use at call time. */
 function installFoundryShim() {
@@ -74,6 +113,11 @@ export function makeFacadeActor(
       .reduce((value, part) => (value == null ? undefined : value[part]), flags[scope]);
   return {
     id,
+    // The bulk facades read `uuid` and `name` off the RESOLVED actor: `salvageComponents`
+    // derives the uuid the service receives (the seam itself never takes one) and both
+    // report `actorName` on every row.
+    uuid: `Actor.${id}`,
+    name: `Actor ${id}`,
     items,
     getFlag,
     // Foundry's per-user ownership seam the real predicate calls.
@@ -83,6 +127,44 @@ export function makeFacadeActor(
       return owners.has(globalThis.game?.user?.id);
     },
   };
+}
+
+/**
+ * A {@link makeFacadeActor} that can also DELETE its own embedded Items — what
+ * `destroyComponents` ultimately drives (issue 859).
+ *
+ * `deleteEmbeddedDocuments` RETURNS the removed documents, as core does, because
+ * `BulkDestroyService` derives `unitsDeleted` from the return and never from the
+ * request. A stand-in that returned nothing would report every row as vetoed.
+ *
+ * @param {string} id
+ * @param {object} [options]
+ * @param {string[]} [options.ownerUserIds]
+ * @param {Array<{id: string, name?: string, system?: object}>} [options.documents]
+ * @returns {object} The actor, with `deletedIds` recording every submitted batch.
+ */
+export function makeDeletableFacadeActor(id, { ownerUserIds = [], documents = [] } = {}) {
+  const actor = makeFacadeActor(id, { ownerUserIds });
+  const held = new Map(documents.map((document) => [document.id, document]));
+  actor.deletedIds = [];
+  actor.items = {
+    has: (itemId) => held.has(itemId),
+    get: (itemId) => held.get(itemId) ?? null,
+    contents: [...held.values()],
+  };
+  actor.heldDocuments = held;
+  actor.deleteEmbeddedDocuments = async (type, itemIds) => {
+    actor.deletedIds.push({ type, itemIds: [...itemIds] });
+    const removed = [];
+    for (const itemId of itemIds) {
+      const document = held.get(itemId);
+      if (!document) continue;
+      held.delete(itemId);
+      removed.push(document);
+    }
+    return removed;
+  };
+  return actor;
 }
 
 /**
@@ -138,11 +220,24 @@ export function installFacadeGame({
  * Reads `globalThis.game` live so a mid-test user swap takes effect.
  */
 class FabricateFacadeUnderTest {
-  constructor({ alchemyListingBuilder, craftingEngine, craftingSystemManager, ready }) {
+  constructor({
+    alchemyListingBuilder,
+    craftingEngine,
+    craftingSystemManager,
+    ready,
+    bulkSalvageService = null,
+    bulkDestroyService = null,
+  }) {
     this._alchemyListingBuilder = alchemyListingBuilder;
     this.craftingEngine = craftingEngine;
     this.craftingSystemManager = craftingSystemManager;
     this.ready = ready;
+    // Injected rather than lazily built: `_getBulkSalvageService` / `_getBulkDestroyService`
+    // exist only to wire Foundry collaborators, which this harness has none of. The gate,
+    // the merge and the refusal row — the parts with behaviour worth pinning — are copied
+    // faithfully below.
+    this._bulkSalvageService = bulkSalvageService;
+    this._bulkDestroyService = bulkDestroyService;
   }
 
   get _game() {
@@ -182,6 +277,132 @@ class FabricateFacadeUnderTest {
       .map((id) => this._resolveCraftingActor(id))
       .filter(Boolean);
     return { craftingActor, componentSourceActors };
+  }
+
+  // --- Faithful copy of Fabricate#_gateBulkTargets (issue 859) ---------------
+  //
+  // There is deliberately NO `?? this.getSelectedCraftingActorId()` tail here, unlike
+  // `_resolveCraftingSources` above. A bulk run may span actors, so a persisted-selection
+  // fallback would silently RETARGET a row whose own actor did not resolve onto whichever
+  // actor the player last selected — salvaging or destroying the wrong character's items
+  // with no error anywhere. `tests/fabricate-facade-bulk-owner-gate.test.js` pins that
+  // absence against the real source.
+  _gateBulkTargets(targets, actorId) {
+    return (targets || []).filter(Boolean).map((target) => ({
+      target,
+      actor: this._resolveCraftingActor(target.actorId ?? actorId),
+    }));
+  }
+
+  // --- Faithful copy of Fabricate#_mergeBulkRows -----------------------------
+  _mergeBulkRows(gated, ranItems, buildRefusedRow) {
+    const rows = [];
+    let next = 0;
+    for (const entry of gated) {
+      if (entry.actor && next < ranItems.length) {
+        rows.push(ranItems[next]);
+        next += 1;
+      } else {
+        rows.push(buildRefusedRow(entry.target));
+      }
+    }
+    return rows;
+  }
+
+  // --- Faithful copy of Fabricate#_buildNotPermittedRow ----------------------
+  _buildNotPermittedRow(target) {
+    const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
+    const component =
+      (system?.components || []).find((entry) => entry?.id === target?.componentId) ?? null;
+    return {
+      actorId: target?.actorId ?? null,
+      actorName: '',
+      systemId: target?.systemId ?? null,
+      componentId: target?.componentId ?? null,
+      name: component?.name || '',
+      img: component?.img || '',
+      outcome: 'notPermitted',
+      skipReason: null,
+    };
+  }
+
+  // --- Faithful copy of Fabricate#salvageComponents --------------------------
+  //
+  // `onProgress` is accepted and FORWARDED, exactly as the real facade does. A mirror
+  // that quietly dropped it would report a frozen `0 of N` here while the real facade
+  // ticked — and, worse, would let a test assert progress behaviour that the copy was
+  // supplying rather than the code under test.
+  async salvageComponents({
+    actorId = null,
+    targets = [],
+    interactive = true,
+    onProgress = null,
+  } = {}) {
+    this._requireReady();
+    const gated = this._gateBulkTargets(targets, actorId);
+    const runnable = gated.filter((entry) => entry.actor);
+
+    const result = await this._bulkSalvageService.run({
+      targets: runnable.map(({ target, actor }) => ({
+        actorUuid: actor.uuid,
+        actorId: actor.id,
+        actorName: actor.name,
+        systemId: target.systemId,
+        componentId: target.componentId,
+      })),
+      interactive,
+      onProgress,
+    });
+    if (result.cancelled) return result;
+
+    const items = this._mergeBulkRows(gated, result.items, (target) => ({
+      ...this._buildNotPermittedRow(target),
+      rollValue: null,
+      tierStep: null,
+      message: '',
+      results: [],
+      consumed: [],
+      tools: [],
+    }));
+    return {
+      cancelled: false,
+      items,
+      counts: {
+        ...result.counts,
+        total: items.length,
+        notPermitted: items.length - result.items.length,
+      },
+      posted: result.posted,
+    };
+  }
+
+  // --- Faithful copy of Fabricate#destroyComponents --------------------------
+  async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
+    this._requireReady();
+    const gated = this._gateBulkTargets(targets, actorId);
+    const runnable = gated.filter((entry) => entry.actor);
+
+    const result = await this._bulkDestroyService.run({
+      targets: runnable.map(({ target, actor }) => ({
+        actor,
+        actorId: actor.id,
+        actorName: actor.name,
+        systemId: target.systemId,
+        componentId: target.componentId,
+      })),
+      onProgress,
+    });
+
+    const items = this._mergeBulkRows(gated, result.items, (target) => ({
+      ...this._buildNotPermittedRow(target),
+      requested: 0,
+      unitsDeleted: 0,
+      documentsDeleted: 0,
+      staleIds: 0,
+      items: [],
+      vetoed: [],
+    }));
+    return { items, unitsDeleted: result.unitsDeleted, documentsDeleted: result.documentsDeleted };
   }
 
   // --- Faithful copy of Fabricate#listAlchemyForActor ------------------------
@@ -302,6 +523,8 @@ export function createFabricateFacadeHarness({
   selectedCraftingActorId = null,
   componentSourceActorIds = [],
   ready = true,
+  bulkSalvageService = null,
+  bulkDestroyService = null,
 } = {}) {
   const { game, setCurrentUser } = installFacadeGame({
     user,
@@ -327,6 +550,8 @@ export function createFabricateFacadeHarness({
     craftingEngine,
     craftingSystemManager,
     ready,
+    bulkSalvageService,
+    bulkDestroyService,
   });
   return { facade, game, setCurrentUser, craftAlchemyCalls };
 }

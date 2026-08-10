@@ -11,6 +11,8 @@
   import CompositionStatePill from './CompositionStatePill.svelte';
   import OverrideIndicator from './OverrideIndicator.svelte';
   import Pagination from '../../../components/Pagination.svelte';
+  import Stepper from '../../../components/Stepper.svelte';
+  import { stepperLabels } from '../../../components/stepperLabels.js';
 
   let {
     kind = 'task',
@@ -287,22 +289,23 @@
             </div>
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
-                <label class="manager-environment-comp-weight-field">
-                  <span class="sr-only"
-                    >{text(
-                      'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight',
-                      'Weight'
-                    )}</span
-                  >
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    data-composition-weight={entry.id}
+                <!-- A `<div>`, not the `<label>` wrapping an `.sr-only` caption it was: see
+                     the NAMING contract in `Stepper.svelte`. The commit moment moves from
+                     `change` to `input`, matching every other stepper; the persisted value
+                     is identical. -->
+                <div class="manager-environment-comp-weight-field">
+                  <Stepper
                     value={weightFor(entry.id)}
-                    onchange={(event) => onWeightChange(entry.id, event.currentTarget.value)}
+                    min={0}
+                    step={1}
+                    fill
+                    {...stepperLabels(
+                      text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.Weight', 'Weight')
+                    )}
+                    inputProps={{ 'data-composition-weight': entry.id }}
+                    onChange={(weight) => onWeightChange(entry.id, weight)}
                   />
-                </label>
+                </div>
                 <span
                   class="manager-environment-comp-weight-percent"
                   data-composition-weight-percent={entry.id}

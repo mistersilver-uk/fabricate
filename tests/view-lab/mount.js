@@ -75,10 +75,13 @@ function readParams() {
     // DARK by default, because that is what the smoke renders and the smoke is the fidelity
     // authority. Foundry's configureUI prefers the world's core.uiConfig.colorScheme.applications
     // over the browser's prefers-color-scheme, so reasoning from Playwright's default (light) gets
-    // this wrong - as an earlier version of this file did. It matters more than it sounds:
-    // Fabricate's headings inherit Foundry's --color-text-primary, which is rgb(17,17,17) under
-    // theme-light and rgb(247,243,232) under theme-dark, so the wrong theme renders every heading
-    // near-black on Fabricate's dark panels.
+    // this wrong - as an earlier version of this file did. It matters more than it sounds, though
+    // not for the reason this comment used to give: Fabricate's own surfaces are theme-invariant
+    // (see the coverage-theme-light-* pair and its comment in scripts/lib/viewLabCases.js), so a
+    // wrong default does not recolour the surfaces a Fabricate root covers - what it does do is
+    // quietly repaint the Foundry window CHROME of every published frame away from what the smoke
+    // renders. That comment also lists what theme-invariance does NOT cover, so read it before
+    // treating a light frame as evidence that nothing leaks.
     colorScheme: params.get('colorScheme') === 'light' ? 'light' : 'dark',
     // Which crafting system the manager opens on. A seeded setting rather than a click, because
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
