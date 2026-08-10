@@ -1,7 +1,6 @@
 import {
-  describeRetiredModifierPlaceholder,
   findRangeConflicts,
-  stripRetiredModifierPlaceholder,
+  planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
 
 /**
@@ -105,8 +104,15 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   // reported as ready, inside the module named `checksReadiness`. That falsified the
   // invariant `resolution-modes/spec.md` asserts, on the one surface a GM consults to find
   // out whether a check works.
+  //
+  // ONE PLAN, not one plan and one classifier. `planRetiredPlaceholderStrip` is the same
+  // decider `stripRetiredModifierPlaceholder` (and therefore `checkUsable`) reduces, so
+  // deriving BOTH the formula tick and the severity split below from this single call is
+  // what makes them incapable of disagreeing — see the split's own note for the rows that
+  // caught them disagreeing.
   const authoredFormula = trimmed(check?.rollFormula);
-  const hasRollFormula = Boolean(trimmed(stripRetiredModifierPlaceholder(authoredFormula)));
+  const plan = planRetiredPlaceholderStrip(authoredFormula);
+  const hasRollFormula = plan.outcome !== 'refused' && trimmed(plan.formula) !== '';
   checks.push({ id: 'hasRollFormula', satisfied: hasRollFormula });
   if (!hasRollFormula) {
     issues.push({ id: 'noRollFormula', severity: 'warning' });
@@ -116,21 +122,42 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   // formula field is free text, so nothing stops a GM who read an old guide from typing
   // it, and the shim would then remove it SILENTLY on the way to the roll.
   //
-  // THE SEVERITY SPLITS ON THE PLACEMENT, because the two cases need opposite advice.
-  // An ADDITIVE placement is genuinely ignorable: the check still rolls, the modifiers
-  // still apply, and only what the GM believes about WHY is wrong — so "it is ignored and
-  // removed before the roll, delete it" is true and a warning is proportionate. A
-  // NON-ADDITIVE one is not: the whole formula is discarded and the check does not roll at
-  // all, and telling that GM to "just delete the placeholder" is actively wrong, because
-  // deleting it out of `1d20 * @craftingmod` or `max(@craftingmod, 2)` leaves `1d20 * ` or
-  // `max(, 2)` — still broken. That one is critical and says the formula must be rewritten.
-  // The legacy `routed.rollExpression` alias is inspected too: the migration sweeps it, so
-  // a placeholder can live there, and readiness would otherwise never see it.
-  const placement = describeRetiredModifierPlaceholder(authoredFormula);
-  const legacyPlacement = describeRetiredModifierPlaceholder(trimmed(check?.rollExpression));
-  if (placement.nonAdditive || legacyPlacement.nonAdditive) {
+  // THE SEVERITY SPLITS ON THE STRIP OUTCOME, because the two cases need opposite advice.
+  // A STRIPPED placement is genuinely ignorable: the removal is lossless, so whatever was
+  // authored around it still rolls, the modifiers still apply, and only what the GM
+  // believes about WHY is wrong — so "it is ignored and removed before the roll, delete it"
+  // is true and a warning is proportionate. (A placeholder-ONLY formula is the degenerate
+  // case: it strips losslessly to nothing, and `hasRollFormula` above is what reports that
+  // there is no formula left, because "delete the placeholder" and "author a formula" are
+  // different instructions and must not be merged into one issue.) A REFUSED
+  // one is not ignorable: the whole formula is discarded and the check does not roll at all, and
+  // telling that GM to "just delete the placeholder" is actively wrong, because deleting it
+  // out of `1d20 * @craftingmod` or `max(@craftingmod, 2)` leaves `1d20 * ` or `max(, 2)` —
+  // still broken. That one is critical and says the formula must be rewritten.
+  //
+  // IT ASKS THE DECIDER, NOT THE CLASSIFIER, and the distinction is not cosmetic. This
+  // split used to test `describeRetiredModifierPlaceholder(...).nonAdditive`, which is only
+  // the FIRST half of what decides usability: `planRetiredPlaceholderStrip` refuses a
+  // non-additive placement AND an additive one whose residue is structurally incomplete.
+  // The two disagree on exactly the rows the residue check was added for — `1d20 * -@craftingmod`,
+  // `1d20 - @craftingmod -` and `@craftingmod +` are all `nonAdditive: false` and all refused —
+  // so the tab told that GM the placeholder was "ignored and removed before the roll, so
+  // delete it", and deleting it leaves `1d20 * `, still refused, with `hasRollFormula` then
+  // reading GREEN because nothing re-validates a placeholder-free formula. The migration
+  // meanwhile counted the same formula `untouched` and said it would not roll. One decider
+  // is the only way two surfaces can give one instruction.
+  //
+  // The legacy `routed.rollExpression` alias is planned too, DEFENSIVELY rather than as a
+  // load-bearing branch: both `CraftingSystemManager._normalizeRoutedCraftingCheck` and the
+  // manager root's `cloneRoutedCheck` fold it into `rollFormula` and neither emits the key,
+  // so no draft this tab is handed carries a live one. The `1.21.0` migration sweeps it
+  // because it reads the raw SETTING, which is a different input. It stays because this is
+  // a pure evaluator over a plain check object with no normalizer of its own, and it plans
+  // through the same decider so the two branches cannot answer differently.
+  const legacyPlan = planRetiredPlaceholderStrip(trimmed(check?.rollExpression));
+  if (plan.outcome === 'refused' || legacyPlan.outcome === 'refused') {
     issues.push({ id: 'retiredPlaceholderBreaksFormula', severity: 'critical' });
-  } else if (placement.present || legacyPlacement.present) {
+  } else if (plan.outcome === 'stripped' || legacyPlan.outcome === 'stripped') {
     issues.push({ id: 'retiredPlaceholderInFormula', severity: 'warning' });
   }
 
