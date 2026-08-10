@@ -52,6 +52,27 @@
  *     containment, so twenty types would push the dialog buttons off-screen.
  *   - **All editable checkboxes share ONE `name` with the id in `value`.** Module
  *     subtype ids contain a dot, and an unquoted dotted attribute selector throws.
+ *   - **Presentation is authored as inline `style` attributes, not as rules in
+ *     `styles/fabricate.css`.** `style` is in `cleanHTML`'s `"*"` attribute bucket, so it
+ *     survives. The sheet would be the usual home, but `isUiFile` (both in
+ *     `scripts/lib/viewLabCases.js` and in `scripts/ui-pr-screenshot-evidence.mjs`) treats
+ *     ANY `styles/` path as render-affecting and routes it to the broadest fallback view
+ *     set — and no View Lab case can photograph a Foundry settings dialog, so a rule added
+ *     there would demand screenshot evidence that cannot exist. The `--fab-*` tokens are
+ *     declared on bare `:root` in that globally loaded sheet, so they resolve here
+ *     whatever class this dialog carries; the one token `STYLES` consumes still names a
+ *     token-free fallback, so the dialog degrades rather than losing the distinction
+ *     outright if the sheet is absent.
+ *
+ * ## Why the dialog is given an explicit width
+ *
+ * `ApplicationV2.DEFAULT_OPTIONS.position` is `{width: "auto", height: "auto"}` and
+ * `DialogV2` does not override it. `_updatePosition` skips its clamp entirely for
+ * `"auto"` and writes an empty CSS width, so the `<dialog>` keeps the `fit-content`
+ * default and sizes to the CONTENT's max-content width — which, for the intro paragraph,
+ * is that whole sentence on one line. The result was a dialog spanning nearly the
+ * viewport to hold five short checkbox rows. An explicit numeric width is the only thing
+ * that engages the `Math.clamp(targetWidth, minWidth, maxWidth)` branch.
  *
  * Core's `<multi-checkbox>` element would remove two of the read traps by
  * construction, but cannot express the locked row: `#buildOption` hardcodes
@@ -100,6 +121,49 @@ export const ACTOR_TYPE_FIELD_NAME = 'fabricateAdditionalActorType';
 const CHECKED_ACTOR_TYPE_SELECTOR = `input[name="${ACTOR_TYPE_FIELD_NAME}"]:checked`;
 
 const ROW_ID_PREFIX = 'fabricate-actor-type-';
+
+/**
+ * The dialog's width in pixels.
+ *
+ * Any number defeats the `width: "auto"` default described in the module docblock. This
+ * one is chosen to wrap the intro paragraph to a readable measure while leaving the
+ * widest plausible row — a friendly label plus a dotted module-subtype id plus both
+ * suffixes — room before it wraps.
+ *
+ * @type {number}
+ */
+export const DIALOG_WIDTH = 480;
+
+/**
+ * Inline presentation, keyed by the element it dresses. See the module docblock for why
+ * this is not a stylesheet.
+ *
+ * The row is a flex line rather than the default inline flow so the checkbox, the label
+ * and the trailing spans share one baseline and the row wraps as a unit; the id chip is
+ * monospace and boxed so a RAW TYPE ID is unmistakably not a friendly label, which is the
+ * whole point of showing both.
+ *
+ * Only ONE `--fab-*` token is consumed, and it is a font family. No `--fab-*` COLOUR is
+ * read here: those are declared on bare `:root`, unconditionally carrying the dark
+ * "fabricate" theme's values, and this dialog is a core-chromed window that follows
+ * FOUNDRY's theme — so a parchment-on-dark token would be unreadable against Foundry's
+ * light theme. Muting is done with `opacity` and neutral greys, which read on either.
+ *
+ * @type {Record<string, string>}
+ */
+const STYLES = Object.freeze({
+  row: 'display:flex;align-items:center;flex-wrap:wrap;gap:0.4em;padding:0.15rem 0',
+  label: 'font-weight:600',
+  id:
+    'font-family:var(--fab-font-mono, ui-monospace, monospace);' +
+    'font-size:0.85em;' +
+    'padding:0.05em 0.4em;' +
+    'border:1px solid rgb(127 127 127 / 45%);' +
+    'border-radius:3px;' +
+    'background:rgb(127 127 127 / 12%);' +
+    'opacity:0.85',
+  note: 'font-size:0.9em;font-style:italic;opacity:0.7',
+});
 
 function localize(key, data = null) {
   const i18n = globalThis.game?.i18n;
@@ -197,22 +261,31 @@ function buildRow(option, index) {
     suffixes.push(localize('FABRICATE.Settings.PlayerCharacterActorTypes.UnknownType'));
   }
   const suffixMarkup = suffixes
-    .map((suffix) => ` <span class="notes">${escapeHtml(suffix)}</span>`)
+    .map((suffix) => ` <span class="notes" style="${STYLES.note}">${escapeHtml(suffix)}</span>`)
     .join('');
 
   // The raw id is shown only when it differs from the label — a module subtype's
   // `mod-id.subtype` is otherwise unidentifiable from a friendly label alone, while an
   // unknown stored id already RENDERS as its own label and would read twice.
-  const idMarkup =
+  //
+  // When they are equal, `actorTypeLabel` fell back to the id, so the ONE string on the
+  // row is a raw id and wears the raw id's treatment. Dressing it as a friendly name
+  // instead would make the fallback — the case a GM most needs to recognise, because it
+  // marks a type this world does not translate — the one row that lies about what it is.
+  const idMarkup = ` <span class="fabricate-actor-type-id" style="${STYLES.id}">${escapeHtml(option.id)}</span>`;
+  const nameMarkup =
     option.label === option.id
-      ? ''
-      : ` <span class="fabricate-actor-type-id">${escapeHtml(option.id)}</span>`;
+      ? idMarkup
+      : ` <span class="fabricate-actor-type-label" style="${STYLES.label}">${escapeHtml(option.label)}</span>${idMarkup}`;
 
+  // The single spaces between the spans are load-bearing for the ACCESSIBLE NAME, not for
+  // layout: a whitespace-only text node between flex items is not rendered, so the `gap`
+  // is the only visible separation, but the label's text content is what a screen reader
+  // announces and "Player Charactercharacter" is what dropping them yields.
   return (
-    `<label class="checkbox" for="${rowId}">` +
+    `<label class="checkbox" for="${rowId}" style="${STYLES.row}">` +
     `<input ${attributes.join(' ')}>` +
-    ` <span class="fabricate-actor-type-label">${escapeHtml(option.label)}</span>` +
-    idMarkup +
+    nameMarkup +
     suffixMarkup +
     '</label>'
   );
@@ -277,6 +350,9 @@ export async function openPlayerCharacterTypesDialog() {
 
   const result = await DialogV2.wait({
     window: { title: localize('FABRICATE.Settings.PlayerCharacterActorTypes.Title') },
+    // Without this the inherited `width: "auto"` sizes the window to the intro
+    // paragraph's one-line max-content width. See the module docblock.
+    position: { width: DIALOG_WIDTH },
     content: buildActorTypeDialogContent({ options }),
     rejectClose: false,
     buttons: [
