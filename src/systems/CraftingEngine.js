@@ -23,13 +23,6 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { itemResolvesToComponent } from '../utils/sourceUuid.js';
 
 import { evaluatePrerequisite } from './characterPrerequisites.js';
-import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
-import {
-  awardedQuantityOf,
-  createOrStackComponentItem,
-  tagAwardedQuantity,
-} from './componentStacking.js';
-import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
@@ -37,6 +30,13 @@ import {
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
 } from './checkModifierResolver.js';
+import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import {
+  awardedQuantityOf,
+  createOrStackComponentItem,
+  tagAwardedQuantity,
+} from './componentStacking.js';
+import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,

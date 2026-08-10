@@ -68,7 +68,9 @@ new Recipe({
 > `null` (the default) picks nothing and inherits the system's `defaultModifierIds`.
 > `modifierIds` is authored or absent, not merely non-empty or empty.
 > An authored empty array (`[]`) is a real pick meaning "no eligible modifiers" (nothing is added to the check roll), distinct from an absent `modifierIds`, which inherits.
-> A pick is honoured **only** under the system's `"byRecipe"` rule, and is then truncated to `craftingCheck.maxModifierPicks`; under `"addAll"`, `"highest"`, and `"playerPicks"` it stays on disk unread.
+> A pick is honoured **only** under the system's `"bySubject"` rule — rendered "By recipe" on this activity — and is then truncated to `craftingCheck.maxModifierPicks` and clamped to each entry's own `min`/`max`; under `"addAll"`, `"highest"`, and `"playerPicks"` it stays on disk unread.
+> Its siblings on the other two activities are `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`, which obey the identical authoredness rule.
+> The pre-1095 spelling `"byRecipe"` is still accepted on read and is never written back.
 > Neither switching the rule away nor lowering the cap deletes anything, and restoring either applies the picks again with nothing to re-author.
 > A legacy `policy` key from before issue 1055 is dropped by the normaliser, never round-trips through `toJSON()`, and is never consulted wherever it survives unnormalised.
 

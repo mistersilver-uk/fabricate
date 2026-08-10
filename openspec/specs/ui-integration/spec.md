@@ -1376,11 +1376,11 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 ### Recipe crafting-check modifier control (issue 1055)
 
-The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `byRecipe` ("Recipe picks") combination rule, and only when the system carries a non-empty `checkModifiers` catalogue.
-`byRecipe` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
-Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `byRecipe`.
+The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the system carries a non-empty `CraftingSystem.checkModifiers` catalogue.
+`bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
+Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
-Under `byRecipe` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
+Under `bySubject` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
 
 1. **Inert banner** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
 The third cause, `noPlaceholder`, is REMOVED together with the roll-formula placeholder it named: the resolved scalar is appended to whatever the GM authored, so "a formula is authored but never references it" is not a reachable state.
@@ -1442,16 +1442,29 @@ That is not in tension with the inert-cause copy: those two strings must not nam
 The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
 
 **Checks tab — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
-It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Add all**, **Highest**, **Recipe picks** (`byRecipe`), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
+It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Add all**, **Highest**, **By recipe / By component / By gathering row** (`bySubject`, labelled from the activity), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
+`MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
+The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
+
+**The catalogue's ENTRY editor renders on CRAFTING only.** The icon picker, label field, `@`-prefixed `RollDataExpressionInput`, delete and `+ Add modifier` are the shipped crafting editor and are retained; it GAINS a paired absence-preserving `min`/`max` `Stepper` set with an `Unbounded` placeholder, on its OWN row after the expression input so the row reflows to two lines at a narrow pane rather than compressing the expression field.
+Salvage and gathering render each entry READ-ONLY — identity, expression and a `-1 to +5` bounds chip — with a link back to the crafting sub-tab where the catalogue is authored.
+**Read-only applies to the ENTRIES alone**: the per-entry eligibility control and the combination-rule grid stay fully editable on all three activities, because deciding which entries apply and how they combine is exactly what each activity owns.
+
+**The eligibility pill carries FOUR labels**, each with its own section intro sentence: `Applied` (`addAll`), `Considered` (`highest`), `Selectable` (`playerPicks`) and `Picked per subject` (`bySubject`).
+**The accessible CONTROL is the `SelectionCheckbox`; the `StatusPill` is presentational and supplies the label the checkbox is labelled by.
+The two are adjacent and are NEVER nested** — an interactive control inside an interactive pill lands invalid DOM.
+The not-selected state differs by more than colour: the checkbox is unchecked and the pill's word AND glyph both change, so the distinction survives a monochrome render.
+
+The section is labelled **"Check modifiers"** on all three activities — an explicit, recorded deviation from the prototype's bare "Modifiers" — so it is never confused with gathering's "Character modifiers" library, and the **gathering section additionally renders the dormancy notice** naming issue 683.
 `MODIFIER_POLICIES` is the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, because a hand-maintained mirror of the rule vocabulary is exactly the drift issue 855 was.
 
 Beneath it, a **Maximum picks** stepper authors `maxModifierPicks`.
-It renders **only** under a rule `policyDefersSelection` admits (`byRecipe`, `playerPicks`), asked of the resolver live against the radio group the GM is clicking rather than re-derived from a local membership test or projected from the last persisted rule.
+It renders **only** under a rule `policyDefersSelection` admits (`bySubject`, `playerPicks`), asked of the resolver live against the radio group the GM is clicking rather than re-derived from a local membership test or projected from the last persisted rule.
 Its **empty field is a real value — unlimited — not a blank to be defaulted**: the value shown is `resolveMaxModifierPicks`'s answer rendered back (`Infinity` → empty), so a stored `0`, `-2` or `"three"` displays as unlimited exactly as the engine treats it, and clearing the field persists `maxModifierPicks: null` VERBATIM rather than omitting the key, because omitting it would leave the old bound in place.
-An accompanying hint states "empty means no limit" and is the input's accessible description, since a blank number field cannot state it; the hint is keyed by rule, because the cap bounds the RECIPE AUTHOR at edit time under `byRecipe` and the PLAYER at roll time under `playerPicks`, and one sentence covering both would say nothing specific about either.
+An accompanying hint states "empty means no limit" and is the input's accessible description, since a blank number field cannot state it; the hint is keyed by rule AND by activity, because the cap bounds the SUBJECT AUTHOR at authoring time under `bySubject` and the PLAYER at roll time under `playerPicks`, and one sentence covering both would say nothing specific about either.
 
 The **Default modifiers** intro copy is keyed by rule for the same reason, in three readings: under `addAll`/`highest` the default set IS the eligible set and nobody narrows it ("Which modifiers apply.
-Every recipe in this system uses this set."); under `byRecipe` it is the fallback a recipe inherits until it picks its own; under `playerPicks` it is the menu the player chooses from at roll time.
+Every recipe in this system uses this set."); under `bySubject` it is the fallback a subject inherits until it picks its own; under `playerPicks` it is the menu the player chooses from at roll time.
 
 ### Tools tab
 
@@ -1784,7 +1797,8 @@ Above 1, the dialog disables the unchecked inputs once `maxPicks` are ticked and
 That is a UI affordance only: `evaluateCheckRoll` re-imposes the same cap on the returned selection, since a UI control's constraint is never the invariant.
 A descriptor carrying no usable `maxPicks` renders — and is reduced as — a single pick, so a descriptor built before the field existed cannot silently widen.
 This group is only the presentation of the crafting-check `playerPicks` combination rule: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the picks SUM into the appended modifier term are normative in `resolution-modes/spec.md` §Check Source, not here.
-Only crafting ever supplies `modifierChoice`; salvage and gathering pass no modifier context and never pass it, so their dialog is unchanged, as is a crafting roll under any other combination rule — including `byRecipe`, whose selection was already made at recipe-edit time — so no `modifierChoice`, no fieldset.
+**All three activities may supply a `modifierChoice`** under `playerPicks` (issue 1095), and their dialogs render the modifier fieldset on the same terms crafting's does; the pre-1095 claim that salvage and gathering never pass one retired with the crafting-only catalogue.
+A roll under any other combination rule passes none — including `bySubject`, whose selection was already made at authoring time — so no `modifierChoice`, no fieldset.
 The dialog's formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).

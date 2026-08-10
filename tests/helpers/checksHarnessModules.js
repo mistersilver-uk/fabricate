@@ -47,6 +47,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
   'src/systems/checkModifierResolver.js',
   'src/systems/salvageCheckUsability.js',
+  'src/utils/checkModifierPicks.js',
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
   'src/utils/routedOutcomeKeywords.js',

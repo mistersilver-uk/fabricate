@@ -95,6 +95,16 @@ export const MODIFIER_POLICIES = Object.freeze(['addAll', 'highest', 'bySubject'
 const VALID_POLICIES = new Set(MODIFIER_POLICIES);
 
 /**
+ * The absence-preserving ATTACH every subject normalizer spreads, RE-EXPORTED here so the
+ * READ half of the subject-pick rule ({@link buildCheckModifierContext}, below) and the
+ * WRITE half live behind one module for a consumer that already reads from it.
+ *
+ * The implementation stays in `src/utils/checkModifierPicks.js` and is import-free, because
+ * the two Foundry-free normalizers that also need it must not pull this module in.
+ */
+export { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
+
+/**
  * The pre-1095 spelling of `bySubject`, accepted on READ and never re-emitted — the same
  * new-then-legacy shape `_normalizeSalvageCraftingCheck` uses for
  * `breakToolsOnFail` / `consumeCatalystsOnFail`. Stated as a Map rather than an `if` so a
@@ -534,7 +544,10 @@ export function resolveModifierBounds(entry) {
  * @returns {number|null}
  */
 function numericBoundOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
+  // `[null, undefined, '']` rather than three `===` comparisons: the repo's own idiom for
+  // this guard (`_normalizeSalvage`'s `dcOverride`, `_normalizeGatheringTask`'s), and the
+  // one the lint rule asks for.
+  if ([null, undefined, ''].includes(value)) return null;
   if (typeof value !== 'number' && typeof value !== 'string') return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;

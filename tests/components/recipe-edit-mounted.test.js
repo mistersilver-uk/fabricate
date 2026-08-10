@@ -76,6 +76,7 @@ const RAW_MODULES = [
   // …and issue 1095 a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
   // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
   'src/systems/salvageCheckUsability.js',
+  'src/utils/checkModifierPicks.js',
   // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).

@@ -36,6 +36,7 @@ const harness = createMountedComponentHarness({
     // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
+    'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',
     'src/utils/craftingCheckExpression.js',
     'src/ui/svelte/util/foundryBridge.js',

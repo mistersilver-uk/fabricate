@@ -252,6 +252,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // imports only `craftingCheckExpression.js`, already listed, so this entry closes the
   // graph again.
   'src/systems/salvageCheckUsability.js',
+  'src/utils/checkModifierPicks.js',
   // Same rule, issue 917: the builder now shares its step->recipe view projection and
   // its active-run step read with CraftingEngine through this import-free leaf, so it
   // must be copied alongside the builder.

@@ -1722,7 +1722,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+    // The SHARED subject check-modifier picker (issue 1095) renders inside this salvage
+    // body, so a change to it is evidenced by THIS frame rather than by an unrelated one.
+    // The gathering task editor renders the same component; `manager-gathering-task-edit`
+    // claims it there.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'manager-component-edit-salvage-off',

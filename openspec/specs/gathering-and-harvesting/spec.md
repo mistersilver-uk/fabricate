@@ -627,6 +627,25 @@ Gathering runtime consumers resolve task `toolIds` through this map before actor
 6. The library is per crafting system.
 Tools are not shared across crafting systems.
 
+## Check Modifiers Versus Character Modifiers
+
+A gathering system may now carry TWO named-modifier concepts and they are not interchangeable (issue 1095).
+
+`gatheringConfig.systems[systemId].characterModifiers` (§Gathering Character Modifiers below) applies to the **d100** path only, references are per drop row and per event, and each contributes as a percentage-point delta or a multiplicative factor of the drop chance.
+It is unchanged by this change and it does **not** participate in `progressive` or `routed`.
+
+`CraftingSystem.checkModifiers`, selected by `gatheringCraftingCheck`'s own `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple, applies to the **formula-rolled** modes and contributes as an additive `+ N[Modifiers]` term on the roll; it is inert in `d100` and reports the cause `noCheck`.
+The two arithmetics are incompatible, so they are not unified here.
+
+**The disambiguation is a naming requirement, binding regardless of co-location.**
+No surface shows both — check modifiers live under Checks › Gathering › Modifiers, character modifiers on drop rows and events — so a requirement phrased as "every surface that can show both must name which it is showing" would be vacuous.
+Instead: the GM-facing section label is **"Check modifiers"** on every activity, and the gathering library keeps **"Character modifiers"**, so the two are told apart by name rather than by a sentence on one screen.
+
+**The check-modifier seam on gathering is DORMANT.**
+`_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders `progressive` and `routed` disabled, so no GM-selectable configuration reaches `runFormulaRouted` or `runFormulaProgressive` today.
+The persisted shape, both mirrored normalizers (`normalizeLibraryTask` and `_normalizeGatheringTask` must BOTH emit `GatheringTask.checkModifierIds`), the projection and the UI all land now, and the Modifiers section renders the same inert notice `d100` gets, **naming that reason**.
+The capability activates when 683 lands; no separate follow-up issue is opened.
+
 ## Gathering Character Modifiers
 
 ### Purpose

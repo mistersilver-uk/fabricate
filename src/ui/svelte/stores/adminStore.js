@@ -85,12 +85,12 @@ import {
   normalizeCurrencyUnit,
 } from '../../../systems/currencyProfile.js';
 import {
+  authoredCheckModifierIds,
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
   resolveActiveGatheringCheckFormula,
   resolveActiveSalvageCheckFormula,
 } from '../../../systems/checkModifierResolver.js';
-import { authoredCheckModifierIds } from '../../../utils/checkModifierPicks.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
