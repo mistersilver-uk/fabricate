@@ -115,19 +115,19 @@ Recipes resolve immediately with no skill check, even though the Routed by check
 
 **Likely causes:**
 
-- The system's **Combination rule** is not **Recipe picks**.
+- The system's **Combination rule** is not **By recipe**.
   That is the one rule that hands the selection to the recipe author, so it is the only rule under which the control appears.
   Under **Add all**, **Highest**, and **Player picks** the system decides, and the tab shows nothing rather than a control the system would ignore.
 - The system has no check modifiers in its catalogue yet, so there is nothing to pick from.
 - The system's active crafting check cannot use a modifier right now.
   Either the resolution mode rolls no check at all, or the check has no roll formula authored yet.
-  Under **Recipe picks** the recipe's Overview tab shows a banner naming which of these applies in place of the control.
+  Under **By recipe** the recipe's Overview tab shows a banner naming which of these applies in place of the control.
 
 **Related symptom:** The control is there, but the **Add modifier** button is greyed out.
 The recipe has reached the system's **Maximum picks**.
 Raise that limit, or clear it entirely for no limit, on the **Check modifiers** card.
 
-**What is and is not lost:** Switching a system away from **Recipe picks**, or lowering **Maximum picks**, never deletes what a recipe picked.
+**What is and is not lost:** Switching a system away from **By recipe**, or lowering **Maximum picks**, never deletes what a recipe picked.
 The picks stay stored and stop being applied, and restoring the rule or the limit applies them again immediately with nothing to re-enter.
 A lowered limit rolls only the first few picks, up to the limit, and keeps the rest.
 
@@ -137,8 +137,8 @@ A lowered limit rolls only the first few picks, up to the limit, and keeps the r
 2. Confirm the catalogue has at least one modifier.
    If it is empty, choose **Add modifier** and author one.
 3. Check the **Combination rule**.
-   If it is anything other than **Recipe picks**, that is why no recipe has a control; choose **Recipe picks** to hand the selection to your recipes.
-4. If the rule is already **Recipe picks**, open the recipe's **Overview** tab and read the banner in place of the control.
+   If it is anything other than **By recipe**, that is why no recipe has a control; choose **By recipe** to hand the selection to your recipes.
+4. If the rule is already **By recipe**, open the recipe's **Overview** tab and read the banner in place of the control.
    It names whether the system's active check has no roll formula, or rolls no check at all for the current resolution mode.
 5. Fix whichever of those applies on the **Crafting check** page, then return to the recipe's Overview tab.
 

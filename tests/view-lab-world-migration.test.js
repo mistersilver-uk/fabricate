@@ -26,7 +26,7 @@ import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import {
   policyDefersSelection,
   resolveMaxModifierPicks,
-} from '../src/systems/craftingModifierResolver.js';
+} from '../src/systems/checkModifierResolver.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 
 /**
@@ -65,10 +65,28 @@ const labSystem = (systems, id) => systems.find((system) => system.id === id);
 test('the startup migration pass does not rewrite any lab system’s crafting check', async () => {
   const { before, after } = await migrateLabWorld();
 
+  // ONE EXEMPTION, and it is the point of a migration rather than an accident (issue 1095,
+  // C13). `1.22.0` LIFTS `craftingCheck.checkModifiers` to `system.checkModifiers` and
+  // deletes the old key, and `labContent.js` deliberately goes on authoring it at the OLD
+  // location — which is what makes every lab build a live exercise of that transform, and
+  // what makes the frames show the state a GM upgrading will actually see. "Author the
+  // post-migration shape" is the right instruction for a stamp that fills an absence; it is
+  // the WRONG instruction for a relocation, because authoring the new location would leave
+  // the migration unexercised. So the key is dropped from BOTH sides of the comparison and
+  // the relocation is asserted positively below instead.
+  const withoutRelocatedCatalogue = (check) => {
+    if (!check || typeof check !== 'object') return check;
+    const { checkModifiers, ...rest } = check;
+    return rest;
+  };
+
   const rewritten = [];
   for (const seeded of before.craftingSystems) {
     const migrated = labSystem(after.craftingSystems, seeded.id);
-    if (JSON.stringify(seeded.craftingCheck) !== JSON.stringify(migrated?.craftingCheck)) {
+    if (
+      JSON.stringify(withoutRelocatedCatalogue(seeded.craftingCheck)) !==
+      JSON.stringify(withoutRelocatedCatalogue(migrated?.craftingCheck))
+    ) {
       rewritten.push(
         `${seeded.id}:\n    authored: ${JSON.stringify(seeded.craftingCheck?.checkModifiers ? { ...seeded.craftingCheck, checkModifiers: '…' } : seeded.craftingCheck)}` +
           `\n    rendered: ${JSON.stringify(migrated?.craftingCheck?.checkModifiers ? { ...migrated.craftingCheck, checkModifiers: '…' } : migrated?.craftingCheck)}`
@@ -87,6 +105,33 @@ test('the startup migration pass does not rewrite any lab system’s crafting ch
   );
 });
 
+// The positive half of the exemption above: the relocation the lab build exercises is
+// asserted to have HAPPENED, in both directions. Without this the exemption would merely
+// stop looking at the one key `1.22.0` touches (issue 1095, C13).
+test('the startup migration pass LIFTS the lab catalogue to the system level', async () => {
+  const { before, after } = await migrateLabWorld();
+  const seeded = labSystem(before.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
+  const migrated = labSystem(after.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
+
+  assert.ok(
+    Array.isArray(seeded?.craftingCheck?.checkModifiers) &&
+      seeded.craftingCheck.checkModifiers.length > 0,
+    'the fixture must go on authoring the catalogue at the PRE-1.22.0 location, or the lab ' +
+      'build stops exercising the migration and this assertion proves nothing'
+  );
+  assert.deepEqual(
+    migrated?.checkModifiers,
+    seeded.craftingCheck.checkModifiers,
+    'the catalogue arrives at the system level, entry for entry'
+  );
+  assert.equal(
+    Object.hasOwn(migrated?.craftingCheck ?? {}, 'checkModifiers'),
+    false,
+    'and the old key is DELETED rather than duplicated — two locations for one catalogue is ' +
+      'how two surfaces come to disagree about which one is authoritative'
+  );
+});
+
 test('the lab’s check-modifier system still defers the selection with an unbounded pick cap', async () => {
   const { after } = await migrateLabWorld();
   const herbalism = labSystem(after.craftingSystems, LAB_SYSTEM_IDS.HERBALISM);
@@ -98,7 +143,7 @@ test('the lab’s check-modifier system still defers the selection with an unbou
       'renders under no other, so `manager-checks-crafting-modifiers` would have nothing to assert'
   );
 
-  // The cap is what decides which CONTROL the roll prompt draws. `buildCraftingModifierChoice`
+  // The cap is what decides which CONTROL the roll prompt draws. `buildCheckModifierChoice`
   // takes `Math.min(cap, options.length)`, and `renderModifierFieldset` draws a pick-one radio
   // group at 1 and a checkbox group legended "Pick up to N" above it — so a cap that has fallen
   // below the eligible-set size does not fail any selector, it silently publishes the other

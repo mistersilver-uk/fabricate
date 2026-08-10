@@ -64,8 +64,9 @@ Everything on that card is a system-level decision.
 A recipe never overrides it; the most a recipe can do is pick which modifiers apply, and only when the system's combination rule asks it to.
 The card appears on every crafting sub-tab once the catalogue has at least one entry, whether or not the system's active check can use it yet.
 When it cannot, the card explains why instead of hiding, so a modifier you authored is never silently doing nothing with no indication.
-Check modifiers are a crafting-only feature.
-Salvage and gathering checks do not use them.
+Check modifiers are **not** a crafting-only feature.
+Salvage and Gathering select over the same catalogue, each with its own rule, its own default set and its own pick cap — see [One catalogue, three activities](#one-catalogue-three-activities).
+The catalogue itself is only ever *edited* on the Crafting check.
 
 ### Defining check modifiers
 
@@ -82,7 +83,7 @@ On first load after upgrading, Fabricate removes it from every stored crafting, 
 Three things are worth knowing before you upgrade.
 
 - **A catalogue you authored but never referenced now applies.** If you built a catalogue and deliberately never spent the placeholder, those modifiers were doing nothing and now add to every crafting roll.
-To keep the previous total, clear the **Default modifiers** set on that system, or choose a combination rule whose set resolves to 0.
+To keep the previous total, switch every entry off on that system, or choose a combination rule whose set resolves to 0.
 - **A formula that SUBTRACTED the placeholder now adds it.** A check written as `1d20 - <placeholder>` rolled `1d20 - 3` with a `+3` modifier; it now rolls `1d20 + 3[Modifiers]`.
 A formula that spent the placeholder twice counted it twice and now counts it once.
 - **A placeholder written somewhere it cannot simply be removed is left alone and reported.** If you wrote it inside a multiplication, a function argument such as `max(...)`, a dice count, or its own parentheses, Fabricate cannot guess what you meant, so it leaves the formula exactly as you authored it, names the system in the upgrade notice, and treats that check as having no roll formula until you edit it.
@@ -111,27 +112,63 @@ It also decides **who chooses them, and when**.
 |:-----------------|:------------|:-------------|:------------------------|
 | **Add all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
 | **Highest** | Nobody. The system's default set applies as it stands. | Uses only the single largest modifier in the default set, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
-| **Recipe picks** | You do, per recipe, on that recipe's **Overview** tab. | Sums the modifiers that recipe picked. | Different recipes in one system draw on different skills, and you want to decide that once, while authoring the recipe. |
+| **By recipe** / **By component** / **By gathering task** | You do, per record, on that record's own editor. | Sums the modifiers that record picked. | Different recipes (or components, or gathering tasks) in one system draw on different skills, and you want to decide that once, while authoring the record. |
 | **Player picks** | The player does, at roll time. | Sums the modifiers the player picked. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
 The combination rule is always the system's.
 Neither a recipe nor a player can change it, and neither can pick modifiers under a rule that does not ask them to.
-Choosing **Recipe picks** or **Player picks** hands out the *selection*, never the rule.
+Choosing the by-record rule or **Player picks** hands out the *selection*, never the rule.
+
+Each of the three activities — Crafting, Salvage and Gathering — carries its **own** combination rule, default set and pick cap, over **one shared catalogue**.
+The catalogue is authored once, on the Crafting check; the Salvage and Gathering cards show the same entries read-only and let you decide which of them apply there and how they combine.
+The by-record rule is one rule with three labels: it reads **By recipe** on Crafting, **By component** on Salvage and **By gathering task** on Gathering, because the record doing the picking is different on each.
 
 ### The default eligible set
 
-The **Default modifiers** picker, below the catalogue, sets which modifiers are on by default for the whole system.
-What that set means depends on the combination rule, and the card's own wording changes with it:
+There is no separate "Default modifiers" picker: each catalogue entry carries its own switch, on its own row, and the entries you switch on ARE the activity's default set.
+The switch's word changes with the combination rule, because the rule is what "on" means, and its off word answers it:
 
-- Under **Add all** and **Highest** it is simply the set that applies, to every recipe in the system.
-- Under **Recipe picks** it is what a recipe uses until it picks its own on its **Overview** tab.
-- Under **Player picks** it is the menu the player chooses from at roll time.
+- Under **Add all** an entry reads **Applied** or **Not applied** — the set that applies, to every attempt in the system.
+- Under **Highest** it reads **Considered** or **Not considered** — the entries compared, of which only the largest is added.
+- Under the by-record rule it reads **Picked per subject** or **Not picked by default** — what a record uses until it picks its own on its own editor.
+- Under **Player picks** it reads **Selectable** or **Not selectable** — the menu the player chooses from at roll time.
+
+A sentence above the entries states which of those four readings is in force, and it changes the moment you change the rule.
+
+### Least and most a modifier may add
+
+Each catalogue entry may carry a **Minimum** and a **Maximum**, on the Crafting check where the catalogue is authored.
+They clamp what **that one modifier** contributes, after its expression is worked out and before the modifiers are combined — so a maximum of `+5` caps that entry at `+5` whether the rule sums the eligible set or takes the largest of it.
+
+**Leave either field empty for no bound on that side.**
+An empty field is a real setting, not an unanswered question, exactly as **Maximum picks** is; a bound of `0` is a real bound and is kept.
+
+If you set a minimum **above** the maximum, that modifier contributes **nothing at all** until you fix the two values, and the Validation tab reports it as a blocking issue.
+Fabricate deliberately does not quietly swap them round: that would roll a number you never asked for.
+
+A bound that is too large or too small to appear in a dice formula — anything Foundry would have to write in exponent notation, such as `1e21` — is blocked the same way, with its own message, and the row says so where you typed it.
+Only that entry is refused; the other modifiers on the roll are unaffected.
+
+### One catalogue, three activities
+
+Salvage and Gathering select over the same catalogue the Crafting check authors.
+Their cards show each entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link back to the Crafting check to edit them.
+What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
+
+**Gathering is not switched on yet.**
+Progressive and routed gathering are still disabled (issue 683), and the d100 mode rolls no formula, so nothing you set on the Gathering check's modifiers applies to a roll today.
+The card says so.
+Anything you set is saved and starts applying when those gathering modes ship.
+
+The gathering **check** modifiers here are a different thing from the gathering library's **character** modifiers.
+Character modifiers shift a drop's percentage chance in d100 gathering; check modifiers add to a rolled formula in progressive and routed gathering.
+Neither applies where the other does.
 
 ### Maximum picks
 
-Under **Recipe picks** and **Player picks**, the **Maximum picks** field caps how many modifiers the chooser may take.
+Under the by-record rule and **Player picks**, the **Maximum picks** field caps how many modifiers the chooser may take.
 It appears only under those two rules, because the other two have nobody to cap.
 
 **Leave it empty for no limit.**
@@ -148,13 +185,13 @@ Raise the cap again and the rest count once more, with nothing to re-enter.
 {: .note }
 > **If you are upgrading an existing world:** systems already set to **Player picks** are given a **Maximum picks** of **1**, which is the single pick that rule always meant, so nothing about them changes.
 > Systems on the other three rules are left with no limit.
-> Systems previously set to **Recipe picks** keep every modifier their recipes had picked.
+> Systems previously set to the by-record rule keep every modifier their recipes had picked.
 
-### Recipe picks
+### Picking per record
 
-Under **Recipe picks**, each recipe's **Overview** tab gains an **Eligible modifiers** control with three choices:
+Under the by-record rule, each recipe's **Overview** tab gains an **Eligible modifiers** control with three choices:
 
-- **Inherit system default** uses the system's **Default modifiers** set.
+- **Inherit system default** uses the entries the system has switched on.
 This is what a recipe does until you change it, and the tab names the set it is inheriting.
 - **Custom set** lets the recipe pick its own modifiers, up to **Maximum picks**.
 It starts from whatever the recipe was already using, so customising begins from the inherited set rather than from nothing.
@@ -164,12 +201,13 @@ It is a deliberate choice, distinct from inheriting an empty set.
 The picks are summed at roll time, and nothing is asked of the player.
 
 **If a recipe's Eligible modifiers control is not on its Overview tab**, this section is almost always why.
-The control appears only when the system's combination rule is **Recipe picks** and the system has at least one check modifier in its catalogue.
+The control appears only when the system's combination rule is **By recipe** and the system has at least one check modifier in its catalogue.
+Salvage and Gathering have the same control on the component editor's Salvage section and in the gathering task editor, under their own activity's rule.
 Under **Add all**, **Highest**, or **Player picks** the recipe has nothing to choose, so the tab shows nothing at all rather than a control the system would ignore.
 Open the **Crafting check** page for that recipe's system and look at the **Combination rule** on the **Check modifiers** card.
-If the rule is already **Recipe picks** and the control is still missing, the recipe's Overview tab shows a banner in its place naming one of the two causes in [When check modifiers do nothing](#when-check-modifiers-do-nothing).
+If the rule is already **By recipe** and the control is still missing, the recipe's Overview tab shows a banner in its place naming one of the two causes in [When check modifiers do nothing](#when-check-modifiers-do-nothing).
 
-Switching the system away from **Recipe picks** does not delete anything a recipe picked.
+Switching the system away from the by-record rule does not delete anything a record picked.
 The picks stay stored and simply stop being consulted; switch back and they apply again immediately.
 
 ### Player picks

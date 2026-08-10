@@ -2,6 +2,7 @@
 <script>
   import Chip from './Chip.svelte';
   import EmptyState from './EmptyState.svelte';
+  import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import { DEFAULT_GATHERING_TASK_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -25,6 +26,17 @@
     selectedDropId = '',
     rewardRules = null,
     characterModifierLibrary = [],
+    // The SYSTEM's one CHECK-modifier catalogue and the GATHERING check's selection over
+    // it (issue 1095). DELIBERATELY NOT `characterModifierLibrary` above: that is the d100
+    // percentage-point / multiplicative library, a different concept with different
+    // arithmetic, and the two are told apart by name rather than by a sentence on one
+    // screen. The picker below renders only under `bySubject`.
+    checkModifierOptions = [],
+    gatheringModifierPolicy = 'addAll',
+    gatheringModifierMaxPicks = null,
+    // The gathering check's DEFAULT eligible set, so the picker can NAME what this task
+    // inherits when it has authored no pick of its own.
+    gatheringModifierDefaultIds = [],
     libraryTools = [],
     environmentOptions = [],
     onPickImagePath = null,
@@ -1162,6 +1174,38 @@
             </div>
           </div>
         </div>
+      </section>
+    {/if}
+
+    <!-- This task's own CHECK-modifier pick (issue 1095). Rendered under the gathering
+         check's `bySubject` rule, whatever the resolution mode: the selection is authored
+         and persisted in every mode, and it applies once a formula-rolled mode is
+         selectable (issue 683, decision 8). The Checks screen carries the dormancy notice;
+         repeating it on every task row would be noise. -->
+    {#if gatheringModifierPolicy === 'bySubject'}
+      <section class="manager-task-dc-card" data-gathering-task-check-modifiers>
+        {@render taskCardHeader(
+          text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueHeading',
+            'Check modifiers'
+          ),
+          text(
+            'FABRICATE.Admin.Manager.Gathering.TaskCheckModifierHint',
+            'Which of the system’s check modifiers apply to this task’s rolled gathering check. These are not the character modifiers on drop rows, which shift a drop’s percentage chance.'
+          )
+        )}
+        <SubjectModifierPicker
+          options={checkModifierOptions}
+          selectedIds={Array.isArray(task?.checkModifierIds) ? task.checkModifierIds : null}
+          maxPicks={gatheringModifierMaxPicks}
+          inheritedIds={gatheringModifierDefaultIds}
+          subject="task"
+          testId="gathering-check-modifier"
+          onChange={(next) =>
+            onUpdateTask(
+              Array.isArray(next) ? { checkModifierIds: next } : { checkModifierIds: undefined }
+            )}
+        />
       </section>
     {/if}
 

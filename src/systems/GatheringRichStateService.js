@@ -1,3 +1,5 @@
+import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
+
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
@@ -1511,6 +1513,19 @@ export class GatheringRichStateService {
       // and normalizeList(task.resultGroups)[0]); dormant until #683 ships routed
       // resolution, but must stay carried so that path is not broken on arrival.
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
+      // THE TASK'S OWN CHECK-MODIFIER PICK (issue 1095) MUST SURVIVE COMPOSITION.
+      // `normalizeLibraryTask` above and `_normalizeGatheringTask` (adminStore) are the two
+      // mirrored LIBRARY normalizers, but this literal is a THIRD whitelist rebuild and it
+      // is the one the ENGINE sees: `composeEnvironment` → `_findStartTask` →
+      // `_resolveStartContext` hands this object to `buildCheckModifierContext(system,
+      // 'gathering', task)`, which reads `task.checkModifierIds`. Omitting the key here made
+      // `readSubjectModifierIds` find nothing, so every composed task INHERITED the default
+      // set and `bySubject` could never work on gathering at all — with both library
+      // normalizers correct and the pick intact on disk.
+      //
+      // Same absence-preserving attach as the two normalizers, for the same reason: an
+      // authored EMPTY array is a real pick of zero and must not collapse back to inherit.
+      ...authoredCheckModifierIds(normalized.checkModifierIds),
       // Per-task routed-check DC override (issue 904). resolutionMode stays hardcoded
       // to 'd100' above — routed gathering is disabled ("Coming soon") pending #683 —
       // so this plumbing is deliberately dormant until routed resolution ships.
@@ -1992,6 +2007,19 @@ function normalizeLibraryTask(task = {}) {
       ? task.toolIds.map((id) => String(id ?? '').trim()).filter(Boolean)
       : [],
     nodes: normalizeNodeConfig(task.nodes),
+    // This task's own check-modifier pick (issue 1095) — the GATHERING analogue of
+    // `Recipe.craftingModifier.modifierIds`, consulted only under the `bySubject`
+    // combination rule. Attached ONLY when authored: an authored EMPTY array is a real
+    // pick of zero, distinct from an absent one which inherits
+    // `gatheringCraftingCheck.defaultModifierIds`.
+    //
+    // THIS NORMALIZER IS ONE OF A MIRRORED PAIR. `_normalizeGatheringTask` in
+    // src/ui/svelte/stores/adminStore.js is the other, and BOTH are whitelist rebuilds, so
+    // a key emitted here and not there is dropped the moment a task is saved through the
+    // manager draft path — and vice versa. The shared `authoredCheckModifierIds` attach is
+    // what keeps the two from drifting on the subtle half (authoredness is decided by
+    // `Array.isArray` at entry, never by the filtered length).
+    ...authoredCheckModifierIds(task.checkModifierIds),
     // Per-task routed-check DC override (issue 904): replaces the routed check's
     // own dc at gather time when set. Guard null/''/undefined explicitly before
     // `Number()` so re-normalizing a null stays null (Number(null) is 0, which

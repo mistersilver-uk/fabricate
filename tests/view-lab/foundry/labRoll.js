@@ -27,7 +27,7 @@
  * written here. A private parser is how the lab would start quietly disagreeing with the resolver
  * about what a formula means.
  */
-import { evaluateNumericExpression } from '../../../src/systems/craftingModifierResolver.js';
+import { evaluateNumericExpression } from '../../../src/systems/checkModifierResolver.js';
 
 /**
  * `NdS` with an optional keep-highest / keep-lowest modifier.

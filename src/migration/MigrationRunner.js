@@ -36,6 +36,7 @@ import { migrateRetireCraftingModToken } from './migrateRetireCraftingModToken.j
 import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgressiveAllowPlayerReorder.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
+import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
@@ -378,6 +379,34 @@ const MIGRATIONS = [
     // field (captured and deleted by the runner below for the GM notice).
     migrate: (data) => migrateRetireCraftingModToken(data),
   },
+  {
+    version: '1.22.0',
+    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, NOT IN A COMMENT. The label is the only
+    // string a GM ever reads about this migration — `migrationRecoveryPrompt` renders it as
+    // "aborted during …" beside the Keep/Downgrade buttons — and "Downgrade to 1.21.0" is
+    // precisely the choice this warning is about. A source comment stating it would be
+    // addressed to the wrong reader at the wrong moment.
+    label:
+      'Lift the check-modifier catalogue out of craftingCheck up to the system, so ' +
+      'salvage and gathering can select over the same one, and rewrite the byRecipe ' +
+      'combination rule to its activity-independent name bySubject. THE RUNNER ORDER IS ' +
+      'LOAD-BEARING: this runs before any manager load, and _normalizeCraftingCheck is an ' +
+      'allowlist rebuild that no longer emits checkModifiers, so a save running first ' +
+      'would have DELETED the catalogue rather than relocating it. DOWNGRADING IS NOT ' +
+      'LOSSLESS, and this is the first migration in this registry of which that is true: ' +
+      '1.21.0 never saw a system-level checkModifiers, so it drops the relocated catalogue ' +
+      'on the first read and every check modifier stops contributing to every roll until ' +
+      'you re-author it. Your formulas and combination rules are unaffected',
+    downgradeTo: '1.21.0',
+    // MACHINE-READABLE, so the label clause above is a RULE rather than one entry's prose. A
+    // migration that marks itself here must name the loss in its own `label`
+    // (`tests/migration-runner.test.js` enforces it over the whole registry), because the label
+    // is the only string a GM reads at the Keep/Downgrade prompt and a caveat left in a source
+    // comment reaches nobody standing in front of that dialog. `1.21.0` is deliberately NOT
+    // marked: it is DATA-lossless and BEHAVIOUR-lossy, which is a different fact.
+    downgradeLosesData: true,
+    migrate: (data) => migrateSystemCheckModifierCatalogue(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -392,7 +421,7 @@ export class MigrationRunner {
    *   setSetting: Function,
    *   moduleVersion?: string,
    *   promptRecovery?: Function,
-   *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string }>
+   *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string, downgradeLosesData?: boolean }>
    * }} opts
    *   `promptRecovery` is an optional seam invoked with the abort context so the
    *   caller can present a GM decision prompt; `migrations` overrides the default

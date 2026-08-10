@@ -2905,6 +2905,16 @@ const PROGRESSIVE_SALVAGE_CHECK = Object.freeze({
     thresholds: { success: 10 },
     awardMode: 'equal',
   },
+  // SALVAGE'S OWN SELECTION over the shared catalogue (issue 1095), and it is DIFFERENT from
+  // crafting's on both axes deliberately. The catalogue is shared; the selection is not, and a
+  // world where all three activities picked the same rule over the same ids is a world in which
+  // an activity reading another's selection looks identical on screen.
+  //
+  // It is also what gives the read-only entry row a frame: the salvage card renders the entries
+  // read-only with a bounds chip, and with no eligible set every row would be in the
+  // not-selected state and the chip's companion state would be depicted nowhere.
+  defaultModifierPolicy: 'highest',
+  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-tools'],
 });
 
 /**
@@ -2976,6 +2986,17 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     label: 'Medicine',
     icon: 'fa-solid fa-kit-medical',
     expression: '@skills.med.mod',
+    // THE ONLY BOUNDED ENTRY IN THE WORLD (issue 1095). Per-entry `min`/`max` clamp the
+    // RESOLVED value, and three surfaces render them: the authoring pair of Steppers on the
+    // crafting card, the read-only `-1 to +6` chip on the salvage and gathering cards, and
+    // nothing at all on an unbounded entry. Without one bounded entry anywhere, every frame
+    // of all three shows the same unbounded reading and the chip is depicted nowhere.
+    //
+    // `-1`/`+6` is deliberately a SIGNED pair spanning zero, because the chip signs both ends
+    // and a `0 to 6` reading could not show that. Neither bound binds Bramble's `+4`, so the
+    // player roll-prompt frame's Medicine value is unchanged.
+    min: -1,
+    max: 6,
   },
   {
     id: 'hb-mod-nature',
@@ -2988,6 +3009,21 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     label: 'Herbalism kit',
     icon: 'fa-solid fa-mortar-pestle',
     expression: '@prof',
+  },
+  {
+    id: 'hb-mod-weather',
+    label: 'Favourable weather',
+    icon: 'fa-solid fa-cloud-sun',
+    expression: '@abilities.wis.mod',
+    // CATALOGUED BUT NOT SELECTED, and that is its whole job. The per-entry eligibility control
+    // has two readings — the rule's own word (`Applied` / `Considered` / `Selectable` /
+    // `Picked per subject`) and the not-selected one — and with every lab entry inside
+    // `defaultModifierIds` the second was depicted on no screen anywhere.
+    //
+    // It is a FOURTH entry rather than one of the three demoted, because the eligible set is
+    // load-bearing elsewhere: `player-crafting-roll-prompt` needs three eligible modifiers with
+    // three different values to show a choice rather than a row of interchangeable chips, and
+    // `maxModifierPicks: 3` below is sized to that set.
   },
 ]);
 
@@ -3022,7 +3058,8 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // system already has, because a non-empty catalogue is what un-hides the recipe editor's
   // modifier row at all.
   defaultModifierPolicy: 'playerPicks',
-  // ALL THREE catalogue entries, up from two. The eligible set under `playerPicks` is this list,
+  // THREE of the catalogue's FOUR entries (issue 1095 added `hb-mod-weather` precisely to leave
+  // one out; see its own note). The eligible set under `playerPicks` is this list,
   // and the prompt needs at least TWO to render at all (the engine suppresses a one-option choice)
   // — but three with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2) is what
   // makes the frame show a choice rather than a row of interchangeable chips.
@@ -3044,7 +3081,7 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // header: it names this harness as the reason). This is that opt-out.
   //
   // 3 is the option count, so it is unlimited in every observable way:
-  // `buildCraftingModifierChoice` computes `Math.min(cap, modifiers.length)` and lands on the same
+  // `buildCheckModifierChoice` computes `Math.min(cap, modifiers.length)` and lands on the same
   // `maxPicks: 3` an unbounded cap produces, so the roll prompt still renders the checkbox group
   // legended "Pick up to 3", and the non-interactive best-legal-selection still sums all three.
   //
@@ -3054,6 +3091,41 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // `tests/view-lab-world-migration.test.js` fails if a migration ever silently rewrites a lab
   // system's check block again.
   maxModifierPicks: 3,
+});
+
+/**
+ * Herbalism's GATHERING selection over the shared catalogue (issue 1095).
+ *
+ * IT EXISTS TO GIVE THE INHERIT NOTE SOMETHING TO NAME. `manager-gathering-task-edit-modifier-pick`
+ * opens `SubjectModifierPicker` in its INHERIT state, and that state has TWO readings: it names the
+ * activity's `defaultModifierIds`, or — with an empty set — it states that nothing applies. With no
+ * `gatheringCraftingCheck` on this system at all, `_normalizeGatheringCraftingCheck` normalized an
+ * absent block to an EMPTY default set, so that frame photographed the empty-set sentence and named
+ * nothing, while the registry's own note beside both picker cases claims the inherited set is
+ * NAMED. The fixture is the fix rather than the note, because naming is the reading worth a frame:
+ * "inheriting" with no names is precisely what this picker was built not to say.
+ *
+ * It is also the only place gathering's own selection is authored anywhere in the lab, which is
+ * what makes `manager-checks-gathering-modifiers` show an eligible set rather than four
+ * not-selected rows.
+ *
+ * DISTINCT FROM THE OTHER TWO ON BOTH AXES, deliberately, exactly as the salvage block is. Crafting
+ * is `playerPicks` over three ids, salvage is `highest` over two, gathering is `addAll` over two
+ * DIFFERENT ones — so three of the four combination rules are depicted on a real screen, and an
+ * activity that read another activity's selection would be visible rather than coincidentally
+ * identical.
+ *
+ * `hb-mod-weather` stays out of this set as it stays out of the other two: its whole job is to be
+ * the catalogued-but-not-selected entry, and it can only do that if NO activity selects it.
+ *
+ * No `enabled` and no formula slots: gathering resolves `d100` here, so the check-modifier seam is
+ * inert with cause `noCheck` and dormant pending issue 683 either way. Authoring a formula would
+ * claim a rolled gathering check this world does not have, and both notices are what
+ * `manager-checks-gathering-modifiers` exists to photograph.
+ */
+const HERBALISM_GATHERING_CHECK = Object.freeze({
+  defaultModifierPolicy: 'addAll',
+  defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],
 });
 
 export function buildLabContent() {
@@ -3146,6 +3218,9 @@ export function buildLabContent() {
       // world; smithing stays Simple-with-no-formula, which is the other body.
       salvageResolutionMode: 'progressive',
       salvageCraftingCheck: PROGRESSIVE_SALVAGE_CHECK,
+      // Gathering's own selection over the SAME catalogue — see its own note for why this block
+      // exists at all and why it carries no formula.
+      gatheringCraftingCheck: HERBALISM_GATHERING_CHECK,
       features: {
         essences: true,
         recipeCategories: true,

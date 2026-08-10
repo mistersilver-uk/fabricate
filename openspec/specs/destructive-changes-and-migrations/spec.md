@@ -445,7 +445,7 @@ A post-`1.13.0` **preserved alchemy-formula** `linkedRecipeItemUuid` still satis
 ### Modifier Pick Cap Migration (`1.20.0`, `downgradeTo: '1.19.0'`, pure, clone-first, idempotent)
 
 Issue 1055 generalizes the crafting-check combination rule.
-`craftingCheck.defaultModifierPolicy` keeps **four** rules (`addAll`/`highest`/`byRecipe`/`playerPicks`), each stating both how the eligible values reduce AND who selects them, and the new `craftingCheck.maxModifierPicks` bounds the two SELECTING rules (`byRecipe`, `playerPicks`), which both SUM what was picked.
+`craftingCheck.defaultModifierPolicy` keeps **four** rules (`addAll`/`highest`/`byRecipe`/`playerPicks` — the third renamed `bySubject` by `1.22.0`), each stating both how the eligible values reduce AND who selects them, and the new `craftingCheck.maxModifierPicks` bounds the two SELECTING rules, which both SUM what was picked.
 `resolveMaxModifierPicks` reads an ABSENT cap as UNLIMITED.
 The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`) reads and returns both the `craftingSystems` and `recipes` payloads as pure, clone-first data — it mutates only its own clones, never the runner's payload, so even a hypothetical throw would leave the pre-migration checkpoint untouched — and throws no `FatalMigrationError`.
 
@@ -453,12 +453,15 @@ The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`
    Every system already on that rule carries no cap, because the field did not exist when it was authored, so without this stamp the upgrade would silently widen each one from "pick one" to "pick everything" and jump its check-modifier scalar from `max(...)` to the full sum.
    The migration writes back the bound those systems always had, exactly once.
 2. **The other three rules are deliberately left absent, i.e. unlimited.** `addAll` and `highest` do not select at all, so a cap means nothing to them and stamping one would only leak a bound into any later switch to a selecting rule.
-   `byRecipe` ("Recipe picks") is the other selecting rule, but its historical behaviour was NOT single-pick: a recipe already on disk may legitimately have picked several modifiers, and `resolveEligibleModifierIds` TRUNCATES a recipe's pick to the cap, so a stamp of `1` here would silently discard picks the GM authored.
+   `byRecipe` (renamed `bySubject` by `1.22.0`) is the other selecting rule, but its historical behaviour was NOT single-pick: a record already on disk may legitimately have picked several modifiers, and `resolveEligibleModifierIds` TRUNCATES a subject's pick to the cap, so a stamp of `1` here would silently discard picks the GM authored.
    Unlimited is the only value that preserves them, and a GM who wants a bound can set one.
-3. **`byRecipe` is NOT mapped or retired, at either level.** It is a first-class combination rule — the recipe author selecting at recipe-edit time, the parallel of the player selecting at roll time — so a persisted `byRecipe` is valid data that must survive untouched.
+3. **`byRecipe` is NOT mapped or retired BY THIS MIGRATION, at either level — and that was the correct call for this release.** The rule was first-class then and had no activity-independent name — the recipe author selecting at recipe-edit time, the parallel of the player selecting at roll time — so a persisted `byRecipe` was valid data that had to survive untouched.
+   **The `1.22.0` *System Check-Modifier Catalogue Migration* below supersedes this deliberately, not by oversight** (issue 1095): once salvage and gathering select over the same catalogue the rule's label stopped being "Recipe picks", so the token is renamed to `bySubject` and `normalizeModifierPolicy` accepts the old spelling as a never-re-emitted READ alias.
+   `1.20.0` still leaves it alone: rewriting it here as well would make two gates answer differently about one field, and this one runs first.
 4. **The stamp is conditional on purpose.** It fires only where the cap is still unbounded (`resolveMaxModifierPicks` reports `Infinity`), so an authored cap always wins.
    That is what makes the migration idempotent under re-run without relying on the version gate, and the View Lab depends on it directly: the lab boots the real runner over fixtures that seed no `migrationVersion`, so `lastRunVersion` is `0.0.0` and every migration runs on every lab build — an unconditional write would overwrite an authored cap and corrupt the exact frame that case exists to capture.
-5. **It does not seed a missing `craftingCheck` block.** `checkModifiers` lives inside `craftingCheck`, so a system without that block has no catalogue, no modifiers to pick from and no cap to observe; it also cannot be on `playerPicks`, since the rule is persisted in the very block that is missing.
+5. **It does not seed a missing `craftingCheck` block.** At this point in the ladder `checkModifiers` still lives inside `craftingCheck` — the `1.22.0` migration below is what moves it to `CraftingSystem.checkModifiers` — so a system without that block has no catalogue, no modifiers to pick from and no cap to observe; it also cannot be on `playerPicks`, since the rule is persisted in the very block that is missing.
+   **The reasoning survives the move unchanged**, and `1.22.0` follows it for salvage and gathering for the same reason: an absent selection normalizes to `addAll` with an empty id set, which is a no-op.
    Precedent: the *Progressive Reorder-Flag Retirement Migration* above makes the same call for the same reason — no storage churn for zero observable change.
 6. **The recipe payload is read and returned unchanged, on purpose.** Recipes are the other half of this feature's data, so returning them makes the deliberate no-op explicit rather than leaving a reader to wonder whether they were forgotten; the runner compares each setting's JSON against its pre-pass snapshot before writing, so an unchanged clone persists nothing.
    In particular a recipe's legacy `craftingModifier.policy` is NOT stripped here: the resolver no longer consults it, so it is inert, and leaving it on disk is what keeps the downgrade below lossless.
@@ -469,11 +472,11 @@ The `1.20.0` settings-data migration (`src/migration/migrateMaxModifierPicks.js`
 
 **Mirrored on import.** `migrateExportPayload` applies the identical per-system transform (`applyMaxModifierPicks`, shared with the settings-data migration, not a second implementation of it) to an imported bundle, branch-independently — it runs whether or not the payload's envelope `schemaVersion` needed upcasting, because the cap is a new field on an OLD schema version and its absence is orthogonal to the envelope version.
 An export bundle carries exactly one system, so the shared per-system transform is applied directly with no grouping.
-It is idempotent for the same reason as the settings-data migration: an authored cap in the bundle always survives the import, and a bundle's `byRecipe` rule is left exactly as authored at both levels.
+It is idempotent for the same reason as the settings-data migration: an authored cap in the bundle always survives the import, and a bundle's `byRecipe` rule is left exactly as authored at both levels by THIS transform (the `1.22.0` upcast, which runs after it, is what rewrites the token).
 
 **A recipe's picks are never destroyed by a cap.** Lowering `maxModifierPicks` below what a recipe already picked leaves that recipe's stored `craftingModifier.modifierIds` exactly where it was — only how many of them the resolver HONOURS changes, `resolveEligibleModifierIds` keeping the first N in authored order.
 Raising the cap again re-applies the rest immediately, with nothing to re-enter.
-Switching the system away from `byRecipe` likewise leaves every recipe's stored pick intact and simply stops consulting it.
+Switching the system away from the subject-selecting rule likewise leaves every recipe's stored pick intact and simply stops consulting it.
 The recipe editor's picker truncates its own seed to the cap and refuses an add at the cap, but that is a UI affordance layered on top of the resolver's truncation, never the invariant.
 
 ### Check-Modifier Placeholder Retirement Migration (`1.21.0`, `downgradeTo: '1.20.0'`, pure, clone-first, idempotent)
@@ -525,6 +528,32 @@ The per-system counts are discarded there on purpose: the GM notice reports what
 
 **The runtime shim is the fail-safe, not a second migration.** `stripRetiredModifierPlaceholder` (`src/utils/craftingCheckExpression.js`) removes any placeholder that survives — hand-edited, imported, or seeded by a fixture — at the head of `evaluateCheckRoll` and `resolveCheckFormulaDisplay`, and inside `resolveActiveCraftingCheckFormula` and `resolveSalvageCheck` BEFORE their emptiness test.
 Its rule is normative in `resolution-modes/spec.md` §Check Source.
+
+### System Check-Modifier Catalogue Migration (`1.22.0`, `downgradeTo: '1.21.0'`, pure, clone-first, idempotent)
+
+Issue 1095 lifts the check-modifier catalogue out of `craftingCheck` and up to the system, so salvage and gathering can select over the same entries, and renames the `byRecipe` combination rule to its activity-independent name `bySubject`.
+The `1.22.0` settings-data migration (`src/migration/migrateSystemCheckModifierCatalogue.js`) reads and returns the `craftingSystems` payload as pure, clone-first data — it mutates only its own clones, never the runner's payload — and throws no `FatalMigrationError`.
+
+1. **It moves an ARRAY-valued `craftingCheck.checkModifiers` to `CraftingSystem.checkModifiers` and deletes the old key.** The old key is deleted rather than aliased, so there is exactly one location and nothing to keep in sync.
+   The deletion is **conditional on the legacy value being an `Array`**, and deliberately so: a non-array value there is not a catalogue, so moving it is impossible and deleting it would be a REPAIR — this migration destroying data it has decided it cannot read, on the one code path where the GM has no surviving copy.
+   It is left exactly as authored instead, which also keeps the migration's no-throw guarantee resting on one rule ("a malformed system or check is skipped rather than repaired — normalization is the normalizer's job") rather than on an exception to it.
+2. **The move is GUARDED.** An authored system-level catalogue always wins and is never clobbered; an array-valued legacy key is still deleted, so a half-migrated system converges rather than carrying two catalogues that could disagree.
+   **A skipped non-array legacy value converges too, by a different route:** `_normalizeCraftingCheck` is an allowlist rebuild that no longer emits `checkModifiers` at all, so the residue is dropped the next time that system is saved, and nothing reads it in the meantime.
+   Convergence therefore does not depend on this migration deleting it.
+   The guard is also what makes the migration idempotent without relying on the version gate, and the View Lab depends on it directly: the lab boots the real runner over fixtures that seed no `migrationVersion`, so every migration runs on every lab build, and `tests/view-lab/world/labContent.js` deliberately GOES ON authoring its catalogue at the OLD location so the lab build IS a live exercise of this transform and its frames render post-migration data.
+3. **It rewrites `craftingCheck.defaultModifierPolicy === 'byRecipe'` to `'bySubject'`**, independently of the move — a system may carry the rule with no catalogue at all, and the token must still stop being re-emitted.
+   `normalizeModifierPolicy` accepts `byRecipe` as a never-re-emitted READ alias, so a world that somehow misses this migration still behaves correctly; rewriting it here is what stops the alias becoming permanent.
+4. **It deliberately seeds NOTHING onto a salvage or gathering check that has no block**, matching the no-storage-churn decisions `migrateMaxModifierPicks` and the *Progressive Reorder-Flag Retirement Migration* already record: an absent selection normalizes to `addAll` with an empty id set, which resolves to a scalar of 0 and appends no term.
+5. **The per-system transform is SHARED with the export-payload upcast** (`applySystemCheckModifierCatalogue`), not reimplemented; `migrateExportPayload` applies it branch-independently, and AFTER the `1.21.0` transform, whose inert count reads the catalogue at its pre-move location.
+6. **Mutated setting key:** `craftingSystems`, and only it.
+7. **The runner's ordering is load-bearing and stated, not assumed.** `_runMigrations()` runs before any manager loads persisted data (`src/main.js`) and is gated to the primary GM.
+   `_normalizeCraftingCheck` is an ALLOWLIST REBUILD that no longer emits `checkModifiers`, so had any save run first, the catalogue would have been DELETED rather than relocated — silently, with no error and no recoverable copy.
+8. **The downgrade LOSES the catalogue.** `1.21.0`'s `_normalizeCheckModifierConfig` is an allowlist that never saw a system-level `checkModifiers`, so a downgraded world drops it on the first read and every check modifier stops contributing to every roll until a GM re-authors it.
+   It is **the first entry in this registry whose downgrade is not lossless**, and the warning is carried in the registry entry's **`label` STRING** — the one string a GM ever reads about this migration, rendered by `migrationRecoveryPrompt` beside the very Downgrade button it is about.
+   A source comment would state the same fact to the wrong reader at the wrong moment.
+9. **A world upgraded but not yet re-saved has a stated GAP, and it is ACCEPTED rather than closed.** The migration is GM-gated and runs at init, so a PLAYER who loads the world before the primary GM's pass reads a system whose catalogue still sits at `craftingCheck.checkModifiers`; `buildCheckModifierContext` reads only `system.checkModifiers`, so that client resolves a scalar of `0` and appends no term.
+   There is deliberately NO runtime read alias for the old location, and the properties that make that acceptable are stated rather than assumed: the state **cannot be persisted** (a player writes no system settings), it **self-heals** the moment the GM's migration lands and `updateSetting` propagates, and it is **the same shape every earlier RELOCATING migration in this registry has** — none of them carries a read alias either.
+   It is deliberately **asymmetric with `1.21.0`**, which DOES carry a runtime backstop (`stripRetiredModifierPlaceholder`), and the asymmetry is the point: an unstripped `@craftingmod` makes a formula fail to roll AT ALL and is reachable from hand-edits, imports and fixtures that no migration ever sees, whereas an unrelocated catalogue only under-applies a bonus and is reachable only in the window before one GM-gated pass.
 
 ### Catalyst → Tool Migration (`0.6.0`)
 

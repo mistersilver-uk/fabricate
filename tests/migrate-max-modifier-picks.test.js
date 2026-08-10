@@ -20,7 +20,7 @@ const { migrateMaxModifierPicks, applyMaxModifierPicks } =
 const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
-const { resolveMaxModifierPicks } = await import('../src/systems/craftingModifierResolver.js');
+const { resolveMaxModifierPicks } = await import('../src/systems/checkModifierResolver.js');
 
 const MAX_PICKS = 'maxModifierPicks';
 
@@ -267,7 +267,7 @@ test('the runner applies 1.20.0 to craftingSystems and bumps the migration versi
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.21.0');
+  assert.equal(store.get('migrationVersion'), '1.22.0');
   assert.equal(store.get('craftingSystems')[0].craftingCheck[MAX_PICKS], 1);
   assert.deepEqual(
     store.get('recipes')[0].craftingModifier,
@@ -278,7 +278,7 @@ test('the runner applies 1.20.0 to craftingSystems and bumps the migration versi
 
 test('the runner does not re-run 1.20.0 once the world is at that version', async () => {
   const store = new Map([
-    ['migrationVersion', '1.21.0'],
+    ['migrationVersion', '1.22.0'],
     ['craftingSystems', [system({ defaultModifierPolicy: 'playerPicks' })]],
     ['recipes', []],
   ]);
@@ -336,7 +336,11 @@ test('migrateExportPayload stamps the cap on a LEGACY schema-1 payload too', () 
   assert.equal(migrated.system.craftingCheck[MAX_PICKS], 1);
 });
 
-test('migrateExportPayload leaves a byRecipe bundle and its recipe picks unbounded', () => {
+test('migrateExportPayload leaves a bySubject bundle and its subject picks unbounded', () => {
+  // The rule TOKEN was renamed by `1.22.0` (issue 1095), so the upcast chain rewrites a
+  // bundle's `byRecipe` on the way in — which is asserted in
+  // `tests/migrate-system-check-modifier-catalogue.test.js`. What THIS case owns is
+  // unchanged: `1.20.0` stamps no cap on a subject-selecting rule and destroys no pick.
   const migrated = migrateExportPayload(
     bundle({
       schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
@@ -344,7 +348,7 @@ test('migrateExportPayload leaves a byRecipe bundle and its recipe picks unbound
       recipes: [recipe({ modifierIds: ['med', 'alch'] })],
     })
   );
-  assert.equal(migrated.system.craftingCheck.defaultModifierPolicy, 'byRecipe');
+  assert.equal(migrated.system.craftingCheck.defaultModifierPolicy, 'bySubject');
   assert.equal(Object.hasOwn(migrated.system.craftingCheck, MAX_PICKS), false);
   assert.deepEqual(migrated.recipes[0].craftingModifier, { modifierIds: ['med', 'alch'] });
 });

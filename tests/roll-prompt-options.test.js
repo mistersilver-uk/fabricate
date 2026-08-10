@@ -21,7 +21,7 @@ const PICK_DESCRIPTOR = {
   defaultSelectedId: 'herb',
 };
 
-// The same options under a cap of 2 — the shape `buildCraftingModifierChoice` produces
+// The same options under a cap of 2 — the shape `buildCheckModifierChoice` produces
 // for an unbounded or multi-pick system (issue 1055).
 const MULTI_PICK_DESCRIPTOR = {
   ...PICK_DESCRIPTOR,

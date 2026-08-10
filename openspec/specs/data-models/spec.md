@@ -97,6 +97,17 @@ CraftingSystem = {
       rollFormula: string,             // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
+
+    // The SELECTION TRIPLE over `CraftingSystem.checkModifiers` (issue 1095), the SAME
+    // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
+    // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
+    // every activity rather than left implicit: the catalogue is shared, the SELECTION is
+    // not, and a reader who found it on one block and not on another would reasonably
+    // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
+    // semantics of each key.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
+    defaultModifierIds?: string[],  // default []
+    maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
 
   // Present only when features.gathering is true. System-level gathering check
@@ -111,7 +122,39 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
     routed: RoutedCheck,
+
+    // The SELECTION TRIPLE over `CraftingSystem.checkModifiers` (issue 1095), the SAME
+    // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
+    // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
+    // every activity rather than left implicit: the catalogue is shared, the SELECTION is
+    // not, and a reader who found it on one block and not on another would reasonably
+    // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
+    // semantics of each key.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
+    defaultModifierIds?: string[],  // default []
+    maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
+
+  // THE ONE named check-modifier catalogue for the WHOLE system (issue 1095). It moved
+  // here from `craftingCheck.checkModifiers` because salvage and gathering now select
+  // over the same entries, so it can no longer belong to any one activity; the `1.22.0`
+  // migration relocates it and deletes the old key.
+  //
+  // Each `expression` is a roll-data fragment evaluated against the acting character
+  // (missing/failed → 0). `icon`, `min` and `max` are attached ONLY when authored, so
+  // absence round-trips as key-absent and means unbounded — a bound of `0` is a real
+  // bound, which is why the guard is `Number.isFinite` on an explicitly-guarded value
+  // rather than truthiness. An authored `min > max` is preserved VERBATIM and is a
+  // BLOCKING readiness issue (`modifierBoundsInverted`): that entry contributes 0 until
+  // it is repaired, matching gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS` posture.
+  // A finite bound that no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the
+  // SECOND blocking bounds fault, `modifierBoundsUnsafe`, also `critical`, and likewise
+  // contains the entry to 0. Two issue ids rather than one cause with two readings: the
+  // repairs differ and `1e21` is not an inversion.
+  // Absent = empty catalogue, so every activity's scalar is 0 and no term is appended.
+  checkModifiers?: {
+    id: string, label: string, expression: string, icon?: string, min?: number, max?: number
+  }[],  // default []
 
   craftingCheck: {
     // `enabled` is ONLY the on/off toggle for optional checks (simple/alchemy
@@ -157,34 +200,38 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
 
-    // Per-recipe check-modifier catalogue (issues 770, 1055). A crafting-owned named
-    // catalogue (NOT gathering's characterModifiers — a different aggregate) appended
-    // to the check roll automatically. Each `expression` is a roll-data
-    // fragment evaluated against the crafter (missing/failed → 0). Absent = empty
-    // catalogue + addAll rule = a scalar of 0, which appends no term at all.
-    checkModifiers?: { id: string, label: string, icon?: string, expression: string }[], // default []
+    // THE SELECTION TRIPLE, and only it (issue 1095). The CATALOGUE moved UP to
+    // `CraftingSystem.checkModifiers` — see the system shape above — because salvage and
+    // gathering now select over the same entries; the `1.22.0` migration relocates it and
+    // DELETES this level's `checkModifiers` key. The identical triple appears on
+    // `salvageCraftingCheck` and `gatheringCraftingCheck`, emitted by ONE shared
+    // derivation so the three whitelist rebuilds cannot drift.
+    //
     // The COMBINATION RULE, owned by the SYSTEM alone (issue 1055). It states BOTH how
     // the eligible values reduce to one number AND who selects them:
-    //   addAll      — sum the system's own default set. Nobody selects.
-    //   highest     — max(...) of the system's own default set. Nobody selects.
-    //   byRecipe    — "Recipe picks": the RECIPE author selects, at recipe-edit time.
+    //   addAll      — sum this activity's own default set. Nobody selects.
+    //   highest     — max(...) of this activity's own default set. Nobody selects.
+    //   bySubject   — the record being resolved selects, at authoring time: the recipe on
+    //                 crafting, the component on salvage, the gathering task on gathering.
+    //                 Rendered "By recipe" / "By component" / "By gathering task".
     //   playerPicks — the PLAYER selects, at roll time.
-    // `byRecipe` is a first-class rule, NOT a delegation of authority: a recipe chooses
+    // `bySubject` is a first-class rule, NOT a delegation of authority: a subject chooses
     // WHICH modifiers apply, never HOW they combine. Both selecting rules SUM what was
     // picked and are bounded by `maxModifierPicks` below. An unrecognized value falls
-    // back to "addAll"; a recipe never overrides this field. `playerPicks` resolves
+    // back to "addAll"; a subject never overrides this field. The pre-1095 `byRecipe` is a
+    // legacy READ alias for `bySubject` and is never re-emitted. `playerPicks` resolves
     // deterministically to the best legal selection whenever the roll-time prompt is not
-    // offered (resolution-modes/spec.md).
-    defaultModifierPolicy?: "addAll" | "highest" | "byRecipe" | "playerPicks",  // default "addAll"
+    // offered (resolution-modes/spec.md), and is available on all three activities.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
     defaultModifierIds?: string[],  // default []; catalogue entries applied by default
-    // The cap on how many modifiers a SELECTING rule (`byRecipe`, `playerPicks`) may
-    // pick; meaningless under `addAll`/`highest`, and stored system-wide regardless of
-    // the current rule so flipping between the two selecting rules does not destroy it.
+    // The cap on how many modifiers a SELECTING rule (`bySubject`, `playerPicks`) may
+    // pick; meaningless under `addAll`/`highest`, and stored regardless of the current
+    // rule so flipping between the two selecting rules does not destroy it.
     // PRESERVES ABSENCE — only a positive integer is attached, so `null`, `0`, `2.5` and
     // junk all normalize to the SAME shape, key absent. Absence means UNLIMITED
-    // (`Infinity`), resolved at `resolveMaxModifierPicks` (`craftingModifierResolver.js`)
-    // and never defaulted at this shape: a system never asked the question must not
-    // silently acquire a bound that truncates recipe picks already on disk. See
+    // (`Infinity`), resolved at `resolveMaxModifierPicks` (`checkModifierResolver.js`)
+    // and never defaulted at this shape: a check never asked the question must not
+    // silently acquire a bound that truncates subject picks already on disk. See
     // resolution-modes/spec.md §Check Source and the `1.20.0` migration below.
     maxModifierPicks?: number,  // positive integer; default: key absent = unlimited
   },
@@ -480,6 +527,7 @@ CraftingSystem = {
     The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
     This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
     `craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
+    **`craftingCheck.checkModifiers` no longer exists at this level either** (issue 1095): the catalogue is `CraftingSystem.checkModifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the `1.22.0` migration's before-any-load ordering is load-bearing rather than incidental.
 
 30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
     A check is **usable** IFF its resolution mode carries an authored `rollFormula` that SURVIVES the retired-placeholder shim (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
@@ -497,7 +545,7 @@ CraftingSystem = {
     **Stepping is disposition-preserving:** under a forced outcome the array in play is the ranked SUBSET of tiers sharing the forced disposition, so `data.success` and the final tier's own `success` can never disagree; with no forced outcome it is the whole ranked list and both `success` and `breakTools` follow the final tier.
     A `null` matched tier steps nothing, `target` included.
     Tier order is derived in exactly ONE place (`rankedRoutedOutcomes` in `src/systems/checkRoll.js`), consumed by the forced reroute, the `minOutcomeId` gate and the step pass alike: ascending by `dc` (relative) or `start` (fixed), non-finite ranks dropped, and the FIRST authored tier kept among equal ranks; callers locate a tier in it by ID, never by object identity.
-    The `minOutcomeId` gate uses that ranking only to LOCATE the required tier and still compares threshold VALUES, because `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without complaint (non-overlap is only a `rangeOverlap` readiness warning), so two fixed tiers sharing a `start` compare equal and the craft passes.
+    The `minOutcomeId` gate uses that ranking only to LOCATE the required tier and still compares threshold VALUES, because `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without complaint (`rangeOverlap` is a `critical` READINESS issue, never an ENFORCEMENT — readiness reports it, the normalizer still persists it and the roll path still runs), so two fixed tiers sharing a `start` compare equal and the craft passes.
     Full semantics — including the acknowledged rolled-tier/final-tier asymmetry and the relationship to `clampToNearest` — are in `resolution-modes` § Routed Tier Stepping.
 
 32. **The persisted `tierStep` effect and the runtime `data.tierStepApplied` evidence are different shapes and deliberately different names**, exactly as `natStepping` and `data.natStep` were.
@@ -510,6 +558,25 @@ CraftingSystem = {
     Gathering emits it from the shared runner but threads it to no chat surface.
     Separately, `data.blockedOutcomeId` (additive alongside `data.minTierFailed`, on a minimum-success-tier failure only) is the tier the recipe minimum BLOCKED — post-step and pre-gate.
     It is named for what the gate did to it rather than "rolled", because issue 975 mints **rolled tier** as a term of art for the PRE-step tier; the former `data.rolledOutcomeId` name would overload that word in the same change that defines it.
+
+33. **System-level check-modifier catalogue.** `CraftingSystem.checkModifiers` is the one named catalogue of check modifiers for the whole system: an ordered array of `{ id, label, expression, icon?, min?, max? }`, ids unique and trimmed, malformed entries dropped, a bad expression coerced to `''`, and `icon` / `min` / `max` attached only when authored.
+    It replaces `craftingCheck.checkModifiers`, which the `1.22.0` migration moves up and deletes.
+    Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift; a default id naming nothing in the catalogue is dropped, preserving order and de-duplication.
+    `min` / `max` clamp the RESOLVED value of that entry, after expression evaluation and before combination, so a bound means the same thing under every combination rule.
+    Both are absence-preserving in the same way `maxModifierPicks` is: only a FINITE number is attached, and `null` / `''` / `[]` are guarded explicitly before coercion because `Number()` reads all three as `0` and `0` is a real bound.
+    An authored `min > max` is preserved verbatim rather than reordered, raises the BLOCKING `modifierBoundsInverted` readiness issue, and makes that entry contribute exactly 0 until it is repaired.
+    A bound that is finite but NOT expressible as a dice-grammar `Constant` — `1e21`, `1e-7` — is the SECOND blocking bounds fault, `modifierBoundsUnsafe` (also `critical`), and contains that entry to 0 in the same way; it is a separate issue id rather than a second cause on the first, because the repairs differ and `1e21` is not an inversion.
+    The expressibility test is the same `isDecimalSafeTermValue` the term emit asks, so the clamp and the emit cannot disagree about which numbers a formula can carry.
+
+34. **Subject-level modifier picks.** Under the `bySubject` combination rule the pick lives on the record being resolved: `Recipe.craftingModifier.modifierIds`, `Component.salvage.checkModifierIds`, `GatheringTask.checkModifierIds`.
+    All three preserve an AUTHORED EMPTY array as a real pick of zero, distinct from absent, keyed on `Array.isArray` at entry so a malformed member cannot flip an authored empty set back to inherit.
+    All three are truncated to `maxModifierPicks` at the resolver rather than only at the picker, so lowering the cap never leaves a record rolling more modifiers than the system permits and never destroys its stored picks.
+    **The id COERCION is one rule for all three subjects** (`normalizeCheckModifierIds`, `src/utils/checkModifierPicks.js`): ids are TRIMMED, non-string members are dropped rather than coerced, duplicates are dropped and authored order is preserved.
+    Trimming is part of the shape rather than a nicety, and its absence was a live divergence: a per-subject filter that rejected a whitespace-only id but kept `' med '` untrimmed made one authored id resolve against the catalogue on salvage and gathering and be dropped as unknown on crafting.
+    **`GatheringTask` is rebuilt by THREE whitelist normalizers, not two, and all three must emit `checkModifierIds`.**
+    Two are the mirrored LIBRARY rebuilds — `normalizeLibraryTask` (`GatheringRichStateService.js`) and `_normalizeGatheringTask` (`adminStore.js`) — and either one omitting the key loses the field on save, silently and in one direction only.
+    The third is the ENGINE-FACING rebuild `_libraryTaskToRuntimeTask` (`GatheringRichStateService.js`), which projects a library task into the runtime task `GatheringEngine` resolves against, and its failure mode is DIFFERENT and strictly harder to see: the pick persists correctly, both library normalizers are correct, and the pick is simply never read at roll time, so `bySubject` silently resolves the activity's default set for every task.
+    A world satisfying the two-rebuild reading exactly can therefore still have `bySubject` wholly broken on gathering.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -980,9 +1047,12 @@ Recipe = {
   // (null) = picked nothing; inherit the system's `defaultModifierIds`. Present = names
   // the eligible id subset reduced to the scalar appended to the check roll (unknown ids
   // dropped at resolution against the live catalogue, and the survivors truncated to
-  // `craftingCheck.maxModifierPicks`). It is honoured ONLY under the system's `byRecipe`
-  // ("Recipe picks") combination rule; under `addAll`, `highest` and `playerPicks` a
-  // stored pick sits here and is not consulted at all.
+  // `craftingCheck.maxModifierPicks`, and each clamped to its own entry's `min`/`max`).
+  // It is honoured ONLY under the system's `bySubject` combination rule — rendered "By
+  // recipe" on this activity; under `addAll`, `highest` and `playerPicks` a stored pick
+  // sits here and is not consulted at all.
+  // ITS SIBLINGS ARE `Component.salvage.checkModifierIds` AND `GatheringTask.checkModifierIds`
+  // (issue 1095): the same authoredness rule, on the other two activities' subjects.
   // IT CARRIES NO RULE. A recipe chooses WHICH modifiers apply, never HOW they combine,
   // so the combination rule is the system's alone. Older data may carry a `policy` key
   // from the era when a recipe could override it; `Recipe._normalizeCraftingModifier`
@@ -1077,17 +1147,18 @@ Recipe = {
     It is meaningful only when `CraftingSystem.resolutionMode === "routedByCheck"` and the routed check `type` is `fixed`, and is ignored for relative-type checks and non-routed modes.
     An absent or `undefined` value round-trips to `null` through `Recipe.fromJSON` with no migration.
     13a. `craftingModifier` is the recipe author's optional PICK of crafting-check modifiers (issues 770, 1055): `{ modifierIds? } | null`, defaulting to `null` (picked nothing; inherit the system's `defaultModifierIds`).
-    It authors ONE axis — WHICH modifiers apply — and never the combination rule; the rule is the system's `craftingCheck.defaultModifierPolicy` alone, and the pick is honoured only under that field's `byRecipe` ("Recipe picks") value.
+    It authors ONE axis — WHICH modifiers apply — and never the combination rule; the rule is the system's `craftingCheck.defaultModifierPolicy` alone, and the pick is honoured only under that field's `bySubject` value (rendered "By recipe" on this activity).
+    **The same `Array.isArray`-at-entry authoredness rule now governs `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`** (issue 1095), which are the salvage and gathering subjects of the same rule; all three share one attach so the four normalizers that emit them cannot drift.
     The normalizer keeps a de-duplicated non-empty string `modifierIds` list; a malformed value, or an object carrying no AUTHORED `modifierIds` array, round-trips to `null`.
     A legacy `policy` key — persisted when a recipe could still override the rule — is DROPPED by the normalizer, so it never round-trips out through `toJSON()`, and an object carrying only a `policy` normalizes to `null` because it holds no pick.
     That drop is a normalizer-level erasure, not a migration: the `1.20.0` migration deliberately leaves the raw key on disk (see `destructive-changes-and-migrations/spec.md`), and it is inert either way because `resolveModifierPolicy` reads only the system field.
     `modifierIds` authoredness is keyed on `Array.isArray(input.modifierIds)` AT THE POINT OF ENTRY, before de-duplication/filtering — so an authored `[]`, or an authored array whose only entries are malformed (e.g. `[123, '']`), still round-trips as `{ modifierIds: [] }` (an authored EMPTY set: 0 eligible modifiers, so nothing is appended to the roll), never collapsing to `null` (inherit).
     Keying on the filtered length instead would flip malformed import data from _inherit_ to _no modifiers_, which is the unsafe direction.
-    Whether the pick is actually honoured — rather than merely stored — is decided at the resolver, not by this normalizer: under any rule other than `byRecipe` it is ignored outright, and under `byRecipe` it is truncated to `craftingCheck.maxModifierPicks`.
+    Whether the pick is actually honoured — rather than merely stored — is decided at the resolver, not by this normalizer: under any rule other than `bySubject` it is ignored outright, and under `bySubject` it is truncated to `craftingCheck.maxModifierPicks`.
     See resolution-modes/spec.md §Check Source.
-    An unrecognized `defaultModifierPolicy` falls back to `addAll` at system level (`CraftingSystemManager._normalizeCheckModifierConfig`), which is the only level a rule exists at.
-    Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `byRecipe` reuses this same `modifierIds` list.
-    Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live `craftingCheck.checkModifiers`.
+    An unrecognized `defaultModifierPolicy` falls back to `addAll` at the activity-check level (`CraftingSystemManager._normalizeCheckModifierSelection`), which is the only level a rule exists at.
+    Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `bySubject` reuses this same `modifierIds` list.
+    Catalogue membership of the ids is NOT enforced here — the resolver drops unknown ids against the live system-level `CraftingSystem.checkModifiers`.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
     A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).

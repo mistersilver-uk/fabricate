@@ -61,6 +61,14 @@ export function buildFullAuthoringFixture() {
         difficulty: 1,
         essences: {},
         aliasItemUuids: [],
+        // An AUTHORED EMPTY salvage check-modifier pick (issue 1095): a real pick of ZERO,
+        // distinct from an absent one, which inherits. It is the one shape a truthiness
+        // test silently loses, and the two resolve to DIFFERENT rolls.
+        salvage: {
+          enabled: true,
+          resultGroups: [{ id: 'sg-1', name: 'Scrap', results: [] }],
+          checkModifierIds: [],
+        },
       },
     ],
     recipeItemDefinitions: [{ id: 'recipe-def-1', name: 'Recipe Sheet' }],
@@ -93,6 +101,39 @@ export function buildFullAuthoringFixture() {
       },
     ],
     gatheringRealmSettings: { revealMode: 'alwaysVisible', modifierVisibility: 'visible' },
+    // The ONE system-level check-modifier catalogue (issue 1095). TWO entries on purpose:
+    // one carrying BOTH bounds and one carrying NEITHER, because `min`/`max` are
+    // absence-preserving and a fixture where every entry is bounded cannot tell a
+    // round-trip that DROPS the keys from one that writes them everywhere.
+    checkModifiers: [
+      { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
+      { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
+    ],
+    // A NON-DEFAULT selection triple on EACH of the three activity checks. A
+    // default-valued fixture is not an oracle for an allowlist rebuild: `addAll` with an
+    // empty id set and no cap is exactly what a normalizer that emitted NOTHING produces,
+    // so a dropped key would round-trip indistinguishably.
+    craftingCheck: {
+      enabled: true,
+      simple: { rollFormula: '1d20 + @abilities.med.mod', dc: 14 },
+      defaultModifierPolicy: 'bySubject',
+      defaultModifierIds: ['mod-medicine'],
+      maxModifierPicks: 2,
+    },
+    salvageCraftingCheck: {
+      enabled: true,
+      simple: { rollFormula: '1d20', dc: 12 },
+      defaultModifierPolicy: 'highest',
+      defaultModifierIds: ['mod-medicine', 'mod-alchemy'],
+      maxModifierPicks: 1,
+    },
+    gatheringCraftingCheck: {
+      enabled: true,
+      routed: { rollFormula: '1d20', dc: 12 },
+      defaultModifierPolicy: 'bySubject',
+      defaultModifierIds: ['mod-alchemy'],
+      maxModifierPicks: 3,
+    },
   };
 
   const recipes = [
@@ -239,6 +280,10 @@ export function buildFullAuthoringFixture() {
             timeOfDay: ['day'],
             staminaCost: 2,
             toolIds: [FIXTURE_TOOL_ID],
+            // A TWO-ID check-modifier pick (issue 1095). Non-default on both axes: two
+            // ids rather than none, and a pick at all rather than inheritance — so a
+            // normalizer that dropped the key round-trips visibly differently.
+            checkModifierIds: ['mod-medicine', 'mod-alchemy'],
             dropRows: [
               {
                 id: 'row-1',
@@ -352,6 +397,47 @@ export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
   [
     'a drop row targets a world item via itemUuid',
     (f) => (slice(f).tasks ?? []).some((t) => (t.dropRows ?? []).some((row) => row.itemUuid)),
+  ],
+  // ── issue 1095: the system-level catalogue and its three selections ──────────────
+  [
+    'system carries a check-modifier catalogue with one BOUNDED and one UNBOUNDED entry',
+    (f) => {
+      const catalogue = f.system.checkModifiers ?? [];
+      return (
+        catalogue.some((entry) => Number.isFinite(entry.min) && Number.isFinite(entry.max)) &&
+        catalogue.some((entry) => !Object.hasOwn(entry, 'min') && !Object.hasOwn(entry, 'max'))
+      );
+    },
+  ],
+  [
+    'all THREE activity checks carry a NON-DEFAULT selection triple',
+    (f) =>
+      ['craftingCheck', 'salvageCraftingCheck', 'gatheringCraftingCheck'].every((key) => {
+        const check = f.system[key] ?? {};
+        return (
+          check.defaultModifierPolicy !== undefined &&
+          check.defaultModifierPolicy !== 'addAll' &&
+          (check.defaultModifierIds ?? []).length > 0 &&
+          Number.isInteger(check.maxModifierPicks)
+        );
+      }),
+  ],
+  [
+    'a component authors an EMPTY salvage check-modifier pick',
+    (f) =>
+      f.system.components.some(
+        (component) =>
+          Array.isArray(component.salvage?.checkModifierIds) &&
+          component.salvage.checkModifierIds.length === 0
+      ),
+  ],
+  [
+    'a gathering task authors a TWO-ID check-modifier pick',
+    (f) =>
+      (slice(f).tasks ?? []).some(
+        (task) =>
+          Array.isArray(task.checkModifierIds) && task.checkModifierIds.length === 2
+      ),
   ],
 ]);
 

@@ -62,6 +62,59 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   const second = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
   assert.deepEqual(normalizeExportEnvelope(second), normalizeExportEnvelope(first));
+
+  // ── issue 1095, stated FIELD BY FIELD rather than left to the deep-equal ──────────
+  //
+  // The envelope comparison above is a strong guard, but it cannot distinguish "both
+  // exports carry the field" from "NEITHER does". Every field below is absence-preserving
+  // or authoredness-keyed, and the shape a dropped key produces is a legal shape — so the
+  // round-trip has to be asserted POSITIVELY, against the non-default fixture values.
+  const exported = second.system;
+  assert.deepEqual(
+    exported.checkModifiers,
+    [
+      { id: 'mod-medicine', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
+      { id: 'mod-alchemy', label: 'Alchemy', expression: '@abilities.alch.mod' },
+    ],
+    'the catalogue round-trips at the SYSTEM level, and the unbounded entry keeps NEITHER ' +
+      'bound key — an absence-preserving field that acquired `min: 0` on the way through ' +
+      'would still be a legal catalogue'
+  );
+  for (const [key, policy, ids, cap] of [
+    ['craftingCheck', 'bySubject', ['mod-medicine'], 2],
+    ['salvageCraftingCheck', 'highest', ['mod-medicine', 'mod-alchemy'], 1],
+    ['gatheringCraftingCheck', 'bySubject', ['mod-alchemy'], 3],
+  ]) {
+    assert.equal(exported[key].defaultModifierPolicy, policy, `${key}: the rule round-trips`);
+    assert.deepEqual(exported[key].defaultModifierIds, ids, `${key}: the id set round-trips`);
+    assert.equal(exported[key].maxModifierPicks, cap, `${key}: the cap round-trips`);
+  }
+  const herb = exported.components.find((component) => component.id === 'comp-herb');
+  assert.deepEqual(
+    herb.salvage.checkModifierIds,
+    [],
+    'an AUTHORED EMPTY component pick survives as a pick of zero — the one shape a ' +
+      'truthiness test loses, and it resolves to a DIFFERENT roll from an absent one'
+  );
+  const ore = exported.components.find((component) => component.id === 'comp-ore');
+  assert.equal(
+    Object.hasOwn(ore.salvage ?? {}, 'checkModifierIds'),
+    false,
+    '…and a component that authored nothing keeps the key ABSENT, so it goes on inheriting'
+  );
+  const task = second.gatheringConfig.system.tasks.find((entry) => entry.name === 'Forage Herbs');
+  assert.deepEqual(
+    task.checkModifierIds,
+    ['mod-medicine', 'mod-alchemy'],
+    // What this proves is the EXPORT/IMPORT path for the gathering config setting — the
+    // pick survives export, `prepareForImport`, the importer's write and a second export.
+    // It deliberately does NOT claim to exercise the task normalizers: this harness's
+    // `systemManager` is a plain `Map` stub and the gathering config is carried as a raw
+    // setting, so neither `normalizeLibraryTask` nor `_normalizeGatheringTask` runs here.
+    // Those three whitelist rebuilds are pinned in `tests/subject-check-modifier-picks.test.js`
+    // and `tests/check-modifier-activity-seams.test.js`.
+    'the gathering task pick survives export → import → export'
+  );
 });
 
 test('round-trip: importing keeps other systems’ environments (single-store)', async () => {

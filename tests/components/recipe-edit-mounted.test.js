@@ -66,13 +66,17 @@ const RAW_MODULES = [
   // the same module. This harness DOES validate its dependency graph, so omitting it
   // throws a named "add it to rawModules" error rather than hanging — unlike the manager
   // harness, whose inline list has no validator.
-  'src/systems/craftingModifierResolver.js',
+  'src/systems/checkModifierResolver.js',
   // …and issue 1094 gave that resolver its first two imports: it appends the resolved
   // scalar through `toolCheckBonus.js` and reads the retirement shim from
   // `craftingCheckExpression.js`. Both are import-free leaves, so these two entries close
   // the graph the validator walks.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // …and issue 1095 a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
+  // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair.
+  'src/systems/salvageCheckUsability.js',
+  'src/utils/checkModifierPicks.js',
   // The Overview tab resolves the recipe's category label for its Category select.
   // RecipeToolsSection embeds SearchablePopover for the Tools picker; the harness
   // must copy its supporting raw modules (portal/dismiss/layout helpers).
@@ -508,7 +512,7 @@ describe('RecipeEditView (mounted)', () => {
     //
     // Retargeted for issue 1055: a recipe persists a PICK and nothing else. There is no
     // rule select on this tab at all — a recipe chooses WHICH modifiers apply, never HOW
-    // they combine — and the picker exists only under the system's `byRecipe` rule.
+    // they combine — and the picker exists only under the system's `bySubject` rule.
     const patches = [];
     const target = await editHarness.mount(
       identityProps({
@@ -518,7 +522,7 @@ describe('RecipeEditView (mounted)', () => {
           { id: 'med', label: 'Medicine' },
           { id: 'alch', label: 'Alchemy' },
         ],
-        craftingModifierPolicy: 'byRecipe',
+        craftingModifierPolicy: 'bySubject',
       })
     );
     assert.ok(
@@ -532,7 +536,7 @@ describe('RecipeEditView (mounted)', () => {
     // The per-modifier picker shows the catalogue as cancellable pills, with the
     // recipe's set already selected and the rest offered in the dropdown.
     const picker = target.querySelector('[data-recipe-crafting-modifier-picker]');
-    assert.ok(picker, 'the eligible-modifier picker shows under the byRecipe rule');
+    assert.ok(picker, 'the eligible-modifier picker shows under the bySubject rule');
     assert.ok(
       picker.querySelector('[data-modifier-pill="med"]'),
       'the selected modifier renders as a pill'
@@ -574,13 +578,13 @@ describe('RecipeEditView (mounted)', () => {
         { id: 'alch', label: 'Alchemy' },
       ],
       craftingModifierDefaultIds: ['med', 'alch'],
-      craftingModifierPolicy: 'byRecipe',
+      craftingModifierPolicy: 'bySubject',
       ...overrides,
     });
 
-  it('renders the modifier picker under byRecipe ONLY, and no banner under the rest (issue 1055)', async () => {
+  it('renders the modifier picker under bySubject ONLY, and no banner under the rest (issue 1055)', async () => {
     for (const [policy, picker] of [
-      ['byRecipe', true],
+      ['bySubject', true],
       ['addAll', false],
       ['highest', false],
       ['playerPicks', false],
@@ -598,7 +602,7 @@ describe('RecipeEditView (mounted)', () => {
         `rule ${String(policy)}: a recipe never authors the combination rule`
       );
       // The rejected design put a neutral "the system decides" banner on every recipe of
-      // every system that never delegated. It is gone: under a non-`byRecipe` rule this
+      // every system that never delegated. It is gone: under a non-`bySubject` rule this
       // tab renders NOTHING about check modifiers rather than a standing notice.
       assert.ok(
         !target.querySelector('[data-recipe-modifier-banner]'),
@@ -855,7 +859,7 @@ describe('RecipeEditView (mounted)', () => {
 
   it('hides the crafting-modifier picker when the system has no catalogue (issue 770)', async () => {
     const target = await editHarness.mount(
-      identityProps({ craftingModifierPolicy: 'byRecipe', craftingModifierOptions: [] })
+      identityProps({ craftingModifierPolicy: 'bySubject', craftingModifierOptions: [] })
     );
     assert.ok(
       !target.querySelector('[data-recipe-crafting-modifier-picker]'),

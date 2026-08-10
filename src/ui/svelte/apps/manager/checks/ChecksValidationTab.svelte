@@ -41,6 +41,11 @@
     hasSuccessOutcome: ['CheckHasSuccessOutcome', 'At least one outcome is a Success'],
     rangesValid: ['CheckRangesValid', 'Every tier range is valid'],
     rangesNoOverlap: ['CheckRangesNoOverlap', 'No tier ranges overlap'],
+    rangesContiguous: ['CheckRangesContiguous', 'Tier ranges leave no unclaimed values'],
+    modifierBoundsValid: [
+      'CheckModifierBoundsValid',
+      'Every applied check modifier has usable bounds',
+    ],
     tierStepTargetsResolve: [
       'CheckTierStepTargetsResolve',
       'Tier-step targets name exactly one existing tier',
@@ -72,6 +77,26 @@
       'IssueRangeOverlap',
       'Some tier ranges overlap. Each value range must be unique.',
     ],
+    rangeGap: [
+      'IssueRangeGap',
+      'Some values between your lowest and highest tier belong to no tier at all, so a roll landing there matches nothing and the attempt cannot be routed. Close the gap.',
+    ],
+    modifierBoundsInverted: [
+      'IssueModifierBoundsInverted',
+      'A check modifier this check applies has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.',
+    ],
+    modifierBoundsUnsafe: [
+      'IssueModifierBoundsUnsafe',
+      'A check modifier this check applies has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
+    ],
+    modifiersInertNoCheck: [
+      'IssueModifiersInertNoCheck',
+      'This resolution mode rolls no check, so the check modifiers selected here are never applied.',
+    ],
+    modifiersInertNoFormula: [
+      'IssueModifiersInertNoFormula',
+      'This check has no roll formula yet, so the check modifiers selected here are never applied.',
+    ],
     danglingTierStepTarget: [
       'IssueDanglingTierStepTarget',
       "A trigger's target tier is not set, or names a tier this check does not have; that step does nothing until you pick one of this check's outcome tiers.",
@@ -98,7 +123,10 @@
   const evaluated = $derived(
     sections.map((section) => ({
       subsystem: section.subsystem,
-      readiness: evaluateCheckReadiness(section.check || {}, { mode: section.mode }),
+      readiness: evaluateCheckReadiness(section.check || {}, {
+        mode: section.mode,
+        modifierContext: section.modifierContext ?? null,
+      }),
     }))
   );
 </script>

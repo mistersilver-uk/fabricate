@@ -10,6 +10,7 @@ import {
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
+import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
@@ -2896,7 +2897,14 @@ export class GatheringEngine {
       });
     }
 
-    return this._resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive });
+    return this._resolveRoutedFormulaOutcome({
+      routed,
+      rollFormula,
+      actor,
+      system,
+      task,
+      interactive,
+    });
   }
 
   /**
@@ -2910,8 +2918,23 @@ export class GatheringEngine {
    * `normalizeTerminalOutcome` machinery the provider path uses.
    * @private
    */
-  async _resolveRoutedFormulaOutcome({ routed, rollFormula, actor, task, interactive = false }) {
+  async _resolveRoutedFormulaOutcome({
+    routed,
+    rollFormula,
+    actor,
+    system = null,
+    task,
+    interactive = false,
+  }) {
     const dc = this._resolveGatheringRoutedDc(routed, task);
+    // THIS SEAM IS DORMANT (issue 1095, decision 8) — unreachable, not dead. No
+    // GM-selectable configuration reaches it today: `_libraryTaskToRuntimeTask` hardcodes
+    // `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders both
+    // formula-rolled modes `disabled`. The check-modifier context lands here now so the
+    // capability is complete when 683 flips the switch, and so this path is not the one
+    // place the shape was forgotten. Gathering has no tool-bonus seam, so nothing is
+    // appended before the modifier term (a named out-of-scope follow-up on issue 1093).
+    const craftingModifier = buildCheckModifierContext(system, 'gathering', task);
     const rolled = await runFormulaRouted({
       formula: rollFormula,
       dc,
@@ -2922,6 +2945,7 @@ export class GatheringEngine {
       triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Gathering',
+      craftingModifier,
       // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
       // a per-task dcOverride never opens a null-outcome dead zone.
       clampToNearest: true,
@@ -3178,11 +3202,16 @@ export class GatheringEngine {
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
     if (rollFormula) {
+      // DORMANT, exactly as the routed seam above is (issue 1095, decision 8): progressive
+      // gathering is rendered `disabled` in the economy editor and no runtime task ever
+      // carries the mode, so this modifier context is unreachable pending issue 683. It
+      // lands now so the shape is complete on arrival rather than half-threaded.
       const rolled = await runFormulaProgressive({
         formula: rollFormula,
         triggers: progressive.checkBreakage?.triggers,
         actor,
         label: 'Gathering',
+        craftingModifier: buildCheckModifierContext(system, 'gathering', task),
         rollOptions: buildInteractiveRollOptions({
           interactive,
           actor,

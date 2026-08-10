@@ -209,8 +209,14 @@ export const CHECK_MODIFIER_TERM_LABEL = 'Modifiers';
  * The term is SKIPPED rather than clamped or rounded: a check modifier is the GM's
  * arithmetic, and silently substituting a different number would be worse than
  * contributing nothing.
+ *
+ * EXPORTED for `checkModifierResolver.resolveModifierBounds` (issue 1095), which asks the
+ * same question of an authored `min`/`max`: a bound the grammar cannot express clamps the
+ * SUM into a value this function then refuses, dropping the whole term and with it every
+ * other modifier's contribution. Asking one function keeps the clamp and the emit from
+ * disagreeing about which numbers are expressible.
  */
-function isDecimalSafeTermValue(value) {
+export function isDecimalSafeTermValue(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return false;
   return !String(Math.abs(numeric)).includes('e');

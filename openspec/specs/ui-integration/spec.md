@@ -1376,11 +1376,11 @@ The change persists immediately (like `enabled`), outside the recipe draft's Sav
 
 ### Recipe crafting-check modifier control (issue 1055)
 
-The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `byRecipe` ("Recipe picks") combination rule, and only when the system carries a non-empty `checkModifiers` catalogue.
-`byRecipe` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
-Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `byRecipe`.
+The Overview tab's per-recipe crafting-check modifier control (`RecipeOverviewTab.svelte`) is shown **only** under the system's `bySubject` combination rule — rendered "By recipe" on this activity — and only when the system carries a non-empty `CraftingSystem.checkModifiers` catalogue.
+`bySubject` is the one rule that defers the selection to the recipe author, so it is the only rule under which this tab has anything to say about check modifiers.
+Under `addAll`, `highest` and `playerPicks` the tab is **silent** — no control and no banner: a control the engine will ignore is worse than no control, and a banner explaining its absence would appear on every recipe of every system that never chose `bySubject`.
 
-Under `byRecipe` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
+Under `bySubject` with a catalogue, exactly one of two mutually exclusive dispositions renders, in this priority order:
 
 1. **Inert banner** — shown when the system's active check applies no check modifiers, for one of TWO causes: `noCheck` (this resolution mode rolls no crafting check at all) or `noFormula` (a check slot exists but has no authored roll formula).
 The third cause, `noPlaceholder`, is REMOVED together with the roll-formula placeholder it named: the resolved scalar is appended to whatever the GM authored, so "a formula is authored but never references it" is not a reachable state.
@@ -1407,7 +1407,7 @@ This surface no longer authors a rule and must not silently delete one either �
 The inert banner reuses the resolution-mode banner's chrome (`RecipeModeBanner`, prop-ified with a `tone` and a `dataAttr` name so it can render alongside its sibling on one tab without colliding) rather than inventing a second visual language for "this is set elsewhere".
 It renders full-bleed below the grid, replacing the control the grid would otherwise hold, rather than squeezing into a single grid cell.
 
-**Five-mode active-check-formula table.** WHICH `craftingCheck` sub-config the active resolution mode actually rolls — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`craftingModifierResolver.js`), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to that sub-config:
+**Five-mode active-check-formula table.** WHICH `craftingCheck` sub-config the active resolution mode actually rolls — the precondition for every disposition above — is resolved by `resolveActiveCraftingCheckFormula(system)` (`checkModifierResolver.js`, which replaced the crafting-only `craftingModifierResolver.js` in issue 1095), which maps `resolutionMode` (and, for `alchemy`, the system's `alchemy.checkMode`) to that sub-config:
 
 | Resolution mode       | Check config                 | Notes                                                        |
 |------------------------|-------------------------------|---------------------------------------------------------------|
@@ -1442,16 +1442,64 @@ That is not in tension with the inert-cause copy: those two strings must not nam
 The catalogue card renders in **every** crafting sub-tab, including alchemy: it is no longer gated on a single "check usable" boolean, because that gate made two of the three inert causes unreachable on the sub-tabs it hid the card from entirely.
 
 **Checks tab — combination rule and pick cap.** `CraftingModifierCatalogueCard.svelte` authors everything the SYSTEM owns here, and the system owns all of it: there is no authority axis and no per-recipe rule override.
-It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Add all**, **Highest**, **Recipe picks** (`byRecipe`), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
-`MODIFIER_POLICIES` is the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, because a hand-maintained mirror of the rule vocabulary is exactly the drift issue 855 was.
+It renders the **Combination rule** as one `RadioCardGroup` of four options in `MODIFIER_POLICIES` order — **Add all**, **Highest**, **By recipe / By component / By gathering task** (`bySubject`, labelled from the activity), **Player picks** — so the two selecting rules sit adjacent and the 2x2 grid reads them as a pair.
+`MODIFIER_POLICIES` remains the source of that list and its order, and `normalizeModifierPolicy` validates the selection; neither is re-declared as a local literal, and the latter is what makes a world still carrying the pre-1095 `byRecipe` select the right card.
+The 2x2 grid MUST reflow to 1x4 under the container query rather than overflow the real ~700–760px pane: the card declares itself a container (`container-type: inline-size`), so the shipped `@container (max-width: 620px)` rule for `.is-config-cards` measures the CARD rather than the whole manager shell.
+
+**The catalogue's ENTRY editor renders on CRAFTING only.** The icon picker, label field, `@`-prefixed `RollDataExpressionInput`, delete and `+ Add modifier` are the shipped crafting editor and are retained; it GAINS a paired absence-preserving `min`/`max` `Stepper` set with an `Unbounded` placeholder, on its OWN row after the expression input so the row reflows to two lines at a narrow pane rather than compressing the expression field.
+Salvage and gathering render each entry READ-ONLY — identity, expression and a signed bounds chip (`-1 to +6`) — with a link back to the crafting sub-tab where the catalogue is authored.
+**Read-only applies to the ENTRIES alone**: the per-entry eligibility control and the combination-rule grid stay fully editable on all three activities, because deciding which entries apply and how they combine is exactly what each activity owns.
+
+**The eligibility control carries EIGHT labels, not five**: one selected word per rule — `Applied` (`addAll`), `Considered` (`highest`), `Selectable` (`playerPicks`), `Picked per subject` (`bySubject`) — and one NOT-selected word per rule to answer it (`Not applied`, `Not considered`, `Not selectable`, `Not picked by default`).
+A single off word is the negation of ONE of the four and of no other, so a row reading "Selectable" when on and "Not applied" when off states the two ends of two different sentences.
+The GLYPH and the TONE stay constant across all four off readings, deliberately: the not-selected state has to read as one state at a glance, and it is the WORD that completes the sentence the rule started.
+**The accessible CONTROL is the `SelectionCheckbox`, and it carries the WHOLE accessible name — the entry's label and the state word — in its own `aria-label`.
+The `StatusPill` beside it is presentational and `aria-hidden`**: leaving both in the accessibility tree read the state twice, and a pill that merely supplied `aria-labelledby` would still be a second copy of the same words.
+One of the two, never both.
+The checkbox is `aria-describedby` the ACTIVE RULE's eligibility sentence, which is what makes "Applied" mean something to a reader who never sees the rule grid.
+The two are adjacent and are NEVER nested — an interactive control inside an interactive pill lands invalid DOM.
+The not-selected state differs by more than colour: the checkbox is unchecked and the pill's word AND glyph both change, so the distinction survives a monochrome render.
+
+The section is labelled **"Check modifiers"** on all three activities — an explicit, recorded deviation from the prototype's bare "Modifiers" — so it is never confused with gathering's "Character modifiers" library, and the **gathering section additionally renders the dormancy notice** naming issue 683.
 
 Beneath it, a **Maximum picks** stepper authors `maxModifierPicks`.
-It renders **only** under a rule `policyDefersSelection` admits (`byRecipe`, `playerPicks`), asked of the resolver live against the radio group the GM is clicking rather than re-derived from a local membership test or projected from the last persisted rule.
+It renders **only** under a rule `policyDefersSelection` admits (`bySubject`, `playerPicks`), asked of the resolver live against the radio group the GM is clicking rather than re-derived from a local membership test or projected from the last persisted rule.
 Its **empty field is a real value — unlimited — not a blank to be defaulted**: the value shown is `resolveMaxModifierPicks`'s answer rendered back (`Infinity` → empty), so a stored `0`, `-2` or `"three"` displays as unlimited exactly as the engine treats it, and clearing the field persists `maxModifierPicks: null` VERBATIM rather than omitting the key, because omitting it would leave the old bound in place.
-An accompanying hint states "empty means no limit" and is the input's accessible description, since a blank number field cannot state it; the hint is keyed by rule, because the cap bounds the RECIPE AUTHOR at edit time under `byRecipe` and the PLAYER at roll time under `playerPicks`, and one sentence covering both would say nothing specific about either.
+An accompanying hint states "empty means no limit" and is the input's accessible description, since a blank number field cannot state it; the hint is keyed by rule AND by activity, because the cap bounds the SUBJECT AUTHOR at authoring time under `bySubject` and the PLAYER at roll time under `playerPicks`, and one sentence covering both would say nothing specific about either.
 
-The **Default modifiers** intro copy is keyed by rule for the same reason, in three readings: under `addAll`/`highest` the default set IS the eligible set and nobody narrows it ("Which modifiers apply.
-Every recipe in this system uses this set."); under `byRecipe` it is the fallback a recipe inherits until it picks its own; under `playerPicks` it is the menu the player chooses from at roll time.
+The **eligibility intro** copy is keyed by rule for the same reason, in SIX readings: one each for `addAll`, `highest` and `playerPicks`, and one per ACTIVITY for `bySubject`, because the record doing the picking is a recipe, a component or a gathering task and a sentence covering all three could name none of them.
+There is no longer a **"Default modifiers"** sub-heading and no standing intro string above the rows: issue 1095 replaced the separate default-modifier pill row with a per-row eligibility control, so the rows ARE the default set and a heading naming a control that no longer exists was pointing at nothing.
+The intro sits **ABOVE the rows it governs**, not below the rule grid.
+It states what switching an entry on MEANS under the rule the GM just chose, so it belongs where that switching happens; below the grid it landed far under the controls it explains and read as a footnote about the pick cap.
+The rule grid re-renders it the moment the rule changes, so its position cannot leave it describing a rule the GM is about to change.
+The **empty-catalogue state branches on who owns the entries**: crafting says "Add one", which is an instruction with a button directly below it, and salvage and gathering say the catalogue is defined once on the Crafting check, because neither has an add button at all.
+
+### Subject check-modifier picker — salvage and gathering (issue 1095)
+
+`SubjectModifierPicker.svelte` is the ONE authoring surface for the two NEW `bySubject` subjects, `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds`.
+It is one component with two hosts — `ComponentEditView` (the component's Salvage tab) and `GatheringTaskEditView` (the task card) — rather than two copies, because the pick's semantics are subtle in exactly the way a copy gets wrong, and because the two hosts disagreeing about them is a defect no screen shows.
+The recipe's equivalent control (`RecipeOverviewTab`) is deliberately NOT converted onto it; the mismatch is named in the component's own header and is a behaviour decision about the recipe surface, not a refactor.
+
+- **It renders under the activity's `bySubject` rule and a NON-EMPTY system catalogue, and nothing else gates it.**
+Each host asks its OWN activity's rule (salvage's from `salvageCraftingCheck`, gathering's from `gatheringCraftingCheck`), never another activity's, because the catalogue is shared and the SELECTION is not.
+The salvage host's gate is its own rather than nested inside the DC-override's `simple || routed` one: `progressive` salvage honours the pick at roll time, so nesting made the control unreachable in a mode whose roll reads it.
+An empty catalogue draws NOTHING at all — a control whose menu could only ever be empty.
+- **Three states, and the two absent-vs-empty ones are different rolls.** An ABSENT pick INHERITS the activity's `defaultModifierIds`; an AUTHORED EMPTY array is a real pick of zero and appends no term; an authored non-empty array is the pick.
+The authoredness toggle is the only place a GM moves between the first two: switching it ON emits `[]` and switching it OFF emits `null` (gathering's host patches `undefined`, which is what makes its normalizer drop the key).
+Turning it ON deliberately does NOT seed from the activity's default set — a record turning the switch on has stated that it picks its own, and seeding would author picks the GM never made.
+This is the one axis on which it differs from `RecipeOverviewTab`'s `changeModifierSetMode`, which does seed.
+- **Under inheritance the inherited entries are NAMED, not merely announced.**
+The pill row has nothing to author, so it is hidden and the note lists the activity's default set, resolved against the catalogue and dropping unknown ids exactly as the resolver drops them — so the line cannot promise a modifier the roll would not apply.
+The names are joined by `formatList` (the active language's list conventions) and interpolated into a **`{list}` placeholder** on the sentence; a hand-joined `', '` tail is wrong in English before it is wrong in any other language, and a runtime value concatenated onto a localized string takes the list's position in the sentence away from the translator.
+- **An EMPTY inherited set is its own reading, not a blank.** It states that the activity's default set is empty and that no check modifier applies to this record.
+That distinction is domain-level rather than cosmetic: "inheriting these two" and "inheriting nothing" are two different rolls, and a picker that rendered a bare label for both would tell the GM the same thing about each.
+- **It NAMES THE SUBJECT.** Every sentence is keyed by which record is being edited — a COMPONENT (its salvage check) or a gathering TASK — from the same shape of vocabulary map `CraftingModifierCatalogueCard`'s `SUBJECT_COPY` uses, so the two surfaces name one subject one way.
+The internal noun for the abstraction the two share never reaches a screen.
+The inherit sentences name the ACTIVITY's check rather than "the system", because the default set is per-activity and a GM reading "the system default set" on the Salvage tab would look for it on the wrong screen.
+- **The cap is stated STANDING**, not only once the add button has already gone dead, with an at-cap clause appended when it is reached.
+It is read through `resolveMaxModifierPicks`, so a stored `0`, `-2` or `"three"` shows no cap at all — the picker bounds exactly what the engine bounds.
+A cap of exactly **1 takes its own singular sentence**, never "up to 1 check modifiers", the same pair `RecipeOverviewTab` uses; every other bounded cap interpolates the number into a `{count}` placeholder whose fallback substitutes the count itself, so an unlocalized build reads a number rather than a raw brace.
+- **The accessible control is the `SelectionCheckbox` and it carries the whole accessible name; the visible sentence beside it is `aria-hidden`.** One of the two, never both — the same rule the eligibility pill above follows, for the same reason.
 
 ### Tools tab
 
@@ -1784,7 +1832,9 @@ Above 1, the dialog disables the unchecked inputs once `maxPicks` are ticked and
 That is a UI affordance only: `evaluateCheckRoll` re-imposes the same cap on the returned selection, since a UI control's constraint is never the invariant.
 A descriptor carrying no usable `maxPicks` renders — and is reduced as — a single pick, so a descriptor built before the field existed cannot silently widen.
 This group is only the presentation of the crafting-check `playerPicks` combination rule: which modifiers are eligible, when the group is offered at all, the pre-selection and its tie-break, and how the picks SUM into the appended modifier term are normative in `resolution-modes/spec.md` §Check Source, not here.
-Only crafting ever supplies `modifierChoice`; salvage and gathering pass no modifier context and never pass it, so their dialog is unchanged, as is a crafting roll under any other combination rule — including `byRecipe`, whose selection was already made at recipe-edit time — so no `modifierChoice`, no fieldset.
+**CRAFTING and SALVAGE supply a `modifierChoice`** under `playerPicks` (issue 1095), and their dialogs render the modifier fieldset on the same terms; the pre-1095 claim that salvage never passes one retired with the crafting-only catalogue.
+**GATHERING supplies none**: it threads the modifier context and resolves a `playerPicks` selection deterministically, and its roll-time prompt is deferred to issue 683 with the rest of the seam (`resolution-modes/spec.md` §Check Source is normative).
+A roll under any other combination rule passes none — including `bySubject`, whose selection was already made at authoring time — so no `modifierChoice`, no fieldset.
 The dialog's formula line ends in a trailing `+ (modifier)[Modifiers]` slot while the choice is unanswered.
 - **Pre-resolved roll decisions.**
 A caller MAY supply a `rollDecision` (`{ bonus, rollMode, advantage }` — the prompt's own return shape minus `confirmed`).

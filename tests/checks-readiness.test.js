@@ -2,8 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-import { evaluateCheckReadiness } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
+import { CHECK_READINESS_ISSUE_IDS, evaluateCheckReadiness } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import { planRetiredPlaceholderStrip } from '../src/utils/craftingCheckExpression.js';
 import { RETIRED_PLACEMENT_CORPUS } from './helpers/retiredPlaceholderOracle.js';
 
@@ -225,10 +226,14 @@ describe('checks readiness label maps do not drift', () => {
   );
   const en = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 
-  // A check literal is `{ id, satisfied }`, an issue literal `{ id, severity }` — the
-  // discriminator is the SECOND key, so this finds them wherever they are built,
-  // inline or inside an extracted helper.
+  // A check literal is `{ id, satisfied }` — the discriminator is the SECOND key, so this
+  // finds them wherever they are built, inline or inside an extracted helper.
+  //
+  // ISSUE ids are no longer extracted by source scan (issue 1095): they come from the
+  // exported `CHECK_READINESS_ISSUE_IDS` registry, which `pushIssue` REFUSES to emit
+  // outside. A scan would be the second hand-copied mirror the registry exists to remove.
   function idsBy(secondKey) {
+    if (secondKey === 'severity') return [...CHECK_READINESS_ISSUE_IDS].sort();
     const pattern = new RegExp(`\\{\\s*id:\\s*'([^']+)',\\s*${secondKey}:`, 'g');
     return [...readinessSource.matchAll(pattern)].map((match) => match[1]).sort();
   }
@@ -418,5 +423,327 @@ describe('retired placeholder readiness', () => {
     );
     assert.deepEqual(checks, []);
     assert.deepEqual(issues, []);
+  });
+});
+
+// ── the issue-id registry is a SOURCE OF TRUTH, not a convention (issue 1095, BH3/C3) ──
+//
+// Every id used to be an inline literal in the function body, so the only way to enumerate
+// the set was to call the function with enough fixtures to reach every branch — which
+// cannot prove completeness, because an unreached branch contributes nothing. Downstream
+// surfaces need the whole set (the Validation route buckets each id to a section), and a
+// hand-copied mirror of an unprovable list is how those two drift.
+describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', () => {
+  const readinessPath = resolve(
+    repoRoot,
+    'src/ui/svelte/apps/manager/checks/checksReadiness.js'
+  );
+  const source = readFileSync(readinessPath, 'utf8');
+
+  it('is frozen, non-empty and free of duplicates', () => {
+    assert.ok(Object.isFrozen(CHECK_READINESS_ISSUE_IDS), 'a consumer cannot mutate it');
+    assert.ok(CHECK_READINESS_ISSUE_IDS.length > 0);
+    assert.equal(
+      new Set(CHECK_READINESS_ISSUE_IDS).size,
+      CHECK_READINESS_ISSUE_IDS.length,
+      'a duplicated id would make an exhaustiveness count lie'
+    );
+  });
+
+  // THE MECHANICAL GUARD, and the reason a frozen export alone is not one:
+  // `issues.push({ id: 'newThing' })` still compiles beside it, and a behavioural test can
+  // only fail for branches a fixture reaches. Every emit goes through `pushIssue`, which
+  // THROWS on an unregistered id — so an id added without registering it cannot work.
+  it('refuses an unregistered id at the funnel, loudly', () => {
+    // The funnel is not exported, so it is exercised the way production reaches it: by
+    // loading a COPY of the module with one id removed from the registry. The copy is
+    // built in memory and imported as a data: URL, so nothing on disk is touched.
+    const mutated = source.replace("  'noRollFormula',\n", '');
+    assert.notEqual(mutated, source, 'the mutation must actually change the module');
+    return import(`data:text/javascript;base64,${Buffer.from(rewriteImports(mutated)).toString('base64')}`).then(
+      (module) => {
+        assert.throws(
+          () => module.evaluateCheckReadiness({ rollFormula: '' }),
+          /unregistered issue id "noRollFormula"/,
+          'an id the registry does not carry must not reach the returned list'
+        );
+      }
+    );
+  });
+
+  // The other half: nothing may build an issue by direct `push`, bypassing the funnel.
+  // A source scan is what catches an id on a branch no fixture reaches.
+  it('builds no issue literal outside the registry declaration', () => {
+    const body = source.slice(source.indexOf('const REGISTERED_ISSUE_IDS'));
+    const literals = [...body.matchAll(/\{\s*id:\s*'([^']+)',\s*severity:/g)].map((m) => m[1]);
+    assert.deepEqual(
+      literals,
+      [],
+      'these issues are built as literals rather than through `pushIssue`, so the registry ' +
+        'cannot refuse them:\n  ' + literals.join('\n  ')
+    );
+  });
+
+  it('carries every id the evaluator actually emits across its branches', () => {
+    // A behavioural sweep, deliberately kept ALONGSIDE the mechanical guards rather than
+    // instead of them: it proves the registry is not merely consistent with itself.
+    const emitted = new Set();
+    const collect = (check, options) => {
+      for (const issue of evaluateCheckReadiness(check, options).issues) emitted.add(issue.id);
+    };
+    const catalogue = [
+      { id: 'ok', label: 'Ok', expression: '@a' },
+      { id: 'bad', label: 'Bad', expression: '@b', min: 5, max: -1 },
+      { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
+    ];
+    const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
+    collect({ rollFormula: '' }, { mode: 'simple' });
+    collect({ rollFormula: '1d20 + @craftingmod' }, { mode: 'simple' });
+    collect({ rollFormula: '1d20 * @craftingmod' }, { mode: 'simple' });
+    collect(
+      {
+        rollFormula: '1d20',
+        type: 'fixed',
+        fixedOutcomes: [
+          { id: 'a', name: '', start: 1, end: 9, success: false },
+          { id: 'b', name: 'Rough', start: 11, end: 17, success: false },
+        ],
+        checkBreakage: { triggers: [{ tierStep: { mode: 'target', tierId: 'ghost' } }] },
+      },
+      { mode: 'routed' }
+    );
+    collect(
+      {
+        rollFormula: '1d20',
+        type: 'fixed',
+        fixedOutcomes: [
+          { id: 'a', name: 'Slag', start: 9, end: 1, success: true },
+          { id: 'b', name: 'Rough', start: 1, end: 20, success: true },
+        ],
+        checkBreakage: {
+          triggers: [
+            { tierStep: { mode: 'target', tierId: 'a' } },
+            { tierStep: { mode: 'target', tierId: 'b' } },
+          ],
+        },
+      },
+      { mode: 'routed' }
+    );
+    // Two VALID ranges that overlap. The invalid-range fixture above cannot reach
+    // `rangeOverlap` at all: `findRangeConflicts` excludes a `start > end` span from overlap
+    // detection, so it needs a fixture of its own.
+    collect(
+      {
+        rollFormula: '1d20',
+        type: 'fixed',
+        fixedOutcomes: [
+          { id: 'a', name: 'Slag', start: 1, end: 10, success: true },
+          { id: 'b', name: 'Rough', start: 5, end: 20, success: true },
+        ],
+      },
+      { mode: 'routed' }
+    );
+    collect({ rollFormula: '' }, { mode: 'simple', modifierContext: context(['ok', 'bad']) });
+    collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['huge']) });
+    collect({}, { mode: 'd100', modifierContext: context(['ok']) });
+    for (const id of emitted) {
+      assert.ok(
+        CHECK_READINESS_ISSUE_IDS.includes(id),
+        `${id} is emitted but not registered — #1096's issue-to-section map would drop it`
+      );
+    }
+    // THE CONVERSE, and it is the half that has teeth. `>= 10` against a 14-entry registry
+    // passed while four branches went unreached, which is exactly the state that lets a
+    // registered id ship with no branch behind it (or a branch stop emitting) unnoticed. Set
+    // EQUALITY says the sweep reaches every registered id AND that every id it reaches is
+    // registered, so registering a new one without exercising it fails here.
+    assert.deepEqual(
+      [...emitted].sort(),
+      [...CHECK_READINESS_ISSUE_IDS].sort(),
+      'the sweep must reach EVERY registered issue id, and no others'
+    );
+  });
+});
+
+/**
+ * Rewrite the module's RELATIVE imports to absolute file URLs, so a `data:` copy of it
+ * resolves the same dependencies the real file does.
+ */
+function rewriteImports(text) {
+  const base = pathToFileURL(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/checks/checksReadiness.js')
+  ).href;
+  return text.replaceAll(/from '(\.[^']+)'/g, (_match, specifier) => `from '${new URL(specifier, base).href}'`);
+}
+
+// ── rangeGap: the third range rule, which nothing reported before (issue 1095, DN6) ──
+describe('rangeGap', () => {
+  const gapped = {
+    rollFormula: '1d20',
+    type: 'fixed',
+    fixedOutcomes: [
+      { id: 'slag', name: 'Slag', start: 1, end: 9, success: false },
+      { id: 'rough', name: 'Rough', start: 11, end: 17, success: true },
+    ],
+  };
+
+  it('fires on a gapped fixed set, at critical, where nothing fired before', () => {
+    const { checks, issues } = evaluateCheckReadiness(gapped, { mode: 'routed' });
+    const gap = issues.find((issue) => issue.id === 'rangeGap');
+    assert.ok(gap, 'the unclaimed value 10 is reported');
+    assert.equal(gap.severity, 'critical');
+    assert.equal(
+      checks.find((check) => check.id === 'rangesContiguous')?.satisfied,
+      false,
+      'and the readiness row reads as unsatisfied'
+    );
+    // PROVEN TO RAISE NOTHING AGAINST THE PRE-CHANGE EVALUATOR: the two rules that DID
+    // exist both stay silent on this set, which is exactly why the gap was unreported.
+    assert.equal(issues.find((issue) => issue.id === 'rangeInvalid'), undefined);
+    assert.equal(issues.find((issue) => issue.id === 'rangeOverlap'), undefined);
+  });
+
+  it('stays silent on a contiguous set', () => {
+    const contiguous = structuredClone(gapped);
+    contiguous.fixedOutcomes[1].start = 10;
+    const { issues } = evaluateCheckReadiness(contiguous, { mode: 'routed' });
+    assert.equal(issues.find((issue) => issue.id === 'rangeGap'), undefined);
+  });
+
+  it('measures the set’s own span, so a deliberate window is not a gap', () => {
+    // `2d20` rolls 2-40 and a GM who authors 7-34 has authored a window, not a mistake.
+    // Only a hole BETWEEN two authored tiers is reported.
+    const window = {
+      rollFormula: '2d20',
+      type: 'fixed',
+      fixedOutcomes: [
+        { id: 'a', name: 'A', start: 7, end: 20, success: false },
+        { id: 'b', name: 'B', start: 21, end: 34, success: true },
+      ],
+    };
+    assert.equal(
+      evaluateCheckReadiness(window, { mode: 'routed' }).issues.find(
+        (issue) => issue.id === 'rangeGap'
+      ),
+      undefined
+    );
+  });
+
+  // DN6's premise correction, asserted so no copy or test may call these warnings.
+  it('rangeInvalid and rangeOverlap are CRITICAL, not warnings', () => {
+    const invalid = evaluateCheckReadiness(
+      {
+        rollFormula: '1d20',
+        type: 'fixed',
+        fixedOutcomes: [{ id: 'a', name: 'A', start: 9, end: 1, success: true }],
+      },
+      { mode: 'routed' }
+    ).issues;
+    assert.equal(invalid.find((issue) => issue.id === 'rangeInvalid')?.severity, 'critical');
+    const overlapping = evaluateCheckReadiness(
+      {
+        rollFormula: '1d20',
+        type: 'fixed',
+        fixedOutcomes: [
+          { id: 'a', name: 'A', start: 1, end: 10, success: true },
+          { id: 'b', name: 'B', start: 5, end: 20, success: true },
+        ],
+      },
+      { mode: 'routed' }
+    ).issues;
+    assert.equal(overlapping.find((issue) => issue.id === 'rangeOverlap')?.severity, 'critical');
+  });
+});
+
+// ── check-modifier readiness (issue 1095) ──────────────────────────────────────────────
+describe('check-modifier readiness', () => {
+  const catalogue = [
+    { id: 'ok', label: 'Ok', expression: '@a' },
+    { id: 'inverted', label: 'Inverted', expression: '@b', min: 5, max: -1 },
+    { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
+  ];
+  const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
+
+  it('BLOCKS on an authored min > max, matching gathering’s refuse posture', () => {
+    const { checks, issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      { mode: 'simple', modifierContext: context(['inverted']) }
+    );
+    const issue = issues.find((entry) => entry.id === 'modifierBoundsInverted');
+    assert.ok(issue, 'an inverted pair is reported');
+    assert.equal(issue.severity, 'critical', 'BLOCKING — the entry silently contributes 0');
+    assert.equal(
+      checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied,
+      false
+    );
+  });
+
+  // The second blocking bounds fault, and a SEPARATE id: "your minimum is above your
+  // maximum" and "this number cannot appear in a roll formula" need different repairs, and
+  // `1e21` is not an inversion. Its damage used to spread past its own entry — clamping to
+  // it poisoned the SUM and `appendCheckModifierTerm` dropped the whole term.
+  it('BLOCKS on a bound the dice grammar cannot express, as its own issue', () => {
+    const { checks, issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      { mode: 'simple', modifierContext: context(['huge']) }
+    );
+    const issue = issues.find((entry) => entry.id === 'modifierBoundsUnsafe');
+    assert.ok(issue, 'an inexpressible bound is reported');
+    assert.equal(issue.severity, 'critical');
+    assert.equal(
+      issues.find((entry) => entry.id === 'modifierBoundsInverted'),
+      undefined,
+      'and it is NOT reported as an inversion — the repair is different'
+    );
+    assert.equal(checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied, false);
+  });
+
+  it('says nothing about an entry this activity does not apply', () => {
+    // The catalogue is SHARED across three activities, so a gathering section has no
+    // business reporting an entry only crafting selects. Eligibility, not membership.
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      { mode: 'simple', modifierContext: context(['ok']) }
+    );
+    assert.equal(issues.find((entry) => entry.id === 'modifierBoundsInverted'), undefined);
+  });
+
+  it('reports noCheck under gathering d100 — the ONE owned path for that state', () => {
+    const { issues } = evaluateCheckReadiness(
+      {},
+      { mode: 'd100', modifierContext: context(['ok']) }
+    );
+    assert.ok(
+      issues.find((entry) => entry.id === 'modifiersInertNoCheck'),
+      'd100 rolls no authored formula, so a selection made here never applies'
+    );
+    // …and the d100 branch still validates nothing else: there is nothing authored.
+    assert.equal(issues.find((entry) => entry.id === 'noRollFormula'), undefined);
+  });
+
+  it('reports noFormula when a check slot exists but is empty', () => {
+    const { issues } = evaluateCheckReadiness(
+      { rollFormula: '' },
+      { mode: 'simple', modifierContext: context(['ok']) }
+    );
+    assert.ok(issues.find((entry) => entry.id === 'modifiersInertNoFormula'));
+    assert.equal(issues.find((entry) => entry.id === 'modifiersInertNoCheck'), undefined);
+  });
+
+  it('says nothing at all when the activity selects no modifier', () => {
+    // Gated on a NON-EMPTY eligible set for the reason the card gates its notice: warning
+    // that nothing does anything, when nothing was authored, is noise on first contact.
+    for (const options of [
+      { mode: 'simple', modifierContext: context([]) },
+      { mode: 'simple' },
+      { mode: 'd100', modifierContext: context([]) },
+    ]) {
+      const { issues } = evaluateCheckReadiness({ rollFormula: '' }, options);
+      assert.equal(
+        issues.filter((entry) => entry.id.startsWith('modifier')).length,
+        0,
+        `${JSON.stringify(options.mode)}: an empty selection reports no modifier issue`
+      );
+    }
   });
 });

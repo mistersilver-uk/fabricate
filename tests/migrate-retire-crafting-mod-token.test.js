@@ -154,6 +154,28 @@ test('1.21.0 counts an INERT active check — the formulas whose modifiers go li
   assert.equal(counts.inert, 1, 'an authored, placeholder-free active formula with a catalogue');
 });
 
+// THE LADDER IS RE-RUNNABLE, AND `1.22.0` MOVED THE CATALOGUE. This migration is `1.21.0`, so on a
+// FIRST pass the catalogue still sits at `craftingCheck.checkModifiers` — but a world already past
+// `1.22.0` has it at `system.checkModifiers` and NOTHING at the legacy key, and the runner will
+// walk this entry again. The `?? system.checkModifiers` fallback is what reads it there; without
+// it, the unconditional spread writes `checkModifiers: undefined` OVER the system-level one and
+// the count silently reports 0 for a world full of eligible modifiers. Reverting it left the suite
+// green, because every other case in this file authors the legacy location.
+test('1.21.0 reads the catalogue at its POST-1.22.0 system-level location too', () => {
+  const counts = applyRetireCraftingModToken({
+    id: 'sys-1',
+    name: 'Herbalism',
+    resolutionMode: 'simple',
+    checkModifiers: CATALOGUE,
+    craftingCheck: { defaultModifierIds: ['med'], simple: { rollFormula: '1d20 + 4' } },
+  });
+  assert.equal(
+    counts.inert,
+    1,
+    'the eligible set resolves from the system key when the legacy one is gone'
+  );
+});
+
 test('1.21.0 counts NO inert formula when the system has no catalogue to contribute', () => {
   const counts = applyRetireCraftingModToken(
     system({ craftingCheck: { simple: { rollFormula: '1d20 + 4' } } })
@@ -416,9 +438,12 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
 
   const result = await runnerOver(store).run();
 
-  assert.equal(result.ran, 1);
+  // TWO migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and
+  // lifts the catalogue to the system level (issue 1095). The count is asserted rather than
+  // loosened so a THIRD migration landing here is noticed rather than absorbed.
+  assert.equal(result.ran, 2);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.21.0');
+  assert.equal(store.get('migrationVersion'), '1.22.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner

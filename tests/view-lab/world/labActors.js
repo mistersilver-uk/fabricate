@@ -460,7 +460,7 @@ export function buildLabActors(content) {
       flags: {},
       isOwner: true,
       testUserPermission: () => true,
-      // `checkRoll.js` and `craftingModifierResolver.js` resolve `@`-expressions against this. A
+      // `checkRoll.js` and `checkModifierResolver.js` resolve `@`-expressions against this. A
       // real dnd5e actor supplies it; without it every `@prof` / `@abilities.*.mod` in a check
       // formula resolves to NaN and the card renders a broken formula.
       getRollData() {

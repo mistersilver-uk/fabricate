@@ -16,7 +16,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -106,9 +106,19 @@ const QUOTED = /'([\w./@-]+)'/g;
 function compiledPathsOf(suite) {
   // `const NAME = [ … ]` — the backing array for both `...NAME` spreads inside a
   // `compiledModules` list and `for (const x of NAME)` compile loops.
-  const arrays = new Map(
-    [...suite.matchAll(/const\s+(\w+)\s*=\s*\[([^\]]*)\]/g)].map(([, name, body]) => [name, body])
-  );
+  //
+  // A spread's backing array may be IMPORTED rather than declared here (issue 1095, BM9):
+  // the checks tree's manifest is ONE exported constant under `tests/helpers/`, imported by
+  // every checks suite so a new dependency is added in one place instead of N. Resolving
+  // only same-file consts would read those suites as compiling NOTHING, and this guard
+  // would red for the very shape it is meant to make safe.
+  const arrays = new Map([
+    ...importedArraysOf(suite),
+    ...[...suite.matchAll(/const\s+(\w+)\s*=\s*\[([^\]]*)\]/g)].map(([, name, body]) => [
+      name,
+      body,
+    ]),
+  ]);
   const literalsIn = (body) => [...body.matchAll(QUOTED)].map(([, value]) => value);
 
   const declared = [];
@@ -154,6 +164,34 @@ function compiledPathsOf(suite) {
   }
 
   return declared;
+}
+
+/**
+ * Backing arrays a suite IMPORTS, keyed by the local name it spreads them under.
+ *
+ * Only relative specifiers under `tests/` are followed, and only exported `const NAME = [ … ]`
+ * declarations are read: a helper that computed its list would be unreadable here, and this
+ * guard would rather see nothing than guess.
+ * @param {string} suite Source text of the suite.
+ * @returns {Array<[string, string]>} `[localName, arrayBody]` pairs.
+ */
+function importedArraysOf(suite) {
+  const pairs = [];
+  for (const [, names, specifier] of suite.matchAll(/import\s*\{([^}]*)\}\s*from\s*'(\.[^']+)'/g)) {
+    const resolved = resolve(repoRoot, 'tests/components', specifier);
+    if (!existsSync(resolved)) continue;
+    const source = readFileSync(resolved, 'utf8');
+    const declared = new Map(
+      [...source.matchAll(/export\s+const\s+(\w+)\s*=\s*Object\.freeze\(\[([^\]]*)\]/g)].map(
+        ([, name, body]) => [name, body]
+      )
+    );
+    for (const raw of names.split(',')) {
+      const name = raw.trim().split(/\s+as\s+/).at(-1);
+      if (declared.has(name)) pairs.push([name, declared.get(name)]);
+    }
+  }
+  return pairs;
 }
 
 function repoPathsUnder(directory, extension) {

@@ -2,6 +2,10 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  CHECKS_TREE_COMPILED_MODULES,
+  CHECKS_TREE_RAW_MODULES,
+} from '../helpers/checksHarnessModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -10,18 +14,12 @@ const repoRoot = resolve(__dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-checks-validation-',
-  rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
-    // checksReadiness classifies fixed-tier ranges via the shared expression util.
-    'src/utils/craftingCheckExpression.js',
-    'src/ui/svelte/apps/manager/checks/checksReadiness.js',
-  ],
-  compiledModules: [
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
-    // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
-  ],
+  // The ONE shared checks-tree manifest (issue 1095, BM9), imported rather than
+  // re-typed. A `.js` or `.svelte` the tree renders but the harness omits HANGS the
+  // suite (# cancelled) rather than failing it, so a per-file copy of this list is a
+  // per-file chance to be silently unrunnable.
+  rawModules: CHECKS_TREE_RAW_MODULES,
+  compiledModules: CHECKS_TREE_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
 });
 

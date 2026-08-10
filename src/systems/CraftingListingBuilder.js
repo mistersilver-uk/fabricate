@@ -23,7 +23,7 @@ import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
 
-import { buildCraftingModifierContext } from './craftingModifierResolver.js';
+import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 
 /**
@@ -709,17 +709,23 @@ export class CraftingListingBuilder {
     // false when the formula does not reduce to a number for this actor (error state).
     const resolution =
       rollFormula.length > 0 && craftingActor
-        ? // The check-modifier context (issues 770, 1055): the SAME builder the engine
-          // threads to its check runners, not a second literal of the same shape. The
-          // display path and the evaluation path must agree on every axis the context
-          // carries — the combination rule, the system's default eligible set, the
-          // recipe's own picks under `byRecipe`, and the `maxModifierPicks` cap that
-          // bounds them — or the listed formula shows a scalar the roll will not use
-          // (`resolution-modes/spec.md` requirement 71).
+        ? // The check-modifier context (issues 770, 1055, 1095): the SAME builder the
+          // engine threads to its check runners, not a second literal of the same shape.
+          // The display path and the evaluation path must agree on every axis the context
+          // carries — the combination rule, the activity's default eligible set, the
+          // subject's own picks under `bySubject`, each entry's `min`/`max` clamp, and
+          // the `maxModifierPicks` cap that bounds them — or the listed formula shows a
+          // scalar the roll will not use (`resolution-modes/spec.md` requirement 71).
+          //
+          // THE ACTIVITY ARGUMENT IS LOAD-BEARING (issue 1095). The catalogue is shared
+          // across crafting, salvage and gathering but the SELECTION is not, so an
+          // arity-2 call here would resolve this listed CRAFTING formula against
+          // whichever selection triple the builder happened to default to. This is the
+          // player-facing card; a wrong scalar here is a promise the roll breaks.
           this._resolveCheckFormula(
             rollFormula,
             craftingActor,
-            buildCraftingModifierContext(system, recipe)
+            buildCheckModifierContext(system, 'crafting', recipe)
           )
         : null;
     // A routed fixed check (routedByCheck, or alchemy tiered) matches by value

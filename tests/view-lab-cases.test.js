@@ -34,6 +34,9 @@ import {
   publishableCases,
 } from '../scripts/lib/viewLabCases.js';
 
+import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
+import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
+
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 
@@ -416,6 +419,100 @@ test('every interaction step names text that exists in the manager UI', () => {
   );
 });
 
+/**
+ * Every SELECTOR-BEARING field on a case, so a scan cannot silently miss one.
+ *
+ * `steps[].selector` is the obvious one and the only one the token check above looks at.
+ * `expectSelector` is not gated by that check AT ALL — it is the assertion the capture
+ * driver runs before it photographs, and a dead one fails the job WHOLE, publishing
+ * nothing while `check-screenshots` stays green on stale frames.
+ */
+function caseSelectors(viewCase) {
+  const selectors = [];
+  for (const step of viewCase.steps ?? []) {
+    if (typeof step === 'object' && typeof step.selector === 'string') selectors.push(step.selector);
+  }
+  if (typeof viewCase.expectSelector === 'string') selectors.push(viewCase.expectSelector);
+  return selectors;
+}
+
+test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
+  // Nine selectors in this registry pin a rule option by its VALUE, and NOTHING else could
+  // see them go stale. The token check above strips attribute values before extracting
+  // hooks ("Attribute VALUES are not hooks"), so a renamed value passes it; `expectSelector`
+  // is not scanned by it at all. Issue 1095 renamed exactly such a value — `byRecipe` to
+  // `bySubject` — and the failure mode is total: the capture job fails whole and publishes
+  // NOTHING.
+  //
+  // THE ATTRIBUTE NAME IS IMPORTED, NOT RESTATED — the rule this file already states at the
+  // knowledge-probe check below ("The list is IMPORTED, not restated"). A restated literal
+  // would go on naming the old attribute after a rename, this scan would extract ZERO
+  // values, `[] ⊆ MODIFIER_POLICIES` would hold vacuously, and the guard would pass over
+  // seven dead selectors. The literal cannot be imported out of Svelte MARKUP — it is a
+  // prop value, the component exports nothing, and this file compiles no Svelte — so it is
+  // hoisted into `modifierPolicyAttrs.js`, which the component consumes and this test
+  // imports. `MODIFIER_POLICIES` is imported for the same reason.
+  const pattern = new RegExp(
+    String.raw`\[` + escapeForRegExp(MODIFIER_POLICY_OPTION_ATTR) + String.raw`="([^"]*)"\]`,
+    'g'
+  );
+  const found = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const selector of caseSelectors(viewCase)) {
+      for (const match of selector.matchAll(pattern)) {
+        found.push({ id: viewCase.id, value: match[1] });
+      }
+    }
+  }
+
+  // NON-EMPTY, and of the EXPECTED CARDINALITY. Either half alone goes vacuous: an empty
+  // set satisfies the membership assertion, and a non-empty one satisfies it while eight of
+  // the nine selectors have quietly lost the attribute.
+  //
+  // NINE since issue 1095's review: the two SUBJECT-PICKER cases each click the rule card
+  // before routing to their editor, because the picker renders under `bySubject` alone and
+  // both lab systems author a non-selecting rule.
+  assert.equal(
+    found.length,
+    9,
+    `expected 9 combination-rule selectors in the registry, found ${found.length} — ` +
+      `either \`${MODIFIER_POLICY_OPTION_ATTR}\` was renamed in the registry without being ` +
+      'renamed here, or cases carrying it were added or deleted'
+  );
+
+  const foreign = found.filter((entry) => !MODIFIER_POLICIES.includes(entry.value));
+  assert.deepEqual(
+    foreign,
+    [],
+    'these registry selectors target a combination rule that is not in MODIFIER_POLICIES, so ' +
+      'they match nothing and the capture job fails whole:\n  ' +
+      foreign.map((entry) => `${entry.id}: "${entry.value}"`).join('\n  ')
+  );
+});
+
+test('the combination-rule scan reads expectSelector, not only steps', () => {
+  // The property that keeps the check above honest, asserted rather than assumed. The
+  // pre-1095 registry carried one of its seven rule selectors in `expectSelector`
+  // (`manager-checks-crafting-modifiers`), which the existing token check never looks at —
+  // so a scan restricted to `steps[]` would have graded six of seven and called it a pass.
+  const fromExpect = VIEW_LAB_CASES.filter((viewCase) =>
+    (viewCase.expectSelector ?? '').includes(MODIFIER_POLICY_OPTION_ATTR)
+  ).map((viewCase) => viewCase.id);
+  assert.ok(
+    fromExpect.length > 0,
+    'no case pins a combination rule through `expectSelector` any more, so the scan above no ' +
+      'longer proves it covers that field — re-point it at whichever field now carries one'
+  );
+  // …and the same for the step field, so neither half can be dropped unnoticed.
+  const fromSteps = VIEW_LAB_CASES.filter((viewCase) =>
+    (viewCase.steps ?? []).some(
+      (step) => typeof step === 'object' && (step.selector ?? '').includes(MODIFIER_POLICY_OPTION_ATTR)
+    )
+  ).map((viewCase) => viewCase.id);
+  assert.ok(fromSteps.length > 0, 'no case CLICKS a combination rule any more');
+  assert.notDeepEqual(fromExpect, fromSteps, 'the two fields must be genuinely distinct sets');
+});
+
 test('the hooks the capture driver hard-codes still exist in the UI', () => {
   // These are the load-bearing selectors no case names, so nothing else can notice them going away.
   // `scripts/view-lab-screenshots.mjs` clicks every rail label through `.manager-nav-button` and
@@ -711,6 +808,71 @@ test('changed files map to the windows they affect', () => {
 
   // An unmatched render file still yields evidence rather than none.
   assert.deepEqual(ids(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']), [FALLBACK_CASE_ID]);
+});
+
+// The NEW `.js` modules this change adds under the checks tree, and the frames a change
+// confined to each of them must still select (issue 1095, C2).
+//
+// STATED AS A POSITIVE PIN, not as a `FALLBACK_CASE_ID` probe. The premise that a `.js`
+// module reaches the fallback is FALSE here: nine cases already claim the directory prefix
+// `/^src\/ui\/svelte\/apps\/manager\/checks\//`, and `UI_PATH_PATTERN` admits any
+// `src/ui/**/*.js` as a render file — so a change confined to a new module under that
+// directory selects those cases and can NEVER reach the fallback. "Proven to fail before
+// the entry exists" would therefore be vacuous, and "selects exactly those ids" would be
+// false in the other direction.
+//
+// What CAN fail, and is what matters, is the direction below: each module selects a
+// non-empty set that INCLUDES the frames it determines, and never the fallback.
+const NEW_CHECKS_MODULES = [
+  [
+    'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
+    ['manager-checks-crafting-modifiers', 'manager-checks-crafting-modifier-max-picks'],
+  ],
+  [
+    'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+    ['manager-checks-crafting-modifiers'],
+  ],
+];
+
+test('a change confined to a new checks module selects the frames it determines', () => {
+  const ids = (files) => mapChangedFilesToCases(files).map((viewCase) => viewCase.id);
+  for (const [modulePath, determined] of NEW_CHECKS_MODULES) {
+    assert.ok(
+      sourceFiles.includes(modulePath),
+      `${modulePath} names no file under src/ — a renamed module makes this probe inert`
+    );
+    const selected = ids([modulePath]);
+    assert.ok(selected.length > 0, `${modulePath} selects no case at all`);
+    const missing = determined.filter((id) => !selected.includes(id));
+    assert.deepEqual(
+      missing,
+      [],
+      `${modulePath} determines these frames but does not select them:\n  ${missing.join('\n  ')}`
+    );
+    assert.ok(
+      !selected.includes(FALLBACK_CASE_ID),
+      `${modulePath} fell through to the fallback, so the frames it determines go unpublished`
+    );
+  }
+});
+
+test('the new-module pin is capable of failing, on a path outside every pattern', () => {
+  // The capability proof the pin above needs, and the one thing it cannot demonstrate about
+  // itself: a path that matches NO `sourceMatches` pattern falls through to the fallback, so
+  // "never the fallback" is a real constraint rather than an unreachable one.
+  const ids = (files) => mapChangedFilesToCases(files).map((viewCase) => viewCase.id);
+  assert.deepEqual(
+    ids(['src/ui/svelte/apps/manager/checks/notARealModule.js']).includes(FALLBACK_CASE_ID),
+    false,
+    'the checks DIRECTORY prefix already admits any .js under it, matched or not — which is ' +
+      'exactly why the fallback premise was withdrawn'
+  );
+  assert.deepEqual(
+    ids(['src/ui/svelte/apps/SomeBrandNewRoot.svelte']),
+    [FALLBACK_CASE_ID],
+    'a render file outside every pattern DOES reach the fallback, so the assertion above is ' +
+      'testing a reachable state rather than an impossible one'
+  );
 });
 
 test('every publishable case is in the registry order the driver iterates', () => {

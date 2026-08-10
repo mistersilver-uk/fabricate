@@ -987,7 +987,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The recipe end of the `byRecipe` rule (issue 1055) ───────────────────────────────────────
+  // ── The recipe end of the `bySubject` rule (issues 1055, 1095) ───────────────────────────────
   //
   // Every frame below reaches its state by CLICKING the rule group (and, for the capped pair, by
   // typing into the pick-cap Stepper) rather than by authoring a second catalogued system. The
@@ -1022,7 +1022,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // The per-recipe check-modifier picker AT REST. `RecipeOverviewTab` gates the whole control on
-    // `craftingModifierOptions.length > 0` AND on the system's rule being `byRecipe`, so it exists
+    // `craftingModifierOptions.length > 0` AND on the system's rule being `bySubject`, so it exists
     // on exactly one lab system — herbalism, the only one carrying a catalogue — and every other
     // recipe-editor frame in this registry runs on smithing or jewelry.
     //
@@ -1033,7 +1033,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-kiln"]' },
       { selector: '#recipe-tab-overview' },
@@ -1083,7 +1083,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1124,7 +1124,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '5' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1150,7 +1150,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '3' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1172,7 +1172,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // no counterpart frame of the surface being gone.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE NEGATIVE FRAME, and the one the redesign turns on. Under any rule but `byRecipe` this
+    // THE NEGATIVE FRAME, and the one the redesign turns on. Under any rule but `bySubject` this
     // tab renders NOTHING about check modifiers — no picker, and no standing "the system decides"
     // banner either. The rejected design put such a banner on every recipe of every system that
     // never delegated, and this frame is the evidence that it is gone rather than merely restyled.
@@ -1257,13 +1257,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     // so this frame is also the only evidence that the control is withdrawn rather than left
     // live-but-useless, and the only one showing `RecipeModeBanner`'s warning tone at all.
     //
-    // The `byRecipe` click is what makes the contradiction reachable: under a non-selecting
+    // The `bySubject` click is what makes the contradiction reachable: under a non-selecting
     // rule there are no picks to warn about and the tab says nothing.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
       'Crafting',
@@ -1272,7 +1272,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-modifier-inert]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The cause, and the withdrawal. The rule click puts this system on `byRecipe`, so an
+    // The cause, and the withdrawal. The rule click puts this system on `bySubject`, so an
     // inert state that failed to suppress the control would still render the picker cell —
     // which is exactly what this frame claims cannot happen.
     expectSelector:
@@ -1722,6 +1722,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
+    // The SHARED subject check-modifier picker does NOT render here, and this list used to
+    // claim it did (issue 1095). `lab-runework`'s salvage check is on `addAll`, and the picker
+    // renders under `bySubject` alone — so routing the component's changed file to this case
+    // would publish a frame that provably cannot depict it. The two cases that CAN are
+    // `manager-component-edit-salvage-modifier-pick` and
+    // `manager-gathering-task-edit-modifier-pick`, each of which clicks the rule first.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -1870,20 +1876,32 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#checks-tab-crafting' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
-      // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so anchoring the LAST of
-      // the things this frame is named for — the default-modifier pill row, below the rule group —
-      // puts the whole card in frame with the catalogue rows above it for context.
-      { selector: '[data-crafting-modifier-defaults]', scroll: true },
+      // RE-ANCHORED (issue 1095 review). `[data-crafting-modifier-defaults]` was the anchor while
+      // it was the pill row directly under "Default modifiers"; this change turned it into the
+      // eligibility intro and MOVED it above the rows, so the anchor stopped naming the thing it
+      // was chosen for — and each entry grew from two lines to four at the same time, so the
+      // published frame clipped mid-entry with two `Unbounded` steppers and a `Selectable` pill
+      // whose own row's icon, name, expression and delete button were all above the fold.
+      //
+      // "Put the WHOLE card in frame" is no longer achievable and the claim is retired rather
+      // than restated: at four entries the card is ~1240px and `.application`'s max-height
+      // resolves to ~1000px against the harness viewport, which the harness refuses outright
+      // rather than silently clamping. So the two crafting cases were split by SUBJECT instead.
+      // This one is the RULE GRID and the UNLIMITED cap reading, so it anchors the cap — the
+      // card's last element — and carries the grid above it, with the not-selected eligibility
+      // pill of the last entry for context. `manager-checks-crafting-modifier-entries` below is
+      // the entry editor's own frame.
+      { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks',
-    // Two things at once, on the one card. `byRecipe` is the FOURTH option — the one the redesign
+    // Two things at once, on the one card. `bySubject` is the FOURTH option — the one the redesign
     // restored, the one that makes the row count even, and the only one whose absence would
     // silently turn the 2x2 this frame is evidence for back into a three-across row. The
     // `unlimited` cap reading is the other half, and asserting the VALUE rather than the field's
     // presence is what separates this frame from its bounded sibling.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue]' +
-      ':has([data-crafting-modifier-policy-option="byRecipe"])' +
+      ':has([data-crafting-modifier-policy-option="bySubject"])' +
       ':has([data-crafting-modifier-max-picks="unlimited"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -1903,15 +1921,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     // different pictures of the same control — which is exactly the pair a reviewer needs to judge
     // whether "empty means no limit" is legible without reading the hint.
     //
-    // `byRecipe` rather than `playerPicks`, so the two cap frames also differ in their hint: the
+    // `bySubject` rather than `playerPicks`, so the two cap frames also differ in their hint: the
     // cap means a bound on the RECIPE AUTHOR at edit time here and on the PLAYER at roll time
     // there, and the card keys its sentence off the rule rather than writing one ambiguous line.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
+      // The CAP FIELD, which is this case's whole subject and the card's last element, so the
+      // frame carries the rule grid above it. NOT the rows: at four entries the card is
+      // ~1240px against a ~1000px maximum viewport, so no anchor frames the whole of it, and
+      // an anchor that framed the entries would push this case's own subject off the bottom.
+      // The entries have their own case (`manager-checks-crafting-modifier-entries`).
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks',
@@ -1919,6 +1942,229 @@ export const VIEW_LAB_CASES = Object.freeze([
     // rendered and blank, which is the sibling frame published under this name.
     expectSelector: '.fabricate-manager [data-crafting-modifier-max-picks="1"]',
     kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-modifier-entries',
+    label: 'Manager — Checks crafting modifier entries',
+    // BEYOND the smoke: the walk never opens a system carrying a catalogue on this tab, and the
+    // two sibling cases above frame the rule grid and the cap rather than the entries.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE ENTRY EDITOR, which is what actually grew in issue 1095 and what its siblings can no
+    // longer show: a row is now icon + label, expression + delete, a `min`/`max` Stepper pair on
+    // its own line, and an eligibility checkbox with its state word. Four lines, not two.
+    //
+    // Anchored on the FIRST row rather than on the rows container, and the difference is the
+    // whole point: `scrollIntoViewIfNeeded` lands an over-tall container's BOTTOM edge, so
+    // anchoring the container frames the last entries and drops the eligibility sentence that
+    // now sits above the first one. Anchoring the first row frames the card from its top.
+    //
+    // `hb-mod-medicine` is the world's only BOUNDED entry, so this is also the only frame of the
+    // authoring pair carrying real values rather than two `Unbounded` placeholders.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-crafting-modifier-row="hb-mod-medicine"]', scroll: true },
+    ],
+    expectView: 'checks',
+    // The eligibility sentence ABOVE the rows, and a row carrying the bounds pair. Asserting the
+    // sentence's own hook is what would catch it moving back below the rule grid, which is where
+    // it sat until this change and where it read as a footnote about the pick cap.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-catalogue="crafting"]' +
+      ':has([data-crafting-modifier-defaults])' +
+      ':has([data-crafting-modifier-bounds="hb-mod-medicine"] ' +
+      '[data-crafting-modifier-field="min"])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // ── the OTHER TWO activities' catalogue cards (issue 1095) ──────────────────────────────────
+  //
+  // The card is activity-aware and only its ENTRY EDITOR is gated: salvage and gathering render
+  // each entry READ-ONLY, with a bounds chip and a link back to the crafting tab, while the
+  // per-entry eligibility control and the rule grid stay fully editable. That read-only row is a
+  // shape nothing else in the registry draws — the crafting frames above show the editor — and
+  // before these two cases there was no `manager-checks-salvage*` case in the registry at all.
+  //
+  // Both run on `lab-herbalism`, the one system with a catalogue, and both its salvage and its
+  // gathering features are on. Their selections DIFFER from crafting's (`labContent.js`), which is
+  // what makes the two frames distinguishable from the crafting one at a glance rather than three
+  // photographs of the same state.
+  managerCase({
+    id: 'manager-checks-salvage-modifiers',
+    label: 'Manager — Checks salvage modifiers',
+    // BEYOND the smoke: the walk never opens the salvage sub-tab of a system carrying a
+    // catalogue, so no counterpart frame of the read-only entry rows exists.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-salvage' },
+      { selector: '[data-crafting-modifier-rows]', scroll: true },
+    ],
+    expectView: 'checks',
+    // THE READ-ONLY ROW, asserted through the one element the editable branch cannot draw. The
+    // `has(...bounds-chip)` clause is the bounds chip's only assertion anywhere: it renders for a
+    // bounded entry alone, and `hb-mod-medicine` is the world's only bounded one.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-catalogue="salvage"]' +
+      ':has([data-crafting-modifier-readonly="expression"])' +
+      ':has(.manager-modifier-bounds-chip)' +
+      ':has([data-crafting-modifier-edit-link])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-gathering-modifiers',
+    label: 'Manager — Checks gathering modifiers',
+    // BEYOND the smoke, and the only frame of the DORMANCY notice against a populated catalogue:
+    // `manager-checks-gathering` runs on the default system, whose catalogue is empty, so its card
+    // draws the empty state and none of the rows the notice is about.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-gathering' },
+      { selector: '[data-crafting-modifier-rows]', scroll: true },
+    ],
+    expectView: 'checks',
+    // The gathering card carries TWO notices no other activity's does — the check-vs-character
+    // modifier disambiguation and the issue-683 dormancy note — and both are stated against real
+    // rows here rather than against an empty catalogue.
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-catalogue="gathering"]' +
+      ':has([data-gathering-modifier-disambiguation])' +
+      ':has([data-check-modifier-dormant])' +
+      ':has([data-crafting-modifier-readonly="expression"])',
+    kinds: ['manager', 'checks'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/checks\//,
+      /^src\/ui\/svelte\/apps\/manager\/.*Check/,
+    ],
+  }),
+  // ── the SHARED subject picker, one case per host (issue 1095) ───────────────────────────────
+  //
+  // `SubjectModifierPicker` is one component with TWO hosts, and both gate it on the activity's
+  // rule being `bySubject`. Both lab systems author a non-selecting rule, so it renders in NO
+  // existing frame — which is why these two cases click the rule card first, exactly as the
+  // recipe picker's cases do. Clicking a `RadioCardGroup` radio is legal in this registry (see the
+  // recipe block's own note); the card persists on change, so no Save step follows.
+  //
+  // Both open the picker in its INHERIT state, which is the reading the pill row cannot show: the
+  // inherited set is NAMED from the activity's own `defaultModifierIds`, and a picker that said
+  // "inheriting" and stopped there told the GM nothing about what the record actually rolls.
+  //
+  // BOTH FRAMES DEPEND ON A FIXTURE, not merely on the click. The inherit note has a SECOND
+  // reading — "the default set is empty, so no check modifier applies" — and that is what renders
+  // when the activity has no eligible entries. `lab-herbalism` carries a `salvageCraftingCheck`
+  // and (since issue 1095's review) a `gatheringCraftingCheck`, each with its OWN non-empty
+  // `defaultModifierIds`, precisely so each frame photographs the NAMING reading. Both
+  // `expectSelector`s therefore assert the inherit note itself rather than only that the picker
+  // rendered — without that, a world whose default set went empty would publish a frame showing
+  // the opposite sentence and the case would still pass.
+  managerCase({
+    id: 'manager-component-edit-salvage-modifier-pick',
+    label: 'Manager — Component edit salvage modifier pick',
+    // BEYOND the smoke: the walk never presses a rule card, so the picker is on no smoke frame.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-salvage' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      'Components',
+      {
+        selector:
+          '.manager-component-row[data-component-id="hb-cracked-alembic"] ' +
+          '.manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
+    ],
+    expectView: 'component-edit',
+    // The picker AND its inherit note. The first proves the rule click landed (the picker renders
+    // under no other rule), the second proves the frame shows the inherit reading rather than an
+    // authored pick — and the note is where the inherited entries are named.
+    expectSelector:
+      '.fabricate-manager [data-subject-modifier-picker="salvage-check-modifier"] ' +
+      '[data-subject-modifier-inherited]',
+    kinds: ['manager', 'components'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-edit-modifier-pick',
+    label: 'Manager — Gathering task edit modifier pick',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    // The rail's gathering group is a SUBMENU, so reaching the task library is two clicks —
+    // the same route `manager-gathering-task-editor-normal` takes, after the rule click.
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-gathering' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-check-modifiers]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    // The task card, the picker inside it AND the picker's inherit note: the card carries the
+    // check-vs-character modifier hint, which is the disambiguation this screen is the second half
+    // of, and the note is where the inherited entries are named.
+    expectSelector:
+      '.fabricate-manager [data-gathering-task-check-modifiers] ' +
+      '[data-subject-modifier-picker="gathering-check-modifier"] ' +
+      '[data-subject-modifier-inherited]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-checks-crafting-modifiers-narrow',
+    label: 'Manager — Checks crafting modifiers narrow',
+    // BEYOND the smoke: the walk runs one geometry, and the whole subject here is the other one.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE 1x4 REFLOW, which is only judgeable from a photograph. The rule grid is a FIXED
+    // two-track `RadioCardGroup`, so its 2x2 is a decision rather than a reflow — and the card
+    // declares itself a container so the shipped `@container (max-width: 620px)` rule measures
+    // THIS card's inline size instead of the whole manager shell's. That is what drops the grid to
+    // 1x4 at a narrow pane, and a claim about a container query with no narrow frame behind it is
+    // a claim about code nobody has looked at.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Checks',
+      { selector: '#checks-tab-crafting' },
+      { selector: '[data-crafting-modifier-policy]', scroll: true },
+    ],
+    expectView: 'checks',
+    expectSelector:
+      '.fabricate-manager [data-crafting-modifier-catalogue="crafting"] ' +
+      '[data-crafting-modifier-policy]',
+    position: { width: 1000, height: 720 },
+    kinds: ['manager', 'checks', 'responsive'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
@@ -3906,7 +4152,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // RE-AIMED by issue 1055, and the aim moved for a reason worth recording. The rule used to be
     // a per-RECIPE override on this recipe; a recipe can no longer override the system's rule at
     // all, so it now lives on `lab-herbalism` itself (`labContent.js`). The system is UNBOUNDED,
-    // so `buildCraftingModifierChoice` clamps `maxPicks` to the three eligible modifiers and the
+    // so `buildCheckModifierChoice` clamps `maxPicks` to the three eligible modifiers and the
     // fieldset renders as a MULTI-pick checkbox group legended "Pick up to 3" — the control this
     // change introduces, rather than the pick-one radio group it generalizes.
     reaches: 'exact',

@@ -286,7 +286,7 @@ test('migrationVersion setting is updated to the highest migration version after
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
   assert.ok(versionCall, 'migrationVersion should be persisted');
-  assert.equal(versionCall.value, '1.21.0');
+  assert.equal(versionCall.value, '1.22.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -354,7 +354,7 @@ test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async 
   assert.deepEqual(saved.systems, { 'sys-a': { tools: [{ id: 't1' }] } }, 'systems preserved');
 
   const versionCall = settings.calls.set.find(c => c.key === 'migrationVersion');
-  assert.equal(versionCall.value, '1.21.0');
+  assert.equal(versionCall.value, '1.22.0');
 });
 
 test('0.2.0 is a no-op when gatheringConfig.vocabularies.regions is already empty', async () => {
@@ -466,7 +466,7 @@ test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode
   assert.equal(config.systems['sys-1'].economy.stamina.enabled, false);
   assert.equal(config.systems['sys-1'].economy.nodes.enabled, true);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.21.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.22.0');
 });
 
 test('0.4.0 collapses legacy node respawn policies in library tasks and environments', async () => {
@@ -495,7 +495,7 @@ test('0.4.0 collapses legacy node respawn policies in library tasks and environm
   assert.deepEqual(envs[0].tasks[0].nodes.respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.4, intervalUnit: 'hours', intervalAmount: 2 });
   assert.deepEqual(envs[0].nodeRuntime['t1'].respawn, { policy: 'overTime', gainMode: 'chance', chance: 0.2, intervalUnit: 'minutes', intervalAmount: 1 });
 
-  assert.equal(settings.store.get('migrationVersion'), '1.21.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.22.0');
 });
 
 test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
@@ -567,7 +567,7 @@ test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', 
   assert.equal(systems['sys-none'].economy.stamina.enabled, false);
   assert.equal(systems['sys-none'].economy.nodes.enabled, false);
 
-  assert.equal(settings.store.get('migrationVersion'), '1.21.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.22.0');
 });
 
 test('0.8.0 is idempotent and leaves already-migrated economies untouched', async () => {
@@ -611,7 +611,7 @@ test('0.3.0 -> 0.8.0 compose: env-level economyMode becomes the two flags', asyn
   assert.equal('mode' in economy, false, '0.8.0 drops the mode 0.3.0 seeded');
   assert.equal(economy.stamina.enabled, true);
   assert.equal(economy.nodes.enabled, false);
-  assert.equal(settings.store.get('migrationVersion'), '1.21.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.22.0');
 });
 
 // ---------------------------------------------------------------------------
@@ -638,7 +638,7 @@ test('1.2.0 rewrites a legacy elapsedTime stamina-regen policy to overTime', asy
   assert.equal(stamina.regen.unit, 'days');
   assert.equal(stamina.regen.amount, 5);
   assert.equal(stamina.max, '20');
-  assert.equal(settings.store.get('migrationVersion'), '1.21.0');
+  assert.equal(settings.store.get('migrationVersion'), '1.22.0');
 });
 
 test('1.2.0 is idempotent and leaves already-overTime economies untouched (no re-persist)', async () => {
@@ -1065,5 +1065,37 @@ test('1.6.0 recovery-warning payload is surfaced in the summary and never persis
     if (value && typeof value === 'object') {
       assert.equal('_removedResultSelectionProviders' in value, false);
     }
+  }
+});
+
+// ── the lossy-downgrade contract, as a RULE over the registry ────────────────
+//
+// `migrationRecoveryPrompt` renders a migration's `label` as "aborted during …" directly beside
+// the Keep/Downgrade buttons, so that string is the ONLY place a GM meets the consequences of the
+// choice they are about to make. A caveat left in a source comment is addressed to the wrong
+// reader at the wrong moment, and this is the one moment that matters.
+//
+// It is a rule rather than one entry's assertion because deleting the clause from `1.22.0`'s label
+// was green, and the next lossy migration would land with nothing at all stopping it. An entry
+// declares the fact once, machine-readably, and the label is then held to it.
+test('every migration whose downgrade LOSES DATA names that in its own label', () => {
+  const registry = new MigrationRunner({ getSetting: () => undefined, setSetting: () => {} })
+    ._migrations;
+  const lossy = registry.filter((migration) => migration.downgradeLosesData === true);
+  assert.ok(
+    lossy.length > 0,
+    'the rule is not vacuous: at least one registered migration declares a lossy downgrade'
+  );
+  for (const migration of lossy) {
+    assert.match(
+      migration.label,
+      /DOWNGRADING IS NOT LOSSLESS/,
+      `${migration.version}: a GM choosing Downgrade at the recovery prompt reads this label and ` +
+        'nothing else, so the loss has to be stated in it'
+    );
+    assert.ok(
+      typeof migration.downgradeTo === 'string' && migration.downgradeTo,
+      `${migration.version}: a lossy downgrade still has to name the version it downgrades TO`
+    );
   }
 });

@@ -75,7 +75,7 @@
     // skipping this wrapper silently drops to its default and the control never renders.
     craftingModifierOptions = [],
     // The SYSTEM's combination rule. Not a "default": a recipe cannot override it, and
-    // only `byRecipe` gives the recipe anything to author at all.
+    // only `bySubject` ("By recipe" on crafting) gives the recipe anything to author at all.
     craftingModifierPolicy = 'addAll',
     craftingModifierDefaultIds = [],
     // The system's pick cap (issue 1055). `null`, NOT a number: absence is the
