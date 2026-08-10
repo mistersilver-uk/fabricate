@@ -1998,7 +1998,7 @@
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-main,
-.fabricate-manager[data-manager-view="checks"] .manager-main,
+.fabricate-manager[data-manager-view^="checks"] .manager-main,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-main,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-main,
 .fabricate-manager[data-manager-view="system-edit"] .manager-main {
@@ -6911,9 +6911,16 @@
    This list and the `<aside class="manager-inspector">` render condition in
    `CraftingSystemManagerRoot.svelte` are ONE decision expressed twice: release the
    column here without suppressing the aside and its (empty) box wraps to an implicit
-   grid row BELOW the editor instead of vanishing. Keep the two in step. */
+   grid row BELOW the editor instead of vanishing. Keep the two in step.
+
+   The Checks entry is a PREFIX match since issue 1096, because `checks` became four
+   child routes (`checks-crafting` and friends) plus the retained redirect. An exact
+   match went on matching nothing at all: the aside was still suppressed by the root's
+   `!isChecksRoute` guard, so the studio rendered against a ~300px dead strip — the
+   exact regression the comment above says this pairing exists to prevent, arriving
+   from the other direction. */
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
-.fabricate-manager[data-manager-view="checks"] .manager-body,
+.fabricate-manager[data-manager-view^="checks"] .manager-body,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
@@ -6923,7 +6930,7 @@
 }
 
 .fabricate-manager[data-manager-view="environment-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="checks"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view^="checks"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="component-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
@@ -13866,7 +13873,7 @@
   }
 
   .fabricate-manager[data-manager-view="environment-edit"] .manager-body,
-  .fabricate-manager[data-manager-view="checks"] .manager-body,
+  .fabricate-manager[data-manager-view^="checks"] .manager-body,
   .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
   .fabricate-manager[data-manager-view="books-scrolls"] .manager-body,
   .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
