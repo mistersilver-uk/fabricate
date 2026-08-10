@@ -126,7 +126,7 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectCrafting',
       label: 'By recipe',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectCraftingDesc',
-      desc: 'Each recipe picks which modifiers apply, on its Overview tab; the picks are summed. Recipes that pick nothing use the default set below.',
+      desc: 'Each recipe picks which modifiers apply, on its Overview tab; the picks are summed. Recipes that pick nothing use the default set above.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectCrafting',
       cap: 'The most modifiers a recipe author may pick for one recipe. Leave it empty for no limit. Lowering it below what a recipe already picked keeps the recipe intact but rolls only the first modifiers it picked, up to this many.',
       introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroBySubjectCrafting',
@@ -137,7 +137,7 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectSalvage',
       label: 'By component',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectSalvageDesc',
-      desc: 'Each component picks which modifiers apply, on its Salvage tab; the picks are summed. Components that pick nothing use the default set below.',
+      desc: 'Each component picks which modifiers apply, on its Salvage tab; the picks are summed. Components that pick nothing use the default set above.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectSalvage',
       cap: 'The most modifiers a component may pick for one salvage. Leave it empty for no limit. Lowering it below what a component already picked keeps the component intact but rolls only the first modifiers it picked, up to this many.',
       introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroBySubjectSalvage',
@@ -148,7 +148,7 @@
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectGathering',
       label: 'By gathering row',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectGatheringDesc',
-      desc: 'Each gathering task picks which modifiers apply, in the gathering library; the picks are summed. Tasks that pick nothing use the default set below.',
+      desc: 'Each gathering task picks which modifiers apply, in the gathering library; the picks are summed. Tasks that pick nothing use the default set above.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectGathering',
       cap: 'The most modifiers a gathering task may pick. Leave it empty for no limit. Lowering it below what a task already picked keeps the task intact but rolls only the first modifiers it picked, up to this many.',
       introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroBySubjectGathering',
@@ -254,12 +254,33 @@
     },
   };
 
+  // The NOT-selected vocabulary, keyed off the rule for the same reason the ON one is:
+  // "Not applied" is the negation of `Applied` and of nothing else, so under the other
+  // three rules it was one OFF word answering four different ON words — the row said
+  // "Selectable" or "Considered" when on and "Not applied" when off, which are not the two
+  // ends of one statement. The GLYPH and TONE stay constant across all four, deliberately:
+  // the not-selected state has to read as one state at a glance, and it is the WORD that
+  // completes the sentence the rule started.
   const NOT_ELIGIBLE_COPY = {
-    key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOff',
-    label: 'Not applied',
-    tone: 'subtle',
-    icon: 'fas fa-circle-minus',
+    addAll: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOff',
+      label: 'Not applied',
+    },
+    highest: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOffHighest',
+      label: 'Not considered',
+    },
+    playerPicks: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOffPlayerPicks',
+      label: 'Not selectable',
+    },
+    bySubject: {
+      key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOffBySubject',
+      label: 'Not picked by default',
+    },
   };
+  const NOT_ELIGIBLE_TONE = 'subtle';
+  const NOT_ELIGIBLE_ICON = 'fas fa-circle-minus';
 
   // Why the catalogue reaches no roll. Each cause has its own remedy, so each has its
   // own sentence — "the modifiers do nothing" with no reason is not actionable. Both
@@ -417,16 +438,27 @@
     return `${text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsAtLeast', 'At least')} ${signed(min)}`;
   }
 
-  // An authored `min > max` is BLOCKING, not silently reordered: the entry contributes 0
+  // Which BLOCKING bounds fault this entry has, or `''`. Both make the entry contribute 0
   // until it is repaired, matching the refuse posture gathering's drop modifiers already
-  // take. The row says so where the GM authored it; the Validation route reports the same
-  // fact as a critical `modifierBoundsInverted`.
-  function boundsInverted(modifier) {
-    return resolveModifierBounds(modifier).inverted;
+  // take, and the row says so where the GM authored it; the Validation route reports the
+  // same two facts as `modifierBoundsInverted` / `modifierBoundsUnsafe`, both `critical`.
+  //
+  // TWO CAUSES, TWO SENTENCES. "Your minimum is above your maximum" and "this number cannot
+  // appear in a roll formula" need different repairs, and `1e21` is not an inversion.
+  function boundsFault(modifier) {
+    const bounds = resolveModifierBounds(modifier);
+    if (bounds.inverted) return 'inverted';
+    return bounds.unsafe ? 'unsafe' : '';
   }
 
+  const notEligible = $derived({
+    ...(NOT_ELIGIBLE_COPY[selectedPolicy] || NOT_ELIGIBLE_COPY.addAll),
+    tone: NOT_ELIGIBLE_TONE,
+    icon: NOT_ELIGIBLE_ICON,
+  });
+
   function eligibilityStateOf(id) {
-    return defaultIds.includes(id) ? eligibility : NOT_ELIGIBLE_COPY;
+    return defaultIds.includes(id) ? eligibility : notEligible;
   }
 
   function eligibilityLabelOf(id) {
@@ -495,13 +527,43 @@
     </p>
   {/if}
 
+  {#if modifiers.length > 0 && defaultsIntro.fallback}
+    <!-- The eligibility sentence for the ACTIVE rule, ABOVE the rows it governs. It states
+         what switching an entry on MEANS under the rule the GM just chose, so it has to sit
+         where that switching happens: below the rule grid it landed ~500px under the
+         controls it explains and read as a footnote about the pick cap. The rule grid
+         re-renders this sentence the moment the rule changes, so "it would describe a rule
+         they are about to change" is not a risk the position creates. -->
+    <p
+      class="manager-muted"
+      id={DEFAULTS_LABEL_ID}
+      data-crafting-modifier-defaults={selectedPolicy}
+    >
+      {text(defaultsIntro.key, defaultsIntro.fallback)}
+    </p>
+  {/if}
+
   <div class="manager-modifier-catalogue" data-crafting-modifier-rows>
     {#if modifiers.length === 0}
-      <p class="manager-muted" data-crafting-modifier-empty>
-        {text(
-          'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmpty',
-          'No check modifiers yet. Add one to make it available to the checks in this system.'
-        )}
+      <!-- The empty state BRANCHES on who owns the entries. "Add one" is an instruction on
+           crafting, where the add button is directly below it; on salvage and gathering there
+           is no add button at all and the only control is a link to the crafting tab, so the
+           same sentence told the GM to do something this screen cannot do. -->
+      <p
+        class="manager-muted"
+        data-crafting-modifier-empty={entriesEditable ? 'editable' : 'linked'}
+      >
+        {#if entriesEditable}
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmpty',
+            'No check modifiers yet. Add one to make it available to the checks in this system.'
+          )}
+        {:else}
+          {text(
+            'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmptyLinked',
+            'This system has no check modifiers yet. They are defined once, on the Crafting check.'
+          )}
+        {/if}
       </p>
     {/if}
     {#each modifiers as modifier (modifier.id)}
@@ -630,35 +692,51 @@
           </div>
         {/if}
 
-        {#if boundsInverted(modifier)}
+        {#if boundsFault(modifier)}
           <p
             class="manager-modifier-bounds-error"
             role="note"
             data-crafting-modifier-bounds-invalid={modifier.id}
+            data-crafting-modifier-bounds-cause={boundsFault(modifier)}
           >
-            {text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsInverted',
-              'This modifier’s minimum is above its maximum, so it adds nothing to the roll until you fix the two values.'
-            )}
+            {#if boundsFault(modifier) === 'inverted'}
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsInverted',
+                'This modifier’s minimum is above its maximum, so it adds nothing to the roll until you fix the two values.'
+              )}
+            {:else}
+              {text(
+                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsUnsafe',
+                'This modifier’s bound is too large or too small to appear in a roll formula, so it adds nothing to the roll until you fix it.'
+              )}
+            {/if}
           </p>
         {/if}
 
         <!-- The ELIGIBILITY control, on ALL THREE activities. The checkbox IS the control
-             and carries the accessible name; the pill beside it is presentational and
-             repeats the state as a word. They are siblings, never nested. -->
+             and carries the accessible name; the pill beside it repeats the state as a word
+             for sighted users and is HIDDEN from assistive technology, because the checkbox's
+             own accessible name already ends in that word — leaving both in the tree read the
+             state twice ("Medicine — Applied, checkbox, Applied"). They are siblings, never
+             nested. The `aria-describedby` points at the ACTIVE RULE's eligibility sentence
+             above, which is what makes "Applied" mean something to a reader who never sees the
+             rule grid. -->
         <div class="manager-modifier-eligibility" data-crafting-modifier-eligibility={modifier.id}>
           <SelectionCheckbox
             size="sm"
             checked={defaultIds.includes(modifier.id)}
             ariaLabel={`${modifier.label || modifier.id} — ${eligibilityLabelOf(modifier.id)}`}
+            aria-describedby={defaultsIntro.fallback ? DEFAULTS_LABEL_ID : undefined}
             data-crafting-modifier-eligibility-input={modifier.id}
             onChange={(checked) => toggleDefault(modifier.id, checked)}
           />
-          <StatusPill
-            tone={eligibilityStateOf(modifier.id).tone}
-            icon={eligibilityStateOf(modifier.id).icon}
-            label={eligibilityLabelOf(modifier.id)}
-          />
+          <span class="manager-modifier-eligibility-pill" aria-hidden="true">
+            <StatusPill
+              tone={eligibilityStateOf(modifier.id).tone}
+              icon={eligibilityStateOf(modifier.id).icon}
+              label={eligibilityLabelOf(modifier.id)}
+            />
+          </span>
         </div>
       </div>
     {/each}
@@ -750,19 +828,6 @@
       />
     </div>
   {/if}
-
-  {#if modifiers.length > 0 && defaultsIntro.fallback}
-    <!-- The eligibility sentence for the ACTIVE rule. It sits BELOW the rule grid, because
-         it explains what switching an entry on means under the rule the GM just chose;
-         above the grid it would describe a rule they were about to change. -->
-    <p
-      class="manager-muted"
-      id={DEFAULTS_LABEL_ID}
-      data-crafting-modifier-defaults={selectedPolicy}
-    >
-      {text(defaultsIntro.key, defaultsIntro.fallback)}
-    </p>
-  {/if}
 </section>
 
 <style>
@@ -847,6 +912,13 @@
     gap: var(--fab-space-2);
     align-items: center;
     margin-top: 0.35rem;
+  }
+
+  /* The `aria-hidden` wrapper the pill sits in contributes NO box: the pill stays a direct
+     flex item of the row above, so the wrapper changes the accessibility tree and nothing
+     else. */
+  .manager-modifier-eligibility-pill {
+    display: contents;
   }
 
   .manager-modifier-subheading {

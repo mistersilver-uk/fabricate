@@ -14,6 +14,7 @@ globalThis.ui = { notifications: { warn: () => {}, error: () => {} } };
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { Recipe } = await import('../src/models/Recipe.js');
+const { normalizeCheckModifierIds } = await import('../src/utils/checkModifierPicks.js');
 
 function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
@@ -239,14 +240,57 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
     );
   }
   // `\bkey:` cannot match `labelKey:`/`descKey:` (no word boundary after `l`/`c`), so
-  // this picks up only the MAX_PICKS_COPY, DEFAULTS_INTRO_COPY and INERT_COPY tables.
+  // this picks up only the MAX_PICKS_COPY, DEFAULTS_INTRO_COPY, INERT_COPY and
+  // NOT_ELIGIBLE_COPY tables.
   assertMirrored(
     [...source.matchAll(/\bkey:\s*'([^']+)',\s*(?:label|fallback):\s*'((?:[^'\\]|\\.)*)'/g)],
-    8,
-    'the playerPicks cap hint, the two surviving inert-cause sentences, and the FIVE ' +
-      'eligibility words — four rule states plus not-selected (issue 1095 moved the ' +
-      'per-activity cap hints and intros into SUBJECT_COPY, keyed by `capKey`/`introKey`)'
+    11,
+    'the playerPicks cap hint, the two surviving inert-cause sentences, the four ON ' +
+      'eligibility words, and the FOUR OFF ones — one per rule, because "Not applied" is ' +
+      'the negation of `Applied` and of nothing else'
   );
+  // Everything else the card localizes INLINE, through `text(key, fallback)` — the empty
+  // state's two branches, the two bounds faults, the read-only link, the field captions.
+  // The table sweeps above cannot see any of them, which is how `ModifierCatalogueEmpty`
+  // could have drifted from `lang/en.json` unnoticed.
+  const inline = [
+    ...source.matchAll(/text\(\s*'(FABRICATE\.[^']+)',\s*\n?\s*'((?:[^'\\]|\\.)*)'\s*\)/g),
+  ];
+  assert.ok(inline.length >= 15, `expected the card's inline fallbacks, got ${inline.length}`);
+  for (const [, key, fallback] of inline) {
+    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
+  }
+});
+
+// The shared subject picker is a THIRD surface restating the same vocabulary, one noun per
+// subject (issue 1095). Same mirror, same failure mode, so the same guard.
+test('the subject modifier picker fallbacks match lang/en.json exactly', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const source = readFileSync(
+    join(root, 'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte'),
+    'utf8'
+  );
+  const lang = JSON.parse(readFileSync(join(root, 'lang/en.json'), 'utf8'));
+  const resolve = (key) =>
+    key.split('.').reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
+
+  // The per-subject SUBJECT_COPY table: `<name>Key: '...'` immediately followed by
+  // `<name>: '...'`, on both subjects.
+  const pairs = [
+    ...source.matchAll(/\b(\w+)Key:\s*\n?\s*'([^']+)',\s*\1:\s*\n?\s*'((?:[^'\\]|\\.)*)'/g),
+  ];
+  assert.equal(pairs.length, 14, 'seven sentences per subject, on two subjects');
+  for (const [, , key, fallback] of pairs) {
+    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
+  }
+  // …plus the activity-independent ones it localizes inline.
+  const inline = [
+    ...source.matchAll(/text\(\s*'(FABRICATE\.[^']+)',\s*\n?\s*'((?:[^'\\]|\\.)*)'\s*\)/g),
+  ];
+  assert.ok(inline.length >= 4, `expected the picker's inline fallbacks, got ${inline.length}`);
+  for (const [, key, fallback] of inline) {
+    assert.equal(resolve(key), fallback.replaceAll("\\'", "'"), `${key} drifted`);
+  }
 });
 
 // The Overview tab restates the pick-source labels for its own tri-state select, the
@@ -366,6 +410,52 @@ test('_normalizeSystem preserves cap absence, and an authored cap, through a who
   assert.equal(bounded.craftingCheck.defaultModifierPolicy, 'bySubject');
 });
 
+// THE OTHER END OF THE MIGRATION'S LOAD-BEARING ORDERING.
+// `migrateSystemCheckModifierCatalogue`'s header names the exact failure this pins: because
+// `_normalizeSystem` is an ALLOWLIST REBUILD with no `...system` spread, a catalogue key it
+// does not emit is DELETED on the next save — silently, with no error and nothing
+// recoverable. The migration is defended by its own suite; the normalizer holding the other
+// end was not, and deleting the one-word `checkModifiers,` emit left the entire suite green
+// while every GM's next system save destroyed their catalogue.
+test('_normalizeSystem carries the SYSTEM catalogue through a whole rebuild, bounds and all', () => {
+  const manager = makeManager();
+  const catalogue = [
+    {
+      id: 'med',
+      label: 'Medicine',
+      expression: '@abilities.med.mod',
+      icon: 'fas fa-staff',
+      min: -1,
+      max: 5,
+    },
+    { id: 'alch', label: 'Alchemy', expression: '@abilities.alch.mod' },
+  ];
+  const created = manager._normalizeSystem({
+    id: 'sys-cat',
+    name: 'S',
+    checkModifiers: catalogue,
+    craftingCheck: { defaultModifierPolicy: 'addAll', defaultModifierIds: ['med', 'alch'] },
+    salvageCraftingCheck: { defaultModifierPolicy: 'highest', defaultModifierIds: ['med'] },
+    gatheringCraftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['alch'] },
+  });
+  assert.deepEqual(
+    created.checkModifiers,
+    catalogue,
+    'the entries survive the rebuild, and the bounded one keeps BOTH bounds'
+  );
+  // The SECOND save is the one that matters: `updateSystem` re-normalizes an
+  // already-normalized system, so a dropped key survives the first pass on the caller's
+  // input and disappears on the round-trip.
+  const resaved = manager._normalizeSystem(created);
+  assert.deepEqual(resaved.checkModifiers, catalogue, 'and they survive a re-save of it');
+  // The blast radius, stated separately: `validCatalogueIds` is derived from the catalogue,
+  // so losing it does not merely lose the entries — every activity's default set is filtered
+  // against an empty catalogue and emptied too, on all three checks at once.
+  assert.deepEqual(resaved.craftingCheck.defaultModifierIds, ['med', 'alch']);
+  assert.deepEqual(resaved.salvageCraftingCheck.defaultModifierIds, ['med']);
+  assert.deepEqual(resaved.gatheringCraftingCheck.defaultModifierIds, ['alch']);
+});
+
 test('_normalizeCraftingCheck preserves sibling check fields alongside the selection', () => {
   const result = makeManager()._normalizeCraftingCheck(
     {
@@ -431,6 +521,32 @@ test('Recipe.craftingModifier DROPS a legacy policy and keeps the pick, de-dupli
       `${policy} is dropped alongside the surviving pick`
     );
   }
+});
+
+// ONE ID RULE FOR THREE SUBJECTS. `Recipe` used to keep its own member filter, which agreed
+// with the shared `authoredCheckModifierIds` on everything except TRIMMING: it rejected a
+// whitespace-only id but kept `' med '` verbatim. That is not a cosmetic divergence — the
+// resolver drops an id that names nothing in the catalogue, so the SAME authored id resolved
+// on salvage and gathering and was silently dropped on crafting.
+test('the three subject picks coerce an id IDENTICALLY, padding included', () => {
+  const manager = makeManager();
+  const padded = ['  med  ', 'med', ' ', 3, ''];
+  const expected = ['med'];
+  assert.deepEqual(
+    new Recipe({ name: 'r', craftingModifier: { modifierIds: padded } }).craftingModifier,
+    { modifierIds: expected },
+    'crafting: the recipe pick trims, so a padded id names its catalogue entry'
+  );
+  assert.deepEqual(
+    manager._normalizeSalvage({ enabled: false, checkModifierIds: padded }).checkModifierIds,
+    expected,
+    'salvage: the component pick answers identically'
+  );
+  assert.deepEqual(
+    normalizeCheckModifierIds(padded),
+    expected,
+    'gathering: and so does the shared coercion its two normalizers call'
+  );
 });
 
 // The authored-empty-set contract, keyed on `Array.isArray` AT ENTRY (issue 1055).

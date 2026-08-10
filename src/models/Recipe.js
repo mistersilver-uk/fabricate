@@ -1,4 +1,5 @@
 import { ingredientSetToolsAreActive } from '../systems/toolCheckBonus.js';
+import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { buildRecipeActivationIssue } from '../utils/recipeActivationMessages.js';
 import { normalizeRecipeCategory } from '../utils/recipeCategories.js';
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
@@ -151,9 +152,18 @@ export class Recipe {
    * length would flip malformed import data from *inherit* to *none*, which is the
    * unsafe direction.
    *
-   * Kept ids are non-empty strings, de-duplicated in order; catalogue membership is NOT
-   * checked here (the resolver drops unknown ids against the live system catalogue, and
-   * truncates the survivors to `craftingCheck.maxModifierPicks`).
+   * Kept ids are TRIMMED, non-empty strings, de-duplicated in order; catalogue membership
+   * is NOT checked here (the resolver drops unknown ids against the live system catalogue,
+   * and truncates the survivors to `craftingCheck.maxModifierPicks`).
+   *
+   * THE MEMBER COERCION IS THE SHARED ONE (issue 1095). `authoredCheckModifierIds`
+   * (`src/utils/checkModifierPicks.js`) is what `Component.salvage.checkModifierIds` and
+   * `GatheringTask.checkModifierIds` normalize through, and this used to be a local filter
+   * that agreed with it on everything EXCEPT trimming: it rejected a whitespace-only id but
+   * kept `' med '` verbatim, so the same authored id matched its catalogue entry on salvage
+   * and gathering and was dropped as unknown on crafting. One id rule for three subjects, or
+   * the three subjects disagree about what an id IS. The `key` argument is why that helper
+   * takes one: the recipe keeps its own `modifierIds` spelling inside `craftingModifier`.
    *
    * @param {unknown} craftingModifier
    * @returns {{ modifierIds: string[] } | null}
@@ -162,18 +172,11 @@ export class Recipe {
   _normalizeCraftingModifier(craftingModifier) {
     if (!craftingModifier || typeof craftingModifier !== 'object') return null;
     // The authored-ness of the set is decided HERE, before any filtering.
-    const authoredIds = Array.isArray(craftingModifier.modifierIds);
     // No authored id set → nothing picked, so inherit. A legacy `policy` alongside is not
     // a reason to keep the block: it is not honoured, so a block holding only a policy
     // carries no information.
-    if (!authoredIds) return null;
-    const seen = new Set();
-    const modifierIds = craftingModifier.modifierIds.filter((id) => {
-      if (typeof id !== 'string' || id.trim() === '' || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-    return { modifierIds };
+    if (!Array.isArray(craftingModifier.modifierIds)) return null;
+    return authoredCheckModifierIds(craftingModifier.modifierIds, 'modifierIds');
   }
 
   /**

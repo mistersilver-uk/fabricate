@@ -82,7 +82,7 @@ On first load after upgrading, Fabricate removes it from every stored crafting, 
 Three things are worth knowing before you upgrade.
 
 - **A catalogue you authored but never referenced now applies.** If you built a catalogue and deliberately never spent the placeholder, those modifiers were doing nothing and now add to every crafting roll.
-To keep the previous total, clear the **Default modifiers** set on that system, or choose a combination rule whose set resolves to 0.
+To keep the previous total, switch every entry off on that system, or choose a combination rule whose set resolves to 0.
 - **A formula that SUBTRACTED the placeholder now adds it.** A check written as `1d20 - <placeholder>` rolled `1d20 - 3` with a `+3` modifier; it now rolls `1d20 + 3[Modifiers]`.
 A formula that spent the placeholder twice counted it twice and now counts it once.
 - **A placeholder written somewhere it cannot simply be removed is left alone and reported.** If you wrote it inside a multiplication, a function argument such as `max(...)`, a dice count, or its own parentheses, Fabricate cannot guess what you meant, so it leaves the formula exactly as you authored it, names the system in the upgrade notice, and treats that check as having no roll formula until you edit it.
@@ -126,12 +126,15 @@ The by-record rule is one rule with three labels: it reads **By recipe** on Craf
 
 ### The default eligible set
 
-The **Default modifiers** picker, below the catalogue, sets which modifiers are on by default for the whole system.
-What that set means depends on the combination rule, and the card's own wording changes with it:
+There is no separate "Default modifiers" picker: each catalogue entry carries its own switch, on its own row, and the entries you switch on ARE the activity's default set.
+The switch's word changes with the combination rule, because the rule is what "on" means, and its off word answers it:
 
-- Under **Add all** and **Highest** it is simply the set that applies, to every recipe in the system.
-- Under the by-record rule it is what a record uses until it picks its own on its own editor.
-- Under **Player picks** it is the menu the player chooses from at roll time.
+- Under **Add all** an entry reads **Applied** or **Not applied** — the set that applies, to every attempt in the system.
+- Under **Highest** it reads **Considered** or **Not considered** — the entries compared, of which only the largest is added.
+- Under the by-record rule it reads **Picked per subject** or **Not picked by default** — what a record uses until it picks its own on its own editor.
+- Under **Player picks** it reads **Selectable** or **Not selectable** — the menu the player chooses from at roll time.
+
+A sentence above the entries states which of those four readings is in force, and it changes the moment you change the rule.
 
 ### Least and most a modifier may add
 
@@ -144,10 +147,13 @@ An empty field is a real setting, not an unanswered question, exactly as **Maxim
 If you set a minimum **above** the maximum, that modifier contributes **nothing at all** until you fix the two values, and the Validation tab reports it as a blocking issue.
 Fabricate deliberately does not quietly swap them round: that would roll a number you never asked for.
 
+A bound that is too large or too small to appear in a dice formula — anything Foundry would have to write in exponent notation, such as `1e21` — is blocked the same way, with its own message, and the row says so where you typed it.
+Only that entry is refused; the other modifiers on the roll are unaffected.
+
 ### One catalogue, three activities
 
 Salvage and Gathering select over the same catalogue the Crafting check authors.
-Their cards show each entry read-only — its name, its expression and a bounds chip such as `-1 to +5` — with a link back to the Crafting check to edit them.
+Their cards show each entry read-only — its name, its expression and a bounds chip such as `-1 to +6` — with a link back to the Crafting check to edit them.
 What each activity *does* own is fully editable there: which entries apply, how they combine, and the pick cap.
 
 **Gathering is not switched on yet.**
@@ -184,7 +190,7 @@ Raise the cap again and the rest count once more, with nothing to re-enter.
 
 Under the by-record rule, each recipe's **Overview** tab gains an **Eligible modifiers** control with three choices:
 
-- **Inherit system default** uses the system's **Default modifiers** set.
+- **Inherit system default** uses the entries the system has switched on.
 This is what a recipe does until you change it, and the tab names the set it is inheriting.
 - **Custom set** lets the recipe pick its own modifiers, up to **Maximum picks**.
 It starts from whatever the recipe was already using, so customising begins from the inherited set rather than from nothing.

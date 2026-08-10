@@ -494,6 +494,7 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
     const catalogue = [
       { id: 'ok', label: 'Ok', expression: '@a' },
       { id: 'bad', label: 'Bad', expression: '@b', min: 5, max: -1 },
+      { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
     ];
     const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
     collect({ rollFormula: '' }, { mode: 'simple' });
@@ -528,7 +529,22 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
       },
       { mode: 'routed' }
     );
+    // Two VALID ranges that overlap. The invalid-range fixture above cannot reach
+    // `rangeOverlap` at all: `findRangeConflicts` excludes a `start > end` span from overlap
+    // detection, so it needs a fixture of its own.
+    collect(
+      {
+        rollFormula: '1d20',
+        type: 'fixed',
+        fixedOutcomes: [
+          { id: 'a', name: 'Slag', start: 1, end: 10, success: true },
+          { id: 'b', name: 'Rough', start: 5, end: 20, success: true },
+        ],
+      },
+      { mode: 'routed' }
+    );
     collect({ rollFormula: '' }, { mode: 'simple', modifierContext: context(['ok', 'bad']) });
+    collect({ rollFormula: '1d20' }, { mode: 'simple', modifierContext: context(['huge']) });
     collect({}, { mode: 'd100', modifierContext: context(['ok']) });
     for (const id of emitted) {
       assert.ok(
@@ -536,7 +552,16 @@ describe('CHECK_READINESS_ISSUE_IDS is the source of truth for every issue id', 
         `${id} is emitted but not registered — #1096's issue-to-section map would drop it`
       );
     }
-    assert.ok(emitted.size >= 10, `the sweep reached only ${emitted.size} branches`);
+    // THE CONVERSE, and it is the half that has teeth. `>= 10` against a 14-entry registry
+    // passed while four branches went unreached, which is exactly the state that lets a
+    // registered id ship with no branch behind it (or a branch stop emitting) unnoticed. Set
+    // EQUALITY says the sweep reaches every registered id AND that every id it reaches is
+    // registered, so registering a new one without exercising it fails here.
+    assert.deepEqual(
+      [...emitted].sort(),
+      [...CHECK_READINESS_ISSUE_IDS].sort(),
+      'the sweep must reach EVERY registered issue id, and no others'
+    );
   });
 });
 
@@ -635,6 +660,7 @@ describe('check-modifier readiness', () => {
   const catalogue = [
     { id: 'ok', label: 'Ok', expression: '@a' },
     { id: 'inverted', label: 'Inverted', expression: '@b', min: 5, max: -1 },
+    { id: 'huge', label: 'Huge', expression: '@c', min: 1e21 },
   ];
   const context = (ids) => ({ catalogue, systemPolicy: 'addAll', defaultModifierIds: ids });
 
@@ -650,6 +676,26 @@ describe('check-modifier readiness', () => {
       checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied,
       false
     );
+  });
+
+  // The second blocking bounds fault, and a SEPARATE id: "your minimum is above your
+  // maximum" and "this number cannot appear in a roll formula" need different repairs, and
+  // `1e21` is not an inversion. Its damage used to spread past its own entry — clamping to
+  // it poisoned the SUM and `appendCheckModifierTerm` dropped the whole term.
+  it('BLOCKS on a bound the dice grammar cannot express, as its own issue', () => {
+    const { checks, issues } = evaluateCheckReadiness(
+      { rollFormula: '1d20' },
+      { mode: 'simple', modifierContext: context(['huge']) }
+    );
+    const issue = issues.find((entry) => entry.id === 'modifierBoundsUnsafe');
+    assert.ok(issue, 'an inexpressible bound is reported');
+    assert.equal(issue.severity, 'critical');
+    assert.equal(
+      issues.find((entry) => entry.id === 'modifierBoundsInverted'),
+      undefined,
+      'and it is NOT reported as an inversion — the repair is different'
+    );
+    assert.equal(checks.find((check) => check.id === 'modifierBoundsValid')?.satisfied, false);
   });
 
   it('says nothing about an entry this activity does not apply', () => {

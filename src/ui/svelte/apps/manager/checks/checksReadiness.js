@@ -53,6 +53,7 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   'multipleTierStepTargets',
   // Check modifiers
   'modifierBoundsInverted',
+  'modifierBoundsUnsafe',
   'modifiersInertNoCheck',
   'modifiersInertNoFormula',
 ]);
@@ -195,6 +196,15 @@ function fixedRangesHaveGap(outcomes, excluded) {
  *   adopted deliberately so a check modifier and a drop modifier fail the same way. It is
  *   not a warning: the entry is silently worth nothing, which is exactly the class of
  *   defect readiness exists to surface.
+ * - **`modifierBoundsUnsafe`** (`critical`, BLOCKING). An entry whose authored bound is
+ *   finite but not expressible as a dice-grammar `Constant` — `1e21`, `1e-7`. It is a
+ *   SEPARATE id rather than a second cause folded into the one above, because the two need
+ *   different advice: "your minimum is above your maximum" and "this number is too large to
+ *   roll" are not the same repair. It is `critical` for a stronger reason than its sibling:
+ *   `clampModifierValue` now contains it to the offending entry, but the bound it would
+ *   otherwise clamp to poisons the SUM, and `appendCheckModifierTerm` drops the WHOLE term
+ *   for an exponent-notation value — so before the containment this single entry deleted
+ *   every other modifier from the roll.
  * - **`modifiersInertNoCheck` / `modifiersInertNoFormula`** (`warning`). An eligible
  *   selection that reaches no roll. These are the ONE owned path for "the gathering d100
  *   check-modifier section reports `noCheck`", and they are gated on the selection being
@@ -221,11 +231,14 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula 
       .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string')
       .map((entry) => [entry.id, entry])
   );
-  const inverted = eligible.some((id) => resolveModifierBounds(byId.get(id)).inverted);
+  const bounds = eligible.map((id) => resolveModifierBounds(byId.get(id)));
+  const inverted = bounds.some((entry) => entry.inverted);
+  const unsafe = bounds.some((entry) => entry.unsafe);
 
   const issues = [];
-  const checks = [{ id: 'modifierBoundsValid', satisfied: !inverted }];
+  const checks = [{ id: 'modifierBoundsValid', satisfied: !inverted && !unsafe }];
   if (inverted) pushIssue(issues, 'modifierBoundsInverted', 'critical');
+  if (unsafe) pushIssue(issues, 'modifierBoundsUnsafe', 'critical');
   if (rollsNoCheck) pushIssue(issues, 'modifiersInertNoCheck', 'warning');
   else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
   return { checks, issues };

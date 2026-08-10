@@ -23,6 +23,7 @@ const {
   resolveActiveSalvageCheckFormula,
   resolveActiveGatheringCheckFormula,
 } = await import(RESOLVER_MODULE);
+const { appendCheckModifierTerm } = await import('../src/systems/toolCheckBonus.js');
 
 const CATALOGUE = [
   { id: 'med', label: 'Medicine', expression: '@med' },
@@ -1127,19 +1128,65 @@ test('resolveModifierBounds preserves absence and refuses to coerce a nullish bo
     min: -1,
     max: 5,
     inverted: false,
+    unsafe: false,
   });
   // ZERO is a REAL bound. Reading it through truthiness would silently unbound the entry.
-  assert.deepEqual(resolveModifierBounds({ min: 0, max: 0 }), { min: 0, max: 0, inverted: false });
+  assert.deepEqual(resolveModifierBounds({ min: 0, max: 0 }), {
+    min: 0,
+    max: 0,
+    inverted: false,
+    unsafe: false,
+  });
   for (const junk of [null, undefined, '', NaN, Infinity, -Infinity, 'three', {}, []]) {
     assert.deepEqual(
       resolveModifierBounds({ min: junk, max: junk }),
-      { min: null, max: null, inverted: false },
+      { min: null, max: null, inverted: false, unsafe: false },
       `${String(junk)} is unbounded on both sides — Number(null), Number("") and Number([]) ` +
         'are all 0, and 0 is a real bound here'
     );
   }
   assert.equal(resolveModifierBounds(null).min, null, 'a missing entry is unbounded');
   assert.equal(resolveModifierBounds({ min: 5, max: -1 }).inverted, true);
+});
+
+// A WHITESPACE-ONLY bound is the `''` guard's blind spot: `Number('   ')` is `0`, and `0`
+// is a REAL bound, so an untrimmed read minted a floor of zero out of a field that carries
+// nothing. It is reachable from an import and from a hand-edited world, and its damage is
+// silent — the entry clamps to at least 0 and a negative modifier stops being negative.
+test('resolveModifierBounds trims a string bound, so whitespace reads as UNBOUNDED not 0', () => {
+  for (const blank of ['   ', '\t', '\n ']) {
+    assert.deepEqual(
+      resolveModifierBounds({ min: blank, max: blank }),
+      { min: null, max: null, inverted: false, unsafe: false },
+      `${JSON.stringify(blank)} is not a bound of zero`
+    );
+  }
+  assert.equal(
+    resolveModifierBounds({ min: ' -2 ' }).min,
+    -2,
+    'a padded REAL bound still reads as that bound'
+  );
+  assert.equal(clampModifierValue(-5, { min: '   ' }), -5, 'and nothing clamps to a phantom 0');
+});
+
+// A bound only has to be FINITE to be a bound, so `1e21` is one — and it is a bound the
+// dice grammar cannot express. Before this, clamping to it poisoned the SUM, and
+// `appendCheckModifierTerm` then dropped THE WHOLE TERM, so one entry's bound deleted every
+// other modifier's contribution from the roll.
+test('resolveModifierBounds flags a bound the dice grammar cannot express as unsafe', () => {
+  for (const bound of [1e21, '1e21', 1e-7, -1e21]) {
+    assert.equal(
+      resolveModifierBounds({ min: bound }).unsafe,
+      true,
+      `${String(bound)} stringifies to exponent notation, which Constant has no production for`
+    );
+  }
+  assert.equal(resolveModifierBounds({ min: -999999, max: 999999 }).unsafe, false);
+  assert.equal(
+    resolveModifierBounds({ min: 0.5 }).unsafe,
+    false,
+    'a decimal is expressible — Constant is [0-9]+ ("." [0-9]+)?'
+  );
 });
 
 test('clampModifierValue applies each bound independently and refuses an inverted pair', () => {
@@ -1170,6 +1217,28 @@ test('resolveCheckModifierScalar clamps EACH value before combining, under every
     resolveCheckModifierScalar(context('highest'), evaluate),
     5,
     'highest compares CLAMPED values, so the capped 9 does not win at 9'
+  );
+});
+
+// THE CONTAGION IS THE DEFECT, and the assertion is the OTHER entry's survival. With the
+// unsafe bound honoured, `ok` clamps to 3, `bad` clamps to 1e21, the sum is 1e21, and
+// `appendCheckModifierTerm` refuses the whole exponent-notation term — so the well-formed
+// `+3` vanishes from a roll because of a bound on a DIFFERENT entry.
+test('an entry with a grammar-inexpressible bound contributes 0 without poisoning the sum', () => {
+  const catalogue = [
+    { id: 'ok', label: 'Ok', expression: '@ok' },
+    { id: 'huge', label: 'Huge', expression: '@huge', min: 1e21 },
+  ];
+  const evaluate = evaluatorFor({ '@ok': 3, '@huge': 1 });
+  const scalar = resolveCheckModifierScalar(
+    { catalogue, systemPolicy: 'addAll', defaultModifierIds: ['ok', 'huge'] },
+    evaluate
+  );
+  assert.equal(scalar, 3, 'the unbounded-by-mistake entry adds nothing, and 3 survives');
+  assert.equal(
+    appendCheckModifierTerm('1d20', { value: scalar }),
+    '1d20 + 3[Modifiers]',
+    'and the term still reaches the formula — the whole point of containing the refusal'
   );
 });
 

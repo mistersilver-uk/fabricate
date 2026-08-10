@@ -95,10 +95,15 @@ function retireCraftingModToken(migrated) {
  * the legacy branch would never run on a real bundle. The catalogue's LOCATION is
  * orthogonal to the envelope version.
  *
- * THIS RUNS AFTER `retireCraftingModToken`, and the order is load-bearing in one
- * direction: that transform counts how many crafting formulas were inert for want of the
- * retired token, and it reads the catalogue from its PRE-move location. Moving the
- * catalogue first would zero every one of those counts.
+ * THIS RUNS AFTER `retireCraftingModToken` FOR SYMMETRY WITH THE WORLD LADDER, not because
+ * swapping the two would change this function's output. It is worth being exact about,
+ * because the ordering claim is easy to over-state: `retireCraftingModToken` does read the
+ * catalogue, but only to COUNT how many crafting formulas were inert for want of the
+ * retired token — and those counts are discarded here on purpose (see its own note above),
+ * so nothing observable depends on them. `countInertActiveCraftingCheck` additionally falls
+ * back to the system-level key, so it reads the same catalogue either way. What the order
+ * does buy is that these two transforms compose in the SAME sequence as `1.21.0` then
+ * `1.22.0` on the world side, so a bundle and a world reach one state by one route.
  *
  * Idempotent — a bundle already carrying a system-level catalogue keeps it (the move is
  * guarded) and a second pass finds no legacy key.

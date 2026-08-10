@@ -106,7 +106,14 @@ test('round-trip: export → import(keep) → export is deep-equal modulo volati
   assert.deepEqual(
     task.checkModifierIds,
     ['mod-medicine', 'mod-alchemy'],
-    'the gathering task pick round-trips through BOTH mirrored normalizers'
+    // What this proves is the EXPORT/IMPORT path for the gathering config setting — the
+    // pick survives export, `prepareForImport`, the importer's write and a second export.
+    // It deliberately does NOT claim to exercise the task normalizers: this harness's
+    // `systemManager` is a plain `Map` stub and the gathering config is carried as a raw
+    // setting, so neither `normalizeLibraryTask` nor `_normalizeGatheringTask` runs here.
+    // Those three whitelist rebuilds are pinned in `tests/subject-check-modifier-picks.test.js`
+    // and `tests/check-modifier-activity-seams.test.js`.
+    'the gathering task pick survives export → import → export'
   );
 });
 

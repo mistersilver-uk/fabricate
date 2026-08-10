@@ -61,6 +61,10 @@
     checkModifierOptions = [],
     salvageModifierPolicy = 'addAll',
     salvageModifierMaxPicks = null,
+    // The salvage check's DEFAULT eligible set, so the picker can NAME what this component
+    // inherits when it has authored no pick of its own. "Inheriting" with no names told the
+    // GM nothing about what this component actually rolls — the recipe picker's own note.
+    salvageModifierDefaultIds = [],
     componentOptions = [],
     saving = false,
     // Progressive difficulty, rehomed out of the deleted right-rail inspector into the
@@ -1642,20 +1646,33 @@
           </div>
         {/if}
 
+        <!-- The component's own check-modifier pick (issue 1095). Rendered only under the
+             salvage check's `bySubject` rule — the one rule that hands the selection to
+             this component — and only when the system catalogue is non-empty.
+
+             ITS GATE IS ITS OWN, NOT THE DC OVERRIDE'S. It used to be nested inside
+             `salvageShowDcOverride`, which is `simple || routed` and therefore EXCLUDES
+             progressive — but `ChecksView` renders the salvage catalogue card in the
+             progressive branch too, and `CraftingEngine._runSalvageCraftingCheck` builds the
+             modifier context before dispatch, so a progressive salvage roll honours a pick
+             no editor could author. Two different questions: "does this mode compare a roll
+             against a DC" and "does this component select its own modifiers". The gathering
+             host gates on the rule alone, and one shared component with two disagreeing
+             hosts is the drift this comment exists to stop. -->
+        {#if salvageShowChrome && salvageCheckEnabled && salvageModifierPolicy === 'bySubject'}
+          <SubjectModifierPicker
+            options={checkModifierOptions}
+            selectedIds={salvageDraft.checkModifierIds}
+            maxPicks={salvageModifierMaxPicks}
+            inheritedIds={salvageModifierDefaultIds}
+            disabled={saving}
+            subject="component"
+            testId="salvage-check-modifier"
+            onChange={(next) => setSalvage({ checkModifierIds: next })}
+          />
+        {/if}
+
         {#if salvageShowChrome && salvageShowDcOverride}
-          <!-- The component's own check-modifier pick (issue 1095). Rendered only under
-               the salvage check's `bySubject` rule — the one rule that hands the selection
-               to this component — and only when the system catalogue is non-empty. -->
-          {#if salvageModifierPolicy === 'bySubject'}
-            <SubjectModifierPicker
-              options={checkModifierOptions}
-              selectedIds={salvageDraft.checkModifierIds}
-              maxPicks={salvageModifierMaxPicks}
-              disabled={saving}
-              testId="salvage-check-modifier"
-              onChange={(next) => setSalvage({ checkModifierIds: next })}
-            />
-          {/if}
           <div class="manager-field" data-salvage-dc-override>
             <span class="manager-component-readonly-label">
               <span

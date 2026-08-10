@@ -1513,6 +1513,19 @@ export class GatheringRichStateService {
       // and normalizeList(task.resultGroups)[0]); dormant until #683 ships routed
       // resolution, but must stay carried so that path is not broken on arrival.
       resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
+      // THE TASK'S OWN CHECK-MODIFIER PICK (issue 1095) MUST SURVIVE COMPOSITION.
+      // `normalizeLibraryTask` above and `_normalizeGatheringTask` (adminStore) are the two
+      // mirrored LIBRARY normalizers, but this literal is a THIRD whitelist rebuild and it
+      // is the one the ENGINE sees: `composeEnvironment` → `_findStartTask` →
+      // `_resolveStartContext` hands this object to `buildCheckModifierContext(system,
+      // 'gathering', task)`, which reads `task.checkModifierIds`. Omitting the key here made
+      // `readSubjectModifierIds` find nothing, so every composed task INHERITED the default
+      // set and `bySubject` could never work on gathering at all — with both library
+      // normalizers correct and the pick intact on disk.
+      //
+      // Same absence-preserving attach as the two normalizers, for the same reason: an
+      // authored EMPTY array is a real pick of zero and must not collapse back to inherit.
+      ...authoredCheckModifierIds(normalized.checkModifierIds),
       // Per-task routed-check DC override (issue 904). resolutionMode stays hardcoded
       // to 'd100' above — routed gathering is disabled ("Coming soon") pending #683 —
       // so this plumbing is deliberately dormant until routed resolution ships.

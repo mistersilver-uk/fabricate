@@ -8630,9 +8630,14 @@ export function createAdminStore(services) {
   // re-defaults (silent data loss). The catalogue is a TOP-LEVEL array, so it replaces
   // wholesale and removing an entry persists without any `-=` deletion.
   //
-  // A `maxModifierPicks: null` is a real value in that patch, not an omission: absence
-  // means UNLIMITED, so clearing the cap has to be able to overwrite a stored bound. The
-  // presence test is therefore `Object.hasOwn`, never truthiness.
+  // BOTH PRESENCE TESTS BELOW ARE KEY TESTS, NEVER TRUTHINESS, and they guard different
+  // halves. `Object.hasOwn(patch, 'checkModifiers')` is the CATALOGUE half: the card emits
+  // `{checkModifiers: []}` when the GM deletes the last entry, and a truthiness test would
+  // read that empty array as "no catalogue in this patch" and silently keep the deleted
+  // entries. `Object.keys(selection).length > 0` is the SELECTION half, and it is what
+  // carries a `maxModifierPicks: null` through: absence means UNLIMITED, so clearing the cap
+  // has to be able to overwrite a stored bound, and a `null` value with its key present is
+  // exactly the patch that does it.
   async function saveCheckModifiers(activity, patch = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);

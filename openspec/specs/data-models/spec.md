@@ -97,6 +97,17 @@ CraftingSystem = {
       rollFormula: string,             // default ""; total drives progressive awarding
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
+
+    // The SELECTION TRIPLE over `CraftingSystem.checkModifiers` (issue 1095), the SAME
+    // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
+    // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
+    // every activity rather than left implicit: the catalogue is shared, the SELECTION is
+    // not, and a reader who found it on one block and not on another would reasonably
+    // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
+    // semantics of each key.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
+    defaultModifierIds?: string[],  // default []
+    maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
 
   // Present only when features.gathering is true. System-level gathering check
@@ -111,6 +122,17 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
     routed: RoutedCheck,
+
+    // The SELECTION TRIPLE over `CraftingSystem.checkModifiers` (issue 1095), the SAME
+    // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
+    // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
+    // every activity rather than left implicit: the catalogue is shared, the SELECTION is
+    // not, and a reader who found it on one block and not on another would reasonably
+    // conclude this activity inherits crafting's rule. See `craftingCheck` for the full
+    // semantics of each key.
+    defaultModifierPolicy?: "addAll" | "highest" | "bySubject" | "playerPicks",  // default "addAll"
+    defaultModifierIds?: string[],  // default []
+    maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
 
   // THE ONE named check-modifier catalogue for the WHOLE system (issue 1095). It moved

@@ -34,6 +34,9 @@
     checkModifierOptions = [],
     gatheringModifierPolicy = 'addAll',
     gatheringModifierMaxPicks = null,
+    // The gathering check's DEFAULT eligible set, so the picker can NAME what this task
+    // inherits when it has authored no pick of its own.
+    gatheringModifierDefaultIds = [],
     libraryTools = [],
     environmentOptions = [],
     onPickImagePath = null,
@@ -1195,6 +1198,8 @@
           options={checkModifierOptions}
           selectedIds={Array.isArray(task?.checkModifierIds) ? task.checkModifierIds : null}
           maxPicks={gatheringModifierMaxPicks}
+          inheritedIds={gatheringModifierDefaultIds}
+          subject="task"
           testId="gathering-check-modifier"
           onChange={(next) =>
             onUpdateTask(

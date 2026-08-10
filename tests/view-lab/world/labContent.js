@@ -2905,6 +2905,16 @@ const PROGRESSIVE_SALVAGE_CHECK = Object.freeze({
     thresholds: { success: 10 },
     awardMode: 'equal',
   },
+  // SALVAGE'S OWN SELECTION over the shared catalogue (issue 1095), and it is DIFFERENT from
+  // crafting's on both axes deliberately. The catalogue is shared; the selection is not, and a
+  // world where all three activities picked the same rule over the same ids is a world in which
+  // an activity reading another's selection looks identical on screen.
+  //
+  // It is also what gives the read-only entry row a frame: the salvage card renders the entries
+  // read-only with a bounds chip, and with no eligible set every row would be in the
+  // not-selected state and the chip's companion state would be depicted nowhere.
+  defaultModifierPolicy: 'highest',
+  defaultModifierIds: ['hb-mod-medicine', 'hb-mod-tools'],
 });
 
 /**
@@ -2976,6 +2986,17 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     label: 'Medicine',
     icon: 'fa-solid fa-kit-medical',
     expression: '@skills.med.mod',
+    // THE ONLY BOUNDED ENTRY IN THE WORLD (issue 1095). Per-entry `min`/`max` clamp the
+    // RESOLVED value, and three surfaces render them: the authoring pair of Steppers on the
+    // crafting card, the read-only `-1 to +6` chip on the salvage and gathering cards, and
+    // nothing at all on an unbounded entry. Without one bounded entry anywhere, every frame
+    // of all three shows the same unbounded reading and the chip is depicted nowhere.
+    //
+    // `-1`/`+6` is deliberately a SIGNED pair spanning zero, because the chip signs both ends
+    // and a `0 to 6` reading could not show that. Neither bound binds Bramble's `+4`, so the
+    // player roll-prompt frame's Medicine value is unchanged.
+    min: -1,
+    max: 6,
   },
   {
     id: 'hb-mod-nature',
@@ -2988,6 +3009,21 @@ const HERBALISM_CHECK_MODIFIERS = Object.freeze([
     label: 'Herbalism kit',
     icon: 'fa-solid fa-mortar-pestle',
     expression: '@prof',
+  },
+  {
+    id: 'hb-mod-weather',
+    label: 'Favourable weather',
+    icon: 'fa-solid fa-cloud-sun',
+    expression: '@abilities.wis.mod',
+    // CATALOGUED BUT NOT SELECTED, and that is its whole job. The per-entry eligibility control
+    // has two readings — the rule's own word (`Applied` / `Considered` / `Selectable` /
+    // `Picked per subject`) and the not-selected one — and with every lab entry inside
+    // `defaultModifierIds` the second was depicted on no screen anywhere.
+    //
+    // It is a FOURTH entry rather than one of the three demoted, because the eligible set is
+    // load-bearing elsewhere: `player-crafting-roll-prompt` needs three eligible modifiers with
+    // three different values to show a choice rather than a row of interchangeable chips, and
+    // `maxModifierPicks: 3` below is sized to that set.
   },
 ]);
 
@@ -3022,7 +3058,8 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // system already has, because a non-empty catalogue is what un-hides the recipe editor's
   // modifier row at all.
   defaultModifierPolicy: 'playerPicks',
-  // ALL THREE catalogue entries, up from two. The eligible set under `playerPicks` is this list,
+  // THREE of the catalogue's FOUR entries (issue 1095 added `hb-mod-weather` precisely to leave
+  // one out; see its own note). The eligible set under `playerPicks` is this list,
   // and the prompt needs at least TWO to render at all (the engine suppresses a one-option choice)
   // — but three with three DIFFERENT values (Medicine +4, Herbalism kit +3, Nature +2) is what
   // makes the frame show a choice rather than a row of interchangeable chips.

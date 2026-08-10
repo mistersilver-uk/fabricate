@@ -4,11 +4,13 @@
  * Under the `bySubject` combination rule the pick lives on the record being resolved, and
  * there are THREE of those — `Recipe.craftingModifier.modifierIds`,
  * `Component.salvage.checkModifierIds` and `GatheringTask.checkModifierIds` — normalized
- * across FOUR whitelist rebuilds, because `GatheringTask` is mirrored by both
- * `normalizeLibraryTask` (`GatheringRichStateService.js`) and `_normalizeGatheringTask`
- * (`adminStore.js`).
+ * across FIVE whitelist rebuilds. `Recipe._normalizeCraftingModifier` and
+ * `CraftingSystemManager._normalizeSalvage` are one each; `GatheringTask` needs three,
+ * because it is mirrored by `normalizeLibraryTask` and `_normalizeGatheringTask`
+ * (`adminStore.js`) on the LIBRARY side and rebuilt again by
+ * `_libraryTaskToRuntimeTask` (`GatheringRichStateService.js`) on the way to the engine.
  *
- * Four hand-written copies of "an authored empty array is a real pick of zero" is exactly
+ * Five hand-written copies of "an authored empty array is a real pick of zero" is exactly
  * the drift this module exists to prevent: the rule is subtle (it is keyed on
  * `Array.isArray` AT ENTRY, never on the filtered array's length) and a copy that got it
  * wrong would silently turn an authored pick of nothing back into "inherit the default
@@ -22,10 +24,14 @@
  * Coerce an authored id list to trimmed, non-empty, de-duplicated STRINGS, preserving
  * authored order.
  *
- * Non-string members are DROPPED rather than coerced, matching
- * `Recipe._normalizeCraftingModifier`'s filter: an id is a catalogue key, and `123` is not
- * one. The resolver drops any surviving id that names nothing in the catalogue, so this
- * only has to guarantee shape.
+ * Non-string members are DROPPED rather than coerced: an id is a catalogue key, and `123`
+ * is not one. The resolver drops any surviving id that names nothing in the catalogue, so
+ * this only has to guarantee shape.
+ *
+ * TRIMMING IS PART OF THE SHAPE, not a nicety. `Recipe._normalizeCraftingModifier` used to
+ * keep its own filter, which rejected a whitespace-only id but kept `' med '` untrimmed —
+ * so one authored id resolved against the catalogue on salvage and gathering and was
+ * dropped as unknown on crafting. It routes through here now for exactly that reason.
  *
  * @param {unknown} ids
  * @returns {string[]}

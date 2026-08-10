@@ -270,6 +270,90 @@ test('gathering bySubject honours the TASK’s own pick, including an authored e
   }
 });
 
+// ── the pick has to SURVIVE COMPOSITION to reach any of the above ─────────────
+//
+// Every gathering test above hands the engine a hand-built task literal, and that is the
+// one thing they cannot prove: the engine never receives a library task. It receives a
+// COMPOSED one, rebuilt field by field by `_libraryTaskToRuntimeTask` on the way through
+// `composeEnvironment` → `_findStartTask` → `_resolveStartContext`. That literal is a THIRD
+// whitelist rebuild beside the two mirrored library normalizers, and it omitted
+// `checkModifierIds` — so `readSubjectModifierIds` found nothing, every composed task
+// silently INHERITED the default set, and `bySubject` could not work on gathering at all
+// while both library normalizers were correct and the pick sat intact on disk.
+//
+// The composed task is fed to the SAME runner the tests above drive, so the observable is
+// the same formula string and the two cannot disagree about what a pick means.
+
+const { GatheringRichStateService } = await import('../src/systems/GatheringRichStateService.js');
+const { SETTING_KEYS } = await import('../src/config/settings.js');
+
+function composeTask(libraryTask) {
+  const config = { systems: { 'sys-a': { tasks: [libraryTask] } } };
+  const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, config]]);
+  const service = new GatheringRichStateService({
+    getSetting: (key) => settings.get(key),
+    setSetting: async (key, value) => {
+      settings.set(key, value);
+      return value;
+    },
+    settingKey: SETTING_KEYS.GATHERING_CONFIG,
+    rollD100: () => 1,
+  });
+  const composed = service.composeEnvironment(
+    {
+      id: 'env-a',
+      craftingSystemId: 'sys-a',
+      name: 'Glade',
+      enabled: true,
+      selectionMode: 'targeted',
+      compositionMode: 'automatic',
+      biomes: ['forest'],
+      tasks: [],
+    },
+    { id: 'sys-a', name: 'Wildcraft' }
+  );
+  return composed.tasks[0];
+}
+
+test('a task’s pick survives COMPOSITION and reaches the rolled formula', async () => {
+  const routedSlot = {
+    routed: {
+      rollFormula: '1d20',
+      dc: 10,
+      thresholdMode: 'meet',
+      type: 'relative',
+      relativeOutcomes: [{ id: 'o', name: 'Fine', dc: 0, success: true }],
+    },
+  };
+  for (const [checkModifierIds, expected, why] of [
+    [['med'], '1d20 + 3[Modifiers]', 'the composed task carries the authored pick'],
+    [[], '1d20', 'an authored EMPTY pick survives composition as a pick of zero'],
+    [undefined, '1d20 + 5[Modifiers]', 'and an absent one still inherits the default set'],
+  ]) {
+    const libraryTask = {
+      id: 't1',
+      name: 'Forage',
+      biomes: ['forest'],
+      dropRows: [{ id: 'd1', componentId: 'herb', quantity: 1, dropRate: 100 }],
+      ...(checkModifierIds === undefined ? {} : { checkModifierIds }),
+    };
+    const composed = composeTask(libraryTask);
+    assert.ok(composed, 'the environment composed the task');
+    const rolled = [];
+    const restore = stubRoll(rolled);
+    try {
+      await new GatheringEngine({})._resolveRoutedOutcome({
+        actor: ACTOR,
+        system: gatheringSystem(routedSlot, { defaultModifierPolicy: 'bySubject' }),
+        task: composed,
+      });
+    } finally {
+      restore();
+    }
+    assert.equal(rolled.at(-1), expected, why);
+  }
+});
+
 // ── gathering d100 is PROVEN untouched, capably ───────────────────────────────
 
 test('the d100 branch consults NO check-modifier context, and the proof can fail', () => {

@@ -91,14 +91,18 @@ export function applySystemCheckModifierCatalogue(system) {
   if (!_isPlainObject(system)) return;
   const check = _isPlainObject(system.craftingCheck) ? system.craftingCheck : null;
 
-  if (check && Object.hasOwn(check, LEGACY_CATALOGUE_KEY)) {
+  // A MALFORMED LEGACY VALUE IS SKIPPED, NOT DELETED. The header's no-throw guarantee rests
+  // on "a malformed system/check is skipped rather than repaired — normalization is the
+  // normalizer's job", and deleting a non-array `craftingCheck.checkModifiers` is a repair:
+  // this migration would be destroying data it has decided it cannot read, on the one code
+  // path where the GM has no copy left. It costs nothing to leave it — the value is not a
+  // catalogue, nothing reads it, and `_normalizeCraftingCheck` is an allowlist rebuild that
+  // drops it on the next save anyway.
+  if (check && Array.isArray(check[LEGACY_CATALOGUE_KEY])) {
     // GUARDED. An authored system-level catalogue is the newer, correct location and is
     // never clobbered; the legacy key is still deleted, so a half-migrated system
     // converges rather than carrying two catalogues that could disagree.
-    if (
-      !Array.isArray(system[SYSTEM_CATALOGUE_KEY]) &&
-      Array.isArray(check[LEGACY_CATALOGUE_KEY])
-    ) {
+    if (!Array.isArray(system[SYSTEM_CATALOGUE_KEY])) {
       system[SYSTEM_CATALOGUE_KEY] = check[LEGACY_CATALOGUE_KEY];
     }
     delete check[LEGACY_CATALOGUE_KEY];

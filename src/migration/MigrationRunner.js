@@ -381,18 +381,22 @@ const MIGRATIONS = [
   },
   {
     version: '1.22.0',
+    // THE LOSSY-DOWNGRADE FACT IS IN THE LABEL, NOT IN A COMMENT. The label is the only
+    // string a GM ever reads about this migration — `migrationRecoveryPrompt` renders it as
+    // "aborted during …" beside the Keep/Downgrade buttons — and "Downgrade to 1.21.0" is
+    // precisely the choice this warning is about. A source comment stating it would be
+    // addressed to the wrong reader at the wrong moment.
     label:
       'Lift the check-modifier catalogue out of craftingCheck up to the system, so ' +
       'salvage and gathering can select over the same one, and rewrite the byRecipe ' +
       'combination rule to its activity-independent name bySubject. THE RUNNER ORDER IS ' +
       'LOAD-BEARING: this runs before any manager load, and _normalizeCraftingCheck is an ' +
       'allowlist rebuild that no longer emits checkModifiers, so a save running first ' +
-      'would have DELETED the catalogue rather than relocating it',
-    // NOT lossless, and the first entry in this registry that is not. A world downgraded
-    // to 1.21.0 finds its formulas and its selection rules intact, but that build's
-    // `_normalizeCheckModifierConfig` is an allowlist that never saw a SYSTEM-level
-    // `checkModifiers`, so the relocated catalogue is dropped on the first read and every
-    // check modifier stops contributing to every roll. The GM must re-author it.
+      'would have DELETED the catalogue rather than relocating it. DOWNGRADING IS NOT ' +
+      'LOSSLESS, and this is the first migration in this registry of which that is true: ' +
+      '1.21.0 never saw a system-level checkModifiers, so it drops the relocated catalogue ' +
+      'on the first read and every check modifier stops contributing to every roll until ' +
+      'you re-author it. Your formulas and combination rules are unaffected',
     downgradeTo: '1.21.0',
     migrate: (data) => migrateSystemCheckModifierCatalogue(data),
   },

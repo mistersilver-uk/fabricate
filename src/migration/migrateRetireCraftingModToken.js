@@ -194,8 +194,18 @@ function countInertActiveCraftingCheck(system) {
   // `system.checkModifiers`, which is where the shared builder reads it. Handing the
   // builder a view carrying the catalogue at the key it reads is what keeps this count
   // reading real data without hand-mirroring the bag or reaching backwards in the ladder.
+  //
+  // The `??` is not decoration: the spread is unconditional, so a system whose check
+  // carries no catalogue key would otherwise write `checkModifiers: undefined` OVER a
+  // system-level one. That is reachable — the ladder is re-runnable and a world already
+  // past `1.22.0` has the catalogue at the system key and nothing at the legacy one — and
+  // the failure is silent, a count of 0 where the world has eligible modifiers.
   const eligible = resolveEligibleModifierIds(
-    buildCheckModifierContext({ ...system, checkModifiers: check.checkModifiers }, 'crafting', null)
+    buildCheckModifierContext(
+      { ...system, checkModifiers: check.checkModifiers ?? system.checkModifiers },
+      'crafting',
+      null
+    )
   );
   if (eligible.length === 0) return 0;
   const active = resolveActiveCraftingCheckFormula(system);

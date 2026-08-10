@@ -85,6 +85,10 @@
       'IssueModifierBoundsInverted',
       'A check modifier this check applies has a minimum above its maximum, so it contributes nothing to the roll until you fix the two values.',
     ],
+    modifierBoundsUnsafe: [
+      'IssueModifierBoundsUnsafe',
+      'A check modifier this check applies has a minimum or maximum too large or too small to appear in a roll formula, so it contributes nothing. Use a whole number a die roll could plausibly reach.',
+    ],
     modifiersInertNoCheck: [
       'IssueModifiersInertNoCheck',
       'This resolution mode rolls no check, so the check modifiers selected here are never applied.',

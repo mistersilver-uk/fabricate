@@ -7179,6 +7179,8 @@
         gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
           'addAll'}
         gatheringModifierMaxPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ?? null}
+        gatheringModifierDefaultIds={selectedSystem?.gatheringCraftingCheck?.defaultModifierIds ||
+          []}
         libraryTools={selectedGatheringSystemTools}
         environmentOptions={selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
@@ -7316,6 +7318,7 @@
           salvageModifierPolicy={selectedSystem?.salvageCraftingCheck?.defaultModifierPolicy ||
             'addAll'}
           salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
+          salvageModifierDefaultIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds || []}
           {salvageCheckDcMode}
           {salvageCheckDc}
           componentOptions={salvageComponentOptions}

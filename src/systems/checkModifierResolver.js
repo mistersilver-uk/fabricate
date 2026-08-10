@@ -69,7 +69,7 @@
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
-import { appendCheckModifierTerm } from './toolCheckBonus.js';
+import { appendCheckModifierTerm, isDecimalSafeTermValue } from './toolCheckBonus.js';
 
 /**
  * The combination rules a system may choose, in authoring-surface order. Each states
@@ -522,13 +522,42 @@ export function resolveEligibleModifierIds(context = {}) {
  * drop modifiers (`GatheringRichStateService`), so a check modifier and a drop modifier
  * fail the same way. Swapping them instead would roll a number the GM never authored.
  *
+ * `unsafe` is the second blocking case, and it is the one whose damage SPREADS (issue
+ * 1095). A bound only has to be FINITE to be a bound, so `1e21` is one — but the appended
+ * term is a dice-grammar `Constant`, which has no exponent production, so
+ * `isDecimalSafeTermValue` refuses the value and `appendCheckModifierTerm` drops THE WHOLE
+ * TERM. Under `addAll` that term is the SUM, so one entry clamped to `1e21` deletes every
+ * other modifier's contribution from the roll — a well-formed `+3` silently vanishing
+ * because of a bound on a different entry. Reporting it per-entry, and contributing 0 for
+ * that entry alone, keeps the blast radius where the GM authored the mistake.
+ *
  * @param {{ min?: unknown, max?: unknown }|null|undefined} entry A catalogue entry.
- * @returns {{ min: number|null, max: number|null, inverted: boolean }}
+ * @returns {{ min: number|null, max: number|null, inverted: boolean, unsafe: boolean }}
  */
 export function resolveModifierBounds(entry) {
   const min = numericBoundOrNull(entry?.min);
   const max = numericBoundOrNull(entry?.max);
-  return { min, max, inverted: min !== null && max !== null && min > max };
+  return {
+    min,
+    max,
+    inverted: min !== null && max !== null && min > max,
+    unsafe: !boundIsTermSafe(min) || !boundIsTermSafe(max),
+  };
+}
+
+/**
+ * Whether a resolved bound can survive the append it will be clamped into.
+ *
+ * A `null` bound is unbounded and therefore always safe. Anything else has to be a value
+ * the dice grammar's `Constant` production can express, which is exactly the question
+ * {@link isDecimalSafeTermValue} answers for the appended term itself — asked of the same
+ * function rather than re-derived, so the clamp and the emit cannot disagree about which
+ * numbers are expressible.
+ * @param {number|null} bound
+ * @returns {boolean}
+ */
+function boundIsTermSafe(bound) {
+  return bound === null || isDecimalSafeTermValue(bound);
 }
 
 /**
@@ -540,6 +569,12 @@ export function resolveModifierBounds(entry) {
  * and it matters twice over on this field: clearing a bound in the editor patches `null`,
  * so without the guard "clear the maximum" would mint a maximum of 0 and silently zero the
  * modifier.
+ *
+ * A STRING IS TRIMMED FIRST, and that is the same guard again rather than tidiness:
+ * `Number('   ')` is `0`, so a whitespace-only field — which is what a stored `' '` from an
+ * import or a hand-edit looks like — would otherwise mint a real bound of `0` and clamp the
+ * entry to nothing. `''` is already guarded above; trimming is what makes `'  '` reach the
+ * same answer as `''` instead of the opposite one.
  * @param {unknown} value
  * @returns {number|null}
  */
@@ -549,7 +584,9 @@ function numericBoundOrNull(value) {
   // one the lint rule asks for.
   if ([null, undefined, ''].includes(value)) return null;
   if (typeof value !== 'number' && typeof value !== 'string') return null;
-  const numeric = Number(value);
+  const raw = typeof value === 'string' ? value.trim() : value;
+  if (raw === '') return null;
+  const numeric = Number(raw);
   return Number.isFinite(numeric) ? numeric : null;
 }
 
@@ -558,16 +595,18 @@ function numericBoundOrNull(value) {
  * and BEFORE combination — so `highest` compares clamped values and `addAll` sums them,
  * which is what makes a bound mean the same thing under every combination rule.
  *
- * An inverted pair contributes 0 (see {@link resolveModifierBounds}). An absent bound is
- * unbounded on that side.
+ * An inverted pair contributes 0 (see {@link resolveModifierBounds}), and so does a bound
+ * the dice grammar cannot express — clamping to one would poison the SUM and delete every
+ * other modifier's term, so the refusal is contained to the entry that owns the bad bound.
+ * An absent bound is unbounded on that side.
  *
  * @param {number} value An already-coerced finite number.
  * @param {{ min?: unknown, max?: unknown }|null|undefined} entry
  * @returns {number}
  */
 export function clampModifierValue(value, entry) {
-  const { min, max, inverted } = resolveModifierBounds(entry);
-  if (inverted) return 0;
+  const { min, max, inverted, unsafe } = resolveModifierBounds(entry);
+  if (inverted || unsafe) return 0;
   let clamped = value;
   if (min !== null) clamped = Math.max(min, clamped);
   if (max !== null) clamped = Math.min(max, clamped);
