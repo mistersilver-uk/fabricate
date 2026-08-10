@@ -2066,6 +2066,15 @@ export const VIEW_LAB_CASES = Object.freeze([
   // Both open the picker in its INHERIT state, which is the reading the pill row cannot show: the
   // inherited set is NAMED from the activity's own `defaultModifierIds`, and a picker that said
   // "inheriting" and stopped there told the GM nothing about what the record actually rolls.
+  //
+  // BOTH FRAMES DEPEND ON A FIXTURE, not merely on the click. The inherit note has a SECOND
+  // reading — "the default set is empty, so no check modifier applies" — and that is what renders
+  // when the activity has no eligible entries. `lab-herbalism` carries a `salvageCraftingCheck`
+  // and (since issue 1095's review) a `gatheringCraftingCheck`, each with its OWN non-empty
+  // `defaultModifierIds`, precisely so each frame photographs the NAMING reading. Both
+  // `expectSelector`s therefore assert the inherit note itself rather than only that the picker
+  // rendered — without that, a world whose default set went empty would publish a frame showing
+  // the opposite sentence and the case would still pass.
   managerCase({
     id: 'manager-component-edit-salvage-modifier-pick',
     label: 'Manager — Component edit salvage modifier pick',
@@ -2119,11 +2128,13 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-gathering-task-check-modifiers]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
-    // The task card AND the picker inside it: the card carries the check-vs-character modifier
-    // hint, which is the disambiguation this screen is the second half of.
+    // The task card, the picker inside it AND the picker's inherit note: the card carries the
+    // check-vs-character modifier hint, which is the disambiguation this screen is the second half
+    // of, and the note is where the inherited entries are named.
     expectSelector:
       '.fabricate-manager [data-gathering-task-check-modifiers] ' +
-      '[data-subject-modifier-picker="gathering-check-modifier"]',
+      '[data-subject-modifier-picker="gathering-check-modifier"] ' +
+      '[data-subject-modifier-inherited]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SubjectModifierPicker\.svelte$/,

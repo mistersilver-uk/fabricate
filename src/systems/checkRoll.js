@@ -1007,9 +1007,10 @@ function applyTierStepTriggers({
  * It consumes {@link rankedRoutedOutcomes} to LOCATE the required tier but keeps
  * comparing threshold VALUES rather than rank indices, which is load-bearing:
  * `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without
- * complaint (non-overlap is only a `rangeOverlap` readiness warning, never an
- * enforcement), so two fixed tiers sharing a `start` compare EQUAL by value and the
- * craft passes, where an index comparison would strictly fail it.
+ * complaint (`rangeOverlap` is a `critical` READINESS issue but never an
+ * enforcement — `checksReadiness.js` reports it and nothing refuses the roll), so
+ * two fixed tiers sharing a `start` compare EQUAL by value and the craft passes,
+ * where an index comparison would strictly fail it.
  */
 function minSuccessTierFailed({ type, minOutcomeId, matched, relativeOutcomes, fixedOutcomes }) {
   if (type !== 'fixed' || !minOutcomeId) return false;

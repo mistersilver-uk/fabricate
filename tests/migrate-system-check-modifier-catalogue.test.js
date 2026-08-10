@@ -98,6 +98,37 @@ test('1.22.0 never clobbers an authored system-level catalogue', () => {
   );
 });
 
+// A MALFORMED LEGACY VALUE IS SKIPPED, NOT DELETED — and skipping it is a decision, not an
+// oversight. Deleting a non-array `craftingCheck.checkModifiers` would be this migration
+// destroying data it has decided it cannot read, on the ONE path where the GM has no surviving
+// copy. It costs nothing to leave: nothing reads it, and `_normalizeCraftingCheck` is an allowlist
+// rebuild that drops it on the next save anyway, so the system still converges.
+//
+// Reverting the `Array.isArray` guard left the suite green: every other case here authors a
+// well-formed array, so the guard was undiscriminated by the fixtures.
+test('1.22.0 leaves a MALFORMED legacy catalogue exactly where it was', () => {
+  const migrated = migrateOne({
+    id: 's',
+    craftingCheck: { checkModifiers: 'oops', defaultModifierPolicy: 'byRecipe' },
+  });
+  assert.equal(
+    migrated.craftingCheck.checkModifiers,
+    'oops',
+    'the key survives untouched — not repairing data you cannot read is the point'
+  );
+  assert.equal(
+    Object.hasOwn(migrated, 'checkModifiers'),
+    false,
+    'and a non-catalogue is never promoted to the system level, where the normalizer would ' +
+      'read it as an EMPTY catalogue and the GM would lose nothing visibly at all'
+  );
+  assert.equal(
+    migrated.craftingCheck.defaultModifierPolicy,
+    'bySubject',
+    'the rule rewrite is independent of the move and still runs'
+  );
+});
+
 test('1.22.0 is idempotent under re-run', () => {
   const once = migrateOne(legacySystem());
   const twice = migrateOne(structuredClone(once));
@@ -144,7 +175,16 @@ test('1.22.0 is registered with a downgrade target that states the loss', () => 
   assert.ok(entry, 'the migration is registered, or it never runs');
   assert.equal(entry.downgradeTo, '1.21.0');
   // The downgrade is NOT lossless — the first entry in this registry of which that is
-  // true — and the label has to say so rather than leaving it to be inferred.
+  // true — and the entry DECLARES that machine-readably. The declaration is what routes it
+  // into the registry-wide rule in `tests/migration-runner.test.js`, which is where the
+  // label's "DOWNGRADING IS NOT LOSSLESS" clause is held; asserting the clause here as well
+  // would be a second copy of one rule.
+  assert.equal(
+    entry.downgradeLosesData,
+    true,
+    'a downgraded world drops the relocated catalogue on the first read, and the registry ' +
+      'rule turns that declaration into a required sentence in the label'
+  );
   assert.match(
     entry.label,
     /LOAD-BEARING/,

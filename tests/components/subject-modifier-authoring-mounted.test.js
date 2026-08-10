@@ -163,6 +163,30 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
     salvageHarness.remount();
   });
 
+  // THE HOST→PICKER HOP FOR `inheritedIds`, which nothing pinned. The root→host hop is pinned by
+  // the source contract at the foot of this file; this is the OTHER half, and replacing
+  // `inheritedIds={salvageModifierDefaultIds}` with `[]` left the whole suite green.
+  //
+  // The symptom is not a blank. The picker falls into its EMPTY-SET branch and tells the GM that
+  // "the salvage check's default set is empty, so no check modifier applies to this component" —
+  // while the roll is in fact applying it. A confident false statement, on the one screen whose
+  // job is to say what this component actually rolls.
+  it('names the SALVAGE default set in the inherit note it hands the picker', async () => {
+    const { target } = await mountSalvage({ salvageModifierDefaultIds: ['med'] });
+    const note = target.querySelector(`${PICKER} [data-subject-modifier-inherited]`);
+    assert.ok(note, 'a component that authored no pick renders the inherit note');
+    assert.match(
+      note.textContent,
+      /Medicine/,
+      'the inherited entry is NAMED from this activity’s own default set'
+    );
+    assert.ok(
+      !/empty/i.test(note.textContent),
+      'and the empty-set sentence is not what a non-empty default set renders'
+    );
+    salvageHarness.remount();
+  });
+
   it('threads the salvage cap, so the picker bounds what the salvage roll bounds', async () => {
     const { target } = await mountSalvage({
       salvageModifierMaxPicks: 1,
@@ -311,6 +335,22 @@ describe('gathering check-modifier pick — the GatheringTaskEditView host', () 
       { checkModifierIds: undefined },
       'OFF patches UNDEFINED, which is what makes the normalizer drop the key and inherit — ' +
         'a `null` or a `[]` here would be a different roll'
+    );
+    gatheringHarness.remount();
+  });
+
+  // The same hop on the OTHER host, and asserted separately rather than inferred from the salvage
+  // one: they are two different wirings in two different files, and one component with two
+  // disagreeing hosts is the defect this whole suite exists for. Replacing
+  // `inheritedIds={gatheringModifierDefaultIds}` with `[]` was likewise green.
+  it('names the GATHERING default set in the inherit note it hands the picker', async () => {
+    const { target } = await mountGathering({ gatheringModifierDefaultIds: ['med'] });
+    const note = target.querySelector(`${GATHERING_PICKER} [data-subject-modifier-inherited]`);
+    assert.ok(note, 'a task that authored no pick renders the inherit note');
+    assert.match(note.textContent, /Medicine/, 'the inherited entry is NAMED');
+    assert.ok(
+      !/empty/i.test(note.textContent),
+      'telling the GM the set is empty while the roll applies it is worse than saying nothing'
     );
     gatheringHarness.remount();
   });

@@ -37,7 +37,11 @@
   THE INHERITED SET IS NAMED. Under inheritance the pill row has nothing to author, so it is
   hidden and the inherited entries are listed instead — the recipe picker's own rule, and its
   note says why: "inheriting" with no names told the GM nothing about what this record
-  actually rolls.
+  actually rolls. The names are joined by `foundryBridge.formatList` and interpolated into a
+  `{list}` PLACEHOLDER on the sentence, never concatenated onto the end of a localized
+  string: "x, y and z" is a language rule (separator, conjunction and Oxford comma all vary
+  by locale, which is why `items.join(', ')` is wrong even in English), and a sentence whose
+  tail is glued on at render time cannot be reordered by a translator.
 
   The cap is a SYSTEM fact this record cannot change, so it is stated STANDING rather than
   only once the GM hits it and the add button has already gone dead, with the at-cap clause
@@ -58,7 +62,7 @@
      authors a pick.
 -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import { formatList, localize } from '../../util/foundryBridge.js';
   import ModifierPillSelect from '../../components/ModifierPillSelect.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import { resolveMaxModifierPicks } from '../../../../systems/checkModifierResolver.js';
@@ -91,7 +95,7 @@
       authorKey: 'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierAuthorComponent',
       author: 'Pick check modifiers for this component',
       inheritKey: 'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierInheritComponent',
-      inherit: 'Inheriting the salvage check’s default set:',
+      inherit: 'Inheriting the salvage check’s default set: {list}',
       inheritEmptyKey:
         'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierInheritEmptyComponent',
       inheritEmpty:
@@ -109,7 +113,7 @@
       authorKey: 'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierAuthorTask',
       author: 'Pick check modifiers for this task',
       inheritKey: 'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierInheritTask',
-      inherit: 'Inheriting the gathering check’s default set:',
+      inherit: 'Inheriting the gathering check’s default set: {list}',
       inheritEmptyKey: 'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierInheritEmptyTask',
       inheritEmpty:
         'The gathering check’s default set is empty, so no check modifier applies to this task.',
@@ -155,17 +159,36 @@
   // The inherited entries, BY NAME. Resolved against `options` and dropped when unknown,
   // which is what the resolver does with the same ids — so this line cannot promise a
   // modifier the roll would not apply.
+  //
+  // Joined by `formatList`, the ACTIVE language's list conventions, exactly as
+  // `RecipeOverviewTab` joins the same set for the same sentence: a hand-rolled
+  // `join(', ')` renders "Medicine, Herbalism kit" where the recipe surface — one rule,
+  // three subjects — renders "Medicine and Herbalism kit", so the two would disagree in
+  // English before any translation was attempted.
   const inheritedNames = $derived(
-    (Array.isArray(inheritedIds) ? inheritedIds : [])
-      .map((id) => options.find((option) => option?.id === id))
-      .filter(Boolean)
-      .map(
-        (option) =>
-          option.label ||
-          text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')
-      )
-      .join(', ')
+    formatList(
+      (Array.isArray(inheritedIds) ? inheritedIds : [])
+        .map((id) => options.find((option) => option?.id === id))
+        .filter(Boolean)
+        .map(
+          (option) =>
+            option.label ||
+            text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierUnnamed', 'Unnamed modifier')
+        )
+    )
   );
+
+  // The list is a `{list}` PLACEHOLDER, not a runtime value concatenated onto a localized
+  // sentence: the position of a list inside its sentence is a translator's decision, and a
+  // caller that appends it has already made that decision for every language. Same
+  // fallback contract as `capText` — the fallback substitutes the list itself, so an
+  // unlocalized build reads identically rather than printing a raw brace.
+  const inheritText = $derived.by(() => {
+    if (!inheritedNames) return text(copy.inheritEmptyKey, copy.inheritEmpty);
+    const translated = localize(copy.inheritKey, { list: inheritedNames });
+    if (translated && translated !== copy.inheritKey) return translated;
+    return copy.inherit.replace('{list}', inheritedNames);
+  });
 
   function toggleAuthored(checked) {
     // Turning it ON authors an EMPTY array — a real pick of zero, which is the honest
@@ -194,7 +217,13 @@
         data-subject-modifier-authored={authored ? 'custom' : 'inherit'}
         onChange={toggleAuthored}
       />
-      <span class="manager-muted">
+      <!-- PRESENTATIONAL. The `SelectionCheckbox` carries the whole accessible name in its
+           own `aria-label`, so this copy of the same words is `aria-hidden` — the rule
+           `ui-integration/spec.md` states for the catalogue card's eligibility pill ("One
+           of the two, never both"), applied to the surface it also governs. It is not a
+           `<label for>` either: `SelectionCheckbox`'s default wrapper already renders its
+           own `<label>` around the input, and a second one would nest labels. -->
+      <span class="manager-muted" aria-hidden="true">
         {text(copy.authorKey, copy.author)}
       </span>
     </div>
@@ -228,9 +257,7 @@
       {/if}
     {:else}
       <p class="manager-muted" data-subject-modifier-inherited>
-        {inheritedNames
-          ? `${text(copy.inheritKey, copy.inherit)} ${inheritedNames}`
-          : text(copy.inheritEmptyKey, copy.inheritEmpty)}
+        {inheritText}
       </p>
     {/if}
   </div>

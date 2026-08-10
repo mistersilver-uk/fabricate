@@ -27,7 +27,7 @@
        modifiers, and how they reduce to the one number appended to the check roll:
          - Add all:      sum the activity's default set. Nobody selects.
          - Highest:      the single largest of it (a deterministic max, not a pool).
-         - By subject:   the RECIPE / COMPONENT / GATHERING ROW selects, at authoring time.
+         - By subject:   the RECIPE / COMPONENT / GATHERING TASK selects, at authoring time.
          - Player picks: the PLAYER selects, at roll time; the picks sum.
        `MODIFIER_POLICIES` in the resolver is the source of that list and its order;
        `policyDefersSelection` is the source of which two defer the selection.
@@ -75,7 +75,6 @@
   import { MODIFIER_POLICY_OPTION_ATTR } from './modifierPolicyAttrs.js';
 
   const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
-  const DEFAULTS_LABEL_ID = 'manager-crafting-modifier-defaults-label';
   // The cap hint is the ONLY place "empty means unlimited" is stated, and the Stepper's
   // blank field cannot state it, so the input takes the hint as its description rather
   // than leaving a screen-reader user with an unexplained empty number field.
@@ -119,7 +118,7 @@
 
   // The `bySubject` rule's LABEL is per-activity while its TOKEN is not: the rule always
   // means "the record being resolved picks, at authoring time", and that record is a
-  // recipe, a component or a gathering row. One vocabulary map rather than three rule
+  // recipe, a component or a gathering task. One vocabulary map rather than three rule
   // lists, so `MODIFIER_POLICIES` stays the single source of the option set and its order.
   const SUBJECT_COPY = {
     crafting: {
@@ -129,7 +128,7 @@
       desc: 'Each recipe picks which modifiers apply, on its Overview tab; the picks are summed. Recipes that pick nothing use the default set above.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectCrafting',
       cap: 'The most modifiers a recipe author may pick for one recipe. Leave it empty for no limit. Lowering it below what a recipe already picked keeps the recipe intact but rolls only the first modifiers it picked, up to this many.',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroBySubjectCrafting',
+      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectCrafting',
       intro:
         'Which modifiers apply when a recipe does not pick its own. A recipe can pick its own set on its Overview tab.',
     },
@@ -140,18 +139,19 @@
       desc: 'Each component picks which modifiers apply, on its Salvage tab; the picks are summed. Components that pick nothing use the default set above.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectSalvage',
       cap: 'The most modifiers a component may pick for one salvage. Leave it empty for no limit. Lowering it below what a component already picked keeps the component intact but rolls only the first modifiers it picked, up to this many.',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroBySubjectSalvage',
+      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectSalvage',
       intro:
         'Which modifiers apply when a component does not pick its own. A component can pick its own set on its Salvage tab.',
     },
     gathering: {
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectGathering',
-      label: 'By gathering row',
+      label: 'By gathering task',
       descKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectGatheringDesc',
       desc: 'Each gathering task picks which modifiers apply, in the gathering library; the picks are summed. Tasks that pick nothing use the default set above.',
       capKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicksBySubjectGathering',
       cap: 'The most modifiers a gathering task may pick. Leave it empty for no limit. Lowering it below what a task already picked keeps the task intact but rolls only the first modifiers it picked, up to this many.',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroBySubjectGathering',
+      introKey:
+        'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroBySubjectGathering',
       intro:
         'Which modifiers apply when a gathering task does not pick its own. A task can pick its own set in the gathering library.',
     },
@@ -223,7 +223,7 @@
       label: 'Applied',
       tone: 'success',
       icon: 'fas fa-circle-check',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroAddAll',
+      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroAddAll',
       intro: 'Every modifier switched on here is added to the roll. Every attempt uses this set.',
     },
     highest: {
@@ -231,7 +231,7 @@
       label: 'Considered',
       tone: 'accent',
       icon: 'fas fa-arrow-up-wide-short',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroHighest',
+      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroHighest',
       intro:
         'The modifiers switched on here are compared — only the largest of them is added. Every attempt uses this set.',
     },
@@ -240,7 +240,7 @@
       label: 'Selectable',
       tone: 'info',
       icon: 'fas fa-hand-pointer',
-      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierDefaultsIntroPlayerPicks',
+      introKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityIntroPlayerPicks',
       intro:
         'Which modifiers the player chooses from at roll time. Every attempt in this system offers this set.',
     },
@@ -339,12 +339,18 @@
   );
   // What the default set IS depends on the rule, and the four readings are materially
   // different decisions. Under `bySubject` the sentence also depends on the ACTIVITY,
-  // because the record doing the picking is a recipe, a component or a gathering row.
-  const defaultsIntro = $derived(
+  // because the record doing the picking is a recipe, a component or a gathering task.
+  const eligibilityIntro = $derived(
     selectedPolicy === 'bySubject'
       ? { key: subjectCopy.introKey, fallback: subjectCopy.intro }
       : { key: eligibility.introKey, fallback: eligibility.intro }
   );
+  // KEYED BY ACTIVITY, not a module-level literal. This component is instantiated three
+  // times — crafting, salvage and gathering — and a hardcoded id is unique only because the
+  // three panels happen to be mutually exclusive today. A duplicate DOM id silently sends
+  // every `aria-describedby` on the page to whichever copy rendered first, which is a
+  // screen-reader-only defect no frame would show.
+  const ELIGIBILITY_INTRO_ID = $derived(`manager-${activity}-modifier-eligibility-intro`);
   // Gated on the catalogue being NON-EMPTY as well as on the cause. The notice reports a
   // CATALOGUE that reaches no roll, and an empty catalogue is not one: a fresh crafting
   // system is `simple` + `rollFormula: ''`, so an ungated notice put a permanent warning
@@ -527,7 +533,7 @@
     </p>
   {/if}
 
-  {#if modifiers.length > 0 && defaultsIntro.fallback}
+  {#if modifiers.length > 0 && eligibilityIntro.fallback}
     <!-- The eligibility sentence for the ACTIVE rule, ABOVE the rows it governs. It states
          what switching an entry on MEANS under the rule the GM just chose, so it has to sit
          where that switching happens: below the rule grid it landed ~500px under the
@@ -536,10 +542,10 @@
          they are about to change" is not a risk the position creates. -->
     <p
       class="manager-muted"
-      id={DEFAULTS_LABEL_ID}
+      id={ELIGIBILITY_INTRO_ID}
       data-crafting-modifier-defaults={selectedPolicy}
     >
-      {text(defaultsIntro.key, defaultsIntro.fallback)}
+      {text(eligibilityIntro.key, eligibilityIntro.fallback)}
     </p>
   {/if}
 
@@ -726,7 +732,7 @@
             size="sm"
             checked={defaultIds.includes(modifier.id)}
             ariaLabel={`${modifier.label || modifier.id} — ${eligibilityLabelOf(modifier.id)}`}
-            aria-describedby={defaultsIntro.fallback ? DEFAULTS_LABEL_ID : undefined}
+            aria-describedby={eligibilityIntro.fallback ? ELIGIBILITY_INTRO_ID : undefined}
             data-crafting-modifier-eligibility-input={modifier.id}
             onChange={(checked) => toggleDefault(modifier.id, checked)}
           />

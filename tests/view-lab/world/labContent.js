@@ -3093,6 +3093,41 @@ const PROGRESSIVE_CHECK = Object.freeze({
   maxModifierPicks: 3,
 });
 
+/**
+ * Herbalism's GATHERING selection over the shared catalogue (issue 1095).
+ *
+ * IT EXISTS TO GIVE THE INHERIT NOTE SOMETHING TO NAME. `manager-gathering-task-edit-modifier-pick`
+ * opens `SubjectModifierPicker` in its INHERIT state, and that state has TWO readings: it names the
+ * activity's `defaultModifierIds`, or — with an empty set — it states that nothing applies. With no
+ * `gatheringCraftingCheck` on this system at all, `_normalizeGatheringCraftingCheck` normalized an
+ * absent block to an EMPTY default set, so that frame photographed the empty-set sentence and named
+ * nothing, while the registry's own note beside both picker cases claims the inherited set is
+ * NAMED. The fixture is the fix rather than the note, because naming is the reading worth a frame:
+ * "inheriting" with no names is precisely what this picker was built not to say.
+ *
+ * It is also the only place gathering's own selection is authored anywhere in the lab, which is
+ * what makes `manager-checks-gathering-modifiers` show an eligible set rather than four
+ * not-selected rows.
+ *
+ * DISTINCT FROM THE OTHER TWO ON BOTH AXES, deliberately, exactly as the salvage block is. Crafting
+ * is `playerPicks` over three ids, salvage is `highest` over two, gathering is `addAll` over two
+ * DIFFERENT ones — so three of the four combination rules are depicted on a real screen, and an
+ * activity that read another activity's selection would be visible rather than coincidentally
+ * identical.
+ *
+ * `hb-mod-weather` stays out of this set as it stays out of the other two: its whole job is to be
+ * the catalogued-but-not-selected entry, and it can only do that if NO activity selects it.
+ *
+ * No `enabled` and no formula slots: gathering resolves `d100` here, so the check-modifier seam is
+ * inert with cause `noCheck` and dormant pending issue 683 either way. Authoring a formula would
+ * claim a rolled gathering check this world does not have, and both notices are what
+ * `manager-checks-gathering-modifiers` exists to photograph.
+ */
+const HERBALISM_GATHERING_CHECK = Object.freeze({
+  defaultModifierPolicy: 'addAll',
+  defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],
+});
+
 export function buildLabContent() {
   const systems = [
     {
@@ -3183,6 +3218,9 @@ export function buildLabContent() {
       // world; smithing stays Simple-with-no-formula, which is the other body.
       salvageResolutionMode: 'progressive',
       salvageCraftingCheck: PROGRESSIVE_SALVAGE_CHECK,
+      // Gathering's own selection over the SAME catalogue — see its own note for why this block
+      // exists at all and why it carries no formula.
+      gatheringCraftingCheck: HERBALISM_GATHERING_CHECK,
       features: {
         essences: true,
         recipeCategories: true,

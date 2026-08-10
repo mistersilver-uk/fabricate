@@ -1067,3 +1067,35 @@ test('1.6.0 recovery-warning payload is surfaced in the summary and never persis
     }
   }
 });
+
+// ── the lossy-downgrade contract, as a RULE over the registry ────────────────
+//
+// `migrationRecoveryPrompt` renders a migration's `label` as "aborted during …" directly beside
+// the Keep/Downgrade buttons, so that string is the ONLY place a GM meets the consequences of the
+// choice they are about to make. A caveat left in a source comment is addressed to the wrong
+// reader at the wrong moment, and this is the one moment that matters.
+//
+// It is a rule rather than one entry's assertion because deleting the clause from `1.22.0`'s label
+// was green, and the next lossy migration would land with nothing at all stopping it. An entry
+// declares the fact once, machine-readably, and the label is then held to it.
+test('every migration whose downgrade LOSES DATA names that in its own label', () => {
+  const registry = new MigrationRunner({ getSetting: () => undefined, setSetting: () => {} })
+    ._migrations;
+  const lossy = registry.filter((migration) => migration.downgradeLosesData === true);
+  assert.ok(
+    lossy.length > 0,
+    'the rule is not vacuous: at least one registered migration declares a lossy downgrade'
+  );
+  for (const migration of lossy) {
+    assert.match(
+      migration.label,
+      /DOWNGRADING IS NOT LOSSLESS/,
+      `${migration.version}: a GM choosing Downgrade at the recovery prompt reads this label and ` +
+        'nothing else, so the loss has to be stated in it'
+    );
+    assert.ok(
+      typeof migration.downgradeTo === 'string' && migration.downgradeTo,
+      `${migration.version}: a lossy downgrade still has to name the version it downgrades TO`
+    );
+  }
+});

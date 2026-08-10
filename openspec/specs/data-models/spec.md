@@ -147,6 +147,10 @@ CraftingSystem = {
   // rather than truthiness. An authored `min > max` is preserved VERBATIM and is a
   // BLOCKING readiness issue (`modifierBoundsInverted`): that entry contributes 0 until
   // it is repaired, matching gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS` posture.
+  // A finite bound that no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the
+  // SECOND blocking bounds fault, `modifierBoundsUnsafe`, also `critical`, and likewise
+  // contains the entry to 0. Two issue ids rather than one cause with two readings: the
+  // repairs differ and `1e21` is not an inversion.
   // Absent = empty catalogue, so every activity's scalar is 0 and no term is appended.
   checkModifiers?: {
     id: string, label: string, expression: string, icon?: string, min?: number, max?: number
@@ -209,7 +213,7 @@ CraftingSystem = {
     //   highest     — max(...) of this activity's own default set. Nobody selects.
     //   bySubject   — the record being resolved selects, at authoring time: the recipe on
     //                 crafting, the component on salvage, the gathering task on gathering.
-    //                 Rendered "By recipe" / "By component" / "By gathering row".
+    //                 Rendered "By recipe" / "By component" / "By gathering task".
     //   playerPicks — the PLAYER selects, at roll time.
     // `bySubject` is a first-class rule, NOT a delegation of authority: a subject chooses
     // WHICH modifiers apply, never HOW they combine. Both selecting rules SUM what was
@@ -541,7 +545,7 @@ CraftingSystem = {
     **Stepping is disposition-preserving:** under a forced outcome the array in play is the ranked SUBSET of tiers sharing the forced disposition, so `data.success` and the final tier's own `success` can never disagree; with no forced outcome it is the whole ranked list and both `success` and `breakTools` follow the final tier.
     A `null` matched tier steps nothing, `target` included.
     Tier order is derived in exactly ONE place (`rankedRoutedOutcomes` in `src/systems/checkRoll.js`), consumed by the forced reroute, the `minOutcomeId` gate and the step pass alike: ascending by `dc` (relative) or `start` (fixed), non-finite ranks dropped, and the FIRST authored tier kept among equal ranks; callers locate a tier in it by ID, never by object identity.
-    The `minOutcomeId` gate uses that ranking only to LOCATE the required tier and still compares threshold VALUES, because `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without complaint (non-overlap is only a `rangeOverlap` readiness warning), so two fixed tiers sharing a `start` compare equal and the craft passes.
+    The `minOutcomeId` gate uses that ranking only to LOCATE the required tier and still compares threshold VALUES, because `_normalizeRoutedOutcome` stores duplicate and overlapping ranges without complaint (`rangeOverlap` is a `critical` READINESS issue, never an ENFORCEMENT — readiness reports it, the normalizer still persists it and the roll path still runs), so two fixed tiers sharing a `start` compare equal and the craft passes.
     Full semantics — including the acknowledged rolled-tier/final-tier asymmetry and the relationship to `clampToNearest` — are in `resolution-modes` § Routed Tier Stepping.
 
 32. **The persisted `tierStep` effect and the runtime `data.tierStepApplied` evidence are different shapes and deliberately different names**, exactly as `natStepping` and `data.natStep` were.
@@ -561,11 +565,18 @@ CraftingSystem = {
     `min` / `max` clamp the RESOLVED value of that entry, after expression evaluation and before combination, so a bound means the same thing under every combination rule.
     Both are absence-preserving in the same way `maxModifierPicks` is: only a FINITE number is attached, and `null` / `''` / `[]` are guarded explicitly before coercion because `Number()` reads all three as `0` and `0` is a real bound.
     An authored `min > max` is preserved verbatim rather than reordered, raises the BLOCKING `modifierBoundsInverted` readiness issue, and makes that entry contribute exactly 0 until it is repaired.
+    A bound that is finite but NOT expressible as a dice-grammar `Constant` — `1e21`, `1e-7` — is the SECOND blocking bounds fault, `modifierBoundsUnsafe` (also `critical`), and contains that entry to 0 in the same way; it is a separate issue id rather than a second cause on the first, because the repairs differ and `1e21` is not an inversion.
+    The expressibility test is the same `isDecimalSafeTermValue` the term emit asks, so the clamp and the emit cannot disagree about which numbers a formula can carry.
 
 34. **Subject-level modifier picks.** Under the `bySubject` combination rule the pick lives on the record being resolved: `Recipe.craftingModifier.modifierIds`, `Component.salvage.checkModifierIds`, `GatheringTask.checkModifierIds`.
     All three preserve an AUTHORED EMPTY array as a real pick of zero, distinct from absent, keyed on `Array.isArray` at entry so a malformed member cannot flip an authored empty set back to inherit.
     All three are truncated to `maxModifierPicks` at the resolver rather than only at the picker, so lowering the cap never leaves a record rolling more modifiers than the system permits and never destroys its stored picks.
-    **`GatheringTask` is normalized by TWO mirrored whitelist rebuilds** — `normalizeLibraryTask` (`GatheringRichStateService.js`) and `_normalizeGatheringTask` (`adminStore.js`) — and BOTH must emit `checkModifierIds`, or a task saved through whichever omits it loses the field, silently and in one direction only.
+    **The id COERCION is one rule for all three subjects** (`normalizeCheckModifierIds`, `src/utils/checkModifierPicks.js`): ids are TRIMMED, non-string members are dropped rather than coerced, duplicates are dropped and authored order is preserved.
+    Trimming is part of the shape rather than a nicety, and its absence was a live divergence: a per-subject filter that rejected a whitespace-only id but kept `' med '` untrimmed made one authored id resolve against the catalogue on salvage and gathering and be dropped as unknown on crafting.
+    **`GatheringTask` is rebuilt by THREE whitelist normalizers, not two, and all three must emit `checkModifierIds`.**
+    Two are the mirrored LIBRARY rebuilds — `normalizeLibraryTask` (`GatheringRichStateService.js`) and `_normalizeGatheringTask` (`adminStore.js`) — and either one omitting the key loses the field on save, silently and in one direction only.
+    The third is the ENGINE-FACING rebuild `_libraryTaskToRuntimeTask` (`GatheringRichStateService.js`), which projects a library task into the runtime task `GatheringEngine` resolves against, and its failure mode is DIFFERENT and strictly harder to see: the pick persists correctly, both library normalizers are correct, and the pick is simply never read at roll time, so `bySubject` silently resolves the activity's default set for every task.
+    A world satisfying the two-rebuild reading exactly can therefore still have `bySubject` wholly broken on gathering.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.

@@ -4709,7 +4709,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         ],
         craftingDefaultModifierPolicy,
       });
-      const text = target.querySelector('#manager-crafting-modifier-defaults-label').textContent;
+      const text = target.querySelector('#manager-crafting-modifier-eligibility-intro').textContent;
       unmount(mounted);
       mounted = null;
       target.remove();

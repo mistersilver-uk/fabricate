@@ -64,8 +64,9 @@ Everything on that card is a system-level decision.
 A recipe never overrides it; the most a recipe can do is pick which modifiers apply, and only when the system's combination rule asks it to.
 The card appears on every crafting sub-tab once the catalogue has at least one entry, whether or not the system's active check can use it yet.
 When it cannot, the card explains why instead of hiding, so a modifier you authored is never silently doing nothing with no indication.
-Check modifiers are a crafting-only feature.
-Salvage and gathering checks do not use them.
+Check modifiers are **not** a crafting-only feature.
+Salvage and Gathering select over the same catalogue, each with its own rule, its own default set and its own pick cap — see [One catalogue, three activities](#one-catalogue-three-activities).
+The catalogue itself is only ever *edited* on the Crafting check.
 
 ### Defining check modifiers
 
@@ -111,7 +112,7 @@ It also decides **who chooses them, and when**.
 |:-----------------|:------------|:-------------|:------------------------|
 | **Add all** | Nobody. The system's default set applies as it stands. | Sums every modifier in the default set. | The recipe rewards stacking every relevant skill or tool bonus at once. |
 | **Highest** | Nobody. The system's default set applies as it stands. | Uses only the single largest modifier in the default set, as a plain number, not a keep-highest dice roll. | Several skills can substitute for each other, and only the best should count. |
-| **By recipe** / **By component** / **By gathering row** | You do, per record, on that record's own editor. | Sums the modifiers that record picked. | Different recipes (or components, or gathering tasks) in one system draw on different skills, and you want to decide that once, while authoring the record. |
+| **By recipe** / **By component** / **By gathering task** | You do, per record, on that record's own editor. | Sums the modifiers that record picked. | Different recipes (or components, or gathering tasks) in one system draw on different skills, and you want to decide that once, while authoring the record. |
 | **Player picks** | The player does, at roll time. | Sums the modifiers the player picked. | You want the player to decide, in the moment, which of their skills they are relying on for that attempt. |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
@@ -122,7 +123,7 @@ Choosing the by-record rule or **Player picks** hands out the *selection*, never
 
 Each of the three activities — Crafting, Salvage and Gathering — carries its **own** combination rule, default set and pick cap, over **one shared catalogue**.
 The catalogue is authored once, on the Crafting check; the Salvage and Gathering cards show the same entries read-only and let you decide which of them apply there and how they combine.
-The by-record rule is one rule with three labels: it reads **By recipe** on Crafting, **By component** on Salvage and **By gathering row** on Gathering, because the record doing the picking is different on each.
+The by-record rule is one rule with three labels: it reads **By recipe** on Crafting, **By component** on Salvage and **By gathering task** on Gathering, because the record doing the picking is different on each.
 
 ### The default eligible set
 

@@ -20,7 +20,7 @@
  *
  * `bySubject` replaces the pre-1095 `byRecipe` because the rule's MEANING is
  * activity-independent while its LABEL is not ("By recipe" / "By component" / "By
- * gathering row"). {@link normalizeModifierPolicy} accepts `byRecipe` as a legacy READ
+ * gathering task"). {@link normalizeModifierPolicy} accepts `byRecipe` as a legacy READ
  * alias and never re-emits it, exactly as `breakToolsOnFail` reads
  * `consumeCatalystsOnFail`.
  *
@@ -85,7 +85,7 @@ import { appendCheckModifierTerm, isDecimalSafeTermValue } from './toolCheckBonu
  * WHICH modifiers apply, never HOW they combine. Both selecting rules sum what was
  * picked and are bounded by {@link resolveMaxModifierPicks}.
  *
- * The LABEL is per-activity ("By recipe" / "By component" / "By gathering row") and lives
+ * The LABEL is per-activity ("By recipe" / "By component" / "By gathering task") and lives
  * in the authoring surfaces; the TOKEN is activity-independent, which is why issue 1095
  * renamed the pre-1095 `byRecipe`.
  * @type {ReadonlyArray<'addAll'|'highest'|'bySubject'|'playerPicks'>}

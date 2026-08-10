@@ -398,6 +398,13 @@ const MIGRATIONS = [
       'on the first read and every check modifier stops contributing to every roll until ' +
       'you re-author it. Your formulas and combination rules are unaffected',
     downgradeTo: '1.21.0',
+    // MACHINE-READABLE, so the label clause above is a RULE rather than one entry's prose. A
+    // migration that marks itself here must name the loss in its own `label`
+    // (`tests/migration-runner.test.js` enforces it over the whole registry), because the label
+    // is the only string a GM reads at the Keep/Downgrade prompt and a caveat left in a source
+    // comment reaches nobody standing in front of that dialog. `1.21.0` is deliberately NOT
+    // marked: it is DATA-lossless and BEHAVIOUR-lossy, which is a different fact.
+    downgradeLosesData: true,
     migrate: (data) => migrateSystemCheckModifierCatalogue(data),
   },
   // Future migrations added here in version order
@@ -414,7 +421,7 @@ export class MigrationRunner {
    *   setSetting: Function,
    *   moduleVersion?: string,
    *   promptRecovery?: Function,
-   *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string }>
+   *   migrations?: Array<{ version: string, label: string, migrate: Function, downgradeTo?: string, downgradeLosesData?: boolean }>
    * }} opts
    *   `promptRecovery` is an optional seam invoked with the abort context so the
    *   caller can present a GM decision prompt; `migrations` overrides the default

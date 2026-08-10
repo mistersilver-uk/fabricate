@@ -205,7 +205,7 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
 
   // The INLINE option table: three rules whose copy is activity-independent. The fourth,
   // `bySubject`, reads its label and description out of `SUBJECT_COPY`, because they change
-  // per activity ("By recipe" / "By component" / "By gathering row") — so it is mirrored by
+  // per activity ("By recipe" / "By component" / "By gathering task") — so it is mirrored by
   // the per-activity block below instead.
   assertMirrored(
     [

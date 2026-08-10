@@ -760,6 +760,72 @@ describe('createAdminStore', () => {
       );
     });
 
+    // THE CATALOGUE VALUE IS GUARDED, and this is the reachable wipe it guards. The presence
+    // test (`Object.hasOwn`) and a truthiness test are UNDISCRIMINATED over every patch the
+    // card emits — `[]` is truthy, so the delete-the-last-entry patch takes the same branch
+    // under either — but they differ on `undefined`, and `saveSystemCheckModifiers` is
+    // exported with no in-repo caller, so that shape is reachable from the public surface.
+    // Written through, it reaches `_normalizeCheckModifierCatalogue`, whose
+    // `Array.isArray(catalogue) ? … : []` returns an EMPTY catalogue: every entry gone, for
+    // all three activities at once, on a call that looks like a no-op.
+    it('refuses to write a NON-ARRAY catalogue rather than wiping the system’s entries', async () => {
+      for (const junk of [undefined, null, 'oops', 7]) {
+        const calls = [];
+        const services = createMockServices();
+        const sys = services._getSystemsMutable().find((s) => s.id === 'sys1');
+        sys.checkModifiers = [{ id: 'med', label: 'Medicine', expression: '@med' }];
+        const origManager = services.getCraftingSystemManager();
+        services.getCraftingSystemManager = () => ({
+          ...origManager,
+          updateSystem: async (id, next) => {
+            calls.push(next);
+            await origManager.updateSystem(id, next);
+          },
+        });
+        const store = createAdminStore(services);
+        await store.selectSystem('sys1');
+
+        await store.saveSystemCheckModifiers(junk);
+
+        assert.deepEqual(
+          calls,
+          [],
+          `${JSON.stringify(junk)} is not a catalogue, so nothing is persisted at all`
+        );
+        await store.refresh();
+        assert.deepEqual(
+          get(store.viewState).selectedSystem.checkModifiers.map((entry) => entry.id),
+          ['med'],
+          'and the authored catalogue is still there'
+        );
+      }
+    });
+
+    // The empty-`update` early return. Without it a patch asking for NEITHER half still calls
+    // `updateSystem({})`, which re-normalizes and re-persists the whole system and then
+    // re-projects it through `refresh()` — a write, a settings round trip and a store churn
+    // for a request that named nothing. Deleting the guard was green.
+    it('writes NOTHING for a patch that carries neither the catalogue nor a selection', async () => {
+      const calls = [];
+      const services = createMockServices();
+      const origManager = services.getCraftingSystemManager();
+      services.getCraftingSystemManager = () => ({
+        ...origManager,
+        updateSystem: async (id, next) => {
+          calls.push(next);
+          await origManager.updateSystem(id, next);
+        },
+      });
+      const store = createAdminStore(services);
+      await store.selectSystem('sys1');
+
+      await store.saveCraftingCheckModifiers({});
+      await store.saveSalvageCheckModifiers({});
+      await store.saveGatheringCheckModifiers({});
+
+      assert.deepEqual(calls, [], 'an empty patch is a no-op, not a full-system rewrite');
+    });
+
     // A `maxModifierPicks: null` is a real VALUE in that patch, not an omission (issue
     // 1055): absence means UNLIMITED, so clearing the field has to be able to overwrite a
     // stored bound. A patch that dropped the null key would leave the old cap in place

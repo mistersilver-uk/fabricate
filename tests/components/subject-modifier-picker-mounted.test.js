@@ -109,6 +109,21 @@ describe('SubjectModifierPicker (mounted)', () => {
       !text.includes('ghost'),
       'an id naming nothing in the catalogue is dropped, exactly as the resolver drops it'
     );
+    // JOINED BY `formatList`, never by hand. The separator, the conjunction and the Oxford
+    // comma are all LANGUAGE rules, and `items.join(', ')` gets them wrong in English before
+    // it gets them wrong anywhere else: the recipe surface renders "Medicine and Herbalism"
+    // for this same set, so a hand-joined list here made one rule read two ways across three
+    // subjects. The oracle is `Intl.ListFormat` because that is what `formatList` degrades to
+    // with no Foundry i18n present, and in every English locale it differs from the naive
+    // comma join — which is what makes this assertion fail on the mutation.
+    const joined = new Intl.ListFormat(undefined, {
+      style: 'long',
+      type: 'conjunction',
+    }).format(['Medicine', 'Herbalism']);
+    assert.ok(
+      text.includes(joined),
+      `the inherited entries are joined by the active language's list conventions (${joined})`
+    );
     assert.ok(
       !target.querySelector('[data-modifier-pill-select]'),
       'and there is no pill row to author, because nothing here is authored'
@@ -204,6 +219,44 @@ describe('SubjectModifierPicker (mounted)', () => {
       full.querySelector('[data-modifier-pill-menu-button]').getAttribute('aria-disabled'),
       'true',
       'and the add button is disabled AT the cap, not one past it'
+    );
+  });
+
+  // THE CAP SENTENCE CARRIES A NUMBER, and the FALLBACK has to substitute it.
+  //
+  // The cap copy is the one string on this surface with an interpolation placeholder, so it is
+  // the one whose fallback cannot simply be the authored English: returning `copy.cap` verbatim
+  // renders a literal `{count}` and the suite was green on that. The build that reads the
+  // fallback is a real one — an unlocalized world, where `localize` finds no `game.i18n` and
+  // hands the key straight back — so `game` is unset here to put the component on exactly that
+  // path. (The harness's `i18n.format` stub returns a `key:{…}` marker rather than interpolating,
+  // so leaving it installed would assert against harness noise instead of the component.)
+  it('interpolates the cap COUNT rather than printing a raw placeholder', async () => {
+    const game = globalThis.game;
+    globalThis.game = undefined;
+    try {
+      const { target } = await mount({ selectedIds: ['med'], maxPicks: 3 });
+      const hint = target.querySelector('[data-subject-modifier-cap]').textContent;
+      assert.match(hint, /\b3\b/, 'the bound the GM is being told about is a number on the screen');
+      assert.ok(
+        !hint.includes('{'),
+        'and never a raw interpolation placeholder — the fallback substitutes the count itself'
+      );
+    } finally {
+      globalThis.game = game;
+    }
+  });
+
+  // A cap of ONE is the commonest bounded value there is (it is what `playerPicks` always meant,
+  // and what `migrateMaxModifierPicks` stamps onto every upgraded system on that rule), so the
+  // plural sentence would be the reading most GMs met.
+  it('states a cap of exactly ONE in the singular', async () => {
+    const { target } = await mount({ selectedIds: [], maxPicks: 1 });
+    const hint = target.querySelector('[data-subject-modifier-cap]').textContent.trim();
+    assert.match(hint, /pick one check modifier/i, 'a cap of 1 gets its own sentence');
+    assert.ok(
+      !/check modifiers/i.test(hint),
+      '"pick up to 1 check modifiers" is the reading this branch exists to prevent'
     );
   });
 

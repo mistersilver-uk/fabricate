@@ -154,6 +154,28 @@ test('1.21.0 counts an INERT active check — the formulas whose modifiers go li
   assert.equal(counts.inert, 1, 'an authored, placeholder-free active formula with a catalogue');
 });
 
+// THE LADDER IS RE-RUNNABLE, AND `1.22.0` MOVED THE CATALOGUE. This migration is `1.21.0`, so on a
+// FIRST pass the catalogue still sits at `craftingCheck.checkModifiers` — but a world already past
+// `1.22.0` has it at `system.checkModifiers` and NOTHING at the legacy key, and the runner will
+// walk this entry again. The `?? system.checkModifiers` fallback is what reads it there; without
+// it, the unconditional spread writes `checkModifiers: undefined` OVER the system-level one and
+// the count silently reports 0 for a world full of eligible modifiers. Reverting it left the suite
+// green, because every other case in this file authors the legacy location.
+test('1.21.0 reads the catalogue at its POST-1.22.0 system-level location too', () => {
+  const counts = applyRetireCraftingModToken({
+    id: 'sys-1',
+    name: 'Herbalism',
+    resolutionMode: 'simple',
+    checkModifiers: CATALOGUE,
+    craftingCheck: { defaultModifierIds: ['med'], simple: { rollFormula: '1d20 + 4' } },
+  });
+  assert.equal(
+    counts.inert,
+    1,
+    'the eligible set resolves from the system key when the legacy one is gone'
+  );
+});
+
 test('1.21.0 counts NO inert formula when the system has no catalogue to contribute', () => {
   const counts = applyRetireCraftingModToken(
     system({ craftingCheck: { simple: { rollFormula: '1d20 + 4' } } })

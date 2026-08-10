@@ -8630,14 +8630,35 @@ export function createAdminStore(services) {
   // re-defaults (silent data loss). The catalogue is a TOP-LEVEL array, so it replaces
   // wholesale and removing an entry persists without any `-=` deletion.
   //
-  // BOTH PRESENCE TESTS BELOW ARE KEY TESTS, NEVER TRUTHINESS, and they guard different
-  // halves. `Object.hasOwn(patch, 'checkModifiers')` is the CATALOGUE half: the card emits
-  // `{checkModifiers: []}` when the GM deletes the last entry, and a truthiness test would
-  // read that empty array as "no catalogue in this patch" and silently keep the deleted
-  // entries. `Object.keys(selection).length > 0` is the SELECTION half, and it is what
-  // carries a `maxModifierPicks: null` through: absence means UNLIMITED, so clearing the cap
-  // has to be able to overwrite a stored bound, and a `null` value with its key present is
-  // exactly the patch that does it.
+  // THE CATALOGUE HALF IS A KEY TEST **PLUS A VALUE GUARD**, and the reason is not the one
+  // an earlier draft of this comment gave. That draft claimed a truthiness test would read
+  // the card's delete-the-last-entry patch (`{checkModifiers: []}`) as "no catalogue here":
+  // that is simply WRONG on the JavaScript, because `[]` is truthy, and `if (checkModifiers)`
+  // takes the same branch on the same input. The key test and a truthiness test are
+  // UNDISCRIMINATED by construction over every patch this card emits, and no test can
+  // separate them — swapping one for the other leaves the whole suite green.
+  //
+  // `Object.hasOwn` is still the right DEFAULT for a patch-shaped API: presence of the key
+  // is what "this patch is about the catalogue" means, and a falsy-but-authored value
+  // (a future `0`-length sentinel, say) would be a value decision, not an absence.
+  //
+  // What DOES need guarding is the value, and only the key test makes that guard reachable.
+  // `saveSystemCheckModifiers` is exported with no in-repo caller, so `undefined` and `null`
+  // are reachable from the public surface — and either one written through `updateSystem`
+  // hits `_normalizeCheckModifierCatalogue`, whose `Array.isArray(catalogue) ? … : []`
+  // returns an EMPTY catalogue. That silently wipes every entry in the system, for all
+  // three activities at once, on a call that looks like a no-op. A non-array is therefore
+  // not written at all: refusing to persist a value this store cannot read is the same call
+  // `migrateSystemCheckModifierCatalogue` makes about a malformed legacy catalogue.
+  //
+  // `Object.keys(selection).length > 0` is the SELECTION half, and it is what carries a
+  // `maxModifierPicks: null` through: absence means UNLIMITED, so clearing the cap has to be
+  // able to overwrite a stored bound, and a `null` value with its key present is exactly the
+  // patch that does it.
+  //
+  // The empty-`update` early return is what makes a patch of NEITHER half a no-op rather
+  // than a write: without it, `updateSystem(sysId, {})` re-normalizes and re-persists the
+  // whole system — and `refresh()` re-projects it — for a patch that asked for nothing.
   async function saveCheckModifiers(activity, patch = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
@@ -8646,7 +8667,9 @@ export function createAdminStore(services) {
     if (!system) return;
     const { checkModifiers, ...selection } = patch;
     const update = {};
-    if (Object.hasOwn(patch, 'checkModifiers')) update.checkModifiers = checkModifiers;
+    if (Object.hasOwn(patch, 'checkModifiers') && Array.isArray(checkModifiers)) {
+      update.checkModifiers = checkModifiers;
+    }
     const activityKey = CHECK_MODIFIER_ACTIVITY_KEYS[activity];
     if (activityKey && Object.keys(selection).length > 0) {
       update[activityKey] = { ...(system[activityKey] || {}), ...selection };
