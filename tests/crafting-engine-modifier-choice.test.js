@@ -47,7 +47,7 @@ const context = (overrides = {}) => ({
   catalogue: CATALOGUE,
   systemPolicy: 'playerPicks',
   defaultModifierIds: ['med', 'herb'],
-  recipeModifier: null,
+  subjectModifierIds: null,
   ...overrides,
 });
 
@@ -57,30 +57,30 @@ test('engine gating: a non-interactive craft threads no modifierChoice', () => {
   });
 });
 
-// `playerPicks` is the ONLY rule that defers to ROLL time. `byRecipe` defers too, but to
+// `playerPicks` is the ONLY rule that defers to ROLL time. `bySubject` defers too, but to
 // the RECIPE AUTHOR at recipe-edit time — by the time the engine rolls, the choice is
 // already made and stored, so prompting would re-ask a question the recipe answered.
 // That is why the gate tests for `playerPicks` specifically rather than for
 // `policyDefersSelection`.
 test('engine gating: an interactive non-playerPicks rule threads no modifierChoice', () => {
   withRoll({ med: 2, herb: 5 }, () => {
-    for (const systemPolicy of ['addAll', 'highest', 'byRecipe']) {
+    for (const systemPolicy of ['addAll', 'highest', 'bySubject']) {
       assert.equal(
         build('1d20', context({ systemPolicy }), true),
         null,
         systemPolicy
       );
     }
-    // …including `byRecipe` with a real recipe pick in hand: the selection is stored, so
+    // …including `bySubject` with a real recipe pick in hand: the selection is stored, so
     // there is still nothing to prompt for.
     assert.equal(
       build(
         '1d20',
-        context({ systemPolicy: 'byRecipe', recipeModifier: { modifierIds: ['med', 'herb'] } }),
+        context({ systemPolicy: 'bySubject', subjectModifierIds: ['med', 'herb'] }),
         true
       ),
       null,
-      'byRecipe defers to the recipe author, not to the player'
+      'bySubject defers to the recipe author, not to the player'
     );
   });
 });
@@ -203,11 +203,11 @@ test('engine gating: fewer than two eligible modifiers threads no modifierChoice
 // further down.
 test('engine gating: a stored recipe policy can neither add nor remove the descriptor', () => {
   withRoll({ med: 2, herb: 5 }, () => {
-    for (const stale of ['playerPicks', 'byRecipe', 'highest', 'addAll']) {
+    for (const stale of ['playerPicks', 'bySubject', 'highest', 'addAll']) {
       assert.equal(
         build(
           '1d20',
-          context({ systemPolicy: 'addAll', recipeModifier: { policy: stale } }),
+          context({ systemPolicy: 'addAll', subjectPolicy: stale }),
           true
         ),
         null,
@@ -216,7 +216,7 @@ test('engine gating: a stored recipe policy can neither add nor remove the descr
       assert.ok(
         build(
           '1d20',
-          context({ systemPolicy: 'playerPicks', recipeModifier: { policy: stale } }),
+          context({ systemPolicy: 'playerPicks', subjectPolicy: stale }),
           true
         ),
         `…and cannot opt a playerPicks system out of one either (${stale})`
@@ -249,9 +249,11 @@ const PICK_RECIPE = { name: 'Healing Salve', craftingSystemId: 'sys-1' };
 
 /** A crafting system whose modifier catalogue is `playerPicks` over both entries. */
 function modifierSystem(checkSlot) {
+  // The catalogue is SYSTEM-level since issue 1095; only the selection triple stays on
+  // `craftingCheck`, and `buildCheckModifierContext` reads the two from those two places.
   return {
+    checkModifiers: PICK_CATALOGUE,
     craftingCheck: {
-      checkModifiers: PICK_CATALOGUE,
       defaultModifierPolicy: 'playerPicks',
       defaultModifierIds: ['med', 'herb'],
       ...checkSlot,
@@ -333,10 +335,10 @@ test('engine craft: dismissing the playerPicks prompt cancels with zero Item mut
   const system = {
     resolutionMode: 'simple',
     features: { craftingChecks: true },
+    checkModifiers: PICK_CATALOGUE,
     craftingCheck: {
       enabled: true,
       simple: { rollFormula: PICK_FORMULA, dc: 10, thresholdMode: 'meet' },
-      checkModifiers: PICK_CATALOGUE,
       defaultModifierPolicy: 'playerPicks',
       defaultModifierIds: ['med', 'herb'],
     },
@@ -462,13 +464,12 @@ const RULE_SLOT = { simple: { rollFormula: PICK_FORMULA, dc: 10, thresholdMode: 
  */
 function ruleSystem({ policy, defaultIds = ['med', 'herb'], maxPicks } = {}) {
   const craftingCheck = {
-    checkModifiers: PICK_CATALOGUE,
     defaultModifierPolicy: policy,
     defaultModifierIds: defaultIds,
     ...RULE_SLOT,
   };
   if (maxPicks !== undefined) craftingCheck.maxModifierPicks = maxPicks;
-  return { resolutionMode: 'simple', craftingCheck };
+  return { resolutionMode: 'simple', checkModifiers: PICK_CATALOGUE, craftingCheck };
 }
 
 /** A REAL recipe, so `Recipe._normalizeCraftingModifier` is on the path. */
@@ -502,7 +503,7 @@ function assertRolled({ rolled, resolved }, expected, message) {
 
 test('engine rules: the SYSTEM rule decides the arithmetic, whatever a recipe stored', async () => {
   // A recipe carrying a legacy rule alongside a pick. The pick is honoured under
-  // `byRecipe` and ignored elsewhere; the RULE is ignored everywhere.
+  // `bySubject` and ignored elsewhere; the RULE is ignored everywhere.
   const recipe = modifierRecipe({ policy: 'addAll', modifierIds: ['med'] }, 'r-rule');
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'highest' }), recipe),
@@ -512,12 +513,12 @@ test('engine rules: the SYSTEM rule decides the arithmetic, whatever a recipe st
   assertRolled(
     await rollThrough(ruleSystem({ policy: 'addAll' }), recipe),
     '1d20 + 7[Modifiers]',
-    'addAll sums the SYSTEM default set — the stored {med} pick is not a byRecipe pick'
+    'addAll sums the SYSTEM default set — the stored {med} pick is not a bySubject pick'
   );
 });
 
-test('engine rules: byRecipe rolls the recipe author’s pick', async () => {
-  const system = ruleSystem({ policy: 'byRecipe' });
+test('engine rules: bySubject rolls the recipe author’s pick', async () => {
+  const system = ruleSystem({ policy: 'bySubject' });
   assertRolled(
     await rollThrough(system, modifierRecipe({ modifierIds: ['med'] }, 'r-pick')),
     '1d20 + 2[Modifiers]',
@@ -526,7 +527,7 @@ test('engine rules: byRecipe rolls the recipe author’s pick', async () => {
   assertRolled(
     await rollThrough(system, modifierRecipe({ modifierIds: ['med', 'herb'] }, 'r-both')),
     '1d20 + 7[Modifiers]',
-    'two picks SUM — byRecipe is a sum over what was picked'
+    'two picks SUM — bySubject is a sum over what was picked'
   );
   assertRolled(
     await rollThrough(system, modifierRecipe(null, 'r-none')),
@@ -538,21 +539,21 @@ test('engine rules: byRecipe rolls the recipe author’s pick', async () => {
 // The cap is enforced at the RESOLVER, not only at the picker, so a GM who lowers it
 // below what a recipe already picked cannot leave that recipe rolling more than the
 // system now permits.
-test('engine rules: a lowered cap TRUNCATES a byRecipe pick already on disk', async () => {
+test('engine rules: a lowered cap TRUNCATES a bySubject pick already on disk', async () => {
   const recipe = modifierRecipe({ modifierIds: ['med', 'herb'] }, 'r-capped');
   assertRolled(
-    await rollThrough(ruleSystem({ policy: 'byRecipe' }), recipe),
+    await rollThrough(ruleSystem({ policy: 'bySubject' }), recipe),
     '1d20 + 7[Modifiers]',
     'unbounded, both picks reach the roll'
   );
   assertRolled(
-    await rollThrough(ruleSystem({ policy: 'byRecipe', maxPicks: 1 }), recipe),
+    await rollThrough(ruleSystem({ policy: 'bySubject', maxPicks: 1 }), recipe),
     '1d20 + 2[Modifiers]',
     'a cap of 1 keeps the FIRST pick in authored order (Medicine 2), never the best one'
   );
 });
 
-test('engine rules: an AUTHORED EMPTY pick appends nothing under byRecipe', async () => {
+test('engine rules: an AUTHORED EMPTY pick appends nothing under bySubject', async () => {
   // Built through the MODEL, never as a literal: the preservation of the empty array is
   // `Recipe._normalizeCraftingModifier`'s job, and a bare literal would bypass it and
   // prove nothing about the shape that actually persists.
@@ -563,7 +564,7 @@ test('engine rules: an AUTHORED EMPTY pick appends nothing under byRecipe', asyn
     'the model preserved the authored empty array rather than dropping the key'
   );
   assertRolled(
-    await rollThrough(ruleSystem({ policy: 'byRecipe' }), recipe),
+    await rollThrough(ruleSystem({ policy: 'bySubject' }), recipe),
     '1d20',
     'no modifier is eligible, so the placeholder reduces to 0 — not to the system default'
   );
@@ -694,10 +695,10 @@ test('engine rules: a one-modifier eligible set collapses a playerPicks system',
 });
 
 test('engine rules: the listing DISPLAYS exactly what the engine rolls (parity)', async () => {
-  // The fixture is chosen so the two context builders can DISAGREE: `byRecipe` with a
+  // The fixture is chosen so the two context builders can DISAGREE: `bySubject` with a
   // capped recipe pick reads the recipe set, the cap and the rule. Under `addAll` both
   // sides would read the system default set and the parity would hold vacuously.
-  const system = ruleSystem({ policy: 'byRecipe', maxPicks: 1 });
+  const system = ruleSystem({ policy: 'bySubject', maxPicks: 1 });
   const recipe = modifierRecipe({ modifierIds: ['med', 'herb'] }, 'r-parity');
   const engineRoll = await rollThrough(system, recipe);
   assert.equal(

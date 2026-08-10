@@ -7110,11 +7110,22 @@
             craftingCheckSimple={checkSimpleDraft}
             craftingCheckProgressive={checkProgressiveDraft}
             craftingConsumption={selectedSystem?.craftingCheck?.consumption || null}
-            craftingCheckModifiers={selectedSystem?.craftingCheck?.checkModifiers || []}
+            checkModifiers={selectedSystem?.checkModifiers || []}
             craftingDefaultModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy ||
               'addAll'}
             craftingDefaultModifierIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
             craftingMaxModifierPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}
+            salvageDefaultModifierPolicy={selectedSystem?.salvageCraftingCheck
+              ?.defaultModifierPolicy || 'addAll'}
+            salvageDefaultModifierIds={selectedSystem?.salvageCraftingCheck?.defaultModifierIds ||
+              []}
+            salvageMaxModifierPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
+            gatheringDefaultModifierPolicy={selectedSystem?.gatheringCraftingCheck
+              ?.defaultModifierPolicy || 'addAll'}
+            gatheringDefaultModifierIds={selectedSystem?.gatheringCraftingCheck
+              ?.defaultModifierIds || []}
+            gatheringMaxModifierPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ??
+              null}
             alchemyLearnOnCraft={selectedSystem?.alchemy?.learnOnCraft === true}
             alchemyConsumeOnFail={selectedSystem?.alchemy?.consumeOnFail !== false}
             alchemyShowAttemptHistory={selectedSystem?.alchemy?.showAttemptHistoryToPlayers !==
@@ -7140,6 +7151,8 @@
             onSetAlchemyCheckMode={(m) => store.setAlchemyCheckMode?.(m)}
             onUpdateCraftingConsumption={(patch) => store.saveCraftingCheckConsumption?.(patch)}
             onUpdateCraftingCheckModifiers={(patch) => store.saveCraftingCheckModifiers?.(patch)}
+            onUpdateSalvageCheckModifiers={(patch) => store.saveSalvageCheckModifiers?.(patch)}
+            onUpdateGatheringCheckModifiers={(patch) => store.saveGatheringCheckModifiers?.(patch)}
             {onUpdateAlchemyFlags}
             onTabChange={(tab) => {
               checksActiveTab = tab;
@@ -7162,6 +7175,10 @@
         selectedDropId={selectedGatheringDrop?.id || selectedGatheringDropId}
         rewardRules={selectedGatheringRules}
         characterModifierLibrary={selectedGatheringCharacterModifiers}
+        checkModifierOptions={selectedSystem?.checkModifiers || []}
+        gatheringModifierPolicy={selectedSystem?.gatheringCraftingCheck?.defaultModifierPolicy ||
+          'addAll'}
+        gatheringModifierMaxPicks={selectedSystem?.gatheringCraftingCheck?.maxModifierPicks ?? null}
         libraryTools={selectedGatheringSystemTools}
         environmentOptions={selectedSystemEnvironmentOptions}
         onPickImagePath={services?.pickImagePath}
@@ -7295,6 +7312,10 @@
           {salvageOutcomeNames}
           {salvageCheckEnabled}
           {salvageCheckTiers}
+          checkModifierOptions={selectedSystem?.checkModifiers || []}
+          salvageModifierPolicy={selectedSystem?.salvageCraftingCheck?.defaultModifierPolicy ||
+            'addAll'}
+          salvageModifierMaxPicks={selectedSystem?.salvageCraftingCheck?.maxModifierPicks ?? null}
           {salvageCheckDcMode}
           {salvageCheckDc}
           componentOptions={salvageComponentOptions}
@@ -7367,7 +7388,7 @@
         itemTags={selectedSystem?.itemTags || []}
         checkTierOptions={recipeCheckTierOptions}
         minSuccessTierOptions={recipeMinSuccessTierOptions}
-        craftingModifierOptions={selectedSystem?.craftingCheck?.checkModifiers || []}
+        craftingModifierOptions={selectedSystem?.checkModifiers || []}
         craftingModifierPolicy={selectedSystem?.craftingCheck?.defaultModifierPolicy || 'addAll'}
         craftingModifierDefaultIds={selectedSystem?.craftingCheck?.defaultModifierIds || []}
         craftingModifierMaxPicks={selectedSystem?.craftingCheck?.maxModifierPicks ?? null}

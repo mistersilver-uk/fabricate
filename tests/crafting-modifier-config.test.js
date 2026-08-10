@@ -1,5 +1,5 @@
-// Normalizer tests for the crafting check-modifier catalogue (system) and the
-// per-recipe `craftingModifier` override (Recipe model) — issue 770.
+// Normalizer tests for the SYSTEM-level check-modifier catalogue, the per-activity
+// selection triple over it, and the per-subject picks — issues 770, 1055, 1095.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -21,45 +21,147 @@ function makeManager() {
 
 // ── system catalogue normalizer ──────────────────────────────────────────────
 
-test('_normalizeCraftingCheck defaults an absent catalogue to empty + addAll (back-compat)', () => {
+// The catalogue is a SYSTEM field since issue 1095 — `_normalizeCraftingCheck` no longer
+// emits it at all, which is exactly what makes the `1.22.0` migration's ordering
+// load-bearing: a save that ran before the move would have DELETED it.
+test('_normalizeCraftingCheck no longer emits a catalogue at all', () => {
+  const result = makeManager()._normalizeCraftingCheck({
+    checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
+  });
+  assert.equal(
+    Object.hasOwn(result, 'checkModifiers'),
+    false,
+    'the catalogue moved UP to the system; a check block that still carried one would be a ' +
+      'second location for the same data'
+  );
+});
+
+test('_normalizeCraftingCheck defaults an absent selection to addAll + no ids (back-compat)', () => {
   const result = makeManager()._normalizeCraftingCheck({});
-  assert.deepEqual(result.checkModifiers, []);
   assert.equal(result.defaultModifierPolicy, 'addAll');
   assert.deepEqual(result.defaultModifierIds, []);
 });
 
-test('_normalizeCraftingCheck normalizes catalogue entries, dropping malformed ones', () => {
-  const result = makeManager()._normalizeCraftingCheck({
-    checkModifiers: [
-      { id: 'med', label: 'Medicine', expression: '  @abilities.med.mod  ', icon: 'fas fa-staff' },
-      { id: '', label: 'no id', expression: '@x' },
-      { label: 'missing id', expression: '@y' },
-      { id: 'med', label: 'dup id', expression: '@dup' },
-      { id: 'bad', label: 3, expression: 42 },
-      'not an object',
-    ],
-  });
-  assert.deepEqual(result.checkModifiers, [
+test('_normalizeCheckModifierCatalogue normalizes entries, dropping malformed ones', () => {
+  const result = makeManager()._normalizeCheckModifierCatalogue([
+    { id: 'med', label: 'Medicine', expression: '  @abilities.med.mod  ', icon: 'fas fa-staff' },
+    { id: '', label: 'no id', expression: '@x' },
+    { label: 'missing id', expression: '@y' },
+    { id: 'med', label: 'dup id', expression: '@dup' },
+    { id: 'bad', label: 3, expression: 42 },
+    'not an object',
+  ]);
+  assert.deepEqual(result, [
     { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', icon: 'fas fa-staff' },
     { id: 'bad', label: '', expression: '' },
   ]);
 });
 
-test('_normalizeCraftingCheck keeps only known policies + catalogue-valid default ids', () => {
-  const result = makeManager()._normalizeCraftingCheck({
+// PER-ENTRY BOUNDS (issue 1095), absence-preserving in exactly the way `maxModifierPicks`
+// is: only a FINITE number is attached, so every unbounded FORM normalizes to the same
+// key-absent shape. `0` is a real bound and survives — which is why the guard cannot be
+// truthiness.
+test('_normalizeCheckModifierCatalogue attaches min/max only when authored', () => {
+  const [bounded, floored, capped, zeroed] = makeManager()._normalizeCheckModifierCatalogue([
+    { id: 'a', label: 'A', expression: '@a', min: -1, max: 5 },
+    { id: 'b', label: 'B', expression: '@b', min: 2 },
+    { id: 'c', label: 'C', expression: '@c', max: 3 },
+    { id: 'd', label: 'D', expression: '@d', min: 0, max: 0 },
+  ]);
+  assert.deepEqual(bounded, { id: 'a', label: 'A', expression: '@a', min: -1, max: 5 });
+  assert.equal(floored.min, 2);
+  assert.equal(Object.hasOwn(floored, 'max'), false, 'an unauthored max stays absent');
+  assert.equal(capped.max, 3);
+  assert.equal(Object.hasOwn(capped, 'min'), false, 'an unauthored min stays absent');
+  assert.deepEqual(
+    zeroed,
+    { id: 'd', label: 'D', expression: '@d', min: 0, max: 0 },
+    'ZERO is a real bound: a truthiness guard would drop it and silently unbound the entry'
+  );
+
+  for (const junk of [null, undefined, '', NaN, Infinity, -Infinity, 'three', {}, []]) {
+    const [entry] = makeManager()._normalizeCheckModifierCatalogue([
+      { id: 'j', label: 'J', expression: '@j', min: junk, max: junk },
+    ]);
+    assert.deepEqual(
+      entry,
+      { id: 'j', label: 'J', expression: '@j' },
+      `${String(junk)} is not a bound, so BOTH keys stay absent`
+    );
+  }
+});
+
+// An inverted pair is PRESERVED VERBATIM rather than repaired. It is a blocking readiness
+// issue the GM must fix; silently swapping the two would roll a number nobody authored.
+test('_normalizeCheckModifierCatalogue preserves an inverted min/max rather than reordering it', () => {
+  const [entry] = makeManager()._normalizeCheckModifierCatalogue([
+    { id: 'a', label: 'A', expression: '@a', min: 5, max: -1 },
+  ]);
+  assert.equal(entry.min, 5);
+  assert.equal(entry.max, -1);
+});
+
+test('the selection keeps only known policies + catalogue-valid default ids', () => {
+  const system = makeManager()._normalizeSystem({
+    id: 's',
+    name: 'S',
     checkModifiers: [
       { id: 'med', label: 'Medicine', expression: '@med' },
       { id: 'alch', label: 'Alchemy', expression: '@alch' },
     ],
-    defaultModifierPolicy: 'highest',
-    defaultModifierIds: ['med', 'ghost', 'alch', 'med'],
+    craftingCheck: {
+      defaultModifierPolicy: 'highest',
+      defaultModifierIds: ['med', 'ghost', 'alch', 'med'],
+    },
   });
-  assert.equal(result.defaultModifierPolicy, 'highest');
-  assert.deepEqual(result.defaultModifierIds, ['med', 'alch'], 'unknown + duplicate dropped');
+  assert.equal(system.craftingCheck.defaultModifierPolicy, 'highest');
+  assert.deepEqual(
+    system.craftingCheck.defaultModifierIds,
+    ['med', 'alch'],
+    'unknown + duplicate dropped'
+  );
+});
+
+// ONE derivation, three activities (issue 1095). Each of these normalizers is an allowlist
+// rebuild, so a key emitted by one and not another is dropped on the next save of that
+// activity — silently, and in one direction only.
+test('all THREE activity checks emit the same selection triple over the system catalogue', () => {
+  const system = makeManager()._normalizeSystem({
+    id: 's',
+    name: 'S',
+    checkModifiers: [
+      { id: 'med', label: 'Medicine', expression: '@med' },
+      { id: 'alch', label: 'Alchemy', expression: '@alch' },
+    ],
+    craftingCheck: { defaultModifierPolicy: 'bySubject', defaultModifierIds: ['med'] },
+    salvageCraftingCheck: {
+      defaultModifierPolicy: 'highest',
+      defaultModifierIds: ['alch', 'ghost'],
+      maxModifierPicks: 2,
+    },
+    gatheringCraftingCheck: {
+      defaultModifierPolicy: 'playerPicks',
+      defaultModifierIds: ['med', 'alch'],
+    },
+  });
+  assert.equal(system.craftingCheck.defaultModifierPolicy, 'bySubject');
+  assert.deepEqual(system.craftingCheck.defaultModifierIds, ['med']);
+  assert.equal(system.salvageCraftingCheck.defaultModifierPolicy, 'highest');
+  assert.deepEqual(
+    system.salvageCraftingCheck.defaultModifierIds,
+    ['alch'],
+    'a salvage default naming nothing in the SYSTEM catalogue is dropped'
+  );
+  assert.equal(system.salvageCraftingCheck.maxModifierPicks, 2);
+  assert.equal(system.gatheringCraftingCheck.defaultModifierPolicy, 'playerPicks');
+  assert.deepEqual(system.gatheringCraftingCheck.defaultModifierIds, ['med', 'alch']);
+  // Absence is preserved on every activity, not only on crafting.
+  assert.equal(Object.hasOwn(system.craftingCheck, 'maxModifierPicks'), false);
+  assert.equal(Object.hasOwn(system.gatheringCraftingCheck, 'maxModifierPicks'), false);
 });
 
 test('_normalizeCraftingCheck accepts every one of the four combination rules', () => {
-  for (const defaultModifierPolicy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+  for (const defaultModifierPolicy of ['addAll', 'highest', 'bySubject', 'playerPicks']) {
     assert.equal(
       makeManager()._normalizeCraftingCheck({ defaultModifierPolicy }).defaultModifierPolicy,
       defaultModifierPolicy,
@@ -100,21 +202,50 @@ test('the modifier card fallbacks match lang/en.json exactly', () => {
     }
   };
 
+  // The INLINE option table: three rules whose copy is activity-independent. The fourth,
+  // `bySubject`, reads its label and description out of `SUBJECT_COPY`, because they change
+  // per activity ("By recipe" / "By component" / "By gathering row") — so it is mirrored by
+  // the per-activity block below instead.
   assertMirrored(
     [
       ...source.matchAll(
         /(?:labelKey|descKey):\s*'([^']+)',\s*\w*[Ff]allback:\s*'((?:[^'\\]|\\.)*)'/g
       ),
     ],
-    8,
-    'label + description pairs across the four combination rules'
+    6,
+    'label + description pairs across the three activity-independent combination rules'
   );
+  // SUBJECT_COPY: FOUR key/literal pairs per activity, on THREE activities (issue 1095) —
+  // the per-activity `bySubject` label, its description, its pick-cap hint and its
+  // eligibility intro. Twelve sentences that would otherwise drift one at a time, plus the
+  // three activity-independent eligibility intros that share the `introKey`/`intro` shape.
+  for (const [keyProp, valueProp, expected] of [
+    ['labelKey', 'label', 3],
+    ['descKey', 'desc', 3],
+    ['capKey', 'cap', 3],
+    ['introKey', 'intro', 6],
+  ]) {
+    assertMirrored(
+      [
+        ...source.matchAll(
+          new RegExp(
+            String.raw`\b${keyProp}:\s*'([^']+)',\s*${valueProp}:\s*\n?\s*'((?:[^'\\]|\\.)*)'`,
+            'g'
+          )
+        ),
+      ],
+      expected,
+      `${keyProp}/${valueProp} pairs`
+    );
+  }
   // `\bkey:` cannot match `labelKey:`/`descKey:` (no word boundary after `l`/`c`), so
   // this picks up only the MAX_PICKS_COPY, DEFAULTS_INTRO_COPY and INERT_COPY tables.
   assertMirrored(
-    [...source.matchAll(/\bkey:\s*'([^']+)',\s*fallback:\s*'((?:[^'\\]|\\.)*)'/g)],
-    7,
-    'pick-cap hint, default-set intro and the TWO surviving inert-cause sentences'
+    [...source.matchAll(/\bkey:\s*'([^']+)',\s*(?:label|fallback):\s*'((?:[^'\\]|\\.)*)'/g)],
+    8,
+    'the playerPicks cap hint, the two surviving inert-cause sentences, and the FIVE ' +
+      'eligibility words — four rule states plus not-selected (issue 1095 moved the ' +
+      'per-activity cap hints and intros into SUBJECT_COPY, keyed by `capKey`/`introKey`)'
   );
 });
 
@@ -159,7 +290,7 @@ test('_normalizeCraftingCheck never emits a recipeModifierAuthority, even when h
   for (const check of [
     {},
     { recipeModifierAuthority: 'setOnly' },
-    { defaultModifierPolicy: 'byRecipe' },
+    { defaultModifierPolicy: 'bySubject' },
   ]) {
     assert.equal(
       Object.hasOwn(makeManager()._normalizeCraftingCheck(check), 'recipeModifierAuthority'),
@@ -208,7 +339,7 @@ test('_normalizeCraftingCheck keeps an authored positive-integer cap', () => {
 // The cap is stored SYSTEM-WIDE regardless of the current rule, so flipping between the
 // two selecting rules — or parking on a non-selecting one — does not destroy it.
 test('_normalizeCraftingCheck keeps the cap under every combination rule', () => {
-  for (const defaultModifierPolicy of ['addAll', 'highest', 'byRecipe', 'playerPicks']) {
+  for (const defaultModifierPolicy of ['addAll', 'highest', 'bySubject', 'playerPicks']) {
     assert.equal(
       makeManager()._normalizeCraftingCheck({ defaultModifierPolicy, maxModifierPicks: 2 })
         .maxModifierPicks,
@@ -229,20 +360,25 @@ test('_normalizeSystem preserves cap absence, and an authored cap, through a who
   const bounded = manager._normalizeSystem({
     id: 'sys-2',
     name: 'S',
-    craftingCheck: { defaultModifierPolicy: 'byRecipe', maxModifierPicks: 2 },
+    craftingCheck: { defaultModifierPolicy: 'bySubject', maxModifierPicks: 2 },
   });
   assert.equal(bounded.craftingCheck.maxModifierPicks, 2);
-  assert.equal(bounded.craftingCheck.defaultModifierPolicy, 'byRecipe');
+  assert.equal(bounded.craftingCheck.defaultModifierPolicy, 'bySubject');
 });
 
-test('_normalizeCraftingCheck preserves sibling check fields alongside the catalogue', () => {
-  const result = makeManager()._normalizeCraftingCheck({
-    simple: { rollFormula: '1d20 + @abilities.med.mod', dc: 12 },
-    checkModifiers: [{ id: 'med', label: 'Medicine', expression: '@med' }],
-  });
+test('_normalizeCraftingCheck preserves sibling check fields alongside the selection', () => {
+  const result = makeManager()._normalizeCraftingCheck(
+    {
+      simple: { rollFormula: '1d20 + @abilities.med.mod', dc: 12 },
+      defaultModifierPolicy: 'highest',
+      defaultModifierIds: ['med'],
+    },
+    new Set(['med'])
+  );
   assert.equal(result.simple.rollFormula, '1d20 + @abilities.med.mod');
   assert.equal(result.simple.dc, 12);
-  assert.equal(result.checkModifiers.length, 1);
+  assert.equal(result.defaultModifierPolicy, 'highest');
+  assert.deepEqual(result.defaultModifierIds, ['med']);
 });
 
 // ── recipe pick normalizer ───────────────────────────────────────────────────

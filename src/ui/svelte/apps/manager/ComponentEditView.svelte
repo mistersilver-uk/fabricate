@@ -4,6 +4,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import ToggleCard from './ToggleCard.svelte';
   import Stepper from '../../components/Stepper.svelte';
+  import SubjectModifierPicker from './SubjectModifierPicker.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from './SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
@@ -51,6 +52,15 @@
     salvageCheckTiers = [],
     salvageCheckDcMode = 'static',
     salvageCheckDc = 0,
+    // The SYSTEM's one check-modifier catalogue and the SALVAGE check's selection over it
+    // (issue 1095). The picker below renders only under `bySubject` — the rule that hands
+    // the selection to the component — and only when the catalogue is non-empty, for the
+    // reason the recipe picker states: a control the system will ignore is worse than no
+    // control. `salvageModifierMaxPicks` is `null` and NOT coerced at any call site on the
+    // way here: `resolveMaxModifierPicks` owns what absence means.
+    checkModifierOptions = [],
+    salvageModifierPolicy = 'addAll',
+    salvageModifierMaxPicks = null,
     componentOptions = [],
     saving = false,
     // Progressive difficulty, rehomed out of the deleted right-rail inspector into the
@@ -219,6 +229,14 @@
     const source = salvage && typeof salvage === 'object' ? salvage : {};
     return {
       ...source,
+      // The component's own check-modifier pick (issue 1095). Kept as `null` for ABSENT
+      // rather than `[]`, because an authored empty array is a real pick of zero and a
+      // DIFFERENT roll — `...source` above preserves an authored one, and this only
+      // normalizes the absent case so the dirty-check baseline is comparable (the trap
+      // `allowPlayerResultReorder` documents two fields below).
+      checkModifierIds: Array.isArray(source.checkModifierIds)
+        ? [...source.checkModifierIds]
+        : null,
       dcOverride: source.dcOverride ?? null,
       // Default FALSE, matching `_normalizeSalvage` (issue 676, decision 6). Do NOT
       // copy the `!== false` shape of `allowPlayerResultReorder` below — that would
@@ -292,6 +310,9 @@
       outcomeRouting: salvage.outcomeRouting,
       dcOverride: salvage.dcOverride,
       allowPlayerResultReorder: salvage.allowPlayerResultReorder,
+      // Omit this and the issue-651 bug returns verbatim for the modifier pick: the GM
+      // picks, nothing is ever dirty, Save never enables, and the edit is discarded on exit.
+      checkModifierIds: salvage.checkModifierIds,
     });
   }
 
@@ -357,6 +378,11 @@
         dcOverride: salvageDraft.dcOverride,
         allowPlayerResultReorder: salvageDraft.allowPlayerResultReorder,
       };
+      // ABSENCE IS A VALUE HERE, and the normalizer keys authoredness on `Array.isArray`
+      // at entry — so the key must be DELETED, never written as `null`. Writing `null`
+      // would read as "not an array" and inherit, which is the same roll by accident
+      // rather than by construction; deleting it says so.
+      if (!Array.isArray(salvageDraft.checkModifierIds)) delete updates.salvage.checkModifierIds;
     }
     return updates;
   }
@@ -1617,6 +1643,19 @@
         {/if}
 
         {#if salvageShowChrome && salvageShowDcOverride}
+          <!-- The component's own check-modifier pick (issue 1095). Rendered only under
+               the salvage check's `bySubject` rule — the one rule that hands the selection
+               to this component — and only when the system catalogue is non-empty. -->
+          {#if salvageModifierPolicy === 'bySubject'}
+            <SubjectModifierPicker
+              options={checkModifierOptions}
+              selectedIds={salvageDraft.checkModifierIds}
+              maxPicks={salvageModifierMaxPicks}
+              disabled={saving}
+              testId="salvage-check-modifier"
+              onChange={(next) => setSalvage({ checkModifierIds: next })}
+            />
+          {/if}
           <div class="manager-field" data-salvage-dc-override>
             <span class="manager-component-readonly-label">
               <span

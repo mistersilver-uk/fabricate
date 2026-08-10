@@ -36,6 +36,7 @@ import { migrateRetireCraftingModToken } from './migrateRetireCraftingModToken.j
 import { migrateRetireProgressiveAllowPlayerReorder } from './migrateRetireProgressiveAllowPlayerReorder.js';
 import { migrateSplitRoutedResolutionModes } from './migrateSplitRoutedResolutionModes.js';
 import { migrateStaminaRegenPolicy } from './migrateStaminaRegenPolicy.js';
+import { migrateSystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { migrateToolsToFirstClass } from './migrateToolsToFirstClass.js';
 import { migrateToolsToSystem } from './migrateToolsToSystem.js';
 import { migrateUnifyGatheringRegions } from './migrateUnifyGatheringRegions.js';
@@ -377,6 +378,23 @@ const MIGRATIONS = [
     // Reports the per-system counts through the transient `_retiredCraftingModCounts`
     // field (captured and deleted by the runner below for the GM notice).
     migrate: (data) => migrateRetireCraftingModToken(data),
+  },
+  {
+    version: '1.22.0',
+    label:
+      'Lift the check-modifier catalogue out of craftingCheck up to the system, so ' +
+      'salvage and gathering can select over the same one, and rewrite the byRecipe ' +
+      'combination rule to its activity-independent name bySubject. THE RUNNER ORDER IS ' +
+      'LOAD-BEARING: this runs before any manager load, and _normalizeCraftingCheck is an ' +
+      'allowlist rebuild that no longer emits checkModifiers, so a save running first ' +
+      'would have DELETED the catalogue rather than relocating it',
+    // NOT lossless, and the first entry in this registry that is not. A world downgraded
+    // to 1.21.0 finds its formulas and its selection rules intact, but that build's
+    // `_normalizeCheckModifierConfig` is an allowlist that never saw a SYSTEM-level
+    // `checkModifiers`, so the relocated catalogue is dropped on the first read and every
+    // check modifier stops contributing to every roll. The GM must re-author it.
+    downgradeTo: '1.21.0',
+    migrate: (data) => migrateSystemCheckModifierCatalogue(data),
   },
   // Future migrations added here in version order
 ];

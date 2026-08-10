@@ -15,7 +15,7 @@ import {
   stripRetiredModifierPlaceholder,
 } from '../utils/craftingCheckExpression.js';
 
-import { applyCraftingModifier } from './craftingModifierResolver.js';
+import { appendResolvedCheckModifier } from './checkModifierResolver.js';
 import { appendCheckModifierTerm, CHECK_MODIFIER_TERM_LABEL } from './toolCheckBonus.js';
 
 /**
@@ -160,7 +160,7 @@ function requestedModifierIds(modifierChoice, choice) {
  *   contributed 0 before and contributes nothing now, so a lone unknown id still
  *   reduces to 0).
  * - The survivors are taken in ELIGIBLE-SET order and TRUNCATED to `maxPicks`, matching
- *   how `resolveEligibleModifierIds` bounds a `byRecipe` selection. Ordering by the
+ *   how `resolveEligibleModifierIds` bounds a `bySubject` selection. Ordering by the
  *   descriptor rather than by the returned array makes the outcome independent of the
  *   order the prompt happened to report, and truncating (rather than taking the best N)
  *   keeps an over-large selection from paying MORE than a legal one.
@@ -271,7 +271,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   // (eval == display). A zero scalar — or no modifier context at all — appends nothing.
   const baseFormula = useDeferredChoice
     ? authoredFormula
-    : applyCraftingModifier(authoredFormula, actor, options?.craftingModifier);
+    : appendResolvedCheckModifier(authoredFormula, actor, options?.craftingModifier);
   // Capture the @-resolved formula (e.g. "1d20 + 3") so the dialog and run journal
   // can show the actual modifiers, not the authored `@abilities…` placeholders.
   // Recomputed from the COMBINED formula below when a valid situational bonus is
@@ -456,7 +456,7 @@ export function resolveCheckFormulaDisplay(formula, actor, craftingModifier = nu
   const authored = stripRetiredModifierPlaceholder(String(formula), Roll);
   if (authored.trim() === '') return null;
   const rollData = actor?.getRollData?.() ?? actor?.system ?? {};
-  const substituted = applyCraftingModifier(authored, actor, craftingModifier, Roll);
+  const substituted = appendResolvedCheckModifier(authored, actor, craftingModifier, Roll);
   const display = Roll.replaceFormulaData(substituted, rollData, {
     missing: 'NaN',
     warn: false,

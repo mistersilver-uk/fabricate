@@ -87,7 +87,10 @@ import {
 import {
   normalizeModifierPolicy,
   resolveActiveCraftingCheckFormula,
-} from '../../../systems/craftingModifierResolver.js';
+  resolveActiveGatheringCheckFormula,
+  resolveActiveSalvageCheckFormula,
+} from '../../../systems/checkModifierResolver.js';
+import { authoredCheckModifierIds } from '../../../utils/checkModifierPicks.js';
 import { validateDropRows } from '../../../systems/GatheringEnvironmentStore.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
@@ -1096,6 +1099,16 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
     // so authoring it on a task survives the save (the runtime reads it back to
     // seed per-env pools; canvas tokens snapshot it for per-token depletion).
     ...(normalizeNodeConfig(task.nodes) ? { nodes: normalizeNodeConfig(task.nodes) } : {}),
+    // This task's own check-modifier pick (issue 1095), consulted only under the
+    // `bySubject` combination rule. Attached ONLY when authored: an authored EMPTY array
+    // is a real pick of zero, distinct from an absent one which inherits
+    // `gatheringCraftingCheck.defaultModifierIds`.
+    //
+    // THE MIRROR OF `normalizeLibraryTask` (src/systems/GatheringRichStateService.js).
+    // Both are whitelist rebuilds, so a key emitted there and not here is silently
+    // dropped the moment a task is saved through THIS draft path. The shared
+    // `authoredCheckModifierIds` attach is the same call on both sides.
+    ...authoredCheckModifierIds(task.checkModifierIds),
     // Optional per-task gathering DC override: when set it replaces the
     // system-level gathering check default DC at gather time. null = use default.
     // Guard null/''/undefined explicitly so re-normalizing a null stays null
@@ -2471,10 +2484,16 @@ function _descriptionTextCandidate(value, seen = new Set()) {
  * spends the placeholder" — retired with the placeholder itself: the resolved scalar is
  * appended to whatever the GM authored, so an authored formula always carries it and the
  * state is no longer reachable.
- * @param {ReturnType<typeof resolveActiveCraftingCheckFormula>} formula
+ *
+ * PER-ACTIVITY SINCE ISSUE 1095. This used to be crafting-only, keyed directly on
+ * `resolveActiveCraftingCheckFormula`; salvage and gathering now select over the same
+ * catalogue, so they need the same answer and it must come from ONE derivation. The
+ * argument is whichever of the three `resolveActive*CheckFormula` siblings owns the
+ * activity — all three return the same shape for exactly this reason.
+ * @param {{ slot: string|null, checkUsable: boolean }} formula
  * @returns {'noCheck'|'noFormula'|null}
  */
-function _craftingModifierInertCause(formula) {
+function _checkModifierInertCause(formula) {
   if (formula.slot === null) return 'noCheck';
   if (!formula.checkUsable) return 'noFormula';
   return null;
@@ -2499,14 +2518,63 @@ function _craftingModifierInertCause(formula) {
  * from the last persisted rule and would be the one derivation on this axis capable of
  * disagreeing with the card that reads it.
  *
+ * PER-ACTIVITY SINCE ISSUE 1095. One builder, three call sites, so the salvage and
+ * gathering Modifiers sections can report `noCheck` / `noFormula` at all — before this
+ * they had no inert-cause projection and no way to say that their selection reaches no
+ * roll. The activity picks which `resolveActive*CheckFormula` sibling answers and which
+ * check block the cap is read from.
+ *
+ * GATHERING IS ANSWERED AGAINST `d100` (issue 1095, decision 8), and that is a fact
+ * rather than a shortcut: the gathering resolution mode lives on the gathering ECONOMY
+ * config, which this projection cannot see, and both formula-rolled modes are rendered
+ * `disabled` pending issue 683 — so `d100` is the only mode a GM can select, and
+ * `noCheck` is the true answer for every system today. When 683 ships, the real mode is
+ * threaded in here and this stops being a constant.
+ *
  * @param {object} system The selected crafting system.
+ * @param {'crafting'|'salvage'|'gathering'} activity
  */
-function _buildCraftingModifierRuleView(system) {
+function _buildCheckModifierRuleView(system, activity) {
+  const formula =
+    activity === 'salvage'
+      ? resolveActiveSalvageCheckFormula(system)
+      : activity === 'gathering'
+        ? resolveActiveGatheringCheckFormula(system)
+        : resolveActiveCraftingCheckFormula(system);
+  const check =
+    activity === 'salvage'
+      ? system?.salvageCraftingCheck
+      : activity === 'gathering'
+        ? system?.gatheringCraftingCheck
+        : system?.craftingCheck;
   return {
-    modifierFormulaInertCause: _craftingModifierInertCause(
-      resolveActiveCraftingCheckFormula(system)
-    ),
-    maxModifierPicks: system?.craftingCheck?.maxModifierPicks,
+    modifierFormulaInertCause: _checkModifierInertCause(formula),
+    maxModifierPicks: check?.maxModifierPicks,
+  };
+}
+
+/**
+ * The selection triple every activity check carries over the system catalogue (issue
+ * 1095), projected through ONE derivation so the three cannot drift.
+ *
+ * `defaultModifierPolicy` is normalized through the resolver's own vocabulary rather than
+ * a local copy of it, for the reason the crafting projection already records: a
+ * hand-maintained allowlist here silently rewrote a stored `playerPicks` to `addAll` and
+ * made the rule unselectable (issue 855). It also means a world still carrying the
+ * pre-1095 `byRecipe` projects as `bySubject`, so the radio group selects correctly
+ * before the migration has run.
+ *
+ * @param {object|null|undefined} check The persisted activity check block.
+ * @param {object} system The selected crafting system.
+ * @param {'crafting'|'salvage'|'gathering'} activity
+ */
+function _buildCheckModifierSelectionView(check, system, activity) {
+  return {
+    defaultModifierPolicy: normalizeModifierPolicy(check?.defaultModifierPolicy) ?? 'addAll',
+    defaultModifierIds: Array.isArray(check?.defaultModifierIds)
+      ? [...check.defaultModifierIds]
+      : [],
+    ..._buildCheckModifierRuleView(system, activity),
   };
 }
 
@@ -2634,29 +2702,23 @@ function _buildSelectedSystemViewData(
           (selectedSystem.craftingCheck?.consumption?.breakToolsOnFail ??
             selectedSystem.craftingCheck?.consumption?.consumeCatalystsOnFail) === true,
       },
-      // Per-recipe check-modifier catalogue + default policy (issue 770). This
-      // hand-built projection is an allowlist: a field omitted here is INVISIBLE to
-      // the UI, so the catalogue editor + recipe override control would read empty.
-      checkModifiers: Array.isArray(selectedSystem.craftingCheck?.checkModifiers)
-        ? selectedSystem.craftingCheck.checkModifiers.map((modifier) => _clonePlain(modifier))
-        : [],
-      // Normalized through the resolver's OWN policy vocabulary rather than a local
-      // copy of it: this projection used to inline `['addAll','highest','byRecipe']`,
-      // which silently rewrote a stored `playerPicks` to `addAll` on the way out, so the
-      // GM's radio selection came back as "Add all" and the policy was unselectable
-      // (issue 855). A fifth hand-maintained allowlist is exactly the drift that caused
-      // that, so read the single source of truth instead. Unknown → `addAll`, unchanged.
-      defaultModifierPolicy:
-        normalizeModifierPolicy(selectedSystem.craftingCheck?.defaultModifierPolicy) ?? 'addAll',
-      defaultModifierIds: Array.isArray(selectedSystem.craftingCheck?.defaultModifierIds)
-        ? [...selectedSystem.craftingCheck.defaultModifierIds]
-        : [],
-      // The pick cap and the two derivations both authoring surfaces read (issue 1055).
-      // Spread from a named builder so this allowlist keeps stating what it carries while
-      // the giant literal gains no new branches — see `_buildCraftingModifierRuleView` for
-      // why `maxModifierPicks` is passed through undefaulted.
-      ..._buildCraftingModifierRuleView(selectedSystem),
+      // Crafting's SELECTION over the system catalogue plus the pick cap and the two
+      // derivations both authoring surfaces read (issues 770, 1055, 1095). Spread from a
+      // named builder so this allowlist keeps stating what it carries while the giant
+      // literal gains no new branches — see `_buildCheckModifierRuleView` for why
+      // `maxModifierPicks` is passed through undefaulted. The CATALOGUE itself is no
+      // longer here: it moved to the system level and is projected below.
+      ..._buildCheckModifierSelectionView(selectedSystem.craftingCheck, selectedSystem, 'crafting'),
     },
+    // The ONE system-level check-modifier catalogue (issue 1095). This hand-built
+    // projection is an ALLOWLIST: a field omitted here is INVISIBLE to the UI, however
+    // correctly the normalizer and the write path behave — so without this line the
+    // catalogue editor, all three eligibility pickers and the recipe override control all
+    // read empty. It moved out of `craftingCheck` because salvage and gathering now select
+    // over the same entries.
+    checkModifiers: Array.isArray(selectedSystem.checkModifiers)
+      ? selectedSystem.checkModifiers.map((modifier) => _clonePlain(modifier))
+      : [],
     // Tool-breakage authority (issue 419): surfaced so the Tools page and the
     // check editors can read it back (NOT projected before → invisible to the UI).
     // The engine normalizer defaults unknown/missing to "toolSpecific".
@@ -2679,6 +2741,14 @@ function _buildSelectedSystemViewData(
       progressive: selectedSystem.salvageCraftingCheck?.progressive
         ? _clonePlain(selectedSystem.salvageCraftingCheck.progressive)
         : null,
+      // Salvage's OWN selection over the system catalogue (issue 1095). New: salvage had
+      // no modifier seam at all before this, so none of these three keys existed and the
+      // salvage Modifiers section had nothing to read.
+      ..._buildCheckModifierSelectionView(
+        selectedSystem.salvageCraftingCheck,
+        selectedSystem,
+        'salvage'
+      ),
     },
     // System-level gathering check. The gathering editor reads these back per
     // resolution mode (d100 has no editable config, so only progressive/routed
@@ -2691,6 +2761,15 @@ function _buildSelectedSystemViewData(
       routed: selectedSystem.gatheringCraftingCheck?.routed
         ? _clonePlain(selectedSystem.gatheringCraftingCheck.routed)
         : null,
+      // Gathering's OWN selection over the system catalogue (issue 1095). Its
+      // `modifierFormulaInertCause` reads `noCheck` for every system today, because `d100`
+      // is the only gathering mode a GM can select (decision 8) — the section says so, and
+      // additionally renders the dormancy notice naming issue 683.
+      ..._buildCheckModifierSelectionView(
+        selectedSystem.gatheringCraftingCheck,
+        selectedSystem,
+        'gathering'
+      ),
     },
 
     alchemy:
@@ -8528,28 +8607,57 @@ export function createAdminStore(services) {
     await refresh();
   }
 
-  // Persist the crafting check-modifier catalogue + default policy (issue 770). MUST
-  // spread the existing craftingCheck block: `updateSystem` shallow-merges only the
-  // top level, so a naive `{ craftingCheck: { checkModifiers } }` would drop every
-  // sibling check field (simple/routed/progressive/consumption) which the normalizer
-  // then re-defaults (silent data loss). The whole `checkModifiers`/`defaultModifierIds`
-  // arrays are REPLACED by `game.settings.set` (array replace, not merge), so removing a
-  // catalogue entry persists without any `-=` deletion. Callers pass a partial patch of
-  // { checkModifiers?, defaultModifierPolicy?, defaultModifierIds?, maxModifierPicks? }.
+  // Which system key each activity's check-modifier SELECTION is persisted under. The
+  // catalogue is not in here: it is top-level and shared (issue 1095).
+  const CHECK_MODIFIER_ACTIVITY_KEYS = {
+    crafting: 'craftingCheck',
+    salvage: 'salvageCraftingCheck',
+    gathering: 'gatheringCraftingCheck',
+  };
+
+  // Persist a check-modifier patch for ONE activity (issues 770, 1055, 1095).
+  //
+  // The patch may carry the system-level `checkModifiers` CATALOGUE, the activity's
+  // SELECTION keys (`defaultModifierPolicy`/`defaultModifierIds`/`maxModifierPicks`), or
+  // both — the catalogue card emits whichever the GM just touched. They are split here and
+  // written in ONE `updateSystem` call rather than two: a catalogue delete also drops the
+  // removed id from the default set, and two sequential writes would each re-read the
+  // system, so the second could be built from a pre-first snapshot.
+  //
+  // MUST spread the existing activity check block: `updateSystem` shallow-merges only the
+  // top level, so a naive `{ craftingCheck: { defaultModifierIds } }` would drop every
+  // sibling check field (simple/routed/progressive/consumption) which the normalizer then
+  // re-defaults (silent data loss). The catalogue is a TOP-LEVEL array, so it replaces
+  // wholesale and removing an entry persists without any `-=` deletion.
+  //
   // A `maxModifierPicks: null` is a real value in that patch, not an omission: absence
-  // means UNLIMITED, so clearing the cap has to be able to overwrite a stored bound.
-  async function saveCraftingCheckModifiers(patch = {}) {
+  // means UNLIMITED, so clearing the cap has to be able to overwrite a stored bound. The
+  // presence test is therefore `Object.hasOwn`, never truthiness.
+  async function saveCheckModifiers(activity, patch = {}) {
     const systemManager = services.getCraftingSystemManager();
     const sysId = get(selectedSystemId);
     if (!sysId) return;
     const system = systemManager.getSystem(sysId);
     if (!system) return;
-    const existing = system.craftingCheck || {};
-    await systemManager.updateSystem(sysId, {
-      craftingCheck: { ...existing, ...patch },
-    });
+    const { checkModifiers, ...selection } = patch;
+    const update = {};
+    if (Object.hasOwn(patch, 'checkModifiers')) update.checkModifiers = checkModifiers;
+    const activityKey = CHECK_MODIFIER_ACTIVITY_KEYS[activity];
+    if (activityKey && Object.keys(selection).length > 0) {
+      update[activityKey] = { ...(system[activityKey] || {}), ...selection };
+    }
+    if (Object.keys(update).length === 0) return;
+    await systemManager.updateSystem(sysId, update);
     await refresh();
   }
+
+  // The system-level catalogue on its own — the one write that is not per-activity,
+  // because all three activities select over the same entries.
+  const saveSystemCheckModifiers = (checkModifiers) =>
+    saveCheckModifiers('crafting', { checkModifiers });
+  const saveCraftingCheckModifiers = (patch) => saveCheckModifiers('crafting', patch);
+  const saveSalvageCheckModifiers = (patch) => saveCheckModifiers('salvage', patch);
+  const saveGatheringCheckModifiers = (patch) => saveCheckModifiers('gathering', patch);
 
   // Shallow-merge a patch into the selected system's salvageCraftingCheck and
   // persist (the manager normalizes the whole check on write). Shared by every
@@ -9662,6 +9770,9 @@ export function createAdminStore(services) {
     saveCraftingCheckActive,
     saveCraftingCheckConsumption,
     saveCraftingCheckModifiers,
+    saveSystemCheckModifiers,
+    saveSalvageCheckModifiers,
+    saveGatheringCheckModifiers,
     saveSalvageCheckActive,
     saveSalvageCheckProgressive,
     saveSalvageCheckSimple,

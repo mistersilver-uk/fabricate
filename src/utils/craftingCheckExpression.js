@@ -7,8 +7,8 @@
  * This module also owns the RETIREMENT of the Fabricate-owned `@craftingmod`
  * placeholder (issue 1094). It lives here, beside the formula tokenizers it is a
  * sibling of, and NOT in `checkRoll.js`: the usability readers
- * (`craftingModifierResolver.js`, `salvageCheckUsability.js`) must call it, and
- * `checkRoll.js` already imports FROM `craftingModifierResolver.js`, so putting the
+ * (`checkModifierResolver.js`, `salvageCheckUsability.js`) must call it, and
+ * `checkRoll.js` already imports FROM `checkModifierResolver.js`, so putting the
  * rule there would close an import cycle whose failure mode is a module-init error
  * in the BUILT bundle that `npm test` cannot see. This module has zero imports and
  * is already imported by `checkRoll.js`.

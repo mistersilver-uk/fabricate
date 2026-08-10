@@ -1,4 +1,8 @@
 import {
+  resolveEligibleModifierIds,
+  resolveModifierBounds,
+} from '../../../../../systems/checkModifierResolver.js';
+import {
   findRangeConflicts,
   planRetiredPlaceholderStrip,
 } from '../../../../../utils/craftingCheckExpression.js';
@@ -13,6 +17,69 @@ import {
  * @typedef {{ id: string, satisfied: boolean }} CheckReadinessCheck
  * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info' }} CheckReadinessIssue
  */
+
+/**
+ * EVERY issue id this evaluator can raise — the SOURCE OF TRUTH, not a summary (issue
+ * 1095).
+ *
+ * Until now every id was an inline string literal in the function body, and the only way
+ * to enumerate them was to call the function with enough fixtures to reach every branch —
+ * which cannot prove the set complete, because an unreached branch contributes nothing.
+ * Downstream surfaces need the whole set (the Checks Validation route buckets each id to
+ * a section), and a hand-copied mirror of an unprovable list is how those two drift.
+ *
+ * IT IS A GUARD, NOT A CONVENTION. `pushIssue` below is the ONLY way an issue reaches the
+ * returned list and it THROWS on an unregistered id, so `issues.push({ id: 'newThing' })`
+ * cannot quietly work: adding an id without registering it fails the first test that
+ * reaches the branch, and `tests/checks-readiness.test.js` additionally scans this file's
+ * source text so an id added by direct `push` is caught even on an unreached branch.
+ *
+ * Frozen, so a consumer cannot mutate the set process-wide.
+ * @type {ReadonlyArray<string>}
+ */
+export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
+  // Formula
+  'noRollFormula',
+  'retiredPlaceholderBreaksFormula',
+  'retiredPlaceholderInFormula',
+  // Outcomes
+  'unnamedOutcome',
+  'noSuccessOutcome',
+  'rangeInvalid',
+  'rangeOverlap',
+  'rangeGap',
+  // Triggers
+  'danglingTierStepTarget',
+  'multipleTierStepTargets',
+  // Check modifiers
+  'modifierBoundsInverted',
+  'modifiersInertNoCheck',
+  'modifiersInertNoFormula',
+]);
+
+const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
+
+/**
+ * Append one issue, refusing any id not in {@link CHECK_READINESS_ISSUE_IDS}.
+ *
+ * The throw is the mechanism. A frozen exported array is only a convention — nothing stops
+ * a later edit pushing a literal straight onto `issues` — so the registry is made
+ * load-bearing by routing every emit through here. The failure is loud and immediate
+ * rather than a silently under-bucketed row on the Validation route.
+ *
+ * @param {CheckReadinessIssue[]} issues
+ * @param {string} id
+ * @param {'critical'|'warning'|'info'} severity
+ */
+function pushIssue(issues, id, severity) {
+  if (!REGISTERED_ISSUE_IDS.has(id)) {
+    throw new Error(
+      `checksReadiness: unregistered issue id "${id}" — add it to CHECK_READINESS_ISSUE_IDS ` +
+        'so every surface that buckets these ids can see it'
+    );
+  }
+  issues.push({ id, severity });
+}
 
 function trimmed(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -64,12 +131,104 @@ function tierStepTargetReadiness(check, outcomes) {
   const ambiguous = targets.length > 1;
 
   const issues = [];
-  if (dangling) issues.push({ id: 'danglingTierStepTarget', severity: 'warning' });
-  if (ambiguous) issues.push({ id: 'multipleTierStepTargets', severity: 'warning' });
+  if (dangling) pushIssue(issues, 'danglingTierStepTarget', 'warning');
+  if (ambiguous) pushIssue(issues, 'multipleTierStepTargets', 'warning');
   return {
     checks: [{ id: 'tierStepTargetsResolve', satisfied: !dangling && !ambiguous }],
     issues,
   };
+}
+
+/**
+ * Whether a FIXED outcome set leaves a GAP — a roll value inside the set's own span that
+ * no tier claims (issue 1095, DN6).
+ *
+ * `findRangeConflicts` sees only OVERLAP and `start > end`, so a gapped set — Slag 1–9,
+ * Rough 11–17, with 10 claimed by nobody — raises nothing at all today. That state is
+ * reachable by ordinary authoring (edit one boundary and stop), and a fixed routed check
+ * has no `clampToNearest` rescue: a roll of 10 matches no tier, so the attempt is rolled
+ * but unrouted. The band strip's fallback note is its only signal, and that note never
+ * reaches the section dot, the rail badge or the Validation route — so the four surfaces
+ * disagree about whether the check is ready.
+ *
+ * SPAN-INTERIOR ONLY. The gap is measured between the set's own minimum and maximum, so a
+ * set that simply does not cover every value a die can roll is NOT a gap: `2d20` rolls
+ * 2–40 and a GM who authors 7–34 has authored a deliberate window, not a mistake. Only a
+ * hole BETWEEN two authored tiers is reported.
+ *
+ * Invalid and overlapping ranges are excluded first: both already raise their own
+ * `critical`, and a `start > end` range would otherwise manufacture a phantom gap.
+ *
+ * @param {object[]} outcomes The active FIXED outcome-tier list.
+ * @param {Set<number>} excluded Indices already reported invalid or overlapping.
+ * @returns {boolean}
+ */
+function fixedRangesHaveGap(outcomes, excluded) {
+  const spans = outcomes
+    .map((outcome, index) => ({ index, start: Number(outcome?.start), end: Number(outcome?.end) }))
+    .filter(
+      (span) =>
+        !excluded.has(span.index) && Number.isFinite(span.start) && Number.isFinite(span.end)
+    )
+    .sort((a, b) => a.start - b.start);
+  if (spans.length < 2) return false;
+  // Ranges are INCLUSIVE on both ends, so adjacency is `next.start === previous.end + 1`.
+  // Anything larger leaves at least one unclaimed value between the two.
+  let reach = spans[0].end;
+  for (const span of spans.slice(1)) {
+    if (span.start > reach + 1) return true;
+    reach = Math.max(reach, span.end);
+  }
+  return false;
+}
+
+/**
+ * Readiness of the check-modifier selection for this activity (issue 1095).
+ *
+ * Two rules, both keyed on what this activity would ACTUALLY roll rather than on what the
+ * catalogue contains, because the catalogue is shared by all three activities and a
+ * gathering check has no business reporting a crafting-only entry:
+ *
+ * - **`modifierBoundsInverted`** (`critical`, BLOCKING). An entry whose authored
+ *   `min > max` contributes 0 until it is repaired — the refuse posture
+ *   `INVALID_CHARACTER_MODIFIER_BOUNDS` already takes for gathering drop modifiers,
+ *   adopted deliberately so a check modifier and a drop modifier fail the same way. It is
+ *   not a warning: the entry is silently worth nothing, which is exactly the class of
+ *   defect readiness exists to surface.
+ * - **`modifiersInertNoCheck` / `modifiersInertNoFormula`** (`warning`). An eligible
+ *   selection that reaches no roll. These are the ONE owned path for "the gathering d100
+ *   check-modifier section reports `noCheck`", and they are gated on the selection being
+ *   NON-EMPTY for the same reason `CraftingModifierCatalogueCard` gates its notice on a
+ *   non-empty catalogue: warning that nothing does anything, when nothing was authored,
+ *   is noise on first contact.
+ *
+ * Eligibility is resolved through the resolver's own `resolveEligibleModifierIds`, so
+ * readiness and the roll cannot disagree about which entries this activity applies.
+ *
+ * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null when the
+ *   caller has no system to build one from (every assertion below then no-ops).
+ * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
+ */
+function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula }) {
+  if (!modifierContext) return { checks: [], issues: [] };
+  const eligible = resolveEligibleModifierIds(modifierContext);
+  if (eligible.length === 0) return { checks: [], issues: [] };
+
+  const catalogue = Array.isArray(modifierContext.catalogue) ? modifierContext.catalogue : [];
+  const byId = new Map(
+    catalogue
+      .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string')
+      .map((entry) => [entry.id, entry])
+  );
+  const inverted = eligible.some((id) => resolveModifierBounds(byId.get(id)).inverted);
+
+  const issues = [];
+  const checks = [{ id: 'modifierBoundsValid', satisfied: !inverted }];
+  if (inverted) pushIssue(issues, 'modifierBoundsInverted', 'critical');
+  if (rollsNoCheck) pushIssue(issues, 'modifiersInertNoCheck', 'warning');
+  else if (!hasRollFormula) pushIssue(issues, 'modifiersInertNoFormula', 'warning');
+  return { checks, issues };
 }
 
 /**
@@ -79,18 +238,32 @@ function tierStepTargetReadiness(check, outcomes) {
  * @param {object} [options]
  * @param {'routed'|'simple'|'alchemy'|'progressive'|'d100'} [options.mode] The
  *   subsystem's resolution mode. `d100` (gathering's fixed roll) is not authored,
- *   so it has nothing to validate and returns empty lists.
+ *   so it has no formula and no outcomes to validate.
+ * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag for
+ *   this activity (issue 1095). Omitted by a caller that has no system to build one from,
+ *   in which case no check-modifier rule is evaluated.
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
  */
 export function evaluateCheckReadiness(check = {}, options = {}) {
   const mode = options.mode || 'simple';
+  const modifierContext = options.modifierContext ?? null;
   const checks = [];
   const issues = [];
 
   // The gathering d100 check is the fixed d100 roll — there is nothing to author
-  // and therefore nothing to validate.
+  // and therefore no formula, no outcome tiers and no triggers to validate.
+  //
+  // IT IS NO LONGER A BARE EARLY RETURN (issue 1095). The check-modifier selection is
+  // authored on `gatheringCraftingCheck` regardless of the resolution mode, so a GM can
+  // author one and reach `d100` — where it rolls nothing. Reporting `modifiersInertNoCheck`
+  // here is the only owned path for that state; returning empty left it unreported on the
+  // one surface a GM consults to find out whether a check works.
   if (mode === 'd100') {
-    return { checks, issues };
+    const modifiers = checkModifierReadiness(modifierContext, {
+      rollsNoCheck: true,
+      hasRollFormula: false,
+    });
+    return { checks: modifiers.checks, issues: modifiers.issues };
   }
 
   // Every authored check needs a roll formula to resolve. Mirrors the
@@ -115,7 +288,7 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   const hasRollFormula = plan.outcome !== 'refused' && trimmed(plan.formula) !== '';
   checks.push({ id: 'hasRollFormula', satisfied: hasRollFormula });
   if (!hasRollFormula) {
-    issues.push({ id: 'noRollFormula', severity: 'warning' });
+    pushIssue(issues, 'noRollFormula', 'warning');
   }
 
   // The retired check-modifier placeholder, typed after its retirement (issue 1094). The
@@ -156,9 +329,9 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   // through the same decider so the two branches cannot answer differently.
   const legacyPlan = planRetiredPlaceholderStrip(trimmed(check?.rollExpression));
   if (plan.outcome === 'refused' || legacyPlan.outcome === 'refused') {
-    issues.push({ id: 'retiredPlaceholderBreaksFormula', severity: 'critical' });
+    pushIssue(issues, 'retiredPlaceholderBreaksFormula', 'critical');
   } else if (plan.outcome === 'stripped' || legacyPlan.outcome === 'stripped') {
-    issues.push({ id: 'retiredPlaceholderInFormula', severity: 'warning' });
+    pushIssue(issues, 'retiredPlaceholderInFormula', 'warning');
   }
 
   // Routed checks route an outcome tier to a result set by tier NAME, and only
@@ -170,27 +343,38 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
       const allNamed = outcomes.every((outcome) => trimmed(outcome?.name) !== '');
       checks.push({ id: 'outcomesNamed', satisfied: allNamed });
       if (!allNamed) {
-        issues.push({ id: 'unnamedOutcome', severity: 'critical' });
+        pushIssue(issues, 'unnamedOutcome', 'critical');
       }
 
       const hasSuccess = outcomes.some((outcome) => outcome?.success === true);
       checks.push({ id: 'hasSuccessOutcome', satisfied: hasSuccess });
       if (!hasSuccess) {
-        issues.push({ id: 'noSuccessOutcome', severity: 'critical' });
+        pushIssue(issues, 'noSuccessOutcome', 'critical');
       }
 
-      // Fixed tiers own a non-overlapping segment of the roll value range.
+      // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range.
+      // All three of these are `critical` — including the two that predate issue 1095.
+      // No copy or test may describe `rangeInvalid` or `rangeOverlap` as a warning: each
+      // leaves a roll value that routes to the wrong tier or to none, which fails the
+      // attempt rather than degrading it.
       if (type === 'fixed') {
         const conflicts = findRangeConflicts(outcomes);
         const rangesValid = conflicts.invalid.size === 0;
         const rangesNoOverlap = conflicts.overlapping.size === 0;
         checks.push({ id: 'rangesValid', satisfied: rangesValid });
         if (!rangesValid) {
-          issues.push({ id: 'rangeInvalid', severity: 'critical' });
+          pushIssue(issues, 'rangeInvalid', 'critical');
         }
         checks.push({ id: 'rangesNoOverlap', satisfied: rangesNoOverlap });
         if (!rangesNoOverlap) {
-          issues.push({ id: 'rangeOverlap', severity: 'critical' });
+          pushIssue(issues, 'rangeOverlap', 'critical');
+        }
+        // The third range rule, and the one nothing reported before issue 1095 (DN6).
+        const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
+        const gapped = fixedRangesHaveGap(outcomes, excluded);
+        checks.push({ id: 'rangesContiguous', satisfied: !gapped });
+        if (gapped) {
+          pushIssue(issues, 'rangeGap', 'critical');
         }
       }
     }
@@ -201,6 +385,15 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
     checks.push(...tierStep.checks);
     issues.push(...tierStep.issues);
   }
+
+  // The check-modifier selection, last: it reads `hasRollFormula` above to decide whether
+  // an eligible selection reaches a roll at all.
+  const modifiers = checkModifierReadiness(modifierContext, {
+    rollsNoCheck: false,
+    hasRollFormula,
+  });
+  checks.push(...modifiers.checks);
+  issues.push(...modifiers.issues);
 
   return { checks, issues };
 }

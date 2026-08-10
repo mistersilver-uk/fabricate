@@ -239,7 +239,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/CraftingListingBuilder.js',
   // Same rule, issue 1055: the builder resolves the displayed check formula through the
   // SAME check-modifier context the engine rolls, so it imports the resolver.
-  'src/systems/craftingModifierResolver.js',
+  'src/systems/checkModifierResolver.js',
   // …and issue 1094 gave that resolver its first two imports, so one entry no longer
   // suffices. It appends the resolved scalar through `toolCheckBonus.js` (so the sign
   // split, the bracketing and the zero-skip stay ONE implementation) and reads the
@@ -247,6 +247,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // these two entries close the graph.
   'src/systems/toolCheckBonus.js',
   'src/utils/craftingCheckExpression.js',
+  // Issue 1095 gave it a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
+  // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair. That module
+  // imports only `craftingCheckExpression.js`, already listed, so this entry closes the
+  // graph again.
+  'src/systems/salvageCheckUsability.js',
   // Same rule, issue 917: the builder now shares its step->recipe view projection and
   // its active-run step read with CraftingEngine through this import-free leaf, so it
   // must be copied alongside the builder.

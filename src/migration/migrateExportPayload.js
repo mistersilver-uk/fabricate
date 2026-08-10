@@ -14,6 +14,7 @@ import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 
 import { applyMaxModifierPicks } from './migrateMaxModifierPicks.js';
 import { applyRetireCraftingModToken } from './migrateRetireCraftingModToken.js';
+import { applySystemCheckModifierCatalogue } from './migrateSystemCheckModifierCatalogue.js';
 import { deriveToolSourceFromComponents } from './migrateToolsToFirstClass.js';
 
 /**
@@ -82,6 +83,34 @@ function retireCraftingModToken(migrated) {
 }
 
 /**
+ * Lift an imported bundle's check-modifier catalogue out of `craftingCheck` up to the
+ * system and rewrite its `byRecipe` rule to `bySubject` (issue 1095), mirroring the
+ * world-side 1.22.0 migration so an imported system behaves exactly like a migrated one.
+ * An export bundle carries exactly one system, so the shared per-system transform is
+ * applied directly with no grouping.
+ *
+ * BRANCH-INDEPENDENT for the same reason as its three siblings above: `migrateExportPayload`
+ * returns early once `payload.schemaVersion` is already current, and every bundle written
+ * by the shipping build carries the current schema, so a derivation reachable only from
+ * the legacy branch would never run on a real bundle. The catalogue's LOCATION is
+ * orthogonal to the envelope version.
+ *
+ * THIS RUNS AFTER `retireCraftingModToken`, and the order is load-bearing in one
+ * direction: that transform counts how many crafting formulas were inert for want of the
+ * retired token, and it reads the catalogue from its PRE-move location. Moving the
+ * catalogue first would zero every one of those counts.
+ *
+ * Idempotent — a bundle already carrying a system-level catalogue keeps it (the move is
+ * guarded) and a second pass finds no legacy key.
+ * @private
+ */
+function liftCheckModifierCatalogue(migrated) {
+  const system = migrated?.system;
+  if (!system || typeof system !== 'object' || Array.isArray(system)) return;
+  applySystemCheckModifierCatalogue(system);
+}
+
+/**
  * @param {*} payload - Parsed export JSON of any prior schema
  * @returns {object} Upcast payload at the current schema version
  */
@@ -98,6 +127,7 @@ export function migrateExportPayload(payload) {
     upcastLegacyTools(current);
     deriveMaxModifierPicks(current);
     retireCraftingModToken(current);
+    liftCheckModifierCatalogue(current);
     return current;
   }
 
@@ -130,6 +160,7 @@ export function migrateExportPayload(payload) {
   upcastLegacyTools(migrated);
   deriveMaxModifierPicks(migrated);
   retireCraftingModToken(migrated);
+  liftCheckModifierCatalogue(migrated);
 
   return migrated;
 }

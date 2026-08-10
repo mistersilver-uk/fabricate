@@ -97,7 +97,7 @@ export class Recipe {
         ? data.minSuccessOutcomeId.trim()
         : null;
     // The recipe author's PICK of crafting-check modifiers (issues 770, 1055), honoured
-    // only under the system's `byRecipe` ("Recipe picks") combination rule. Absent → the
+    // only under the system's `bySubject` combination rule. Absent → the
     // recipe inherits the system's default eligible modifier ids. Present → names the
     // eligible id subset reduced to the scalar appended to the check roll. It carries
     // NO rule: a recipe chooses WHICH modifiers apply, never HOW they combine, so the
@@ -138,7 +138,7 @@ export class Recipe {
    * **A rule is never persisted here.** Older data may carry a `policy` key from the era
    * when a recipe could override the system's combination rule; it is DROPPED on the way
    * in, so it cannot round-trip back out through `toJSON`. The system owns the rule
-   * outright — `resolveModifierPolicy` (`craftingModifierResolver.js`) reads only
+   * outright — `resolveModifierPolicy` (`checkModifierResolver.js`) reads only
    * `craftingCheck.defaultModifierPolicy` — and dropping the key here keeps the stored
    * shape from implying an override the resolver would never honour.
    *

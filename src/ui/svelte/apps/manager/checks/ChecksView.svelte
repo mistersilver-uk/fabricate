@@ -25,7 +25,12 @@
   import ProgressiveCraftingCheckEditor from './ProgressiveCraftingCheckEditor.svelte';
   import CraftingModifierCatalogueCard from './CraftingModifierCatalogueCard.svelte';
   import ChecksValidationTab from './ChecksValidationTab.svelte';
-  import { resolveActiveCraftingCheckFormula } from '../../../../../systems/craftingModifierResolver.js';
+  import {
+    buildCheckModifierContext,
+    resolveActiveCraftingCheckFormula,
+    resolveActiveGatheringCheckFormula,
+    resolveActiveSalvageCheckFormula,
+  } from '../../../../../systems/checkModifierResolver.js';
 
   // `resolutionMode` is the selected system's recipe resolution mode and selects
   // which crafting check editor renders: routed → the outcome-tier editor;
@@ -49,19 +54,29 @@
     // crafting check (and mirrors it for salvage); alchemy resolves consumption through its
     // own `consumeOnFail` flag instead, so these toggles are hidden in alchemy mode.
     craftingConsumption = null,
-    // The system's check-modifier catalogue and the rules that reduce it (issue 770,
-    // reshaped by issue 1055): the crafting-owned `craftingCheck.checkModifiers`
-    // catalogue, `defaultModifierPolicy`, `defaultModifierIds` and `maxModifierPicks`,
-    // edited in a card beside the failure-consumption card and persisted live via
+    // The ONE system-level check-modifier catalogue (issue 770, reshaped by 1055 and
+    // moved up by 1095). It is shared by all three activities and edited on the crafting
+    // sub-tab only; salvage and gathering render its entries read-only.
+    checkModifiers = [],
+    // Crafting's own SELECTION over that catalogue: which entries it applies
+    // (`defaultModifierIds`), how they combine (`defaultModifierPolicy`) and how many a
+    // selecting rule may pick (`maxModifierPicks`). Persisted live via
     // `onUpdateCraftingCheckModifiers`. Rendered for every crafting sub-tab, including
     // the ones where the catalogue reaches no roll — that is what `inertCause` reports.
-    craftingCheckModifiers = [],
     craftingDefaultModifierPolicy = 'addAll',
     craftingDefaultModifierIds = [],
     // The cap on how many modifiers a selecting rule may pick (issue 1055). `null`, NOT a
     // number: absence is the "unlimited" value, and a numeric default here would impose a
     // bound the GM never authored on every system that has not been asked.
     craftingMaxModifierPicks = null,
+    // The same triple for salvage and for gathering (issue 1095). New: before this change
+    // neither activity had a modifier seam at all.
+    salvageDefaultModifierPolicy = 'addAll',
+    salvageDefaultModifierIds = [],
+    salvageMaxModifierPicks = null,
+    gatheringDefaultModifierPolicy = 'addAll',
+    gatheringDefaultModifierIds = [],
+    gatheringMaxModifierPicks = null,
     // Alchemy behaviour flags (issue 713): the three system-level alchemy flags the engine
     // already honours. Restored as live-persisting toggles below the alchemy check-mode
     // selector. Defaults mirror the manager normalizer (all three ON; learnOnCraft
@@ -95,6 +110,8 @@
     onSetAlchemyCheckMode = () => {},
     onUpdateCraftingConsumption = () => {},
     onUpdateCraftingCheckModifiers = () => {},
+    onUpdateSalvageCheckModifiers = () => {},
+    onUpdateGatheringCheckModifiers = () => {},
     onUpdateAlchemyFlags = () => {},
     onTabChange = () => {},
     onToggleCheckActive = () => {},
@@ -210,6 +227,59 @@
   }
 
   const craftingModifierInertCause = $derived(inertCauseFor(activeCraftingCheck));
+
+  // The same derivation for the other two activities (issue 1095), through the two
+  // sibling resolvers rather than a second copy of the crafting one — all three return
+  // the same shape so `inertCauseFor` can answer for any of them. Fed from the DRAFTS for
+  // the reason the crafting one states: the GM is editing these formulas on this tab.
+  const activeSalvageCheck = $derived(
+    resolveActiveSalvageCheckFormula({
+      salvageResolutionMode,
+      salvageCraftingCheck: {
+        simple: salvageCheckSimple,
+        routed: salvageCheckRouted,
+        progressive: salvageCheckProgressive,
+      },
+    })
+  );
+  const salvageModifierInertCause = $derived(inertCauseFor(activeSalvageCheck));
+
+  const activeGatheringCheck = $derived(
+    resolveActiveGatheringCheckFormula(
+      {
+        gatheringCraftingCheck: {
+          progressive: gatheringCheckProgressive,
+          routed: gatheringCheckRouted,
+        },
+      },
+      gatheringResolutionMode
+    )
+  );
+  const gatheringModifierInertCause = $derived(inertCauseFor(activeGatheringCheck));
+
+  // The one bag the readiness evaluator resolves eligibility through, built by the SAME
+  // builder the engine threads to its check runners rather than a second literal of the
+  // same shape (issue 1095). The subject is `null`: this tab validates the SYSTEM's
+  // selection, and no individual recipe, component or task is in scope here.
+  const draftSystem = $derived({
+    checkModifiers,
+    craftingCheck: {
+      defaultModifierPolicy: craftingDefaultModifierPolicy,
+      defaultModifierIds: craftingDefaultModifierIds,
+      maxModifierPicks: craftingMaxModifierPicks,
+    },
+    salvageCraftingCheck: {
+      defaultModifierPolicy: salvageDefaultModifierPolicy,
+      defaultModifierIds: salvageDefaultModifierIds,
+      maxModifierPicks: salvageMaxModifierPicks,
+    },
+    gatheringCraftingCheck: {
+      defaultModifierPolicy: gatheringDefaultModifierPolicy,
+      defaultModifierIds: gatheringDefaultModifierIds,
+      maxModifierPicks: gatheringMaxModifierPicks,
+    },
+  });
+
   const salvageRouted = $derived(salvageResolutionMode === 'routed');
   const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
   const salvageSimple = $derived(
@@ -293,6 +363,7 @@
           : craftingProgressive
             ? craftingCheckProgressive
             : craftingCheckSimple,
+        modifierContext: buildCheckModifierContext(draftSystem, 'crafting', null),
       },
     ];
     if (salvageEnabled) {
@@ -304,17 +375,33 @@
           : salvageProgressive
             ? salvageCheckProgressive
             : salvageCheckSimple,
+        modifierContext: buildCheckModifierContext(draftSystem, 'salvage', null),
       });
     }
-    if (gatheringEnabled && !gatheringD100) {
+    // GATHERING IS NO LONGER OMITTED UNDER d100 (issue 1095). It used to be skipped
+    // because the fixed roll authors nothing, but a GM can author a check-modifier
+    // selection on the gathering check in any mode — and under d100 that selection reaches
+    // no roll. Validating it is the one owned path for reporting that, so the section is
+    // listed and `evaluateCheckReadiness`'s `d100` branch answers with the modifier rules
+    // alone.
+    if (gatheringEnabled) {
       list.push({
         subsystem: 'gathering',
         mode: gatheringResolutionMode,
         check: gatheringProgressive ? gatheringCheckProgressive : gatheringCheckRouted,
+        modifierContext: buildCheckModifierContext(draftSystem, 'gathering', null),
       });
     }
     return list;
   });
+
+  // The read-only catalogue rows on salvage and gathering link back to the ONE surface
+  // that authors them. It routes rather than opening a second editor: two editors for one
+  // catalogue is how two screens come to disagree about which wrote last.
+  function goToCraftingCatalogue() {
+    activeTab = 'crafting';
+    onTabChange('crafting');
+  }
 
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
   const pageKicker = text('FABRICATE.Admin.Manager.Checks.PageKicker', 'One per system');
@@ -330,12 +417,46 @@
      copies of it drift (and count against the new-code duplication gate). -->
 {#snippet craftingModifierCard()}
   <CraftingModifierCatalogueCard
-    checkModifiers={craftingCheckModifiers}
+    activity="crafting"
+    {checkModifiers}
     defaultModifierPolicy={craftingDefaultModifierPolicy}
     defaultModifierIds={craftingDefaultModifierIds}
     maxModifierPicks={craftingMaxModifierPicks}
     inertCause={craftingModifierInertCause}
     onChange={onUpdateCraftingCheckModifiers}
+  />
+{/snippet}
+
+<!-- Salvage and gathering render the SAME card against their own selection (issue 1095).
+     The catalogue rows are read-only there — one surface authors the entries — while the
+     eligibility control and the combination-rule grid stay fully editable, because
+     deciding which entries apply and how they combine is what each activity owns. The
+     "edit the catalogue" link routes to the crafting sub-tab rather than to a System
+     Settings surface issue 1093 puts out of scope. -->
+{#snippet salvageModifierCard()}
+  <CraftingModifierCatalogueCard
+    activity="salvage"
+    {checkModifiers}
+    defaultModifierPolicy={salvageDefaultModifierPolicy}
+    defaultModifierIds={salvageDefaultModifierIds}
+    maxModifierPicks={salvageMaxModifierPicks}
+    inertCause={salvageModifierInertCause}
+    onEditCatalogue={goToCraftingCatalogue}
+    onChange={onUpdateSalvageCheckModifiers}
+  />
+{/snippet}
+
+{#snippet gatheringModifierCard()}
+  <CraftingModifierCatalogueCard
+    activity="gathering"
+    {checkModifiers}
+    defaultModifierPolicy={gatheringDefaultModifierPolicy}
+    defaultModifierIds={gatheringDefaultModifierIds}
+    maxModifierPicks={gatheringMaxModifierPicks}
+    inertCause={gatheringModifierInertCause}
+    dormant
+    onEditCatalogue={goToCraftingCatalogue}
+    onChange={onUpdateGatheringCheckModifiers}
   />
 {/snippet}
 
@@ -578,30 +699,33 @@
           {@render craftingModifierCard()}
         </div>
       {:else if activeTab === 'salvage' && salvageRouted}
-        <div data-checks-panel="salvage">
+        <div class="manager-checks-editor-stack" data-checks-panel="salvage">
           <CraftingCheckEditor
             value={salvageCheckRouted}
             showTiers={false}
             breakageAuthority={salvageBreakageAuthority}
             onChange={onUpdateSalvageCheckRouted}
           />
+          {@render salvageModifierCard()}
         </div>
       {:else if activeTab === 'salvage' && salvageProgressive}
-        <div data-checks-panel="salvage">
+        <div class="manager-checks-editor-stack" data-checks-panel="salvage">
           <ProgressiveCraftingCheckEditor
             value={salvageCheckProgressive}
             breakageAuthority={salvageBreakageAuthority}
             onChange={onUpdateSalvageCheckProgressive}
           />
+          {@render salvageModifierCard()}
         </div>
       {:else if activeTab === 'salvage' && salvageSimple}
-        <div data-checks-panel="salvage">
+        <div class="manager-checks-editor-stack" data-checks-panel="salvage">
           <SimpleCraftingCheckEditor
             value={salvageCheckSimple}
             showDcSource={false}
             breakageAuthority={salvageBreakageAuthority}
             onChange={onUpdateSalvageCheckSimple}
           />
+          {@render salvageModifierCard()}
         </div>
       {:else if activeTab === 'gathering' && gatheringD100}
         <div class="manager-checks-page" data-checks-panel="gathering" data-gathering-d100-readonly>
@@ -626,23 +750,26 @@
               )}
             </p>
           </section>
+          {@render gatheringModifierCard()}
         </div>
       {:else if activeTab === 'gathering' && gatheringProgressive}
-        <div data-checks-panel="gathering">
+        <div class="manager-checks-editor-stack" data-checks-panel="gathering">
           <ProgressiveCraftingCheckEditor
             value={gatheringCheckProgressive}
             breakageAuthority={gatheringBreakageAuthority}
             onChange={onUpdateGatheringCheckProgressive}
           />
+          {@render gatheringModifierCard()}
         </div>
       {:else if activeTab === 'gathering' && gatheringRouted}
-        <div data-checks-panel="gathering">
+        <div class="manager-checks-editor-stack" data-checks-panel="gathering">
           <CraftingCheckEditor
             value={gatheringCheckRouted}
             showTiers={false}
             breakageAuthority={gatheringBreakageAuthority}
             onChange={onUpdateGatheringCheckRouted}
           />
+          {@render gatheringModifierCard()}
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activeTab}>

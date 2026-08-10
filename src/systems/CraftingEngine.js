@@ -31,12 +31,12 @@ import {
 } from './componentStacking.js';
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import {
-  buildCraftingModifierChoice,
-  buildCraftingModifierContext,
+  buildCheckModifierChoice,
+  buildCheckModifierContext,
   makeRollDataExpressionEvaluator,
   resolveActiveCraftingCheckFormula,
   resolveModifierPolicy,
-} from './craftingModifierResolver.js';
+} from './checkModifierResolver.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
@@ -4235,7 +4235,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-    const craftingModifier = buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCheckModifierContext(system, 'crafting', recipe);
     const result = await runFormulaPassFail({
       formula,
       dc,
@@ -4301,7 +4301,7 @@ export class CraftingEngine {
       ingredientSet,
       craftingActor
     );
-    const craftingModifier = buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCheckModifierContext(system, 'crafting', recipe);
     const result = await runFormulaRouted({
       formula,
       dc,
@@ -4357,7 +4357,7 @@ export class CraftingEngine {
    * 1055, 1094) for an interactive craft. Returns the descriptor ONLY when this is an
    * interactive roll AND the active mode carries an authored (post-shim) roll formula
    * AND the effective combination rule is `playerPicks` AND at least TWO modifiers are
-   * eligible (the two-option rule is enforced by {@link buildCraftingModifierChoice});
+   * eligible (the two-option rule is enforced by {@link buildCheckModifierChoice});
    * otherwise `null`, so every other rule and every non-interactive craft threads a
    * byte-identical `rollOptions` bag (no `modifierChoice` key). The descriptor is
    * threaded onto `rollOptions.modifierChoice`; the player picks UP TO `maxPicks` of its
@@ -4374,11 +4374,11 @@ export class CraftingEngine {
    * about to roll have a formula at all? A formula that strips to empty is not a check,
    * so there is nothing to modify and nothing to ask the player about.
    *
-   * `playerPicks` is the ONLY rule that defers to roll time. `byRecipe` also defers
-   * selection, but to the RECIPE AUTHOR at recipe-edit time, so by the time the engine
+   * `playerPicks` is the ONLY rule that defers to roll time. `bySubject` also defers
+   * selection, but to the SUBJECT AUTHOR at authoring time, so by the time the engine
    * rolls, the choice is already made and stored: `resolveEligibleModifierIds` has
-   * narrowed the eligible set to the recipe's picks and capped it, and the deterministic
-   * scalar sums exactly that. Prompting for it would re-ask a question the recipe already
+   * narrowed the eligible set to the subject's picks and capped it, and the deterministic
+   * scalar sums exactly that. Prompting for it would re-ask a question the subject already
    * answered, which is why the gate below tests for `playerPicks` specifically rather
    * than for "some rule defers selection".
    *
@@ -4401,7 +4401,7 @@ export class CraftingEngine {
     // one-option group is not a choice — the deterministic scalar IS the only possible
     // pick, so the prompt falls through to it);
     // `buildInteractiveRollOptions` omits the `modifierChoice` key for a falsy value.
-    return buildCraftingModifierChoice(
+    return buildCheckModifierChoice(
       craftingModifierContext,
       makeRollDataExpressionEvaluator(craftingActor)
     );
@@ -4446,7 +4446,7 @@ export class CraftingEngine {
   ) {
     const progressive = system?.craftingCheck?.progressive || {};
     const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
-    const craftingModifier = buildCraftingModifierContext(system, recipe);
+    const craftingModifier = buildCheckModifierContext(system, 'crafting', recipe);
     const result = await runFormulaProgressive({
       formula,
       triggers: progressive.checkBreakage?.triggers,
@@ -5870,6 +5870,15 @@ export class CraftingEngine {
    * When routed/progressive need a check outcome but no roll formula is configured, the
    * attempt fails loudly; every other mode with no usable formula is a no-op success.
    *
+   * THE CHECK-MODIFIER CONTEXT IS BUILT ONCE, HERE (issue 1095), and threaded to whichever
+   * runner dispatch selects. Salvage gained a modifier seam it never had: the system's one
+   * catalogue is now selected over by `salvageCraftingCheck`'s own
+   * `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks}` triple, with the
+   * COMPONENT as the `bySubject` subject (`component.salvage.checkModifierIds`). Building
+   * it at the dispatch point rather than in each of the three runners is what stops a
+   * fourth runner shipping without one — the same argument `_salvageRollOptions`'s own
+   * header makes about the roll-decision attach.
+   *
    * @param {object} [options]
    * @param {object|null} [options.rollDecision] A pre-resolved roll decision (issue 859
    *   bulk salvage) threaded to the runners' `rollOptions`; see `evaluateCheckRoll`.
@@ -5883,7 +5892,12 @@ export class CraftingEngine {
   ) {
     const { mode, config, checkUsable, requiresCheck, unsupportedMode } =
       resolveSalvageCheck(system);
-    const runOptions = { interactive, toolItems, rollDecision };
+    const runOptions = {
+      interactive,
+      toolItems,
+      rollDecision,
+      craftingModifier: buildCheckModifierContext(system, 'salvage', component),
+    };
 
     // A mode outside `simple|routed|progressive` is a GM-side config defect, not a
     // rolled failure: report it exactly as a missing required formula is reported, so
@@ -5951,9 +5965,24 @@ export class CraftingEngine {
    *
    * One helper rather than three inline spreads: the attach is a single gate, so a
    * fourth runner cannot silently ship without it.
+   *
+   * `modifierChoice` (issue 1095) is built through the SAME
+   * {@link CraftingEngine#_buildInteractiveModifierChoice} crafting uses, so salvage's
+   * `playerPicks` prompt renders the modifier fieldset on exactly crafting's terms —
+   * interactive only, over an authored post-shim formula, under `playerPicks`, and only
+   * with at least two eligible modifiers. The pre-1095 claim that "salvage never passes
+   * one, so their dialog is unchanged" is retired with the crafting-only catalogue.
    * @private
    */
-  _salvageRollOptions({ interactive, actor, component, dc, rollDecision = null }) {
+  _salvageRollOptions({
+    interactive,
+    actor,
+    component,
+    dc,
+    rollDecision = null,
+    formula = '',
+    craftingModifier = null,
+  }) {
     const rollOptions = buildInteractiveRollOptions({
       interactive,
       actor,
@@ -5961,6 +5990,12 @@ export class CraftingEngine {
       activity: 'Salvage',
       img: component?.img,
       dc,
+      modifierChoice: this._buildInteractiveModifierChoice(
+        formula,
+        craftingModifier,
+        actor,
+        interactive
+      ),
     });
     if (rollDecision) rollOptions.rollDecision = rollDecision;
     return rollOptions;
@@ -5975,9 +6010,12 @@ export class CraftingEngine {
     simple,
     component,
     actor,
-    { interactive = false, toolItems = [], rollDecision = null } = {}
+    { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
     const dc = this._resolveSalvageDc(simple, component);
+    // Tool bonuses append FIRST and the modifier term after them, exactly as on crafting:
+    // `_appendToolCheckBonuses` rewrites the formula here, and `evaluateCheckRoll` appends
+    // the resolved modifier scalar to whatever it is handed.
     const formula = await this._appendToolCheckBonuses(simple.rollFormula, toolItems);
     const result = await runFormulaPassFail({
       formula,
@@ -5986,7 +6024,16 @@ export class CraftingEngine {
       triggers: simple.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
-      rollOptions: this._salvageRollOptions({ interactive, actor, component, dc, rollDecision }),
+      craftingModifier,
+      rollOptions: this._salvageRollOptions({
+        interactive,
+        actor,
+        component,
+        dc,
+        rollDecision,
+        formula,
+        craftingModifier,
+      }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -6000,7 +6047,7 @@ export class CraftingEngine {
     progressive,
     component,
     actor,
-    { interactive = false, toolItems = [], rollDecision = null } = {}
+    { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
     const formula = await this._appendToolCheckBonuses(progressive.rollFormula, toolItems);
     const result = await runFormulaProgressive({
@@ -6008,8 +6055,16 @@ export class CraftingEngine {
       triggers: progressive.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
+      craftingModifier,
       // No `dc`: progressive has none, and the prompt must show no DC chip.
-      rollOptions: this._salvageRollOptions({ interactive, actor, component, rollDecision }),
+      rollOptions: this._salvageRollOptions({
+        interactive,
+        actor,
+        component,
+        rollDecision,
+        formula,
+        craftingModifier,
+      }),
     });
     return this._markEngineEvaluated(result);
   }
@@ -6027,7 +6082,7 @@ export class CraftingEngine {
     routed,
     component,
     actor,
-    { interactive = false, toolItems = [], rollDecision = null } = {}
+    { interactive = false, toolItems = [], rollDecision = null, craftingModifier = null } = {}
   ) {
     const dc = this._resolveSalvageDc(routed, component);
     const formula = await this._appendToolCheckBonuses(routed.rollFormula, toolItems);
@@ -6041,10 +6096,19 @@ export class CraftingEngine {
       triggers: routed.checkBreakage?.triggers,
       actor,
       label: 'Salvage',
+      craftingModifier,
       // Clamp a below-lowest total to the closest tier (mirrors crafting); a per-
       // component dcOverride never opens a null-outcome dead zone.
       clampToNearest: true,
-      rollOptions: this._salvageRollOptions({ interactive, actor, component, dc, rollDecision }),
+      rollOptions: this._salvageRollOptions({
+        interactive,
+        actor,
+        component,
+        dc,
+        rollDecision,
+        formula,
+        craftingModifier,
+      }),
     });
     return this._markEngineEvaluated(result);
   }

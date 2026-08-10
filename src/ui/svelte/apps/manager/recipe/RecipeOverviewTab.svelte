@@ -16,7 +16,7 @@
   import Chip from '../Chip.svelte';
   import RecipeModeBanner from './RecipeModeBanner.svelte';
   import { formatList, localize } from '../../../util/foundryBridge.js';
-  import { resolveMaxModifierPicks } from '../../../../../systems/craftingModifierResolver.js';
+  import { resolveMaxModifierPicks } from '../../../../../systems/checkModifierResolver.js';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
   import {
     GENERAL_RECIPE_CATEGORY,
@@ -81,10 +81,10 @@
     // and an AUTHORED EMPTY `modifierIds` is "no modifiers" — a real choice that adds
     // nothing to the roll, not an absence.
     craftingModifierOptions = [],
-    // The SYSTEM's combination rule, and the whole gate on this surface: only `byRecipe`
-    // ("Recipe picks") defers the selection to the recipe author, so only `byRecipe`
-    // renders anything here. A recipe can never override the rule, so this is not a
-    // "default" and there is no control for it on this tab.
+    // The SYSTEM's combination rule, and the whole gate on this surface: only `bySubject`
+    // ("By recipe" on this activity) defers the selection to the recipe author, so only
+    // `bySubject` renders anything here. A recipe can never override the rule, so this is
+    // not a "default" and there is no control for it on this tab.
     craftingModifierPolicy = 'addAll',
     craftingModifierDefaultIds = [],
     // The system's cap on how many modifiers this recipe may pick (issue 1055). `null`
@@ -165,14 +165,18 @@
 
   const modifierInert = $derived(MODIFIER_INERT_COPY[craftingModifierInertCause] || null);
   const hasModifierCatalogue = $derived(craftingModifierOptions.length > 0);
-  // `byRecipe` — "Recipe picks" — is the ONE rule that defers the selection to the recipe
-  // author, so it is the only rule under which this tab shows anything at all. Under
-  // `addAll`, `highest` and `playerPicks` the recipe has nothing to say about check
-  // modifiers and the tab is silent: a control the system will ignore is worse than no
-  // control, and a banner explaining its absence would appear on every recipe of every
-  // system that never opted in.
+  // `bySubject` — rendered "By recipe" on crafting — is the ONE rule that defers the
+  // selection to the recipe author, so it is the only rule under which this tab shows
+  // anything at all. Under `addAll`, `highest` and `playerPicks` the recipe has nothing to
+  // say about check modifiers and the tab is silent: a control the system will ignore is
+  // worse than no control, and a banner explaining its absence would appear on every
+  // recipe of every system that never opted in.
+  //
+  // The comparison is against the CANONICAL token, and the projection normalizes the
+  // pre-1095 `byRecipe` to it on the way here (issue 1095) — so a world that has not run
+  // the `1.22.0` migration still renders the picker rather than silently withdrawing it.
   const modifierDeferredToRecipe = $derived(
-    hasModifierCatalogue && craftingModifierPolicy === 'byRecipe'
+    hasModifierCatalogue && craftingModifierPolicy === 'bySubject'
   );
   // Two dispositions under that rule, mutually exclusive. The inert banner wins: the
   // system asked this recipe to pick, but it rolls no check for the picks to reach —
@@ -227,7 +231,7 @@
   // nothing picked yet". It writes `modifierIds: []`, the same bytes as "No modifiers".
   // Read purely, that made Custom set unreachable on a system with a catalogue but an
   // EMPTY `defaultModifierIds` — the ordinary "every recipe picks its own" setup that
-  // `byRecipe` exists to serve. The seed came back empty, `setModeOf` mapped it to
+  // `bySubject` exists to serve. The seed came back empty, `setModeOf` mapped it to
   // `none`, and the control snapped to "No modifiers" as though it had rejected the GM's
   // choice; the same snap ran going No modifiers → Custom set.
   //
@@ -524,8 +528,8 @@
         </select>
       </label>
     {/if}
-    <!-- Check-modifier picks (issue 1055). Rendered only under the system's `byRecipe`
-         ("Recipe picks") rule, and only when the system actually rolls a check for the
+    <!-- Check-modifier picks (issue 1055). Rendered only under the system's `bySubject`
+         ("By recipe") rule, and only when the system actually rolls a check for the
          picks to reach; every other rule leaves this grid at its pre-1055 shape. There is
          no rule select: a recipe may choose WHICH modifiers apply, never HOW they
          combine.

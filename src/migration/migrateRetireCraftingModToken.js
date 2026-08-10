@@ -75,10 +75,10 @@
  */
 
 import {
-  buildCraftingModifierContext,
+  buildCheckModifierContext,
   resolveActiveCraftingCheckFormula,
   resolveEligibleModifierIds,
-} from '../systems/craftingModifierResolver.js';
+} from '../systems/checkModifierResolver.js';
 import {
   describeRetiredModifierPlaceholder,
   planRetiredPlaceholderStrip,
@@ -172,7 +172,7 @@ function retireFormulaField(config, key, counts) {
  * start applying, so counting it would state a change that did not happen and prescribe a
  * remedy already in force. `resolveEligibleModifierIds` is asked rather than
  * `defaultModifierIds.length` so the answer matches what the engine will actually roll:
- * ids absent from the catalogue are dropped, and under `byRecipe` the source is the
+ * ids absent from the catalogue are dropped, and under `bySubject` the source is the
  * recipe's pick — which no migration can see, so that rule is counted on the system set it
  * falls back to.
  *
@@ -184,10 +184,19 @@ function countInertActiveCraftingCheck(system) {
   if (!check) return 0;
   // The context is BUILT by the shared builder, not hand-mirrored: four of its five fields
   // were being restated here, and a hand-mirrored copy of a bag is how this count would
-  // silently stop matching what the engine resolves. `null` for the recipe is the whole
-  // point of the second argument — no migration can see a recipe's pick, so `byRecipe`
+  // silently stop matching what the engine resolves. `null` for the subject is the whole
+  // point of the third argument — no migration can see a recipe's pick, so `bySubject`
   // falls back to the system set, which is exactly what the doc below says it counts.
-  const eligible = resolveEligibleModifierIds(buildCraftingModifierContext(system, null));
+  //
+  // THE CATALOGUE IS LIFTED FROM ITS PRE-1.22.0 LOCATION (issue 1095). This migration is
+  // `1.21.0` and the runner walks the ladder in version order, so at THIS point the
+  // catalogue still lives inside `craftingCheck` — `1.22.0` has not yet moved it to
+  // `system.checkModifiers`, which is where the shared builder reads it. Handing the
+  // builder a view carrying the catalogue at the key it reads is what keeps this count
+  // reading real data without hand-mirroring the bag or reaching backwards in the ladder.
+  const eligible = resolveEligibleModifierIds(
+    buildCheckModifierContext({ ...system, checkModifiers: check.checkModifiers }, 'crafting', null)
+  );
   if (eligible.length === 0) return 0;
   const active = resolveActiveCraftingCheckFormula(system);
   if (active.slot === null) return 0;

@@ -19,6 +19,7 @@ import { getIngredientComponentId } from '../models/match/matchTypes.js';
 import { Tool, TOOL_BREAKAGE_MODES as TOOL_BREAKAGE_MODE_LIST } from '../models/Tool.js';
 import { normalizeSelectionIds } from '../utils/bulkSelectionModel.js';
 import { normalizeCategoryIconMap } from '../utils/categoryIcons.js';
+import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import {
   normalizeComponentCategory,
   normalizeCustomComponentCategories,
@@ -42,7 +43,11 @@ import {
 } from '../utils/sourceUuid.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
-import { normalizeModifierPolicy, resolveMaxModifierPicks } from './craftingModifierResolver.js';
+import {
+  normalizeModifierPolicy,
+  resolveMaxModifierPicks,
+  resolveModifierBounds,
+} from './checkModifierResolver.js';
 import { normalizeCurrencyConfig } from './currencyProfile.js';
 import { normalizeGatheringRealmList, normalizeGatheringRealmSettings } from './gatheringRealms.js';
 import { RecipeActivationError } from './RecipeActivationError.js';
@@ -186,6 +191,15 @@ export class CraftingSystemManager {
     // hoisting is safe; the return literal below reuses `salvageResolutionMode`.
     const { salvageResolutionMode, salvageSimpleCheckHasFormula } =
       this._salvageNormalizationContext(system);
+    // The ONE system-level check-modifier catalogue (issue 1095), HOISTED above the three
+    // activity checks because each of their selections is validated against it: a default
+    // id naming nothing in the catalogue is dropped. Before `1.22.0` this lived inside
+    // `craftingCheck`; the migration moves it up and deletes the old key, and it is NOT
+    // read from the old location here — the migration and the export-payload upcast are
+    // the two paths a legacy payload arrives through, and a silent read-alias would make
+    // the relocation unobservable.
+    const checkModifiers = this._normalizeCheckModifierCatalogue(system.checkModifiers);
+    const validCatalogueIds = new Set(checkModifiers.map((entry) => entry.id));
     const rawManagedItems = Array.isArray(system.components)
       ? system.components
       : Array.isArray(system.managedItems)
@@ -293,7 +307,11 @@ export class CraftingSystemManager {
         recipeItemDefinitions.some(
           (def) => Array.isArray(def.recipeIds) && def.recipeIds.length > 0
         ),
-      craftingCheck: this._normalizeCraftingCheck(system.craftingCheck),
+      // The one named catalogue of check modifiers for the WHOLE system (issue 1095).
+      // Crafting, salvage and gathering each select over it through their own
+      // `{defaultModifierPolicy, defaultModifierIds, maxModifierPicks?}` triple below.
+      checkModifiers,
+      craftingCheck: this._normalizeCraftingCheck(system.craftingCheck, validCatalogueIds),
       // Canonical salvage mode, derived above with the salvage-normalization context
       // (issue 764) so the component map and this field agree on one value.
       salvageResolutionMode,
@@ -309,8 +327,14 @@ export class CraftingSystemManager {
           : 'toolSpecific';
         return { authority };
       })(system.toolBreakage),
-      salvageCraftingCheck: this._normalizeSalvageCraftingCheck(system.salvageCraftingCheck),
-      gatheringCraftingCheck: this._normalizeGatheringCraftingCheck(system.gatheringCraftingCheck),
+      salvageCraftingCheck: this._normalizeSalvageCraftingCheck(
+        system.salvageCraftingCheck,
+        validCatalogueIds
+      ),
+      gatheringCraftingCheck: this._normalizeGatheringCraftingCheck(
+        system.gatheringCraftingCheck,
+        validCatalogueIds
+      ),
       alchemy: this._normalizeAlchemyConfig(
         system.alchemy ?? system.cauldron,
         system.resolutionMode
@@ -563,7 +587,7 @@ export class CraftingSystemManager {
     };
   }
 
-  _normalizeCraftingCheck(check = {}) {
+  _normalizeCraftingCheck(check = {}, validCatalogueIds = new Set()) {
     const outcomes = Array.isArray(check?.outcomes) ? check.outcomes : [];
     const normalizedOutcomes = outcomes
       .map((o) =>
@@ -595,44 +619,48 @@ export class CraftingSystemManager {
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
       routed: this._normalizeRoutedCraftingCheck(check?.routed),
       simple: this._normalizeSimpleCraftingCheck(check?.simple),
-      // Per-recipe check-modifier catalogue + default policy (issue 770). A crafting-
-      // owned aggregate (NOT gathering's `characterModifiers`), feeding the
-      // check roll. Absent → an empty catalogue with the
-      // `addAll` default, a no-op for a single-formula check (full back-compat).
-      ...this._normalizeCheckModifierConfig(check),
+      // Crafting's SELECTION over the system-level catalogue (issues 770, 1055, 1095).
+      // The catalogue itself moved UP to `system.checkModifiers` in `1.22.0`; what stays
+      // here — and, identically, on the salvage and gathering checks — is which entries
+      // this activity applies and how they combine. Absent → the `addAll` default with an
+      // empty id set, a no-op for a single-formula check (full back-compat).
+      ...this._normalizeCheckModifierSelection(check, validCatalogueIds),
     };
   }
 
   /**
-   * Normalize the crafting check-modifier catalogue, combination rule and pick cap
-   * (issues 770, 1055): `checkModifiers` is a named catalogue of
-   * `{id,label,icon?,expression}` entries appended to the check roll;
-   * `defaultModifierPolicy` is the COMBINATION RULE, one of the four
-   * {@link MODIFIER_POLICIES} — `addAll`/`highest`/`byRecipe`/`playerPicks`, default
-   * `addAll`; `defaultModifierIds` names the catalogue entries applied by default.
-   * Malformed entries are dropped, a bad expression coerces to an empty string, and a
-   * default id naming nothing in the catalogue is dropped (order + de-dup preserved).
+   * Normalize the SYSTEM-LEVEL check-modifier catalogue (issue 1095): the ONE named
+   * catalogue of `{id, label, expression, icon?, min?, max?}` entries every activity's
+   * check selects over. Malformed entries are dropped, ids are trimmed and de-duplicated,
+   * and a bad expression coerces to an empty string.
    *
-   * The rule is validated through the resolver's own `normalizeModifierPolicy` rather
-   * than a literal repeated here, so the authoring surface and the engine can never
-   * disagree about which rules exist.
+   * IT LIVES ON THE SYSTEM, not on `craftingCheck`. Before `1.22.0` it was persisted at
+   * `craftingCheck.checkModifiers`, which made it crafting-owned by construction; salvage
+   * and gathering now select over the same catalogue, so it cannot belong to any one of
+   * them. The `1.22.0` migration relocates it and deletes the old key, and the runner
+   * runs before any manager load — load-bearing, because THIS normalizer is an allowlist
+   * rebuild, so a save that ran first would have DELETED the old key rather than moving
+   * it.
    *
-   * `maxModifierPicks` — the cap on how many modifiers a SELECTING rule (`byRecipe`,
-   * `playerPicks`) may pick — deliberately **PRESERVES ABSENCE**: only a positive
-   * integer is attached, so `null`, `undefined`, `0`, `2.5` and junk all normalize to the
-   * SAME shape, key absent, exactly as `normalized.icon` is attached only when authored
-   * below. Absence is unlimited, not a defaulting accident: a system that has never been
-   * asked the question must not silently acquire a bound that truncates recipe picks
-   * already on disk ({@link resolveMaxModifierPicks} owns that meaning, and is reused
-   * here so the two cannot drift). The cap is stored system-wide regardless of the
-   * current rule, so flipping between the two selecting rules does not destroy it.
+   * `icon`, `min` and `max` are all ABSENCE-PRESERVING: each is attached only when
+   * authored, so `null`, `undefined`, `''` and junk all normalize to the same shape (key
+   * absent) and absence means unbounded. `0` is a real bound and survives, which is why
+   * the guard is `Number.isFinite` and not truthiness. An inverted pair (`min > max`) is
+   * PRESERVED VERBATIM rather than repaired: it is a blocking readiness issue
+   * (`modifierBoundsInverted`) that the GM must fix, and silently swapping the pair would
+   * roll a number nobody authored. `clampModifierValue` makes such an entry contribute 0
+   * meanwhile — the refuse posture gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS`
+   * already takes.
+   * @param {unknown} catalogue Raw `system.checkModifiers`.
+   * @returns {Array<{id: string, label: string, expression: string, icon?: string,
+   *   min?: number, max?: number}>}
    * @private
    */
-  _normalizeCheckModifierConfig(check) {
-    const rawCatalogue = Array.isArray(check?.checkModifiers) ? check.checkModifiers : [];
+  _normalizeCheckModifierCatalogue(catalogue) {
+    const raw = Array.isArray(catalogue) ? catalogue : [];
     const seenIds = new Set();
     const checkModifiers = [];
-    for (const entry of rawCatalogue) {
+    for (const entry of raw) {
       if (!entry || typeof entry !== 'object') continue;
       const id = typeof entry.id === 'string' && entry.id.trim() ? entry.id.trim() : null;
       if (!id || seenIds.has(id)) continue;
@@ -643,9 +671,54 @@ export class CraftingSystemManager {
         expression: typeof entry.expression === 'string' ? entry.expression.trim() : '',
       };
       if (typeof entry.icon === 'string' && entry.icon.trim()) normalized.icon = entry.icon.trim();
+      // Asked of the RESOLVER rather than re-derived here, so the persisted shape and the
+      // clamp the engine applies cannot disagree about what an unbounded form is. That
+      // matters more than it looks: `Number(null)`, `Number('')` and `Number([])` are all
+      // `0`, and `0` is a REAL bound on this field — so a hand-written `Number.isFinite`
+      // guard here would MINT a bound of 0 every time the editor cleared one (it patches
+      // `null`), exactly the trap `_normalizeSalvage`'s `dcOverride` guard calls out.
+      const { min, max } = resolveModifierBounds(entry);
+      if (min !== null) normalized.min = min;
+      if (max !== null) normalized.max = max;
       checkModifiers.push(normalized);
     }
-    const validIds = new Set(checkModifiers.map((entry) => entry.id));
+    return checkModifiers;
+  }
+
+  /**
+   * Normalize ONE activity check's selection over the system catalogue (issue 1095):
+   * `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }`.
+   *
+   * ONE derivation, three callers — `_normalizeCraftingCheck`,
+   * `_normalizeSalvageCraftingCheck` and `_normalizeGatheringCraftingCheck` — so the
+   * three cannot drift. Each of these normalizers is an allowlist rebuild, so an
+   * unemitted key is dropped on the next save; sharing the emit is what makes "salvage
+   * silently loses its rule" unreachable rather than merely unlikely.
+   *
+   * `defaultModifierPolicy` is the COMBINATION RULE, one of the four
+   * {@link MODIFIER_POLICIES} — `addAll`/`highest`/`bySubject`/`playerPicks`, default
+   * `addAll`. It is validated through the resolver's own `normalizeModifierPolicy` rather
+   * than a literal repeated here, so the authoring surface and the engine can never
+   * disagree about which rules exist — and so the pre-1095 `byRecipe` reads as
+   * `bySubject` and is never re-emitted.
+   *
+   * `defaultModifierIds` names the catalogue entries this activity applies by default; an
+   * id naming nothing in the SYSTEM catalogue is dropped (order + de-dup preserved).
+   *
+   * `maxModifierPicks` — the cap on how many modifiers a SELECTING rule (`bySubject`,
+   * `playerPicks`) may pick — deliberately **PRESERVES ABSENCE**: only a positive
+   * integer is attached, so `null`, `undefined`, `0`, `2.5` and junk all normalize to the
+   * SAME shape, key absent. Absence is unlimited, not a defaulting accident: a check that
+   * has never been asked the question must not silently acquire a bound that truncates
+   * subject picks already on disk ({@link resolveMaxModifierPicks} owns that meaning, and
+   * is reused here so the two cannot drift). The cap is stored regardless of the current
+   * rule, so flipping between the two selecting rules does not destroy it.
+   *
+   * @param {object|null|undefined} check The raw activity check block.
+   * @param {Set<string>} validIds The ids present in the system-level catalogue.
+   * @private
+   */
+  _normalizeCheckModifierSelection(check, validIds) {
     const seenDefaults = new Set();
     const defaultModifierIds = (
       Array.isArray(check?.defaultModifierIds) ? check.defaultModifierIds : []
@@ -655,7 +728,7 @@ export class CraftingSystemManager {
       return true;
     });
     const defaultModifierPolicy = normalizeModifierPolicy(check?.defaultModifierPolicy) ?? 'addAll';
-    const normalized = { checkModifiers, defaultModifierPolicy, defaultModifierIds };
+    const normalized = { defaultModifierPolicy, defaultModifierIds };
     // Absence-preserving: `resolveMaxModifierPicks` reports every unbounded form —
     // absent, `null`, non-integer, non-positive — as `Infinity`, so only a real positive
     // integer cap survives as a key and unlimited stays unlimited.
@@ -1098,7 +1171,7 @@ export class CraftingSystemManager {
     return null;
   }
 
-  _normalizeSalvageCraftingCheck(check = {}) {
+  _normalizeSalvageCraftingCheck(check = {}, validCatalogueIds = new Set()) {
     const normalizedCheck = !check || typeof check !== 'object' ? {} : check;
     const outcomes = Array.isArray(normalizedCheck.outcomes) ? normalizedCheck.outcomes : [];
     const normalizedOutcomes = outcomes
@@ -1128,6 +1201,10 @@ export class CraftingSystemManager {
       routed: this._normalizeRoutedCraftingCheck(normalizedCheck.routed),
       progressive: this._normalizeProgressiveCraftingCheck(normalizedCheck.progressive),
       outcomes: normalizedOutcomes.length > 0 ? [...new Set(normalizedOutcomes)] : ['fail', 'pass'],
+      // Salvage's OWN selection over the system catalogue (issue 1095). New here: before
+      // this change salvage had no modifier seam at all and the engine passed no context.
+      // Shares one derivation with crafting and gathering, so the three cannot drift.
+      ...this._normalizeCheckModifierSelection(normalizedCheck, validCatalogueIds),
     };
   }
 
@@ -1135,12 +1212,19 @@ export class CraftingSystemManager {
   // routed). d100 needs no editable config (the fixed d100 roll), so only the
   // progressive and routed sub-objects are authored, reusing the crafting shapes.
   // A per-task DC override lives on the gathering task (`task.dcOverride`).
-  _normalizeGatheringCraftingCheck(check = {}) {
+  _normalizeGatheringCraftingCheck(check = {}, validCatalogueIds = new Set()) {
     const source = !check || typeof check !== 'object' ? {} : check;
     return {
       enabled: source.enabled === true,
       progressive: this._normalizeProgressiveCraftingCheck(source.progressive),
       routed: this._normalizeRoutedCraftingCheck(source.routed),
+      // Gathering's OWN selection over the system catalogue (issue 1095). It applies to
+      // the FORMULA-ROLLED modes only: `d100` rolls no authored formula, so the catalogue
+      // is inert under it with cause `noCheck`. The selection is persisted regardless of
+      // the current mode so switching modes never destroys it — and today every
+      // formula-rolled gathering mode is disabled pending issue 683 (decision 8), so the
+      // whole surface is dormant rather than live.
+      ...this._normalizeCheckModifierSelection(source, validCatalogueIds),
     };
   }
 
@@ -1916,6 +2000,10 @@ export class CraftingSystemManager {
         toolIds: [],
         resultGroups: [],
         dcOverride: null,
+        // `checkModifierIds` is deliberately ABSENT from this literal, not `[]`: an empty
+        // array is an AUTHORED pick of zero, and a component with no salvage config at all
+        // has authored nothing. Seeding one here would silently give every such component a
+        // pick of zero modifiers under `bySubject`. See the attach in the main return.
       };
     }
 
@@ -1985,6 +2073,14 @@ export class CraftingSystemManager {
       // next system save. Coerced to trimmed, non-empty, deduped id strings.
       toolIds: this._normalizeToolIds(salvage.toolIds),
       resultGroups,
+      // This component's own check-modifier pick (issue 1095) — the SALVAGE analogue of
+      // `Recipe.craftingModifier.modifierIds`, consulted only under the `bySubject`
+      // combination rule. Attached ONLY when authored, keyed on `Array.isArray` AT ENTRY:
+      // an authored EMPTY array is a real pick of zero and survives as `[]`, distinct from
+      // an absent one which inherits `salvageCraftingCheck.defaultModifierIds`. That is
+      // deliberately NOT keyed on the post-filter length, so a pick whose junk members the
+      // filter removes stays an authored pick rather than reverting to inherit.
+      ...authoredCheckModifierIds(salvage.checkModifierIds),
       ...(salvage.outcomeRouting &&
         typeof salvage.outcomeRouting === 'object' && {
           outcomeRouting: { ...salvage.outcomeRouting },

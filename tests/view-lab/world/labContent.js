@@ -3044,7 +3044,7 @@ const PROGRESSIVE_CHECK = Object.freeze({
   // header: it names this harness as the reason). This is that opt-out.
   //
   // 3 is the option count, so it is unlimited in every observable way:
-  // `buildCraftingModifierChoice` computes `Math.min(cap, modifiers.length)` and lands on the same
+  // `buildCheckModifierChoice` computes `Math.min(cap, modifiers.length)` and lands on the same
   // `maxPicks: 3` an unbounded cap produces, so the roll prompt still renders the checkbox group
   // legended "Pick up to 3", and the non-interactive best-legal-selection still sums all three.
   //

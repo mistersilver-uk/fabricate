@@ -987,7 +987,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The recipe end of the `byRecipe` rule (issue 1055) ───────────────────────────────────────
+  // ── The recipe end of the `bySubject` rule (issues 1055, 1095) ───────────────────────────────
   //
   // Every frame below reaches its state by CLICKING the rule group (and, for the capped pair, by
   // typing into the pick-cap Stepper) rather than by authoring a second catalogued system. The
@@ -1022,7 +1022,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // The per-recipe check-modifier picker AT REST. `RecipeOverviewTab` gates the whole control on
-    // `craftingModifierOptions.length > 0` AND on the system's rule being `byRecipe`, so it exists
+    // `craftingModifierOptions.length > 0` AND on the system's rule being `bySubject`, so it exists
     // on exactly one lab system — herbalism, the only one carrying a catalogue — and every other
     // recipe-editor frame in this registry runs on smithing or jewelry.
     //
@@ -1033,7 +1033,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-kiln"]' },
       { selector: '#recipe-tab-overview' },
@@ -1083,7 +1083,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1124,7 +1124,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '5' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1150,7 +1150,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '3' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -1172,7 +1172,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // no counterpart frame of the surface being gone.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE NEGATIVE FRAME, and the one the redesign turns on. Under any rule but `byRecipe` this
+    // THE NEGATIVE FRAME, and the one the redesign turns on. Under any rule but `bySubject` this
     // tab renders NOTHING about check modifiers — no picker, and no standing "the system decides"
     // banner either. The rejected design put such a banner on every recipe of every system that
     // never delegated, and this frame is the evidence that it is gone rather than merely restyled.
@@ -1257,13 +1257,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     // so this frame is also the only evidence that the control is withdrawn rather than left
     // live-but-useless, and the only one showing `RecipeModeBanner`'s warning tone at all.
     //
-    // The `byRecipe` click is what makes the contradiction reachable: under a non-selecting
+    // The `bySubject` click is what makes the contradiction reachable: under a non-selecting
     // rule there are no picks to warn about and the tab says nothing.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-check-roll-formula]', fill: '' },
       { selector: '[data-checks-save]' },
       'Crafting',
@@ -1272,7 +1272,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-modifier-inert]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The cause, and the withdrawal. The rule click puts this system on `byRecipe`, so an
+    // The cause, and the withdrawal. The rule click puts this system on `bySubject`, so an
     // inert state that failed to suppress the control would still render the picker cell —
     // which is exactly what this frame claims cannot happen.
     expectSelector:
@@ -1871,19 +1871,21 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#checks-tab-crafting' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
       // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so anchoring the LAST of
-      // the things this frame is named for — the default-modifier pill row, below the rule group —
-      // puts the whole card in frame with the catalogue rows above it for context.
+      // the things this frame is named for — the eligibility sentence below the rule group, which
+      // states what switching an entry on MEANS under the selected rule (issue 1095 replaced the
+      // separate default-modifier pill row with a per-row eligibility control) — puts the whole
+      // card in frame with the catalogue rows above it for context.
       { selector: '[data-crafting-modifier-defaults]', scroll: true },
     ],
     expectView: 'checks',
-    // Two things at once, on the one card. `byRecipe` is the FOURTH option — the one the redesign
+    // Two things at once, on the one card. `bySubject` is the FOURTH option — the one the redesign
     // restored, the one that makes the row count even, and the only one whose absence would
     // silently turn the 2x2 this frame is evidence for back into a three-across row. The
     // `unlimited` cap reading is the other half, and asserting the VALUE rather than the field's
     // presence is what separates this frame from its bounded sibling.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue]' +
-      ':has([data-crafting-modifier-policy-option="byRecipe"])' +
+      ':has([data-crafting-modifier-policy-option="bySubject"])' +
       ':has([data-crafting-modifier-max-picks="unlimited"])',
     kinds: ['manager', 'checks'],
     sourceMatches: [
@@ -1903,14 +1905,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     // different pictures of the same control — which is exactly the pair a reviewer needs to judge
     // whether "empty means no limit" is legible without reading the hint.
     //
-    // `byRecipe` rather than `playerPicks`, so the two cap frames also differ in their hint: the
+    // `bySubject` rather than `playerPicks`, so the two cap frames also differ in their hint: the
     // cap means a bound on the RECIPE AUTHOR at edit time here and on the PLAYER at roll time
     // there, and the card keys its sentence off the rule rather than writing one ambiguous line.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
       { selector: '#checks-tab-crafting' },
-      { selector: '[data-crafting-modifier-policy-option="byRecipe"] input' },
+      { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
@@ -3906,7 +3908,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // RE-AIMED by issue 1055, and the aim moved for a reason worth recording. The rule used to be
     // a per-RECIPE override on this recipe; a recipe can no longer override the system's rule at
     // all, so it now lives on `lab-herbalism` itself (`labContent.js`). The system is UNBOUNDED,
-    // so `buildCraftingModifierChoice` clamps `maxPicks` to the three eligible modifiers and the
+    // so `buildCheckModifierChoice` clamps `maxPicks` to the three eligible modifiers and the
     // fieldset renders as a MULTI-pick checkbox group legended "Pick up to 3" — the control this
     // change introduces, rather than the pick-one radio group it generalizes.
     reaches: 'exact',
