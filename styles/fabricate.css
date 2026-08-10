@@ -5190,6 +5190,16 @@
   align-items: center;
   justify-content: flex-start;
   gap: var(--fab-space-2);
+
+  /* The switch never shrinks. As a flex item it defaults to `flex-shrink: 1`, and
+     `min-width: 0` lets it squash below its content, so in a tight row the button
+     narrows while the 34px track (`flex: 0 0 34px`) keeps its size and spills out to
+     the right — over the parent's padding and into its border. The squeeze scales
+     with how much the row overflows, so a status card with a long sub-line pushed its
+     switch ~10px further right than its shorter siblings and broke the alignment of
+     the switch column. The copy column beside it carries `min-width: 0` and absorbs
+     the shrink instead. */
+  flex: 0 0 auto;
   width: auto;
   min-width: 0;
   max-width: 78px;
