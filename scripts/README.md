@@ -52,22 +52,73 @@ node scripts/foundry-test-down.mjs --clean
 
 # Against an already-running Foundry instance
 node scripts/foundry-test-run.mjs
+
+# The narrow boot-and-assert arm (issue 1088): boot, join, confirm Fabricate loads,
+# assert a few version-sensitive API shapes, exit. Roughly a minute, not the ~32-minute walk.
+npm run test:foundry:v13       # Foundry 13.351 + dnd5e 5.2.5
+npm run test:foundry:v14       # the default 14.365 build, same assertions
 ```
+
+The two arms share one container identity (the felddy licence binds to the hostname), so they must
+never run at the same time in one worktree.
+See "Smoke arms" in `CONTRIBUTING.md`.
 
 ### Environment Variables
 
+Every variable the Foundry harness reads, grouped by what it controls.
+Read `docker-compose.foundry.yml` alongside this: the container-identity and credential rows are consumed there, not in JavaScript.
+
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+#### Credentials and licensing
+
+Loaded from `.env.foundry` when present; CI sets them directly.
 
 | Variable | Default | Description |
 |---|---|---|
-| `FOUNDRY_URL` | `http://localhost:30100` | Base URL of the Foundry instance |
-| `FOUNDRY_HOST_PORT` | `30100` | Host port used by the Docker harness. The default is 30100 (not 30000) so the smoke test can coexist with a developer's local Foundry on 30000; override with a matching `FOUNDRY_URL` if 30100 is also occupied. |
-| `FOUNDRY_ADMIN_KEY` | `fabricate-test-admin` | Admin password for the setup/auth page |
-| `FOUNDRY_IMAGE` | `felddy/foundryvtt:14.365` | Docker image used by the compose harness. Pinned to an exact build in `docker-compose.foundry.yml`, which `scripts/foundry-test-up.mjs` reads rather than restating: the CI archive cache key hashes that file, and the View Lab harvests whatever archive this image downloads. |
-| `FOUNDRY_RELEASE_URL` | unset | Optional explicit Foundry release URL. When unset, `test:foundry:up` uses a matching local cached zip if one exists. |
-| `FOUNDRY_RECREATE` | unset | Set to `1` before `npm run test:foundry:up` to discard and recreate the cached container. |
+| `FOUNDRY_USERNAME` | required | Foundry account username. `test:foundry:up` exits 1 without it. |
+| `FOUNDRY_PASSWORD` | required | Foundry account password. |
+| `FOUNDRY_LICENSE_KEY` | empty | Optional license key forwarded to the container. Credential-only activation can intermittently leave the instance unlicensed (it then boots to the License Key Activation page and the harness fails before the EULA step), so CI forwards the key for a deterministic activation. |
+| `FOUNDRY_ADMIN_KEY` | `fabricate-test-admin` | Admin password for the setup/auth page. Set in the compose file; the harness reads the same value to fill the form. |
+
+#### Which Foundry boots
+
+| Variable | Default | Description |
+|---|---|---|
+| `FOUNDRY_SMOKE_ARM` | `v14` | Which Foundry generation the harness boots — `v14` or `v13` (issue 1088). Resolved by `scripts/lib/foundrySmokeArms.js` into an image, a dnd5e release and the world manifest's `coreVersion`. `--arm=<id>` on `foundry-test.mjs` sets it. |
+| `FOUNDRY_IMAGE` | the selected arm's image (`v14` reads the pin in `docker-compose.foundry.yml`) | Docker image used by the compose harness. The default arm's pin lives in the compose file and is read rather than restated — the CI archive cache key hashes that file, and the View Lab harvests whatever archive this image downloads. **A non-default arm reaches Docker through this variable only; do not edit the compose pin to switch generation.** |
+| `FOUNDRY_VERSION` | derived | Overrides the Foundry build used to name the cached release archive. Normally derived from the image's `com.foundryvtt.version` label, falling back to the arm's image tag. |
+| `FOUNDRY_RELEASE_URL` | unset | Optional explicit Foundry release URL. When unset, `test:foundry:up` points the container at a matching local cached zip if one exists (an offline install). |
+| `FOUNDRY_RECREATE` | unset | Set to `1` before `npm run test:foundry:up` to discard and recreate the cached container. Not needed for an arm switch — `up` recreates automatically when the cached container's image differs from `FOUNDRY_IMAGE`. |
+
+#### Container identity and endpoint
+
+Derived per worktree by `scripts/lib/foundryRunIdentity.js`; override only to pin a run.
+
+| Variable | Default | Description |
+|---|---|---|
+| `FOUNDRY_URL` | `http://localhost:<derived port>` | Base URL Playwright targets. Reconciled with `FOUNDRY_HOST_PORT` so the two can never name different ports. |
+| `FOUNDRY_HOST_PORT` | derived, in `[30100, 30500)` | Host port the container binds. The base is 30100 (not 30000) so the smoke can coexist with a developer's local Foundry; `foundry-test.mjs` scans upward for a free port when neither this nor `FOUNDRY_URL` is pinned. |
+| `FOUNDRY_CONTAINER_NAME` | `fabricate-foundry-<hash>` | Container name, hashed from the worktree root so worktrees do not collide. |
+| `FOUNDRY_CONTAINER_HOSTNAME` | `fabricate-<hash>` | Container hostname. **The felddy licence binds to this**, so a new value consumes a Foundry activation; it is stable per worktree, and shared by every arm, for exactly that reason. |
+| `COMPOSE_PROJECT_NAME` | `fabricate-foundry-<hash>` | Compose project, so `down` tears down this worktree's container and never a sibling's. |
+| `FOUNDRY_HOST_UID` / `FOUNDRY_HOST_GID` | `1000` on Windows, else `id -u`/`id -g` | User the container runs as, so bind-mounted volumes are writable. |
+
+#### What runs, and for how long
+
+| Variable | Default | Description |
+|---|---|---|
+| `FOUNDRY_SMOKE_PROFILE` | `full` | Walk profile for the full smoke — `full`, `rc`, `ci` or `screenshots`. `--profile=<id>` sets it. Ignored by the narrow version arm. |
+| `FOUNDRY_RUN_TIMEOUT_MS` | profile-derived | Wall-clock budget for the run phase, so a CI job timeout can never preempt teardown and artifact upload. **A check that declares its own budget wins over this** — `--check=version` is always 360000. That reverses the usual precedence on purpose: this variable's documented use is to *enlarge* the long walk's budget (`FOUNDRY_RUN_TIMEOUT_MS=1500000`), so in a shell where it is exported the one-minute version arm would otherwise silently inherit 25 minutes and a hang would stop looking like a hang. Every run prints the budget it chose and where it came from. |
+| `FOUNDRY_SKIP_BUILD` | unset | Set to `1` to skip the `npm run build` step `foundry-test.mjs` performs before `up`. CI builds in its own cached step. A stale `dist/` silently tests old code, so only skip when you have just built. |
+| `FOUNDRY_SMOKE_THEMES` | unset | Set to `1` (or pass `--themes`) to regenerate the two 7-theme screenshot sweeps, which are off by default because the 14 frames are unasserted and unmapped. |
+| `FOUNDRY_SCREENSHOT_TARGET_LABELS` | empty | CSV of smoke screenshot labels to scope the `screenshots` profile to (issue 826). `--target-labels=<csv>` sets it; empty captures the full catalogue. |
+| `FOUNDRY_SCREENSHOT_HEAD_SHA` | `git HEAD` | Exact-head override stamped into screenshot evidence. |
+| `FOUNDRY_ALLOWED_CONSOLE_ERROR_PATTERNS` | empty | CSV of extra console/`pageerror` waiver patterns, **appended** to the in-source defaults (never replacing them). `--allowed-console-error-patterns <csv>` does the same. Reach for it last: the canvas-priority default that lived in-source for a year was suppressing a real harness defect (issue 1010). |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+`GITHUB_SHA` and `GITHUB_STEP_SUMMARY` are read when present but are set by GitHub Actions, not by a developer.
 
 ### Foundry Download Cache
 

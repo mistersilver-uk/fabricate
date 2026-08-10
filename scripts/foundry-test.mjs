@@ -5,7 +5,13 @@
  * Ensures `down` is always called even if `run` fails, so containers
  * are never left orphaned in CI.
  *
- * Usage: node scripts/foundry-test.mjs
+ * Usage: node scripts/foundry-test.mjs [--profile=<full|rc|ci|screenshots>]
+ *                                      [--arm=<v14|v13>] [--check=<full|version>]
+ *
+ * `--arm` picks the Foundry generation (issue #1088) and `--check` picks what runs against it.
+ * They are deliberately separate axes: the narrow boot-and-assert check is what makes a V13 run
+ * cheap, but it is equally runnable against V14 — and running it on both is the only way to know
+ * that a V13 failure is a V13 failure rather than a broken check.
  *
  * Exit codes:
  *   0 — smoke test passed
@@ -25,9 +31,24 @@ import {
   PORT_SPAN
 } from './lib/foundryRunIdentity.js';
 import { defaultRunTimeoutMs, resolveSmokeProfile } from './lib/foundryRunBudget.js';
+import { SMOKE_ARM_ENV_VAR, normalizeSmokeArmName } from './lib/foundrySmokeArms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
+
+/**
+ * What runs against the booted container, and the wall-clock budget it gets.
+ *
+ * `version` exists because the full walk takes ~32 minutes, which is a price worth paying once per
+ * release candidate and never worth paying to answer "does Fabricate still load at all on the
+ * generation `module.json` declares as its minimum?". Its budget is a flat 6 minutes: it boots,
+ * asserts a handful of version-sensitive shapes and exits, so anything approaching that number is a
+ * hang rather than a long run.
+ */
+const CHECKS = Object.freeze({
+  full: Object.freeze({ script: 'foundry-test-run.mjs', timeoutMs: null }),
+  version: Object.freeze({ script: 'foundry-version-assert.mjs', timeoutMs: 360_000 })
+});
 
 /**
  * Whether a TCP port on 127.0.0.1 is bindable right now. Used for the free-port
@@ -118,25 +139,86 @@ function runScript(scriptPath, args = [], timeoutMs) {
   return result.status ?? 1;
 }
 
-async function main() {
-  // Optional --profile=<full|rc|ci|screenshots> CLI arg flows through to the child run
-  // script via FOUNDRY_SMOKE_PROFILE. Useful for cross-platform local CI emulation;
-  // POSIX users could also set the env var directly. The scoped `screenshots` profile
-  // (issue #826) additionally reads --target-labels=<csv> (the smoke labels of the
-  // views a PR affects, from `ui-pr-screenshot-evidence.mjs targets`) and forwards it
-  // as FOUNDRY_SCREENSHOT_TARGET_LABELS; empty means capture the full label set.
-  for (const arg of process.argv.slice(2)) {
+/**
+ * Read the CLI flags into the environment the child phases inherit, and return the check to run.
+ *
+ * `--profile=<full|rc|ci|screenshots>` flows through as FOUNDRY_SMOKE_PROFILE (useful for
+ * cross-platform local CI emulation; POSIX users could export it directly). The scoped `screenshots`
+ * profile additionally reads `--target-labels=<csv>` (the smoke labels of the views a PR affects,
+ * from `ui-pr-screenshot-evidence.mjs targets`) and forwards it as
+ * FOUNDRY_SCREENSHOT_TARGET_LABELS; empty means capture the full label set. `--arm` reaches `up`,
+ * `fetch-systems` and `setup-data` through the environment ONLY — nothing here or in them edits
+ * docker-compose.foundry.yml, whose pin the View Lab version lock reads.
+ *
+ * @param {string[]} argv
+ * @returns {string} The `--check` name, defaulting to `full`.
+ */
+function applyCliArguments(argv) {
+  let checkName = 'full';
+  for (const arg of argv) {
     const profile = /^--profile=(.+)$/.exec(arg);
     if (profile) process.env.FOUNDRY_SMOKE_PROFILE = profile[1];
     const targets = /^--target-labels=(.*)$/.exec(arg);
     if (targets) process.env.FOUNDRY_SCREENSHOT_TARGET_LABELS = targets[1];
+    const arm = /^--arm=(.+)$/.exec(arg);
+    if (arm) process.env[SMOKE_ARM_ENV_VAR] = normalizeSmokeArmName(arm[1]);
+    const check = /^--check=(.+)$/.exec(arg);
+    if (check) checkName = check[1];
   }
+  return checkName;
+}
+
+/**
+ * The run phase's wall-clock budget, and where it came from.
+ *
+ * The run phase gets a budget so the GitHub Actions job timeout can never preempt Docker teardown +
+ * artifact upload. The default is PROFILE-DERIVED (expected walk + finalization grace) so it clears
+ * a legitimately-passing walk of that profile plus its post-verdict `summary.json` write.
+ *
+ * A check that declares its OWN budget wins over FOUNDRY_RUN_TIMEOUT_MS, which is the reverse of the
+ * usual precedence and deliberate. That variable's documented use is to ENLARGE the long walk's
+ * budget (`FOUNDRY_RUN_TIMEOUT_MS=1500000`), so in a shell where it is exported the narrow version
+ * arm would silently inherit 25 minutes — and a hang would stop looking like a hang, which is the
+ * one thing a one-minute check exists to make obvious. The source is returned so no run has to guess
+ * which rule applied.
+ *
+ * @param {{ timeoutMs: number|null }} selectedCheck
+ * @param {string} checkName
+ * @returns {{ runTimeoutMs: number, budgetSource: string }}
+ */
+function resolveRunBudget(selectedCheck, checkName) {
+  const profile = resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE);
+  if (selectedCheck.timeoutMs !== null) {
+    return { runTimeoutMs: selectedCheck.timeoutMs, budgetSource: `--check=${checkName}` };
+  }
+  if (process.env.FOUNDRY_RUN_TIMEOUT_MS) {
+    return {
+      runTimeoutMs: Number(process.env.FOUNDRY_RUN_TIMEOUT_MS),
+      budgetSource: 'FOUNDRY_RUN_TIMEOUT_MS'
+    };
+  }
+  return { runTimeoutMs: defaultRunTimeoutMs(profile), budgetSource: `smoke profile ${profile}` };
+}
+
+async function main() {
+  const checkName = applyCliArguments(process.argv.slice(2));
+
+  // `Object.hasOwn`, not a bare index: `CHECKS.constructor` is a truthy inherited Object, so an
+  // index would sail past this guard and die much later inside `join()` with
+  // "Path must be a string". Mirrors normalizeSmokeArmName in scripts/lib/foundrySmokeArms.js.
+  if (!Object.hasOwn(CHECKS, checkName)) {
+    process.stderr.write(
+      `Unknown --check=${checkName}; expected one of ${Object.keys(CHECKS).join(', ')}.\n`
+    );
+    process.exit(2);
+  }
+  const selectedCheck = CHECKS[checkName];
 
   // Pin the per-worktree container identity + host port/URL for every child phase.
   await exportRunIdentity();
 
   const up = join(__dirname, 'foundry-test-up.mjs');
-  const run = join(__dirname, 'foundry-test-run.mjs');
+  const run = join(__dirname, selectedCheck.script);
   const down = join(__dirname, 'foundry-test-down.mjs');
 
   // Step 0: Build the module so the smoke always exercises CURRENT source.
@@ -165,20 +247,12 @@ async function main() {
   }
 
   // Step 2: Run the smoke test (capture result, always proceed to down).
-  // The run phase gets its own wall-clock budget so the 25-minute GitHub
-  // Actions job timeout can never preempt Docker teardown + artifact upload.
-  // The default is PROFILE-DERIVED (expected walk + finalization grace) so it
-  // clears a legitimately-passing walk of that profile plus its post-verdict
-  // `summary.json` write: `rc`/`ci` keep today's ~18-minute budget (~870-930s
-  // walk) while `full`/`screenshots` get enough headroom that the long walk no
-  // longer needs a manual override to avoid a SIGTERM mid-finalization. An
-  // explicit FOUNDRY_RUN_TIMEOUT_MS (e.g. CI's pin) still wins, and the budget
-  // stays well under the job cap so teardown + upload always run.
+  // `rc`/`ci` keep today's ~18-minute budget (~870-930s walk) while `full`/`screenshots` get enough
+  // headroom that the long walk no longer needs a manual override to avoid a SIGTERM
+  // mid-finalization. See resolveRunBudget for the precedence and why a check's own budget wins.
   process.stdout.write('=== foundry-test: RUN ===\n');
-  const runTimeoutMs = Number(
-    process.env.FOUNDRY_RUN_TIMEOUT_MS ??
-      defaultRunTimeoutMs(resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE))
-  );
+  const { runTimeoutMs, budgetSource } = resolveRunBudget(selectedCheck, checkName);
+  process.stdout.write(`Run budget: ${runTimeoutMs}ms (from ${budgetSource})\n`);
   const runCode = runScript(run, [], runTimeoutMs);
 
   // Step 3: Tear down regardless of test result

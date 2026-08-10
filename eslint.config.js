@@ -264,6 +264,24 @@ export default [
     },
   },
 
+  // 6b. Harness scripts that ship code INTO a browser page.
+  //
+  //     A Playwright `page.evaluate(fn)` serialises `fn` and runs it inside Foundry's page, so the
+  //     body legitimately references `document`, `HTMLElement`, `game` and friends — none of which
+  //     exist in the Node process that wrote them. Without these globals `no-undef` fires on
+  //     perfectly correct in-page code, and the only ways to silence it are worse than declaring
+  //     them: a file-level disable, or `globalThis.`-qualifying every DOM reference (which changes
+  //     what a `page.evaluate` body reads like for no benefit inside a page that always has a DOM).
+  //
+  //     Scoped to the two files that actually do this rather than to `scripts/**`: over-declaring
+  //     browser globals across the whole harness would hide a real `document` typo in Node code.
+  {
+    files: ['scripts/lib/foundryBrowserBoot.js', 'scripts/foundry-version-assert.mjs'],
+    languageOptions: {
+      globals: { ...globals.browser, ...foundryGlobals },
+    },
+  },
+
   // 7. Tests run under `node --test` with a happy-dom DOM, and dynamically
   //    import shipped code — so they see both Node and browser globals. Relax
   //    the rules that punish test ergonomics.

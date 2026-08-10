@@ -673,6 +673,8 @@ npm run build
 - `npm run test:foundry:down` — stop and remove the container (preserve the image).
 - `npm run test:foundry:rc` — release-candidate profile.
 - `npm run test:foundry:screenshots` — scoped PR screenshot evidence (issue 826): full real-Foundry frames for only the views a PR affects (pass `-- --target-labels=<csv>` from `npm run screenshots:ui:targets` to scope it; empty captures the full catalogue).
+- `npm run test:foundry:v13` — the narrow **V13 boot-and-assert arm** (issue 1088), about a minute on a warm container; see "The narrow V13 arm" below.
+- `npm run test:foundry:v14` — the same narrow arm against the default (14.365) build.
 
 To run the release-candidate CI profile locally:
 
@@ -691,6 +693,62 @@ node scripts/foundry-test-down.mjs --clean
 
 Scripts live in `scripts/foundry-test-*.mjs`.
 The main harness is `scripts/foundry-test-run.mjs` (~3700 lines).
+
+### Smoke arms: which Foundry generation boots
+
+`module.json` declares `minimum: "13"` and `verified: "14"`, and the harness can boot either.
+Which one is an **arm**, selected with `--arm=<v14|v13>` (or the `FOUNDRY_SMOKE_ARM` environment variable) and defined once in `scripts/lib/foundrySmokeArms.js`.
+An arm bundles the three things that must agree: the Docker image, the dnd5e release, and the world manifest's `coreVersion`.
+
+| Arm | Foundry | dnd5e | Selected by |
+|-----|---------|-------|-------------|
+| `v14` (default) | the pin in `docker-compose.foundry.yml` (14.365) | 5.3.3 (`verified: "14"`) | nothing — it is the default |
+| `v13` | 13.351 | 5.2.5 (`verified: "13"`) | `--arm=v13` / `FOUNDRY_SMOKE_ARM=v13` |
+
+Three properties of that design are load-bearing, and `tests/foundry-smoke-arms.test.js` pins each of them.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **The non-default arm is env-only.** It reaches Docker through `FOUNDRY_IMAGE`, and nothing writes it into `docker-compose.foundry.yml`. Editing that pin to boot 13 would red `tests/view-lab-chrome-version-lock.test.js` (which holds the View Lab's harvested window chrome to the build the smoke boots), rotate the CI `foundry-binary-*` cache key, and leave the lab attesting a build nothing runs.
+- **There is one committed world fixture.** `.foundry-e2e/worlds/fabricate-smoke-ci/world.json` targets the default arm; `scripts/foundry-setup-data.mjs` stamps `coreVersion`, `systemVersion` and `compatibility` onto the *runtime copy* for whichever arm is booting. A second committed fixture would drift, and the drift presents as a world-launch timeout that names nothing.
+- **Every arm shares one container identity.** The felddy licence binds to the container **hostname**, so a per-arm hostname would burn a second Foundry activation per worktree. Both arms therefore use the same container name, hostname, host port and data directory — which means **two arms can never run at the same time in one worktree**. Switching arms recreates the container (the felddy image extracts Foundry into the container filesystem, so a reused container would keep booting the previous generation); `foundry-test-up.mjs` detects the image mismatch and does this for you.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Downloaded game systems are kept per version under the gitignored `.foundry-e2e/systems-cache/`, so switching arms is a local copy rather than a repeat ~50 MB download.
+
+An arm switch installs a different dnd5e release, so Foundry migrates package data on the world's first launch afterwards.
+That is a one-off that can run past the compose healthcheck's grace period, and Docker then reports the container `unhealthy` — a state it clears again on the very next passing probe.
+`foundry-test-up.mjs` therefore treats `unhealthy` as "not answering yet" and waits for its own deadline rather than aborting, which is what it used to do; a run that hits this says so and carries on.
+
+### The narrow V13 arm (`npm run test:foundry:v13`)
+
+`scripts/foundry-version-assert.mjs` boots the arm's Foundry, launches the smoke world, joins as Gamemaster, confirms Fabricate loads, asserts a handful of version-sensitive API shapes, and exits.
+It is deliberately **not** the ~32-minute walk: it answers "is Fabricate broken on V13?" in about a minute, which is the question that otherwise goes unanswered between releases because V13 is unexercised everywhere else.
+
+It writes `test-results/version-arm-<arm>.json` (`{ arm, expectedFoundryVersion, image, passed, failure, assertions[], pageErrors[], consoleErrors[] }`) and `test-results/version-arm-<arm>-console.log`.
+A run fails on any failing assertion, any `pageerror`, or any non-waived console error; the waiver list is one entry (`/favicon/i`) on purpose.
+
+The assertions, and why each is there, are documented at the top of that script.
+In summary: `core-build` (the container really is running the arm's Foundry — without it a mis-set image tests 14 twice and reports a V13 pass), `fabricate-ready`, `compendium-directory`, `compendium-context` (the modern `{label, icon, visible, onClick}` entry shape, exercised against a really-rendered Item pack row **and** a non-Item control row), `settings-round-trip`, `region-subtype`, `region-sheet`, `scene-control`, `app-renders`.
+
+Two properties of that list are deliberate and worth preserving.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **Every entry is a check some build could fail.** An observation no verdict rests on goes in the summary's `reportedOnly` instead — which is where the `CompendiumCollection` namespace probe lives, because both supported builds expose the namespaced path *and* the bare global, so any assertion over it would pass by construction. A check that cannot fail is worse than no check: it buys confidence it has not earned and inflates the pass count a reader uses to judge coverage.
+- **`compendium-directory` is a named precondition, not padding.** `compendium-context` exercises Fabricate's `visible()` against a really-rendered sidebar row, so it needs one row of each kind to exist; the arm waits for them explicitly and reports the wait under its own name. Without that, a slow or unrendered Compendium Directory reported `compendium-context: FAIL` — that is, "Fabricate is broken on V13" — and the arm's whole value is that a red result is believable.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The `compendium-directory` wait was verified by mutating its predicate to demand an impossible document type: the run went red on `compendium-directory` with a message naming the sidebar, and `compendium-context` reported `blockedBy: compendium-directory` rather than sending anyone to debug `visible()`.
+
+The arm never touches the canvas and adds no console-error waiver keyed on a render-flag queue name.
+`Canvas##activateTicker` builds `pendingRenderFlags` with two queues on 13.351 and three on 14.365, so a placeable created before the first scene draw throws `reading 'OBJECTS'` on V13 and `reading 'INTERFACE'` on V14 — the same defect under two names.
+Issue 1010 retired that waiver from the full smoke after it hid a real defect for a year; anything needing a drawn canvas belongs in the full walk, which waits properly via `scripts/lib/foundryCanvasReadiness.js`.
+
+The setup → license → auth → launch → join path is shared with the full smoke through `scripts/lib/foundryBrowserBoot.js`, so both harnesses log in the same way and the join-control select-vs-tile fallback exists once.
+That module takes a Playwright `page` but never imports Playwright, and reporting (step records, screenshots, progress output) is injected by the caller.
 
 ### Phases
 
