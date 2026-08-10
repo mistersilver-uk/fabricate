@@ -12,6 +12,12 @@ stats.html
 .foundry-e2e/worlds/*/backups/
 # Downloaded game systems (fetched by scripts/foundry-fetch-systems.mjs)
 .foundry-e2e/systems/
+# Previously-fetched game-system releases, kept per version so switching smoke arms
+# (npm run test:foundry:v13) is a local copy rather than a repeat ~50 MB download.
+# A SIBLING of systems/ rather than a subdirectory of it because foundry-setup-data.mjs
+# installs every directory it finds under systems/ into the container as a game system —
+# a cache nested there would be installed as a second, bogus one. Never commit a game system.
+.foundry-e2e/systems-cache/
 # Foundry installation cache (avoids re-downloading)
 .foundry-e2e/cache/
 # Harvested Foundry window chrome for the View Lab (proprietary; never commit)

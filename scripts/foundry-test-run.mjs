@@ -56,6 +56,18 @@ import {
   SUPPRESSED_STEP_INDEX,
 } from './lib/foundryTourSuppression.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
+// The setup -> license -> auth -> launch -> join path lives in scripts/lib/foundryBrowserBoot.js so
+// the narrow V13 arm (scripts/foundry-version-assert.mjs) can boot a Foundry page WITHOUT importing
+// this file, which exports nothing and runs `main()` on import. Reporting is injected, so this
+// harness keeps recording its `results.steps[]` entries and screenshots exactly as before.
+import {
+  acceptLicenseIfPresent as acceptLicenseIfPresentShared,
+  authenticateIfRequired as authenticateIfRequiredShared,
+  createBootReporter,
+  getPathname,
+  joinWorldSession as joinWorldSessionShared,
+  launchWorld as launchWorldShared
+} from './lib/foundryBrowserBoot.js';
 import { isCanvasReadyForScene } from './lib/foundryCanvasReadiness.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
@@ -194,10 +206,6 @@ const RC_SCREENSHOT_BUDGET = new Set([
 const CAPTURE_THEME_SWEEPS =
   ['1', 'true', 'yes'].includes(String(process.env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase())
   || process.argv.slice(2).includes('--themes');
-
-const JOIN_BUTTON_SELECTOR = 'button:has-text("Join Game Session"), button[name="join"]';
-const JOIN_USER_SELECT_SELECTOR = 'select[name="userid"]';
-const JOIN_USER_TILE_SELECTOR = '[data-user-id]';
 
 /** @type {string[]} */
 const consoleErrors = [];
@@ -590,140 +598,12 @@ async function captureAlchemyThemes(page) {
 }
 
 /**
- * Safely parse a page pathname.
- * @param {string} rawUrl
- * @returns {string}
- */
-function getPathname(rawUrl) {
-  try {
-    return new URL(rawUrl).pathname;
-  } catch {
-    return '';
-  }
-}
-
-/**
  * Normalize text for stable UI matching.
  * @param {unknown} value
  * @returns {string}
  */
 function normalizeText(value) {
   return String(value ?? '').trim().toLowerCase();
-}
-
-/**
- * Summarize join-page state for debugging.
- * @param {{
- *   mode?: string | null,
- *   reason?: string | null,
- *   availableUsers?: string[],
- *   selectedLabel?: string,
- *   selectedValue?: string,
- *   joinButtonDisabled?: boolean,
- *   selectionMatches?: boolean
- * }} state
- * @param {string} userLabel
- * @returns {string}
- */
-function describeJoinState(state, userLabel) {
-  /** @type {string[]} */
-  const parts = [];
-  if (state.mode) parts.push(`mode=${state.mode}`);
-  if (state.selectedLabel) parts.push(`selectedLabel=${state.selectedLabel}`);
-  if (state.selectedValue) parts.push(`selectedValue=${state.selectedValue}`);
-  if (typeof state.selectionMatches === 'boolean') parts.push(`selectionMatches=${state.selectionMatches}`);
-  if (typeof state.joinButtonDisabled === 'boolean') parts.push(`joinButtonDisabled=${state.joinButtonDisabled}`);
-  if (Array.isArray(state.availableUsers) && state.availableUsers.length > 0) {
-    parts.push(`availableUsers=${state.availableUsers.join(', ')}`);
-  }
-  if (state.reason) parts.push(`reason=${state.reason}`);
-  return `Join diagnostics for "${userLabel}": ${parts.join('; ') || 'no details available'}.`;
-}
-
-/**
- * Accept first-run license if Foundry redirects to /license.
- * Safe to call on every run; no-op when license page is not present.
- * @param {import('playwright').Page} page
- * @param {{ steps: Array<Record<string, boolean | string>> }} results
- */
-async function acceptLicenseIfPresent(page, results) {
-  if (getPathname(page.url()) !== '/license') {
-    results.steps.push({ step: 'license-check', passed: true, skipped: true });
-    return;
-  }
-
-  process.stdout.write('License agreement detected. Accepting terms...\n');
-  await screenshot(page, 'license');
-
-  const checkboxCandidates = page.locator(
-    'input[name="agree"], input[id*="agree" i], input[type="checkbox"]'
-  );
-  if (await checkboxCandidates.count() === 0) {
-    // No EULA checkbox usually means Foundry booted unlicensed and is showing the
-    // License Key Activation page (a license-key text field + Submit Key button)
-    // rather than the EULA. That is an activation/credentials problem, not an EULA
-    // one — surface it clearly. Fix: ensure FOUNDRY_LICENSE_KEY is set and forwarded
-    // to the container (docker-compose.foundry.yml) so felddy activates at boot.
-    const keyActivation = await page
-      .locator('input[name="licenseKey"], input[id*="license" i], button:has-text("Submit Key")')
-      .count();
-    if (keyActivation > 0) {
-      throw new Error(
-        'Foundry booted unlicensed (License Key Activation page shown, not the EULA). ' +
-          'Ensure FOUNDRY_LICENSE_KEY is configured and forwarded to the container.'
-      );
-    }
-    throw new Error('License page detected, but agreement checkbox was not found.');
-  }
-
-  const checkbox = checkboxCandidates.first();
-  await checkbox.waitFor({ state: 'visible', timeout: 10_000 });
-  if (!(await checkbox.isChecked())) {
-    await checkbox.check();
-  }
-
-  const agreeButtonCandidates = page.locator(
-    'button:has-text("AGREE"), button:has-text("Agree"), button:has-text("I Agree")'
-  );
-  if (await agreeButtonCandidates.count() === 0) {
-    throw new Error('License page detected, but AGREE button was not found.');
-  }
-
-  const agreeButton = agreeButtonCandidates.first();
-  await agreeButton.waitFor({ state: 'visible', timeout: 10_000 });
-  await Promise.all([
-    page.waitForURL(/\/(setup|auth)(?:\?.*)?$/, { timeout: 60_000 }),
-    agreeButton.click()
-  ]);
-
-  await screenshot(page, 'license-accepted');
-  results.steps.push({ step: 'license-accepted', passed: true });
-}
-
-/**
- * Enter admin key on /auth page if present.
- * After successful auth, Foundry redirects to /setup.
- * @param {import('playwright').Page} page
- * @param {{ steps: Array<Record<string, boolean | string>> }} results
- */
-async function authenticateIfRequired(page, results) {
-  if (getPathname(page.url()) !== '/auth') {
-    return;
-  }
-
-  process.stdout.write('Admin auth page detected. Entering admin key...\n');
-  const adminInput = page.locator('input[name="adminKey"], input[name="password"], input[type="password"]').first();
-  await adminInput.waitFor({ state: 'visible', timeout: 10_000 });
-  await adminInput.fill(ADMIN_KEY);
-
-  const submitBtn = page.locator('button[type="submit"], button:has-text("Submit"), button:has-text("Log In")').first();
-  await Promise.all([
-    page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 60_000 }),
-    submitBtn.click()
-  ]);
-
-  await screenshot(page, 'auth-complete');
-  results.steps.push({ step: 'admin-auth-page', passed: true });
 }
 
 /**
@@ -829,311 +709,6 @@ async function suppressFoundryTours(context) {
       stepIndex: SUPPRESSED_STEP_INDEX,
     }
   );
-}
-
-/**
- * Dismiss first-run overlay dialogs on the setup page:
- * telemetry consent, backup tour, etc.
- * @param {import('playwright').Page} page
- * @param {{ steps: Array<Record<string, boolean | string>> }} results
- */
-async function dismissFirstRunDialogs(page, results) {
-  // 1. Telemetry / usage sharing dialog
-  try {
-    const declineSharing = page.locator('button:has-text("Decline Sharing")');
-    await declineSharing.waitFor({ state: 'visible', timeout: 10_000 });
-    process.stdout.write('Telemetry dialog detected. Declining...\n');
-    await declineSharing.click();
-    await declineSharing.waitFor({ state: 'hidden', timeout: 5_000 });
-    results.steps.push({ step: 'dismiss-telemetry', passed: true });
-  } catch {
-    // Not shown
-  }
-
-  // 2. Foundry tours (e.g. "Backups Overview") — dismiss via API
-  try {
-    await page.waitForTimeout(2_000); // Allow tours to start
-    const dismissed = await page.evaluate(() => {
-      const tour = globalThis.foundry?.nue?.Tour;
-      if (tour?.activeTour) {
-        tour.activeTour.exit();
-        return true;
-      }
-      return false;
-    });
-    if (dismissed) {
-      process.stdout.write('Active tour dismissed via API.\n');
-      results.steps.push({ step: 'dismiss-tour', passed: true });
-    }
-  } catch {
-    // No active tour
-  }
-}
-
-/**
- * Evaluate the current join-form state from the page, optionally selecting the target user.
- * @param {import('playwright').Page} page
- * @param {string} userLabel
- * @param {'read'|'select'} action
- */
-async function evaluateJoinControl(page, userLabel, action) {
-  return page.evaluate(({ selectSelector, tileSelector, userLabel: targetLabel, action }) => {
-    const normalize = value => String(value ?? '').trim().toLowerCase();
-    const target = normalize(targetLabel);
-    const isVisible = element => {
-      if (!(element instanceof HTMLElement)) return false;
-      if (element.hidden) return false;
-      const style = globalThis.getComputedStyle(element);
-      return style.display !== 'none' && style.visibility !== 'hidden' && element.offsetParent !== null;
-    };
-    const matchTarget = value => {
-      const normalized = normalize(value);
-      if (!normalized) return false;
-      return normalized === target || normalized.includes(target) || target.includes(normalized);
-    };
-    const getNodeLabel = node => {
-      const candidates = [
-        node.getAttribute('data-user-name'),
-        node.getAttribute('aria-label'),
-        node.textContent
-      ];
-      return candidates.map(value => String(value ?? '').trim()).find(Boolean) ?? '';
-    };
-    const findJoinButton = () => Array.from(document.querySelectorAll('button')).find(button => {
-      const text = normalize(button.textContent);
-      return text.includes('join game session') || button.name === 'join';
-    }) ?? null;
-    const findSelect = () => {
-      const selects = Array.from(document.querySelectorAll(selectSelector))
-        .filter(node => node instanceof HTMLSelectElement);
-      return selects.find(isVisible) ?? selects[selects.length - 1] ?? null;
-    };
-    const readOptions = select => Array.from(select.options)
-        .map(option => ({
-          option,
-          label: option.textContent?.trim() ?? '',
-          value: option.value,
-          disabled: option.disabled
-        }))
-        .filter(option => option.value && !option.disabled);
-    const readSelectState = select => {
-      const options = readOptions(select);
-      const selectedOption = select.selectedOptions?.[0];
-      const selectedLabel = selectedOption?.textContent?.trim() ?? '';
-      const selectedValue = select.value ?? '';
-
-      return {
-        mode: 'select',
-        targetFound: options.some(option => matchTarget(option.label)),
-        selectionMatches: Boolean(selectedValue) && matchTarget(selectedLabel),
-        selectedLabel,
-        selectedValue,
-        availableUsers: options.map(option => option.label || option.value).filter(Boolean),
-        joinButtonDisabled: Boolean(findJoinButton()?.disabled),
-        reason: options.length === 0 ? 'User select has no joinable options yet.' : null
-      };
-    };
-    const readTileState = (fallbackTile = null) => {
-      const tiles = Array.from(document.querySelectorAll(tileSelector))
-        .filter(isVisible);
-      const availableUsers = tiles.map(getNodeLabel).filter(Boolean);
-      const hiddenInput = document.querySelector('input[name="userid"]');
-      const selectedValue = hiddenInput instanceof HTMLInputElement ? hiddenInput.value : '';
-      const selectedTile = tiles.find(tile =>
-        tile.matches('[aria-selected="true"], .selected, [data-selected="true"], [aria-pressed="true"]')
-      ) ?? tiles.find(tile => {
-        const tileUserId = tile.getAttribute('data-user-id') ?? '';
-        return Boolean(selectedValue) && tileUserId === selectedValue;
-      }) ?? fallbackTile;
-      const selectedLabel = selectedTile ? getNodeLabel(selectedTile) : '';
-
-      return {
-        mode: tiles.length > 0 ? 'tile' : null,
-        targetFound: availableUsers.some(matchTarget),
-        selectionMatches: Boolean(selectedValue || selectedLabel) && matchTarget(selectedLabel || selectedValue),
-        selectedLabel,
-        selectedValue,
-        availableUsers,
-        joinButtonDisabled: Boolean(findJoinButton()?.disabled),
-        reason: tiles.length === 0 ? 'Join page did not expose a selectable user control.' : null
-      };
-    };
-
-    const select = findSelect();
-    if (action === 'select') {
-      if (select) {
-        const options = readOptions(select);
-        const match = options.find(entry => matchTarget(entry.label)) ?? null;
-        if (!match) {
-          const state = readSelectState(select);
-          return {
-            ...state,
-            selected: false,
-            reason: `User "${targetLabel}" was not found in the join select.`
-          };
-        }
-
-        select.selectedIndex = match.option.index;
-        select.dispatchEvent(new Event('input', { bubbles: true }));
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-        const state = readSelectState(select);
-        return {
-          ...state,
-          selected: state.selectionMatches,
-          reason: null
-        };
-      }
-
-      const tiles = Array.from(document.querySelectorAll(tileSelector))
-        .filter(isVisible);
-      const match = tiles.find(tile => matchTarget(getNodeLabel(tile))) ?? null;
-      if (!match) {
-        const state = readTileState();
-        return {
-          ...state,
-          selected: false,
-          reason: `User "${targetLabel}" was not found in the join tiles.`
-        };
-      }
-
-      match.click();
-      const state = readTileState(match);
-      return {
-        ...state,
-        selected: state.selectionMatches,
-        reason: null
-      };
-    }
-
-    return select ? readSelectState(select) : readTileState();
-  }, {
-    selectSelector: JOIN_USER_SELECT_SELECTOR,
-    tileSelector: JOIN_USER_TILE_SELECTOR,
-    userLabel,
-    action
-  });
-}
-
-/**
- * Read the current join-form state from the page.
- * @param {import('playwright').Page} page
- * @param {string} userLabel
- * @returns {Promise<{
- *   mode: string | null,
- *   targetFound: boolean,
- *   selectionMatches: boolean,
- *   selectedLabel: string,
- *   selectedValue: string,
- *   availableUsers: string[],
- *   joinButtonDisabled: boolean,
- *   reason: string | null
- * }>}
- */
-async function readJoinState(page, userLabel) {
-  return evaluateJoinControl(page, userLabel, 'read');
-}
-
-/**
- * Wait until the join UI exposes a selectable user.
- * @param {import('playwright').Page} page
- * @param {string} userLabel
- */
-async function waitForJoinUi(page, userLabel) {
-  const joinButton = page.locator(JOIN_BUTTON_SELECTOR).first();
-  await joinButton.waitFor({ state: 'visible', timeout: 15_000 });
-  const startedAt = Date.now();
-  let lastState = null;
-  while (Date.now() - startedAt < 15_000) {
-    lastState = await readJoinState(page, userLabel);
-    if (lastState.targetFound) return;
-    await page.waitForTimeout(250);
-  }
-  throw new Error(lastState?.reason ?? `Join UI did not expose "${userLabel}" within 15000ms.`);
-}
-
-/**
- * Attempt to select the target join user.
- * @param {import('playwright').Page} page
- * @param {string} userLabel
- * @returns {Promise<{
- *   selected: boolean,
- *   mode: string | null,
- *   availableUsers: string[],
- *   selectedLabel: string,
- *   selectedValue: string,
- *   reason: string | null
- * }>}
- */
-async function selectJoinUser(page, userLabel) {
-  return evaluateJoinControl(page, userLabel, 'select');
-}
-
-/**
- * Join the running world from the Foundry join page.
- * @param {import('playwright').Page} page
- * @param {{ steps: Array<Record<string, boolean | string>> }} results
- * @param {{ userLabel?: string, stepName?: string | null }} [options]
- */
-async function joinWorldSession(page, results, options = {}) {
-  if (getPathname(page.url()) !== '/join') {
-    return;
-  }
-
-  const userLabel = options.userLabel ?? 'Gamemaster';
-  const stepName = options.stepName ?? null;
-
-  process.stdout.write(`Join page detected. Joining as ${userLabel}...\n`);
-  await page.waitForLoadState('domcontentloaded');
-  await waitForJoinUi(page, userLabel);
-
-  let joinState = await readJoinState(page, userLabel);
-  if (!joinState.selectionMatches) {
-    let selected = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await selectJoinUser(page, userLabel);
-      await page.waitForTimeout(250 * attempt);
-      joinState = await readJoinState(page, userLabel);
-      if (joinState.selectionMatches) {
-        selected = true;
-        break;
-      }
-    }
-
-    if (!selected) {
-      await screenshot(page, 'join-selection-failed');
-      throw new Error(`Unable to select join user. ${describeJoinState(joinState, userLabel)}`);
-    }
-  }
-
-  const joinButton = page.locator(JOIN_BUTTON_SELECTOR).first();
-  await joinButton.waitFor({ state: 'visible', timeout: 10_000 });
-  await page.waitForFunction(() => {
-    const button = Array.from(document.querySelectorAll('button')).find(candidate => {
-      const text = String(candidate.textContent ?? '').trim().toLowerCase();
-      return text.includes('join game session') || candidate.name === 'join';
-    });
-    return button instanceof HTMLButtonElement ? !button.disabled : true;
-  }, null, { timeout: 5_000 }).catch(() => {});
-
-  await screenshot(page, 'join-ready');
-
-  try {
-    await Promise.all([
-      page.waitForURL(/\/game/, { timeout: 60_000, waitUntil: 'load' }),
-      joinButton.click()
-    ]);
-  } catch (err) {
-    const failureState = await readJoinState(page, userLabel);
-    await screenshot(page, 'join-submit-failed');
-    throw new Error(
-      `Join session did not reach /game after selecting "${userLabel}". ` +
-      `${describeJoinState(failureState, userLabel)} Cause: ${err.message}`
-    );
-  }
-
-  if (stepName) {
-    results.steps.push({ step: stepName, passed: true });
-  }
 }
 
 /**
@@ -6879,6 +6454,15 @@ async function main() {
     consoleErrors: []
   };
 
+  // How the shared boot path (scripts/lib/foundryBrowserBoot.js) reports back into THIS harness's
+  // bookkeeping. The boot helpers know nothing about `results` or the screenshot budget; both are
+  // injected here, so the extraction that let the V13 arm reuse them changed no behaviour.
+  const bootReporter = createBootReporter({
+    screenshot,
+    recordStep: (step) => results.steps.push(step),
+    log: (message) => process.stdout.write(message)
+  });
+
   // Issue #807: page.isClosed() is causation-blind (true for an intentional
   // close OR a renderer crash), so a tolerated post-captures teardown could hide
   // a real product OOM as an untraceable "transient". page 'crash' is
@@ -6897,62 +6481,33 @@ async function main() {
     results.steps.push({ step: 'navigate-setup', passed: true });
 
     // Handle first-run license page (redirects /setup → /license → /auth)
-    await acceptLicenseIfPresent(page, results);
+    await acceptLicenseIfPresentShared(page, { reporter: bootReporter });
 
     // Handle admin auth page (/auth → /setup)
-    await authenticateIfRequired(page, results);
+    await authenticateIfRequiredShared(page, { adminKey: ADMIN_KEY, reporter: bootReporter });
 
     // If the world is already running, Foundry redirects straight to /join or /game
     const postAuthPath = getPathname(page.url());
     const worldAlreadyRunning = postAuthPath === '/join' || postAuthPath === '/game';
 
     if (!worldAlreadyRunning) {
-      await page.waitForURL(/\/setup(?:\?.*)?$/, { timeout: 15_000 });
-
-      // Dismiss first-run dialogs (telemetry, tours) that overlay the setup page
-      await dismissFirstRunDialogs(page, results);
-
-      await screenshot(page, 'setup-ready');
-      results.steps.push({ step: 'setup-ready', passed: true });
-
-      // ── Step 2: Launch world ───────────────────────────────────────────────
-      // Navigate to the Worlds tab via JavaScript (Foundry V13 setup page)
-      await page.evaluate(() => {
-        // Foundry V13 uses ApplicationV2 tabs — switch to worlds tab
-        const tab = document.querySelector('#setup-packages-header [data-tab="worlds"]');
-        if (tab) tab.click();
+      // ── Step 2: Dismiss first-run dialogs, then launch the world ───────────
+      await launchWorldShared(page, {
+        worldId: WORLD_ID,
+        foundryUrl: FOUNDRY_URL,
+        reporter: bootReporter
       });
-      // Wait for the smoke world's card to be present (replaces a 2 s fixed sleep)
-      await page.locator(`[data-package-id="${WORLD_ID}"]`).first()
-        .waitFor({ state: 'visible', timeout: 15_000 });
-      await screenshot(page, 'worlds-tab');
-
-      // Click the Launch World button (visible on hover in Foundry V13)
-      const worldCard = page.locator(`[data-package-id="${WORLD_ID}"]`);
-      await worldCard.hover();
-      const launchBtn = worldCard.locator('[data-action="worldLaunch"]');
-      await launchBtn.waitFor({ state: 'visible', timeout: 5_000 });
-      await launchBtn.click();
-      // After launch, Foundry navigates to /join (player selection) or /game
-      try {
-        await page.waitForURL(/\/(join|game)/, { timeout: 120_000 });
-      } catch (err) {
-        if (!String(err?.message ?? '').includes('ERR_CONNECTION_REFUSED')) {
-          throw err;
-        }
-        await page.waitForTimeout(10_000);
-        await page.goto(`${FOUNDRY_URL}/join`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-        await page.waitForURL(/\/(join|game)/, { timeout: 60_000 });
-      }
-      await screenshot(page, 'world-launching');
-      results.steps.push({ step: 'launch-world', passed: true });
     } else {
       process.stdout.write('World already running, skipping setup/launch.\n');
       results.steps.push({ step: 'setup-ready', passed: true, skipped: true });
       results.steps.push({ step: 'launch-world', passed: true, skipped: true });
     }
 
-    await joinWorldSession(page, results, { userLabel: 'Gamemaster', stepName: 'join-session' });
+    await joinWorldSessionShared(page, {
+      userLabel: 'Gamemaster',
+      stepName: 'join-session',
+      reporter: bootReporter
+    });
 
     // Hide notification toasts globally — they otherwise overlay screenshots
     // and force a per-screenshot dismiss + sleep dance. Behavioral assertions
@@ -6980,7 +6535,7 @@ async function main() {
       // Reload the page to apply module activation
       await page.reload({ waitUntil: 'load', timeout: 60_000 });
       // Re-join if redirected to /join
-      await joinWorldSession(page, results, { userLabel: 'Gamemaster' });
+      await joinWorldSessionShared(page, { userLabel: 'Gamemaster', reporter: bootReporter });
       // Re-apply the notification-hiding CSS after reload (style tags are
       // scoped to the document and are cleared on navigation)
       await installNotificationHidingCss(page);

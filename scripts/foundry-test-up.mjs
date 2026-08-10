@@ -21,18 +21,21 @@ import {
   prepareFoundryData,
   startPreparedFoundryContainer,
 } from './lib/foundryDataPreparation.js';
-import { readPinnedFoundryImage } from './lib/foundryImagePin.js';
 import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
+import { resolveSmokeArmFromEnv } from './lib/foundrySmokeArms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const COMPOSE_FILE = join(ROOT, 'docker-compose.foundry.yml');
 const ENV_FILE = join(ROOT, '.env.foundry');
-// Read from the compose file rather than restated here. This constant is the value that actually
-// boots (it is written into process.env below, before compose reads its own default), while the
-// compose file is what CI hashes into the `foundry-binary-*` cache key — so a second copy is wrong
-// in opposite directions depending on which one you edit. See scripts/lib/foundryImagePin.js.
-const DEFAULT_FOUNDRY_IMAGE = readPinnedFoundryImage(COMPOSE_FILE).image;
+// Which Foundry generation this run boots (issue #1088). The DEFAULT arm reads its image out of the
+// compose file rather than restating it: that value is what actually boots (it is written into
+// process.env below, before compose reads its own default), while the compose file is what CI
+// hashes into the `foundry-binary-*` cache key — so a second copy is wrong in opposite directions
+// depending on which one you edit. A non-default arm (FOUNDRY_SMOKE_ARM=v13) reaches compose purely
+// through FOUNDRY_IMAGE, so the compose pin — and the version-lock test that reads it — never moves.
+const SMOKE_ARM = resolveSmokeArmFromEnv();
+const DEFAULT_FOUNDRY_IMAGE = SMOKE_ARM.image;
 
 // Per-worktree-stable container identity (issue #827). Derived deterministically from
 // the worktree root so it is unique across worktrees (no fixed-name collision) yet
@@ -220,6 +223,29 @@ function getContainerHostPort() {
   }
 }
 
+/**
+ * The image reference the cached container was created from, or null when it cannot be read.
+ *
+ * Needed because the container-reuse cache is keyed on nothing but the container's existence: a
+ * `compose start` of a container built from felddy/foundryvtt:14.365 boots Foundry 14 no matter what
+ * FOUNDRY_IMAGE now says, so switching smoke arms would silently re-run the previous generation and
+ * report it as the new one. See the arm-mismatch branch in runFoundryLauncher.
+ */
+function getContainerImage() {
+  const result = spawnSync('docker', [
+    'inspect',
+    '--format',
+    '{{.Config.Image}}',
+    CONTAINER_NAME
+  ], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  });
+
+  if (result.status !== 0) return null;
+  return (result.stdout ?? '').trim() || null;
+}
+
 function getImageFoundryVersion(image) {
   const result = spawnSync('docker', [
     'image',
@@ -242,7 +268,11 @@ function configureCachedReleaseUrl() {
     return;
   }
 
-  const foundryVersion = process.env.FOUNDRY_VERSION || getImageFoundryVersion(process.env.FOUNDRY_IMAGE);
+  // The arm's own version is the last fallback: it is derived from the image TAG, so it still names
+  // the right cached archive on a host where `docker image inspect` cannot read the label.
+  const foundryVersion = process.env.FOUNDRY_VERSION
+    || getImageFoundryVersion(process.env.FOUNDRY_IMAGE)
+    || SMOKE_ARM.foundryVersion;
   if (!foundryVersion) {
     process.stdout.write('Unable to determine Foundry version; clean starts may request a release URL.\n');
     return;
@@ -279,6 +309,10 @@ export async function runFoundryLauncher({
   if (!process.env.FOUNDRY_IMAGE) {
     process.env.FOUNDRY_IMAGE = DEFAULT_FOUNDRY_IMAGE;
   }
+  process.stdout.write(
+    `Smoke arm ${SMOKE_ARM.id}: Foundry ${SMOKE_ARM.foundryVersion} via ${process.env.FOUNDRY_IMAGE}` +
+    `${SMOKE_ARM.isDefault ? ' (default arm — the compose pin)' : ' (env-selected arm)'}\n`
+  );
 
   // Both local and CI runs use this same per-worktree identity and recovery
   // boundary. A live container must release its bind mount before setup replaces
@@ -352,6 +386,25 @@ export async function runFoundryLauncher({
     process.stdout.write('FOUNDRY_RECREATE=1 set; removing cached Foundry container...\n');
     compose('down --remove-orphans');
     existingStatus = null;
+  }
+
+  // Switching smoke arms MUST recreate the container. The felddy image extracts the Foundry
+  // application into the container filesystem, and the reuse path is a plain `compose start` that
+  // never consults FOUNDRY_IMAGE — so a reused 14.365 container would boot Foundry 14 while every
+  // log line, the stamped world manifest and the arm's own assertions said 13. The container
+  // identity (name, hostname, port, data dir) is deliberately unchanged: the felddy licence binds to
+  // the HOSTNAME, so a per-arm hostname would burn a second Foundry activation per worktree. The
+  // corollary is that the two arms cannot run concurrently in one worktree.
+  if (existingStatus) {
+    const cachedImage = getContainerImage();
+    if (cachedImage && cachedImage !== process.env.FOUNDRY_IMAGE) {
+      process.stdout.write(
+        `Cached Foundry container was created from ${cachedImage}; recreating for ` +
+        `${process.env.FOUNDRY_IMAGE} (smoke arm ${SMOKE_ARM.id}).\n`
+      );
+      compose('down --remove-orphans');
+      existingStatus = null;
+    }
   }
 
   if (existingStatus) {

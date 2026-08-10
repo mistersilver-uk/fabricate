@@ -104,6 +104,9 @@ const GATE_TARGETS = [
   'scripts/view-lab-screenshots.mjs',
   'scripts/lib/viewLabIndex.js',
   'scripts/view-lab-index.mjs',
+  'scripts/lib/foundrySmokeArms.js',
+  'scripts/lib/foundryBrowserBoot.js',
+  'scripts/foundry-version-assert.mjs',
   'eslint.config.js',
 ];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];

@@ -5,7 +5,13 @@
  * Ensures `down` is always called even if `run` fails, so containers
  * are never left orphaned in CI.
  *
- * Usage: node scripts/foundry-test.mjs
+ * Usage: node scripts/foundry-test.mjs [--profile=<full|rc|ci|screenshots>]
+ *                                      [--arm=<v14|v13>] [--check=<full|version>]
+ *
+ * `--arm` picks the Foundry generation (issue #1088) and `--check` picks what runs against it.
+ * They are deliberately separate axes: the narrow boot-and-assert check is what makes a V13 run
+ * cheap, but it is equally runnable against V14 — and running it on both is the only way to know
+ * that a V13 failure is a V13 failure rather than a broken check.
  *
  * Exit codes:
  *   0 — smoke test passed
@@ -25,9 +31,24 @@ import {
   PORT_SPAN
 } from './lib/foundryRunIdentity.js';
 import { defaultRunTimeoutMs, resolveSmokeProfile } from './lib/foundryRunBudget.js';
+import { SMOKE_ARM_ENV_VAR, normalizeSmokeArmName } from './lib/foundrySmokeArms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
+
+/**
+ * What runs against the booted container, and the wall-clock budget it gets.
+ *
+ * `version` exists because the full walk takes ~32 minutes, which is a price worth paying once per
+ * release candidate and never worth paying to answer "does Fabricate still load at all on the
+ * generation `module.json` declares as its minimum?". Its budget is a flat 6 minutes: it boots,
+ * asserts a handful of version-sensitive shapes and exits, so anything approaching that number is a
+ * hang rather than a long run.
+ */
+const CHECKS = Object.freeze({
+  full: Object.freeze({ script: 'foundry-test-run.mjs', timeoutMs: null }),
+  version: Object.freeze({ script: 'foundry-version-assert.mjs', timeoutMs: 360_000 })
+});
 
 /**
  * Whether a TCP port on 127.0.0.1 is bindable right now. Used for the free-port
@@ -125,18 +146,33 @@ async function main() {
   // (issue #826) additionally reads --target-labels=<csv> (the smoke labels of the
   // views a PR affects, from `ui-pr-screenshot-evidence.mjs targets`) and forwards it
   // as FOUNDRY_SCREENSHOT_TARGET_LABELS; empty means capture the full label set.
+  let checkName = 'full';
   for (const arg of process.argv.slice(2)) {
     const profile = /^--profile=(.+)$/.exec(arg);
     if (profile) process.env.FOUNDRY_SMOKE_PROFILE = profile[1];
     const targets = /^--target-labels=(.*)$/.exec(arg);
     if (targets) process.env.FOUNDRY_SCREENSHOT_TARGET_LABELS = targets[1];
+    // `--arm` reaches `up`, `fetch-systems` and `setup-data` through the environment only; nothing
+    // here (or in them) edits docker-compose.foundry.yml, whose pin the View Lab version lock reads.
+    const arm = /^--arm=(.+)$/.exec(arg);
+    if (arm) process.env[SMOKE_ARM_ENV_VAR] = normalizeSmokeArmName(arm[1]);
+    const check = /^--check=(.+)$/.exec(arg);
+    if (check) checkName = check[1];
+  }
+
+  const selectedCheck = CHECKS[checkName];
+  if (!selectedCheck) {
+    process.stderr.write(
+      `Unknown --check=${checkName}; expected one of ${Object.keys(CHECKS).join(', ')}.\n`
+    );
+    process.exit(2);
   }
 
   // Pin the per-worktree container identity + host port/URL for every child phase.
   await exportRunIdentity();
 
   const up = join(__dirname, 'foundry-test-up.mjs');
-  const run = join(__dirname, 'foundry-test-run.mjs');
+  const run = join(__dirname, selectedCheck.script);
   const down = join(__dirname, 'foundry-test-down.mjs');
 
   // Step 0: Build the module so the smoke always exercises CURRENT source.
@@ -177,6 +213,7 @@ async function main() {
   process.stdout.write('=== foundry-test: RUN ===\n');
   const runTimeoutMs = Number(
     process.env.FOUNDRY_RUN_TIMEOUT_MS ??
+      selectedCheck.timeoutMs ??
       defaultRunTimeoutMs(resolveSmokeProfile(process.env.FOUNDRY_SMOKE_PROFILE))
   );
   const runCode = runScript(run, [], runTimeoutMs);
