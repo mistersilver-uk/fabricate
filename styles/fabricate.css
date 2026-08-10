@@ -16284,6 +16284,16 @@
   margin-top: var(--fab-space-2);
 }
 
+/* Alchemy Simple's two fixed slots (success + reserved failure) are siblings in a
+   plain wrapper, so without this they stack flush and the failure card reads as
+   part of the success card. Match the multi-set list's spacing. */
+.fabricate-manager .manager-recipe-result-set-alchemy-simple {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fab-space-3);
+  margin-top: var(--fab-space-2);
+}
+
 
 .fabricate-manager .manager-environment-composition {
   display: flex;
